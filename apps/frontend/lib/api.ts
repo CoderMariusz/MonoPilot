@@ -8,6 +8,8 @@ import type {
   UpdatePurchaseOrderData,
   CreateTransferOrderData,
   UpdateTransferOrderData,
+  YieldReport,
+  ConsumeReport,
 } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
@@ -68,5 +70,21 @@ export const api = {
     create: (data: CreateTransferOrderData) => fetchAPI<TransferOrder>('/transfer-orders', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: UpdateTransferOrderData) => fetchAPI<TransferOrder>(`/transfer-orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: number) => fetchAPI<null>(`/transfer-orders/${id}`, { method: 'DELETE' }),
+  },
+  production: {
+    yieldReport: (dateFrom?: string, dateTo?: string) => {
+      const params = new URLSearchParams();
+      if (dateFrom) params.append('date_from', dateFrom);
+      if (dateTo) params.append('date_to', dateTo);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return fetchAPI<YieldReport>(`/production/yield-report${query}`);
+    },
+    consumeReport: (dateFrom?: string, dateTo?: string) => {
+      const params = new URLSearchParams();
+      if (dateFrom) params.append('date_from', dateFrom);
+      if (dateTo) params.append('date_to', dateTo);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return fetchAPI<ConsumeReport>(`/production/consume-report${query}`);
+    },
   },
 };

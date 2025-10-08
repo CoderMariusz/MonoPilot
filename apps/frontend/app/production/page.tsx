@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { ClipboardList, TrendingUp, Package } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ClipboardList, TrendingUp, Package, Loader2 } from 'lucide-react';
 import { WorkOrdersTable } from '@/components/WorkOrdersTable';
+import { api } from '@/lib/api';
+import type { YieldReport, ConsumeReport } from '@/lib/types';
 
 type TabType = 'work-orders' | 'yield-report' | 'consume-report';
 
@@ -71,6 +73,45 @@ function WorkOrdersTab() {
 }
 
 function YieldReportTab() {
+  const [data, setData] = useState<YieldReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const report = await api.production.yieldReport();
+        setData(report);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load report');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+        <span className="ml-2 text-slate-600">Loading yield report...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+        <p className="font-semibold">Error loading report</p>
+        <p className="text-sm mt-1">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -91,18 +132,21 @@ function YieldReportTab() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
           <div className="text-sm text-slate-600 mb-1">Total Output</div>
-          <div className="text-2xl font-bold text-slate-900">1,250 pcs</div>
-          <div className="text-xs text-green-600 mt-1">+12% from last period</div>
+          <div className="text-2xl font-bold text-slate-900">
+            {data?.summary.total_output.toLocaleString()} pcs
+          </div>
         </div>
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
           <div className="text-sm text-slate-600 mb-1">Yield Rate</div>
-          <div className="text-2xl font-bold text-slate-900">94.5%</div>
-          <div className="text-xs text-green-600 mt-1">+2.3% from last period</div>
+          <div className="text-2xl font-bold text-slate-900">
+            {data?.summary.yield_rate.toFixed(1)}%
+          </div>
         </div>
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
           <div className="text-sm text-slate-600 mb-1">Scrap Rate</div>
-          <div className="text-2xl font-bold text-slate-900">5.5%</div>
-          <div className="text-xs text-red-600 mt-1">-0.8% from last period</div>
+          <div className="text-2xl font-bold text-slate-900">
+            {data?.summary.scrap_rate.toFixed(1)}%
+          </div>
         </div>
       </div>
 
@@ -120,11 +164,38 @@ function YieldReportTab() {
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-slate-100">
-              <td colSpan={7} className="py-8 text-center text-slate-500 text-sm">
-                No production data available for selected period
-              </td>
-            </tr>
+            {data?.work_orders.length === 0 ? (
+              <tr className="border-b border-slate-100">
+                <td colSpan={7} className="py-8 text-center text-slate-500 text-sm">
+                  No production data available for selected period
+                </td>
+              </tr>
+            ) : (
+              data?.work_orders.map((wo) => (
+                <tr key={wo.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="py-3 px-4 text-sm">{wo.wo_number}</td>
+                  <td className="py-3 px-4 text-sm">
+                    {wo.product ? (
+                      <div>
+                        <div className="font-medium">{wo.product.part_number}</div>
+                        <div className="text-xs text-slate-500">{wo.product.description}</div>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">N/A</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 text-sm">{wo.target_qty.toLocaleString()}</td>
+                  <td className="py-3 px-4 text-sm">{wo.actual_output.toLocaleString()}</td>
+                  <td className="py-3 px-4 text-sm">{wo.scrap.toLocaleString()}</td>
+                  <td className="py-3 px-4 text-sm">
+                    <span className={wo.yield_percentage >= 95 ? 'text-green-600' : wo.yield_percentage >= 85 ? 'text-yellow-600' : 'text-red-600'}>
+                      {wo.yield_percentage.toFixed(1)}%
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-sm">{wo.date}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -133,6 +204,45 @@ function YieldReportTab() {
 }
 
 function ConsumeReportTab() {
+  const [data, setData] = useState<ConsumeReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const report = await api.production.consumeReport();
+        setData(report);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load report');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+        <span className="ml-2 text-slate-600">Loading consume report...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+        <p className="font-semibold">Error loading report</p>
+        <p className="text-sm mt-1">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -153,16 +263,21 @@ function ConsumeReportTab() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
           <div className="text-sm text-slate-600 mb-1">Total Materials Consumed</div>
-          <div className="text-2xl font-bold text-slate-900">45 items</div>
+          <div className="text-2xl font-bold text-slate-900">
+            {data?.summary.total_materials_consumed} items
+          </div>
         </div>
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-          <div className="text-sm text-slate-600 mb-1">Total Value</div>
-          <div className="text-2xl font-bold text-slate-900">$12,450</div>
+          <div className="text-sm text-slate-600 mb-1">Unique Materials</div>
+          <div className="text-2xl font-bold text-slate-900">
+            {data?.summary.unique_materials}
+          </div>
         </div>
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-          <div className="text-sm text-slate-600 mb-1">Variance</div>
-          <div className="text-2xl font-bold text-slate-900">-2.3%</div>
-          <div className="text-xs text-green-600 mt-1">Within tolerance</div>
+          <div className="text-sm text-slate-600 mb-1">Work Orders</div>
+          <div className="text-2xl font-bold text-slate-900">
+            {data?.summary.total_work_orders}
+          </div>
         </div>
       </div>
       
@@ -179,11 +294,41 @@ function ConsumeReportTab() {
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-slate-100">
-              <td colSpan={6} className="py-8 text-center text-slate-500 text-sm">
-                No consumption data available for selected period
-              </td>
-            </tr>
+            {data?.consumption_records.length === 0 ? (
+              <tr className="border-b border-slate-100">
+                <td colSpan={6} className="py-8 text-center text-slate-500 text-sm">
+                  No consumption data available for selected period
+                </td>
+              </tr>
+            ) : (
+              data?.consumption_records.map((record, idx) => (
+                <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="py-3 px-4 text-sm">{record.wo_number}</td>
+                  <td className="py-3 px-4 text-sm">
+                    {record.material ? (
+                      <div>
+                        <div className="font-medium">{record.material.part_number}</div>
+                        <div className="text-xs text-slate-500">{record.material.description}</div>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">N/A</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 text-sm">
+                    {record.standard_qty.toFixed(2)} {record.material?.uom}
+                  </td>
+                  <td className="py-3 px-4 text-sm">
+                    {record.consumed_qty.toFixed(2)} {record.material?.uom}
+                  </td>
+                  <td className="py-3 px-4 text-sm">
+                    <span className={record.variance > 0 ? 'text-red-600' : record.variance < 0 ? 'text-green-600' : 'text-slate-600'}>
+                      {record.variance > 0 ? '+' : ''}{record.variance.toFixed(2)} ({record.variance_percentage.toFixed(1)}%)
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-sm">{record.date}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

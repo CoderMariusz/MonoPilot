@@ -115,3 +115,81 @@ export interface CreateTransferOrderData {
 }
 
 export interface UpdateTransferOrderData extends Partial<CreateTransferOrderData> {}
+
+export interface YieldReportWorkOrder {
+  id: number;
+  wo_number: string;
+  product: {
+    id: number;
+    part_number: string;
+    description: string;
+  } | null;
+  target_qty: number;
+  actual_output: number;
+  scrap: number;
+  yield_percentage: number;
+  date: string;
+  status: WorkOrder['status'];
+}
+
+export interface YieldReportSummary {
+  total_output: number;
+  total_target: number;
+  yield_rate: number;
+  scrap_rate: number;
+  total_work_orders: number;
+}
+
+export interface YieldReport {
+  summary: YieldReportSummary;
+  work_orders: YieldReportWorkOrder[];
+  date_range: {
+    from: string;
+    to: string;
+  };
+}
+
+export interface ConsumeReportRecord {
+  wo_number: string;
+  material: {
+    id: number;
+    part_number: string;
+    description: string;
+    uom: string;
+  } | null;
+  standard_qty: number;
+  consumed_qty: number;
+  variance: number;
+  variance_percentage: number;
+  date: string;
+  wo_status: WorkOrder['status'];
+}
+
+export interface MaterialSummary {
+  material: {
+    id: number;
+    part_number: string;
+    description: string;
+    uom: string;
+  } | null;
+  total_consumed: number;
+  total_standard: number;
+  total_variance: number;
+}
+
+export interface ConsumeReportSummary {
+  total_materials_consumed: number;
+  total_value: number;
+  unique_materials: number;
+  total_work_orders: number;
+}
+
+export interface ConsumeReport {
+  summary: ConsumeReportSummary;
+  consumption_records: ConsumeReportRecord[];
+  material_summary: MaterialSummary[];
+  date_range: {
+    from: string;
+    to: string;
+  };
+}
