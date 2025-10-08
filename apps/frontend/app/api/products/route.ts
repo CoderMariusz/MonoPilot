@@ -11,27 +11,51 @@ export async function GET(request: NextRequest) {
     const res = await fetch(url);
     const text = await res.text();
     
-    const encoder = new TextEncoder();
-    const data = encoder.encode(text);
-    
-    return new Response(data, {
+    return new Response(text, {
       status: res.status,
       headers: {
         'Content-Type': 'application/json',
-        'Content-Length': data.length.toString(),
       },
     });
   } catch (error) {
-    console.error('Error in products route:', error);
-    const errorText = JSON.stringify({ error: 'Failed to fetch' });
-    const encoder = new TextEncoder();
-    const errorData = encoder.encode(errorText);
-    
-    return new Response(errorData, {
+    console.error('Error in products GET:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch' }), {
       status: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Content-Length': errorData.length.toString(),
+      },
+    });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.text();
+    const url = `${BACKEND_URL}/products`;
+    
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: body,
+    });
+    
+    const text = await res.text();
+    
+    return new Response(text, {
+      status: res.status,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (error) {
+    console.error('Error in products POST:', error);
+    return new Response(JSON.stringify({ error: 'Failed to create product' }), { 
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
       },
     });
   }

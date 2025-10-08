@@ -159,6 +159,7 @@ cd apps/backend && php artisan migrate
   - Used Next.js Server Components to resolve client-side fetch issues in development mode
   - Toast notification system for user feedback
   - Complete TypeScript types and Zod validation for all product categories
+  - Fixed 405 error: Added POST handler to /api/products/route.ts (specific route was missing mutating methods)
 
 - 2025-10-08: Production Module completed
   - Created Production page (/production) with 3 tabs: Work Orders, Yield Report, Consume Report
