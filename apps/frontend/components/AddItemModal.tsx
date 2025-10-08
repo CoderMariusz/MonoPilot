@@ -50,8 +50,16 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }: AddItemModa
 
   const fetchAvailableProducts = async () => {
     try {
-      const response = await api.products.list({ type: 'RM' });
-      setAvailableProducts(response.data);
+      if (category === 'PROCESS') {
+        const response = await api.products.list({ type: 'RM' });
+        setAvailableProducts(response.data);
+      } else if (category === 'FINISHED_GOODS') {
+        const [rmResponse, prResponse] = await Promise.all([
+          api.products.list({ type: 'RM' }),
+          api.products.list({ type: 'PR' }),
+        ]);
+        setAvailableProducts([...rmResponse.data, ...prResponse.data]);
+      }
     } catch (error) {
       showToast('Failed to load products', 'error');
     }
