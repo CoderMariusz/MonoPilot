@@ -9,7 +9,8 @@ import {
   Warehouse, 
   ScanLine, 
   Settings, 
-  Wrench 
+  Wrench,
+  FileText
 } from 'lucide-react';
 
 const menuItems = [
@@ -17,7 +18,14 @@ const menuItems = [
   { href: '/production', label: 'Production', icon: Factory },
   { href: '/warehouse', label: 'Warehouse', icon: Warehouse },
   { href: '/scanner', label: 'Scanner', icon: ScanLine },
-  { href: '/technical', label: 'Technical', icon: Wrench },
+  { 
+    href: '/technical', 
+    label: 'Technical', 
+    icon: Wrench,
+    submenu: [
+      { href: '/technical/bom', label: 'BOM', icon: FileText },
+    ]
+  },
   { href: '/admin', label: 'Admin', icon: Settings },
 ];
 
@@ -36,20 +44,47 @@ export default function Sidebar() {
           const isActive = pathname.startsWith(item.href);
           
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`
-                flex items-center gap-3 px-4 py-3 rounded-lg text-base transition-colors
-                ${isActive 
-                  ? 'bg-slate-800 text-white' 
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
-                }
-              `}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
-            </Link>
+            <div key={item.href}>
+              <Link
+                href={item.href}
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-lg text-base transition-colors
+                  ${isActive 
+                    ? 'bg-slate-800 text-white' 
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                  }
+                `}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="font-medium">{item.label}</span>
+              </Link>
+              
+              {item.submenu && isActive && (
+                <div className="ml-8 mt-1 space-y-1">
+                  {item.submenu.map((subItem) => {
+                    const SubIcon = subItem.icon;
+                    const isSubActive = pathname === subItem.href;
+                    
+                    return (
+                      <Link
+                        key={subItem.href}
+                        href={subItem.href}
+                        className={`
+                          flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors
+                          ${isSubActive 
+                            ? 'bg-slate-700 text-white' 
+                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                          }
+                        `}
+                      >
+                        <SubIcon className="w-4 h-4" />
+                        <span>{subItem.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
