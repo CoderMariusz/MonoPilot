@@ -147,6 +147,20 @@ cd apps/backend && php artisan migrate
 - All sensitive configuration uses environment variables
 
 ## Recent Changes
+- 2025-10-08: Work Order Creation & Details functionality completed
+  - **CreateWorkOrderModal**: Added machine dropdown with api.machines.list() loading
+  - **WorkOrderDetailsModal**: Shows BOM components, stock levels, and completion progress
+  - **Critical Fix - Completed Quantity Calculation**: Changed from "produce" to "consume" moves tracking
+    - Now accurately tracks how much of each BOM component has been consumed for the work order
+    - Properly reflects work order progress based on material consumption
+  - **MachineController**: Created backend controller with index() and show() endpoints
+    - Returns active machines ordered by name
+    - Routes: GET /machines and GET /machines/{machine}
+  - **Frontend API**: Added machines namespace with list() and get() methods
+  - **WO Number**: Auto-generated with format WO-{timestamp}
+  - **Filtering**: Only PR and FG products can have work orders created (RM excluded)
+  - All TypeScript errors resolved, architect review passed
+
 - 2025-10-08: Technical Module - BOM Edit & Delete functionality completed
   - **Fixed category-to-type mapping**: MEAT/DRYGOODS→RM, PROCESS→PR, FINISHED_GOODS→FG (corrected from WIP to PR)
   - **Material selection for BOMs**: Process can now use Meat + Dry Goods; Finished Goods can use Meat + Dry Goods + Process
