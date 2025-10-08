@@ -233,17 +233,17 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }: AddItemModa
         }
       } else if (category === 'FINISHED_GOODS') {
         payload.type = 'FG';
-        payload.bom_components = bomComponents.map(c => ({
-          product_id: parseInt(c.product_id),
+        payload.bom_items = bomComponents.map(c => ({
+          material_id: parseInt(c.product_id),
           quantity: parseFloat(c.quantity),
           uom: c.uom,
         }));
       } else if (category === 'PROCESS') {
-        payload.type = 'WIP';
+        payload.type = 'PR';
         payload.expiry_policy = 'FROM_CREATION_DATE';
         payload.shelf_life_days = parseInt(formData.shelf_life_days);
-        payload.bom_components = bomComponents.map(c => ({
-          product_id: parseInt(c.product_id),
+        payload.bom_items = bomComponents.map(c => ({
+          material_id: parseInt(c.product_id),
           quantity: parseFloat(c.quantity),
           uom: c.uom,
         }));

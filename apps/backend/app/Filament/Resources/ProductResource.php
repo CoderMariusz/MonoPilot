@@ -53,7 +53,7 @@ class ProductResource extends Resource
                                 $typeMapping = [
                                     'MEAT' => 'RM',
                                     'DRYGOODS' => 'RM',
-                                    'PROCESS' => 'WIP',
+                                    'PROCESS' => 'PR',
                                     'FINISHED_GOODS' => 'FG',
                                 ];
                                 $set('type', $typeMapping[$state] ?? 'RM');
@@ -163,12 +163,12 @@ class ProductResource extends Resource
                     ->badge()
                     ->colors([
                         'success' => 'RM',
-                        'warning' => 'WIP',
+                        'warning' => 'PR',
                         'primary' => 'FG',
                     ])
                     ->formatStateUsing(fn (?string $state): string => match($state) {
                         'RM' => 'Raw Material',
-                        'WIP' => 'Work in Progress',
+                        'PR' => 'Process Recipe',
                         'FG' => 'Finished Goods',
                         default => $state ?? 'N/A',
                     })
@@ -212,7 +212,7 @@ class ProductResource extends Resource
                     ->label('Type')
                     ->options([
                         'RM' => 'Raw Material',
-                        'WIP' => 'Work in Progress',
+                        'PR' => 'Process Recipe',
                         'FG' => 'Finished Goods',
                     ]),
 

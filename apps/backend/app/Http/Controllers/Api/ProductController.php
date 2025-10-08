@@ -68,7 +68,7 @@ class ProductController extends Controller
 
         $product = Product::create($productData);
 
-        if ($validated['category'] === 'FINISHED_GOODS' && isset($validated['bom_items'])) {
+        if (($validated['category'] === 'FINISHED_GOODS' || $validated['category'] === 'PROCESS') && isset($validated['bom_items'])) {
             $bom = Bom::create([
                 'product_id' => $product->id,
                 'version' => '1.0',
@@ -173,7 +173,7 @@ class ProductController extends Controller
         return match($category) {
             'MEAT' => 'RM',
             'DRYGOODS' => 'RM',
-            'PROCESS' => 'WIP',
+            'PROCESS' => 'PR',
             'FINISHED_GOODS' => 'FG',
             default => 'RM',
         };
