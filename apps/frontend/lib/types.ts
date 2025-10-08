@@ -1,10 +1,44 @@
+export type CategoryType = 'MEAT' | 'DRYGOODS' | 'FINISHED_GOODS' | 'PROCESS';
+export type ExpiryPolicyType = 'DAYS_STATIC' | 'FROM_MFG_DATE' | 'FROM_DELIVERY_DATE' | 'FROM_CREATION_DATE';
+
+export interface Bom {
+  id: number;
+  product_id: number;
+  version: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductLineSettings {
+  id: number;
+  product_id: number;
+  machine_id: number;
+  std_cost: string;
+  labor_rate?: string | null;
+  machine_rate?: string | null;
+  throughput_packs_per_min?: string | null;
+  yield_cut_override?: string | null;
+  created_at: string;
+  updated_at: string;
+  product?: Product;
+  machine?: Machine;
+}
+
 export interface Product {
   id: number;
   part_number: string;
   description: string;
-  type: 'RM' | 'PR' | 'FG';
+  type: 'RM' | 'PR' | 'FG' | 'WIP';
   uom: string;
   is_active: boolean;
+  category?: CategoryType;
+  subtype?: string | null;
+  expiry_policy?: ExpiryPolicyType | null;
+  shelf_life_days?: number | null;
+  std_price?: string | null;
+  activeBom?: Bom | null;
+  lineSettings?: ProductLineSettings[];
   created_at: string;
   updated_at: string;
 }
@@ -192,4 +226,55 @@ export interface ConsumeReport {
     from: string;
     to: string;
   };
+}
+
+export interface CreateProductData {
+  part_number: string;
+  description: string;
+  uom: string;
+  category: CategoryType;
+  subtype?: string;
+  std_price?: number;
+  expiry_policy?: ExpiryPolicyType;
+  shelf_life_days?: number;
+  is_active?: boolean;
+  bom_items?: Array<{
+    material_id: number;
+    quantity: number;
+    uom: string;
+    sequence?: number;
+  }>;
+}
+
+export interface UpdateProductData {
+  part_number?: string;
+  description?: string;
+  uom?: string;
+  category?: CategoryType;
+  subtype?: string;
+  std_price?: number;
+  expiry_policy?: ExpiryPolicyType;
+  shelf_life_days?: number;
+  is_active?: boolean;
+}
+
+export interface CreateLineSettingData {
+  machine_id: number;
+  std_cost: number;
+  labor_rate?: number;
+  machine_rate?: number;
+  throughput_packs_per_min?: number;
+  yield_cut_override?: number;
+}
+
+export interface UpdateLineSettingData {
+  std_cost?: number;
+  labor_rate?: number;
+  machine_rate?: number;
+  throughput_packs_per_min?: number;
+  yield_cut_override?: number;
+}
+
+export interface BulkUpsertLineSettingsData {
+  settings: CreateLineSettingData[];
 }

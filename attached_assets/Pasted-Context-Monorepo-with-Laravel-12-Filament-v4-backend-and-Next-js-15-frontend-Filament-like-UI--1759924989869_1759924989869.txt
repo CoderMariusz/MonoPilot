@@ -1,0 +1,175 @@
+Context:
+Monorepo with Laravel 12 + Filament v4 backend and Next.js 15 frontend. Filament-like UI (neutral/slate), dark left sidebar, topbar with search and avatar, base font 10px, Lucide icons. RBAC: Technical and Admin manage master data. Must align with the current data model (see below) and extend it only where needed.
+
+1) Frontend – /technical/bom page (Next 15)
+
+Create a BOM & Items Catalog page with 4 tabs mirroring Planning-style tables:
+
+Tabs: Meat, Dry Goods, Finished Goods, Process.
+
+Common table columns: Item # (SKU), Name, UoM, Type/Category, Expiry Policy, Shelf Life (days), Std. Price, Active BOM version, Updated At, Actions (View/Edit).
+
+Top-right: global “Add Item” button. Clicking opens a modal that first asks for Category (Meat, Dry Goods, Finished Goods, Process). Based on the chosen category, show dynamic fields (see §3).
+
+Filters/search: free-text search (SKU/Name), category/type filter, expiry policy filter.
+
+Consistency: Use the shared generic table component (sort, filter, pagination, batch actions).
+
+AC:
+
+Page renders 4 tabs, each scoped to the category.
+
+“Add Item” modal shows category-specific fields; submit creates the item and refreshes the correct tab.
+
+Tables support sorting, filtering, pagination; actions route to item detail (Filament or a Next modal/detail view).
+
+2) Backend – model mapping (fit into existing schema)
+
+Reuse and extend existing tables:
+
+products (existing: id, sku, name, uom, type[RM/WIP/FG], shelf_life_days …)
+
+Add:
+
+category ENUM: MEAT, DRYGOODS, FINISHED_GOODS, PROCESS
+
+expiry_policy ENUM: DAYS_STATIC, FROM_MFG_DATE, FROM_DELIVERY_DATE, FROM_CREATION_DATE
+
+std_price NUMERIC(12,4) default 0
+
+Mapping rules:
+
+MEAT → type = RM
+
+DRYGOODS → type = Lab, Flm, Ing, C
+
+PROCESS → type = WIP (PR)
+
+FINISHED_GOODS → type = FG
+
+bom / bom_items remain the source of components. No change needed for structure; we will expose them in UI.
+
+Line-specific cost/rates for Finished Goods:
+Create product_line_settings:
+
+id, product_id (FK products), machine_id (FK machines), std_cost NUMERIC(12,4), labor_rate NUMERIC(12,4) NULL, machine_rate NUMERIC(12,4) NULL, throughput_packs_per_min NUMERIC(8,3) NULL, yield_cut_override NUMERIC(5,4) NULL, created_at, updated_at.
+
+This supports “different standard cost and rates per line”.
+
+Process shelf life: handled by expiry_policy = FROM_CREATION_DATE with shelf_life_days.
+
+AC:
+
+Migrations run; enums added; product_line_settings created with FKs and indexes.
+
+Existing code that relies on products.type remains valid; category provides finer grouping for RM types (Meat vs Dry Goods).
+
+3) “Add Item” modal – dynamic fields by category
+
+When user clicks “Add Item”, show step 1: Category. Then display fields:
+
+Common fields (all categories)
+
+Item Number (SKU), Name, UoM, Standard Price, Expiry Policy, Shelf Life (days) (shown/validated depending on policy), Notes (optional).
+
+Meat
+
+Expiry Policy: allow DAYS_STATIC, FROM_MFG_DATE, FROM_DELIVERY_DATE.
+
+Shelf Life (days): required if policy is DAYS_STATIC.
+
+Standard Price, UoM.
+
+(Save as category = MEAT, type = RM.)
+
+Dry Goods
+
+Same as Meat: Expiry Policy (DAYS_STATIC / FROM_MFG_DATE / FROM_DELIVERY_DATE), Shelf Life (days), Standard Price, UoM.
+
+(Save as category = DRYGOODS, type = (have 4 types Lab, Flm, ING, C.)
+
+Finished Goods
+
+Components (BOM): add children via picker (will create/attach BOM items).
+
+Per-line settings (multi-row editor inside the modal or a follow-up detail page):
+
+For each Line (machine): Std. Cost, optional Labor Rate, Machine Rate, Throughput (packs/min), optional Yield Cut override.
+
+(Save as category = FINISHED_GOODS, type = FG.)
+
+Process
+
+Components (BOM) — e.g., RM + glaze.
+
+Expiry Policy must default to FROM_CREATION_DATE; require Shelf Life (days).
+
+(Save as category = PROCESS, type = WIP.)
+
+Validation & UX
+
+If expiry_policy = DAYS_STATIC → shelf_life_days is required.
+
+If expiry_policy ∈ {FROM_MFG_DATE, FROM_DELIVERY_DATE, FROM_CREATION_DATE} → shelf_life_days is required (used to compute expiry from the chosen base).
+
+Currency/number inputs validated; UoM selection from a list.
+
+For Finished Goods, allow saving item first, then manage BOM and per-line settings on the detail page if the modal gets too long.
+
+AC:
+
+Creating any category persists the correct type/category, policy, price, and optional per-line settings (FG).
+
+For Process, expiry policy is fixed to FROM_CREATION_DATE.
+
+4) Item detail (Filament resource)
+
+In Filament v4, expose Product resource with tabs: Details, BOM, Per-Line Settings (only for FINISHED_GOODS), Audit.
+
+Details: all product fields including category, type, expiry_policy, shelf_life_days, std_price, uom.
+
+BOM: manage bom / bom_items (versioning stays as in existing design).
+
+Per-Line Settings (FG only): grid editor of product_line_settings.
+
+Audit: show created/updated, who changed what.
+
+AC:
+
+Filament lists and forms reflect new fields; role restrictions applied (Technical/Admin).
+
+5) API endpoints (extend OpenAPI 3.1)
+
+POST /api/products (with category-specific payload)
+
+GET /api/products?category=… (tabs)
+
+GET /api/products/{id}
+
+PATCH /api/products/{id}
+
+POST /api/products/{id}/bom (create/replace draft), PATCH /api/bom/{id}/activate
+
+POST /api/products/{id}/line-settings (bulk upsert for FG)
+
+GET /api/line-settings?product_id=…
+
+AC:
+
+OpenAPI/types/Zod regenerated in /packages/shared; frontend forms use generated types.
+
+6) Acceptance Criteria (end-to-end)
+
+/technical/bom shows 4 category tabs with correct records and columns.
+
+“Add Item” button creates items with category-specific logic and fields.
+
+Meat & Dry Goods support all three expiry policies (days/static, from mfg date, from delivery date).
+
+Process items default to expiry “from creation date” + shelf life days.
+
+Finished Goods support components (BOM) and per-line cost/rate settings.
+
+Filament resource exposes product details, BOM editor, and FG per-line settings.
+
+OpenAPI/types updated and consumed by the frontend; RBAC enforced.

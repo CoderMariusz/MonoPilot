@@ -2,12 +2,18 @@ import type {
   WorkOrder,
   PurchaseOrder,
   TransferOrder,
+  Product,
+  ProductLineSettings,
   CreateWorkOrderData,
   UpdateWorkOrderData,
   CreatePurchaseOrderData,
   UpdatePurchaseOrderData,
   CreateTransferOrderData,
   UpdateTransferOrderData,
+  CreateProductData,
+  UpdateProductData,
+  BulkUpsertLineSettingsData,
+  UpdateLineSettingData,
   YieldReport,
   ConsumeReport,
 } from './types';
@@ -15,38 +21,64 @@ import type {
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
 
 async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+  console.log('fetchAPI called with endpoint:', endpoint);
   
-  try {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      credentials: 'include',
-      signal: controller.signal,
-    });
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const method = (options.method as string) || 'GET';
+    xhr.open(method, `${API_URL}${endpoint}`);
     
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      throw new Error(`API error: ${res.statusText}`);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    if (options.headers) {
+      Object.entries(options.headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== 'content-type') {
+          xhr.setRequestHeader(key, value as string);
+        }
+      });
     }
-
-    if (res.status === 204 || res.headers.get('content-length') === '0') {
-      return null as T;
+    
+    xhr.onload = () => {
+      console.log('XHR loaded, status:', xhr.status);
+      
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (xhr.status === 204 || xhr.responseText === '') {
+          console.log('Empty response');
+          resolve(null as T);
+        } else {
+          try {
+            console.log('Parsing response, length:', xhr.responseText.length);
+            const data = JSON.parse(xhr.responseText);
+            console.log('Successfully parsed JSON');
+            resolve(data as T);
+          } catch (e) {
+            console.error('JSON parse error:', e);
+            reject(new Error('Failed to parse JSON'));
+          }
+        }
+      } else {
+        console.error('XHR error status:', xhr.status);
+        reject(new Error(`API error: ${xhr.statusText}`));
+      }
+    };
+    
+    xhr.onerror = () => {
+      console.error('XHR network error');
+      reject(new Error('Network error'));
+    };
+    
+    xhr.ontimeout = () => {
+      console.error('XHR timeout');
+      reject(new Error('Request timeout'));
+    };
+    
+    xhr.timeout = 30000;
+    
+    if (options.body) {
+      xhr.send(options.body as string);
+    } else {
+      xhr.send();
     }
-
-    return res.json();
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Request timeout - please try again');
-    }
-    throw error;
-  }
+  });
 }
 
 export const api = {
@@ -86,5 +118,32 @@ export const api = {
       const query = params.toString() ? `?${params.toString()}` : '';
       return fetchAPI<ConsumeReport>(`/production/consume-report${query}`);
     },
+  },
+  products: {
+    list: (params?: { category?: string; type?: string; search?: string; expiry_policy?: string; page?: number }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.category) searchParams.append('category', params.category);
+      if (params?.type) searchParams.append('type', params.type);
+      if (params?.search) searchParams.append('search', params.search);
+      if (params?.expiry_policy) searchParams.append('expiry_policy', params.expiry_policy);
+      if (params?.page) searchParams.append('page', params.page.toString());
+      const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+      return fetchAPI<{ data: Product[]; current_page: number; last_page: number; total: number }>(`/products${query}`);
+    },
+    get: (id: number) => fetchAPI<Product>(`/products/${id}`),
+    create: (data: CreateProductData) => fetchAPI<Product>('/products', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: UpdateProductData) => fetchAPI<Product>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: number) => fetchAPI<null>(`/products/${id}`, { method: 'DELETE' }),
+  },
+  lineSettings: {
+    getByProduct: (productId: number) => fetchAPI<ProductLineSettings[]>(`/products/${productId}/line-settings`),
+    bulkUpsert: (productId: number, data: BulkUpsertLineSettingsData) => fetchAPI<ProductLineSettings[]>(`/products/${productId}/line-settings`, { method: 'POST', body: JSON.stringify(data) }),
+    list: (productId: number) => {
+      const params = new URLSearchParams();
+      params.append('product_id', productId.toString());
+      return fetchAPI<ProductLineSettings[]>(`/line-settings?${params.toString()}`);
+    },
+    update: (id: number, data: UpdateLineSettingData) => fetchAPI<ProductLineSettings>(`/line-settings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: number) => fetchAPI<null>(`/line-settings/${id}`, { method: 'DELETE' }),
   },
 };
