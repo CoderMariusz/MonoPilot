@@ -147,6 +147,15 @@ cd apps/backend && php artisan migrate
 - All sensitive configuration uses environment variables
 
 ## Recent Changes
+- 2025-10-08: Technical Module - BOM Edit & Delete functionality completed
+  - **Fixed category-to-type mapping**: MEAT/DRYGOODS→RM, PROCESS→PR, FINISHED_GOODS→FG (corrected from WIP to PR)
+  - **Material selection for BOMs**: Process can now use Meat + Dry Goods; Finished Goods can use Meat + Dry Goods + Process
+  - **Delete functionality**: Replaced View icon with Delete (red trash) icon, added confirmation dialog, DELETE API route with 204 handling
+  - **Edit functionality**: Full edit support with pre-filled modal, BOM component editing, PUT API route
+  - **Type definitions**: Added BomItem interface with material relationship, updated Bom interface with bomItems array
+  - **Backend updates**: ProductController now handles BOM updates (delete existing, create new), loads activeBom.bomItems.material
+  - All CRUD operations (Create, Read, Update, Delete) now working for all product categories
+
 - 2025-10-08: Technical Module completed
   - Extended products table with category, subtype, expiry_policy, shelf_life_days, std_price fields
   - Created product_line_settings table for FG per-line cost/rate configurations
@@ -155,7 +164,6 @@ cd apps/backend && php artisan migrate
   - Created Filament ProductResource with Details, BOM, and Per-Line Settings tabs
   - Built /technical/bom page with 4 category tabs (Meat, Dry Goods, Finished Goods, Process)
   - Implemented Add Item modal with dynamic fields based on category selection (MEAT/DRYGOODS: expiry policies; FINISHED_GOODS: BOM components; PROCESS: creation date expiry)
-  - Fixed category-to-type mapping (MEAT/DRYGOODS→RM, PROCESS→WIP, FINISHED_GOODS→FG)
   - Used Next.js Server Components to resolve client-side fetch issues in development mode
   - Toast notification system for user feedback
   - Complete TypeScript types and Zod validation for all product categories
