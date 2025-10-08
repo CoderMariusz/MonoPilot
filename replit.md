@@ -31,11 +31,11 @@ forza-mes/
 - ✅ Database models and migrations (WorkOrder, Product, BOM, PurchaseOrder, TransferOrder, etc.)
 - ✅ **Planning Module** - Work Orders, Purchase Orders, Transfer Orders tabs with API integration
 - ✅ **Production Module** - Work Orders view, Yield Report, Consume Report with backend API
+- ✅ **Technical Module** - BOM & Items Catalog with 4 category tabs, dynamic Add Item modal, Filament admin resource
 
 ### In Progress
 - 🔄 Scanner module (/scanner route)
 - 🔄 Warehouse module (GRN, Stock Move, LP operations)
-- 🔄 Technical module (BOM editor, Process Recipes)
 - 🔄 Authentication with RBAC (7 roles)
 
 ## Technology Stack
@@ -147,6 +147,19 @@ cd apps/backend && php artisan migrate
 - All sensitive configuration uses environment variables
 
 ## Recent Changes
+- 2025-10-08: Technical Module completed
+  - Extended products table with category, subtype, expiry_policy, shelf_life_days, std_price fields
+  - Created product_line_settings table for FG per-line cost/rate configurations
+  - Built ProductController API with category-specific validation and BOM creation
+  - Built ProductLineSettingsController for bulk upsert and per-line management
+  - Created Filament ProductResource with Details, BOM, and Per-Line Settings tabs
+  - Built /technical/bom page with 4 category tabs (Meat, Dry Goods, Finished Goods, Process)
+  - Implemented Add Item modal with dynamic fields based on category selection (MEAT/DRYGOODS: expiry policies; FINISHED_GOODS: BOM components; PROCESS: creation date expiry)
+  - Fixed category-to-type mapping (MEAT/DRYGOODS→RM, PROCESS→WIP, FINISHED_GOODS→FG)
+  - Used Next.js Server Components to resolve client-side fetch issues in development mode
+  - Toast notification system for user feedback
+  - Complete TypeScript types and Zod validation for all product categories
+
 - 2025-10-08: Production Module completed
   - Created Production page (/production) with 3 tabs: Work Orders, Yield Report, Consume Report
   - Built backend API endpoints: `/api/production/yield-report` and `/api/production/consume-report`
