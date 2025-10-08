@@ -21,6 +21,8 @@ return [
 
     'allowed_origins' => [
         'http://localhost:5000',
+        'http://127.0.0.1:5000',
+        'https://da6dc41a-24c0-4490-80b3-1d29839c6d34-00-3ec386zbxmldw.spock.replit.dev',
         env('FRONTEND_URL', 'http://localhost:5000')
     ],
 
