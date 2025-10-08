@@ -9,11 +9,14 @@ export default {
   theme: {
     extend: {
       fontSize: {
-        'base': '10px',
-      },
-      colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        'xs': '1.1rem',
+        'sm': '1.2rem',
+        'base': '1.4rem',
+        'lg': '1.6rem',
+        'xl': '1.8rem',
+        '2xl': '2.0rem',
+        '3xl': '2.4rem',
+        '4xl': '3.0rem',
       },
     },
   },
