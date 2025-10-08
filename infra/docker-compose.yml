@@ -17,6 +17,31 @@ services:
     ports:
       - "6379:6379"
 
+  backend:
+    build:
+      context: ../apps/backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${PGDATABASE}
+      - DB_USERNAME=${PGUSER}
+      - DB_PASSWORD=${PGPASSWORD}
+    depends_on:
+      - postgres
+      - redis
+
+  frontend:
+    build:
+      context: ../apps/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    depends_on:
+      - backend
+
   nginx:
     image: nginx:alpine
     ports:
