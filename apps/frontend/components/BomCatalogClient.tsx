@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Package, Beef, ShoppingBag, FlaskConical, Plus, Loader2, Eye, Pencil, Search } from 'lucide-react';
+import { Package, Beef, ShoppingBag, FlaskConical, Plus, Loader2, Trash2, Pencil, Search } from 'lucide-react';
 import type { Product } from '@/lib/types';
 import AddItemModal from '@/components/AddItemModal';
 
@@ -133,6 +133,7 @@ function ProductsTable({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(initialData.last_page);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     setProducts(initialData.data);
@@ -219,6 +220,29 @@ function ProductsTable({
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const handleDelete = async (product: Product) => {
+    if (!confirm(`Are you sure you want to delete "${product.description}" (${product.part_number})?`)) {
+      return;
+    }
+
+    try {
+      setDeletingId(product.id);
+      const response = await fetch(`/api/products/${product.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete product');
+      }
+
+      setProducts(prev => prev.filter(p => p.id !== product.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete product');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const getTypeBadgeColor = (type: string) => {
@@ -357,15 +381,21 @@ function ProductsTable({
                       <div className="flex items-center gap-2">
                         <button 
                           className="p-1 hover:bg-slate-200 rounded transition-colors"
-                          title="View details"
-                        >
-                          <Eye className="w-4 h-4 text-slate-600" />
-                        </button>
-                        <button 
-                          className="p-1 hover:bg-slate-200 rounded transition-colors"
-                          title="Edit product"
+                          title="Edit item"
                         >
                           <Pencil className="w-4 h-4 text-slate-600" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(product)}
+                          disabled={deletingId === product.id}
+                          className="p-1 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
+                          title="Delete item"
+                        >
+                          {deletingId === product.id ? (
+                            <Loader2 className="w-4 h-4 text-red-600 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          )}
                         </button>
                       </div>
                     </td>
