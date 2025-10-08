@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { ClipboardList, ShoppingCart, ArrowRightLeft, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { WorkOrder, PurchaseOrder, TransferOrder } from '@/lib/types';
+import { WorkOrdersTable } from '@/components/WorkOrdersTable';
+import type { PurchaseOrder, TransferOrder } from '@/lib/types';
 
 type TabType = 'work-orders' | 'purchase-orders' | 'transfer-orders';
 
@@ -58,17 +59,6 @@ export default function PlanningPage() {
 }
 
 function WorkOrdersTab() {
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api.workOrders.list()
-      .then(setWorkOrders)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
-
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -77,66 +67,7 @@ function WorkOrdersTab() {
           Create Work Order
         </button>
       </div>
-      
-      {loading && (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-        </div>
-      )}
-      
-      {error && (
-        <div className="py-4 px-6 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
-          Error loading work orders: {error}
-        </div>
-      )}
-      
-      {!loading && !error && (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">WO Number</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Product</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Quantity</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Status</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Due Date</th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Material Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrders.length === 0 ? (
-                <tr className="border-b border-slate-100">
-                  <td colSpan={6} className="py-8 text-center text-slate-500 text-sm">
-                    No work orders found
-                  </td>
-                </tr>
-              ) : (
-                workOrders.map(wo => (
-                  <tr key={wo.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="py-3 px-4 text-sm">{wo.wo_number}</td>
-                    <td className="py-3 px-4 text-sm">{wo.product?.description || '-'}</td>
-                    <td className="py-3 px-4 text-sm">{wo.quantity}</td>
-                    <td className="py-3 px-4 text-sm">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        wo.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        wo.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                        wo.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                        'bg-slate-100 text-slate-800'
-                      }`}>
-                        {wo.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-sm">{wo.due_date || '-'}</td>
-                    <td className="py-3 px-4 text-sm">
-                      <span className="text-slate-500">-</span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <WorkOrdersTable />
     </div>
   );
 }
