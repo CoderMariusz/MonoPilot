@@ -13,7 +13,7 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::with(['boms', 'activeBom', 'lineSettings.machine']);
+        $query = Product::with(['boms', 'activeBom.bomItems.material', 'lineSettings.machine']);
 
         if ($request->has('category')) {
             $query->where('category', $request->category);
@@ -86,14 +86,14 @@ class ProductController extends Controller
             }
         }
 
-        $product->load(['boms', 'activeBom', 'lineSettings.machine']);
+        $product->load(['boms', 'activeBom.bomItems.material', 'lineSettings.machine']);
 
         return response()->json($product, 201);
     }
 
     public function show($id)
     {
-        $product = Product::with(['boms', 'activeBom', 'lineSettings.machine'])->findOrFail($id);
+        $product = Product::with(['boms', 'activeBom.bomItems.material', 'lineSettings.machine'])->findOrFail($id);
 
         return response()->json($product);
     }
@@ -112,6 +112,11 @@ class ProductController extends Controller
             'expiry_policy' => ['nullable', Rule::in(['DAYS_STATIC', 'FROM_MFG_DATE', 'FROM_DELIVERY_DATE', 'FROM_CREATION_DATE'])],
             'shelf_life_days' => 'nullable|integer|min:0',
             'is_active' => 'nullable|boolean',
+            'bom_items' => 'nullable|array',
+            'bom_items.*.material_id' => 'required_with:bom_items|exists:products,id',
+            'bom_items.*.quantity' => 'required_with:bom_items|numeric|min:0',
+            'bom_items.*.uom' => 'required_with:bom_items|string',
+            'bom_items.*.sequence' => 'nullable|integer',
         ]);
 
         if (isset($validated['category'])) {
@@ -119,8 +124,40 @@ class ProductController extends Controller
             $validated['type'] = $this->mapCategoryToType($validated['category']);
         }
 
-        $product->update($validated);
-        $product->load(['boms', 'activeBom', 'lineSettings.machine']);
+        $productData = $validated;
+        unset($productData['bom_items']);
+
+        $product->update($productData);
+
+        if (isset($validated['bom_items'])) {
+            $category = $validated['category'] ?? $product->category;
+            
+            if (in_array($category, ['FINISHED_GOODS', 'PROCESS'])) {
+                $activeBom = $product->activeBom;
+                
+                if ($activeBom) {
+                    $activeBom->bomItems()->delete();
+                } else {
+                    $activeBom = Bom::create([
+                        'product_id' => $product->id,
+                        'version' => '1.0',
+                        'is_active' => true,
+                    ]);
+                }
+
+                foreach ($validated['bom_items'] as $index => $item) {
+                    BomItem::create([
+                        'bom_id' => $activeBom->id,
+                        'material_id' => $item['material_id'],
+                        'quantity' => $item['quantity'],
+                        'uom' => $item['uom'],
+                        'sequence' => $item['sequence'] ?? $index + 1,
+                    ]);
+                }
+            }
+        }
+
+        $product->load(['boms', 'activeBom.bomItems.material', 'lineSettings.machine']);
 
         return response()->json($product);
     }

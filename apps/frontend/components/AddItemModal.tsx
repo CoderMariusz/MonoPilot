@@ -14,9 +14,11 @@ interface AddItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  product?: Product;
 }
 
-export default function AddItemModal({ isOpen, onClose, onSuccess }: AddItemModalProps) {
+export default function AddItemModal({ isOpen, onClose, onSuccess, product }: AddItemModalProps) {
+  const isEditMode = !!product;
   const [step, setStep] = useState<1 | 2>(1);
   const [category, setCategory] = useState<CategoryType | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,6 +43,37 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }: AddItemModa
   }>>([{ product_id: '', quantity: '', uom: '' }]);
 
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    if (isEditMode && product && isOpen) {
+      setStep(2);
+      setCategory(product.category || null);
+      
+      setFormData({
+        part_number: product.part_number || '',
+        description: product.description || '',
+        uom: product.uom || '',
+        std_price: product.std_price || '',
+        notes: '',
+        subtype: product.subtype || '',
+        expiry_policy: (product.expiry_policy as ExpiryPolicy) || '',
+        shelf_life_days: product.shelf_life_days?.toString() || '',
+      });
+
+      if (product.activeBom?.bomItems && product.activeBom.bomItems.length > 0) {
+        setBomComponents(
+          product.activeBom.bomItems.map((item: any) => ({
+            product_id: item.material_id?.toString() || '',
+            quantity: item.quantity?.toString() || '',
+            uom: item.uom || '',
+          }))
+        );
+      }
+    } else if (isOpen && !product) {
+      setStep(1);
+      setCategory(null);
+    }
+  }, [isEditMode, product, isOpen]);
 
   useEffect(() => {
     if (isOpen && (category === 'FINISHED_GOODS' || category === 'PROCESS')) {
@@ -257,12 +290,18 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }: AddItemModa
         }));
       }
 
-      await api.products.create(payload);
-      showToast('Product created successfully', 'success');
+      if (isEditMode && product) {
+        await api.products.update(product.id, payload);
+        showToast('Product updated successfully', 'success');
+      } else {
+        await api.products.create(payload);
+        showToast('Product created successfully', 'success');
+      }
+      
       handleClose();
       onSuccess();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create product';
+      const errorMessage = error instanceof Error ? error.message : `Failed to ${isEditMode ? 'update' : 'create'} product`;
       showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
@@ -276,7 +315,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }: AddItemModa
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
-            {step === 2 && (
+            {step === 2 && !isEditMode && (
               <button
                 onClick={handleBack}
                 className="p-1 hover:bg-slate-100 rounded transition-colors"
@@ -286,7 +325,10 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }: AddItemModa
               </button>
             )}
             <h2 className="text-xl font-semibold text-slate-900">
-              {step === 1 ? 'Add Item - Select Category' : 'Add Item - Item Details'}
+              {isEditMode 
+                ? 'Edit Item' 
+                : (step === 1 ? 'Add Item - Select Category' : 'Add Item - Item Details')
+              }
             </h2>
           </div>
           <button

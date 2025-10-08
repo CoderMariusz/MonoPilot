@@ -32,6 +32,7 @@ interface BomCatalogClientProps {
 export default function BomCatalogClient({ initialData }: BomCatalogClientProps) {
   const [activeTab, setActiveTab] = useState<CategoryType>('MEAT');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const tabs: TabConfig[] = [
@@ -43,6 +44,16 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
 
   const handleModalSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setEditingProduct(undefined);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setIsModalOpen(true);
   };
 
   const getInitialDataForCategory = (category: CategoryType): ProductsResponse => {
@@ -73,8 +84,9 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
       
       <AddItemModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleModalClose}
         onSuccess={handleModalSuccess}
+        product={editingProduct}
       />
       
       <div className="bg-white rounded-lg shadow-sm border border-slate-200">
@@ -108,7 +120,8 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
           <ProductsTable 
             category={activeTab} 
             initialData={getInitialDataForCategory(activeTab)}
-            refreshTrigger={refreshTrigger} 
+            refreshTrigger={refreshTrigger}
+            onEditProduct={handleEditProduct}
           />
         </div>
       </div>
@@ -119,11 +132,13 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
 function ProductsTable({ 
   category, 
   initialData,
-  refreshTrigger 
+  refreshTrigger,
+  onEditProduct
 }: { 
   category: CategoryType; 
   initialData: ProductsResponse;
   refreshTrigger: number;
+  onEditProduct: (product: Product) => void;
 }) {
   const [products, setProducts] = useState<Product[]>(initialData.data);
   const [loading, setLoading] = useState(false);
@@ -380,6 +395,7 @@ function ProductsTable({
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <button 
+                          onClick={() => onEditProduct(product)}
                           className="p-1 hover:bg-slate-200 rounded transition-colors"
                           title="Edit item"
                         >

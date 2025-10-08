@@ -1,11 +1,24 @@
 export type CategoryType = 'MEAT' | 'DRYGOODS' | 'FINISHED_GOODS' | 'PROCESS';
 export type ExpiryPolicyType = 'DAYS_STATIC' | 'FROM_MFG_DATE' | 'FROM_DELIVERY_DATE' | 'FROM_CREATION_DATE';
 
+export interface BomItem {
+  id: number;
+  bom_id: number;
+  material_id: number;
+  material?: Product;
+  quantity: string;
+  uom: string;
+  sequence: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Bom {
   id: number;
   product_id: number;
   version: string;
   is_active: boolean;
+  bomItems?: BomItem[];
   created_at: string;
   updated_at: string;
 }
