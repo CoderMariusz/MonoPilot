@@ -4,6 +4,7 @@ import type {
   TransferOrder,
   Product,
   ProductLineSettings,
+  Machine,
   CreateWorkOrderData,
   UpdateWorkOrderData,
   CreatePurchaseOrderData,
@@ -85,6 +86,7 @@ export const api = {
   workOrders: {
     list: () => fetchAPI<WorkOrder[]>('/work-orders'),
     get: (id: number) => fetchAPI<WorkOrder>(`/work-orders/${id}`),
+    getDetails: (id: number) => fetchAPI<any>(`/work-orders/${id}/details`),
     create: (data: CreateWorkOrderData) => fetchAPI<WorkOrder>('/work-orders', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: UpdateWorkOrderData) => fetchAPI<WorkOrder>(`/work-orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: number) => fetchAPI<null>(`/work-orders/${id}`, { method: 'DELETE' }),
@@ -145,5 +147,9 @@ export const api = {
     },
     update: (id: number, data: UpdateLineSettingData) => fetchAPI<ProductLineSettings>(`/line-settings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: number) => fetchAPI<null>(`/line-settings/${id}`, { method: 'DELETE' }),
+  },
+  machines: {
+    list: () => fetchAPI<Machine[]>('/machines'),
+    get: (id: number) => fetchAPI<Machine>(`/machines/${id}`),
   },
 };

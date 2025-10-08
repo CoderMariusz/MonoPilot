@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ClipboardList, ShoppingCart, ArrowRightLeft, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { WorkOrdersTable } from '@/components/WorkOrdersTable';
+import { CreateWorkOrderModal } from '@/components/CreateWorkOrderModal';
 import type { PurchaseOrder, TransferOrder } from '@/lib/types';
 
 type TabType = 'work-orders' | 'purchase-orders' | 'transfer-orders';
@@ -59,15 +60,30 @@ export default function PlanningPage() {
 }
 
 function WorkOrdersTab() {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleCreateSuccess = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-slate-900">Work Orders</h2>
-        <button className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors text-sm">
+        <button 
+          onClick={() => setIsCreateModalOpen(true)}
+          className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors text-sm"
+        >
           Create Work Order
         </button>
       </div>
-      <WorkOrdersTable />
+      <WorkOrdersTable key={refreshKey} />
+      <CreateWorkOrderModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </div>
   );
 }

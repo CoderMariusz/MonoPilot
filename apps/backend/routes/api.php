@@ -8,12 +8,14 @@ use App\Http\Controllers\Api\TransferOrderController;
 use App\Http\Controllers\Api\ProductionReportController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductLineSettingsController;
+use App\Http\Controllers\Api\MachineController;
 
 Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
     return $request->user()->load('roles', 'permissions');
 });
 
 // TODO: Add auth:sanctum middleware when authentication system is implemented
+Route::get('work-orders/{workOrder}/details', [WorkOrderController::class, 'details']);
 Route::apiResource('work-orders', WorkOrderController::class);
 Route::apiResource('purchase-orders', PurchaseOrderController::class);
 Route::apiResource('transfer-orders', TransferOrderController::class);
@@ -34,4 +36,8 @@ Route::delete('/line-settings/{id}', [ProductLineSettingsController::class, 'des
 // Production Reports
 Route::get('production/yield-report', [ProductionReportController::class, 'yieldReport']);
 Route::get('production/consume-report', [ProductionReportController::class, 'consumeReport']);
+
+// Machines
+Route::get('machines', [MachineController::class, 'index']);
+Route::get('machines/{machine}', [MachineController::class, 'show']);
 
