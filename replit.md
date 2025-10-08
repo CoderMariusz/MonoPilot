@@ -20,7 +20,7 @@ forza-mes/
 
 ## Current Status
 
-### Completed (Phase 1)
+### Completed
 - ✅ Monorepo structure created
 - ✅ Laravel 12 + Filament v4 backend installed
 - ✅ Next.js 15 frontend with Tailwind CSS
@@ -28,11 +28,15 @@ forza-mes/
 - ✅ Laravel Sanctum for authentication
 - ✅ Filament admin panel installed
 - ✅ Frontend running on port 5000
+- ✅ Database models and migrations (WorkOrder, Product, BOM, PurchaseOrder, TransferOrder, etc.)
+- ✅ **Planning Module** - Work Orders, Purchase Orders, Transfer Orders tabs with API integration
+- ✅ **Production Module** - Work Orders view, Yield Report, Consume Report with backend API
 
 ### In Progress
-- 🔄 Database models and migrations
+- 🔄 Scanner module (/scanner route)
+- 🔄 Warehouse module (GRN, Stock Move, LP operations)
+- 🔄 Technical module (BOM editor, Process Recipes)
 - 🔄 Authentication with RBAC (7 roles)
-- 🔄 Module development (Planning, Production, Warehouse, Technical)
 
 ## Technology Stack
 
@@ -143,6 +147,21 @@ cd apps/backend && php artisan migrate
 - All sensitive configuration uses environment variables
 
 ## Recent Changes
+- 2025-10-08: Production Module completed
+  - Created Production page (/production) with 3 tabs: Work Orders, Yield Report, Consume Report
+  - Built backend API endpoints: `/api/production/yield-report` and `/api/production/consume-report`
+  - Implemented yield calculation (based on WO completion status) and consumption calculation (based on BOM items)
+  - Created shared WorkOrdersTable component used by both Planning and Production (ensures identical WO views)
+  - Added proper TypeScript types for all report data structures
+  - All reports fetch real data from backend with loading/error states
+
+- 2025-10-08: Planning Module completed
+  - Created Planning page (/planning) with 3 tabs: Work Orders, Purchase Orders, Transfer Orders
+  - Built Laravel API with WorkOrderController, PurchaseOrderController, TransferOrderController
+  - Created Next.js API proxy at /app/api/[...path]/route.ts with proper status code/header forwarding
+  - Implemented type-safe API client in lib/api.ts
+  - Fixed Next.js 15 async params requirement
+
 - 2025-10-08: Initial project setup completed
   - Monorepo structure created (apps/backend, apps/frontend, packages/shared, infra)
   - Laravel 12 + Filament v4 installed and configured
