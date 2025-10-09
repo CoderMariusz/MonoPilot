@@ -249,11 +249,11 @@ export default function PackTerminalPage() {
           updateLicensePlate(staged.lp.id, { quantity: newLPQty.toString() });
           
           addStockMove({
-            move_number: `SM-CONSUME-${Date.now()}-${staged.lp.id}`,
+            move_number: `SM-CONSUME-${Date.now()}-${staged.lp.lp_number}`,
             lp_id: staged.lp.id,
             from_location_id: staged.lp.location_id,
-            to_location_id: 3,
-            quantity: toConsume.toString(),
+            to_location_id: null,
+            quantity: `-${toConsume}`,
             status: 'completed',
             move_date: moveDate,
             wo_number: selectedWO!.wo_number,
@@ -329,7 +329,7 @@ export default function PackTerminalPage() {
       product_id: selectedWO.product!.id,
       location_id: warehouseLocationId,
       quantity: qtyToCreate.toString(),
-      qa_status: 'Pending',
+      qa_status: 'Passed',
       grn_id: null,
     });
 
@@ -339,7 +339,7 @@ export default function PackTerminalPage() {
     addStockMove({
       move_number: `SM-${fgLPNumber}`,
       lp_id: newFGLP.id,
-      from_location_id: 3,
+      from_location_id: null,
       to_location_id: warehouseLocationId,
       quantity: qtyToCreate.toString(),
       status: 'completed',
@@ -412,8 +412,8 @@ export default function PackTerminalPage() {
       move_number: `SM-MANUAL-${Date.now()}`,
       lp_id: lp.id,
       from_location_id: lp.location_id,
-      to_location_id: 3,
-      quantity: quantity.toString(),
+      to_location_id: null,
+      quantity: `-${quantity}`,
       status: 'completed',
       move_date: moveDate,
       wo_number: selectedWO!.wo_number,

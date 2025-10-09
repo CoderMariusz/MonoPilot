@@ -344,9 +344,9 @@ export interface StockMove {
   move_number: string;
   lp_id: number;
   lp?: LicensePlate;
-  from_location_id: number;
+  from_location_id: number | null;
   from_location?: Location;
-  to_location_id: number;
+  to_location_id: number | null;
   to_location?: Location;
   quantity: string;
   status: 'draft' | 'completed' | 'cancelled';

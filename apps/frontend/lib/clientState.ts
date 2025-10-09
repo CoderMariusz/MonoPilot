@@ -65,7 +65,11 @@ class ClientState {
   }
 
   getLicensePlates(): LicensePlate[] {
-    return [...this.licensePlates];
+    return this.licensePlates.map(lp => ({
+      ...lp,
+      product: lp.product_id ? this.products.find(p => p.id === lp.product_id) : undefined,
+      location: lp.location_id ? this.locations.find(loc => loc.id === lp.location_id) : undefined,
+    }));
   }
 
   getLocations(): Location[] {
