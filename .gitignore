@@ -9,13 +9,6 @@ build/
 .DS_Store
 .vscode/
 .idea/
-apps/backend/vendor/
-apps/backend/.env
-apps/backend/storage/logs/
-apps/backend/bootstrap/cache/
-apps/backend/public/storage
-apps/backend/public/hot
-apps/backend/storage/*.key
 apps/frontend/.next/
 apps/frontend/out/
 apps/frontend/node_modules/
