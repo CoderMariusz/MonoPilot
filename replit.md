@@ -51,4 +51,25 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
 - **Database (Planned)**: Supabase PostgreSQL or Replit PostgreSQL
 - **Authentication (Planned)**: Replit Auth or NextAuth
 - **Package Manager**: pnpm
-```
+
+## Recent Changes
+
+- 2025-10-09: **Planning, Production & Scanner Advanced Features**
+  - **Work Order Product Filtering by Line**:
+    - When creating Work Orders, product dropdown now filters based on selected production line
+    - Only shows products where production_lines includes 'ALL' or matches selected machine ID
+    - Product selection automatically resets when line changes
+    - Prevents creating Work Orders with incompatible line/product combinations
+  - **BOM Component Line Selection in Scanner Terminals**:
+    - Added line selection dropdown for BOM components with specific production_lines (not 'ALL')
+    - Operators can choose which production line's materials to consume for line-restricted components
+    - Validation ensures all required line selections are made before item creation
+    - Consumption logic filters staged LPs by selected component line
+    - Staging now correctly persists component line selection (not WO line) for proper matching
+    - Implemented in both Process and Pack terminals with full end-to-end workflow
+  - **Edit Functionality for Planning Tables**:
+    - Added Edit button to Work Orders table with full edit modal support
+    - CreateWorkOrderModal now supports edit mode - populates existing data and calls updateWorkOrder
+    - Purchase Orders and Transfer Orders already had edit functionality (verified working)
+    - Fixed LSP type errors in modals (status type, import issues)
+    - All three planning tables (WO, PO, TO) have complete CRUD operations
