@@ -58,6 +58,7 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - To Location uses warehouse default location from admin settings instead of hardcoded values
     - Added Item Code column to Stock Movements table
     - Added wo_number field to StockMove interface for better traceability
+    - Date now shows full timestamp (YYYY-MM-DD HH:MM:SS) instead of just date
   - **Warehouse LP Stock**:
     - Renamed "LP Operations" tab to "LP Stock" throughout warehouse module
     - Added Item Code column to LP Stock table (shows product part_number)
