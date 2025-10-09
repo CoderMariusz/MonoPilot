@@ -17,6 +17,7 @@ export function StockMoveTable() {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Move Number</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">LP Number</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Item Code</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">From Location</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">To Location</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Quantity</th>
@@ -30,6 +31,7 @@ export function StockMoveTable() {
               <tr key={move.id} className="hover:bg-slate-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{move.move_number}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.lp_number || 'N/A'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.product?.part_number || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.wo_number || move.from_location?.name || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.to_location?.name || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.quantity}</td>
