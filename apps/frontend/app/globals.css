@@ -6,7 +6,29 @@ html {
   font-size: 10px;
 }
 
+@media (max-width: 640px) {
+  html {
+    font-size: 12px;
+  }
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   font-size: 1.4rem;
+}
+
+@media (max-width: 640px) {
+  input[type="text"],
+  input[type="number"],
+  select,
+  button {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    touch-action: manipulation;
+  }
+  
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
