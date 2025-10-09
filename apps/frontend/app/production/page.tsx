@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { ClipboardList, TrendingUp, Package, Loader2 } from 'lucide-react';
 import { WorkOrdersTable } from '@/components/WorkOrdersTable';
-import { mockYieldReport, mockConsumeReport } from '@/lib/mockData';
-import type { YieldReport, ConsumeReport } from '@/lib/types';
+import { mockConsumeReport } from '@/lib/mockData';
+import { useYieldReports, useWorkOrders } from '@/lib/clientState';
+import type { ConsumeReport, YieldReportDetail } from '@/lib/types';
 
 type TabType = 'work-orders' | 'yield-report' | 'consume-report';
 
@@ -73,43 +74,24 @@ function WorkOrdersTab() {
 }
 
 function YieldReportTab() {
-  const [data, setData] = useState<YieldReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const yieldReports = useYieldReports();
+  const workOrders = useWorkOrders();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setData(mockYieldReport);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load report');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const sortedReports = [...yieldReports].sort((a, b) => 
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 
-    fetchData();
-  }, []);
+  const getEfficiencyColor = (efficiency: number) => {
+    if (efficiency >= 90) return 'text-green-600 font-semibold';
+    if (efficiency >= 70) return 'text-orange-600 font-semibold';
+    return 'text-red-600 font-semibold';
+  };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-        <span className="ml-2 text-slate-600">Loading yield report...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-        <p className="font-semibold">Error loading report</p>
-        <p className="text-sm mt-1">{error}</p>
-      </div>
-    );
-  }
+  const getBomMaterials = (workOrderId: number) => {
+    const workOrder = workOrders.find(wo => wo.id === workOrderId);
+    if (!workOrder?.product?.activeBom?.bomItems) return [];
+    return workOrder.product.activeBom.bomItems;
+  };
 
   return (
     <div>
@@ -127,27 +109,6 @@ function YieldReportTab() {
           </button>
         </div>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-          <div className="text-sm text-slate-600 mb-1">Total Output</div>
-          <div className="text-2xl font-bold text-slate-900">
-            {data?.summary.total_output.toLocaleString()} pcs
-          </div>
-        </div>
-        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-          <div className="text-sm text-slate-600 mb-1">Yield Rate</div>
-          <div className="text-2xl font-bold text-slate-900">
-            {data?.summary.yield_rate.toFixed(1)}%
-          </div>
-        </div>
-        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-          <div className="text-sm text-slate-600 mb-1">Scrap Rate</div>
-          <div className="text-2xl font-bold text-slate-900">
-            {data?.summary.scrap_rate.toFixed(1)}%
-          </div>
-        </div>
-      </div>
 
       <div className="overflow-x-auto">
         <table className="w-full">
@@ -155,45 +116,69 @@ function YieldReportTab() {
             <tr className="border-b border-slate-200">
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">WO Number</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Product</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Line</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Target Qty</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Actual Output</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Scrap</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Actual Qty</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">BOM Materials</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Consumed Materials</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Yield %</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Date</th>
             </tr>
           </thead>
           <tbody>
-            {data?.work_orders.length === 0 ? (
+            {sortedReports.length === 0 ? (
               <tr className="border-b border-slate-100">
-                <td colSpan={7} className="py-8 text-center text-slate-500 text-sm">
-                  No production data available for selected period
+                <td colSpan={8} className="py-8 text-center text-slate-500 text-sm">
+                  No yield reports available. Close a work order in the scanner terminal to generate a report.
                 </td>
               </tr>
             ) : (
-              data?.work_orders.map((wo) => (
-                <tr key={wo.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="py-3 px-4 text-sm">{wo.wo_number}</td>
-                  <td className="py-3 px-4 text-sm">
-                    {wo.product ? (
-                      <div>
-                        <div className="font-medium">{wo.product.part_number}</div>
-                        <div className="text-xs text-slate-500">{wo.product.description}</div>
-                      </div>
-                    ) : (
-                      <span className="text-slate-400">N/A</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-sm">{wo.target_qty.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-sm">{wo.actual_output.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-sm">{wo.scrap.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-sm">
-                    <span className={wo.yield_percentage >= 95 ? 'text-green-600' : wo.yield_percentage >= 85 ? 'text-yellow-600' : 'text-red-600'}>
-                      {wo.yield_percentage.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-sm">{wo.date}</td>
-                </tr>
-              ))
+              sortedReports.map((report) => {
+                const bomMaterials = getBomMaterials(report.work_order_id);
+                return (
+                  <tr key={report.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="py-3 px-4 text-sm font-medium">{report.work_order_number}</td>
+                    <td className="py-3 px-4 text-sm">{report.product_name}</td>
+                    <td className="py-3 px-4 text-sm">{report.line_number || '-'}</td>
+                    <td className="py-3 px-4 text-sm">{report.target_quantity.toLocaleString()}</td>
+                    <td className="py-3 px-4 text-sm">{report.actual_quantity.toLocaleString()}</td>
+                    <td className="py-3 px-4 text-sm">
+                      {bomMaterials.length > 0 ? (
+                        <div className="space-y-1">
+                          {bomMaterials.map((item) => (
+                            <div key={item.id} className="text-xs">
+                              <span className="font-medium">{item.material?.part_number || 'N/A'}</span>
+                              {' - '}
+                              <span className="text-slate-600">{item.quantity} {item.uom}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs">No BOM</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-sm">
+                      {report.materials_used.length > 0 ? (
+                        <div className="space-y-1">
+                          {report.materials_used.map((material, idx) => (
+                            <div key={idx} className="text-xs">
+                              <span className="font-medium">{material.item_code}</span>
+                              {' - '}
+                              <span className="text-slate-600">{material.quantity} {material.uom}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs">None</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-sm">
+                      <span className={getEfficiencyColor(report.efficiency_percentage)}>
+                        {report.efficiency_percentage}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
