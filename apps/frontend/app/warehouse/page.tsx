@@ -16,7 +16,7 @@ export default function WarehousePage() {
   const tabs = [
     { id: 'grn' as TabType, label: 'GRN', icon: ClipboardList },
     { id: 'stock-move' as TabType, label: 'Stock Move', icon: TruckIcon },
-    { id: 'lp-operations' as TabType, label: 'LP Operations', icon: Package },
+    { id: 'lp-operations' as TabType, label: 'LP Stock', icon: Package },
   ];
 
   return (
@@ -122,7 +122,7 @@ function LPOperationsTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-slate-900">License Plate Operations</h2>
+        <h2 className="text-xl font-semibold text-slate-900">LP Stock</h2>
       </div>
       <LPOperationsTable />
     </div>
