@@ -157,3 +157,30 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - Shows: Original Quantity, Already Staged, Available to Stage
     - Blocks staging if would exceed LP's total quantity
   - **Architecture**: Proper manufacturing staging workflow with BOM validation and FIFO consumption
+
+- 2025-10-09: **Planning & Quality Enhancements**
+  - **Planning Modal UOM Fix**:
+    - UOM field now auto-populates from selected product's BOM
+    - UOM field is read-only/disabled (not editable)
+    - Only quantity and product code are user-editable
+  - **BOM Priority System**:
+    - Added optional priority field to BOM items (number input)
+    - Scanner consumption logic now sorts by priority (lower priority consumed first)
+    - Items without priority consume together (FIFO within group)
+    - Enables custom consumption order for special manufacturing processes
+  - **Allergen Display & Management**:
+    - Added "Allergens" column to Work Order tables
+    - Displays product allergens as amber pill badges
+    - Shows inherited allergens from BOM components
+  - **Smart Auto-Allergen System**:
+    - When adding BOM components with allergens, automatically suggests those allergens for the product
+    - Tracks manual vs auto-suggested allergens separately
+    - Users can freely remove auto-suggested allergens (suppressions tracked)
+    - When BOM component removed, its auto-allergens removed (unless user manually re-added)
+    - Prevents stale allergen data and respects user choices
+  - **Quarantine Status Blocking**:
+    - Scanner terminals now validate LP QA status before staging
+    - LPs with "Quarantine" status cannot be scanned/used
+    - Shows clear error toast: "Cannot scan LP {number} - Status: Quarantine"
+    - Prevents quarantined materials from entering production
+    - Implemented in both Process and Pack terminals
