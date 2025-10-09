@@ -96,6 +96,40 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - Both FIFO and manual consume create consumption movements
     - Provides complete traceability: see what was consumed AND what was created
 
+- 2025-10-09: **Settings Module & Allergen Management System**
+  - **Settings Page (NEW)**:
+    - Added Settings link to main menu sidebar (between Technical and Admin)
+    - Three management tabs: Locations, Machines, Allergens
+    - Full CRUD functionality for all master data entities
+  - **Location Management**:
+    - Table displays: Code, Name, Zone, Status (Active/Inactive)
+    - Add/Edit/Delete operations with modal forms
+    - Form validation and toast notifications
+    - Integrated with warehouse operations
+  - **Machine Management**:
+    - Table displays: Code, Name, Type, Status (Active/Inactive)
+    - Add/Edit/Delete operations with modal forms
+    - Used for production line equipment tracking
+  - **Allergen Management**:
+    - Table displays: Code, Name, Description
+    - Add/Edit/Delete operations with modal forms
+    - Foundation for product allergen tracking
+  - **Product Allergen System**:
+    - Added allergen_ids field to Product type
+    - Multi-select allergen UI in BOM editor
+    - Products can have multiple allergens assigned
+  - **Allergen Inheritance Logic**:
+    - Automatic inheritance from BOM materials
+    - If RM has allergen and used in formula, product inherits it
+    - Display shows: "Gluten from DG-006 Breadcrumbs"
+    - Visual indicator with amber warning styling
+    - Works for PROCESS and FINISHED_GOODS products
+  - **Production Rates**:
+    - Added rate field to FG (Finished Goods) products
+    - Measured in units per hour
+    - Only visible for FINISHED_GOODS category
+    - Used for production planning and scheduling
+
 - 2025-10-09: **Scanner Terminals Complete Rebuild - Manufacturing Staging Workflow**
   - **Complete Workflow Redesign**: Rebuilt both Process and Pack terminals from scratch
   - **Line Selection First**: Production line (Line 1-4) must be selected before work order
