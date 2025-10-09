@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { mockProducts, mockPurchaseOrders } from '@/lib/mockData';
-import type { Product } from '@/lib/types';
+import type { Product, PurchaseOrderItem } from '@/lib/types';
 
 interface EditPurchaseOrderModalProps {
   isOpen: boolean;
@@ -48,13 +48,10 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const { usePurchaseOrders } = await import('@/lib/clientState');
       const rmProducts = mockProducts.filter(p => p.type === 'RM');
       setProducts(rmProducts);
 
-      const { getPurchaseOrders } = await import('@/lib/clientState');
-      const purchaseOrders = typeof window !== 'undefined' ? (await import('@/lib/clientState')).default?.getPurchaseOrders?.() || mockPurchaseOrders : mockPurchaseOrders;
-      const po = purchaseOrders.find((p: any) => p.id === purchaseOrderId) || mockPurchaseOrders.find(p => p.id === purchaseOrderId);
+      const po = mockPurchaseOrders.find(p => p.id === purchaseOrderId);
       if (po) {
         setFormData({
           supplier: po.supplier,
@@ -63,7 +60,7 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
         });
 
         if (po.purchase_order_items && po.purchase_order_items.length > 0) {
-          setLineItems(po.purchase_order_items.map(item => ({
+          setLineItems(po.purchase_order_items.map((item: PurchaseOrderItem) => ({
             id: item.id.toString(),
             product_id: item.product_id.toString(),
             quantity: item.quantity,

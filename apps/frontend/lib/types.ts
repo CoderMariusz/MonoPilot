@@ -326,6 +326,7 @@ export type QAStatus = 'Pending' | 'Passed' | 'Failed' | 'Quarantine';
 export interface StagedLP {
   lp: LicensePlate;
   stagedQuantity: number;
+  line?: string;
 }
 
 export interface OrderProgress {

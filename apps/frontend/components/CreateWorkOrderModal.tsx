@@ -4,15 +4,16 @@ import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useMachines } from '@/lib/clientState';
 import { mockProducts } from '@/lib/mockData';
-import type { Product } from '@/lib/types';
+import type { Product, WorkOrder } from '@/lib/types';
 
 interface CreateWorkOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  editingWorkOrder?: WorkOrder | null;
 }
 
-export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkOrderModalProps) {
+export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOrder }: CreateWorkOrderModalProps) {
   const machines = useMachines();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
@@ -26,16 +27,56 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
     scheduled_start: '',
     scheduled_end: '',
     machine_id: '',
-    status: 'planned' as const,
+    status: 'planned' as WorkOrder['status'],
   });
 
   const selectedProduct = products.find(p => p.id === Number(formData.product_id));
+
+  const selectedMachineId = formData.machine_id;
+
+  const availableProducts = products.filter(product => {
+    // If no line selected yet, show all products
+    if (!selectedMachineId) return true;
+    
+    // If product has no production_lines defined, show it
+    if (!product.production_lines || product.production_lines.length === 0) return true;
+    
+    // If product has 'ALL', it can run on any line
+    if (product.production_lines.includes('ALL')) return true;
+    
+    // Check if product's production_lines includes selected machine ID
+    return product.production_lines.includes(String(selectedMachineId));
+  });
 
   useEffect(() => {
     if (isOpen) {
       loadData();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (editingWorkOrder) {
+      setFormData({
+        product_id: editingWorkOrder.product_id?.toString() || '',
+        quantity: editingWorkOrder.quantity || '',
+        due_date: editingWorkOrder.due_date || '',
+        scheduled_start: editingWorkOrder.scheduled_start || '',
+        scheduled_end: editingWorkOrder.scheduled_end || '',
+        machine_id: editingWorkOrder.machine_id?.toString() || '',
+        status: editingWorkOrder.status || 'planned',
+      });
+    } else {
+      setFormData({
+        product_id: '',
+        quantity: '',
+        due_date: '',
+        scheduled_start: '',
+        scheduled_end: '',
+        machine_id: '',
+        status: 'planned',
+      });
+    }
+  }, [editingWorkOrder]);
 
   const loadData = async () => {
     setLoadingData(true);
@@ -58,25 +99,40 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
     setError(null);
 
     try {
-      const { addWorkOrder } = await import('@/lib/clientState');
       const product = products.find(p => p.id === Number(formData.product_id));
       const machine = machines.find(m => m.id === Number(formData.machine_id));
-      
-      const nextWoNumber = `WO-2024-${String(Date.now()).slice(-3).padStart(3, '0')}`;
-      
-      addWorkOrder({
-        wo_number: nextWoNumber,
-        product_id: Number(formData.product_id),
-        product,
-        quantity: formData.quantity,
-        status: formData.status,
-        due_date: formData.due_date || null,
-        scheduled_start: formData.scheduled_start || null,
-        scheduled_end: formData.scheduled_end || null,
-        machine_id: Number(formData.machine_id) || null,
-        machine,
-        line_number: null,
-      });
+
+      if (editingWorkOrder) {
+        const { updateWorkOrder } = await import('@/lib/clientState');
+        updateWorkOrder(editingWorkOrder.id, {
+          product_id: Number(formData.product_id),
+          product,
+          quantity: formData.quantity,
+          status: formData.status,
+          due_date: formData.due_date || null,
+          scheduled_start: formData.scheduled_start || null,
+          scheduled_end: formData.scheduled_end || null,
+          machine_id: Number(formData.machine_id) || null,
+          machine,
+        });
+      } else {
+        const { addWorkOrder } = await import('@/lib/clientState');
+        const nextWoNumber = `WO-2024-${String(Date.now()).slice(-3).padStart(3, '0')}`;
+        
+        addWorkOrder({
+          wo_number: nextWoNumber,
+          product_id: Number(formData.product_id),
+          product,
+          quantity: formData.quantity,
+          status: formData.status,
+          due_date: formData.due_date || null,
+          scheduled_start: formData.scheduled_start || null,
+          scheduled_end: formData.scheduled_end || null,
+          machine_id: Number(formData.machine_id) || null,
+          machine,
+          line_number: null,
+        });
+      }
       
       onSuccess();
       onClose();
@@ -90,7 +146,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
         status: 'planned',
       });
     } catch (err: any) {
-      setError(err.message || 'Failed to create work order');
+      setError(err.message || `Failed to ${editingWorkOrder ? 'update' : 'create'} work order`);
     } finally {
       setLoading(false);
     }
@@ -102,7 +158,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
-          <h2 className="text-xl font-semibold text-slate-900">Create Work Order</h2>
+          <h2 className="text-xl font-semibold text-slate-900">
+            {editingWorkOrder ? 'Edit Work Order' : 'Create Work Order'}
+          </h2>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 transition-colors"
@@ -134,7 +192,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
                 required
               >
                 <option value="">Select a product...</option>
-                {products.map((product) => (
+                {availableProducts.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.part_number} - {product.description}
                   </option>
@@ -228,7 +286,11 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
               </label>
               <select
                 value={formData.machine_id}
-                onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  machine_id: e.target.value,
+                  product_id: '' // Reset product when line changes
+                })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               >
                 <option value="">Select Line</option>
@@ -254,7 +316,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
                 className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Create
+                {editingWorkOrder ? 'Update' : 'Create'}
               </button>
             </div>
           </form>

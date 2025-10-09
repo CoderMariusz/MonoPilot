@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Loader2, Eye, Trash2, Search } from 'lucide-react';
+import { Loader2, Eye, Edit, Trash2, Search } from 'lucide-react';
 import { useWorkOrders, deleteWorkOrder } from '@/lib/clientState';
 import { WorkOrderDetailsModal } from '@/components/WorkOrderDetailsModal';
+import { CreateWorkOrderModal } from '@/components/CreateWorkOrderModal';
 import { toast } from '@/lib/toast';
 import type { WorkOrder } from '@/lib/types';
 
@@ -13,6 +14,7 @@ export function WorkOrdersTable() {
   const [error] = useState<string | null>(null);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<number | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -34,6 +36,15 @@ export function WorkOrdersTable() {
   const handleViewDetails = (workOrderId: number) => {
     setSelectedWorkOrderId(workOrderId);
     setIsDetailsModalOpen(true);
+  };
+
+  const handleEdit = (workOrder: WorkOrder) => {
+    setEditingWorkOrder(workOrder);
+  };
+
+  const handleEditSuccess = () => {
+    setEditingWorkOrder(null);
+    toast.success('Work order updated successfully');
   };
 
   const handleDelete = (woId: number) => {
@@ -160,6 +171,13 @@ export function WorkOrdersTable() {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
+                      <button
+                        onClick={() => handleEdit(wo)}
+                        className="text-slate-600 hover:text-slate-900 transition-colors"
+                        title="Edit"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
                       {deleteConfirmId === wo.id ? (
                         <div className="flex items-center gap-1">
                           <button
@@ -196,6 +214,12 @@ export function WorkOrdersTable() {
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
         workOrderId={selectedWorkOrderId}
+      />
+      <CreateWorkOrderModal
+        isOpen={editingWorkOrder !== null}
+        onClose={() => setEditingWorkOrder(null)}
+        onSuccess={handleEditSuccess}
+        editingWorkOrder={editingWorkOrder}
       />
     </>
   );

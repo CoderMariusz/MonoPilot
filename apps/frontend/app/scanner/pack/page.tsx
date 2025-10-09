@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Package, CheckCircle, X, Check, AlertTriangle, Minus } from 'lucide-react';
-import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports, useSettings, saveOrderProgress, getOrderProgress, clearOrderProgress } from '@/lib/clientState';
+import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports, useSettings, saveOrderProgress, getOrderProgress, clearOrderProgress, useMachines } from '@/lib/clientState';
 import { toast } from '@/lib/toast';
 import { AlertDialog } from '@/components/AlertDialog';
 import { ManualConsumeModal } from '@/components/ManualConsumeModal';
@@ -44,6 +44,9 @@ export default function PackTerminalPage() {
   const licensePlates = useLicensePlates();
   const yieldReports = useYieldReports();
   const settings = useSettings();
+  const machines = useMachines();
+  
+  const [componentLineSelections, setComponentLineSelections] = useState<{[materialId: number]: string}>({});
 
   const lines = ['Line 1', 'Line 2', 'Line 3', 'Line 4'];
   
@@ -186,6 +189,7 @@ export default function PackTerminalPage() {
     const staged: StagedLP = {
       lp: currentScannedLP,
       stagedQuantity: qty,
+      line: componentLineSelections[currentScannedLP.product_id] || selectedLine || undefined,
     };
 
     setStagedLPsByOrder(prev => ({
@@ -273,10 +277,16 @@ export default function PackTerminalPage() {
       const materialId = bomItem.material_id;
       let remainingToConsume = needs[materialId];
       
+      const selectedLine = componentLineSelections[materialId];
+      
       for (let i = 0; i < updatedStaging.length && remainingToConsume > 0; i++) {
         const staged = updatedStaging[i];
         
         if (staged.lp.product_id === materialId) {
+          if (selectedLine && staged.line !== selectedLine) {
+            continue;
+          }
+          
           const toConsume = Math.min(remainingToConsume, staged.stagedQuantity);
           
           const currentLPQty = parseFloat(staged.lp.quantity);
@@ -338,6 +348,16 @@ export default function PackTerminalPage() {
     if (qtyToCreate <= 0) {
       toast.error('Invalid quantity');
       return;
+    }
+
+    for (const item of bomItems) {
+      const productionLines = item.material?.production_lines;
+      const needsLineSelection = productionLines && productionLines.length > 0 && !productionLines.includes('ALL');
+      
+      if (needsLineSelection && !componentLineSelections[item.material_id]) {
+        toast.error(`Please select production line for ${item.material?.part_number || 'component'}`);
+        return;
+      }
     }
 
     const insufficient = checkMaterialAvailability(qtyToCreate);
@@ -689,20 +709,47 @@ export default function PackTerminalPage() {
                 <div className="space-y-1">
                   {bomItems.map((item) => {
                     const isStaged = isBomComponentStaged(item.material_id);
+                    const productionLines = item.material?.production_lines;
+                    const needsLineSelection = productionLines && productionLines.length > 0 && !productionLines.includes('ALL');
+                    
                     return (
-                      <div key={item.id} className="flex items-center justify-between bg-white px-3 py-2 rounded">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-900">
-                            {item.material?.part_number} - {item.material?.description}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            Required: {item.quantity} {item.uom}
-                          </p>
+                      <div key={item.id} className="bg-white px-3 py-2 rounded">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-slate-900">
+                              {item.material?.part_number} - {item.material?.description}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Required: {item.quantity} {item.uom}
+                            </p>
+                          </div>
+                          {isStaged ? (
+                            <Check className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <X className="w-5 h-5 text-red-600" />
+                          )}
                         </div>
-                        {isStaged ? (
-                          <Check className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <X className="w-5 h-5 text-red-600" />
+                        {needsLineSelection && (
+                          <div className="mt-2">
+                            <select
+                              value={componentLineSelections[item.material_id] || ''}
+                              onChange={(e) => setComponentLineSelections({
+                                ...componentLineSelections,
+                                [item.material_id]: e.target.value
+                              })}
+                              className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                            >
+                              <option value="">Select Production Line</option>
+                              {productionLines.map(lineId => {
+                                const machine = machines.find(m => m.id === parseInt(lineId));
+                                return (
+                                  <option key={lineId} value={lineId}>
+                                    {machine?.name || `Line ${lineId}`}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
                         )}
                       </div>
                     );
