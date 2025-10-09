@@ -152,6 +152,18 @@ npx prisma generate
 
 ## Recent Changes
 
+- 2025-10-09: **Scanner Module Final Fixes - Unified Workflow Complete**
+  - **AlertDialog Component**: Created reusable modal component for validation errors
+  - **BOM Validation Alerts**: Both terminals now show modal pop-up (not toast) when LP doesn't match BOM
+  - **Auto-Focus Feature**: After alert dismissal, LP input auto-focuses for continuous scanning flow
+  - **Process Terminal**: Creates PR items at default location (location_id: 3) with PR-{timestamp} LP codes
+  - **Pack Terminal**: Creates FG items at default location (location_id: 1) with FG-{timestamp} LP codes
+  - **Unified Workflow**: Both terminals identical except header color (blue/green) and output type (PR/FG)
+  - **UI Fix**: Removed location selector from Pack terminal to match Process terminal exactly
+  - **Created Items Display**: Fixed undefined labels, both terminals display output items correctly
+  - **Complete Flow**: Select WO → Scan LP → Validate → Enter Quantity → Create Output → Auto-focus for next scan
+  - **Architecture**: All state changes persist in clientState, ready for backend integration
+
 - 2025-10-09: **Frontend Fixes & Enhancements - Planning & Scanner Modules**
   - **Planning Module Enhancements**:
     - Added search functionality to all tables (WO, PO, TO) with item code search
