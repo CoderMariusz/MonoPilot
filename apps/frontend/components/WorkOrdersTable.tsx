@@ -1,22 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Loader2, Eye } from 'lucide-react';
-import { mockWorkOrders } from '@/lib/mockData';
+import { useWorkOrders } from '@/lib/clientState';
 import { WorkOrderDetailsModal } from '@/components/WorkOrderDetailsModal';
 import type { WorkOrder } from '@/lib/types';
 
 export function WorkOrdersTable() {
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const workOrders = useWorkOrders();
+  const [loading] = useState(false);
+  const [error] = useState<string | null>(null);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<number | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-
-  useEffect(() => {
-    setWorkOrders(mockWorkOrders);
-    setLoading(false);
-  }, []);
 
   const handleViewDetails = (workOrderId: number) => {
     setSelectedWorkOrderId(workOrderId);

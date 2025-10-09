@@ -56,6 +56,23 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
     setError(null);
 
     try {
+      const { addWorkOrder } = await import('@/lib/clientState');
+      const product = products.find(p => p.id === Number(formData.product_id));
+      const machine = machines.find(m => m.id === Number(formData.machine_id));
+      
+      const nextWoNumber = `WO-2024-${String(Date.now()).slice(-3).padStart(3, '0')}`;
+      
+      addWorkOrder({
+        wo_number: nextWoNumber,
+        product_id: Number(formData.product_id),
+        product,
+        quantity: formData.quantity,
+        status: formData.status,
+        due_date: formData.due_date || null,
+        machine_id: Number(formData.machine_id) || null,
+        machine,
+      });
+      
       onSuccess();
       onClose();
       setFormData({

@@ -248,6 +248,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
 
     setLoading(true);
     try {
+      const { addProduct, updateProduct } = await import('@/lib/clientState');
       const payload: any = {
         part_number: formData.part_number,
         description: formData.description,
@@ -289,8 +290,10 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       }
 
       if (isEditMode && product) {
+        updateProduct(product.id, payload);
         showToast('Product updated successfully', 'success');
       } else {
+        addProduct(payload);
         showToast('Product created successfully', 'success');
       }
       

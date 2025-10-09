@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Package, Beef, ShoppingBag, FlaskConical, Plus, Loader2, Trash2, Pencil, Search } from 'lucide-react';
 import type { Product } from '@/lib/types';
+import { useProducts } from '@/lib/clientState';
 import AddItemModal from '@/components/AddItemModal';
 
 type CategoryType = 'MEAT' | 'DRYGOODS' | 'FINISHED_GOODS' | 'PROCESS';
@@ -140,30 +141,21 @@ function ProductsTable({
   refreshTrigger: number;
   onEditProduct: (product: Product) => void;
 }) {
-  const [products, setProducts] = useState<Product[]>(initialData.data);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const allProducts = useProducts();
+  const products = allProducts.filter(p => p.category === category);
+  const [loading] = useState(false);
+  const [error] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<keyof Product | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(initialData.last_page);
+  const [totalPages] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
-    setProducts(initialData.data);
-    setTotalPages(initialData.last_page);
     setCurrentPage(1);
     setSearchQuery('');
-  }, [category, initialData]);
-
-  useEffect(() => {
-    if (currentPage === 1 && !searchQuery && refreshTrigger === 0) {
-      return;
-    }
-
-    setLoading(false);
-  }, [category, searchQuery, currentPage, refreshTrigger]);
+  }, [category]);
 
   const handleSort = (column: keyof Product) => {
     if (sortColumn === column) {
@@ -218,7 +210,8 @@ function ProductsTable({
 
     try {
       setDeletingId(product.id);
-      setProducts(prev => prev.filter(p => p.id !== product.id));
+      const { deleteProduct } = await import('@/lib/clientState');
+      deleteProduct(product.id);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete product');
     } finally {
