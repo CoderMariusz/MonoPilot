@@ -50,3 +50,32 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
 - **Database (Planned)**: Supabase PostgreSQL or Replit PostgreSQL
 - **Authentication (Planned)**: Replit Auth or NextAuth
 - **Package Manager**: pnpm
+## Recent Changes
+
+- 2025-10-09: **Scanner Terminals Complete Rebuild - Manufacturing Staging Workflow**
+  - **Complete Workflow Redesign**: Rebuilt both Process and Pack terminals from scratch
+  - **Line Selection First**: Production line (Line 1-4) must be selected before work order
+  - **Material Staging Workflow**: 
+    - Scan LP → Enter quantity to stage → Confirm → Add to staging list
+    - Build material staging area before creating items
+    - Staging list shows all staged LPs with quantities
+  - **Required Materials Section**: 
+    - Displays BOM components with check/X icons
+    - Green tick when component is staged on the line
+    - Red X when component is missing
+  - **Smart Create Button**:
+    - Positioned below staging table
+    - Inactive until all BOM components present (checks items, not kg)
+    - Calculates materials needed based on BOM × quantity to create
+  - **Missing Materials Handling**:
+    - Pop-up modal shows shortages with details
+    - Option to "Proceed Anyway" or "Cancel"
+  - **FIFO Consumption Logic**:
+    - Consumes materials top-to-bottom from staging list
+    - Removes LPs when quantity reaches 0
+    - Moves to next LP for remaining quantity
+  - **Critical Bug Fix**: Prevent staging same LP beyond available quantity
+    - Tracks already staged quantity per LP
+    - Shows: Original Quantity, Already Staged, Available to Stage
+    - Blocks staging if would exceed LP's total quantity
+  - **Architecture**: Proper manufacturing staging workflow with BOM validation and FIFO consumption
