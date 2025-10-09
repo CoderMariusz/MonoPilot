@@ -83,6 +83,8 @@ export interface WorkOrder {
   quantity: string;
   status: 'planned' | 'released' | 'in_progress' | 'completed' | 'cancelled';
   due_date: string | null;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
   machine_id: number | null;
   machine?: Machine;
   created_at: string;
@@ -141,6 +143,8 @@ export interface CreateWorkOrderData {
   status?: WorkOrder['status'];
   due_date?: string;
   machine_id?: number;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
 }
 
 export interface UpdateWorkOrderData extends Partial<CreateWorkOrderData> {}

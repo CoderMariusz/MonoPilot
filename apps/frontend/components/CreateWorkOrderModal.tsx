@@ -22,6 +22,8 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
     product_id: '',
     quantity: '',
     due_date: '',
+    scheduled_start: '',
+    scheduled_end: '',
     machine_id: '',
     status: 'planned' as const,
   });
@@ -69,6 +71,8 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
         quantity: formData.quantity,
         status: formData.status,
         due_date: formData.due_date || null,
+        scheduled_start: formData.scheduled_start || null,
+        scheduled_end: formData.scheduled_end || null,
         machine_id: Number(formData.machine_id) || null,
         machine,
       });
@@ -79,6 +83,8 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
         product_id: '',
         quantity: '',
         due_date: '',
+        scheduled_start: '',
+        scheduled_end: '',
         machine_id: '',
         status: 'planned',
       });
@@ -172,6 +178,30 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
                 type="date"
                 value={formData.due_date}
                 onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Scheduled Start
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.scheduled_start}
+                onChange={(e) => setFormData({ ...formData, scheduled_start: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Scheduled End
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.scheduled_end}
+                onChange={(e) => setFormData({ ...formData, scheduled_end: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               />
             </div>

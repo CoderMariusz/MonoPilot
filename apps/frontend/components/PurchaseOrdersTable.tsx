@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Loader2, Eye, Edit, Trash2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Loader2, Eye, Edit, Trash2, Search } from 'lucide-react';
 import { usePurchaseOrders, deletePurchaseOrder } from '@/lib/clientState';
 import { PurchaseOrderDetailsModal } from '@/components/PurchaseOrderDetailsModal';
 import { EditPurchaseOrderModal } from '@/components/EditPurchaseOrderModal';
@@ -15,6 +15,24 @@ export function PurchaseOrdersTable() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredPurchaseOrders = useMemo(() => {
+    if (!searchQuery.trim()) return purchaseOrders;
+    
+    const query = searchQuery.toLowerCase();
+    return purchaseOrders.filter(po => {
+      const poNumber = po.po_number?.toLowerCase() || '';
+      const supplier = po.supplier?.toLowerCase() || '';
+      const itemCodes = po.purchase_order_items?.map(item => 
+        item.product?.part_number?.toLowerCase() || ''
+      ).join(' ') || '';
+      
+      return poNumber.includes(query) || 
+             supplier.includes(query) || 
+             itemCodes.includes(query);
+    });
+  }, [purchaseOrders, searchQuery]);
 
   const handleViewDetails = (poId: number) => {
     setSelectedPOId(poId);
@@ -52,6 +70,19 @@ export function PurchaseOrdersTable() {
 
   return (
     <>
+      <div className="mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+          <input
+            type="text"
+            placeholder="Search by PO number, supplier, or item codes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+          />
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -65,14 +96,14 @@ export function PurchaseOrdersTable() {
             </tr>
           </thead>
           <tbody>
-            {purchaseOrders.length === 0 ? (
+            {filteredPurchaseOrders.length === 0 ? (
               <tr className="border-b border-slate-100">
                 <td colSpan={6} className="py-8 text-center text-slate-500 text-sm">
-                  No purchase orders found
+                  {searchQuery ? 'No purchase orders found matching your search' : 'No purchase orders found'}
                 </td>
               </tr>
             ) : (
-              purchaseOrders.map(po => (
+              filteredPurchaseOrders.map(po => (
                 <tr key={po.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{po.po_number}</td>
                   <td className="py-3 px-4 text-sm">{po.supplier}</td>

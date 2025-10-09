@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Loader2, Eye, Edit, Trash2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Loader2, Eye, Edit, Trash2, Search } from 'lucide-react';
 import { useTransferOrders, deleteTransferOrder } from '@/lib/clientState';
 import { TransferOrderDetailsModal } from '@/components/TransferOrderDetailsModal';
 import { EditTransferOrderModal } from '@/components/EditTransferOrderModal';
@@ -15,6 +15,26 @@ export function TransferOrdersTable() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredTransferOrders = useMemo(() => {
+    if (!searchQuery.trim()) return transferOrders;
+    
+    const query = searchQuery.toLowerCase();
+    return transferOrders.filter(to => {
+      const toNumber = to.to_number?.toLowerCase() || '';
+      const fromLocation = to.from_location?.name?.toLowerCase() || '';
+      const toLocation = to.to_location?.name?.toLowerCase() || '';
+      const itemCodes = to.transfer_order_items?.map(item => 
+        item.product?.part_number?.toLowerCase() || ''
+      ).join(' ') || '';
+      
+      return toNumber.includes(query) || 
+             fromLocation.includes(query) || 
+             toLocation.includes(query) || 
+             itemCodes.includes(query);
+    });
+  }, [transferOrders, searchQuery]);
 
   const handleViewDetails = (toId: number) => {
     setSelectedTOId(toId);
@@ -52,6 +72,19 @@ export function TransferOrdersTable() {
 
   return (
     <>
+      <div className="mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+          <input
+            type="text"
+            placeholder="Search by TO number, locations, or item codes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+          />
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -66,14 +99,14 @@ export function TransferOrdersTable() {
             </tr>
           </thead>
           <tbody>
-            {transferOrders.length === 0 ? (
+            {filteredTransferOrders.length === 0 ? (
               <tr className="border-b border-slate-100">
                 <td colSpan={7} className="py-8 text-center text-slate-500 text-sm">
-                  No transfer orders found
+                  {searchQuery ? 'No transfer orders found matching your search' : 'No transfer orders found'}
                 </td>
               </tr>
             ) : (
-              transferOrders.map(to => (
+              filteredTransferOrders.map(to => (
                 <tr key={to.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{to.to_number}</td>
                   <td className="py-3 px-4 text-sm">{to.from_location?.name || '-'}</td>
