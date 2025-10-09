@@ -20,6 +20,7 @@ export function LPOperationsTable() {
           <thead className="bg-slate-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">LP Number</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Item Code</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Product</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Location</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Quantity</th>
@@ -31,6 +32,7 @@ export function LPOperationsTable() {
             {licensePlates.map((lp) => (
               <tr key={lp.id} className="hover:bg-slate-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{lp.lp_number}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lp.product?.part_number || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lp.product?.description || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lp.location?.name || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lp.quantity} {lp.product?.uom}</td>
