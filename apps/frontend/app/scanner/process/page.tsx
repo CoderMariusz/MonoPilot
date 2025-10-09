@@ -20,10 +20,10 @@ export default function ProcessTerminalPage() {
   const router = useRouter();
   const [selectedWOId, setSelectedWOId] = useState<number | null>(null);
   const [lpNumber, setLpNumber] = useState('');
-  const [scannedLP, setScannedLP] = useState<LicensePlate | null>(null);
+  const [scannedLPsByOrder, setScannedLPsByOrder] = useState<{ [key: number]: LicensePlate[] }>({});
   const [consumeQty, setConsumeQty] = useState('');
   const [confirmedQty, setConfirmedQty] = useState('');
-  const [createdPRs, setCreatedPRs] = useState<CreatedPR[]>([]);
+  const [createdPRsByOrder, setCreatedPRsByOrder] = useState<{ [key: number]: CreatedPR[] }>({});
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
 
@@ -33,17 +33,23 @@ export default function ProcessTerminalPage() {
   const workOrders = useWorkOrders();
   const licensePlates = useLicensePlates();
 
-  const plannedWOs = workOrders.filter(wo => wo.status === 'planned' && wo.product?.type === 'PR');
+  const availableWOs = workOrders.filter(wo => (wo.status === 'in_progress' || wo.status === 'released') && wo.product?.type === 'PR');
   const selectedWO = workOrders.find(wo => wo.id === selectedWOId);
+  const scannedLPsForCurrentOrder = selectedWOId ? (scannedLPsByOrder[selectedWOId] || []) : [];
+  const createdPRsForCurrentOrder = selectedWOId ? (createdPRsByOrder[selectedWOId] || []) : [];
+  const currentScannedLP = scannedLPsForCurrentOrder.length > 0 ? scannedLPsForCurrentOrder[scannedLPsForCurrentOrder.length - 1] : null;
 
   useEffect(() => {
     if (selectedWOId) {
+      setLpNumber('');
+      setConsumeQty('');
+      setConfirmedQty('');
       lpInputRef.current?.focus();
     }
   }, [selectedWOId]);
 
   const handleScanLP = () => {
-    if (!selectedWO) {
+    if (!selectedWO || !selectedWOId) {
       toast.error('Please select a work order first');
       return;
     }
@@ -64,7 +70,10 @@ export default function ProcessTerminalPage() {
       return;
     }
 
-    setScannedLP(lp);
+    setScannedLPsByOrder(prev => ({
+      ...prev,
+      [selectedWOId]: [...(prev[selectedWOId] || []), lp]
+    }));
     setLpNumber('');
     toast.success(`LP ${lp.lp_number} scanned successfully`);
     setTimeout(() => qtyInputRef.current?.focus(), 100);
@@ -77,16 +86,16 @@ export default function ProcessTerminalPage() {
   };
 
   const handleConfirmQty = () => {
-    if (!scannedLP || !selectedWO || !consumeQty) {
+    if (!currentScannedLP || !selectedWO || !consumeQty) {
       toast.error('Please enter quantity to consume');
       return;
     }
 
     const qty = parseFloat(consumeQty);
-    const availableQty = parseFloat(scannedLP.quantity);
+    const availableQty = parseFloat(currentScannedLP.quantity);
 
     if (qty <= 0 || qty > availableQty) {
-      toast.error(`Invalid quantity. Available: ${availableQty} ${scannedLP.product?.uom}`);
+      toast.error(`Invalid quantity. Available: ${availableQty} ${currentScannedLP.product?.uom}`);
       return;
     }
 
@@ -95,21 +104,21 @@ export default function ProcessTerminalPage() {
   };
 
   const handleCreatePR = () => {
-    if (!scannedLP || !selectedWO || !confirmedQty) {
+    if (!currentScannedLP || !selectedWO || !confirmedQty || !selectedWOId) {
       toast.error('Please confirm quantity first');
       return;
     }
 
     const qty = parseFloat(confirmedQty);
-    const availableQty = parseFloat(scannedLP.quantity);
+    const availableQty = parseFloat(currentScannedLP.quantity);
 
     if (qty <= 0 || qty > availableQty) {
-      toast.error(`Invalid quantity. Available: ${availableQty} ${scannedLP.product?.uom}`);
+      toast.error(`Invalid quantity. Available: ${availableQty} ${currentScannedLP.product?.uom}`);
       return;
     }
 
     const newLPQty = availableQty - qty;
-    updateLicensePlate(scannedLP.id, { quantity: newLPQty.toString() });
+    updateLicensePlate(currentScannedLP.id, { quantity: newLPQty.toString() });
 
     const prLPNumber = generateLPNumber();
     const newPRLP = addLicensePlate({
@@ -124,7 +133,7 @@ export default function ProcessTerminalPage() {
     addStockMove({
       move_number: `SM-${prLPNumber}`,
       lp_id: newPRLP.id,
-      from_location_id: scannedLP.location_id,
+      from_location_id: currentScannedLP.location_id,
       to_location_id: 3,
       quantity: qty.toString(),
       status: 'completed',
@@ -136,10 +145,13 @@ export default function ProcessTerminalPage() {
       productPartNumber: selectedWO.product!.part_number,
       productDescription: selectedWO.product!.description,
       quantity: qty,
-      fromLP: scannedLP.lp_number,
+      fromLP: currentScannedLP.lp_number,
     };
 
-    setCreatedPRs([...createdPRs, created]);
+    setCreatedPRsByOrder(prev => ({
+      ...prev,
+      [selectedWOId]: [...(prev[selectedWOId] || []), created]
+    }));
     
     const woQty = parseFloat(selectedWO.quantity);
     const remainingQty = woQty - qty;
@@ -161,21 +173,19 @@ export default function ProcessTerminalPage() {
     setConsumeQty('');
     setConfirmedQty('');
     
-    const updatedLP = licensePlates.find(l => l.id === scannedLP.id);
-    if (updatedLP) {
-      setScannedLP(updatedLP);
-    }
+    setScannedLPsByOrder(prev => ({
+      ...prev,
+      [selectedWOId]: (prev[selectedWOId] || []).slice(0, -1)
+    }));
     
-    setTimeout(() => qtyInputRef.current?.focus(), 100);
+    setTimeout(() => lpInputRef.current?.focus(), 100);
   };
 
   const handleReset = () => {
     setSelectedWOId(null);
-    setScannedLP(null);
     setLpNumber('');
     setConsumeQty('');
     setConfirmedQty('');
-    setCreatedPRs([]);
   };
 
   const handleAlertClose = () => {
@@ -214,8 +224,8 @@ export default function ProcessTerminalPage() {
             onChange={(e) => setSelectedWOId(e.target.value ? Number(e.target.value) : null)}
             className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
           >
-            <option value="">-- Select a planned WO --</option>
-            {plannedWOs.map(wo => (
+            <option value="">-- Select a WO --</option>
+            {availableWOs.map(wo => (
               <option key={wo.id} value={wo.id}>
                 {wo.wo_number} - {wo.product?.part_number} ({wo.quantity} {wo.product?.uom})
               </option>
@@ -276,17 +286,17 @@ export default function ProcessTerminalPage() {
               </div>
             </div>
 
-            {scannedLP && (
+            {currentScannedLP && (
               <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                 <div className="flex items-start gap-3">
                   <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
                   <div className="flex-1">
                     <h3 className="font-semibold text-slate-900 mb-2">Scanned LP Details</h3>
                     <div className="space-y-1 text-sm text-slate-700">
-                      <p><span className="font-medium">LP Number:</span> {scannedLP.lp_number}</p>
-                      <p><span className="font-medium">Product:</span> {scannedLP.product?.part_number} - {scannedLP.product?.description}</p>
-                      <p><span className="font-medium">Available Qty:</span> {scannedLP.quantity} {scannedLP.product?.uom}</p>
-                      <p><span className="font-medium">Location:</span> {scannedLP.location?.code} - {scannedLP.location?.name}</p>
+                      <p><span className="font-medium">LP Number:</span> {currentScannedLP.lp_number}</p>
+                      <p><span className="font-medium">Product:</span> {currentScannedLP.product?.part_number} - {currentScannedLP.product?.description}</p>
+                      <p><span className="font-medium">Available Qty:</span> {currentScannedLP.quantity} {currentScannedLP.product?.uom}</p>
+                      <p><span className="font-medium">Location:</span> {currentScannedLP.location?.code} - {currentScannedLP.location?.name}</p>
                     </div>
 
                     <div className="mt-4 space-y-3">
@@ -303,7 +313,7 @@ export default function ProcessTerminalPage() {
                             setConfirmedQty('');
                           }}
                           disabled={!!confirmedQty}
-                          placeholder={`Max: ${scannedLP.quantity}`}
+                          placeholder={`Max: ${currentScannedLP.quantity}`}
                           className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px] disabled:bg-slate-100 disabled:cursor-not-allowed"
                         />
                       </div>
@@ -331,13 +341,13 @@ export default function ProcessTerminalPage() {
               </div>
             )}
 
-            {createdPRs.length > 0 && (
+            {createdPRsForCurrentOrder.length > 0 && (
               <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200">
                 <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3">
-                  Created Process Recipes
+                  Created Process Recipes (This Order)
                 </h3>
                 <div className="space-y-2">
-                  {createdPRs.map((pr, idx) => (
+                  {createdPRsForCurrentOrder.map((pr, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
                       <div className="flex-1">
                         <p className="font-medium text-slate-900">{pr.lpNumber}</p>

@@ -20,21 +20,20 @@ export default function PackTerminalPage() {
   const router = useRouter();
   const [selectedWOId, setSelectedWOId] = useState<number | null>(null);
   const [lpNumber, setLpNumber] = useState('');
-  const [scannedLP, setScannedLP] = useState<LicensePlate | null>(null);
-  const [packQty, setPackQty] = useState('');
-  const [confirmedQty, setConfirmedQty] = useState('');
-  const [createdFGs, setCreatedFGs] = useState<CreatedFG[]>([]);
+  const [scannedLPsByOrder, setScannedLPsByOrder] = useState<{ [key: number]: LicensePlate[] }>({});
+  const [createdFGsByOrder, setCreatedFGsByOrder] = useState<{ [key: number]: CreatedFG[] }>({});
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
 
   const lpInputRef = useRef<HTMLInputElement>(null);
-  const qtyInputRef = useRef<HTMLInputElement>(null);
 
   const workOrders = useWorkOrders();
   const licensePlates = useLicensePlates();
 
-  const plannedWOs = workOrders.filter(wo => wo.status === 'planned' && wo.product?.type === 'FG');
+  const availableWOs = workOrders.filter(wo => (wo.status === 'in_progress' || wo.status === 'released') && wo.product?.type === 'FG');
   const selectedWO = workOrders.find(wo => wo.id === selectedWOId);
+  const scannedLPsForCurrentOrder = selectedWOId ? (scannedLPsByOrder[selectedWOId] || []) : [];
+  const createdFGsForCurrentOrder = selectedWOId ? (createdFGsByOrder[selectedWOId] || []) : [];
 
   useEffect(() => {
     if (selectedWOId) {
@@ -43,7 +42,7 @@ export default function PackTerminalPage() {
   }, [selectedWOId]);
 
   const handleScanLP = () => {
-    if (!selectedWO) {
+    if (!selectedWO || !selectedWOId) {
       toast.error('Please select a work order first');
       return;
     }
@@ -51,6 +50,13 @@ export default function PackTerminalPage() {
     const lp = licensePlates.find(l => l.lp_number === lpNumber.trim());
     if (!lp) {
       toast.error('License Plate not found');
+      return;
+    }
+
+    const alreadyScanned = scannedLPsForCurrentOrder.some(scannedLP => scannedLP.lp_number === lp.lp_number);
+    if (alreadyScanned) {
+      toast.error('This pallet has already been scanned for this order');
+      setLpNumber('');
       return;
     }
 
@@ -64,10 +70,13 @@ export default function PackTerminalPage() {
       return;
     }
 
-    setScannedLP(lp);
+    setScannedLPsByOrder({
+      ...scannedLPsByOrder,
+      [selectedWOId]: [...scannedLPsForCurrentOrder, lp]
+    });
     setLpNumber('');
-    toast.success(`LP ${lp.lp_number} scanned successfully`);
-    setTimeout(() => qtyInputRef.current?.focus(), 100);
+    toast.success(`Pallet ${lp.lp_number} added successfully`);
+    setTimeout(() => lpInputRef.current?.focus(), 100);
   };
 
   const generateLPNumber = () => {
@@ -76,40 +85,22 @@ export default function PackTerminalPage() {
     return `FG-${timestamp}-${random}`;
   };
 
-  const handleConfirmQty = () => {
-    if (!scannedLP || !selectedWO || !packQty) {
-      toast.error('Please enter quantity to pack');
-      return;
-    }
-
-    const qty = parseFloat(packQty);
-    const availableQty = parseFloat(scannedLP.quantity);
-
-    if (qty <= 0 || qty > availableQty) {
-      toast.error(`Invalid quantity. Available: ${availableQty} ${scannedLP.product?.uom}`);
-      return;
-    }
-
-    setConfirmedQty(packQty);
-    toast.success(`Quantity ${packQty} confirmed - Ready to create item`);
-  };
-
   const handleCreateFG = () => {
-    if (!scannedLP || !selectedWO || !confirmedQty) {
-      toast.error('Please confirm quantity first');
+    if (scannedLPsForCurrentOrder.length === 0 || !selectedWO || !selectedWOId) {
+      toast.error('Please scan at least one pallet first');
       return;
     }
 
-    const qty = parseFloat(confirmedQty);
-    const availableQty = parseFloat(scannedLP.quantity);
+    let totalQty = 0;
+    const consumedPallets: string[] = [];
 
-    if (qty <= 0 || qty > availableQty) {
-      toast.error(`Invalid quantity. Available: ${availableQty} ${scannedLP.product?.uom}`);
-      return;
-    }
+    scannedLPsForCurrentOrder.forEach(lp => {
+      const qty = parseFloat(lp.quantity);
+      totalQty += qty;
+      consumedPallets.push(lp.lp_number);
 
-    const newLPQty = availableQty - qty;
-    updateLicensePlate(scannedLP.id, { quantity: newLPQty.toString() });
+      updateLicensePlate(lp.id, { quantity: '0' });
+    });
 
     const fgLPNumber = generateLPNumber();
     const defaultLocationId = 1;
@@ -118,17 +109,18 @@ export default function PackTerminalPage() {
       lp_number: fgLPNumber,
       product_id: selectedWO.product!.id,
       location_id: defaultLocationId,
-      quantity: qty.toString(),
+      quantity: totalQty.toString(),
       qa_status: 'Pending',
       grn_id: null,
     });
 
+    const firstLP = scannedLPsForCurrentOrder[0];
     addStockMove({
       move_number: `SM-${fgLPNumber}`,
       lp_id: newFGLP.id,
-      from_location_id: scannedLP.location_id,
+      from_location_id: firstLP.location_id,
       to_location_id: defaultLocationId,
-      quantity: qty.toString(),
+      quantity: totalQty.toString(),
       status: 'completed',
       move_date: new Date().toISOString().split('T')[0],
     });
@@ -137,14 +129,22 @@ export default function PackTerminalPage() {
       lpNumber: fgLPNumber,
       productPartNumber: selectedWO.product!.part_number,
       productDescription: selectedWO.product!.description,
-      quantity: qty,
-      fromLP: scannedLP.lp_number,
+      quantity: totalQty,
+      fromLP: consumedPallets.join(', '),
     };
 
-    setCreatedFGs([...createdFGs, created]);
+    setCreatedFGsByOrder({
+      ...createdFGsByOrder,
+      [selectedWOId]: [...createdFGsForCurrentOrder, created]
+    });
+
+    setScannedLPsByOrder({
+      ...scannedLPsByOrder,
+      [selectedWOId]: []
+    });
     
     const woQty = parseFloat(selectedWO.quantity);
-    const remainingQty = woQty - qty;
+    const remainingQty = woQty - totalQty;
     
     if (remainingQty <= 0) {
       updateWorkOrder(selectedWO.id, { 
@@ -158,26 +158,24 @@ export default function PackTerminalPage() {
       });
     }
 
-    toast.success(`Created FG ${fgLPNumber} - ${qty} ${selectedWO.product!.uom}`);
-
-    setPackQty('');
-    setConfirmedQty('');
+    toast.success(`Created FG ${fgLPNumber} from ${scannedLPsForCurrentOrder.length} pallets - Total: ${totalQty} ${selectedWO.product!.uom}`);
     
-    const updatedLP = licensePlates.find(l => l.id === scannedLP.id);
-    if (updatedLP) {
-      setScannedLP(updatedLP);
-    }
-    
-    setTimeout(() => qtyInputRef.current?.focus(), 100);
+    setTimeout(() => lpInputRef.current?.focus(), 100);
   };
 
   const handleReset = () => {
     setSelectedWOId(null);
-    setScannedLP(null);
     setLpNumber('');
-    setPackQty('');
-    setConfirmedQty('');
-    setCreatedFGs([]);
+  };
+
+  const handleRemovePallet = (lpToRemove: LicensePlate) => {
+    if (!selectedWOId) return;
+    
+    setScannedLPsByOrder({
+      ...scannedLPsByOrder,
+      [selectedWOId]: scannedLPsForCurrentOrder.filter(lp => lp.id !== lpToRemove.id)
+    });
+    toast.success(`Removed pallet ${lpToRemove.lp_number}`);
   };
 
   const handleAlertClose = () => {
@@ -216,8 +214,8 @@ export default function PackTerminalPage() {
             onChange={(e) => setSelectedWOId(e.target.value ? Number(e.target.value) : null)}
             className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px]"
           >
-            <option value="">-- Select a planned WO --</option>
-            {plannedWOs.map(wo => (
+            <option value="">-- Select a WO --</option>
+            {availableWOs.map(wo => (
               <option key={wo.id} value={wo.id}>
                 {wo.wo_number} - {wo.product?.part_number} ({wo.quantity} {wo.product?.uom})
               </option>
@@ -278,68 +276,45 @@ export default function PackTerminalPage() {
               </div>
             </div>
 
-            {scannedLP && (
-              <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 mb-2">Scanned LP Details</h3>
-                    <div className="space-y-1 text-sm text-slate-700">
-                      <p><span className="font-medium">LP Number:</span> {scannedLP.lp_number}</p>
-                      <p><span className="font-medium">Product:</span> {scannedLP.product?.part_number} - {scannedLP.product?.description}</p>
-                      <p><span className="font-medium">Available Qty:</span> {scannedLP.quantity} {scannedLP.product?.uom}</p>
-                      <p><span className="font-medium">Location:</span> {scannedLP.location?.code} - {scannedLP.location?.name}</p>
-                    </div>
-
-                    <div className="mt-4 space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Quantity to Pack
-                        </label>
-                        <input
-                          ref={qtyInputRef}
-                          type="number"
-                          value={packQty}
-                          onChange={(e) => {
-                            setPackQty(e.target.value);
-                            setConfirmedQty('');
-                          }}
-                          disabled={!!confirmedQty}
-                          placeholder={`Max: ${scannedLP.quantity}`}
-                          className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px] disabled:bg-slate-100 disabled:cursor-not-allowed"
-                        />
+            {scannedLPsForCurrentOrder.length > 0 && (
+              <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200">
+                <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3">
+                  Scanned Pallets ({scannedLPsForCurrentOrder.length})
+                </h3>
+                <div className="space-y-2">
+                  {scannedLPsForCurrentOrder.map((lp) => (
+                    <div key={lp.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex-1">
+                        <p className="font-medium text-slate-900">{lp.lp_number}</p>
+                        <p className="text-sm text-slate-600">{lp.product?.part_number} - {lp.product?.description}</p>
+                        <p className="text-xs text-slate-500">Qty: {lp.quantity} {lp.product?.uom}</p>
                       </div>
-                      
-                      {!confirmedQty ? (
-                        <button
-                          onClick={handleConfirmQty}
-                          disabled={!packQty}
-                          className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px] disabled:bg-slate-300 disabled:cursor-not-allowed"
-                        >
-                          Confirm Quantity
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleCreateFG}
-                          className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px]"
-                        >
-                          <Package className="w-5 h-5 inline mr-2" />
-                          Create Finished Good
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleRemovePallet(lp)}
+                        className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                      >
+                        Remove
+                      </button>
                     </div>
-                  </div>
+                  ))}
                 </div>
+                <button
+                  onClick={handleCreateFG}
+                  className="w-full mt-4 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px]"
+                >
+                  <Package className="w-5 h-5 inline mr-2" />
+                  Create Finished Good from {scannedLPsForCurrentOrder.length} Pallet{scannedLPsForCurrentOrder.length !== 1 ? 's' : ''}
+                </button>
               </div>
             )}
 
-            {createdFGs.length > 0 && (
+            {createdFGsForCurrentOrder.length > 0 && (
               <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200">
                 <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3">
-                  Created Finished Goods
+                  Created Finished Goods (This Order)
                 </h3>
                 <div className="space-y-2">
-                  {createdFGs.map((fg, idx) => (
+                  {createdFGsForCurrentOrder.map((fg, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
                       <div className="flex-1">
                         <p className="font-medium text-slate-900">{fg.lpNumber}</p>

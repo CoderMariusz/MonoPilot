@@ -87,6 +87,7 @@ export interface WorkOrder {
   scheduled_end: string | null;
   machine_id: number | null;
   machine?: Machine;
+  line_number?: string | null;
   created_at: string;
   updated_at: string;
 }

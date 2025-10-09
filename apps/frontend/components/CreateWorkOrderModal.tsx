@@ -26,6 +26,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
     scheduled_end: '',
     machine_id: '',
     status: 'planned' as const,
+    line_number: '',
   });
 
   const selectedProduct = products.find(p => p.id === Number(formData.product_id));
@@ -75,6 +76,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
         scheduled_end: formData.scheduled_end || null,
         machine_id: Number(formData.machine_id) || null,
         machine,
+        line_number: formData.line_number || null,
       });
       
       onSuccess();
@@ -87,6 +89,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
         scheduled_end: '',
         machine_id: '',
         status: 'planned',
+        line_number: '',
       });
     } catch (err: any) {
       setError(err.message || 'Failed to create work order');
@@ -218,6 +221,23 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
                 <option value="planned">Planned</option>
                 <option value="released">Released</option>
                 <option value="in_progress">In Progress</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Line Number
+              </label>
+              <select
+                value={formData.line_number}
+                onChange={(e) => setFormData({ ...formData, line_number: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+              >
+                <option value="">Select a line...</option>
+                <option value="Line 1">Line 1</option>
+                <option value="Line 2">Line 2</option>
+                <option value="Line 3">Line 3</option>
+                <option value="Line 4">Line 4</option>
               </select>
             </div>
 

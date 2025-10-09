@@ -86,6 +86,7 @@ export function WorkOrdersTable() {
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Item Code</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Quantity</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Status</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Line Number</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Due Date</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Scheduled</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Material Status</th>
@@ -95,7 +96,7 @@ export function WorkOrdersTable() {
           <tbody>
             {filteredWorkOrders.length === 0 ? (
               <tr className="border-b border-slate-100">
-                <td colSpan={9} className="py-8 text-center text-slate-500 text-sm">
+                <td colSpan={10} className="py-8 text-center text-slate-500 text-sm">
                   {searchQuery ? 'No work orders found matching your search' : 'No work orders found'}
                 </td>
               </tr>
@@ -116,6 +117,7 @@ export function WorkOrdersTable() {
                       {wo.status.replace('_', ' ')}
                     </span>
                   </td>
+                  <td className="py-3 px-4 text-sm">{wo.line_number || '-'}</td>
                   <td className="py-3 px-4 text-sm">
                     {wo.due_date ? new Date(wo.due_date).toLocaleDateString() : '-'}
                   </td>
