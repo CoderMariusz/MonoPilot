@@ -152,6 +152,22 @@ npx prisma generate
 
 ## Recent Changes
 
+- 2025-10-09: **Frontend Fixes & Enhancements - Planning & Scanner Modules**
+  - **Planning Module Enhancements**:
+    - Added search functionality to all tables (WO, PO, TO) with item code search
+    - Added item code column to Work Orders table
+    - Added delete functionality to Work Orders table with confirmation
+    - Added schedule time fields (from/to) in CreateWorkOrderModal
+    - Updated WorkOrder type with scheduled_start and scheduled_end fields
+  - **Scanner Module Redesign**:
+    - Redesigned Process terminal with unified workflow (scan LP → select order → create PR)
+    - Redesigned Pack terminal with unified workflow (scan LP → select order → create FG)
+    - Added order selector dropdown filtering only "planned" status work orders
+    - Fixed quantity deduction bug - WOs now properly update quantities
+    - Added validation alerts for wrong item scans
+    - Both terminals now follow same pattern with different outputs
+  - **Architecture**: All changes use client-side state management, ready for backend integration
+
 - 2025-10-09: **Complete Frontend Rebuild - All Modules Completed**
   - **Backend Removal**: Deleted entire Laravel/PHP backend, removed Backend workflow
   - **Client-Side State Management**: Built reactive state system (lib/clientState.ts) with hooks for all entities
