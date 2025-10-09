@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ClipboardList, TrendingUp, Package, Loader2 } from 'lucide-react';
 import { WorkOrdersTable } from '@/components/WorkOrdersTable';
-import { api } from '@/lib/api';
+import { mockYieldReport, mockConsumeReport } from '@/lib/mockData';
 import type { YieldReport, ConsumeReport } from '@/lib/types';
 
 type TabType = 'work-orders' | 'yield-report' | 'consume-report';
@@ -82,8 +82,7 @@ function YieldReportTab() {
       try {
         setLoading(true);
         setError(null);
-        const report = await api.production.yieldReport();
-        setData(report);
+        setData(mockYieldReport);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load report');
       } finally {
@@ -213,8 +212,7 @@ function ConsumeReportTab() {
       try {
         setLoading(true);
         setError(null);
-        const report = await api.production.consumeReport();
-        setData(report);
+        setData(mockConsumeReport);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load report');
       } finally {

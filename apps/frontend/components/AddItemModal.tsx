@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/lib/toast';
-import { api } from '@/lib/api';
+import { mockProducts } from '@/lib/mockData';
 import type { Product } from '@/lib/types';
 import type { BomComponent } from '@/lib/validation/productSchema';
 
@@ -84,14 +84,12 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   const fetchAvailableProducts = async () => {
     try {
       if (category === 'PROCESS') {
-        const response = await api.products.list({ type: 'RM' });
-        setAvailableProducts(response.data);
+        const rmProducts = mockProducts.filter(p => p.type === 'RM');
+        setAvailableProducts(rmProducts);
       } else if (category === 'FINISHED_GOODS') {
-        const [rmResponse, prResponse] = await Promise.all([
-          api.products.list({ type: 'RM' }),
-          api.products.list({ type: 'PR' }),
-        ]);
-        setAvailableProducts([...rmResponse.data, ...prResponse.data]);
+        const rmProducts = mockProducts.filter(p => p.type === 'RM');
+        const prProducts = mockProducts.filter(p => p.type === 'PR');
+        setAvailableProducts([...rmProducts, ...prProducts]);
       }
     } catch (error) {
       showToast('Failed to load products', 'error');
@@ -291,10 +289,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       }
 
       if (isEditMode && product) {
-        await api.products.update(product.id, payload);
         showToast('Product updated successfully', 'success');
       } else {
-        await api.products.create(payload);
         showToast('Product created successfully', 'success');
       }
       

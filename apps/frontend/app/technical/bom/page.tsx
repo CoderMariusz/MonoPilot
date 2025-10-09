@@ -1,27 +1,16 @@
 import BomCatalogClient from '@/components/BomCatalogClient';
+import { mockProducts } from '@/lib/mockData';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000/api';
-
-async function fetchProducts(category: string, page: number = 1) {
-  const url = `${BACKEND_URL}/products?category=${category}&page=${page}`;
-  const res = await fetch(url, {
-    cache: 'no-store',
-  });
-  
-  if (!res.ok) {
-    return { data: [], current_page: 1, last_page: 1, total: 0 };
-  }
-  
-  return res.json();
+function filterProducts(category: string) {
+  const filtered = mockProducts.filter(p => p.category === category);
+  return { data: filtered, current_page: 1, last_page: 1, total: filtered.length };
 }
 
 export default async function BOMPage() {
-  const [meat, dryGoods, finishedGoods, process] = await Promise.all([
-    fetchProducts('MEAT'),
-    fetchProducts('DRYGOODS'),
-    fetchProducts('FINISHED_GOODS'),
-    fetchProducts('PROCESS'),
-  ]);
+  const meat = filterProducts('MEAT');
+  const dryGoods = filterProducts('DRYGOODS');
+  const finishedGoods = filterProducts('FINISHED_GOODS');
+  const process = filterProducts('PROCESS');
 
   return (
     <BomCatalogClient

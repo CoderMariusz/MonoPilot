@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { mockProducts, mockMachines } from '@/lib/mockData';
 import type { Product, Machine } from '@/lib/types';
 
 interface CreateWorkOrderModalProps {
@@ -37,15 +37,12 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [prProducts, fgProducts, machinesData] = await Promise.all([
-        api.products.list({ type: 'PR' }),
-        api.products.list({ type: 'FG' }),
-        api.machines.list(),
-      ]);
+      const prProducts = mockProducts.filter(p => p.type === 'PR');
+      const fgProducts = mockProducts.filter(p => p.type === 'FG');
       
-      const allProducts = [...prProducts.data, ...fgProducts.data];
+      const allProducts = [...prProducts, ...fgProducts];
       setProducts(allProducts);
-      setMachines(machinesData);
+      setMachines(mockMachines);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {
@@ -59,17 +56,6 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
     setError(null);
 
     try {
-      const woNumber = `WO-${Date.now()}`;
-      
-      await api.workOrders.create({
-        wo_number: woNumber,
-        product_id: Number(formData.product_id),
-        quantity: Number(formData.quantity),
-        status: formData.status,
-        due_date: formData.due_date || undefined,
-        machine_id: formData.machine_id ? Number(formData.machine_id) : undefined,
-      });
-
       onSuccess();
       onClose();
       setFormData({

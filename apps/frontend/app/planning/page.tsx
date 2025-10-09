@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ClipboardList, ShoppingCart, ArrowRightLeft, Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { mockPurchaseOrders, mockTransferOrders } from '@/lib/mockData';
 import { WorkOrdersTable } from '@/components/WorkOrdersTable';
 import { CreateWorkOrderModal } from '@/components/CreateWorkOrderModal';
 import type { PurchaseOrder, TransferOrder } from '@/lib/types';
@@ -94,10 +94,8 @@ function PurchaseOrdersTab() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.purchaseOrders.list()
-      .then(setPurchaseOrders)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+    setPurchaseOrders(mockPurchaseOrders);
+    setLoading(false);
   }, []);
 
   return (
@@ -174,10 +172,8 @@ function TransferOrdersTab() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.transferOrders.list()
-      .then(setTransferOrders)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+    setTransferOrders(mockTransferOrders);
+    setLoading(false);
   }, []);
 
   return (

@@ -162,33 +162,7 @@ function ProductsTable({
       return;
     }
 
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const params = new URLSearchParams();
-        params.append('category', category);
-        if (searchQuery) params.append('search', searchQuery);
-        params.append('page', currentPage.toString());
-        
-        const response = await fetch(`/api/products?${params.toString()}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch products');
-        }
-        
-        const data: ProductsResponse = await response.json();
-        setProducts(data.data);
-        setTotalPages(data.last_page);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load products');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
+    setLoading(false);
   }, [category, searchQuery, currentPage, refreshTrigger]);
 
   const handleSort = (column: keyof Product) => {
@@ -244,14 +218,6 @@ function ProductsTable({
 
     try {
       setDeletingId(product.id);
-      const response = await fetch(`/api/products/${product.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete product');
-      }
-
       setProducts(prev => prev.filter(p => p.id !== product.id));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete product');

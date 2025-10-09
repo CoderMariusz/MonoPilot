@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { mockWorkOrderDetails } from '@/lib/mockData';
 
 interface BomComponent {
   material_id: number;
@@ -55,7 +55,10 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
     setLoading(true);
     setError(null);
     try {
-      const data = await api.workOrders.getDetails(workOrderId);
+      const data = mockWorkOrderDetails(workOrderId);
+      if (!data) {
+        throw new Error('Work order not found');
+      }
       setDetails(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load work order details');

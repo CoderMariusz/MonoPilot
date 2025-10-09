@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Loader2, Eye } from 'lucide-react';
-import { api } from '@/lib/api';
+import { mockWorkOrders } from '@/lib/mockData';
 import { WorkOrderDetailsModal } from '@/components/WorkOrderDetailsModal';
 import type { WorkOrder } from '@/lib/types';
 
@@ -14,10 +14,8 @@ export function WorkOrdersTable() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   useEffect(() => {
-    api.workOrders.list()
-      .then(setWorkOrders)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+    setWorkOrders(mockWorkOrders);
+    setLoading(false);
   }, []);
 
   const handleViewDetails = (workOrderId: number) => {
