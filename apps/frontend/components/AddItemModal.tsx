@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { X, ArrowLeft, Loader2, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/lib/toast';
 import { mockProducts } from '@/lib/mockData';
-import type { Product } from '@/lib/types';
+import { useAllergens, useProducts } from '@/lib/clientState';
+import type { Product, Allergen } from '@/lib/types';
 import type { BomComponent } from '@/lib/validation/productSchema';
 
 type CategoryType = 'MEAT' | 'DRYGOODS' | 'FINISHED_GOODS' | 'PROCESS';
@@ -24,6 +25,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { showToast } = useToast();
+  const allergens = useAllergens();
+  const allProducts = useProducts();
 
   const [formData, setFormData] = useState({
     part_number: '',
@@ -34,6 +37,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     subtype: '',
     expiry_policy: '' as ExpiryPolicy | '',
     shelf_life_days: '',
+    allergen_ids: [] as number[],
+    rate: '',
   });
 
   const [bomComponents, setBomComponents] = useState<Array<{
@@ -58,6 +63,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         subtype: product.subtype || '',
         expiry_policy: (product.expiry_policy as ExpiryPolicy) || '',
         shelf_life_days: product.shelf_life_days?.toString() || '',
+        allergen_ids: product.allergen_ids || [],
+        rate: product.rate?.toString() || '',
       });
 
       if (product.activeBom?.bomItems && product.activeBom.bomItems.length > 0) {
@@ -96,6 +103,37 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     }
   };
 
+  const getInheritedAllergens = useMemo(() => {
+    if (!category || (category !== 'FINISHED_GOODS' && category !== 'PROCESS')) {
+      return [];
+    }
+
+    const inheritedAllergens: Array<{ allergen: Allergen; source: Product }> = [];
+    const allergenMap = new Map<number, { allergen: Allergen; sources: Product[] }>();
+
+    bomComponents.forEach(component => {
+      if (component.product_id) {
+        const material = allProducts.find(p => p.id === parseInt(component.product_id));
+        if (material && material.allergens && material.allergens.length > 0) {
+          material.allergens.forEach(allergen => {
+            if (!allergenMap.has(allergen.id)) {
+              allergenMap.set(allergen.id, { allergen, sources: [] });
+            }
+            allergenMap.get(allergen.id)!.sources.push(material);
+          });
+        }
+      }
+    });
+
+    allergenMap.forEach(({ allergen, sources }) => {
+      sources.forEach(source => {
+        inheritedAllergens.push({ allergen, source });
+      });
+    });
+
+    return inheritedAllergens;
+  }, [category, bomComponents, allProducts]);
+
   const resetForm = () => {
     setStep(1);
     setCategory(null);
@@ -108,6 +146,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       subtype: '',
       expiry_policy: '',
       shelf_life_days: '',
+      allergen_ids: [],
+      rate: '',
     });
     setBomComponents([{ product_id: '', quantity: '', uom: '' }]);
     setErrors({});
@@ -142,6 +182,15 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         return newErrors;
       });
     }
+  };
+
+  const toggleAllergen = (allergenId: number) => {
+    setFormData(prev => ({
+      ...prev,
+      allergen_ids: prev.allergen_ids.includes(allergenId)
+        ? prev.allergen_ids.filter(id => id !== allergenId)
+        : [...prev.allergen_ids, allergenId]
+    }));
   };
 
   const addBomComponent = () => {
@@ -256,6 +305,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         std_price: parseFloat(formData.std_price),
         notes: formData.notes || undefined,
         category: category,
+        allergen_ids: formData.allergen_ids,
       };
 
       if (category === 'MEAT') {
@@ -273,6 +323,9 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         }
       } else if (category === 'FINISHED_GOODS') {
         payload.type = 'FG';
+        if (formData.rate) {
+          payload.rate = parseFloat(formData.rate);
+        }
         payload.bom_items = bomComponents.map(c => ({
           material_id: parseInt(c.product_id),
           quantity: parseFloat(c.quantity),
@@ -559,6 +612,52 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                 </div>
               )}
 
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Allergens
+                </label>
+                <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                  {allergens.length === 0 ? (
+                    <p className="text-sm text-slate-500">No allergens available</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {allergens.map(allergen => (
+                        <button
+                          key={allergen.id}
+                          type="button"
+                          onClick={() => toggleAllergen(allergen.id)}
+                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                            formData.allergen_ids.includes(allergen.id)
+                              ? 'bg-amber-500 text-white'
+                              : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {allergen.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {category === 'FINISHED_GOODS' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Rate (units/hour)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.rate}
+                    onChange={(e) => updateFormField('rate', e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    placeholder="e.g., 100"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Production rate in units per hour</p>
+                </div>
+              )}
+
               {(category === 'FINISHED_GOODS' || category === 'PROCESS') && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -649,6 +748,31 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                         Note: Per-line settings can be configured after creation
                       </p>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {(category === 'FINISHED_GOODS' || category === 'PROCESS') && getInheritedAllergens.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    <label className="block text-sm font-medium text-slate-700">
+                      Inherited Allergens
+                    </label>
+                  </div>
+                  <div className="border border-amber-200 rounded-lg p-3 bg-amber-50">
+                    <div className="space-y-1">
+                      {getInheritedAllergens.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <span className="font-medium text-amber-800">{item.allergen.name}</span>
+                          <span className="text-slate-600">from</span>
+                          <span className="text-slate-700">{item.source.part_number} {item.source.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-amber-700 mt-2">
+                      These allergens are inherited from BOM materials
+                    </p>
                   </div>
                 </div>
               )}

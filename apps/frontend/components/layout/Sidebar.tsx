@@ -10,7 +10,8 @@ import {
   ScanLine, 
   Settings, 
   Wrench,
-  FileText
+  FileText,
+  ShieldAlert
 } from 'lucide-react';
 
 const menuItems = [
@@ -26,7 +27,8 @@ const menuItems = [
       { href: '/technical/bom', label: 'BOM', icon: FileText },
     ]
   },
-  { href: '/admin', label: 'Admin', icon: Settings },
+  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/admin', label: 'Admin', icon: ShieldAlert },
 ];
 
 export default function Sidebar() {

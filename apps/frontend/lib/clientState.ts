@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location } from './types';
+import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen } from './types';
 import { 
   mockWorkOrders, 
   mockPurchaseOrders, 
@@ -13,7 +13,9 @@ import {
   mockUsers,
   mockSessions,
   mockSettings,
-  mockLocations
+  mockLocations,
+  mockMachines,
+  mockAllergens
 } from './mockData';
 
 type Listener = () => void;
@@ -31,6 +33,8 @@ class ClientState {
   private settings: Settings = { ...mockSettings };
   private yieldReports: YieldReportDetail[] = [];
   private locations: Location[] = [...mockLocations];
+  private machines: Machine[] = [...mockMachines];
+  private allergens: Allergen[] = [...mockAllergens];
   
   private workOrderListeners: Listener[] = [];
   private purchaseOrderListeners: Listener[] = [];
@@ -43,6 +47,9 @@ class ClientState {
   private sessionListeners: Listener[] = [];
   private settingsListeners: Listener[] = [];
   private yieldReportListeners: Listener[] = [];
+  private locationListeners: Listener[] = [];
+  private machineListeners: Listener[] = [];
+  private allergenListeners: Listener[] = [];
 
   getWorkOrders(): WorkOrder[] {
     return [...this.workOrders];
@@ -57,7 +64,12 @@ class ClientState {
   }
 
   getProducts(): Product[] {
-    return [...this.products];
+    return this.products.map(product => ({
+      ...product,
+      allergens: product.allergen_ids 
+        ? product.allergen_ids.map(id => this.allergens.find(a => a.id === id)).filter(Boolean) as Allergen[]
+        : undefined,
+    }));
   }
 
   getGRNs(): GRN[] {
@@ -74,6 +86,14 @@ class ClientState {
 
   getLocations(): Location[] {
     return [...this.locations];
+  }
+
+  getMachines(): Machine[] {
+    return [...this.machines];
+  }
+
+  getAllergens(): Allergen[] {
+    return [...this.allergens];
   }
 
   getStockMoves(): StockMove[] {
@@ -146,6 +166,27 @@ class ClientState {
     };
   }
 
+  subscribeToLocations(listener: Listener): () => void {
+    this.locationListeners.push(listener);
+    return () => {
+      this.locationListeners = this.locationListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToMachines(listener: Listener): () => void {
+    this.machineListeners.push(listener);
+    return () => {
+      this.machineListeners = this.machineListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToAllergens(listener: Listener): () => void {
+    this.allergenListeners.push(listener);
+    return () => {
+      this.allergenListeners = this.allergenListeners.filter(l => l !== listener);
+    };
+  }
+
   private notifyWorkOrderListeners() {
     this.workOrderListeners.forEach(listener => listener());
   }
@@ -172,6 +213,18 @@ class ClientState {
 
   private notifyStockMoveListeners() {
     this.stockMoveListeners.forEach(listener => listener());
+  }
+
+  private notifyLocationListeners() {
+    this.locationListeners.forEach(listener => listener());
+  }
+
+  private notifyMachineListeners() {
+    this.machineListeners.forEach(listener => listener());
+  }
+
+  private notifyAllergenListeners() {
+    this.allergenListeners.forEach(listener => listener());
   }
 
   addWorkOrder(workOrder: Omit<WorkOrder, 'id' | 'created_at' | 'updated_at'>): WorkOrder {
@@ -470,6 +523,135 @@ class ClientState {
     this.stockMoves = this.stockMoves.filter(m => m.id !== id);
     if (this.stockMoves.length < initialLength) {
       this.notifyStockMoveListeners();
+      return true;
+    }
+    return false;
+  }
+
+  addLocation(location: Omit<Location, 'id' | 'created_at' | 'updated_at'>): Location {
+    const newLocation: Location = {
+      ...location,
+      id: Math.max(...this.locations.map(l => l.id), 0) + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.locations = [...this.locations, newLocation];
+    this.notifyLocationListeners();
+    return newLocation;
+  }
+
+  updateLocation(id: number, updates: Partial<Location>): Location | null {
+    const index = this.locations.findIndex(l => l.id === id);
+    if (index === -1) return null;
+
+    const updatedLocation: Location = {
+      ...this.locations[index],
+      ...updates,
+      id: this.locations[index].id,
+      updated_at: new Date().toISOString(),
+    };
+    
+    this.locations = [
+      ...this.locations.slice(0, index),
+      updatedLocation,
+      ...this.locations.slice(index + 1),
+    ];
+    
+    this.notifyLocationListeners();
+    return updatedLocation;
+  }
+
+  deleteLocation(id: number): boolean {
+    const initialLength = this.locations.length;
+    this.locations = this.locations.filter(l => l.id !== id);
+    if (this.locations.length < initialLength) {
+      this.notifyLocationListeners();
+      return true;
+    }
+    return false;
+  }
+
+  addMachine(machine: Omit<Machine, 'id' | 'created_at' | 'updated_at'>): Machine {
+    const newMachine: Machine = {
+      ...machine,
+      id: Math.max(...this.machines.map(m => m.id), 0) + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.machines = [...this.machines, newMachine];
+    this.notifyMachineListeners();
+    return newMachine;
+  }
+
+  updateMachine(id: number, updates: Partial<Machine>): Machine | null {
+    const index = this.machines.findIndex(m => m.id === id);
+    if (index === -1) return null;
+
+    const updatedMachine: Machine = {
+      ...this.machines[index],
+      ...updates,
+      id: this.machines[index].id,
+      updated_at: new Date().toISOString(),
+    };
+    
+    this.machines = [
+      ...this.machines.slice(0, index),
+      updatedMachine,
+      ...this.machines.slice(index + 1),
+    ];
+    
+    this.notifyMachineListeners();
+    return updatedMachine;
+  }
+
+  deleteMachine(id: number): boolean {
+    const initialLength = this.machines.length;
+    this.machines = this.machines.filter(m => m.id !== id);
+    if (this.machines.length < initialLength) {
+      this.notifyMachineListeners();
+      return true;
+    }
+    return false;
+  }
+
+  addAllergen(allergen: Omit<Allergen, 'id' | 'created_at' | 'updated_at'>): Allergen {
+    const newAllergen: Allergen = {
+      ...allergen,
+      id: Math.max(...this.allergens.map(a => a.id), 0) + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.allergens = [...this.allergens, newAllergen];
+    this.notifyAllergenListeners();
+    return newAllergen;
+  }
+
+  updateAllergen(id: number, updates: Partial<Allergen>): Allergen | null {
+    const index = this.allergens.findIndex(a => a.id === id);
+    if (index === -1) return null;
+
+    const updatedAllergen: Allergen = {
+      ...this.allergens[index],
+      ...updates,
+      id: this.allergens[index].id,
+      updated_at: new Date().toISOString(),
+    };
+    
+    this.allergens = [
+      ...this.allergens.slice(0, index),
+      updatedAllergen,
+      ...this.allergens.slice(index + 1),
+    ];
+    
+    this.notifyAllergenListeners();
+    return updatedAllergen;
+  }
+
+  deleteAllergen(id: number): boolean {
+    const initialLength = this.allergens.length;
+    this.allergens = this.allergens.filter(a => a.id !== id);
+    if (this.allergens.length < initialLength) {
+      this.notifyAllergenListeners();
       return true;
     }
     return false;
@@ -878,4 +1060,79 @@ export function useYieldReports() {
 
 export function addYieldReport(report: YieldReportDetail): YieldReportDetail {
   return clientState.addYieldReport(report);
+}
+
+export function useLocations() {
+  const [locations, setLocations] = useState<Location[]>(clientState.getLocations());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToLocations(() => {
+      setLocations(clientState.getLocations());
+    });
+    return unsubscribe;
+  }, []);
+
+  return locations;
+}
+
+export function useMachines() {
+  const [machines, setMachines] = useState<Machine[]>(clientState.getMachines());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToMachines(() => {
+      setMachines(clientState.getMachines());
+    });
+    return unsubscribe;
+  }, []);
+
+  return machines;
+}
+
+export function useAllergens() {
+  const [allergens, setAllergens] = useState<Allergen[]>(clientState.getAllergens());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToAllergens(() => {
+      setAllergens(clientState.getAllergens());
+    });
+    return unsubscribe;
+  }, []);
+
+  return allergens;
+}
+
+export function addLocation(location: Omit<Location, 'id' | 'created_at' | 'updated_at'>): Location {
+  return clientState.addLocation(location);
+}
+
+export function updateLocation(id: number, updates: Partial<Location>): Location | null {
+  return clientState.updateLocation(id, updates);
+}
+
+export function deleteLocation(id: number): boolean {
+  return clientState.deleteLocation(id);
+}
+
+export function addMachine(machine: Omit<Machine, 'id' | 'created_at' | 'updated_at'>): Machine {
+  return clientState.addMachine(machine);
+}
+
+export function updateMachine(id: number, updates: Partial<Machine>): Machine | null {
+  return clientState.updateMachine(id, updates);
+}
+
+export function deleteMachine(id: number): boolean {
+  return clientState.deleteMachine(id);
+}
+
+export function addAllergen(allergen: Omit<Allergen, 'id' | 'created_at' | 'updated_at'>): Allergen {
+  return clientState.addAllergen(allergen);
+}
+
+export function updateAllergen(id: number, updates: Partial<Allergen>): Allergen | null {
+  return clientState.updateAllergen(id, updates);
+}
+
+export function deleteAllergen(id: number): boolean {
+  return clientState.deleteAllergen(id);
 }

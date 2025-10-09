@@ -50,6 +50,9 @@ export interface Product {
   expiry_policy?: ExpiryPolicyType | null;
   shelf_life_days?: number | null;
   std_price?: string | null;
+  allergen_ids?: number[];
+  rate?: number;
+  allergens?: Allergen[];
   activeBom?: Bom | null;
   lineSettings?: ProductLineSettings[];
   created_at: string;
@@ -60,7 +63,17 @@ export interface Machine {
   id: number;
   code: string;
   name: string;
+  type: string;
   is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Allergen {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
   created_at: string;
   updated_at: string;
 }

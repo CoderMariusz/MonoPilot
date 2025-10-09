@@ -16,19 +16,23 @@ import type {
   User,
   Session,
   Settings,
+  Allergen,
 } from './types';
-
-export const mockMachines: Machine[] = [
-  { id: 1, code: 'LINE-01', name: 'Production Line 1', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-  { id: 2, code: 'LINE-02', name: 'Production Line 2', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-  { id: 3, code: 'LINE-03', name: 'Production Line 3', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-  { id: 4, code: 'PKG-01', name: 'Packaging Line 1', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-];
 
 export const mockLocations: Location[] = [
   { id: 1, code: 'WH-01', name: 'Main Warehouse', zone: 'A', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   { id: 2, code: 'WH-02', name: 'Cold Storage', zone: 'B', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   { id: 3, code: 'PROD-01', name: 'Production Floor', zone: 'C', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+];
+
+export const mockMachines: Machine[] = [
+  { id: 1, code: 'MCH-001', name: 'Mixer A', type: 'Mixer', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 2, code: 'MCH-002', name: 'Oven B', type: 'Oven', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+];
+
+export const mockAllergens: Allergen[] = [
+  { id: 1, code: 'ALG-001', name: 'Gluten', description: 'Contains wheat gluten', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 2, code: 'ALG-002', name: 'Dairy', description: 'Contains milk products', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
 ];
 
 const mockBomItems: Record<number, BomItem[]> = {
@@ -69,6 +73,7 @@ export const mockProducts: Product[] = [
     expiry_policy: 'FROM_DELIVERY_DATE',
     shelf_life_days: 14,
     std_price: '12.50',
+    allergen_ids: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-15T00:00:00Z',
   },
@@ -84,6 +89,7 @@ export const mockProducts: Product[] = [
     expiry_policy: 'FROM_DELIVERY_DATE',
     shelf_life_days: 10,
     std_price: '8.75',
+    allergen_ids: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-10T00:00:00Z',
   },
@@ -99,6 +105,7 @@ export const mockProducts: Product[] = [
     expiry_policy: 'DAYS_STATIC',
     shelf_life_days: 7,
     std_price: '6.25',
+    allergen_ids: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-20T00:00:00Z',
   },
@@ -114,6 +121,7 @@ export const mockProducts: Product[] = [
     expiry_policy: 'DAYS_STATIC',
     shelf_life_days: 365,
     std_price: '1.20',
+    allergen_ids: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-05T00:00:00Z',
   },
@@ -129,6 +137,7 @@ export const mockProducts: Product[] = [
     expiry_policy: 'FROM_MFG_DATE',
     shelf_life_days: 180,
     std_price: '15.50',
+    allergen_ids: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-08T00:00:00Z',
   },
@@ -144,6 +153,7 @@ export const mockProducts: Product[] = [
     expiry_policy: null,
     shelf_life_days: null,
     std_price: '0.45',
+    allergen_ids: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-12T00:00:00Z',
   },
@@ -159,6 +169,7 @@ export const mockProducts: Product[] = [
     expiry_policy: null,
     shelf_life_days: null,
     std_price: '0.15',
+    allergen_ids: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-18T00:00:00Z',
   },
@@ -174,8 +185,25 @@ export const mockProducts: Product[] = [
     expiry_policy: null,
     shelf_life_days: null,
     std_price: '0.85',
+    allergen_ids: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-22T00:00:00Z',
+  },
+  {
+    id: 13,
+    part_number: 'DG-006',
+    description: 'Breadcrumbs',
+    type: 'RM',
+    uom: 'KG',
+    is_active: true,
+    category: 'DRYGOODS',
+    subtype: 'Ing',
+    expiry_policy: 'FROM_MFG_DATE',
+    shelf_life_days: 90,
+    std_price: '3.50',
+    allergen_ids: [1],
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-15T00:00:00Z',
   },
   {
     id: 9,
@@ -189,6 +217,7 @@ export const mockProducts: Product[] = [
     expiry_policy: 'FROM_CREATION_DATE',
     shelf_life_days: 3,
     std_price: '14.25',
+    allergen_ids: [],
     activeBom: mockBoms[9],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-25T00:00:00Z',
@@ -205,6 +234,7 @@ export const mockProducts: Product[] = [
     expiry_policy: 'FROM_CREATION_DATE',
     shelf_life_days: 5,
     std_price: '10.50',
+    allergen_ids: [],
     activeBom: mockBoms[10],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-28T00:00:00Z',
@@ -221,6 +251,8 @@ export const mockProducts: Product[] = [
     expiry_policy: null,
     shelf_life_days: null,
     std_price: '2.99',
+    allergen_ids: [],
+    rate: 100,
     activeBom: mockBoms[11],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-02-01T00:00:00Z',
@@ -237,6 +269,8 @@ export const mockProducts: Product[] = [
     expiry_policy: null,
     shelf_life_days: null,
     std_price: '5.49',
+    allergen_ids: [],
+    rate: 80,
     activeBom: mockBoms[12],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-02-05T00:00:00Z',
