@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { WorkOrder, PurchaseOrder, TransferOrder, Product } from './types';
+import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove } from './types';
 import { 
   mockWorkOrders, 
   mockPurchaseOrders, 
   mockTransferOrders, 
-  mockProducts 
+  mockProducts,
+  mockGRNs,
+  mockLicensePlates,
+  mockStockMoves
 } from './mockData';
 
 type Listener = () => void;
@@ -16,11 +19,17 @@ class ClientState {
   private purchaseOrders: PurchaseOrder[] = [...mockPurchaseOrders];
   private transferOrders: TransferOrder[] = [...mockTransferOrders];
   private products: Product[] = [...mockProducts];
+  private grns: GRN[] = [...mockGRNs];
+  private licensePlates: LicensePlate[] = [...mockLicensePlates];
+  private stockMoves: StockMove[] = [...mockStockMoves];
   
   private workOrderListeners: Listener[] = [];
   private purchaseOrderListeners: Listener[] = [];
   private transferOrderListeners: Listener[] = [];
   private productListeners: Listener[] = [];
+  private grnListeners: Listener[] = [];
+  private licensePlateListeners: Listener[] = [];
+  private stockMoveListeners: Listener[] = [];
 
   getWorkOrders(): WorkOrder[] {
     return [...this.workOrders];
@@ -36,6 +45,18 @@ class ClientState {
 
   getProducts(): Product[] {
     return [...this.products];
+  }
+
+  getGRNs(): GRN[] {
+    return [...this.grns];
+  }
+
+  getLicensePlates(): LicensePlate[] {
+    return [...this.licensePlates];
+  }
+
+  getStockMoves(): StockMove[] {
+    return [...this.stockMoves];
   }
 
   subscribeToWorkOrders(listener: Listener): () => void {
@@ -66,6 +87,27 @@ class ClientState {
     };
   }
 
+  subscribeToGRNs(listener: Listener): () => void {
+    this.grnListeners.push(listener);
+    return () => {
+      this.grnListeners = this.grnListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToLicensePlates(listener: Listener): () => void {
+    this.licensePlateListeners.push(listener);
+    return () => {
+      this.licensePlateListeners = this.licensePlateListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToStockMoves(listener: Listener): () => void {
+    this.stockMoveListeners.push(listener);
+    return () => {
+      this.stockMoveListeners = this.stockMoveListeners.filter(l => l !== listener);
+    };
+  }
+
   private notifyWorkOrderListeners() {
     this.workOrderListeners.forEach(listener => listener());
   }
@@ -80,6 +122,18 @@ class ClientState {
 
   private notifyProductListeners() {
     this.productListeners.forEach(listener => listener());
+  }
+
+  private notifyGRNListeners() {
+    this.grnListeners.forEach(listener => listener());
+  }
+
+  private notifyLicensePlateListeners() {
+    this.licensePlateListeners.forEach(listener => listener());
+  }
+
+  private notifyStockMoveListeners() {
+    this.stockMoveListeners.forEach(listener => listener());
   }
 
   addWorkOrder(workOrder: Omit<WorkOrder, 'id' | 'created_at' | 'updated_at'>): WorkOrder {
@@ -253,6 +307,135 @@ class ClientState {
     }
     return false;
   }
+
+  addGRN(grn: Omit<GRN, 'id' | 'created_at' | 'updated_at'>): GRN {
+    const newGRN: GRN = {
+      ...grn,
+      id: Math.max(...this.grns.map(g => g.id), 0) + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.grns = [...this.grns, newGRN];
+    this.notifyGRNListeners();
+    return newGRN;
+  }
+
+  updateGRN(id: number, updates: Partial<GRN>): GRN | null {
+    const index = this.grns.findIndex(g => g.id === id);
+    if (index === -1) return null;
+
+    const updatedGRN: GRN = {
+      ...this.grns[index],
+      ...updates,
+      id: this.grns[index].id,
+      updated_at: new Date().toISOString(),
+    };
+    
+    this.grns = [
+      ...this.grns.slice(0, index),
+      updatedGRN,
+      ...this.grns.slice(index + 1),
+    ];
+    
+    this.notifyGRNListeners();
+    return updatedGRN;
+  }
+
+  deleteGRN(id: number): boolean {
+    const initialLength = this.grns.length;
+    this.grns = this.grns.filter(g => g.id !== id);
+    if (this.grns.length < initialLength) {
+      this.notifyGRNListeners();
+      return true;
+    }
+    return false;
+  }
+
+  addLicensePlate(lp: Omit<LicensePlate, 'id' | 'created_at' | 'updated_at'>): LicensePlate {
+    const newLP: LicensePlate = {
+      ...lp,
+      id: Math.max(...this.licensePlates.map(lp => lp.id), 0) + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.licensePlates = [...this.licensePlates, newLP];
+    this.notifyLicensePlateListeners();
+    return newLP;
+  }
+
+  updateLicensePlate(id: number, updates: Partial<LicensePlate>): LicensePlate | null {
+    const index = this.licensePlates.findIndex(lp => lp.id === id);
+    if (index === -1) return null;
+
+    const updatedLP: LicensePlate = {
+      ...this.licensePlates[index],
+      ...updates,
+      id: this.licensePlates[index].id,
+      updated_at: new Date().toISOString(),
+    };
+    
+    this.licensePlates = [
+      ...this.licensePlates.slice(0, index),
+      updatedLP,
+      ...this.licensePlates.slice(index + 1),
+    ];
+    
+    this.notifyLicensePlateListeners();
+    return updatedLP;
+  }
+
+  deleteLicensePlate(id: number): boolean {
+    const initialLength = this.licensePlates.length;
+    this.licensePlates = this.licensePlates.filter(lp => lp.id !== id);
+    if (this.licensePlates.length < initialLength) {
+      this.notifyLicensePlateListeners();
+      return true;
+    }
+    return false;
+  }
+
+  addStockMove(move: Omit<StockMove, 'id' | 'created_at' | 'updated_at'>): StockMove {
+    const newMove: StockMove = {
+      ...move,
+      id: Math.max(...this.stockMoves.map(m => m.id), 0) + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.stockMoves = [...this.stockMoves, newMove];
+    this.notifyStockMoveListeners();
+    return newMove;
+  }
+
+  updateStockMove(id: number, updates: Partial<StockMove>): StockMove | null {
+    const index = this.stockMoves.findIndex(m => m.id === id);
+    if (index === -1) return null;
+
+    const updatedMove: StockMove = {
+      ...this.stockMoves[index],
+      ...updates,
+      id: this.stockMoves[index].id,
+      updated_at: new Date().toISOString(),
+    };
+    
+    this.stockMoves = [
+      ...this.stockMoves.slice(0, index),
+      updatedMove,
+      ...this.stockMoves.slice(index + 1),
+    ];
+    
+    this.notifyStockMoveListeners();
+    return updatedMove;
+  }
+
+  deleteStockMove(id: number): boolean {
+    const initialLength = this.stockMoves.length;
+    this.stockMoves = this.stockMoves.filter(m => m.id !== id);
+    if (this.stockMoves.length < initialLength) {
+      this.notifyStockMoveListeners();
+      return true;
+    }
+    return false;
+  }
 }
 
 const clientState = new ClientState();
@@ -355,4 +538,79 @@ export function updateProduct(id: number, updates: Partial<Product>): Product | 
 
 export function deleteProduct(id: number): boolean {
   return clientState.deleteProduct(id);
+}
+
+export function useGRNs() {
+  const [grns, setGRNs] = useState<GRN[]>(clientState.getGRNs());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToGRNs(() => {
+      setGRNs(clientState.getGRNs());
+    });
+    return unsubscribe;
+  }, []);
+
+  return grns;
+}
+
+export function useLicensePlates() {
+  const [licensePlates, setLicensePlates] = useState<LicensePlate[]>(clientState.getLicensePlates());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToLicensePlates(() => {
+      setLicensePlates(clientState.getLicensePlates());
+    });
+    return unsubscribe;
+  }, []);
+
+  return licensePlates;
+}
+
+export function useStockMoves() {
+  const [stockMoves, setStockMoves] = useState<StockMove[]>(clientState.getStockMoves());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToStockMoves(() => {
+      setStockMoves(clientState.getStockMoves());
+    });
+    return unsubscribe;
+  }, []);
+
+  return stockMoves;
+}
+
+export function addGRN(grn: Omit<GRN, 'id' | 'created_at' | 'updated_at'>): GRN {
+  return clientState.addGRN(grn);
+}
+
+export function updateGRN(id: number, updates: Partial<GRN>): GRN | null {
+  return clientState.updateGRN(id, updates);
+}
+
+export function deleteGRN(id: number): boolean {
+  return clientState.deleteGRN(id);
+}
+
+export function addLicensePlate(lp: Omit<LicensePlate, 'id' | 'created_at' | 'updated_at'>): LicensePlate {
+  return clientState.addLicensePlate(lp);
+}
+
+export function updateLicensePlate(id: number, updates: Partial<LicensePlate>): LicensePlate | null {
+  return clientState.updateLicensePlate(id, updates);
+}
+
+export function deleteLicensePlate(id: number): boolean {
+  return clientState.deleteLicensePlate(id);
+}
+
+export function addStockMove(move: Omit<StockMove, 'id' | 'created_at' | 'updated_at'>): StockMove {
+  return clientState.addStockMove(move);
+}
+
+export function updateStockMove(id: number, updates: Partial<StockMove>): StockMove | null {
+  return clientState.updateStockMove(id, updates);
+}
+
+export function deleteStockMove(id: number): boolean {
+  return clientState.deleteStockMove(id);
 }

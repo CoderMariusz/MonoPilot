@@ -291,3 +291,61 @@ export interface UpdateLineSettingData {
 export interface BulkUpsertLineSettingsData {
   settings: CreateLineSettingData[];
 }
+
+export type QAStatus = 'Pending' | 'Passed' | 'Failed' | 'Quarantine';
+
+export interface LicensePlate {
+  id: number;
+  lp_number: string;
+  product_id: number;
+  product?: Product;
+  location_id: number;
+  location?: Location;
+  quantity: string;
+  qa_status: QAStatus;
+  grn_id?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GRNItem {
+  id: number;
+  grn_id: number;
+  product_id: number;
+  product?: Product;
+  quantity_ordered: string;
+  quantity_received: string;
+  location_id: number;
+  location?: Location;
+  lp_number?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GRN {
+  id: number;
+  grn_number: string;
+  po_id: number;
+  po?: PurchaseOrder;
+  status: 'draft' | 'completed' | 'cancelled';
+  received_date: string | null;
+  grn_items?: GRNItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StockMove {
+  id: number;
+  move_number: string;
+  lp_id: number;
+  lp?: LicensePlate;
+  from_location_id: number;
+  from_location?: Location;
+  to_location_id: number;
+  to_location?: Location;
+  quantity: string;
+  status: 'draft' | 'completed' | 'cancelled';
+  move_date: string | null;
+  created_at: string;
+  updated_at: string;
+}

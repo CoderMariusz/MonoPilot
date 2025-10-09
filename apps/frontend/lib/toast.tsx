@@ -27,6 +27,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }, 5000);
   }, []);
 
+  setGlobalToast(showToast);
+
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   }, []);
@@ -73,3 +75,18 @@ export function useToast() {
   }
   return context;
 }
+
+let globalToast: ((message: string, type: 'success' | 'error') => void) | null = null;
+
+export function setGlobalToast(showToast: (message: string, type: 'success' | 'error') => void) {
+  globalToast = showToast;
+}
+
+export const toast = {
+  success: (message: string) => {
+    if (globalToast) globalToast(message, 'success');
+  },
+  error: (message: string) => {
+    if (globalToast) globalToast(message, 'error');
+  }
+};

@@ -9,6 +9,10 @@ import type {
   ConsumeReport,
   Bom,
   BomItem,
+  GRN,
+  GRNItem,
+  LicensePlate,
+  StockMove,
 } from './types';
 
 export const mockMachines: Machine[] = [
@@ -625,3 +629,102 @@ export const mockWorkOrderDetails = (workOrderId: number) => {
     })),
   };
 };
+
+export const mockLicensePlates: LicensePlate[] = [
+  { id: 1, lp_number: 'LP-2024-001', product_id: 1, product: mockProducts.find(p => p.id === 1), location_id: 1, location: mockLocations[0], quantity: '500', qa_status: 'Passed', grn_id: 1, created_at: '2024-02-08T00:00:00Z', updated_at: '2024-02-08T00:00:00Z' },
+  { id: 2, lp_number: 'LP-2024-002', product_id: 2, product: mockProducts.find(p => p.id === 2), location_id: 1, location: mockLocations[0], quantity: '300', qa_status: 'Passed', grn_id: 1, created_at: '2024-02-08T00:00:00Z', updated_at: '2024-02-08T00:00:00Z' },
+  { id: 3, lp_number: 'LP-2024-003', product_id: 4, product: mockProducts.find(p => p.id === 4), location_id: 2, location: mockLocations[1], quantity: '100', qa_status: 'Passed', grn_id: 2, created_at: '2024-02-06T00:00:00Z', updated_at: '2024-02-06T00:00:00Z' },
+  { id: 4, lp_number: 'LP-2024-004', product_id: 5, product: mockProducts.find(p => p.id === 5), location_id: 2, location: mockLocations[1], quantity: '50', qa_status: 'Passed', grn_id: 2, created_at: '2024-02-06T00:00:00Z', updated_at: '2024-02-06T00:00:00Z' },
+  { id: 5, lp_number: 'LP-2024-005', product_id: 3, product: mockProducts.find(p => p.id === 3), location_id: 2, location: mockLocations[1], quantity: '250', qa_status: 'Pending', grn_id: null, created_at: '2024-02-09T00:00:00Z', updated_at: '2024-02-09T00:00:00Z' },
+  { id: 6, lp_number: 'LP-2024-006', product_id: 6, product: mockProducts.find(p => p.id === 6), location_id: 1, location: mockLocations[0], quantity: '1000', qa_status: 'Quarantine', grn_id: null, created_at: '2024-02-07T00:00:00Z', updated_at: '2024-02-07T00:00:00Z' },
+];
+
+export const mockGRNs: GRN[] = [
+  {
+    id: 1,
+    grn_number: 'GRN-2024-001',
+    po_id: 1,
+    po: mockPurchaseOrders.find(po => po.id === 1),
+    status: 'completed',
+    received_date: '2024-02-08',
+    grn_items: [
+      { id: 1, grn_id: 1, product_id: 1, product: mockProducts.find(p => p.id === 1), quantity_ordered: '500', quantity_received: '500', location_id: 1, location: mockLocations[0], lp_number: 'LP-2024-001', created_at: '2024-02-08T00:00:00Z', updated_at: '2024-02-08T00:00:00Z' },
+      { id: 2, grn_id: 1, product_id: 2, product: mockProducts.find(p => p.id === 2), quantity_ordered: '300', quantity_received: '300', location_id: 1, location: mockLocations[0], lp_number: 'LP-2024-002', created_at: '2024-02-08T00:00:00Z', updated_at: '2024-02-08T00:00:00Z' },
+    ],
+    created_at: '2024-02-08T00:00:00Z',
+    updated_at: '2024-02-08T00:00:00Z',
+  },
+  {
+    id: 2,
+    grn_number: 'GRN-2024-002',
+    po_id: 2,
+    po: mockPurchaseOrders.find(po => po.id === 2),
+    status: 'completed',
+    received_date: '2024-02-06',
+    grn_items: [
+      { id: 3, grn_id: 2, product_id: 4, product: mockProducts.find(p => p.id === 4), quantity_ordered: '100', quantity_received: '100', location_id: 2, location: mockLocations[1], lp_number: 'LP-2024-003', created_at: '2024-02-06T00:00:00Z', updated_at: '2024-02-06T00:00:00Z' },
+      { id: 4, grn_id: 2, product_id: 5, product: mockProducts.find(p => p.id === 5), quantity_ordered: '50', quantity_received: '50', location_id: 2, location: mockLocations[1], lp_number: 'LP-2024-004', created_at: '2024-02-06T00:00:00Z', updated_at: '2024-02-06T00:00:00Z' },
+    ],
+    created_at: '2024-02-06T00:00:00Z',
+    updated_at: '2024-02-06T00:00:00Z',
+  },
+  {
+    id: 3,
+    grn_number: 'GRN-2024-003',
+    po_id: 3,
+    po: mockPurchaseOrders.find(po => po.id === 3),
+    status: 'draft',
+    received_date: null,
+    grn_items: [],
+    created_at: '2024-02-09T00:00:00Z',
+    updated_at: '2024-02-09T00:00:00Z',
+  },
+];
+
+export const mockStockMoves: StockMove[] = [
+  {
+    id: 1,
+    move_number: 'SM-2024-001',
+    lp_id: 1,
+    lp: mockLicensePlates.find(lp => lp.id === 1),
+    from_location_id: 1,
+    from_location: mockLocations[0],
+    to_location_id: 3,
+    to_location: mockLocations[2],
+    quantity: '100',
+    status: 'completed',
+    move_date: '2024-02-09',
+    created_at: '2024-02-09T00:00:00Z',
+    updated_at: '2024-02-09T00:00:00Z',
+  },
+  {
+    id: 2,
+    move_number: 'SM-2024-002',
+    lp_id: 3,
+    lp: mockLicensePlates.find(lp => lp.id === 3),
+    from_location_id: 2,
+    from_location: mockLocations[1],
+    to_location_id: 3,
+    to_location: mockLocations[2],
+    quantity: '20',
+    status: 'completed',
+    move_date: '2024-02-08',
+    created_at: '2024-02-08T00:00:00Z',
+    updated_at: '2024-02-08T00:00:00Z',
+  },
+  {
+    id: 3,
+    move_number: 'SM-2024-003',
+    lp_id: 2,
+    lp: mockLicensePlates.find(lp => lp.id === 2),
+    from_location_id: 1,
+    from_location: mockLocations[0],
+    to_location_id: 2,
+    to_location: mockLocations[1],
+    quantity: '50',
+    status: 'draft',
+    move_date: null,
+    created_at: '2024-02-10T00:00:00Z',
+    updated_at: '2024-02-10T00:00:00Z',
+  },
+];
