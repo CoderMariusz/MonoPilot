@@ -45,9 +45,13 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     product_id: string;
     quantity: string;
     uom: string;
-  }>>([{ product_id: '', quantity: '', uom: '' }]);
+    sequence: string;
+    priority: string;
+  }>>([{ product_id: '', quantity: '', uom: '', sequence: '', priority: '' }]);
 
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  const [autoAllergenIds, setAutoAllergenIds] = useState<number[]>([]);
+  const [suppressedAutoAllergenIds, setSuppressedAutoAllergenIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (isEditMode && product && isOpen) {
@@ -73,6 +77,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
             product_id: item.material_id?.toString() || '',
             quantity: item.quantity?.toString() || '',
             uom: item.uom || '',
+            sequence: item.sequence?.toString() || '',
+            priority: item.priority?.toString() || '',
           }))
         );
       }
@@ -134,6 +140,52 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     return inheritedAllergens;
   }, [category, bomComponents, allProducts]);
 
+  useEffect(() => {
+    if (category === 'PROCESS' || category === 'FINISHED_GOODS') {
+      const allergenSet = new Set<number>();
+      bomComponents.forEach(comp => {
+        if (comp.product_id) {
+          const material = allProducts.find(p => p.id === parseInt(comp.product_id));
+          if (material?.allergen_ids) {
+            material.allergen_ids.forEach(id => allergenSet.add(id));
+          }
+        }
+      });
+      
+      const newAutoAllergens = Array.from(allergenSet);
+      
+      // Deep compare without mutating state
+      const sortedNew = [...newAutoAllergens].sort();
+      const sortedOld = [...autoAllergenIds].sort();
+      const autoChanged = JSON.stringify(sortedNew) !== JSON.stringify(sortedOld);
+      
+      if (autoChanged) {
+        // Remove suppressions for allergens no longer in BOM
+        const validSuppressions = suppressedAutoAllergenIds.filter(id => 
+          newAutoAllergens.includes(id)
+        );
+        if (validSuppressions.length !== suppressedAutoAllergenIds.length) {
+          setSuppressedAutoAllergenIds(validSuppressions);
+        }
+        
+        setFormData(prev => {
+          const currentIds = prev.allergen_ids || [];
+          
+          // Manual = in current but not in previous auto (or was suppressed)
+          const manualIds = currentIds.filter(id => !autoAllergenIds.includes(id));
+          
+          // New auto to add = new auto allergens minus suppressed ones
+          const autoToAdd = newAutoAllergens.filter(id => !suppressedAutoAllergenIds.includes(id));
+          
+          const combined = [...new Set([...manualIds, ...autoToAdd])];
+          return { ...prev, allergen_ids: combined };
+        });
+        
+        setAutoAllergenIds(newAutoAllergens);
+      }
+    }
+  }, [bomComponents, allProducts, category]);
+
   const resetForm = () => {
     setStep(1);
     setCategory(null);
@@ -149,7 +201,9 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       allergen_ids: [],
       rate: '',
     });
-    setBomComponents([{ product_id: '', quantity: '', uom: '' }]);
+    setBomComponents([{ product_id: '', quantity: '', uom: '', sequence: '', priority: '' }]);
+    setAutoAllergenIds([]);
+    setSuppressedAutoAllergenIds([]);
     setErrors({});
   };
 
@@ -185,16 +239,33 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   };
 
   const toggleAllergen = (allergenId: number) => {
-    setFormData(prev => ({
-      ...prev,
-      allergen_ids: prev.allergen_ids.includes(allergenId)
-        ? prev.allergen_ids.filter(id => id !== allergenId)
-        : [...prev.allergen_ids, allergenId]
-    }));
+    const isCurrentlySelected = formData.allergen_ids.includes(allergenId);
+    
+    if (isCurrentlySelected) {
+      // User is removing the allergen
+      if (autoAllergenIds.includes(allergenId)) {
+        // If it's an auto allergen, mark it as suppressed
+        setSuppressedAutoAllergenIds(prev => [...new Set([...prev, allergenId])]);
+      }
+      setFormData(prev => ({
+        ...prev,
+        allergen_ids: prev.allergen_ids.filter(id => id !== allergenId)
+      }));
+    } else {
+      // User is adding the allergen
+      if (suppressedAutoAllergenIds.includes(allergenId)) {
+        // If it was suppressed, remove it from suppressions (user wants it back)
+        setSuppressedAutoAllergenIds(prev => prev.filter(id => id !== allergenId));
+      }
+      setFormData(prev => ({
+        ...prev,
+        allergen_ids: [...prev.allergen_ids, allergenId]
+      }));
+    }
   };
 
   const addBomComponent = () => {
-    setBomComponents(prev => [...prev, { product_id: '', quantity: '', uom: '' }]);
+    setBomComponents(prev => [...prev, { product_id: '', quantity: '', uom: '', sequence: '', priority: '' }]);
   };
 
   const removeBomComponent = (index: number) => {
@@ -207,6 +278,14 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     setBomComponents(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
+      
+      if (field === 'product_id' && value) {
+        const selectedProduct = availableProducts.find(p => p.id === parseInt(value));
+        if (selectedProduct) {
+          updated[index].uom = selectedProduct.uom;
+        }
+      }
+      
       return updated;
     });
     if (errors[`bom_${index}`]) {
@@ -280,7 +359,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
           }
         }
         if (!component.uom) {
-          newErrors[`bom_${index}_uom`] = 'UoM is required';
+          newErrors[`bom_${index}_uom`] = 'Please select a material to auto-populate UoM';
         }
       });
     }
@@ -326,19 +405,23 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         if (formData.rate) {
           payload.rate = parseFloat(formData.rate);
         }
-        payload.bom_items = bomComponents.map(c => ({
+        payload.bom_items = bomComponents.map((c, index) => ({
           material_id: parseInt(c.product_id),
           quantity: parseFloat(c.quantity),
           uom: c.uom,
+          sequence: c.sequence ? parseInt(c.sequence) : index + 1,
+          priority: c.priority ? parseInt(c.priority) : undefined,
         }));
       } else if (category === 'PROCESS') {
         payload.type = 'PR';
         payload.expiry_policy = 'FROM_CREATION_DATE';
         payload.shelf_life_days = parseInt(formData.shelf_life_days);
-        payload.bom_items = bomComponents.map(c => ({
+        payload.bom_items = bomComponents.map((c, index) => ({
           material_id: parseInt(c.product_id),
           quantity: parseFloat(c.quantity),
           uom: c.uom,
+          sequence: c.sequence ? parseInt(c.sequence) : index + 1,
+          priority: c.priority ? parseInt(c.priority) : undefined,
         }));
       }
 
@@ -675,9 +758,16 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                   </div>
 
                   <div className="space-y-3 border border-slate-200 rounded-lg p-4 bg-slate-50">
+                    <div className="grid grid-cols-5 gap-2 mb-2">
+                      <div className="text-xs font-medium text-slate-600">Material</div>
+                      <div className="text-xs font-medium text-slate-600">Quantity</div>
+                      <div className="text-xs font-medium text-slate-600">UoM</div>
+                      <div className="text-xs font-medium text-slate-600">Sequence</div>
+                      <div className="text-xs font-medium text-slate-600">Priority (optional)</div>
+                    </div>
                     {bomComponents.map((component, index) => (
                       <div key={index} className="flex gap-2 items-start">
-                        <div className="flex-1 grid grid-cols-3 gap-2">
+                        <div className="flex-1 grid grid-cols-5 gap-2">
                           <div>
                             <select
                               value={component.product_id}
@@ -719,15 +809,38 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                             <input
                               type="text"
                               value={component.uom}
-                              onChange={(e) => updateBomComponent(index, 'uom', e.target.value)}
                               placeholder="UoM"
-                              className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 ${
-                                errors[`bom_${index}_uom`] ? 'border-red-300' : 'border-slate-300'
-                              }`}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-slate-50 text-slate-600"
+                              readOnly
+                              disabled
                             />
                             {errors[`bom_${index}_uom`] && (
                               <p className="text-xs text-red-600 mt-1">{errors[`bom_${index}_uom`]}</p>
                             )}
+                          </div>
+
+                          <div>
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={component.sequence}
+                              onChange={(e) => updateBomComponent(index, 'sequence', e.target.value)}
+                              placeholder="Sequence"
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                            />
+                          </div>
+
+                          <div>
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={component.priority}
+                              onChange={(e) => updateBomComponent(index, 'priority', e.target.value)}
+                              placeholder="Priority"
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                            />
                           </div>
                         </div>
 
@@ -744,9 +857,10 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                     ))}
 
                     {(category === 'FINISHED_GOODS' || category === 'PROCESS') && (
-                      <p className="text-xs text-slate-500 italic mt-2">
-                        Note: Per-line settings can be configured after creation
-                      </p>
+                      <div className="text-xs text-slate-500 italic mt-2 space-y-1">
+                        <p>Priority: Lower number = consumed first. Leave empty for simultaneous consumption.</p>
+                        <p>Note: Per-line settings can be configured after creation</p>
+                      </div>
                     )}
                   </div>
                 </div>

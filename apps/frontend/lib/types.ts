@@ -9,6 +9,7 @@ export interface BomItem {
   quantity: string;
   uom: string;
   sequence: number;
+  priority?: number;
   created_at: string;
   updated_at: string;
 }

@@ -114,6 +114,13 @@ export default function PackTerminalPage() {
       return;
     }
 
+    if (lp.qa_status === 'Quarantine') {
+      toast.error(`Cannot scan LP ${lp.lp_number} - Status: Quarantine. This item is quarantined and cannot be used.`);
+      setLpNumber('');
+      setTimeout(() => lpInputRef.current?.focus(), 100);
+      return;
+    }
+
     const isValidMaterial = bomItems.some(item => item.material_id === lp.product_id);
     if (!isValidMaterial) {
       setAlertMessage("Cannot scan this item - doesn't match order BOM");
@@ -234,8 +241,15 @@ export default function PackTerminalPage() {
     const now = new Date();
     const moveDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
     
-    Object.keys(needs).forEach(materialIdStr => {
-      const materialId = parseInt(materialIdStr);
+    const sortedBomItems = [...bomItems].sort((a, b) => {
+      if (a.priority === undefined && b.priority === undefined) return 0;
+      if (a.priority === undefined) return 1;
+      if (b.priority === undefined) return -1;
+      return a.priority - b.priority;
+    });
+    
+    sortedBomItems.forEach(bomItem => {
+      const materialId = bomItem.material_id;
       let remainingToConsume = needs[materialId];
       
       for (let i = 0; i < updatedStaging.length && remainingToConsume > 0; i++) {

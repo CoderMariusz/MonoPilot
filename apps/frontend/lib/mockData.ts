@@ -37,19 +37,19 @@ export const mockAllergens: Allergen[] = [
 
 const mockBomItems: Record<number, BomItem[]> = {
   1: [
-    { id: 1, bom_id: 1, material_id: 1, quantity: '2.5', uom: 'KG', sequence: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-    { id: 2, bom_id: 1, material_id: 4, quantity: '0.1', uom: 'KG', sequence: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 1, bom_id: 1, material_id: 1, quantity: '2.5', uom: 'KG', sequence: 1, priority: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 2, bom_id: 1, material_id: 4, quantity: '0.1', uom: 'KG', sequence: 2, priority: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   ],
   2: [
-    { id: 3, bom_id: 2, material_id: 2, quantity: '3.0', uom: 'KG', sequence: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 3, bom_id: 2, material_id: 2, quantity: '3.0', uom: 'KG', sequence: 1, priority: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
     { id: 4, bom_id: 2, material_id: 5, quantity: '0.05', uom: 'KG', sequence: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   ],
   3: [
     { id: 5, bom_id: 3, material_id: 1, quantity: '1.0', uom: 'KG', sequence: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   ],
   4: [
-    { id: 6, bom_id: 4, material_id: 9, quantity: '1.0', uom: 'KG', sequence: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-    { id: 7, bom_id: 4, material_id: 6, quantity: '0.02', uom: 'M', sequence: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 6, bom_id: 4, material_id: 9, quantity: '1.0', uom: 'KG', sequence: 1, priority: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 7, bom_id: 4, material_id: 6, quantity: '0.02', uom: 'M', sequence: 2, priority: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   ],
 };
 

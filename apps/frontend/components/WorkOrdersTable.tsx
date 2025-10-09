@@ -86,6 +86,7 @@ export function WorkOrdersTable() {
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Item Code</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Quantity</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Status</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Allergens</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Line Number</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Due Date</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Scheduled</th>
@@ -96,7 +97,7 @@ export function WorkOrdersTable() {
           <tbody>
             {filteredWorkOrders.length === 0 ? (
               <tr className="border-b border-slate-100">
-                <td colSpan={10} className="py-8 text-center text-slate-500 text-sm">
+                <td colSpan={11} className="py-8 text-center text-slate-500 text-sm">
                   {searchQuery ? 'No work orders found matching your search' : 'No work orders found'}
                 </td>
               </tr>
@@ -116,6 +117,22 @@ export function WorkOrdersTable() {
                     }`}>
                       {wo.status.replace('_', ' ')}
                     </span>
+                  </td>
+                  <td className="py-3 px-4 text-sm">
+                    {wo.product?.allergens && wo.product.allergens.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {wo.product.allergens.map(allergen => (
+                          <span
+                            key={allergen.id}
+                            className="px-2 py-1 rounded-full text-xs font-medium bg-amber-500 text-white"
+                          >
+                            {allergen.code}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">-</span>
+                    )}
                   </td>
                   <td className="py-3 px-4 text-sm">{wo.line_number || '-'}</td>
                   <td className="py-3 px-4 text-sm">
