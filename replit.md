@@ -184,3 +184,37 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - Shows clear error toast: "Cannot scan LP {number} - Status: Quarantine"
     - Prevents quarantined materials from entering production
     - Implemented in both Process and Pack terminals
+
+- 2025-10-09: **Scanner, Warehouse & Production Fixes**
+  - **Scanner Terminal Start Button**:
+    - Added "Start Work Order" button for Released work orders
+    - Updates order status from Released to In Progress
+    - Shows success toast on status change
+    - Implemented in both Process and Pack terminals
+  - **GRN (Goods Receipt) Enhancements**:
+    - Fixed GRN table to display PO number, supplier, and date with timestamp
+    - Data enrichment joins PO and supplier information
+    - Date displays in YYYY-MM-DD HH:MM:SS format
+    - Changed default LP QA status from Pending to Passed (items immediately available)
+    - Added GRN tracking to Stock Movement table:
+      - Move number: GRN-XXXXX
+      - From Location: PO number
+      - To Location: Main warehouse
+      - Includes LP number, item code, quantity, timestamp
+      - Complete traceability from PO to warehouse
+  - **Production Yield Report Fixes**:
+    - Target Qty: Shows work order quantity (boxes to make)
+    - Actual Qty: Shows boxes actually completed
+    - BOM Materials: Calculated requirements (target qty × BOM qty per box)
+    - Consumed Materials: Actual materials used from yield report
+    - Yield %: Correctly calculated as (Actual / Target) × 100
+    - Color-coded efficiency: Green ≥90%, Orange ≥70%, Red <70%
+  - **Scanner Order Persistence (NEW)**:
+    - Added OrderProgress state tracking for in-progress work orders
+    - Saves staged LPs, box count, line, and consumed materials
+    - Auto-saves progress on every state change
+    - Restores full state when returning to order after navigation
+    - Progress persists until order is formally closed
+    - Shows toast notification when progress is restored
+    - Operators can navigate away without losing work
+    - Implemented in both Process and Pack terminals
