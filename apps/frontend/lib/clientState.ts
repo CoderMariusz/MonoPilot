@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings } from './types';
+import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail } from './types';
 import { 
   mockWorkOrders, 
   mockPurchaseOrders, 
@@ -28,6 +28,7 @@ class ClientState {
   private users: User[] = [...mockUsers];
   private sessions: Session[] = [...mockSessions];
   private settings: Settings = { ...mockSettings };
+  private yieldReports: YieldReportDetail[] = [];
   
   private workOrderListeners: Listener[] = [];
   private purchaseOrderListeners: Listener[] = [];
@@ -39,6 +40,7 @@ class ClientState {
   private userListeners: Listener[] = [];
   private sessionListeners: Listener[] = [];
   private settingsListeners: Listener[] = [];
+  private yieldReportListeners: Listener[] = [];
 
   getWorkOrders(): WorkOrder[] {
     return [...this.workOrders];
@@ -575,6 +577,27 @@ class ClientState {
     this.notifySettingsListeners();
     return { ...this.settings };
   }
+
+  getYieldReports(): YieldReportDetail[] {
+    return [...this.yieldReports];
+  }
+
+  subscribeToYieldReports(listener: Listener): () => void {
+    this.yieldReportListeners.push(listener);
+    return () => {
+      this.yieldReportListeners = this.yieldReportListeners.filter(l => l !== listener);
+    };
+  }
+
+  private notifyYieldReportListeners() {
+    this.yieldReportListeners.forEach(listener => listener());
+  }
+
+  addYieldReport(report: YieldReportDetail): YieldReportDetail {
+    this.yieldReports = [...this.yieldReports, report];
+    this.notifyYieldReportListeners();
+    return report;
+  }
 }
 
 const clientState = new ClientState();
@@ -811,4 +834,21 @@ export function revokeSession(id: number): boolean {
 
 export function updateSettings(updates: Partial<Settings>): Settings {
   return clientState.updateSettings(updates);
+}
+
+export function useYieldReports() {
+  const [yieldReports, setYieldReports] = useState<YieldReportDetail[]>(clientState.getYieldReports());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToYieldReports(() => {
+      setYieldReports(clientState.getYieldReports());
+    });
+    return unsubscribe;
+  }, []);
+
+  return yieldReports;
+}
+
+export function addYieldReport(report: YieldReportDetail): YieldReportDetail {
+  return clientState.addYieldReport(report);
 }

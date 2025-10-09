@@ -412,3 +412,24 @@ export interface Settings {
   warehouse: WarehouseSettings;
   notifications: NotificationSettings;
 }
+
+export interface YieldReportMaterial {
+  item_code: string;
+  item_name: string;
+  quantity: number;
+  uom: string;
+}
+
+export interface YieldReportDetail {
+  id: string;
+  work_order_id: number;
+  work_order_number: string;
+  line_number: string;
+  product_name: string;
+  target_quantity: number;
+  actual_quantity: number;
+  materials_used: YieldReportMaterial[];
+  efficiency_percentage: number;
+  created_at: string;
+  created_by: string;
+}

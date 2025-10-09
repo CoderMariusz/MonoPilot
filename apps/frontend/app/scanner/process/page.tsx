@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Package, CheckCircle, X, Check, AlertTriangle } from 'lucide-react';
-import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove } from '@/lib/clientState';
+import { ArrowLeft, Package, CheckCircle, X, Check, AlertTriangle, Minus } from 'lucide-react';
+import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports } from '@/lib/clientState';
 import { toast } from '@/lib/toast';
 import { AlertDialog } from '@/components/AlertDialog';
-import type { WorkOrder, LicensePlate, BomItem } from '@/lib/types';
+import { ManualConsumeModal } from '@/components/ManualConsumeModal';
+import type { WorkOrder, LicensePlate, BomItem, YieldReportDetail, YieldReportMaterial } from '@/lib/types';
 
 interface StagedLP {
   lp: LicensePlate;
@@ -34,6 +35,11 @@ export default function ProcessTerminalPage() {
   const [showInsufficientModal, setShowInsufficientModal] = useState(false);
   const [insufficientMaterials, setInsufficientMaterials] = useState<InsufficientMaterial[]>([]);
   const [quantityToCreate, setQuantityToCreate] = useState('');
+  const [createdItemsCount, setCreatedItemsCount] = useState(0);
+  const [consumedMaterials, setConsumedMaterials] = useState<{ [materialId: number]: number }>({});
+  const [showManualConsumeModal, setShowManualConsumeModal] = useState(false);
+  const [selectedLPForConsume, setSelectedLPForConsume] = useState<{ lp: LicensePlate; stagedQty: number } | null>(null);
+  const [showYieldReportsModal, setShowYieldReportsModal] = useState(false);
 
   const lpInputRef = useRef<HTMLInputElement>(null);
   const qtyInputRef = useRef<HTMLInputElement>(null);
@@ -41,6 +47,7 @@ export default function ProcessTerminalPage() {
 
   const workOrders = useWorkOrders();
   const licensePlates = useLicensePlates();
+  const yieldReports = useYieldReports();
 
   const lines = ['Line 1', 'Line 2', 'Line 3', 'Line 4'];
   
@@ -59,6 +66,8 @@ export default function ProcessTerminalPage() {
       setLpNumber('');
       setCurrentScannedLP(null);
       setStageQuantity('');
+      setCreatedItemsCount(0);
+      setConsumedMaterials({});
       lpInputRef.current?.focus();
     }
   }, [selectedWOId]);
@@ -219,6 +228,7 @@ export default function ProcessTerminalPage() {
   const consumeMaterialsFIFO = (qtyToCreate: number) => {
     const needs = calculateMaterialNeeds(qtyToCreate);
     const updatedStaging = [...stagedLPsForCurrentOrder];
+    const materialConsumed: { [materialId: number]: number } = {};
     
     Object.keys(needs).forEach(materialIdStr => {
       const materialId = parseInt(materialIdStr);
@@ -236,8 +246,19 @@ export default function ProcessTerminalPage() {
           
           staged.stagedQuantity -= toConsume;
           remainingToConsume -= toConsume;
+          
+          materialConsumed[materialId] = (materialConsumed[materialId] || 0) + toConsume;
         }
       }
+    });
+    
+    setConsumedMaterials(prev => {
+      const updated = { ...prev };
+      Object.keys(materialConsumed).forEach(matId => {
+        const materialId = parseInt(matId);
+        updated[materialId] = (updated[materialId] || 0) + materialConsumed[materialId];
+      });
+      return updated;
     });
     
     const remainingStaging = updatedStaging.filter(staged => staged.stagedQuantity > 0);
@@ -320,11 +341,130 @@ export default function ProcessTerminalPage() {
       });
     }
 
+    setCreatedItemsCount(prev => prev + qtyToCreate);
+
     toast.success(`Created PR ${prLPNumber} - ${qtyToCreate} ${selectedWO.product!.uom}`);
     
     setQuantityToCreate('');
     setShowInsufficientModal(false);
     setTimeout(() => createQtyInputRef.current?.focus(), 100);
+  };
+
+  const handleManualConsume = (lp: LicensePlate, stagedQty: number) => {
+    setSelectedLPForConsume({ lp, stagedQty });
+    setShowManualConsumeModal(true);
+  };
+
+  const handleManualConsumeConfirm = (quantity: number) => {
+    if (!selectedLPForConsume || !selectedWOId) return;
+
+    const { lp, stagedQty } = selectedLPForConsume;
+
+    const currentLPQty = parseFloat(lp.quantity);
+    const newLPQty = currentLPQty - quantity;
+    updateLicensePlate(lp.id, { quantity: newLPQty.toString() });
+
+    const updatedStaging = stagedLPsForCurrentOrder.map(staged => {
+      if (staged.lp.id === lp.id) {
+        return {
+          ...staged,
+          stagedQuantity: staged.stagedQuantity - quantity
+        };
+      }
+      return staged;
+    }).filter(staged => staged.stagedQuantity > 0);
+
+    setStagedLPsByOrder(prev => ({
+      ...prev,
+      [selectedWOId]: updatedStaging,
+    }));
+
+    setConsumedMaterials(prev => ({
+      ...prev,
+      [lp.product_id]: (prev[lp.product_id] || 0) + quantity
+    }));
+
+    addStockMove({
+      move_number: `SM-MANUAL-${Date.now()}`,
+      lp_id: lp.id,
+      from_location_id: lp.location_id,
+      to_location_id: 3,
+      quantity: quantity.toString(),
+      status: 'completed',
+      move_date: new Date().toISOString().split('T')[0],
+    });
+
+    toast.success(`Consumed ${quantity} ${lp.product?.uom} from ${lp.lp_number}`);
+    setShowManualConsumeModal(false);
+    setSelectedLPForConsume(null);
+  };
+
+  const handleCloseOrder = () => {
+    if (!selectedWO || !selectedWOId) return;
+
+    let targetQty: number;
+    let efficiency: number;
+
+    if (bomItems.length === 0) {
+      targetQty = createdItemsCount;
+      efficiency = 100;
+    } else {
+      const materialRatios = bomItems.map(bomComp => {
+        const consumedQty = consumedMaterials[bomComp.material_id] || 0;
+        if (parseFloat(bomComp.quantity) === 0) return Infinity;
+        return consumedQty / parseFloat(bomComp.quantity);
+      });
+
+      targetQty = Math.floor(Math.min(...materialRatios));
+      efficiency = targetQty > 0 
+        ? Math.round((createdItemsCount / targetQty) * 100) 
+        : 0;
+    }
+
+    const materialsUsed: YieldReportMaterial[] = Object.keys(consumedMaterials).map(matId => {
+      const materialId = parseInt(matId);
+      const bomItem = bomItems.find(item => item.material_id === materialId);
+      const material = bomItem?.material;
+      
+      return {
+        item_code: material?.part_number || `MAT-${materialId}`,
+        item_name: material?.description || 'Unknown Material',
+        quantity: consumedMaterials[materialId],
+        uom: bomItem?.uom || material?.uom || ''
+      };
+    });
+
+    const yieldReport: YieldReportDetail = {
+      id: `YR-${Date.now()}`,
+      work_order_id: selectedWO.id,
+      work_order_number: selectedWO.wo_number,
+      line_number: selectedWO.line_number || '',
+      product_name: `${selectedWO.product?.part_number} - ${selectedWO.product?.description}`,
+      target_quantity: targetQty,
+      actual_quantity: createdItemsCount,
+      materials_used: materialsUsed,
+      efficiency_percentage: efficiency,
+      created_at: new Date().toISOString(),
+      created_by: 'Operator'
+    };
+
+    addYieldReport(yieldReport);
+
+    toast.success('Order closed, yield report generated');
+
+    setSelectedLine(null);
+    setSelectedWOId(null);
+    setLpNumber('');
+    setCurrentScannedLP(null);
+    setStageQuantity('');
+    setQuantityToCreate('');
+    setCreatedItemsCount(0);
+    setConsumedMaterials({});
+    setStagedLPsByOrder(prev => {
+      const updated = { ...prev };
+      delete updated[selectedWOId];
+      return updated;
+    });
   };
 
   const handleReset = () => {
@@ -391,14 +531,22 @@ export default function ProcessTerminalPage() {
       )}
 
       <div className="bg-blue-600 text-white p-4 sticky top-0 z-10 shadow-md">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/scanner')}
+              className="p-2 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            <h1 className="text-xl sm:text-2xl font-bold">Process Terminal</h1>
+          </div>
           <button
-            onClick={() => router.push('/scanner')}
-            className="p-2 hover:bg-blue-700 rounded-lg transition-colors"
+            onClick={() => setShowYieldReportsModal(true)}
+            className="px-4 py-2 bg-blue-700 hover:bg-blue-800 rounded-lg transition-colors text-sm font-semibold"
           >
-            <ArrowLeft className="w-6 h-6" />
+            View Yield Reports
           </button>
-          <h1 className="text-xl sm:text-2xl font-bold">Process Terminal</h1>
         </div>
       </div>
 
@@ -572,12 +720,21 @@ export default function ProcessTerminalPage() {
                           Staged: {staged.stagedQuantity} {staged.lp.product?.uom}
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleRemoveStaged(idx)}
-                        className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                      >
-                        Remove
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleManualConsume(staged.lp, staged.stagedQuantity)}
+                          className="px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors flex items-center gap-1"
+                        >
+                          <Minus className="w-4 h-4" />
+                          Consume
+                        </button>
+                        <button
+                          onClick={() => handleRemoveStaged(idx)}
+                          className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -614,15 +771,89 @@ export default function ProcessTerminalPage() {
               </button>
 
               <button
-                onClick={handleReset}
-                className="w-full mt-3 px-6 py-3 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors font-semibold min-h-[48px]"
+                onClick={handleCloseOrder}
+                className="w-full mt-3 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold min-h-[48px]"
               >
-                Reset / New Order
+                Close Order
               </button>
             </div>
           </>
         )}
       </div>
+
+      {showYieldReportsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-slate-900">Yield Reports</h3>
+              <button
+                onClick={() => setShowYieldReportsModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="overflow-auto flex-1">
+              {yieldReports.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  No yield reports available yet. Close an order to generate a report.
+                </div>
+              ) : (
+                <table className="w-full border-collapse">
+                  <thead className="bg-slate-100 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">WO Number</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">Line</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">Product</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">Target</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">Actual</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">Materials Used</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">Efficiency %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {yieldReports.slice().reverse().map((report) => (
+                      <tr key={report.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 text-sm text-slate-900 border-b">{report.work_order_number}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900 border-b">{report.line_number}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900 border-b">{report.product_name}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900 border-b text-right">{report.target_quantity}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900 border-b text-right">{report.actual_quantity}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600 border-b">
+                          <div className="space-y-1">
+                            {report.materials_used.map((mat, idx) => (
+                              <div key={idx}>
+                                {mat.item_code}: {mat.quantity} {mat.uom}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold border-b text-right">
+                          <span className={report.efficiency_percentage >= 90 ? 'text-green-600' : report.efficiency_percentage >= 70 ? 'text-orange-600' : 'text-red-600'}>
+                            {report.efficiency_percentage.toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ManualConsumeModal
+        isOpen={showManualConsumeModal}
+        onClose={() => {
+          setShowManualConsumeModal(false);
+          setSelectedLPForConsume(null);
+        }}
+        lp={selectedLPForConsume?.lp || null}
+        availableQuantity={selectedLPForConsume?.stagedQty || 0}
+        onConfirm={handleManualConsumeConfirm}
+      />
     </div>
   );
 }
