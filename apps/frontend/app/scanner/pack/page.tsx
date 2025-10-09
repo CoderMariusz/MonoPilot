@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Package, CheckCircle } from 'lucide-react';
 import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove } from '@/lib/clientState';
 import { toast } from '@/lib/toast';
-import { mockLocations } from '@/lib/mockData';
+import { AlertDialog } from '@/components/AlertDialog';
 import type { WorkOrder, LicensePlate } from '@/lib/types';
 
 interface CreatedFG {
@@ -14,7 +14,6 @@ interface CreatedFG {
   productDescription: string;
   quantity: number;
   fromLP: string;
-  location: string;
 }
 
 export default function PackTerminalPage() {
@@ -23,15 +22,15 @@ export default function PackTerminalPage() {
   const [lpNumber, setLpNumber] = useState('');
   const [scannedLP, setScannedLP] = useState<LicensePlate | null>(null);
   const [packQty, setPackQty] = useState('');
-  const [selectedLocationId, setSelectedLocationId] = useState<number>(1);
   const [createdFGs, setCreatedFGs] = useState<CreatedFG[]>([]);
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
 
   const lpInputRef = useRef<HTMLInputElement>(null);
   const qtyInputRef = useRef<HTMLInputElement>(null);
 
   const workOrders = useWorkOrders();
   const licensePlates = useLicensePlates();
-  const locations = mockLocations;
 
   const plannedWOs = workOrders.filter(wo => wo.status === 'planned' && wo.product?.type === 'FG');
   const selectedWO = workOrders.find(wo => wo.id === selectedWOId);
@@ -58,7 +57,9 @@ export default function PackTerminalPage() {
     const isValidMaterial = bomItems.some(item => item.material_id === lp.product_id);
 
     if (!isValidMaterial) {
-      toast.error(`Invalid material! Expected one of: ${bomItems.map(item => item.material?.part_number).join(', ')}`);
+      setAlertMessage("Cannot scan this item - doesn't match order BOM");
+      setShowAlert(true);
+      setLpNumber('');
       return;
     }
 
@@ -92,17 +93,12 @@ export default function PackTerminalPage() {
     updateLicensePlate(scannedLP.id, { quantity: newLPQty.toString() });
 
     const fgLPNumber = generateLPNumber();
-    const selectedLocation = locations.find(l => l.id === selectedLocationId);
-
-    if (!selectedLocation) {
-      toast.error('Location not found');
-      return;
-    }
+    const defaultLocationId = 1;
 
     const newFGLP = addLicensePlate({
       lp_number: fgLPNumber,
       product_id: selectedWO.product!.id,
-      location_id: selectedLocationId,
+      location_id: defaultLocationId,
       quantity: qty.toString(),
       qa_status: 'Pending',
       grn_id: null,
@@ -112,7 +108,7 @@ export default function PackTerminalPage() {
       move_number: `SM-${fgLPNumber}`,
       lp_id: newFGLP.id,
       from_location_id: scannedLP.location_id,
-      to_location_id: selectedLocationId,
+      to_location_id: defaultLocationId,
       quantity: qty.toString(),
       status: 'completed',
       move_date: new Date().toISOString().split('T')[0],
@@ -124,7 +120,6 @@ export default function PackTerminalPage() {
       productDescription: selectedWO.product!.description,
       quantity: qty,
       fromLP: scannedLP.lp_number,
-      location: `${selectedLocation.code} - ${selectedLocation.name}`,
     };
 
     setCreatedFGs([...createdFGs, created]);
@@ -159,8 +154,20 @@ export default function PackTerminalPage() {
     setCreatedFGs([]);
   };
 
+  const handleAlertClose = () => {
+    setShowAlert(false);
+    setTimeout(() => lpInputRef.current?.focus(), 100);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
+      <AlertDialog
+        isOpen={showAlert}
+        onClose={handleAlertClose}
+        title="BOM Validation Error"
+        message={alertMessage}
+      />
+
       <div className="bg-green-600 text-white p-4 sticky top-0 z-10 shadow-md">
         <div className="flex items-center gap-3">
           <button
@@ -246,9 +253,9 @@ export default function PackTerminalPage() {
             </div>
 
             {scannedLP && (
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
+                  <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
                   <div className="flex-1">
                     <h3 className="font-semibold text-slate-900 mb-2">Scanned LP Details</h3>
                     <div className="space-y-1 text-sm text-slate-700">
@@ -272,26 +279,10 @@ export default function PackTerminalPage() {
                           className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px]"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Destination Location
-                        </label>
-                        <select
-                          value={selectedLocationId}
-                          onChange={(e) => setSelectedLocationId(Number(e.target.value))}
-                          className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px] bg-white"
-                        >
-                          {locations.map((loc) => (
-                            <option key={loc.id} value={loc.id}>
-                              {loc.code} - {loc.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
                       <button
                         onClick={handleCreateFG}
                         disabled={!packQty}
-                        className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold min-h-[48px] disabled:bg-slate-300 disabled:cursor-not-allowed"
+                        className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px] disabled:bg-slate-300 disabled:cursor-not-allowed"
                       >
                         <Package className="w-5 h-5 inline mr-2" />
                         Create Finished Good
@@ -313,7 +304,7 @@ export default function PackTerminalPage() {
                       <div className="flex-1">
                         <p className="font-medium text-slate-900">{fg.lpNumber}</p>
                         <p className="text-sm text-slate-600">{fg.productPartNumber} - {fg.productDescription}</p>
-                        <p className="text-xs text-slate-500">From: {fg.fromLP} | Location: {fg.location}</p>
+                        <p className="text-xs text-slate-500">From: {fg.fromLP}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-semibold text-green-700">{fg.quantity}</p>

@@ -2,10 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Package, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Package, CheckCircle } from 'lucide-react';
 import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove } from '@/lib/clientState';
 import { toast } from '@/lib/toast';
-import { mockLocations } from '@/lib/mockData';
+import { AlertDialog } from '@/components/AlertDialog';
 import type { WorkOrder, LicensePlate } from '@/lib/types';
 
 interface CreatedPR {
@@ -23,6 +23,8 @@ export default function ProcessTerminalPage() {
   const [scannedLP, setScannedLP] = useState<LicensePlate | null>(null);
   const [consumeQty, setConsumeQty] = useState('');
   const [createdPRs, setCreatedPRs] = useState<CreatedPR[]>([]);
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
 
   const lpInputRef = useRef<HTMLInputElement>(null);
   const qtyInputRef = useRef<HTMLInputElement>(null);
@@ -55,7 +57,9 @@ export default function ProcessTerminalPage() {
     const isValidMaterial = bomItems.some(item => item.material_id === lp.product_id);
 
     if (!isValidMaterial) {
-      toast.error(`Invalid material! Expected one of: ${bomItems.map(item => item.material?.part_number).join(', ')}`);
+      setAlertMessage("Cannot scan this item - doesn't match order BOM");
+      setShowAlert(true);
+      setLpNumber('');
       return;
     }
 
@@ -148,8 +152,20 @@ export default function ProcessTerminalPage() {
     setCreatedPRs([]);
   };
 
+  const handleAlertClose = () => {
+    setShowAlert(false);
+    setTimeout(() => lpInputRef.current?.focus(), 100);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
+      <AlertDialog
+        isOpen={showAlert}
+        onClose={handleAlertClose}
+        title="BOM Validation Error"
+        message={alertMessage}
+      />
+
       <div className="bg-blue-600 text-white p-4 sticky top-0 z-10 shadow-md">
         <div className="flex items-center gap-3">
           <button
