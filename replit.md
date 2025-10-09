@@ -152,6 +152,18 @@ npx prisma generate
 
 ## Recent Changes
 
+- 2025-10-09: **Scanner Module Workflow Enhancement - Separated Confirm & Create Actions**
+  - **Workflow Separation**: Separated "Confirm Quantity" from "Create Item" into distinct actions
+  - **New Flow**: Scan LP → Enter Quantity → Confirm → Create Item (can repeat without rescanning)
+  - **Repeat Functionality**: Users can create multiple items from same LP by confirming new quantities
+  - **Quantity Lock**: Input disabled when confirmed to prevent accidental changes during creation
+  - **UI Navigation**: Removed sidebar from scanner terminals, added back button in topbar
+  - **Full-Width Layout**: Both terminals now display full-width without main app sidebar
+  - **Process Terminal**: Blue "Confirm Quantity" button, then green "Create Process Recipe" button
+  - **Pack Terminal**: Green "Confirm Quantity" button, then "Create Finished Good" button
+  - **Mobile-First**: Large touch-friendly buttons maintained throughout
+  - **Architecture**: All state changes persist in clientState, ready for backend integration
+
 - 2025-10-09: **Scanner Module Final Fixes - Unified Workflow Complete**
   - **AlertDialog Component**: Created reusable modal component for validation errors
   - **BOM Validation Alerts**: Both terminals now show modal pop-up (not toast) when LP doesn't match BOM
