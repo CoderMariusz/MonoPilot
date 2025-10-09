@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail } from './types';
+import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location } from './types';
 import { 
   mockWorkOrders, 
   mockPurchaseOrders, 
@@ -12,7 +12,8 @@ import {
   mockStockMoves,
   mockUsers,
   mockSessions,
-  mockSettings
+  mockSettings,
+  mockLocations
 } from './mockData';
 
 type Listener = () => void;
@@ -29,6 +30,7 @@ class ClientState {
   private sessions: Session[] = [...mockSessions];
   private settings: Settings = { ...mockSettings };
   private yieldReports: YieldReportDetail[] = [];
+  private locations: Location[] = [...mockLocations];
   
   private workOrderListeners: Listener[] = [];
   private purchaseOrderListeners: Listener[] = [];
@@ -66,8 +68,29 @@ class ClientState {
     return [...this.licensePlates];
   }
 
+  getLocations(): Location[] {
+    return [...this.locations];
+  }
+
   getStockMoves(): StockMove[] {
-    return [...this.stockMoves];
+    return this.stockMoves.map(move => {
+      const lp = this.licensePlates.find(l => l.id === move.lp_id);
+      const from_location = this.locations.find(loc => loc.id === move.from_location_id);
+      const to_location = this.locations.find(loc => loc.id === move.to_location_id);
+      
+      let enrichedLP = lp;
+      if (lp) {
+        const product = this.products.find(p => p.id === lp.product_id);
+        enrichedLP = { ...lp, product };
+      }
+      
+      return {
+        ...move,
+        lp: enrichedLP,
+        from_location,
+        to_location
+      };
+    });
   }
 
   subscribeToWorkOrders(listener: Listener): () => void {

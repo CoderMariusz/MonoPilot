@@ -231,6 +231,9 @@ export default function PackTerminalPage() {
     const updatedStaging = [...stagedLPsForCurrentOrder];
     const materialConsumed: { [materialId: number]: number } = {};
     
+    const now = new Date();
+    const moveDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    
     Object.keys(needs).forEach(materialIdStr => {
       const materialId = parseInt(materialIdStr);
       let remainingToConsume = needs[materialId];
@@ -244,6 +247,17 @@ export default function PackTerminalPage() {
           const currentLPQty = parseFloat(staged.lp.quantity);
           const newLPQty = currentLPQty - toConsume;
           updateLicensePlate(staged.lp.id, { quantity: newLPQty.toString() });
+          
+          addStockMove({
+            move_number: `SM-CONSUME-${Date.now()}-${staged.lp.id}`,
+            lp_id: staged.lp.id,
+            from_location_id: staged.lp.location_id,
+            to_location_id: 3,
+            quantity: toConsume.toString(),
+            status: 'completed',
+            move_date: moveDate,
+            wo_number: selectedWO!.wo_number,
+          });
           
           staged.stagedQuantity -= toConsume;
           remainingToConsume -= toConsume;
@@ -391,6 +405,9 @@ export default function PackTerminalPage() {
       [lp.product_id]: (prev[lp.product_id] || 0) + quantity
     }));
 
+    const now = new Date();
+    const moveDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
     addStockMove({
       move_number: `SM-MANUAL-${Date.now()}`,
       lp_id: lp.id,
@@ -398,7 +415,8 @@ export default function PackTerminalPage() {
       to_location_id: 3,
       quantity: quantity.toString(),
       status: 'completed',
-      move_date: new Date().toISOString().split('T')[0],
+      move_date: moveDate,
+      wo_number: selectedWO!.wo_number,
     });
 
     toast.success(`Consumed ${quantity} ${lp.product?.uom} from ${lp.lp_number}`);

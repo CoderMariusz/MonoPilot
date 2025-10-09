@@ -32,8 +32,8 @@ export function StockMoveTable() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{move.move_number}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.lp_number || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.product?.part_number || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.wo_number || move.from_location?.name || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.to_location?.name || 'N/A'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.from_location?.name || move.wo_number || 'N/A'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.wo_number && move.from_location ? move.wo_number : move.to_location?.name || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.quantity}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.move_date || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
