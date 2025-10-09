@@ -148,7 +148,7 @@ function YieldReportTab() {
                       {bomItems.length > 0 ? (
                         <div className="space-y-1">
                           {bomItems.map((item) => {
-                            const totalNeeded = targetQty * parseFloat(item.quantity);
+                            const totalNeeded = actualQty * parseFloat(item.quantity);
                             return (
                               <div key={item.id} className="text-xs">
                                 <span className="font-medium">{item.material?.part_number || 'N/A'}</span>

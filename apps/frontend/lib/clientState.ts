@@ -363,10 +363,41 @@ class ClientState {
     return false;
   }
 
-  addProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Product {
+  addProduct(product: any): Product {
+    const { bom_items, ...productData } = product;
+    const newProductId = Math.max(...this.products.map(p => p.id), 0) + 1;
+    
+    let activeBom = null;
+    if (bom_items && bom_items.length > 0) {
+      const bomId = Date.now();
+      const bomItems = bom_items.map((item: any, index: number) => ({
+        id: bomId + index + 1,
+        bom_id: bomId,
+        material_id: item.material_id,
+        quantity: item.quantity.toString(),
+        uom: item.uom,
+        sequence: item.sequence || index + 1,
+        priority: item.priority,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+      
+      activeBom = {
+        id: bomId,
+        product_id: newProductId,
+        version: '1.0',
+        is_active: true,
+        bomItems,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
+    
     const newProduct: Product = {
-      ...product,
-      id: Math.max(...this.products.map(p => p.id), 0) + 1,
+      ...productData,
+      id: newProductId,
+      production_lines: product.production_lines || [],
+      activeBom,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -375,13 +406,47 @@ class ClientState {
     return newProduct;
   }
 
-  updateProduct(id: number, updates: Partial<Product>): Product | null {
+  updateProduct(id: number, updates: any): Product | null {
     const index = this.products.findIndex(p => p.id === id);
     if (index === -1) return null;
 
+    const { bom_items, ...productUpdates } = updates;
+    
+    let activeBom = this.products[index].activeBom;
+    if (bom_items !== undefined) {
+      if (bom_items && bom_items.length > 0) {
+        const bomId = activeBom?.id || Date.now();
+        const bomItems = bom_items.map((item: any, index: number) => ({
+          id: bomId + index + 1,
+          bom_id: bomId,
+          material_id: item.material_id,
+          quantity: item.quantity.toString(),
+          uom: item.uom,
+          sequence: item.sequence || index + 1,
+          priority: item.priority,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }));
+        
+        activeBom = {
+          id: bomId,
+          product_id: id,
+          version: activeBom?.version || '1.0',
+          is_active: true,
+          bomItems,
+          created_at: activeBom?.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        activeBom = null;
+      }
+    }
+
     const updatedProduct: Product = {
       ...this.products[index],
-      ...updates,
+      ...productUpdates,
+      production_lines: updates.production_lines !== undefined ? updates.production_lines : this.products[index].production_lines,
+      activeBom,
       id: this.products[index].id,
       updated_at: new Date().toISOString(),
     };

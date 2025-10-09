@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { mockProducts, mockMachines } from '@/lib/mockData';
-import type { Product, Machine } from '@/lib/types';
+import { useMachines } from '@/lib/clientState';
+import { mockProducts } from '@/lib/mockData';
+import type { Product } from '@/lib/types';
 
 interface CreateWorkOrderModalProps {
   isOpen: boolean;
@@ -12,8 +13,8 @@ interface CreateWorkOrderModalProps {
 }
 
 export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkOrderModalProps) {
+  const machines = useMachines();
   const [products, setProducts] = useState<Product[]>([]);
-  const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +27,6 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
     scheduled_end: '',
     machine_id: '',
     status: 'planned' as const,
-    line_number: '',
   });
 
   const selectedProduct = products.find(p => p.id === Number(formData.product_id));
@@ -45,7 +45,6 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
       
       const allProducts = [...prProducts, ...fgProducts];
       setProducts(allProducts);
-      setMachines(mockMachines);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {
@@ -76,7 +75,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
         scheduled_end: formData.scheduled_end || null,
         machine_id: Number(formData.machine_id) || null,
         machine,
-        line_number: formData.line_number || null,
+        line_number: null,
       });
       
       onSuccess();
@@ -89,7 +88,6 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
         scheduled_end: '',
         machine_id: '',
         status: 'planned',
-        line_number: '',
       });
     } catch (err: any) {
       setError(err.message || 'Failed to create work order');
@@ -226,18 +224,19 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess }: CreateWorkO
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Line Number
+                Line
               </label>
               <select
-                value={formData.line_number}
-                onChange={(e) => setFormData({ ...formData, line_number: e.target.value })}
+                value={formData.machine_id}
+                onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               >
-                <option value="">Select a line...</option>
-                <option value="Line 1">Line 1</option>
-                <option value="Line 2">Line 2</option>
-                <option value="Line 3">Line 3</option>
-                <option value="Line 4">Line 4</option>
+                <option value="">Select Line</option>
+                {machines.map((machine) => (
+                  <option key={machine.id} value={machine.id}>
+                    {machine.name}
+                  </option>
+                ))}
               </select>
             </div>
 

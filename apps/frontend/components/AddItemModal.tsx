@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { X, ArrowLeft, Loader2, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/lib/toast';
 import { mockProducts } from '@/lib/mockData';
-import { useAllergens, useProducts } from '@/lib/clientState';
+import { useAllergens, useProducts, useMachines } from '@/lib/clientState';
 import type { Product, Allergen } from '@/lib/types';
 import type { BomComponent } from '@/lib/validation/productSchema';
 
@@ -27,6 +27,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   const { showToast } = useToast();
   const allergens = useAllergens();
   const allProducts = useProducts();
+  const machines = useMachines();
 
   const [formData, setFormData] = useState({
     part_number: '',
@@ -39,6 +40,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     shelf_life_days: '',
     allergen_ids: [] as number[],
     rate: '',
+    production_lines: [] as string[],
   });
 
   const [bomComponents, setBomComponents] = useState<Array<{
@@ -69,6 +71,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         shelf_life_days: product.shelf_life_days?.toString() || '',
         allergen_ids: product.allergen_ids || [],
         rate: product.rate?.toString() || '',
+        production_lines: (product as any).production_lines || [],
       });
 
       if (product.activeBom?.bomItems && product.activeBom.bomItems.length > 0) {
@@ -200,6 +203,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       shelf_life_days: '',
       allergen_ids: [],
       rate: '',
+      production_lines: [],
     });
     setBomComponents([{ product_id: '', quantity: '', uom: '', sequence: '', priority: '' }]);
     setAutoAllergenIds([]);
@@ -405,6 +409,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         if (formData.rate) {
           payload.rate = parseFloat(formData.rate);
         }
+        payload.production_lines = formData.production_lines;
         payload.bom_items = bomComponents.map((c, index) => ({
           material_id: parseInt(c.product_id),
           quantity: parseFloat(c.quantity),
@@ -416,6 +421,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         payload.type = 'PR';
         payload.expiry_policy = 'FROM_CREATION_DATE';
         payload.shelf_life_days = parseInt(formData.shelf_life_days);
+        payload.production_lines = formData.production_lines;
         payload.bom_items = bomComponents.map((c, index) => ({
           material_id: parseInt(c.product_id),
           quantity: parseFloat(c.quantity),
@@ -722,6 +728,49 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                   )}
                 </div>
               </div>
+
+              {(category === 'PROCESS' || category === 'FINISHED_GOODS') && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Production Lines</label>
+                  <div className="space-y-2 p-3 border border-slate-600 rounded">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.production_lines?.includes('ALL') || false}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({...formData, production_lines: ['ALL']});
+                          } else {
+                            setFormData({...formData, production_lines: []});
+                          }
+                        }}
+                        className="mr-2"
+                      />
+                      <span>ALL (Any Line)</span>
+                    </label>
+                    
+                    {machines.map(machine => (
+                      <label key={machine.id} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.production_lines?.includes(String(machine.id)) || false}
+                          disabled={formData.production_lines?.includes('ALL')}
+                          onChange={(e) => {
+                            const lines = formData.production_lines || [];
+                            if (e.target.checked) {
+                              setFormData({...formData, production_lines: [...lines, String(machine.id)]});
+                            } else {
+                              setFormData({...formData, production_lines: lines.filter(l => l !== String(machine.id))});
+                            }
+                          }}
+                          className="mr-2"
+                        />
+                        <span>{machine.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {category === 'FINISHED_GOODS' && (
                 <div>

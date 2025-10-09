@@ -56,6 +56,7 @@ export interface Product {
   allergens?: Allergen[];
   activeBom?: Bom | null;
   lineSettings?: ProductLineSettings[];
+  production_lines?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -270,6 +271,7 @@ export interface CreateProductData {
   expiry_policy?: ExpiryPolicyType;
   shelf_life_days?: number;
   is_active?: boolean;
+  production_lines?: string[];
   bom_items?: Array<{
     material_id: number;
     quantity: number;
@@ -288,6 +290,14 @@ export interface UpdateProductData {
   expiry_policy?: ExpiryPolicyType;
   shelf_life_days?: number;
   is_active?: boolean;
+  production_lines?: string[];
+  bom_items?: Array<{
+    material_id: number;
+    quantity: number;
+    uom: string;
+    sequence?: number;
+    priority?: number;
+  }>;
 }
 
 export interface CreateLineSettingData {

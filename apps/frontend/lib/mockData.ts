@@ -28,6 +28,10 @@ export const mockLocations: Location[] = [
 export const mockMachines: Machine[] = [
   { id: 1, code: 'MCH-001', name: 'Mixer A', type: 'Mixer', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   { id: 2, code: 'MCH-002', name: 'Oven B', type: 'Oven', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 3, code: 'LINE-1', name: 'Line 1', type: 'Production Line', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 4, code: 'LINE-2', name: 'Line 2', type: 'Production Line', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 5, code: 'LINE-3', name: 'Line 3', type: 'Production Line', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 6, code: 'LINE-4', name: 'Line 4', type: 'Production Line', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
 ];
 
 export const mockAllergens: Allergen[] = [
@@ -218,6 +222,7 @@ export const mockProducts: Product[] = [
     shelf_life_days: 3,
     std_price: '14.25',
     allergen_ids: [],
+    production_lines: ['3', '4'],
     activeBom: mockBoms[9],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-25T00:00:00Z',
@@ -235,6 +240,7 @@ export const mockProducts: Product[] = [
     shelf_life_days: 5,
     std_price: '10.50',
     allergen_ids: [],
+    production_lines: ['3', '4', '5'],
     activeBom: mockBoms[10],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-28T00:00:00Z',
@@ -253,6 +259,7 @@ export const mockProducts: Product[] = [
     std_price: '2.99',
     allergen_ids: [],
     rate: 100,
+    production_lines: ['ALL'],
     activeBom: mockBoms[11],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-02-01T00:00:00Z',
@@ -271,6 +278,7 @@ export const mockProducts: Product[] = [
     std_price: '5.49',
     allergen_ids: [],
     rate: 80,
+    production_lines: ['3', '4'],
     activeBom: mockBoms[12],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-02-05T00:00:00Z',
