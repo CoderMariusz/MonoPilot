@@ -319,6 +319,9 @@ export default function PackTerminalPage() {
       grn_id: null,
     });
 
+    const now = new Date();
+    const moveDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    
     addStockMove({
       move_number: `SM-${fgLPNumber}`,
       lp_id: newFGLP.id,
@@ -326,7 +329,7 @@ export default function PackTerminalPage() {
       to_location_id: warehouseLocationId,
       quantity: qtyToCreate.toString(),
       status: 'completed',
-      move_date: new Date().toISOString().split('T')[0],
+      move_date: moveDate,
       wo_number: selectedWO.wo_number,
     });
 
