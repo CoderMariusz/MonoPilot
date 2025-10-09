@@ -349,3 +349,61 @@ export interface StockMove {
   created_at: string;
   updated_at: string;
 }
+
+export type UserRole = 'Operator' | 'Planner' | 'Technical' | 'Purchasing' | 'Warehouse' | 'QC' | 'Admin';
+export type UserStatus = 'Active' | 'Inactive';
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  created_at: string;
+  last_login: string | null;
+}
+
+export type SessionStatus = 'Active' | 'Expired';
+
+export interface Session {
+  id: number;
+  user_id: number;
+  user_name: string;
+  ip_address: string;
+  location: string;
+  device: string;
+  login_time: string;
+  status: SessionStatus;
+}
+
+export interface GeneralSettings {
+  company_name: string;
+  timezone: string;
+  date_format: string;
+  currency: string;
+}
+
+export interface ProductionSettings {
+  default_lp_prefix: string;
+  wo_number_format: string;
+  auto_complete_wos: boolean;
+}
+
+export interface WarehouseSettings {
+  default_location_id: number | null;
+  qa_required: boolean;
+  lp_split_allowed: boolean;
+}
+
+export interface NotificationSettings {
+  email_notifications: boolean;
+  low_stock_alerts: boolean;
+  threshold_quantity: number;
+}
+
+export interface Settings {
+  general: GeneralSettings;
+  production: ProductionSettings;
+  warehouse: WarehouseSettings;
+  notifications: NotificationSettings;
+}

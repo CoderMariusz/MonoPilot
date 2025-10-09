@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove } from './types';
+import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings } from './types';
 import { 
   mockWorkOrders, 
   mockPurchaseOrders, 
@@ -9,7 +9,10 @@ import {
   mockProducts,
   mockGRNs,
   mockLicensePlates,
-  mockStockMoves
+  mockStockMoves,
+  mockUsers,
+  mockSessions,
+  mockSettings
 } from './mockData';
 
 type Listener = () => void;
@@ -22,6 +25,9 @@ class ClientState {
   private grns: GRN[] = [...mockGRNs];
   private licensePlates: LicensePlate[] = [...mockLicensePlates];
   private stockMoves: StockMove[] = [...mockStockMoves];
+  private users: User[] = [...mockUsers];
+  private sessions: Session[] = [...mockSessions];
+  private settings: Settings = { ...mockSettings };
   
   private workOrderListeners: Listener[] = [];
   private purchaseOrderListeners: Listener[] = [];
@@ -30,6 +36,9 @@ class ClientState {
   private grnListeners: Listener[] = [];
   private licensePlateListeners: Listener[] = [];
   private stockMoveListeners: Listener[] = [];
+  private userListeners: Listener[] = [];
+  private sessionListeners: Listener[] = [];
+  private settingsListeners: Listener[] = [];
 
   getWorkOrders(): WorkOrder[] {
     return [...this.workOrders];
@@ -436,6 +445,136 @@ class ClientState {
     }
     return false;
   }
+
+  getUsers(): User[] {
+    return [...this.users];
+  }
+
+  getSessions(): Session[] {
+    return [...this.sessions];
+  }
+
+  getSettings(): Settings {
+    return { ...this.settings };
+  }
+
+  subscribeToUsers(listener: Listener): () => void {
+    this.userListeners.push(listener);
+    return () => {
+      this.userListeners = this.userListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToSessions(listener: Listener): () => void {
+    this.sessionListeners.push(listener);
+    return () => {
+      this.sessionListeners = this.sessionListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToSettings(listener: Listener): () => void {
+    this.settingsListeners.push(listener);
+    return () => {
+      this.settingsListeners = this.settingsListeners.filter(l => l !== listener);
+    };
+  }
+
+  private notifyUserListeners() {
+    this.userListeners.forEach(listener => listener());
+  }
+
+  private notifySessionListeners() {
+    this.sessionListeners.forEach(listener => listener());
+  }
+
+  private notifySettingsListeners() {
+    this.settingsListeners.forEach(listener => listener());
+  }
+
+  addUser(user: Omit<User, 'id' | 'created_at'>): User {
+    const newUser: User = {
+      ...user,
+      id: Math.max(...this.users.map(u => u.id), 0) + 1,
+      created_at: new Date().toISOString(),
+    };
+    this.users = [...this.users, newUser];
+    this.notifyUserListeners();
+    return newUser;
+  }
+
+  updateUser(id: number, updates: Partial<User>): User | null {
+    const index = this.users.findIndex(u => u.id === id);
+    if (index === -1) return null;
+
+    const updatedUser: User = {
+      ...this.users[index],
+      ...updates,
+      id: this.users[index].id,
+    };
+    
+    this.users = [
+      ...this.users.slice(0, index),
+      updatedUser,
+      ...this.users.slice(index + 1),
+    ];
+    
+    this.notifyUserListeners();
+    return updatedUser;
+  }
+
+  deleteUser(id: number): boolean {
+    const initialLength = this.users.length;
+    this.users = this.users.filter(u => u.id !== id);
+    if (this.users.length < initialLength) {
+      this.notifyUserListeners();
+      return true;
+    }
+    return false;
+  }
+
+  revokeSession(id: number): boolean {
+    const index = this.sessions.findIndex(s => s.id === id);
+    if (index === -1) return false;
+
+    const updatedSession: Session = {
+      ...this.sessions[index],
+      status: 'Expired',
+    };
+    
+    this.sessions = [
+      ...this.sessions.slice(0, index),
+      updatedSession,
+      ...this.sessions.slice(index + 1),
+    ];
+    
+    this.notifySessionListeners();
+    return true;
+  }
+
+  updateSettings(updates: Partial<Settings>): Settings {
+    this.settings = {
+      ...this.settings,
+      ...updates,
+      general: {
+        ...this.settings.general,
+        ...(updates.general || {}),
+      },
+      production: {
+        ...this.settings.production,
+        ...(updates.production || {}),
+      },
+      warehouse: {
+        ...this.settings.warehouse,
+        ...(updates.warehouse || {}),
+      },
+      notifications: {
+        ...this.settings.notifications,
+        ...(updates.notifications || {}),
+      },
+    };
+    this.notifySettingsListeners();
+    return { ...this.settings };
+  }
 }
 
 const clientState = new ClientState();
@@ -613,4 +752,63 @@ export function updateStockMove(id: number, updates: Partial<StockMove>): StockM
 
 export function deleteStockMove(id: number): boolean {
   return clientState.deleteStockMove(id);
+}
+
+export function useUsers() {
+  const [users, setUsers] = useState<User[]>(clientState.getUsers());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToUsers(() => {
+      setUsers(clientState.getUsers());
+    });
+    return unsubscribe;
+  }, []);
+
+  return users;
+}
+
+export function useSessions() {
+  const [sessions, setSessions] = useState<Session[]>(clientState.getSessions());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToSessions(() => {
+      setSessions(clientState.getSessions());
+    });
+    return unsubscribe;
+  }, []);
+
+  return sessions;
+}
+
+export function useSettings() {
+  const [settings, setSettings] = useState<Settings>(clientState.getSettings());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToSettings(() => {
+      setSettings(clientState.getSettings());
+    });
+    return unsubscribe;
+  }, []);
+
+  return settings;
+}
+
+export function addUser(user: Omit<User, 'id' | 'created_at'>): User {
+  return clientState.addUser(user);
+}
+
+export function updateUser(id: number, updates: Partial<User>): User | null {
+  return clientState.updateUser(id, updates);
+}
+
+export function deleteUser(id: number): boolean {
+  return clientState.deleteUser(id);
+}
+
+export function revokeSession(id: number): boolean {
+  return clientState.revokeSession(id);
+}
+
+export function updateSettings(updates: Partial<Settings>): Settings {
+  return clientState.updateSettings(updates);
 }
