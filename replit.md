@@ -82,6 +82,20 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - Reports sorted newest first for easy tracking
     - Removed summary cards to focus on individual order details
 
+- 2025-10-09: **LP Stock & Consumption Tracking**
+  - **LP Stock Table Enhancements**:
+    - Enriched getLicensePlates() to populate full product and location objects
+    - No more N/A values - all fields display correctly: Item Code, Product, Location, QA Status
+    - QA Status for scanner-created items now defaults to 'Passed' instead of 'Pending'
+  - **Stock Movement Improvements**:
+    - Item creation movements: From Location shows WO number, To Location shows warehouse from admin settings
+    - Updated StockMove type to allow null for from_location_id and to_location_id
+  - **Consumption Tracking (NEW)**:
+    - Added negative quantity stock movements for consumed materials
+    - Each consumed LP creates a movement showing: LP number, item code, quantity consumed (-5 kg), from location (LP's location), to location (WO number), timestamp
+    - Both FIFO and manual consume create consumption movements
+    - Provides complete traceability: see what was consumed AND what was created
+
 - 2025-10-09: **Scanner Terminals Complete Rebuild - Manufacturing Staging Workflow**
   - **Complete Workflow Redesign**: Rebuilt both Process and Pack terminals from scratch
   - **Line Selection First**: Production line (Line 1-4) must be selected before work order
