@@ -3,16 +3,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Package, CheckCircle, X, Check, AlertTriangle, Minus } from 'lucide-react';
-import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports, useSettings } from '@/lib/clientState';
+import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports, useSettings, saveOrderProgress, getOrderProgress, clearOrderProgress } from '@/lib/clientState';
 import { toast } from '@/lib/toast';
 import { AlertDialog } from '@/components/AlertDialog';
 import { ManualConsumeModal } from '@/components/ManualConsumeModal';
-import type { WorkOrder, LicensePlate, BomItem, YieldReportDetail, YieldReportMaterial } from '@/lib/types';
-
-interface StagedLP {
-  lp: LicensePlate;
-  stagedQuantity: number;
-}
+import type { WorkOrder, LicensePlate, BomItem, YieldReportDetail, YieldReportMaterial, StagedLP } from '@/lib/types';
 
 interface InsufficientMaterial {
   material: string;
@@ -63,12 +58,25 @@ export default function PackTerminalPage() {
   const bomItems = selectedWO?.product?.activeBom?.bomItems || [];
 
   useEffect(() => {
-    if (selectedWOId) {
+    if (selectedWOId && selectedWO) {
+      const savedProgress = getOrderProgress(selectedWOId);
+      
+      if (savedProgress) {
+        setStagedLPsByOrder(prev => ({
+          ...prev,
+          [selectedWOId]: savedProgress.staged_lps
+        }));
+        setCreatedItemsCount(savedProgress.boxes_created);
+        setConsumedMaterials(savedProgress.consumed_materials || {});
+        toast.success('Order progress restored');
+      } else {
+        setCreatedItemsCount(0);
+        setConsumedMaterials({});
+      }
+      
       setLpNumber('');
       setCurrentScannedLP(null);
       setStageQuantity('');
-      setCreatedItemsCount(0);
-      setConsumedMaterials({});
       lpInputRef.current?.focus();
     }
   }, [selectedWOId]);
@@ -78,6 +86,19 @@ export default function PackTerminalPage() {
       setSelectedWOId(null);
     }
   }, [selectedLine]);
+
+  useEffect(() => {
+    if (selectedWOId && selectedLine && selectedWO) {
+      saveOrderProgress(selectedWOId, {
+        wo_id: selectedWOId,
+        staged_lps: stagedLPsForCurrentOrder,
+        boxes_created: createdItemsCount,
+        line: selectedLine,
+        started_at: new Date().toISOString(),
+        consumed_materials: consumedMaterials
+      });
+    }
+  }, [stagedLPsForCurrentOrder, createdItemsCount, selectedLine, selectedWOId, consumedMaterials]);
 
   const getStagedMaterialIds = (): Set<number> => {
     const materialIds = new Set<number>();
@@ -489,6 +510,8 @@ export default function PackTerminalPage() {
 
     addYieldReport(yieldReport);
 
+    clearOrderProgress(selectedWOId);
+
     toast.success('Order closed, yield report generated');
 
     setSelectedLine(null);
@@ -518,6 +541,13 @@ export default function PackTerminalPage() {
   const handleAlertClose = () => {
     setShowAlert(false);
     setTimeout(() => lpInputRef.current?.focus(), 100);
+  };
+
+  const handleStartWorkOrder = () => {
+    if (!selectedWO) return;
+    
+    updateWorkOrder(selectedWO.id, { status: 'in_progress' });
+    toast.success(`Work Order ${selectedWO.wo_number} started successfully`);
   };
 
   return (
@@ -639,9 +669,19 @@ export default function PackTerminalPage() {
                     Remaining: {selectedWO.quantity} {selectedWO.product?.uom}
                   </p>
                 </div>
-                <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                  {selectedWO.status}
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                    {selectedWO.status}
+                  </span>
+                  {selectedWO.status === 'released' && (
+                    <button
+                      onClick={handleStartWorkOrder}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors shadow-sm"
+                    >
+                      Start Work Order
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="border-t border-green-200 pt-3 mt-3">

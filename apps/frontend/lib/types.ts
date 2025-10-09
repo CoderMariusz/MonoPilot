@@ -313,6 +313,20 @@ export interface BulkUpsertLineSettingsData {
 
 export type QAStatus = 'Pending' | 'Passed' | 'Failed' | 'Quarantine';
 
+export interface StagedLP {
+  lp: LicensePlate;
+  stagedQuantity: number;
+}
+
+export interface OrderProgress {
+  wo_id: number;
+  staged_lps: StagedLP[];
+  boxes_created: number;
+  line: string;
+  started_at: string;
+  consumed_materials?: { [materialId: number]: number };
+}
+
 export interface LicensePlate {
   id: number;
   lp_number: string;

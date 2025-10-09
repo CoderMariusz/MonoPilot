@@ -6,6 +6,18 @@ import { useGRNs, updateGRN } from '@/lib/clientState';
 import { GRNDetailsModal } from './GRNDetailsModal';
 import { toast } from '@/lib/toast';
 
+const formatDateTime = (dateString: string | null): string => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
 export function GRNTable() {
   const grns = useGRNs();
   const [selectedGRN, setSelectedGRN] = useState<number | null>(null);
@@ -13,7 +25,7 @@ export function GRNTable() {
   const handleComplete = (id: number) => {
     const result = updateGRN(id, { 
       status: 'completed',
-      received_date: new Date().toISOString().split('T')[0]
+      received_date: new Date().toISOString()
     });
     if (result) {
       toast.success('GRN completed successfully');
@@ -41,7 +53,7 @@ export function GRNTable() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{grn.grn_number}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{grn.po?.po_number || 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{grn.po?.supplier || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{grn.received_date || '-'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{formatDateTime(grn.received_date)}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     grn.status === 'completed' ? 'bg-green-100 text-green-800' :

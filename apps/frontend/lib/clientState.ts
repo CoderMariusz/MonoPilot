@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen } from './types';
+import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress } from './types';
 import { 
   mockWorkOrders, 
   mockPurchaseOrders, 
@@ -35,6 +35,7 @@ class ClientState {
   private locations: Location[] = [...mockLocations];
   private machines: Machine[] = [...mockMachines];
   private allergens: Allergen[] = [...mockAllergens];
+  private orderProgress: Map<number, OrderProgress> = new Map();
   
   private workOrderListeners: Listener[] = [];
   private purchaseOrderListeners: Listener[] = [];
@@ -73,7 +74,13 @@ class ClientState {
   }
 
   getGRNs(): GRN[] {
-    return [...this.grns];
+    return this.grns.map(grn => {
+      const po = this.purchaseOrders.find(p => p.id === grn.po_id);
+      return {
+        ...grn,
+        po: po
+      };
+    });
   }
 
   getLicensePlates(): LicensePlate[] {
@@ -657,6 +664,18 @@ class ClientState {
     return false;
   }
 
+  saveOrderProgress(woId: number, progress: OrderProgress): void {
+    this.orderProgress.set(woId, progress);
+  }
+
+  getOrderProgress(woId: number): OrderProgress | undefined {
+    return this.orderProgress.get(woId);
+  }
+
+  clearOrderProgress(woId: number): void {
+    this.orderProgress.delete(woId);
+  }
+
   getUsers(): User[] {
     return [...this.users];
   }
@@ -1135,4 +1154,16 @@ export function updateAllergen(id: number, updates: Partial<Allergen>): Allergen
 
 export function deleteAllergen(id: number): boolean {
   return clientState.deleteAllergen(id);
+}
+
+export function saveOrderProgress(woId: number, progress: OrderProgress): void {
+  return clientState.saveOrderProgress(woId, progress);
+}
+
+export function getOrderProgress(woId: number): OrderProgress | undefined {
+  return clientState.getOrderProgress(woId);
+}
+
+export function clearOrderProgress(woId: number): void {
+  return clientState.clearOrderProgress(woId);
 }

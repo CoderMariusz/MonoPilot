@@ -87,10 +87,8 @@ function YieldReportTab() {
     return 'text-red-600 font-semibold';
   };
 
-  const getBomMaterials = (workOrderId: number) => {
-    const workOrder = workOrders.find(wo => wo.id === workOrderId);
-    if (!workOrder?.product?.activeBom?.bomItems) return [];
-    return workOrder.product.activeBom.bomItems;
+  const getWorkOrder = (workOrderId: number) => {
+    return workOrders.find(wo => wo.id === workOrderId);
   };
 
   return (
@@ -133,24 +131,32 @@ function YieldReportTab() {
               </tr>
             ) : (
               sortedReports.map((report) => {
-                const bomMaterials = getBomMaterials(report.work_order_id);
+                const workOrder = getWorkOrder(report.work_order_id);
+                const targetQty = workOrder ? parseFloat(workOrder.quantity) : 0;
+                const actualQty = report.actual_quantity;
+                const yieldPercent = targetQty > 0 ? Math.round((actualQty / targetQty) * 100) : 0;
+                const bomItems = workOrder?.product?.activeBom?.bomItems || [];
+
                 return (
                   <tr key={report.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-3 px-4 text-sm font-medium">{report.work_order_number}</td>
                     <td className="py-3 px-4 text-sm">{report.product_name}</td>
                     <td className="py-3 px-4 text-sm">{report.line_number || '-'}</td>
-                    <td className="py-3 px-4 text-sm">{report.target_quantity.toLocaleString()}</td>
-                    <td className="py-3 px-4 text-sm">{report.actual_quantity.toLocaleString()}</td>
+                    <td className="py-3 px-4 text-sm">{targetQty.toLocaleString()}</td>
+                    <td className="py-3 px-4 text-sm">{actualQty.toLocaleString()}</td>
                     <td className="py-3 px-4 text-sm">
-                      {bomMaterials.length > 0 ? (
+                      {bomItems.length > 0 ? (
                         <div className="space-y-1">
-                          {bomMaterials.map((item) => (
-                            <div key={item.id} className="text-xs">
-                              <span className="font-medium">{item.material?.part_number || 'N/A'}</span>
-                              {' - '}
-                              <span className="text-slate-600">{item.quantity} {item.uom}</span>
-                            </div>
-                          ))}
+                          {bomItems.map((item) => {
+                            const totalNeeded = targetQty * parseFloat(item.quantity);
+                            return (
+                              <div key={item.id} className="text-xs">
+                                <span className="font-medium">{item.material?.part_number || 'N/A'}</span>
+                                {' - '}
+                                <span className="text-slate-600">{totalNeeded.toFixed(2)} {item.uom}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <span className="text-slate-400 text-xs">No BOM</span>
@@ -163,7 +169,7 @@ function YieldReportTab() {
                             <div key={idx} className="text-xs">
                               <span className="font-medium">{material.item_code}</span>
                               {' - '}
-                              <span className="text-slate-600">{material.quantity} {material.uom}</span>
+                              <span className="text-slate-600">{material.quantity.toFixed(2)} {material.uom}</span>
                             </div>
                           ))}
                         </div>
@@ -172,8 +178,8 @@ function YieldReportTab() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-sm">
-                      <span className={getEfficiencyColor(report.efficiency_percentage)}>
-                        {report.efficiency_percentage}%
+                      <span className={getEfficiencyColor(yieldPercent)}>
+                        {yieldPercent}%
                       </span>
                     </td>
                   </tr>

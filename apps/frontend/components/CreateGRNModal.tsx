@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { usePurchaseOrders, useProducts, addGRN, addLicensePlate } from '@/lib/clientState';
+import { usePurchaseOrders, useProducts, addGRN, addLicensePlate, addStockMove, useSettings } from '@/lib/clientState';
 import { mockLocations } from '@/lib/mockData';
 import { toast } from '@/lib/toast';
 
@@ -22,6 +22,7 @@ interface GRNLineItem {
 export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalProps) {
   const purchaseOrders = usePurchaseOrders();
   const products = useProducts();
+  const settings = useSettings();
   const [selectedPO, setSelectedPO] = useState<number | null>(null);
   const [lineItems, setLineItems] = useState<GRNLineItem[]>([]);
 
@@ -52,17 +53,32 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
     }
 
     const grnNumber = `GRN-2024-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+    const selectedPOData = purchaseOrders.find(p => p.id === selectedPO);
+    const warehouseLocationId = settings.warehouse.default_location_id;
+    const timestamp = new Date().toISOString();
     
     const grnItems = lineItems.map((item, index) => {
       const lpNumber = `LP-2024-${String(Date.now() + index).slice(-3)}`;
+      const product = products.find(p => p.id === item.product_id);
       
-      addLicensePlate({
+      const newLP = addLicensePlate({
         lp_number: lpNumber,
         product_id: item.product_id,
         location_id: item.location_id,
         quantity: item.quantity_received,
-        qa_status: 'Pending',
+        qa_status: 'Passed',
         grn_id: null,
+      });
+
+      addStockMove({
+        move_number: grnNumber,
+        lp_id: newLP.id,
+        from_location_id: null,
+        to_location_id: warehouseLocationId,
+        quantity: item.quantity_received,
+        status: 'completed',
+        move_date: timestamp,
+        wo_number: selectedPOData?.po_number,
       });
 
       return {
@@ -73,8 +89,8 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
         quantity_received: item.quantity_received,
         location_id: item.location_id,
         lp_number: lpNumber,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: timestamp,
+        updated_at: timestamp,
       };
     });
 
@@ -82,7 +98,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
       grn_number: grnNumber,
       po_id: selectedPO,
       status: 'draft',
-      received_date: null,
+      received_date: timestamp,
       grn_items: grnItems,
     });
 

@@ -27,35 +27,45 @@ export function StockMoveTable() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-200">
-            {stockMoves.map((move) => (
-              <tr key={move.id} className="hover:bg-slate-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{move.move_number}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.lp_number || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.product?.part_number || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.from_location?.name || move.wo_number || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.wo_number && move.from_location ? move.wo_number : move.to_location?.name || 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.quantity}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.move_date || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    move.status === 'completed' ? 'bg-green-100 text-green-800' :
-                    move.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {move.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => setSelectedMove(move.id)}
-                    className="text-slate-600 hover:text-slate-900"
-                    title="View Details"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {stockMoves.map((move) => {
+              const isGRN = move.move_number?.startsWith('GRN-');
+              const fromLocation = isGRN 
+                ? (move.wo_number || 'N/A')
+                : (move.from_location?.name || move.wo_number || 'N/A');
+              const toLocation = isGRN
+                ? (move.to_location?.name || 'N/A')
+                : (move.wo_number && move.from_location ? move.wo_number : move.to_location?.name || 'N/A');
+              
+              return (
+                <tr key={move.id} className="hover:bg-slate-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{move.move_number}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.lp_number || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.product?.part_number || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{fromLocation}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{toLocation}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.quantity}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.move_date || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      move.status === 'completed' ? 'bg-green-100 text-green-800' :
+                      move.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {move.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      onClick={() => setSelectedMove(move.id)}
+                      className="text-slate-600 hover:text-slate-900"
+                      title="View Details"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
