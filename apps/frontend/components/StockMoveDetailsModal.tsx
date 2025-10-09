@@ -37,7 +37,7 @@ export function StockMoveDetailsModal({ moveId, isOpen, onClose }: StockMoveDeta
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">From Location</label>
-              <div className="text-base text-slate-900">{move.from_location?.name || 'N/A'}</div>
+              <div className="text-base text-slate-900">{move.wo_number || move.from_location?.name || 'N/A'}</div>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">To Location</label>

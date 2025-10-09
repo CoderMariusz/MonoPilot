@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Package, CheckCircle, X, Check, AlertTriangle, Minus } from 'lucide-react';
-import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports } from '@/lib/clientState';
+import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports, useSettings } from '@/lib/clientState';
 import { toast } from '@/lib/toast';
 import { AlertDialog } from '@/components/AlertDialog';
 import { ManualConsumeModal } from '@/components/ManualConsumeModal';
@@ -48,6 +48,7 @@ export default function ProcessTerminalPage() {
   const workOrders = useWorkOrders();
   const licensePlates = useLicensePlates();
   const yieldReports = useYieldReports();
+  const settings = useSettings();
 
   const lines = ['Line 1', 'Line 2', 'Line 3', 'Line 4'];
   
@@ -307,23 +308,26 @@ export default function ProcessTerminalPage() {
     consumeMaterialsFIFO(qtyToCreate);
 
     const prLPNumber = generateLPNumber();
+    const warehouseLocationId = settings.warehouse.default_location_id || 1;
+    
     const newPRLP = addLicensePlate({
       lp_number: prLPNumber,
       product_id: selectedWO.product!.id,
-      location_id: 3,
+      location_id: warehouseLocationId,
       quantity: qtyToCreate.toString(),
       qa_status: 'Pending',
       grn_id: null,
     });
-
+    
     addStockMove({
       move_number: `SM-${prLPNumber}`,
       lp_id: newPRLP.id,
       from_location_id: 3,
-      to_location_id: 3,
+      to_location_id: warehouseLocationId,
       quantity: qtyToCreate.toString(),
       status: 'completed',
       move_date: new Date().toISOString().split('T')[0],
+      wo_number: selectedWO.wo_number,
     });
 
     const woQty = parseFloat(selectedWO.quantity);

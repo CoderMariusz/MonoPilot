@@ -351,6 +351,7 @@ export interface StockMove {
   quantity: string;
   status: 'draft' | 'completed' | 'cancelled';
   move_date: string | null;
+  wo_number?: string | null;
   created_at: string;
   updated_at: string;
 }
