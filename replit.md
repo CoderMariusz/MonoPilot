@@ -52,6 +52,25 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
 - **Package Manager**: pnpm
 ## Recent Changes
 
+- 2025-10-09: **Stock Movement & Yield Report Improvements**
+  - **Stock Movement Enhancements**:
+    - From Location now displays Work Order number (e.g., "WO-2024-001") for production movements
+    - To Location uses warehouse default location from admin settings instead of hardcoded values
+    - Added Item Code column to Stock Movements table
+    - Added wo_number field to StockMove interface for better traceability
+  - **Warehouse LP Stock**:
+    - Renamed "LP Operations" tab to "LP Stock" throughout warehouse module
+    - Added Item Code column to LP Stock table (shows product part_number)
+    - Table now displays: LP Number, Item Code, Product, Location, Quantity, QA Status, Actions
+  - **Production Yield Report**:
+    - Connected to real-time data from scanner terminals (replaced mock data)
+    - Updated table columns to: WO Number, Product, Line, Target Qty, Actual Qty, BOM Materials, Consumed Materials, Yield %
+    - BOM Materials column fetches requirements from work order
+    - Consumed Materials column shows actual materials used from yield report
+    - Efficiency color-coded: Green ≥90%, Orange ≥70%, Red <70%
+    - Reports sorted newest first for easy tracking
+    - Removed summary cards to focus on individual order details
+
 - 2025-10-09: **Scanner Terminals Complete Rebuild - Manufacturing Staging Workflow**
   - **Complete Workflow Redesign**: Rebuilt both Process and Pack terminals from scratch
   - **Line Selection First**: Production line (Line 1-4) must be selected before work order
