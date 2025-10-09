@@ -54,11 +54,21 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
 
 - 2025-10-09: **Stock Movement & Yield Report Improvements**
   - **Stock Movement Enhancements**:
-    - From Location now displays Work Order number (e.g., "WO-2024-001") for production movements
-    - To Location uses warehouse default location from admin settings instead of hardcoded values
+    - **Data Enrichment**: Added locations to ClientState and enriched getStockMoves() to populate full nested objects (LP with product, from_location, to_location) by joining based on IDs
+    - **Display Logic for Item Creation**:
+      - From Location: Shows Work Order number (e.g., "WO-2024-001")
+      - To Location: Shows warehouse default location from admin settings
+      - LP Number: Displays the created LP number
+      - Item Code: Shows product part_number
+    - **Display Logic for Manual Consume**:
+      - From Location: Shows LP's actual location (where it was before consumption)
+      - To Location: Shows Work Order number (what it was consumed to)
+      - LP Number: Displays the consumed LP number
+      - Item Code: Shows product part_number from consumed LP
     - Added Item Code column to Stock Movements table
     - Added wo_number field to StockMove interface for better traceability
     - Date now shows full timestamp (YYYY-MM-DD HH:MM:SS) instead of just date
+    - Both FIFO consumption and manual consume properly record all tracking data
   - **Warehouse LP Stock**:
     - Renamed "LP Operations" tab to "LP Stock" throughout warehouse module
     - Added Item Code column to LP Stock table (shows product part_number)
