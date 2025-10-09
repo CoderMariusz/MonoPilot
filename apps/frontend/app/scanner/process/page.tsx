@@ -22,6 +22,7 @@ export default function ProcessTerminalPage() {
   const [lpNumber, setLpNumber] = useState('');
   const [scannedLP, setScannedLP] = useState<LicensePlate | null>(null);
   const [consumeQty, setConsumeQty] = useState('');
+  const [confirmedQty, setConfirmedQty] = useState('');
   const [createdPRs, setCreatedPRs] = useState<CreatedPR[]>([]);
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
@@ -75,13 +76,31 @@ export default function ProcessTerminalPage() {
     return `PR-${timestamp}-${random}`;
   };
 
-  const handleCreatePR = () => {
+  const handleConfirmQty = () => {
     if (!scannedLP || !selectedWO || !consumeQty) {
       toast.error('Please enter quantity to consume');
       return;
     }
 
     const qty = parseFloat(consumeQty);
+    const availableQty = parseFloat(scannedLP.quantity);
+
+    if (qty <= 0 || qty > availableQty) {
+      toast.error(`Invalid quantity. Available: ${availableQty} ${scannedLP.product?.uom}`);
+      return;
+    }
+
+    setConfirmedQty(consumeQty);
+    toast.success(`Quantity ${consumeQty} confirmed - Ready to create item`);
+  };
+
+  const handleCreatePR = () => {
+    if (!scannedLP || !selectedWO || !confirmedQty) {
+      toast.error('Please confirm quantity first');
+      return;
+    }
+
+    const qty = parseFloat(confirmedQty);
     const availableQty = parseFloat(scannedLP.quantity);
 
     if (qty <= 0 || qty > availableQty) {
@@ -139,9 +158,15 @@ export default function ProcessTerminalPage() {
 
     toast.success(`Created PR ${prLPNumber} - ${qty} ${selectedWO.product!.uom}`);
 
-    setScannedLP(null);
     setConsumeQty('');
-    setTimeout(() => lpInputRef.current?.focus(), 100);
+    setConfirmedQty('');
+    
+    const updatedLP = licensePlates.find(l => l.id === scannedLP.id);
+    if (updatedLP) {
+      setScannedLP(updatedLP);
+    }
+    
+    setTimeout(() => qtyInputRef.current?.focus(), 100);
   };
 
   const handleReset = () => {
@@ -149,6 +174,7 @@ export default function ProcessTerminalPage() {
     setScannedLP(null);
     setLpNumber('');
     setConsumeQty('');
+    setConfirmedQty('');
     setCreatedPRs([]);
   };
 
@@ -272,19 +298,33 @@ export default function ProcessTerminalPage() {
                           ref={qtyInputRef}
                           type="number"
                           value={consumeQty}
-                          onChange={(e) => setConsumeQty(e.target.value)}
+                          onChange={(e) => {
+                            setConsumeQty(e.target.value);
+                            setConfirmedQty('');
+                          }}
+                          disabled={!!confirmedQty}
                           placeholder={`Max: ${scannedLP.quantity}`}
-                          className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
+                          className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px] disabled:bg-slate-100 disabled:cursor-not-allowed"
                         />
                       </div>
-                      <button
-                        onClick={handleCreatePR}
-                        disabled={!consumeQty}
-                        className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px] disabled:bg-slate-300 disabled:cursor-not-allowed"
-                      >
-                        <Package className="w-5 h-5 inline mr-2" />
-                        Create Process Recipe
-                      </button>
+                      
+                      {!confirmedQty ? (
+                        <button
+                          onClick={handleConfirmQty}
+                          disabled={!consumeQty}
+                          className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold min-h-[48px] disabled:bg-slate-300 disabled:cursor-not-allowed"
+                        >
+                          Confirm Quantity
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleCreatePR}
+                          className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px]"
+                        >
+                          <Package className="w-5 h-5 inline mr-2" />
+                          Create Process Recipe
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

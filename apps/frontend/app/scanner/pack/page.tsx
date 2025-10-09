@@ -22,6 +22,7 @@ export default function PackTerminalPage() {
   const [lpNumber, setLpNumber] = useState('');
   const [scannedLP, setScannedLP] = useState<LicensePlate | null>(null);
   const [packQty, setPackQty] = useState('');
+  const [confirmedQty, setConfirmedQty] = useState('');
   const [createdFGs, setCreatedFGs] = useState<CreatedFG[]>([]);
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
@@ -75,13 +76,31 @@ export default function PackTerminalPage() {
     return `FG-${timestamp}-${random}`;
   };
 
-  const handleCreateFG = () => {
+  const handleConfirmQty = () => {
     if (!scannedLP || !selectedWO || !packQty) {
       toast.error('Please enter quantity to pack');
       return;
     }
 
     const qty = parseFloat(packQty);
+    const availableQty = parseFloat(scannedLP.quantity);
+
+    if (qty <= 0 || qty > availableQty) {
+      toast.error(`Invalid quantity. Available: ${availableQty} ${scannedLP.product?.uom}`);
+      return;
+    }
+
+    setConfirmedQty(packQty);
+    toast.success(`Quantity ${packQty} confirmed - Ready to create item`);
+  };
+
+  const handleCreateFG = () => {
+    if (!scannedLP || !selectedWO || !confirmedQty) {
+      toast.error('Please confirm quantity first');
+      return;
+    }
+
+    const qty = parseFloat(confirmedQty);
     const availableQty = parseFloat(scannedLP.quantity);
 
     if (qty <= 0 || qty > availableQty) {
@@ -141,9 +160,15 @@ export default function PackTerminalPage() {
 
     toast.success(`Created FG ${fgLPNumber} - ${qty} ${selectedWO.product!.uom}`);
 
-    setScannedLP(null);
     setPackQty('');
-    setTimeout(() => lpInputRef.current?.focus(), 100);
+    setConfirmedQty('');
+    
+    const updatedLP = licensePlates.find(l => l.id === scannedLP.id);
+    if (updatedLP) {
+      setScannedLP(updatedLP);
+    }
+    
+    setTimeout(() => qtyInputRef.current?.focus(), 100);
   };
 
   const handleReset = () => {
@@ -151,6 +176,7 @@ export default function PackTerminalPage() {
     setScannedLP(null);
     setLpNumber('');
     setPackQty('');
+    setConfirmedQty('');
     setCreatedFGs([]);
   };
 
@@ -274,19 +300,33 @@ export default function PackTerminalPage() {
                           ref={qtyInputRef}
                           type="number"
                           value={packQty}
-                          onChange={(e) => setPackQty(e.target.value)}
+                          onChange={(e) => {
+                            setPackQty(e.target.value);
+                            setConfirmedQty('');
+                          }}
+                          disabled={!!confirmedQty}
                           placeholder={`Max: ${scannedLP.quantity}`}
-                          className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px]"
+                          className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px] disabled:bg-slate-100 disabled:cursor-not-allowed"
                         />
                       </div>
-                      <button
-                        onClick={handleCreateFG}
-                        disabled={!packQty}
-                        className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px] disabled:bg-slate-300 disabled:cursor-not-allowed"
-                      >
-                        <Package className="w-5 h-5 inline mr-2" />
-                        Create Finished Good
-                      </button>
+                      
+                      {!confirmedQty ? (
+                        <button
+                          onClick={handleConfirmQty}
+                          disabled={!packQty}
+                          className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px] disabled:bg-slate-300 disabled:cursor-not-allowed"
+                        >
+                          Confirm Quantity
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleCreateFG}
+                          className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px]"
+                        >
+                          <Package className="w-5 h-5 inline mr-2" />
+                          Create Finished Good
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
