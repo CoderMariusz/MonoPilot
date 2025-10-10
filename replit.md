@@ -55,11 +55,6 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
 ## Recent Changes
 
 - 2025-10-09: **Planning, Production & Scanner Advanced Features**
-  - **Work Order Product Filtering by Line**:
-    - When creating Work Orders, product dropdown now filters based on selected production line
-    - Only shows products where production_lines includes 'ALL' or matches selected machine ID
-    - Product selection automatically resets when line changes
-    - Prevents creating Work Orders with incompatible line/product combinations
   - **BOM Component Line Selection in Scanner Terminals**:
     - Added line selection dropdown for BOM components with specific production_lines (not 'ALL')
     - Operators can choose which production line's materials to consume for line-restricted components
@@ -73,3 +68,26 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - Purchase Orders and Transfer Orders already had edit functionality (verified working)
     - Fixed LSP type errors in modals (status type, import issues)
     - All three planning tables (WO, PO, TO) have complete CRUD operations
+
+- 2025-10-10: **Line-Specific BOM Filtering & Conditional Components**
+  - **Work Order Creation Flow Redesigned**:
+    - Product selection comes FIRST, line selection comes AFTER
+    - Available lines calculated dynamically from product's BOM components (union of all lines)
+    - Line dropdown shows only lines compatible with product's BOM
+    - Enables BOM components to be line-specific (conditional manufacturing recipes)
+  - **Dynamic BOM Filtering System**:
+    - Work Orders preserve full original product BOM (no mutation)
+    - BOM filtering happens dynamically at read-time using getFilteredBomForWorkOrder()
+    - Components included if: production_lines is empty/undefined OR includes 'ALL' OR includes selected line
+    - Allows editing WO between lines without losing component data
+  - **Line-Specific Manufacturing**:
+    - Example: Sausage with BOM (Meat: lines 3,4 | Seasoning: ALL | Casing: line 3 only)
+    - Available lines for WO: 3, 4 (union of all component lines)
+    - Line 3 selected → BOM includes: Meat, Seasoning, Casing (all 3 components)
+    - Line 4 selected → BOM includes: Meat, Seasoning only (Casing excluded)
+  - **All Consumers Updated**:
+    - Production Yield Reports display line-specific BOMs
+    - Scanner Process Terminal uses filtered BOMs for consumption
+    - Scanner Pack Terminal uses filtered BOMs for consumption
+    - Work Order Details Modal shows filtered BOMs
+    - All filtering centralized in getFilteredBomForWorkOrder() function
