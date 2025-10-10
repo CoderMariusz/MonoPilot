@@ -379,6 +379,7 @@ class ClientState {
         uom: item.uom,
         sequence: item.sequence || index + 1,
         priority: item.priority,
+        production_lines: item.production_lines || [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }));
@@ -425,6 +426,7 @@ class ClientState {
           uom: item.uom,
           sequence: item.sequence || index + 1,
           priority: item.priority,
+          production_lines: item.production_lines || [],
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }));
@@ -1246,8 +1248,7 @@ export function getFilteredBomForWorkOrder(workOrder: WorkOrder): BomItem[] {
   const machineIdStr = String(workOrder.machine_id);
 
   return workOrder.product.activeBom.bomItems.filter(bomItem => {
-    const material = bomItem.material;
-    const productionLines = material?.production_lines;
+    const productionLines = bomItem.production_lines || bomItem.material?.production_lines;
 
     if (!productionLines || productionLines.length === 0) {
       return true;
