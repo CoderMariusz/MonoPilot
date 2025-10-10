@@ -506,11 +506,20 @@ export default function PackTerminalPage() {
       const bomItem = bomItems.find(item => item.material_id === materialId);
       const material = bomItem?.material;
       
+      const consumedQty = consumedMaterials[materialId];
+      const standardQty = createdItemsCount * parseFloat(bomItem?.quantity || '0');
+      const yieldPercentage = consumedQty > 0 
+        ? Math.round((standardQty / consumedQty) * 100)
+        : 0;
+      
       return {
         item_code: material?.part_number || `MAT-${materialId}`,
         item_name: material?.description || 'Unknown Material',
-        quantity: consumedMaterials[materialId],
-        uom: bomItem?.uom || material?.uom || ''
+        standard_qty: standardQty,
+        consumed_qty: consumedQty,
+        quantity: consumedQty,
+        uom: bomItem?.uom || material?.uom || '',
+        yield_percentage: yieldPercentage
       };
     });
 

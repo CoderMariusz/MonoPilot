@@ -115,10 +115,10 @@ function YieldReportTab() {
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">WO Number</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Product</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Line</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Target Qty</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Actual Qty</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">BOM Materials</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Consumed Materials</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Material</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">BOM Standard</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Consumed Qty</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Yield %</th>
             </tr>
           </thead>
@@ -131,56 +131,54 @@ function YieldReportTab() {
               </tr>
             ) : (
               sortedReports.map((report) => {
-                const workOrder = getWorkOrder(report.work_order_id);
-                const targetQty = workOrder ? parseFloat(workOrder.quantity) : 0;
                 const actualQty = report.actual_quantity;
-                const yieldPercent = targetQty > 0 ? Math.round((actualQty / targetQty) * 100) : 0;
-                const bomItems = workOrder ? getFilteredBomForWorkOrder(workOrder) : [];
 
-                return (
+                return report.materials_used.length > 0 ? (
+                  report.materials_used.map((material, idx) => (
+                    <tr key={`${report.id}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50">
+                      {idx === 0 ? (
+                        <>
+                          <td className="py-3 px-4 text-sm font-medium" rowSpan={report.materials_used.length}>
+                            {report.work_order_number}
+                          </td>
+                          <td className="py-3 px-4 text-sm" rowSpan={report.materials_used.length}>
+                            {report.product_name}
+                          </td>
+                          <td className="py-3 px-4 text-sm" rowSpan={report.materials_used.length}>
+                            {report.line_number || '-'}
+                          </td>
+                          <td className="py-3 px-4 text-sm" rowSpan={report.materials_used.length}>
+                            {actualQty.toLocaleString()}
+                          </td>
+                        </>
+                      ) : null}
+                      <td className="py-3 px-4 text-sm">
+                        <div className="text-xs">
+                          <span className="font-medium">{material.item_code}</span>
+                          <div className="text-slate-500">{material.item_name}</div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        <span className="text-slate-600">{material.standard_qty.toFixed(2)} {material.uom}</span>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        <span className="text-slate-600">{material.consumed_qty.toFixed(2)} {material.uom}</span>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        <span className={getEfficiencyColor(material.yield_percentage)}>
+                          {material.yield_percentage}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
                   <tr key={report.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-3 px-4 text-sm font-medium">{report.work_order_number}</td>
                     <td className="py-3 px-4 text-sm">{report.product_name}</td>
                     <td className="py-3 px-4 text-sm">{report.line_number || '-'}</td>
-                    <td className="py-3 px-4 text-sm">{targetQty.toLocaleString()}</td>
                     <td className="py-3 px-4 text-sm">{actualQty.toLocaleString()}</td>
-                    <td className="py-3 px-4 text-sm">
-                      {bomItems.length > 0 ? (
-                        <div className="space-y-1">
-                          {bomItems.map((item) => {
-                            const totalNeeded = actualQty * parseFloat(item.quantity);
-                            return (
-                              <div key={item.id} className="text-xs">
-                                <span className="font-medium">{item.material?.part_number || 'N/A'}</span>
-                                {' - '}
-                                <span className="text-slate-600">{totalNeeded.toFixed(2)} {item.uom}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 text-xs">No BOM</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-sm">
-                      {report.materials_used.length > 0 ? (
-                        <div className="space-y-1">
-                          {report.materials_used.map((material, idx) => (
-                            <div key={idx} className="text-xs">
-                              <span className="font-medium">{material.item_code}</span>
-                              {' - '}
-                              <span className="text-slate-600">{material.quantity.toFixed(2)} {material.uom}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 text-xs">None</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-sm">
-                      <span className={getEfficiencyColor(yieldPercent)}>
-                        {yieldPercent}%
-                      </span>
+                    <td className="py-3 px-4 text-sm" colSpan={4}>
+                      <span className="text-slate-400 text-xs">No materials consumed</span>
                     </td>
                   </tr>
                 );

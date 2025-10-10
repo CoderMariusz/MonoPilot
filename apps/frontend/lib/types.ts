@@ -457,8 +457,11 @@ export interface Settings {
 export interface YieldReportMaterial {
   item_code: string;
   item_name: string;
+  standard_qty: number;
+  consumed_qty: number;
   quantity: number;
   uom: string;
+  yield_percentage: number;
 }
 
 export interface YieldReportDetail {
