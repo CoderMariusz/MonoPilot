@@ -109,3 +109,9 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - Selecting ALL disables individual machine checkboxes
     - Fixed critical bugs: ALL checkbox can now be toggled on/off, visual state matches selection state
     - Consistent UI across both product configuration and BOM component line assignment
+  - **Critical Bug Fixes - Work Order System**:
+    - Fixed CreateWorkOrderModal line selection to respect BOM constraints (bomItem.production_lines priority)
+    - Work Order line dropdown now only shows lines defined in product's BOM components
+    - Fixed WorkOrderDetailsModal to use reactive useWorkOrders() instead of static mock data
+    - Newly created Work Orders can now be viewed immediately without "does not exist" errors
+    - Details modal now calculates BOM details dynamically from current state using getFilteredBomForWorkOrder()
