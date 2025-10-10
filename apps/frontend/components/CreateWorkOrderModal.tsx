@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { useMachines } from '@/lib/clientState';
-import { mockProducts } from '@/lib/mockData';
+import { useMachines, useProducts } from '@/lib/clientState';
 import type { Product, WorkOrder } from '@/lib/types';
 
 interface CreateWorkOrderModalProps {
@@ -15,9 +14,9 @@ interface CreateWorkOrderModalProps {
 
 export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOrder }: CreateWorkOrderModalProps) {
   const machines = useMachines();
-  const [products, setProducts] = useState<Product[]>([]);
+  const allProducts = useProducts();
+  const products = allProducts.filter(p => p.type === 'PR' || p.type === 'FG');
   const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
@@ -64,12 +63,6 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
   const availableLines = calculateAvailableLines();
 
   useEffect(() => {
-    if (isOpen) {
-      loadData();
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
     if (editingWorkOrder) {
       setFormData({
         product_id: editingWorkOrder.product_id?.toString() || '',
@@ -92,21 +85,6 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
       });
     }
   }, [editingWorkOrder]);
-
-  const loadData = async () => {
-    setLoadingData(true);
-    try {
-      const prProducts = mockProducts.filter(p => p.type === 'PR');
-      const fgProducts = mockProducts.filter(p => p.type === 'FG');
-      
-      const allProducts = [...prProducts, ...fgProducts];
-      setProducts(allProducts);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load data');
-    } finally {
-      setLoadingData(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,12 +162,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
           </button>
         </div>
 
-        {loadingData ? (
-          <div className="p-8 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
                 {error}
@@ -340,7 +313,6 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
               </button>
             </div>
           </form>
-        )}
       </div>
     </div>
   );
