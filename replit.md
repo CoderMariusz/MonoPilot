@@ -91,3 +91,13 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - Scanner Pack Terminal uses filtered BOMs for consumption
     - Work Order Details Modal shows filtered BOMs
     - All filtering centralized in getFilteredBomForWorkOrder() function
+  - **BOM Editor Enhancements**:
+    - Fixed CreateWorkOrderModal to use reactive useProducts() hook - newly created FG/PR items appear immediately
+    - Added production_lines multi-select field for each BOM component in AddItemModal
+    - Users can now define which lines each component can run on (e.g., '3', '4', or 'ALL')
+    - BOM editor shows 6 columns: Product, Quantity, UoM, Sequence, Priority, Production Lines
+  - **Test Data Added**:
+    - Premium Italian Sausage (FG) with line-specific BOM components
+    - Premium Pork Meat (lines 3, 4), Italian Seasoning (ALL), Natural Casing (line 3), Synthetic Casing (line 4)
+    - Demonstrates conditional manufacturing: Line 3 uses Natural Casing, Line 4 uses Synthetic Casing
+    - BomItem.production_lines takes priority over material.production_lines in filtering logic
