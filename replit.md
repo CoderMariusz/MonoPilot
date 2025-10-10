@@ -69,6 +69,48 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - Fixed LSP type errors in modals (status type, import issues)
     - All three planning tables (WO, PO, TO) have complete CRUD operations
 
+- 2025-10-10: **Work Order BOM Data Fix & Production Yield Report Improvements**
+  - **Work Order BOM Enrichment**:
+    - Fixed getWorkOrders() in clientState.ts to properly enrich work orders with complete product and BOM data
+    - BOM items now include full material references (part_number, description) for proper display
+    - Follows same enrichment pattern as getGRNs() and getLicensePlates() for consistency
+    - WorkOrderDetailsModal now displays complete BOM component information
+  - **Production Yield Report Formula Correction**:
+    - Updated yield calculation to: (BOM Standard Qty / Consumed Qty) × 100%
+    - Interpretation: >100% = efficient (under-consumption), <100% = waste (over-consumption)
+    - Updated YieldReportMaterial type with standard_qty, consumed_qty, yield_percentage fields
+    - Both Process and Pack terminals use consistent yield calculation
+    - Production page displays per-material yield breakdown with rowSpan for work orders
+  - **Scanner Terminal Yield Display**:
+    - Scanner terminals now READ yield data from production yield reports instead of recalculating
+    - After closing order, modal displays latest yield report data from state
+    - Shows: WO details, efficiency %, material yield table with BOM standard/consumed/yield %
+    - Color-coded yield percentages: green (≥90%), orange (≥70%), red (<70%)
+    - Ensures consistency with Production Yield Reports page
+  - **Purchase Order System Redesign**:
+    - Added new PO fields: warehouse_id, request_delivery_date, expected_delivery_date, buyer, notes
+    - Full datetime timestamps: created_at, updated_at with ISO8601 format
+    - PurchaseOrdersTable columns: PO Number, Supplier, Warehouse, Request Delivery, Expected Delivery, Buyer, Status, Total Items, Actions
+    - All new columns have functional sorting
+    - CreatePurchaseOrderModal and EditPurchaseOrderModal include form fields for all new attributes
+    - getPurchaseOrders() enriches warehouse data similar to getWorkOrders()
+  - **PO Details Modal Enhancements**:
+    - Added "Quantity Received" column showing GRN totals aggregated across multiple GRNs per item
+    - Support for split deliveries (e.g., 600kg + 400kg = 1000kg total received)
+    - Added "Confirmed" checkbox column for marking items as received/confirmed
+    - Confirmation state persists through updatePurchaseOrder
+    - Visual indicators: green checkmarks, row tinting, color-coded receipt progress, percentage display
+    - Test data: PO-2024-004 demonstrates split delivery with GRN-004 and GRN-005
+  - **Accept & Close PO Workflow**:
+    - Implemented "Accept & Close PO" button with validation logic
+    - Button disabled if PO already closed or not all items confirmed
+    - closePurchaseOrder() validates all items are confirmed before allowing closure
+    - Auto-generates sequential GRN numbers for final receipt confirmation
+    - Creates GRN items for outstanding quantities (calculates remaining based on prior GRNs)
+    - Updates PO status to 'closed' with proper audit trail
+    - Toast notifications for success/error with confirmation counts
+    - Loading states and visual feedback throughout workflow
+
 - 2025-10-10: **Line-Specific BOM Filtering & Conditional Components**
   - **Work Order Creation Flow Redesigned**:
     - Product selection comes FIRST, line selection comes AFTER
