@@ -40,7 +40,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
     
     selectedProduct.activeBom.bomItems.forEach(bomItem => {
       const material = bomItem.material;
-      const productionLines = material?.production_lines;
+      const productionLines = bomItem.production_lines || material?.production_lines;
       
       if (!productionLines || productionLines.length === 0) {
         return;

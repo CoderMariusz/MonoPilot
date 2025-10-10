@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { mockWorkOrderDetails } from '@/lib/mockData';
+import { useWorkOrders, getFilteredBomForWorkOrder } from '@/lib/clientState';
 
 interface BomComponent {
   material_id: number;
@@ -39,6 +39,7 @@ interface WorkOrderDetailsModalProps {
 }
 
 export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrderDetailsModalProps) {
+  const workOrders = useWorkOrders();
   const [details, setDetails] = useState<WorkOrderDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,10 +56,44 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
     setLoading(true);
     setError(null);
     try {
-      const data = mockWorkOrderDetails(workOrderId);
-      if (!data) {
+      const workOrder = workOrders.find(wo => wo.id === workOrderId);
+      if (!workOrder || !workOrder.product) {
         throw new Error('Work order not found');
       }
+
+      const bomItems = getFilteredBomForWorkOrder(workOrder);
+      
+      const woQuantity = typeof workOrder.quantity === 'string' ? parseFloat(workOrder.quantity) : workOrder.quantity;
+      
+      const data = {
+        work_order: {
+          id: workOrder.id,
+          wo_number: workOrder.wo_number,
+          product_id: workOrder.product_id,
+          product_name: workOrder.product?.description || '',
+          product_part_number: workOrder.product?.part_number || '',
+          quantity: woQuantity || 0,
+          uom: workOrder.product?.uom || '',
+          status: workOrder.status,
+          due_date: workOrder.due_date,
+          machine_id: workOrder.machine_id,
+          machine_name: workOrder.machine?.name || null,
+        },
+        bom_components: bomItems.map(bomItem => {
+          const bomQty = typeof bomItem.quantity === 'string' ? parseFloat(bomItem.quantity) : bomItem.quantity;
+          return {
+            material_id: bomItem.material_id,
+            part_number: bomItem.material?.part_number || '',
+            description: bomItem.material?.description || '',
+            uom: bomItem.uom,
+            qty_per_unit: bomQty,
+            total_qty_needed: bomQty * (woQuantity || 0),
+            stock_on_hand: 0,
+            qty_completed: 0,
+          };
+        })
+      };
+      
       setDetails(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load work order details');
