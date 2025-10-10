@@ -125,6 +125,12 @@ export interface PurchaseOrder {
   supplier: string;
   status: 'draft' | 'submitted' | 'confirmed' | 'received' | 'cancelled';
   due_date: string | null;
+  warehouse_id?: number;
+  warehouse?: Location;
+  request_delivery_date?: string;
+  expected_delivery_date?: string;
+  buyer?: string;
+  notes?: string;
   purchase_order_items?: PurchaseOrderItem[];
   created_at: string;
   updated_at: string;

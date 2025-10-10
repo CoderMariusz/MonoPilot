@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { mockProducts } from '@/lib/mockData';
-import type { Product } from '@/lib/types';
+import { mockProducts, mockLocations } from '@/lib/mockData';
+import type { Product, Location } from '@/lib/types';
 
 interface CreatePurchaseOrderModalProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ interface LineItem {
 
 export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreatePurchaseOrderModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +29,11 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
     supplier: '',
     due_date: '',
     status: 'draft' as const,
+    warehouse_id: '',
+    request_delivery_date: '',
+    expected_delivery_date: '',
+    buyer: '',
+    notes: '',
   });
 
   const [lineItems, setLineItems] = useState<LineItem[]>([
@@ -45,6 +51,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
     try {
       const rmProducts = mockProducts.filter(p => p.type === 'RM');
       setProducts(rmProducts);
+      setLocations(mockLocations);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {
@@ -99,6 +106,11 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
         supplier: formData.supplier,
         status: formData.status,
         due_date: formData.due_date || null,
+        warehouse_id: formData.warehouse_id ? Number(formData.warehouse_id) : undefined,
+        request_delivery_date: formData.request_delivery_date || undefined,
+        expected_delivery_date: formData.expected_delivery_date || undefined,
+        buyer: formData.buyer || undefined,
+        notes: formData.notes || undefined,
         purchase_order_items,
       });
       
@@ -108,6 +120,11 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
         supplier: '',
         due_date: '',
         status: 'draft',
+        warehouse_id: '',
+        request_delivery_date: '',
+        expected_delivery_date: '',
+        buyer: '',
+        notes: '',
       });
       setLineItems([{ id: '1', product_id: '', quantity: '', unit_price: '' }]);
     } catch (err: any) {
@@ -161,30 +178,90 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Due Date
+                    Warehouse
+                  </label>
+                  <select
+                    value={formData.warehouse_id}
+                    onChange={(e) => setFormData({ ...formData, warehouse_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  >
+                    <option value="">Select warehouse...</option>
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Request Delivery Date
                   </label>
                   <input
                     type="date"
-                    value={formData.due_date}
-                    onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                    value={formData.request_delivery_date}
+                    onChange={(e) => setFormData({ ...formData, request_delivery_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Expected Delivery Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.expected_delivery_date}
+                    onChange={(e) => setFormData({ ...formData, expected_delivery_date: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                   />
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Buyer
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.buyer}
+                    onChange={(e) => setFormData({ ...formData, buyer: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    placeholder="Enter buyer name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="confirmed">Confirmed</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Status
+                  Notes
                 </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="confirmed">Confirmed</option>
-                </select>
+                  rows={3}
+                  placeholder="Add any additional notes or special instructions..."
+                />
               </div>
 
               <div className="border-t border-slate-200 pt-4 mt-6">

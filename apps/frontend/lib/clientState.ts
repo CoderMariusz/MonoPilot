@@ -80,7 +80,13 @@ class ClientState {
   }
 
   getPurchaseOrders(): PurchaseOrder[] {
-    return [...this.purchaseOrders];
+    return this.purchaseOrders.map(po => {
+      const warehouse = po.warehouse_id ? this.locations.find(l => l.id === po.warehouse_id) : undefined;
+      return {
+        ...po,
+        warehouse,
+      };
+    });
   }
 
   getTransferOrders(): TransferOrder[] {

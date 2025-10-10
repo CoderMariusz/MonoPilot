@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { mockProducts, mockPurchaseOrders } from '@/lib/mockData';
-import type { Product, PurchaseOrderItem } from '@/lib/types';
+import { mockProducts, mockPurchaseOrders, mockLocations } from '@/lib/mockData';
+import type { Product, PurchaseOrderItem, Location } from '@/lib/types';
 
 interface EditPurchaseOrderModalProps {
   isOpen: boolean;
@@ -21,6 +21,7 @@ interface LineItem {
 
 export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuccess }: EditPurchaseOrderModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,10 +30,20 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
     supplier: string;
     due_date: string;
     status: 'draft' | 'submitted' | 'confirmed' | 'received' | 'cancelled';
+    warehouse_id: string;
+    request_delivery_date: string;
+    expected_delivery_date: string;
+    buyer: string;
+    notes: string;
   }>({
     supplier: '',
     due_date: '',
     status: 'draft',
+    warehouse_id: '',
+    request_delivery_date: '',
+    expected_delivery_date: '',
+    buyer: '',
+    notes: '',
   });
 
   const [lineItems, setLineItems] = useState<LineItem[]>([
@@ -50,6 +61,7 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
     try {
       const rmProducts = mockProducts.filter(p => p.type === 'RM');
       setProducts(rmProducts);
+      setLocations(mockLocations);
 
       const po = mockPurchaseOrders.find(p => p.id === purchaseOrderId);
       if (po) {
@@ -57,6 +69,11 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
           supplier: po.supplier,
           due_date: po.due_date || '',
           status: po.status,
+          warehouse_id: po.warehouse_id?.toString() || '',
+          request_delivery_date: po.request_delivery_date || '',
+          expected_delivery_date: po.expected_delivery_date || '',
+          buyer: po.buyer || '',
+          notes: po.notes || '',
         });
 
         if (po.purchase_order_items && po.purchase_order_items.length > 0) {
@@ -122,6 +139,11 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
         supplier: formData.supplier,
         status: formData.status,
         due_date: formData.due_date || null,
+        warehouse_id: formData.warehouse_id ? Number(formData.warehouse_id) : undefined,
+        request_delivery_date: formData.request_delivery_date || undefined,
+        expected_delivery_date: formData.expected_delivery_date || undefined,
+        buyer: formData.buyer || undefined,
+        notes: formData.notes || undefined,
         purchase_order_items,
       });
       
@@ -178,32 +200,92 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Due Date
+                    Warehouse
+                  </label>
+                  <select
+                    value={formData.warehouse_id}
+                    onChange={(e) => setFormData({ ...formData, warehouse_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  >
+                    <option value="">Select warehouse...</option>
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Request Delivery Date
                   </label>
                   <input
                     type="date"
-                    value={formData.due_date}
-                    onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                    value={formData.request_delivery_date}
+                    onChange={(e) => setFormData({ ...formData, request_delivery_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Expected Delivery Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.expected_delivery_date}
+                    onChange={(e) => setFormData({ ...formData, expected_delivery_date: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                   />
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Buyer
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.buyer}
+                    onChange={(e) => setFormData({ ...formData, buyer: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    placeholder="Enter buyer name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="received">Received</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Status
+                  Notes
                 </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="received">Received</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
+                  rows={3}
+                  placeholder="Add any additional notes or special instructions..."
+                />
               </div>
 
               <div className="border-t border-slate-200 pt-4 mt-6">

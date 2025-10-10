@@ -51,13 +51,25 @@ export function PurchaseOrdersTable() {
           aVal = a.supplier || '';
           bVal = b.supplier || '';
           break;
+        case 'warehouse':
+          aVal = a.warehouse?.name || '';
+          bVal = b.warehouse?.name || '';
+          break;
+        case 'request_delivery_date':
+          aVal = a.request_delivery_date ? new Date(a.request_delivery_date).getTime() : 0;
+          bVal = b.request_delivery_date ? new Date(b.request_delivery_date).getTime() : 0;
+          break;
+        case 'expected_delivery_date':
+          aVal = a.expected_delivery_date ? new Date(a.expected_delivery_date).getTime() : 0;
+          bVal = b.expected_delivery_date ? new Date(b.expected_delivery_date).getTime() : 0;
+          break;
+        case 'buyer':
+          aVal = a.buyer || '';
+          bVal = b.buyer || '';
+          break;
         case 'status':
           aVal = a.status;
           bVal = b.status;
-          break;
-        case 'due_date':
-          aVal = a.due_date ? new Date(a.due_date).getTime() : 0;
-          bVal = b.due_date ? new Date(b.due_date).getTime() : 0;
           break;
         case 'items_count':
           aVal = a.purchase_order_items?.length || 0;
@@ -167,11 +179,44 @@ export function PurchaseOrdersTable() {
               </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
                 <button 
-                  onClick={() => handleSort('due_date')} 
+                  onClick={() => handleSort('warehouse')} 
                   className="flex items-center gap-1 hover:text-slate-900"
                 >
-                  Date
-                  {sortColumn === 'due_date' ? (
+                  Warehouse
+                  {sortColumn === 'warehouse' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('request_delivery_date')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Request Delivery
+                  {sortColumn === 'request_delivery_date' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('expected_delivery_date')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Expected Delivery
+                  {sortColumn === 'expected_delivery_date' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('buyer')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Buyer
+                  {sortColumn === 'buyer' ? (
                     sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                   ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
                 </button>
@@ -204,7 +249,7 @@ export function PurchaseOrdersTable() {
           <tbody>
             {sortedPurchaseOrders.length === 0 ? (
               <tr className="border-b border-slate-100">
-                <td colSpan={6} className="py-8 text-center text-slate-500 text-sm">
+                <td colSpan={9} className="py-8 text-center text-slate-500 text-sm">
                   {searchQuery ? 'No purchase orders found matching your search' : 'No purchase orders found'}
                 </td>
               </tr>
@@ -213,9 +258,14 @@ export function PurchaseOrdersTable() {
                 <tr key={po.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{po.po_number}</td>
                   <td className="py-3 px-4 text-sm">{po.supplier}</td>
+                  <td className="py-3 px-4 text-sm">{po.warehouse?.name || '-'}</td>
                   <td className="py-3 px-4 text-sm">
-                    {po.due_date ? new Date(po.due_date).toLocaleDateString() : '-'}
+                    {po.request_delivery_date ? new Date(po.request_delivery_date).toLocaleDateString() : '-'}
                   </td>
+                  <td className="py-3 px-4 text-sm">
+                    {po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleDateString() : '-'}
+                  </td>
+                  <td className="py-3 px-4 text-sm">{po.buyer || '-'}</td>
                   <td className="py-3 px-4 text-sm">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
                       po.status === 'received' ? 'bg-green-100 text-green-800' :
