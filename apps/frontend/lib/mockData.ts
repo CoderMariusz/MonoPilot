@@ -895,6 +895,7 @@ export const mockLicensePlates: LicensePlate[] = [
   { id: 4, lp_number: 'LP-2024-004', product_id: 5, product: mockProducts.find(p => p.id === 5), location_id: 2, location: mockLocations[1], quantity: '50', qa_status: 'Passed', grn_id: 2, created_at: '2024-02-06T00:00:00Z', updated_at: '2024-02-06T00:00:00Z' },
   { id: 5, lp_number: 'LP-2024-005', product_id: 3, product: mockProducts.find(p => p.id === 3), location_id: 2, location: mockLocations[1], quantity: '250', qa_status: 'Pending', grn_id: null, created_at: '2024-02-09T00:00:00Z', updated_at: '2024-02-09T00:00:00Z' },
   { id: 6, lp_number: 'LP-2024-006', product_id: 6, product: mockProducts.find(p => p.id === 6), location_id: 1, location: mockLocations[0], quantity: '1000', qa_status: 'Quarantine', grn_id: null, created_at: '2024-02-07T00:00:00Z', updated_at: '2024-02-07T00:00:00Z' },
+  { id: 7, lp_number: 'LP-2024-007', product_id: 13, product: mockProducts.find(p => p.id === 13), location_id: 1, location: mockLocations[0], quantity: '100', qa_status: 'Passed', grn_id: null, created_at: '2024-10-10T00:00:00Z', updated_at: '2024-10-10T00:00:00Z' },
 ];
 
 export const mockGRNs: GRN[] = [
