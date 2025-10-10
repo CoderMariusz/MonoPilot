@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, Check } from 'lucide-react';
-import { usePurchaseOrders, useGRNs, updatePurchaseOrder } from '@/lib/clientState';
+import { X, Loader2, Check, CheckCircle } from 'lucide-react';
+import { usePurchaseOrders, useGRNs, updatePurchaseOrder, closePurchaseOrder } from '@/lib/clientState';
 import type { PurchaseOrder, GRN, PurchaseOrderItem } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 interface PurchaseOrderDetailsModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
   const [grns, setGrns] = useState<GRN[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
     if (isOpen && purchaseOrderId) {
@@ -57,6 +59,8 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
         return 'bg-red-100 text-red-800';
       case 'submitted':
         return 'bg-yellow-100 text-yellow-800';
+      case 'closed':
+        return 'bg-slate-700 text-white';
       default:
         return 'bg-slate-100 text-slate-800';
     }
@@ -98,6 +102,41 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
     });
     
     setPurchaseOrder(updatedPO);
+  };
+
+  const handleClosePO = async () => {
+    if (!purchaseOrder) return;
+    
+    setIsClosing(true);
+    try {
+      const result = closePurchaseOrder(purchaseOrder.id);
+      
+      if (result.success) {
+        toast.success(result.message);
+        onClose();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to close purchase order');
+    } finally {
+      setIsClosing(false);
+    }
+  };
+
+  const canClosePO = () => {
+    if (!purchaseOrder) return false;
+    if (purchaseOrder.status === 'closed' || purchaseOrder.status === 'cancelled') return false;
+    if (!purchaseOrder.purchase_order_items || purchaseOrder.purchase_order_items.length === 0) return false;
+    
+    return purchaseOrder.purchase_order_items.every(item => item.confirmed === true);
+  };
+
+  const getConfirmationStatus = () => {
+    if (!purchaseOrder?.purchase_order_items) return { confirmed: 0, total: 0 };
+    const confirmed = purchaseOrder.purchase_order_items.filter(item => item.confirmed).length;
+    const total = purchaseOrder.purchase_order_items.length;
+    return { confirmed, total };
   };
 
   if (!isOpen) return null;
@@ -258,12 +297,50 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
         ) : null}
 
         <div className="p-6 border-t border-slate-200">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors"
-          >
-            Close
-          </button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {purchaseOrder && (
+                <div className="text-sm text-slate-600">
+                  Items Confirmed: <span className="font-semibold text-slate-900">
+                    {getConfirmationStatus().confirmed} / {getConfirmationStatus().total}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors"
+              >
+                Close
+              </button>
+              {purchaseOrder && purchaseOrder.status !== 'closed' && purchaseOrder.status !== 'cancelled' && (
+                <button
+                  onClick={handleClosePO}
+                  disabled={!canClosePO() || isClosing}
+                  className={`
+                    px-4 py-2 rounded-md transition-colors flex items-center gap-2
+                    ${canClosePO() && !isClosing
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                    }
+                  `}
+                >
+                  {isClosing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Closing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Accept & Close PO
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

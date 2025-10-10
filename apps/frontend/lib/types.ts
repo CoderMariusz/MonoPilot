@@ -124,7 +124,7 @@ export interface PurchaseOrder {
   id: number;
   po_number: string;
   supplier: string;
-  status: 'draft' | 'submitted' | 'confirmed' | 'received' | 'cancelled';
+  status: 'draft' | 'submitted' | 'confirmed' | 'received' | 'cancelled' | 'closed';
   due_date: string | null;
   warehouse_id?: number;
   warehouse?: Location;

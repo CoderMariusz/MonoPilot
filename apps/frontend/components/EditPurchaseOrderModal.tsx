@@ -29,7 +29,7 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
   const [formData, setFormData] = useState<{
     supplier: string;
     due_date: string;
-    status: 'draft' | 'submitted' | 'confirmed' | 'received' | 'cancelled';
+    status: 'draft' | 'submitted' | 'confirmed' | 'received' | 'cancelled' | 'closed';
     warehouse_id: string;
     request_delivery_date: string;
     expected_delivery_date: string;

@@ -272,6 +272,7 @@ export function PurchaseOrdersTable() {
                       po.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
                       po.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                       po.status === 'submitted' ? 'bg-yellow-100 text-yellow-800' :
+                      po.status === 'closed' ? 'bg-slate-700 text-white' :
                       'bg-slate-100 text-slate-800'
                     }`}>
                       {po.status}

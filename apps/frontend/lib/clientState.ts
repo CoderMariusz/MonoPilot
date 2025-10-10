@@ -546,6 +546,90 @@ class ClientState {
     return false;
   }
 
+  closePurchaseOrder(poId: number): { success: boolean; message: string; grnNumber?: string } {
+    const po = this.purchaseOrders.find(p => p.id === poId);
+    
+    if (!po) {
+      return { success: false, message: 'Purchase order not found' };
+    }
+
+    if (po.status === 'closed') {
+      return { success: false, message: 'Purchase order is already closed' };
+    }
+
+    if (!po.purchase_order_items || po.purchase_order_items.length === 0) {
+      return { success: false, message: 'Purchase order has no items' };
+    }
+
+    const unconfirmedItems = po.purchase_order_items.filter(item => !item.confirmed);
+    if (unconfirmedItems.length > 0) {
+      const confirmedCount = po.purchase_order_items.length - unconfirmedItems.length;
+      const totalCount = po.purchase_order_items.length;
+      return { 
+        success: false, 
+        message: `Please confirm all items before closing the PO (${confirmedCount} of ${totalCount} items confirmed)` 
+      };
+    }
+
+    const existingGrns = this.grns.filter(g => g.po_id === poId);
+    
+    const grnItems = po.purchase_order_items.map(poItem => {
+      let totalReceived = 0;
+      existingGrns.forEach(grn => {
+        grn.grn_items?.forEach(grnItem => {
+          if (grnItem.product_id === poItem.product_id) {
+            totalReceived += parseFloat(grnItem.quantity_received || '0');
+          }
+        });
+      });
+
+      const quantityOrdered = parseFloat(poItem.quantity);
+      const remainingQty = quantityOrdered - totalReceived;
+      const quantityToReceive = remainingQty > 0 ? remainingQty : 0;
+
+      return {
+        id: Date.now() + poItem.id,
+        grn_id: 0,
+        product_id: poItem.product_id,
+        quantity_ordered: poItem.quantity,
+        quantity_received: quantityToReceive.toString(),
+        location_id: po.warehouse_id || 1,
+        lp_number: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    });
+
+    const year = new Date().getFullYear();
+    const nextGrnNumber = Math.max(...this.grns.map(g => {
+      const match = g.grn_number.match(/GRN-\d{4}-(\d+)/);
+      return match ? parseInt(match[1]) : 0;
+    }), 0) + 1;
+    const grnNumber = `GRN-${year}-${String(nextGrnNumber).padStart(3, '0')}`;
+
+    const newGRN: GRN = {
+      id: Math.max(...this.grns.map(g => g.id), 0) + 1,
+      grn_number: grnNumber,
+      po_id: poId,
+      status: 'completed',
+      received_date: new Date().toISOString(),
+      grn_items: grnItems.map(item => ({ ...item, grn_id: Math.max(...this.grns.map(g => g.id), 0) + 1 })),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    this.grns = [...this.grns, newGRN];
+    this.notifyGRNListeners();
+
+    this.updatePurchaseOrder(poId, { status: 'closed' });
+
+    return { 
+      success: true, 
+      message: `PO closed successfully. GRN created: ${grnNumber}`,
+      grnNumber 
+    };
+  }
+
   addLicensePlate(lp: Omit<LicensePlate, 'id' | 'created_at' | 'updated_at'>): LicensePlate {
     const newLP: LicensePlate = {
       ...lp,
@@ -1001,6 +1085,10 @@ export function updatePurchaseOrder(id: number, updates: Partial<PurchaseOrder>)
 
 export function deletePurchaseOrder(id: number): boolean {
   return clientState.deletePurchaseOrder(id);
+}
+
+export function closePurchaseOrder(poId: number): { success: boolean; message: string; grnNumber?: string } {
+  return clientState.closePurchaseOrder(poId);
 }
 
 export function addTransferOrder(transferOrder: Omit<TransferOrder, 'id' | 'created_at' | 'updated_at'>): TransferOrder {
