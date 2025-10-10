@@ -118,3 +118,13 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - Details modal now calculates BOM details dynamically from current state using getFilteredBomForWorkOrder()
     - Added "Line" column to WO Details BOM table showing which production line was selected for the Work Order
     - Fixed AddItemModal BOM component line dropdown to show only parent product's production_lines (not all machines)
+    - Fixed WorkOrdersTable to display wo.machine?.name instead of wo.line_number
+    - Fixed scanner terminals (Process and Pack) to filter WOs by wo.machine?.name for newly created work orders
+  - **Table Enhancements - Sorting & Search**:
+    - Added column sorting to Work Orders table (WO Number, Product, Quantity, Status, Line, Due Date)
+    - Added column sorting to Purchase Orders table (PO Number, Supplier, Status, Due Date, Items Count)
+    - Added column sorting to Transfer Orders table (TO Number, From/To Locations, Status, Created Date, Items Count)
+    - Click column header to toggle ascending/descending sort with visual arrow indicators
+    - Added search bars to all Warehouse tables: Goods Receipt Notes, Stock Moves, License Plates
+    - Search filters by relevant fields (GRN numbers, suppliers, LP numbers, locations, item codes, etc.)
+    - Real-time case-insensitive search with contextual empty states
