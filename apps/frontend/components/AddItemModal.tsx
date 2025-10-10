@@ -7,6 +7,7 @@ import { mockProducts } from '@/lib/mockData';
 import { useAllergens, useProducts, useMachines } from '@/lib/clientState';
 import type { Product, Allergen } from '@/lib/types';
 import type { BomComponent } from '@/lib/validation/productSchema';
+import ProductionLinesDropdown from './ProductionLinesDropdown';
 
 type CategoryType = 'MEAT' | 'DRYGOODS' | 'FINISHED_GOODS' | 'PROCESS';
 type ExpiryPolicy = 'DAYS_STATIC' | 'FROM_MFG_DATE' | 'FROM_DELIVERY_DATE' | 'FROM_CREATION_DATE';
@@ -736,43 +737,11 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
               {(category === 'PROCESS' || category === 'FINISHED_GOODS') && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Production Lines</label>
-                  <div className="space-y-2 p-3 border border-slate-600 rounded">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={formData.production_lines?.includes('ALL') || false}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData({...formData, production_lines: ['ALL']});
-                          } else {
-                            setFormData({...formData, production_lines: []});
-                          }
-                        }}
-                        className="mr-2"
-                      />
-                      <span>ALL (Any Line)</span>
-                    </label>
-                    
-                    {machines.map(machine => (
-                      <label key={machine.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={formData.production_lines?.includes(String(machine.id)) || false}
-                          disabled={formData.production_lines?.includes('ALL')}
-                          onChange={(e) => {
-                            const lines = formData.production_lines || [];
-                            if (e.target.checked) {
-                              setFormData({...formData, production_lines: [...lines, String(machine.id)]});
-                            } else {
-                              setFormData({...formData, production_lines: lines.filter(l => l !== String(machine.id))});
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        <span>{machine.name}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <ProductionLinesDropdown
+                    selectedLines={formData.production_lines || []}
+                    onChange={(lines) => setFormData({...formData, production_lines: lines})}
+                    machines={machines}
+                  />
                 </div>
               )}
 
@@ -898,23 +867,11 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                           </div>
 
                           <div>
-                            <select
-                              multiple
-                              value={component.production_lines}
-                              onChange={(e) => {
-                                const selected = Array.from(e.target.selectedOptions, option => option.value);
-                                updateBomComponent(index, 'production_lines', selected);
-                              }}
-                              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
-                              size={3}
-                            >
-                              <option value="ALL">ALL</option>
-                              {machines.map(machine => (
-                                <option key={machine.id} value={String(machine.id)}>
-                                  {machine.name}
-                                </option>
-                              ))}
-                            </select>
+                            <ProductionLinesDropdown
+                              selectedLines={component.production_lines}
+                              onChange={(lines) => updateBomComponent(index, 'production_lines', lines)}
+                              machines={machines}
+                            />
                             <p className="text-xs text-slate-500 mt-1">Leave empty or select ALL for all lines</p>
                           </div>
                         </div>
