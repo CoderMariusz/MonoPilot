@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Loader2, Eye, Edit, Trash2, Search } from 'lucide-react';
+import { Loader2, Eye, Edit, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { usePurchaseOrders, deletePurchaseOrder } from '@/lib/clientState';
 import { PurchaseOrderDetailsModal } from '@/components/PurchaseOrderDetailsModal';
 import { EditPurchaseOrderModal } from '@/components/EditPurchaseOrderModal';
@@ -16,6 +16,8 @@ export function PurchaseOrdersTable() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const filteredPurchaseOrders = useMemo(() => {
     if (!searchQuery.trim()) return purchaseOrders;
@@ -33,6 +35,60 @@ export function PurchaseOrdersTable() {
              itemCodes.includes(query);
     });
   }, [purchaseOrders, searchQuery]);
+
+  const sortedPurchaseOrders = useMemo(() => {
+    if (!sortColumn) return filteredPurchaseOrders;
+    
+    return [...filteredPurchaseOrders].sort((a, b) => {
+      let aVal, bVal;
+      
+      switch(sortColumn) {
+        case 'po_number':
+          aVal = a.po_number;
+          bVal = b.po_number;
+          break;
+        case 'supplier':
+          aVal = a.supplier || '';
+          bVal = b.supplier || '';
+          break;
+        case 'status':
+          aVal = a.status;
+          bVal = b.status;
+          break;
+        case 'due_date':
+          aVal = a.due_date ? new Date(a.due_date).getTime() : 0;
+          bVal = b.due_date ? new Date(b.due_date).getTime() : 0;
+          break;
+        case 'items_count':
+          aVal = a.purchase_order_items?.length || 0;
+          bVal = b.purchase_order_items?.length || 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === 'asc' 
+          ? aVal.localeCompare(bVal) 
+          : bVal.localeCompare(aVal);
+      }
+      
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      
+      return 0;
+    });
+  }, [filteredPurchaseOrders, sortColumn, sortDirection]);
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
 
   const handleViewDetails = (poId: number) => {
     setSelectedPOId(poId);
@@ -87,23 +143,73 @@ export function PurchaseOrdersTable() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-200">
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">PO Number</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Supplier</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Date</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Status</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Total Items</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('po_number')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  PO Number
+                  {sortColumn === 'po_number' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('supplier')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Supplier
+                  {sortColumn === 'supplier' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('due_date')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Date
+                  {sortColumn === 'due_date' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('status')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Status
+                  {sortColumn === 'status' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('items_count')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Total Items
+                  {sortColumn === 'items_count' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredPurchaseOrders.length === 0 ? (
+            {sortedPurchaseOrders.length === 0 ? (
               <tr className="border-b border-slate-100">
                 <td colSpan={6} className="py-8 text-center text-slate-500 text-sm">
                   {searchQuery ? 'No purchase orders found matching your search' : 'No purchase orders found'}
                 </td>
               </tr>
             ) : (
-              filteredPurchaseOrders.map(po => (
+              sortedPurchaseOrders.map(po => (
                 <tr key={po.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{po.po_number}</td>
                   <td className="py-3 px-4 text-sm">{po.supplier}</td>

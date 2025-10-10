@@ -51,7 +51,7 @@ export default function PackTerminalPage() {
   const lines = ['Line 1', 'Line 2', 'Line 3', 'Line 4'];
   
   const availableWOs = workOrders.filter(wo => 
-    wo.line_number === selectedLine &&
+    wo.machine?.name === selectedLine &&
     (wo.status === 'in_progress' || wo.status === 'released') && 
     wo.product?.type === 'FG'
   );

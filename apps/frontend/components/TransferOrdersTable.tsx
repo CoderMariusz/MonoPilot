@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Loader2, Eye, Edit, Trash2, Search } from 'lucide-react';
+import { Loader2, Eye, Edit, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTransferOrders, deleteTransferOrder } from '@/lib/clientState';
 import { TransferOrderDetailsModal } from '@/components/TransferOrderDetailsModal';
 import { EditTransferOrderModal } from '@/components/EditTransferOrderModal';
@@ -16,6 +16,8 @@ export function TransferOrdersTable() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const filteredTransferOrders = useMemo(() => {
     if (!searchQuery.trim()) return transferOrders;
@@ -35,6 +37,64 @@ export function TransferOrdersTable() {
              itemCodes.includes(query);
     });
   }, [transferOrders, searchQuery]);
+
+  const sortedTransferOrders = useMemo(() => {
+    if (!sortColumn) return filteredTransferOrders;
+    
+    return [...filteredTransferOrders].sort((a, b) => {
+      let aVal, bVal;
+      
+      switch(sortColumn) {
+        case 'to_number':
+          aVal = a.to_number;
+          bVal = b.to_number;
+          break;
+        case 'from_location':
+          aVal = a.from_location?.name || '';
+          bVal = b.from_location?.name || '';
+          break;
+        case 'to_location':
+          aVal = a.to_location?.name || '';
+          bVal = b.to_location?.name || '';
+          break;
+        case 'status':
+          aVal = a.status;
+          bVal = b.status;
+          break;
+        case 'created_at':
+          aVal = a.created_at ? new Date(a.created_at).getTime() : 0;
+          bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
+          break;
+        case 'items_count':
+          aVal = a.transfer_order_items?.length || 0;
+          bVal = b.transfer_order_items?.length || 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === 'asc' 
+          ? aVal.localeCompare(bVal) 
+          : bVal.localeCompare(aVal);
+      }
+      
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      
+      return 0;
+    });
+  }, [filteredTransferOrders, sortColumn, sortDirection]);
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
 
   const handleViewDetails = (toId: number) => {
     setSelectedTOId(toId);
@@ -89,24 +149,84 @@ export function TransferOrdersTable() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-200">
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">TO Number</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">From Location</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">To Location</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Date</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Status</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Total Items</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('to_number')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  TO Number
+                  {sortColumn === 'to_number' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('from_location')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  From Location
+                  {sortColumn === 'from_location' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('to_location')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  To Location
+                  {sortColumn === 'to_location' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('created_at')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Date
+                  {sortColumn === 'created_at' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('status')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Status
+                  {sortColumn === 'status' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('items_count')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Total Items
+                  {sortColumn === 'items_count' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredTransferOrders.length === 0 ? (
+            {sortedTransferOrders.length === 0 ? (
               <tr className="border-b border-slate-100">
                 <td colSpan={7} className="py-8 text-center text-slate-500 text-sm">
                   {searchQuery ? 'No transfer orders found matching your search' : 'No transfer orders found'}
                 </td>
               </tr>
             ) : (
-              filteredTransferOrders.map(to => (
+              sortedTransferOrders.map(to => (
                 <tr key={to.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{to.to_number}</td>
                   <td className="py-3 px-4 text-sm">{to.from_location?.name || '-'}</td>

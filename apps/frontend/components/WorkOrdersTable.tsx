@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Loader2, Eye, Edit, Trash2, Search } from 'lucide-react';
+import { Loader2, Eye, Edit, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useWorkOrders, deleteWorkOrder } from '@/lib/clientState';
 import { WorkOrderDetailsModal } from '@/components/WorkOrderDetailsModal';
 import { CreateWorkOrderModal } from '@/components/CreateWorkOrderModal';
@@ -17,6 +17,8 @@ export function WorkOrdersTable() {
   const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const filteredWorkOrders = useMemo(() => {
     if (!searchQuery.trim()) return workOrders;
@@ -32,6 +34,64 @@ export function WorkOrdersTable() {
              itemCode.includes(query);
     });
   }, [workOrders, searchQuery]);
+
+  const sortedWorkOrders = useMemo(() => {
+    if (!sortColumn) return filteredWorkOrders;
+    
+    return [...filteredWorkOrders].sort((a, b) => {
+      let aVal, bVal;
+      
+      switch(sortColumn) {
+        case 'wo_number':
+          aVal = a.wo_number;
+          bVal = b.wo_number;
+          break;
+        case 'product':
+          aVal = a.product?.description || '';
+          bVal = b.product?.description || '';
+          break;
+        case 'quantity':
+          aVal = parseFloat(a.quantity) || 0;
+          bVal = parseFloat(b.quantity) || 0;
+          break;
+        case 'status':
+          aVal = a.status;
+          bVal = b.status;
+          break;
+        case 'line':
+          aVal = a.machine?.name || '';
+          bVal = b.machine?.name || '';
+          break;
+        case 'due_date':
+          aVal = a.due_date ? new Date(a.due_date).getTime() : 0;
+          bVal = b.due_date ? new Date(b.due_date).getTime() : 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === 'asc' 
+          ? aVal.localeCompare(bVal) 
+          : bVal.localeCompare(aVal);
+      }
+      
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      
+      return 0;
+    });
+  }, [filteredWorkOrders, sortColumn, sortDirection]);
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
 
   const handleViewDetails = (workOrderId: number) => {
     setSelectedWorkOrderId(workOrderId);
@@ -92,28 +152,88 @@ export function WorkOrdersTable() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-200">
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">WO Number</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Product</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('wo_number')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  WO Number
+                  {sortColumn === 'wo_number' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('product')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Product
+                  {sortColumn === 'product' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Item Code</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Quantity</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Status</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('quantity')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Quantity
+                  {sortColumn === 'quantity' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('status')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Status
+                  {sortColumn === 'status' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Allergens</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Line Number</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Due Date</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('line')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Line Number
+                  {sortColumn === 'line' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('due_date')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Due Date
+                  {sortColumn === 'due_date' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Scheduled</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Material Status</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredWorkOrders.length === 0 ? (
+            {sortedWorkOrders.length === 0 ? (
               <tr className="border-b border-slate-100">
                 <td colSpan={11} className="py-8 text-center text-slate-500 text-sm">
                   {searchQuery ? 'No work orders found matching your search' : 'No work orders found'}
                 </td>
               </tr>
             ) : (
-              filteredWorkOrders.map(wo => (
+              sortedWorkOrders.map(wo => (
                 <tr key={wo.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{wo.wo_number}</td>
                   <td className="py-3 px-4 text-sm">{wo.product?.description || '-'}</td>
@@ -145,7 +265,7 @@ export function WorkOrdersTable() {
                       <span className="text-slate-400">-</span>
                     )}
                   </td>
-                  <td className="py-3 px-4 text-sm">{wo.line_number || '-'}</td>
+                  <td className="py-3 px-4 text-sm">{wo.machine?.name || '-'}</td>
                   <td className="py-3 px-4 text-sm">
                     {wo.due_date ? new Date(wo.due_date).toLocaleDateString() : '-'}
                   </td>
