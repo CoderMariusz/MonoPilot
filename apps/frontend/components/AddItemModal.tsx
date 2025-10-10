@@ -49,7 +49,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     uom: string;
     sequence: string;
     priority: string;
-  }>>([{ product_id: '', quantity: '', uom: '', sequence: '', priority: '' }]);
+    production_lines: string[];
+  }>>([{ product_id: '', quantity: '', uom: '', sequence: '', priority: '', production_lines: [] }]);
 
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [autoAllergenIds, setAutoAllergenIds] = useState<number[]>([]);
@@ -82,6 +83,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
             uom: item.uom || '',
             sequence: item.sequence?.toString() || '',
             priority: item.priority?.toString() || '',
+            production_lines: item.production_lines || [],
           }))
         );
       }
@@ -205,7 +207,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       rate: '',
       production_lines: [],
     });
-    setBomComponents([{ product_id: '', quantity: '', uom: '', sequence: '', priority: '' }]);
+    setBomComponents([{ product_id: '', quantity: '', uom: '', sequence: '', priority: '', production_lines: [] }]);
     setAutoAllergenIds([]);
     setSuppressedAutoAllergenIds([]);
     setErrors({});
@@ -269,7 +271,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   };
 
   const addBomComponent = () => {
-    setBomComponents(prev => [...prev, { product_id: '', quantity: '', uom: '', sequence: '', priority: '' }]);
+    setBomComponents(prev => [...prev, { product_id: '', quantity: '', uom: '', sequence: '', priority: '', production_lines: [] }]);
   };
 
   const removeBomComponent = (index: number) => {
@@ -278,12 +280,12 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     }
   };
 
-  const updateBomComponent = (index: number, field: string, value: string) => {
+  const updateBomComponent = (index: number, field: string, value: string | string[]) => {
     setBomComponents(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
       
-      if (field === 'product_id' && value) {
+      if (field === 'product_id' && typeof value === 'string' && value) {
         const selectedProduct = availableProducts.find(p => p.id === parseInt(value));
         if (selectedProduct) {
           updated[index].uom = selectedProduct.uom;
@@ -416,6 +418,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
           uom: c.uom,
           sequence: c.sequence ? parseInt(c.sequence) : index + 1,
           priority: c.priority ? parseInt(c.priority) : undefined,
+          production_lines: c.production_lines,
         }));
       } else if (category === 'PROCESS') {
         payload.type = 'PR';
@@ -428,6 +431,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
           uom: c.uom,
           sequence: c.sequence ? parseInt(c.sequence) : index + 1,
           priority: c.priority ? parseInt(c.priority) : undefined,
+          production_lines: c.production_lines,
         }));
       }
 
@@ -807,16 +811,17 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                   </div>
 
                   <div className="space-y-3 border border-slate-200 rounded-lg p-4 bg-slate-50">
-                    <div className="grid grid-cols-5 gap-2 mb-2">
+                    <div className="grid grid-cols-6 gap-2 mb-2">
                       <div className="text-xs font-medium text-slate-600">Material</div>
                       <div className="text-xs font-medium text-slate-600">Quantity</div>
                       <div className="text-xs font-medium text-slate-600">UoM</div>
                       <div className="text-xs font-medium text-slate-600">Sequence</div>
                       <div className="text-xs font-medium text-slate-600">Priority (optional)</div>
+                      <div className="text-xs font-medium text-slate-600">Production Lines</div>
                     </div>
                     {bomComponents.map((component, index) => (
                       <div key={index} className="flex gap-2 items-start">
-                        <div className="flex-1 grid grid-cols-5 gap-2">
+                        <div className="flex-1 grid grid-cols-6 gap-2">
                           <div>
                             <select
                               value={component.product_id}
@@ -890,6 +895,27 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                               placeholder="Priority"
                               className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                             />
+                          </div>
+
+                          <div>
+                            <select
+                              multiple
+                              value={component.production_lines}
+                              onChange={(e) => {
+                                const selected = Array.from(e.target.selectedOptions, option => option.value);
+                                updateBomComponent(index, 'production_lines', selected);
+                              }}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                              size={3}
+                            >
+                              <option value="ALL">ALL</option>
+                              {machines.map(machine => (
+                                <option key={machine.id} value={String(machine.id)}>
+                                  {machine.name}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-slate-500 mt-1">Leave empty or select ALL for all lines</p>
                           </div>
                         </div>
 
