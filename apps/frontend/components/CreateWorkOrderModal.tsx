@@ -32,21 +32,36 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
 
   const selectedProduct = products.find(p => p.id === Number(formData.product_id));
 
-  const selectedMachineId = formData.machine_id;
+  const calculateAvailableLines = () => {
+    if (!selectedProduct?.activeBom?.bomItems) {
+      return machines;
+    }
 
-  const availableProducts = products.filter(product => {
-    // If no line selected yet, show all products
-    if (!selectedMachineId) return true;
+    const lineIds = new Set<string>();
     
-    // If product has no production_lines defined, show it
-    if (!product.production_lines || product.production_lines.length === 0) return true;
-    
-    // If product has 'ALL', it can run on any line
-    if (product.production_lines.includes('ALL')) return true;
-    
-    // Check if product's production_lines includes selected machine ID
-    return product.production_lines.includes(String(selectedMachineId));
-  });
+    selectedProduct.activeBom.bomItems.forEach(bomItem => {
+      const material = bomItem.material;
+      const productionLines = material?.production_lines;
+      
+      if (!productionLines || productionLines.length === 0) {
+        return;
+      }
+      
+      if (productionLines.includes('ALL')) {
+        return;
+      }
+      
+      productionLines.forEach(lineId => lineIds.add(lineId));
+    });
+
+    if (lineIds.size === 0) {
+      return machines;
+    }
+
+    return machines.filter(m => lineIds.has(String(m.id)));
+  };
+
+  const availableLines = calculateAvailableLines();
 
   useEffect(() => {
     if (isOpen) {
@@ -187,12 +202,16 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
               </label>
               <select
                 value={formData.product_id}
-                onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  product_id: e.target.value,
+                  machine_id: ''
+                })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                 required
               >
                 <option value="">Select a product...</option>
-                {availableProducts.map((product) => (
+                {products.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.part_number} - {product.description}
                   </option>
@@ -201,17 +220,40 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
             </div>
 
             {selectedProduct && (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Unit of Measure
-                </label>
-                <input
-                  type="text"
-                  value={selectedProduct.uom}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md bg-slate-50 text-slate-600"
-                  readOnly
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Unit of Measure
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedProduct.uom}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md bg-slate-50 text-slate-600"
+                    readOnly
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Line
+                  </label>
+                  <select
+                    value={formData.machine_id}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      machine_id: e.target.value
+                    })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  >
+                    <option value="">Select Line</option>
+                    {availableLines.map((machine) => (
+                      <option key={machine.id} value={machine.id}>
+                        {machine.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
             )}
 
             <div>
@@ -277,28 +319,6 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
                 <option value="planned">Planned</option>
                 <option value="released">Released</option>
                 <option value="in_progress">In Progress</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Line
-              </label>
-              <select
-                value={formData.machine_id}
-                onChange={(e) => setFormData({ 
-                  ...formData, 
-                  machine_id: e.target.value,
-                  product_id: '' // Reset product when line changes
-                })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-              >
-                <option value="">Select Line</option>
-                {machines.map((machine) => (
-                  <option key={machine.id} value={machine.id}>
-                    {machine.name}
-                  </option>
-                ))}
               </select>
             </div>
 

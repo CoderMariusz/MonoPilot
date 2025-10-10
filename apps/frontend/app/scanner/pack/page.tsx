@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Package, CheckCircle, X, Check, AlertTriangle, Minus } from 'lucide-react';
-import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports, useSettings, saveOrderProgress, getOrderProgress, clearOrderProgress, useMachines } from '@/lib/clientState';
+import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports, useSettings, saveOrderProgress, getOrderProgress, clearOrderProgress, useMachines, getFilteredBomForWorkOrder } from '@/lib/clientState';
 import { toast } from '@/lib/toast';
 import { AlertDialog } from '@/components/AlertDialog';
 import { ManualConsumeModal } from '@/components/ManualConsumeModal';
@@ -58,7 +58,7 @@ export default function PackTerminalPage() {
   
   const selectedWO = workOrders.find(wo => wo.id === selectedWOId);
   const stagedLPsForCurrentOrder = selectedWOId ? (stagedLPsByOrder[selectedWOId] || []) : [];
-  const bomItems = selectedWO?.product?.activeBom?.bomItems || [];
+  const bomItems = selectedWO ? getFilteredBomForWorkOrder(selectedWO) : [];
 
   useEffect(() => {
     if (selectedWOId && selectedWO) {

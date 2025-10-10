@@ -18,6 +18,7 @@ import type {
   Settings,
   Allergen,
 } from './types';
+import { getFilteredBomForWorkOrder } from './clientState';
 
 export const mockLocations: Location[] = [
   { id: 1, code: 'WH-01', name: 'Main Warehouse', zone: 'A', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
@@ -741,7 +742,7 @@ export const mockWorkOrderDetails = (workOrderId: number) => {
     return null;
   }
 
-  const bomItems = workOrder.product.activeBom?.bomItems || [];
+  const bomItems = getFilteredBomForWorkOrder(workOrder);
   
   return {
     work_order: {

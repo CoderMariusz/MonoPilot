@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress } from './types';
+import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress, BomItem } from './types';
 import { 
   mockWorkOrders, 
   mockPurchaseOrders, 
@@ -241,6 +241,7 @@ class ClientState {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    
     this.workOrders = [...this.workOrders, newWorkOrder];
     this.notifyWorkOrderListeners();
     return newWorkOrder;
@@ -1231,4 +1232,31 @@ export function getOrderProgress(woId: number): OrderProgress | undefined {
 
 export function clearOrderProgress(woId: number): void {
   return clientState.clearOrderProgress(woId);
+}
+
+export function getFilteredBomForWorkOrder(workOrder: WorkOrder): BomItem[] {
+  if (!workOrder.product?.activeBom?.bomItems) {
+    return [];
+  }
+
+  if (!workOrder.machine_id) {
+    return workOrder.product.activeBom.bomItems;
+  }
+
+  const machineIdStr = String(workOrder.machine_id);
+
+  return workOrder.product.activeBom.bomItems.filter(bomItem => {
+    const material = bomItem.material;
+    const productionLines = material?.production_lines;
+
+    if (!productionLines || productionLines.length === 0) {
+      return true;
+    }
+
+    if (productionLines.includes('ALL')) {
+      return true;
+    }
+
+    return productionLines.includes(machineIdStr);
+  });
 }
