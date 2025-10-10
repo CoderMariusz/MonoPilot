@@ -57,6 +57,10 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   const [autoAllergenIds, setAutoAllergenIds] = useState<number[]>([]);
   const [suppressedAutoAllergenIds, setSuppressedAutoAllergenIds] = useState<number[]>([]);
 
+  const availableMachinesForBomComponents = formData.production_lines?.includes('ALL') || !formData.production_lines?.length
+    ? machines
+    : machines.filter(m => formData.production_lines?.includes(String(m.id)));
+
   useEffect(() => {
     if (isEditMode && product && isOpen) {
       setStep(2);
@@ -870,7 +874,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                             <ProductionLinesDropdown
                               selectedLines={component.production_lines}
                               onChange={(lines) => updateBomComponent(index, 'production_lines', lines)}
-                              machines={machines}
+                              machines={availableMachinesForBomComponents}
                             />
                             <p className="text-xs text-slate-500 mt-1">Leave empty or select ALL for all lines</p>
                           </div>

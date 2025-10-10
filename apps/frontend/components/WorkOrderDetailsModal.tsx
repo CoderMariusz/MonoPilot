@@ -200,6 +200,7 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
                     <thead>
                       <tr className="border-b border-slate-200">
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Component</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Line</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">UoM</th>
                         <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty per Unit</th>
                         <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Total Qty Needed</th>
@@ -213,6 +214,9 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
                           <td className="py-3 px-4 text-sm">
                             <div className="font-medium text-slate-900">{component.part_number}</div>
                             <div className="text-slate-600 text-xs">{component.description}</div>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-slate-700">
+                            {details.work_order.machine_name || '-'}
                           </td>
                           <td className="py-3 px-4 text-sm text-slate-700">{component.uom}</td>
                           <td className="py-3 px-4 text-sm text-right text-slate-700">

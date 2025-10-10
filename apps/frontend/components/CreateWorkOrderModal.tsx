@@ -32,32 +32,19 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
   const selectedProduct = products.find(p => p.id === Number(formData.product_id));
 
   const calculateAvailableLines = () => {
-    if (!selectedProduct?.activeBom?.bomItems) {
+    if (!selectedProduct) {
       return machines;
     }
 
-    const lineIds = new Set<string>();
+    const productLines = selectedProduct.production_lines;
     
-    selectedProduct.activeBom.bomItems.forEach(bomItem => {
-      const material = bomItem.material;
-      const productionLines = bomItem.production_lines || material?.production_lines;
-      
-      if (!productionLines || productionLines.length === 0) {
-        return;
-      }
-      
-      if (productionLines.includes('ALL')) {
-        return;
-      }
-      
-      productionLines.forEach(lineId => lineIds.add(lineId));
-    });
-
-    if (lineIds.size === 0) {
+    // If product has no lines defined or includes ALL, show all machines
+    if (!productLines || productLines.length === 0 || productLines.includes('ALL')) {
       return machines;
     }
 
-    return machines.filter(m => lineIds.has(String(m.id)));
+    // Filter machines to only those in product's production_lines
+    return machines.filter(m => productLines.includes(String(m.id)));
   };
 
   const availableLines = calculateAvailableLines();
