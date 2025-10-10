@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
-import { mockPurchaseOrders } from '@/lib/mockData';
-import type { PurchaseOrder } from '@/lib/types';
+import { X, Loader2, Check } from 'lucide-react';
+import { usePurchaseOrders, useGRNs, updatePurchaseOrder } from '@/lib/clientState';
+import type { PurchaseOrder, GRN, PurchaseOrderItem } from '@/lib/types';
 
 interface PurchaseOrderDetailsModalProps {
   isOpen: boolean;
@@ -12,7 +12,10 @@ interface PurchaseOrderDetailsModalProps {
 }
 
 export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: PurchaseOrderDetailsModalProps) {
+  const allPurchaseOrders = usePurchaseOrders();
+  const allGrns = useGRNs();
   const [purchaseOrder, setPurchaseOrder] = useState<PurchaseOrder | null>(null);
+  const [grns, setGrns] = useState<GRN[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,19 +23,23 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
     if (isOpen && purchaseOrderId) {
       loadDetails();
     }
-  }, [isOpen, purchaseOrderId]);
+  }, [isOpen, purchaseOrderId, allPurchaseOrders, allGrns]);
 
-  const loadDetails = async () => {
+  const loadDetails = () => {
     if (!purchaseOrderId) return;
     
     setLoading(true);
     setError(null);
     try {
-      const po = mockPurchaseOrders.find(p => p.id === purchaseOrderId);
+      const po = allPurchaseOrders.find(p => p.id === purchaseOrderId);
       if (!po) {
         throw new Error('Purchase order not found');
       }
+      
+      const poGrns = allGrns.filter(g => g.po_id === purchaseOrderId);
+      
       setPurchaseOrder(po);
+      setGrns(poGrns);
     } catch (err: any) {
       setError(err.message || 'Failed to load purchase order details');
     } finally {
@@ -60,6 +67,37 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
     return purchaseOrder.purchase_order_items.reduce((sum, item) => {
       return sum + (parseFloat(item.quantity) * parseFloat(item.unit_price));
     }, 0);
+  };
+
+  const getQuantityReceived = (productId: number): number => {
+    let totalReceived = 0;
+    grns.forEach(grn => {
+      grn.grn_items?.forEach(grnItem => {
+        if (grnItem.product_id === productId) {
+          totalReceived += parseFloat(grnItem.quantity_received || '0');
+        }
+      });
+    });
+    return totalReceived;
+  };
+
+  const handleConfirmToggle = (item: PurchaseOrderItem) => {
+    if (!purchaseOrder) return;
+    
+    const updatedItems = purchaseOrder.purchase_order_items?.map(poi => 
+      poi.id === item.id ? { ...poi, confirmed: !poi.confirmed } : poi
+    );
+    
+    const updatedPO = {
+      ...purchaseOrder,
+      purchase_order_items: updatedItems
+    };
+    
+    updatePurchaseOrder(purchaseOrder.id, {
+      purchase_order_items: updatedItems
+    });
+    
+    setPurchaseOrder(updatedPO);
   };
 
   if (!isOpen) return null;
@@ -141,32 +179,72 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
                     <thead>
                       <tr className="border-b border-slate-200">
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Product</th>
-                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Quantity</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty Ordered</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty Received</th>
                         <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Unit Price</th>
                         <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Total</th>
+                        <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700">Confirmed</th>
                       </tr>
                     </thead>
                     <tbody>
                       {purchaseOrder.purchase_order_items.map((item) => {
                         const total = parseFloat(item.quantity) * parseFloat(item.unit_price);
+                        const quantityOrdered = parseFloat(item.quantity);
+                        const quantityReceived = getQuantityReceived(item.product_id);
+                        const uom = item.product?.uom || '';
+                        const isFullyReceived = quantityReceived >= quantityOrdered;
+                        
                         return (
-                          <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
+                          <tr 
+                            key={item.id} 
+                            className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${
+                              item.confirmed ? 'bg-green-50' : ''
+                            }`}
+                          >
                             <td className="py-3 px-4 text-sm">
-                              <div className="font-medium text-slate-900">
-                                {item.product?.part_number || '-'}
-                              </div>
-                              <div className="text-slate-600 text-xs">
-                                {item.product?.description || '-'}
+                              <div className="flex items-center gap-2">
+                                {item.confirmed && (
+                                  <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                )}
+                                <div>
+                                  <div className="font-medium text-slate-900">
+                                    {item.product?.part_number || '-'}
+                                  </div>
+                                  <div className="text-slate-600 text-xs">
+                                    {item.product?.description || '-'}
+                                  </div>
+                                </div>
                               </div>
                             </td>
                             <td className="py-3 px-4 text-sm text-right text-slate-700">
-                              {item.quantity} {item.product?.uom || ''}
+                              {quantityOrdered} {uom}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-right">
+                              <div className={`font-medium ${
+                                quantityReceived === 0 ? 'text-slate-400' :
+                                isFullyReceived ? 'text-green-600' : 'text-amber-600'
+                              }`}>
+                                {quantityReceived} {uom}
+                              </div>
+                              {quantityReceived > 0 && (
+                                <div className="text-xs text-slate-500 mt-0.5">
+                                  {((quantityReceived / quantityOrdered) * 100).toFixed(0)}% received
+                                </div>
+                              )}
                             </td>
                             <td className="py-3 px-4 text-sm text-right text-slate-700">
                               ${parseFloat(item.unit_price).toFixed(2)}
                             </td>
                             <td className="py-3 px-4 text-sm text-right font-medium text-slate-900">
                               ${total.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <input
+                                type="checkbox"
+                                checked={item.confirmed || false}
+                                onChange={() => handleConfirmToggle(item)}
+                                className="w-4 h-4 text-green-600 border-slate-300 rounded focus:ring-green-500 cursor-pointer"
+                              />
                             </td>
                           </tr>
                         );

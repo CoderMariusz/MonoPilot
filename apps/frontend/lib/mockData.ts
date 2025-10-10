@@ -640,6 +640,24 @@ export const mockPurchaseOrders: PurchaseOrder[] = [
     created_at: '2024-02-05T08:20:00Z',
     updated_at: '2024-02-05T08:20:00Z',
   },
+  {
+    id: 4,
+    po_number: 'PO-2024-004',
+    supplier: 'Premium Meats Supplier',
+    status: 'confirmed',
+    due_date: '2024-02-15',
+    warehouse_id: 2,
+    request_delivery_date: '2024-02-15',
+    expected_delivery_date: '2024-02-15',
+    buyer: 'Sarah Johnson',
+    notes: 'Split delivery expected - partial shipments allowed.',
+    purchase_order_items: [
+      { id: 7, purchase_order_id: 4, product_id: 1, product: mockProducts.find(p => p.id === 1), quantity: '1000', unit_price: '12.50', created_at: '2024-02-03T00:00:00Z', updated_at: '2024-02-03T00:00:00Z' },
+      { id: 8, purchase_order_id: 4, product_id: 3, product: mockProducts.find(p => p.id === 3), quantity: '500', unit_price: '6.25', created_at: '2024-02-03T00:00:00Z', updated_at: '2024-02-03T00:00:00Z' },
+    ],
+    created_at: '2024-02-03T09:00:00Z',
+    updated_at: '2024-02-03T14:00:00Z',
+  },
 ];
 
 export const mockTransferOrders: TransferOrder[] = [
@@ -952,6 +970,34 @@ export const mockGRNs: GRN[] = [
     grn_items: [],
     created_at: '2024-02-09T00:00:00Z',
     updated_at: '2024-02-09T00:00:00Z',
+  },
+  {
+    id: 4,
+    grn_number: 'GRN-2024-004',
+    po_id: 4,
+    po: mockPurchaseOrders.find(po => po.id === 4),
+    status: 'completed',
+    received_date: '2024-02-12',
+    grn_items: [
+      { id: 5, grn_id: 4, product_id: 1, product: mockProducts.find(p => p.id === 1), quantity_ordered: '1000', quantity_received: '600', location_id: 2, location: mockLocations[1], lp_number: 'LP-2024-008', created_at: '2024-02-12T00:00:00Z', updated_at: '2024-02-12T00:00:00Z' },
+      { id: 6, grn_id: 4, product_id: 3, product: mockProducts.find(p => p.id === 3), quantity_ordered: '500', quantity_received: '250', location_id: 2, location: mockLocations[1], lp_number: 'LP-2024-009', created_at: '2024-02-12T00:00:00Z', updated_at: '2024-02-12T00:00:00Z' },
+    ],
+    created_at: '2024-02-12T00:00:00Z',
+    updated_at: '2024-02-12T00:00:00Z',
+  },
+  {
+    id: 5,
+    grn_number: 'GRN-2024-005',
+    po_id: 4,
+    po: mockPurchaseOrders.find(po => po.id === 4),
+    status: 'completed',
+    received_date: '2024-02-14',
+    grn_items: [
+      { id: 7, grn_id: 5, product_id: 1, product: mockProducts.find(p => p.id === 1), quantity_ordered: '1000', quantity_received: '400', location_id: 2, location: mockLocations[1], lp_number: 'LP-2024-010', created_at: '2024-02-14T00:00:00Z', updated_at: '2024-02-14T00:00:00Z' },
+      { id: 8, grn_id: 5, product_id: 3, product: mockProducts.find(p => p.id === 3), quantity_ordered: '500', quantity_received: '250', location_id: 2, location: mockLocations[1], lp_number: 'LP-2024-011', created_at: '2024-02-14T00:00:00Z', updated_at: '2024-02-14T00:00:00Z' },
+    ],
+    created_at: '2024-02-14T00:00:00Z',
+    updated_at: '2024-02-14T00:00:00Z',
   },
 ];
 

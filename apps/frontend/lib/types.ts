@@ -115,6 +115,7 @@ export interface PurchaseOrderItem {
   product?: Product;
   quantity: string;
   unit_price: string;
+  confirmed?: boolean;
   created_at: string;
   updated_at: string;
 }
