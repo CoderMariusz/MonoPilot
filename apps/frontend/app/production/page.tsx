@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { ClipboardList, TrendingUp, Package, Loader2 } from 'lucide-react';
 import { WorkOrdersTable } from '@/components/WorkOrdersTable';
 import { mockConsumeReport } from '@/lib/mockData';
-import { useYieldReports, useWorkOrders } from '@/lib/clientState';
+import { useYieldReports, useWorkOrders, getFilteredBomForWorkOrder } from '@/lib/clientState';
 import type { ConsumeReport, YieldReportDetail } from '@/lib/types';
 
 type TabType = 'work-orders' | 'yield-report' | 'consume-report';
@@ -135,7 +135,7 @@ function YieldReportTab() {
                 const targetQty = workOrder ? parseFloat(workOrder.quantity) : 0;
                 const actualQty = report.actual_quantity;
                 const yieldPercent = targetQty > 0 ? Math.round((actualQty / targetQty) * 100) : 0;
-                const bomItems = workOrder?.product?.activeBom?.bomItems || [];
+                const bomItems = workOrder ? getFilteredBomForWorkOrder(workOrder) : [];
 
                 return (
                   <tr key={report.id} className="border-b border-slate-100 hover:bg-slate-50">
