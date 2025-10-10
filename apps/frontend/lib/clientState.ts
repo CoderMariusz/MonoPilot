@@ -53,7 +53,30 @@ class ClientState {
   private allergenListeners: Listener[] = [];
 
   getWorkOrders(): WorkOrder[] {
-    return [...this.workOrders];
+    return this.workOrders.map(wo => {
+      const product = wo.product_id ? this.products.find(p => p.id === wo.product_id) : undefined;
+      const machine = wo.machine_id ? this.machines.find(m => m.id === wo.machine_id) : undefined;
+      
+      let enrichedProduct = product;
+      if (product && product.activeBom?.bomItems) {
+        enrichedProduct = {
+          ...product,
+          activeBom: {
+            ...product.activeBom,
+            bomItems: product.activeBom.bomItems.map(bomItem => ({
+              ...bomItem,
+              material: bomItem.material_id ? this.products.find(p => p.id === bomItem.material_id) : undefined
+            }))
+          }
+        };
+      }
+      
+      return {
+        ...wo,
+        product: enrichedProduct,
+        machine
+      };
+    });
   }
 
   getPurchaseOrders(): PurchaseOrder[] {
