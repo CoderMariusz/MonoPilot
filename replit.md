@@ -101,3 +101,11 @@ Forza MES is a comprehensive Manufacturing Execution System designed to manage a
     - Premium Pork Meat (lines 3, 4), Italian Seasoning (ALL), Natural Casing (line 3), Synthetic Casing (line 4)
     - Demonstrates conditional manufacturing: Line 3 uses Natural Casing, Line 4 uses Synthetic Casing
     - BomItem.production_lines takes priority over material.production_lines in filtering logic
+  - **UI/UX Improvements - Production Lines Selector**:
+    - Created reusable ProductionLinesDropdown component with checkbox dropdown interface
+    - Replaced both main product production lines field and BOM component production lines selector
+    - Dropdown button displays: "Select lines...", "All lines", machine name, or "X lines selected"
+    - Opens to show checkboxes for ALL + individual machines with clear visual selection
+    - Selecting ALL disables individual machine checkboxes
+    - Fixed critical bugs: ALL checkbox can now be toggled on/off, visual state matches selection state
+    - Consistent UI across both product configuration and BOM component line assignment
