@@ -543,6 +543,8 @@ export default function ProcessTerminalPage() {
 
     toast.success('Order closed, yield report generated');
 
+    setShowYieldReportsModal(true);
+
     setSelectedLine(null);
     setSelectedWOId(null);
     setLpNumber('');
@@ -916,11 +918,11 @@ export default function ProcessTerminalPage() {
         )}
       </div>
 
-      {showYieldReportsModal && (
+      {showYieldReportsModal && yieldReports.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-slate-900">Yield Reports</h3>
+              <h3 className="text-xl font-bold text-slate-900">Order Closed - Yield Summary</h3>
               <button
                 onClick={() => setShowYieldReportsModal(false)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -930,50 +932,97 @@ export default function ProcessTerminalPage() {
             </div>
             
             <div className="overflow-auto flex-1">
-              {yieldReports.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  No yield reports available yet. Close an order to generate a report.
-                </div>
-              ) : (
-                <table className="w-full border-collapse">
-                  <thead className="bg-slate-100 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">WO Number</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">Line</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">Product</th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">Target</th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">Actual</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">Materials Used</th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">Efficiency %</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {yieldReports.slice().reverse().map((report) => (
-                      <tr key={report.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 text-sm text-slate-900 border-b">{report.work_order_number}</td>
-                        <td className="px-4 py-3 text-sm text-slate-900 border-b">{report.line_number}</td>
-                        <td className="px-4 py-3 text-sm text-slate-900 border-b">{report.product_name}</td>
-                        <td className="px-4 py-3 text-sm text-slate-900 border-b text-right">{report.target_quantity}</td>
-                        <td className="px-4 py-3 text-sm text-slate-900 border-b text-right">{report.actual_quantity}</td>
-                        <td className="px-4 py-3 text-sm text-slate-600 border-b">
-                          <div className="space-y-1">
-                            {report.materials_used.map((mat, idx) => (
-                              <div key={idx}>
-                                {mat.item_code}: {mat.quantity} {mat.uom}
-                              </div>
+              {(() => {
+                const latestReport = yieldReports[yieldReports.length - 1];
+                const getYieldColor = (yieldPct: number) => {
+                  if (yieldPct >= 90) return 'text-green-600';
+                  if (yieldPct >= 70) return 'text-orange-600';
+                  return 'text-red-600';
+                };
+
+                return (
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-slate-600">Work Order</p>
+                          <p className="text-lg font-semibold text-slate-900">{latestReport.work_order_number}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600">Product</p>
+                          <p className="text-lg font-semibold text-slate-900">{latestReport.product_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600">Target Quantity</p>
+                          <p className="text-lg font-semibold text-slate-900">{latestReport.target_quantity}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600">Actual Quantity</p>
+                          <p className="text-lg font-semibold text-slate-900">{latestReport.actual_quantity}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600">Line</p>
+                          <p className="text-lg font-semibold text-slate-900">{latestReport.line_number}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600">Efficiency</p>
+                          <p className={`text-lg font-bold ${latestReport.efficiency_percentage >= 90 ? 'text-green-600' : latestReport.efficiency_percentage >= 70 ? 'text-orange-600' : 'text-red-600'}`}>
+                            {latestReport.efficiency_percentage}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-lg font-semibold text-slate-900 mb-3">Material Yield Details</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead className="bg-slate-100">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">Material</th>
+                              <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">BOM Standard</th>
+                              <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">Consumed Qty</th>
+                              <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">Yield %</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {latestReport.materials_used.map((mat, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="px-4 py-3 text-sm text-slate-900 border-b">
+                                  <div>
+                                    <p className="font-medium">{mat.item_code}</p>
+                                    <p className="text-xs text-slate-600">{mat.item_name}</p>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-slate-900 border-b text-right">
+                                  {mat.standard_qty} {mat.uom}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-slate-900 border-b text-right">
+                                  {mat.consumed_qty} {mat.uom}
+                                </td>
+                                <td className="px-4 py-3 text-sm font-semibold border-b text-right">
+                                  <span className={getYieldColor(mat.yield_percentage)}>
+                                    {mat.yield_percentage}%
+                                  </span>
+                                </td>
+                              </tr>
                             ))}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold border-b text-right">
-                          <span className={report.efficiency_percentage >= 90 ? 'text-green-600' : report.efficiency_percentage >= 70 ? 'text-orange-600' : 'text-red-600'}>
-                            {report.efficiency_percentage.toFixed(1)}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t">
+                      <button
+                        onClick={() => setShowYieldReportsModal(false)}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
