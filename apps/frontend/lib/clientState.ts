@@ -1,7 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress, BomItem } from './types';
+import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress, BomItem, ProductionOutput, Supplier, Warehouse } from './types';
+
+interface AuditEvent {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  event_type: string;
+  old_value: any;
+  new_value: any;
+  user_id: string;
+  timestamp: string;
+  reason?: string;
+}
 import { 
   mockWorkOrders, 
   mockPurchaseOrders, 
@@ -15,8 +27,11 @@ import {
   mockSettings,
   mockLocations,
   mockMachines,
-  mockAllergens
+  mockAllergens,
+  mockSuppliers,
+  mockWarehouses
 } from './mockData';
+import { mockBomItems } from './mockData';
 
 type Listener = () => void;
 
@@ -35,7 +50,11 @@ class ClientState {
   private locations: Location[] = [...mockLocations];
   private machines: Machine[] = [...mockMachines];
   private allergens: Allergen[] = [...mockAllergens];
+  private suppliers: Supplier[] = [...mockSuppliers];
+  private warehouses: Warehouse[] = [...mockWarehouses];
+  private productionOutputs: ProductionOutput[] = [];
   private orderProgress: Map<number, OrderProgress> = new Map();
+  private auditEvents: AuditEvent[] = [];
   
   private workOrderListeners: Listener[] = [];
   private purchaseOrderListeners: Listener[] = [];
@@ -51,6 +70,8 @@ class ClientState {
   private locationListeners: Listener[] = [];
   private machineListeners: Listener[] = [];
   private allergenListeners: Listener[] = [];
+  private supplierListeners: Listener[] = [];
+  private warehouseListeners: Listener[] = [];
 
   getWorkOrders(): WorkOrder[] {
     return this.workOrders.map(wo => {
@@ -77,6 +98,32 @@ class ClientState {
         machine
       };
     });
+  }
+
+  getWoProductionStats(woId: number): { madeQty: number; plannedQty: number; progressPct: number } {
+    const wo = this.workOrders.find(w => w.id === woId);
+    if (!wo) return { madeQty: 0, plannedQty: 0, progressPct: 0 };
+    
+    const outputs = this.productionOutputs.filter(o => o.wo_id === woId);
+    const madeQty = outputs.reduce((sum, o) => sum + parseFloat(o.quantity.toString()), 0);
+    const plannedQty = parseFloat(wo.quantity.toString());
+    const progressPct = plannedQty > 0 ? Math.round((madeQty / plannedQty) * 100) : 0;
+    
+    return { madeQty, plannedQty, progressPct };
+  }
+
+  resolveDefaultUnitPrice(productId: number, supplierId?: number): number {
+    // Try BOM standard cost first
+    for (const bomItems of Object.values(mockBomItems)) {
+      const item = bomItems.find(bi => bi.material_id === productId);
+      if (item?.unit_cost_std) return item.unit_cost_std;
+    }
+    
+    // Fallback to product std_price
+    const product = this.products.find(p => p.id === productId);
+    if (product?.std_price) return parseFloat(product.std_price);
+    
+    return 0;
   }
 
   getPurchaseOrders(): PurchaseOrder[] {
@@ -130,6 +177,14 @@ class ClientState {
 
   getAllergens(): Allergen[] {
     return [...this.allergens];
+  }
+
+  getSuppliers(): Supplier[] {
+    return [...this.suppliers];
+  }
+
+  getWarehouses(): Warehouse[] {
+    return [...this.warehouses];
   }
 
   getStockMoves(): StockMove[] {
@@ -223,6 +278,20 @@ class ClientState {
     };
   }
 
+  subscribeToSuppliers(listener: Listener): () => void {
+    this.supplierListeners.push(listener);
+    return () => {
+      this.supplierListeners = this.supplierListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToWarehouses(listener: Listener): () => void {
+    this.warehouseListeners.push(listener);
+    return () => {
+      this.warehouseListeners = this.warehouseListeners.filter(l => l !== listener);
+    };
+  }
+
   private notifyWorkOrderListeners() {
     this.workOrderListeners.forEach(listener => listener());
   }
@@ -305,6 +374,116 @@ class ClientState {
       return true;
     }
     return false;
+  }
+
+  cancelWorkOrder(id: number, reason?: string): boolean {
+    const index = this.workOrders.findIndex(wo => wo.id === id);
+    if (index === -1) return false;
+
+    const oldStatus = this.workOrders[index].status;
+    
+    // Update status
+    this.workOrders[index] = {
+      ...this.workOrders[index],
+      status: 'cancelled',
+      updated_at: new Date().toISOString()
+    };
+    
+    // Add audit event
+    this.auditEvents.push({
+      id: `audit_${Date.now()}`,
+      entity_type: 'work_order',
+      entity_id: id.toString(),
+      event_type: 'cancel',
+      old_value: { status: oldStatus },
+      new_value: { status: 'cancelled' },
+      user_id: 'current_user', // TODO: Replace with actual user
+      timestamp: new Date().toISOString(),
+      reason: reason || undefined
+    });
+    
+    this.notifyWorkOrderListeners();
+    return true;
+  }
+
+  cancelPurchaseOrder(id: number, reason?: string): { success: boolean; message: string } {
+    const index = this.purchaseOrders.findIndex(po => po.id === id);
+    if (index === -1) return { success: false, message: 'Purchase order not found' };
+
+    const po = this.purchaseOrders[index];
+    
+    // Check if PO has any GRNs
+    const hasGRNs = this.grns.some(g => g.po_id === id);
+    if (hasGRNs) {
+      return { success: false, message: 'Cannot cancel PO with existing GRNs' };
+    }
+    
+    // Check status
+    if (po.status === 'closed' || po.status === 'cancelled') {
+      return { success: false, message: `Cannot cancel PO in ${po.status} status` };
+    }
+
+    const oldStatus = po.status;
+    
+    // Update status
+    this.purchaseOrders[index] = {
+      ...po,
+      status: 'cancelled',
+      updated_at: new Date().toISOString()
+    };
+    
+    // Add audit event
+    this.auditEvents.push({
+      id: `audit_${Date.now()}`,
+      entity_type: 'purchase_order',
+      entity_id: id.toString(),
+      event_type: 'cancel',
+      old_value: { status: oldStatus },
+      new_value: { status: 'cancelled' },
+      user_id: 'current_user', // TODO: Replace with actual user
+      timestamp: new Date().toISOString(),
+      reason: reason || undefined
+    });
+    
+    this.notifyPurchaseOrderListeners();
+    return { success: true, message: 'Purchase order cancelled' };
+  }
+
+  cancelTransferOrder(id: number, reason?: string): { success: boolean; message: string } {
+    const index = this.transferOrders.findIndex(to => to.id === id);
+    if (index === -1) return { success: false, message: 'Transfer order not found' };
+
+    const to = this.transferOrders[index];
+    
+    // Check status
+    if (to.status === 'received' || to.status === 'cancelled') {
+      return { success: false, message: `Cannot cancel transfer order in ${to.status} status` };
+    }
+
+    const oldStatus = to.status;
+    
+    // Update status
+    this.transferOrders[index] = {
+      ...to,
+      status: 'cancelled',
+      updated_at: new Date().toISOString()
+    };
+    
+    // Add audit event
+    this.auditEvents.push({
+      id: `audit_${Date.now()}`,
+      entity_type: 'transfer_order',
+      entity_id: id.toString(),
+      event_type: 'cancel',
+      old_value: { status: oldStatus },
+      new_value: { status: 'cancelled' },
+      user_id: 'current_user', // TODO: Replace with actual user
+      timestamp: new Date().toISOString(),
+      reason: reason || undefined
+    });
+    
+    this.notifyTransferOrderListeners();
+    return { success: true, message: 'Transfer order cancelled' };
   }
 
   addPurchaseOrder(purchaseOrder: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>): PurchaseOrder {
@@ -1075,6 +1254,26 @@ export function deleteWorkOrder(id: number): boolean {
   return clientState.deleteWorkOrder(id);
 }
 
+export function cancelWorkOrder(id: number, reason?: string): boolean {
+  return clientState.cancelWorkOrder(id, reason);
+}
+
+export function cancelPurchaseOrder(id: number, reason?: string): { success: boolean; message: string } {
+  return clientState.cancelPurchaseOrder(id, reason);
+}
+
+export function cancelTransferOrder(id: number, reason?: string): { success: boolean; message: string } {
+  return clientState.cancelTransferOrder(id, reason);
+}
+
+export function getWoProductionStats(woId: number) {
+  return clientState.getWoProductionStats(woId);
+}
+
+export function resolveDefaultUnitPrice(productId: number, supplierId?: number) {
+  return clientState.resolveDefaultUnitPrice(productId, supplierId);
+}
+
 export function addPurchaseOrder(purchaseOrder: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>): PurchaseOrder {
   return clientState.addPurchaseOrder(purchaseOrder);
 }
@@ -1303,6 +1502,32 @@ export function useAllergens() {
   }, []);
 
   return allergens;
+}
+
+export function useSuppliers() {
+  const [suppliers, setSuppliers] = useState<Supplier[]>(clientState.getSuppliers());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToSuppliers(() => {
+      setSuppliers(clientState.getSuppliers());
+    });
+    return unsubscribe;
+  }, []);
+
+  return suppliers;
+}
+
+export function useWarehouses() {
+  const [warehouses, setWarehouses] = useState<Warehouse[]>(clientState.getWarehouses());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToWarehouses(() => {
+      setWarehouses(clientState.getWarehouses());
+    });
+    return unsubscribe;
+  }, []);
+
+  return warehouses;
 }
 
 export function addLocation(location: Omit<Location, 'id' | 'created_at' | 'updated_at'>): Location {

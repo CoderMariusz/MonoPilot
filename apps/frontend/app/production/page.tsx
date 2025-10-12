@@ -9,6 +9,7 @@ import type { ConsumeReport, YieldReportDetail } from '@/lib/types';
 
 type TabType = 'work-orders' | 'yield-report' | 'consume-report';
 
+
 export default function ProductionPage() {
   const [activeTab, setActiveTab] = useState<TabType>('work-orders');
 

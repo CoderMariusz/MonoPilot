@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import AppLayout from "@/components/layout/AppLayout";
 import { ToastProvider } from "@/lib/toast";
+import { AuthProvider } from "@/lib/auth/AuthContext";
 
 export const metadata: Metadata = {
   title: "Forza MES",
@@ -16,9 +17,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ToastProvider>
-          <AppLayout>{children}</AppLayout>
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <AppLayout>{children}</AppLayout>
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );

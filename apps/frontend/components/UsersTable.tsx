@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { Edit2, Trash2 } from 'lucide-react';
-import { useUsers, deleteUser } from '@/lib/clientState';
+import { useState, useEffect } from 'react';
+import { Edit2, Trash2, Loader2 } from 'lucide-react';
+import { UsersAPI } from '@/lib/api/users';
 import type { User } from '@/lib/types';
 import { EditUserModal } from './EditUserModal';
 import { toast } from '@/lib/toast';
@@ -27,19 +27,46 @@ const getStatusBadgeColor = (status: string) => {
 };
 
 export function UsersTable() {
-  const users = useUsers();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const usersData = await UsersAPI.getAll();
+      setUsers(usersData);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to fetch users');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEdit = (user: User) => {
     setSelectedUser(user);
     setIsEditModalOpen(true);
   };
 
-  const handleDelete = (user: User) => {
+  const handleDelete = async (user: User) => {
     if (confirm(`Are you sure you want to delete user ${user.name}?`)) {
-      deleteUser(user.id);
-      toast.success(`User ${user.name} deleted successfully`);
+      try {
+        const { error } = await UsersAPI.delete(user.id);
+        if (error) {
+          toast.error(error.message || 'Failed to delete user');
+          return;
+        }
+        toast.success(`User ${user.name} deleted successfully`);
+        fetchUsers(); // Refresh the list
+      } catch (error) {
+        toast.error('Failed to delete user');
+      }
     }
   };
 
@@ -117,6 +144,7 @@ export function UsersTable() {
           onSuccess={() => {
             setIsEditModalOpen(false);
             setSelectedUser(null);
+            fetchUsers(); // Refresh the list
           }}
           user={selectedUser}
         />

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { mockProducts, mockPurchaseOrders, mockLocations } from '@/lib/mockData';
+import { useSuppliers, resolveDefaultUnitPrice } from '@/lib/clientState';
 import type { Product, PurchaseOrderItem, Location } from '@/lib/types';
 
 interface EditPurchaseOrderModalProps {
@@ -22,27 +23,26 @@ interface LineItem {
 export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuccess }: EditPurchaseOrderModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const suppliers = useSuppliers();
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<{
-    supplier: string;
+    supplier_id: string;
     due_date: string;
     status: 'draft' | 'submitted' | 'confirmed' | 'received' | 'cancelled' | 'closed';
     warehouse_id: string;
     request_delivery_date: string;
     expected_delivery_date: string;
-    buyer: string;
     notes: string;
   }>({
-    supplier: '',
+    supplier_id: '',
     due_date: '',
     status: 'draft',
     warehouse_id: '',
     request_delivery_date: '',
     expected_delivery_date: '',
-    buyer: '',
     notes: '',
   });
 
@@ -66,13 +66,12 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
       const po = mockPurchaseOrders.find(p => p.id === purchaseOrderId);
       if (po) {
         setFormData({
-          supplier: po.supplier,
+          supplier_id: po.supplier_id?.toString() || '',
           due_date: po.due_date || '',
           status: po.status,
           warehouse_id: po.warehouse_id?.toString() || '',
           request_delivery_date: po.request_delivery_date || '',
           expected_delivery_date: po.expected_delivery_date || '',
-          buyer: po.buyer || '',
           notes: po.notes || '',
         });
 
@@ -106,9 +105,20 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
   };
 
   const updateLineItem = (id: string, field: keyof LineItem, value: string) => {
-    setLineItems(lineItems.map(item => 
-      item.id === id ? { ...item, [field]: value } : item
-    ));
+    setLineItems(lineItems.map(item => {
+      if (item.id === id) {
+        const updatedItem = { ...item, [field]: value };
+        
+        // Auto-fill unit price when product changes
+        if (field === 'product_id' && value) {
+          const defaultPrice = resolveDefaultUnitPrice(Number(value), Number(formData.supplier_id));
+          updatedItem.unit_price = defaultPrice.toString();
+        }
+        
+        return updatedItem;
+      }
+      return item;
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,13 +146,12 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
       });
       
       updatePurchaseOrder(purchaseOrderId, {
-        supplier: formData.supplier,
+        supplier_id: Number(formData.supplier_id),
         status: formData.status,
         due_date: formData.due_date || null,
         warehouse_id: formData.warehouse_id ? Number(formData.warehouse_id) : undefined,
         request_delivery_date: formData.request_delivery_date || undefined,
         expected_delivery_date: formData.expected_delivery_date || undefined,
-        buyer: formData.buyer || undefined,
         notes: formData.notes || undefined,
         purchase_order_items,
       });
@@ -189,13 +198,17 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Supplier <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    value={formData.supplier}
-                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                  <select
+                    value={formData.supplier_id}
+                    onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                     required
-                  />
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.filter(s => s.is_active).map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

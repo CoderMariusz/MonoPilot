@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { mockProducts, mockLocations } from '@/lib/mockData';
+import { useSuppliers, resolveDefaultUnitPrice } from '@/lib/clientState';
+import { useAuth } from '@/lib/auth/AuthContext';
 import type { Product, Location } from '@/lib/types';
 
 interface CreatePurchaseOrderModalProps {
@@ -21,18 +23,19 @@ interface LineItem {
 export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreatePurchaseOrderModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const suppliers = useSuppliers();
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
-    supplier: '',
+    supplier_id: '',
     due_date: '',
     status: 'draft' as const,
     warehouse_id: '',
     request_delivery_date: '',
     expected_delivery_date: '',
-    buyer: '',
     notes: '',
   });
 
@@ -73,9 +76,20 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
   };
 
   const updateLineItem = (id: string, field: keyof LineItem, value: string) => {
-    setLineItems(lineItems.map(item => 
-      item.id === id ? { ...item, [field]: value } : item
-    ));
+    setLineItems(lineItems.map(item => {
+      if (item.id === id) {
+        const updatedItem = { ...item, [field]: value };
+        
+        // Auto-fill unit price when product changes
+        if (field === 'product_id' && value) {
+          const defaultPrice = resolveDefaultUnitPrice(Number(value), Number(formData.supplier_id));
+          updatedItem.unit_price = defaultPrice.toString();
+        }
+        
+        return updatedItem;
+      }
+      return item;
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,13 +117,14 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
       
       addPurchaseOrder({
         po_number: nextPoNumber,
-        supplier: formData.supplier,
+        supplier_id: Number(formData.supplier_id),
         status: formData.status,
         due_date: formData.due_date || null,
         warehouse_id: formData.warehouse_id ? Number(formData.warehouse_id) : undefined,
         request_delivery_date: formData.request_delivery_date || undefined,
         expected_delivery_date: formData.expected_delivery_date || undefined,
-        buyer: formData.buyer || undefined,
+        buyer_id: profile?.id,
+        buyer_name: profile?.name || 'Unknown',
         notes: formData.notes || undefined,
         purchase_order_items,
       });
@@ -117,13 +132,12 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
       onSuccess();
       onClose();
       setFormData({
-        supplier: '',
+        supplier_id: '',
         due_date: '',
         status: 'draft',
         warehouse_id: '',
         request_delivery_date: '',
         expected_delivery_date: '',
-        buyer: '',
         notes: '',
       });
       setLineItems([{ id: '1', product_id: '', quantity: '', unit_price: '' }]);
@@ -167,13 +181,17 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Supplier <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    value={formData.supplier}
-                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                  <select
+                    value={formData.supplier_id}
+                    onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                     required
-                  />
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.filter(s => s.is_active).map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -222,19 +240,6 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Buyer
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.buyer}
-                    onChange={(e) => setFormData({ ...formData, buyer: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                    placeholder="Enter buyer name"
-                  />
-                </div>
-
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Status

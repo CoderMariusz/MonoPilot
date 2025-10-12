@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, Cog, AlertTriangle } from 'lucide-react';
+import { MapPin, Cog, AlertTriangle, Truck, Warehouse } from 'lucide-react';
 import { LocationsTable } from '@/components/LocationsTable';
 import { MachinesTable } from '@/components/MachinesTable';
 import { AllergensTable } from '@/components/AllergensTable';
+import { SuppliersTable } from '@/components/SuppliersTable';
+import { WarehousesTable } from '@/components/WarehousesTable';
 
-type TabType = 'locations' | 'machines' | 'allergens';
+type TabType = 'locations' | 'machines' | 'allergens' | 'suppliers' | 'warehouses';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('locations');
@@ -15,6 +17,8 @@ export default function SettingsPage() {
     { id: 'locations' as TabType, label: 'Locations', icon: MapPin },
     { id: 'machines' as TabType, label: 'Machines', icon: Cog },
     { id: 'allergens' as TabType, label: 'Allergens', icon: AlertTriangle },
+    { id: 'suppliers' as TabType, label: 'Suppliers', icon: Truck },
+    { id: 'warehouses' as TabType, label: 'Warehouses', icon: Warehouse },
   ];
 
   return (
@@ -52,6 +56,8 @@ export default function SettingsPage() {
           {activeTab === 'locations' && <LocationsTab />}
           {activeTab === 'machines' && <MachinesTab />}
           {activeTab === 'allergens' && <AllergensTab />}
+          {activeTab === 'suppliers' && <SuppliersTab />}
+          {activeTab === 'warehouses' && <WarehousesTab />}
         </div>
       </div>
     </div>
@@ -87,6 +93,28 @@ function AllergensTab() {
         <h2 className="text-xl font-semibold text-slate-900">Allergens</h2>
       </div>
       <AllergensTable />
+    </div>
+  );
+}
+
+function SuppliersTab() {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-slate-900">Suppliers</h2>
+      </div>
+      <SuppliersTable />
+    </div>
+  );
+}
+
+function WarehousesTab() {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-slate-900">Warehouses</h2>
+      </div>
+      <WarehousesTable />
     </div>
   );
 }

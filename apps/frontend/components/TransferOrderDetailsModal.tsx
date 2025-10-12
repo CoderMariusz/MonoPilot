@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { mockTransferOrders } from '@/lib/mockData';
+import { useTransferOrders, useWarehouses } from '@/lib/clientState';
+import { TransferOrdersAPI } from '@/lib/api';
 import type { TransferOrder } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 interface TransferOrderDetailsModalProps {
   isOpen: boolean;
@@ -12,6 +14,8 @@ interface TransferOrderDetailsModalProps {
 }
 
 export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: TransferOrderDetailsModalProps) {
+  const transferOrders = useTransferOrders();
+  const warehouses = useWarehouses();
   const [transferOrder, setTransferOrder] = useState<TransferOrder | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +32,7 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
     setLoading(true);
     setError(null);
     try {
-      const to = mockTransferOrders.find(t => t.id === transferOrderId);
+      const to = transferOrders.find(t => t.id === transferOrderId);
       if (!to) {
         throw new Error('Transfer order not found');
       }
@@ -52,6 +56,28 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
         return 'bg-yellow-100 text-yellow-800';
       default:
         return 'bg-slate-100 text-slate-800';
+    }
+  };
+
+  const canCancel = () => {
+    if (!transferOrder) return false;
+    return !['received', 'cancelled'].includes(transferOrder.status);
+  };
+
+  const handleCancel = async () => {
+    if (!transferOrder) return;
+    
+    if (!confirm('Are you sure you want to cancel this transfer order?')) return;
+    
+    const reason = prompt('Cancellation reason (optional):');
+    
+    const result = await TransferOrdersAPI.cancel(transferOrder.id, reason);
+    
+    if (result.success) {
+      toast.success(result.message);
+      onClose();
+    } else {
+      toast.error(result.message);
     }
   };
 
@@ -95,15 +121,21 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                   </span>
                 </div>
                 <div>
-                  <div className="text-sm text-slate-600 mb-1">From Location</div>
+                  <div className="text-sm text-slate-600 mb-1">From Warehouse</div>
                   <div className="text-base font-medium text-slate-900">
-                    {transferOrder.from_location?.code} - {transferOrder.from_location?.name}
+                    {(() => {
+                      const fromWarehouse = warehouses.find(w => w.id === transferOrder.from_warehouse_id);
+                      return fromWarehouse ? `${fromWarehouse.code} - ${fromWarehouse.name}` : 'Unknown';
+                    })()}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-slate-600 mb-1">To Location</div>
+                  <div className="text-sm text-slate-600 mb-1">To Warehouse</div>
                   <div className="text-base font-medium text-slate-900">
-                    {transferOrder.to_location?.code} - {transferOrder.to_location?.name}
+                    {(() => {
+                      const toWarehouse = warehouses.find(w => w.id === transferOrder.to_warehouse_id);
+                      return toWarehouse ? `${toWarehouse.code} - ${toWarehouse.name}` : 'Unknown';
+                    })()}
                   </div>
                 </div>
                 <div>
@@ -162,12 +194,25 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
         ) : null}
 
         <div className="p-6 border-t border-slate-200">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors"
-          >
-            Close
-          </button>
+          <div className="flex items-center justify-between">
+            <div></div>
+            <div className="flex items-center gap-3">
+              {canCancel() && (
+                <button
+                  onClick={handleCancel}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                >
+                  Cancel Transfer
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

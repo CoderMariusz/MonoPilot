@@ -17,13 +17,76 @@ import type {
   Session,
   Settings,
   Allergen,
+  Supplier,
+  Warehouse,
 } from './types';
 import { getFilteredBomForWorkOrder } from './clientState';
 
+export const mockSuppliers: Supplier[] = [
+  { 
+    id: 1, 
+    name: 'ABC Meats Ltd', 
+    legal_name: 'ABC Meats Limited',
+    vat_number: 'GB123456789',
+    country: 'UK',
+    currency: 'GBP',
+    payment_terms: 'Net 30',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z'
+  },
+  { 
+    id: 2, 
+    name: 'Fresh Produce Co', 
+    legal_name: 'Fresh Produce Company Inc',
+    vat_number: 'US987654321',
+    country: 'USA',
+    currency: 'USD',
+    payment_terms: 'Net 15',
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z'
+  },
+  { 
+    id: 3, 
+    name: 'Spice Masters', 
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z'
+  }
+];
+
+export const mockWarehouses: Warehouse[] = [
+  { 
+    id: 1, 
+    code: 'WH-MAIN', 
+    name: 'Main Warehouse', 
+    is_active: true, 
+    created_at: '2024-01-01T00:00:00Z', 
+    updated_at: '2024-01-01T00:00:00Z' 
+  },
+  { 
+    id: 2, 
+    code: 'WH-COLD', 
+    name: 'Cold Storage Warehouse', 
+    is_active: true, 
+    created_at: '2024-01-01T00:00:00Z', 
+    updated_at: '2024-01-01T00:00:00Z' 
+  },
+  { 
+    id: 3, 
+    code: 'WH-PROD', 
+    name: 'Production Warehouse', 
+    is_active: true, 
+    created_at: '2024-01-01T00:00:00Z', 
+    updated_at: '2024-01-01T00:00:00Z' 
+  }
+];
+
 export const mockLocations: Location[] = [
-  { id: 1, code: 'WH-01', name: 'Main Warehouse', zone: 'A', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-  { id: 2, code: 'WH-02', name: 'Cold Storage', zone: 'B', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-  { id: 3, code: 'PROD-01', name: 'Production Floor', zone: 'C', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 1, code: 'WH-01', name: 'Main Warehouse - Zone A1', warehouse_id: 1, zone: 'A', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 2, code: 'WH-02', name: 'Cold Storage - Zone B1', warehouse_id: 2, zone: 'B', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+  { id: 3, code: 'PROD-01', name: 'Production Floor - Zone C1', warehouse_id: 3, zone: 'C', is_active: true, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
 ];
 
 export const mockMachines: Machine[] = [
@@ -42,29 +105,29 @@ export const mockAllergens: Allergen[] = [
 
 const mockBomItems: Record<number, BomItem[]> = {
   1: [
-    { id: 1, bom_id: 1, material_id: 1, quantity: '2.5', uom: 'KG', sequence: 1, priority: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-    { id: 2, bom_id: 1, material_id: 4, quantity: '0.1', uom: 'KG', sequence: 2, priority: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 1, bom_id: 1, material_id: 1, quantity: '2.5', uom: 'KG', unit_cost_std: 12.50, sequence: 1, priority: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 2, bom_id: 1, material_id: 4, quantity: '0.1', uom: 'KG', unit_cost_std: 8.75, sequence: 2, priority: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   ],
   2: [
-    { id: 3, bom_id: 2, material_id: 2, quantity: '3.0', uom: 'KG', sequence: 1, priority: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-    { id: 4, bom_id: 2, material_id: 5, quantity: '0.05', uom: 'KG', sequence: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 3, bom_id: 2, material_id: 2, quantity: '3.0', uom: 'KG', unit_cost_std: 15.25, sequence: 1, priority: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 4, bom_id: 2, material_id: 5, quantity: '0.05', uom: 'KG', unit_cost_std: 22.50, sequence: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   ],
   3: [
-    { id: 5, bom_id: 3, material_id: 1, quantity: '1.0', uom: 'KG', sequence: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 5, bom_id: 3, material_id: 1, quantity: '1.0', uom: 'KG', unit_cost_std: 12.50, sequence: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   ],
   4: [
-    { id: 6, bom_id: 4, material_id: 9, quantity: '1.0', uom: 'KG', sequence: 1, priority: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-    { id: 7, bom_id: 4, material_id: 6, quantity: '0.02', uom: 'M', sequence: 2, priority: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 6, bom_id: 4, material_id: 9, quantity: '1.0', uom: 'KG', unit_cost_std: 18.90, sequence: 1, priority: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 7, bom_id: 4, material_id: 6, quantity: '0.02', uom: 'M', unit_cost_std: 5.25, sequence: 2, priority: 2, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   ],
   5: [
-    { id: 8, bom_id: 5, material_id: 14, quantity: '0.8', uom: 'KG', sequence: 1, priority: 1, production_lines: ['3', '4'], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-    { id: 9, bom_id: 5, material_id: 15, quantity: '0.05', uom: 'KG', sequence: 2, priority: 2, production_lines: [], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-    { id: 10, bom_id: 5, material_id: 16, quantity: '0.15', uom: 'KG', sequence: 3, priority: 1, production_lines: ['3'], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-    { id: 11, bom_id: 5, material_id: 17, quantity: '0.15', uom: 'KG', sequence: 4, priority: 1, production_lines: ['4'], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 8, bom_id: 5, material_id: 14, quantity: '0.8', uom: 'KG', unit_cost_std: 28.75, sequence: 1, priority: 1, production_lines: ['3', '4'], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 9, bom_id: 5, material_id: 15, quantity: '0.05', uom: 'KG', unit_cost_std: 45.50, sequence: 2, priority: 2, production_lines: [], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 10, bom_id: 5, material_id: 16, quantity: '0.15', uom: 'KG', unit_cost_std: 32.25, sequence: 3, priority: 1, production_lines: ['3'], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 11, bom_id: 5, material_id: 17, quantity: '0.15', uom: 'KG', unit_cost_std: 35.80, sequence: 4, priority: 1, production_lines: ['4'], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   ],
   6: [
-    { id: 12, bom_id: 6, material_id: 14, quantity: '0.85', uom: 'KG', sequence: 1, priority: 1, production_lines: ['3', '4'], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
-    { id: 13, bom_id: 6, material_id: 15, quantity: '0.15', uom: 'KG', sequence: 2, priority: 2, production_lines: [], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 12, bom_id: 6, material_id: 14, quantity: '0.85', uom: 'KG', unit_cost_std: 28.75, sequence: 1, priority: 1, production_lines: ['3', '4'], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+    { id: 13, bom_id: 6, material_id: 15, quantity: '0.15', uom: 'KG', unit_cost_std: 45.50, sequence: 2, priority: 2, production_lines: [], created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
   ],
 };
 

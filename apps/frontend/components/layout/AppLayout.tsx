@@ -6,9 +6,10 @@ import Topbar from './Topbar';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isAuthPage = pathname?.startsWith('/login') || pathname?.startsWith('/signup');
   const isTerminalPage = pathname?.startsWith('/scanner/process') || pathname?.startsWith('/scanner/pack');
 
-  if (isTerminalPage) {
+  if (isTerminalPage || isAuthPage) {
     return <>{children}</>;
   }
 

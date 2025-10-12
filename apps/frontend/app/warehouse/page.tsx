@@ -10,6 +10,7 @@ import { LPOperationsTable } from '@/components/LPOperationsTable';
 
 type TabType = 'grn' | 'stock-move' | 'lp-operations';
 
+
 export default function WarehousePage() {
   const [activeTab, setActiveTab] = useState<TabType>('grn');
 

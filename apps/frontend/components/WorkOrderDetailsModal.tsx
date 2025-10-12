@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
-import { useWorkOrders, getFilteredBomForWorkOrder } from '@/lib/clientState';
+import { X, Loader2, AlertTriangle, Clock, TrendingUp } from 'lucide-react';
+import { useWorkOrders, getFilteredBomForWorkOrder, getWoProductionStats } from '@/lib/clientState';
+import { WorkOrdersAPI } from '@/lib/api';
+import { toast } from '@/lib/toast';
 
 interface BomComponent {
   material_id: number;
@@ -117,6 +119,57 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
     }
   };
 
+  // KPI calculation functions
+  const calculateShortages = () => {
+    if (!details?.bom_components) return 0;
+    return details.bom_components.filter(component => 
+      component.total_qty_needed > (component.stock_on_hand || 0)
+    ).length;
+  };
+
+  const calculateProgress = () => {
+    if (!details?.work_order) return 'Pending';
+    const { work_order } = details;
+    
+    if (work_order.status === 'completed') return '100%';
+    if (work_order.status === 'in_progress') {
+      // For now, return placeholder - will be calculated from actual data later
+      return '50%';
+    }
+    return '0%';
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '–';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const canCancel = () => {
+    if (!details?.work_order) return false;
+    return !['in_progress', 'completed', 'cancelled'].includes(details.work_order.status);
+  };
+
+  const canEditQuantityOnly = () => {
+    if (!details?.work_order) return false;
+    return ['in_progress', 'completed', 'cancelled'].includes(details.work_order.status);
+  };
+
+  const handleCancel = async () => {
+    if (!details?.work_order) return;
+    
+    if (!confirm('Are you sure you want to cancel this work order?')) return;
+    
+    const reason = prompt('Cancellation reason (optional):');
+    
+    const result = await WorkOrdersAPI.cancel(details.work_order.id, reason);
+    if (result.success) {
+      toast.success(result.message);
+      onClose();
+    } else {
+      toast.error(result.message);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -144,6 +197,80 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
           </div>
         ) : details ? (
           <div className="flex-1 overflow-y-auto">
+            {/* KPI Tiles */}
+            <div className="p-6 border-b border-slate-200">
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                {/* KPI 1: Shortages */}
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <div className="text-sm text-red-600 font-medium">Shortages</div>
+                  </div>
+                  <div className="text-2xl font-bold text-red-900">{calculateShortages()}</div>
+                  <div className="text-xs text-red-500">BOM items short</div>
+                </div>
+                
+                {/* KPI 2: Plan vs Real */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-5 h-5 text-blue-600" />
+                    <div className="text-sm text-blue-600 font-medium">Plan vs Real</div>
+                  </div>
+                  <div className="text-sm text-blue-900">
+                    <div className="font-medium">Scheduled:</div>
+                    <div className="text-xs">
+                      {details.work_order.due_date ? formatDate(details.work_order.due_date) : 'Not set'}
+                    </div>
+                    {/* TODO: Add actual start/end when available */}
+                    <div className="text-xs text-blue-500 mt-1">Actual: Not started</div>
+                  </div>
+                </div>
+                
+                {/* KPI 3: Progress/Yield */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="w-5 h-5 text-green-600" />
+                    <div className="text-sm text-green-600 font-medium">Progress/Yield</div>
+                  </div>
+                  <div className="text-2xl font-bold text-green-900">{calculateProgress()}</div>
+                  <div className="text-xs text-green-500">Completion</div>
+                </div>
+              </div>
+              
+              {/* Additional KPI Row for Made and Progress */}
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                {/* KPI 4: Made */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                    <div className="text-sm text-blue-600 font-medium">Made / Planned</div>
+                  </div>
+                  <div className="text-2xl font-bold text-blue-900">
+                    {(() => {
+                      const stats = getWoProductionStats(details.work_order.id);
+                      return `${stats.madeQty.toFixed(2)} / ${stats.plannedQty.toFixed(2)} ${details.work_order.uom}`;
+                    })()}
+                  </div>
+                  <div className="text-xs text-blue-500">Production Progress</div>
+                </div>
+                
+                {/* KPI 5: Progress Bar */}
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="w-5 h-5 text-purple-600" />
+                    <div className="text-sm text-purple-600 font-medium">Progress</div>
+                  </div>
+                  <div className="text-2xl font-bold text-purple-900">
+                    {(() => {
+                      const stats = getWoProductionStats(details.work_order.id);
+                      return `${stats.progressPct}%`;
+                    })()}
+                  </div>
+                  <div className="text-xs text-purple-500">Completion Rate</div>
+                </div>
+              </div>
+            </div>
+
             <div className="p-6 border-b border-slate-200 bg-slate-50">
               <div className="grid grid-cols-2 gap-6">
                 <div>
@@ -205,40 +332,62 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
                         <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty per Unit</th>
                         <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Total Qty Needed</th>
                         <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Stock on Hand</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Reserved</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Shortage</th>
                         <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty Completed</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {details.bom_components.map((component) => (
-                        <tr key={component.material_id} className="border-b border-slate-100 hover:bg-slate-50">
-                          <td className="py-3 px-4 text-sm">
-                            <div className="font-medium text-slate-900">{component.part_number}</div>
-                            <div className="text-slate-600 text-xs">{component.description}</div>
-                          </td>
-                          <td className="py-3 px-4 text-sm text-slate-700">
-                            {details.work_order.machine_name || '-'}
-                          </td>
-                          <td className="py-3 px-4 text-sm text-slate-700">{component.uom}</td>
-                          <td className="py-3 px-4 text-sm text-right text-slate-700">
-                            {component.qty_per_unit.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-sm text-right font-medium text-slate-900">
-                            {component.total_qty_needed.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-4 text-sm text-right">
-                            <span className={`${
-                              component.stock_on_hand >= component.total_qty_needed
-                                ? 'text-green-700 font-medium'
-                                : 'text-red-700 font-medium'
-                            }`}>
-                              {component.stock_on_hand.toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-sm text-right text-slate-700">
-                            {component.qty_completed.toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
+                      {details.bom_components.map((component) => {
+                        const shortage = Math.max(component.total_qty_needed - (component.stock_on_hand || 0), 0);
+                        const hasShortage = shortage > 0;
+                        
+                        return (
+                          <tr 
+                            key={component.material_id} 
+                            className={`border-b border-slate-100 hover:bg-slate-50 ${hasShortage ? 'bg-red-50' : ''}`}
+                          >
+                            <td className="py-3 px-4 text-sm">
+                              <div className="font-medium text-slate-900">{component.part_number}</div>
+                              <div className="text-slate-600 text-xs">{component.description}</div>
+                            </td>
+                            <td className="py-3 px-4 text-sm text-slate-700">
+                              {component.production_line_restrictions?.join(', ') || details.work_order.machine_name || '-'}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-slate-700">{component.uom}</td>
+                            <td className="py-3 px-4 text-sm text-right text-slate-700">
+                              {component.qty_per_unit.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-right font-medium text-slate-900">
+                              {component.total_qty_needed.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-right">
+                              <span className={`${
+                                component.stock_on_hand >= component.total_qty_needed
+                                  ? 'text-green-700 font-medium'
+                                  : 'text-red-700 font-medium'
+                              }`}>
+                                {component.stock_on_hand.toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-sm text-right text-slate-700">
+                              0
+                            </td>
+                            <td className="py-3 px-4 text-sm text-right">
+                              {hasShortage ? (
+                                <span className="text-red-600 font-medium">
+                                  {shortage.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500">–</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-right text-slate-700">
+                              {component.qty_completed.toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -247,7 +396,17 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
           </div>
         ) : null}
 
-        <div className="p-6 border-t border-slate-200">
+        <div className="p-6 border-t border-slate-200 flex justify-between items-center">
+          <div>
+            {canCancel() && (
+              <button
+                onClick={handleCancel}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors mr-3"
+              >
+                Cancel WO
+              </button>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors"

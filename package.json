@@ -9,8 +9,16 @@
   "scripts": {
     "dev": "pnpm --parallel dev",
     "build": "pnpm --recursive build",
-    "backend:dev": "cd apps/backend && php artisan serve --host=0.0.0.0 --port=8000",
-    "frontend:dev": "cd apps/frontend && pnpm dev"
+    "frontend:dev": "cd apps/frontend && pnpm dev",
+    "frontend:build": "cd apps/frontend && pnpm build",
+    "frontend:start": "cd apps/frontend && pnpm start",
+    "lint": "pnpm --recursive lint",
+    "lint:fix": "pnpm --recursive lint:fix",
+    "format": "pnpm --recursive format",
+    "format:check": "pnpm --recursive format:check",
+    "type-check": "pnpm --recursive type-check",
+    "clean": "pnpm --recursive clean && rm -rf node_modules",
+    "install:all": "pnpm install"
   },
   "engines": {
     "node": ">=20.0.0",

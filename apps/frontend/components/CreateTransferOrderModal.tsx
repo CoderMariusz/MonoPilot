@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { mockProducts, mockLocations } from '@/lib/mockData';
-import type { Product, Location } from '@/lib/types';
+import { mockProducts } from '@/lib/mockData';
+import { useWarehouses } from '@/lib/clientState';
+import type { Product, Warehouse } from '@/lib/types';
 
 interface CreateTransferOrderModalProps {
   isOpen: boolean;
@@ -19,14 +20,14 @@ interface TransferItem {
 
 export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateTransferOrderModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const warehouses = useWarehouses();
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
-    from_location_id: '',
-    to_location_id: '',
+    from_warehouse_id: '',
+    to_warehouse_id: '',
     status: 'draft' as const,
   });
 
@@ -44,7 +45,6 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
     setLoadingData(true);
     try {
       setProducts(mockProducts);
-      setLocations(mockLocations);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {
@@ -79,8 +79,8 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
     try {
       const { addTransferOrder } = await import('@/lib/clientState');
       const nextToNumber = `TO-2024-${String(Date.now()).slice(-3).padStart(3, '0')}`;
-      const from_location = locations.find(l => l.id === Number(formData.from_location_id));
-      const to_location = locations.find(l => l.id === Number(formData.to_location_id));
+      const from_warehouse = warehouses.find(w => w.id === Number(formData.from_warehouse_id));
+      const to_warehouse = warehouses.find(w => w.id === Number(formData.to_warehouse_id));
       
       const transfer_order_items = transferItems.map((item, index) => {
         const product = products.find(p => p.id === Number(item.product_id));
@@ -97,10 +97,10 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
       
       addTransferOrder({
         to_number: nextToNumber,
-        from_location_id: Number(formData.from_location_id),
-        from_location,
-        to_location_id: Number(formData.to_location_id),
-        to_location,
+        from_warehouse_id: Number(formData.from_warehouse_id),
+        from_warehouse,
+        to_warehouse_id: Number(formData.to_warehouse_id),
+        to_warehouse,
         status: formData.status,
         transfer_order_items,
       });
@@ -108,8 +108,8 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
       onSuccess();
       onClose();
       setFormData({
-        from_location_id: '',
-        to_location_id: '',
+        from_warehouse_id: '',
+        to_warehouse_id: '',
         status: 'draft',
       });
       setTransferItems([{ id: '1', product_id: '', quantity: '' }]);
@@ -151,18 +151,18 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    From Location <span className="text-red-500">*</span>
+                    From Warehouse <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={formData.from_location_id}
-                    onChange={(e) => setFormData({ ...formData, from_location_id: e.target.value })}
+                    value={formData.from_warehouse_id}
+                    onChange={(e) => setFormData({ ...formData, from_warehouse_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                     required
                   >
-                    <option value="">Select location...</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.code} - {location.name}
+                    <option value="">Select warehouse...</option>
+                    {warehouses.filter(w => w.is_active).map((warehouse) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.code} - {warehouse.name}
                       </option>
                     ))}
                   </select>
@@ -170,18 +170,18 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    To Location <span className="text-red-500">*</span>
+                    To Warehouse <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={formData.to_location_id}
-                    onChange={(e) => setFormData({ ...formData, to_location_id: e.target.value })}
+                    value={formData.to_warehouse_id}
+                    onChange={(e) => setFormData({ ...formData, to_warehouse_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                     required
                   >
-                    <option value="">Select location...</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.code} - {location.name}
+                    <option value="">Select warehouse...</option>
+                    {warehouses.filter(w => w.is_active).map((warehouse) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.code} - {warehouse.name}
                       </option>
                     ))}
                   </select>

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Check, CheckCircle } from 'lucide-react';
 import { usePurchaseOrders, useGRNs, updatePurchaseOrder, closePurchaseOrder } from '@/lib/clientState';
+import { PurchaseOrdersAPI } from '@/lib/api';
+import { UploadASNModal } from './UploadASNModal';
 import type { PurchaseOrder, GRN, PurchaseOrderItem } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
@@ -20,6 +22,7 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [isASNModalOpen, setIsASNModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen && purchaseOrderId) {
@@ -124,12 +127,42 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
     }
   };
 
+  const handleCancelPO = async () => {
+    if (!purchaseOrder) return;
+    
+    if (!confirm('Are you sure you want to cancel this purchase order?')) return;
+    
+    const reason = prompt('Cancellation reason (optional):');
+    
+    const result = await PurchaseOrdersAPI.cancel(purchaseOrder.id, reason);
+    
+    if (result.success) {
+      toast.success(result.message);
+      onClose();
+    } else {
+      toast.error(result.message);
+    }
+  };
+
+  const handleUploadASN = () => {
+    setIsASNModalOpen(true);
+  };
+
   const canClosePO = () => {
     if (!purchaseOrder) return false;
     if (purchaseOrder.status === 'closed' || purchaseOrder.status === 'cancelled') return false;
     if (!purchaseOrder.purchase_order_items || purchaseOrder.purchase_order_items.length === 0) return false;
     
     return purchaseOrder.purchase_order_items.every(item => item.confirmed === true);
+  };
+
+  const canCancelPO = () => {
+    if (!purchaseOrder) return false;
+    if (purchaseOrder.status === 'closed' || purchaseOrder.status === 'cancelled') return false;
+    
+    // Check if PO has any GRNs
+    const hasGRNs = grns.length > 0;
+    return !hasGRNs;
   };
 
   const getConfirmationStatus = () => {
@@ -314,6 +347,28 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
               >
                 Close
               </button>
+              
+              {/* Cancel PO Button */}
+              {purchaseOrder && canCancelPO() && (
+                <button
+                  onClick={handleCancelPO}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                >
+                  Cancel PO
+                </button>
+              )}
+              
+              {/* Upload ASN Button */}
+              {purchaseOrder && purchaseOrder.status !== 'closed' && purchaseOrder.status !== 'cancelled' && (
+                <button
+                  onClick={handleUploadASN}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Upload ASN
+                </button>
+              )}
+              
+              {/* Accept & Close PO Button */}
               {purchaseOrder && purchaseOrder.status !== 'closed' && purchaseOrder.status !== 'cancelled' && (
                 <button
                   onClick={handleClosePO}
@@ -343,6 +398,14 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
           </div>
         </div>
       </div>
+      
+      <UploadASNModal
+        isOpen={isASNModalOpen}
+        onClose={() => setIsASNModalOpen(false)}
+        poId={purchaseOrder?.id}
+        poNumber={purchaseOrder?.po_number}
+        supplierId={purchaseOrder?.supplier_id}
+      />
     </div>
   );
 }

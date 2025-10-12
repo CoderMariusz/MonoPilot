@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { addUser } from '@/lib/clientState';
+import { UsersAPI } from '@/lib/api/users';
 import type { UserRole, UserStatus } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
@@ -32,17 +32,21 @@ export function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUserModalP
     setError(null);
 
     try {
-      if (!formData.name || !formData.email) {
+      if (!formData.name || !formData.email || !formData.password) {
         throw new Error('Please fill all required fields');
       }
 
-      addUser({
+      const { user, error } = await UsersAPI.create({
         name: formData.name,
         email: formData.email,
+        password: formData.password,
         role: formData.role,
         status: formData.status,
-        last_login: null,
       });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to create user');
+      }
       
       toast.success(`User ${formData.name} created successfully`);
       onSuccess();
@@ -127,16 +131,17 @@ export function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUserModalP
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              Password
+              Password <span className="text-red-500">*</span>
             </label>
             <input
               type="password"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent text-sm"
-              placeholder="Will be set up during authentication setup"
+              placeholder="Enter password for the user"
+              required
             />
-            <p className="text-xs text-slate-500 mt-1">Password management will be configured when authentication is enabled</p>
+            <p className="text-xs text-slate-500 mt-1">Minimum 6 characters required</p>
           </div>
 
           <div>
