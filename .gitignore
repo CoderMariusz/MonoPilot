@@ -1,18 +1,13 @@
 # Dependencies
 node_modules/
-.pnp
-.pnp.js
+.pnpm-store/
+.local/
 
-# Testing
-coverage/
-
-# Next.js
+# Build outputs
+dist/
+build/
 .next/
 out/
-
-# Production
-build/
-dist/
 
 # Environment variables
 .env
@@ -21,24 +16,8 @@ dist/
 .env.test.local
 .env.production.local
 
-# Vercel
-.vercel
-
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
 # Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -50,6 +29,19 @@ pids
 *.pid
 *.seed
 *.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
 
 # Optional npm cache directory
 .npm
@@ -72,23 +64,49 @@ pids
 # Yarn Integrity file
 .yarn-integrity
 
+# dotenv environment variables file
+.env
+.env.test
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
 
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
 
 # Temporary folders
 tmp/
 temp/
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Replit specific
+.replit
+.replitignore
