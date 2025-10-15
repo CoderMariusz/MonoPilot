@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress, BomItem, ProductionOutput, Supplier, Warehouse } from './types';
+import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress, BomItem, ProductionOutput, Supplier, Warehouse, TaxCode, SupplierProduct, Routing, ProductAllergen } from './types';
 
 interface AuditEvent {
   id: string;
@@ -29,7 +29,11 @@ import {
   mockMachines,
   mockAllergens,
   mockSuppliers,
-  mockWarehouses
+  mockWarehouses,
+  mockTaxCodes,
+  mockSupplierProducts,
+  mockRoutings,
+  mockProductAllergens
 } from './mockData';
 import { mockBomItems } from './mockData';
 
@@ -52,6 +56,10 @@ class ClientState {
   private allergens: Allergen[] = [...mockAllergens];
   private suppliers: Supplier[] = [...mockSuppliers];
   private warehouses: Warehouse[] = [...mockWarehouses];
+  private taxCodes: TaxCode[] = [...mockTaxCodes];
+  private supplierProducts: SupplierProduct[] = [...mockSupplierProducts];
+  private routings: Routing[] = [...mockRoutings];
+  private productAllergens: ProductAllergen[] = [...mockProductAllergens];
   private productionOutputs: ProductionOutput[] = [];
   private orderProgress: Map<number, OrderProgress> = new Map();
   private auditEvents: AuditEvent[] = [];
@@ -72,6 +80,10 @@ class ClientState {
   private allergenListeners: Listener[] = [];
   private supplierListeners: Listener[] = [];
   private warehouseListeners: Listener[] = [];
+  private taxCodeListeners: Listener[] = [];
+  private supplierProductListeners: Listener[] = [];
+  private routingListeners: Listener[] = [];
+  private productAllergenListeners: Listener[] = [];
 
   getWorkOrders(): WorkOrder[] {
     return this.workOrders.map(wo => {
@@ -113,13 +125,32 @@ class ClientState {
   }
 
   resolveDefaultUnitPrice(productId: number, supplierId?: number): number {
-    // Try BOM standard cost first
+    // Priority 1: Check supplier_products pricing (for specific supplier + product)
+    if (supplierId) {
+      const supplierProduct = this.supplierProducts.find(sp => 
+        sp.supplier_id === supplierId && 
+        sp.product_id === productId && 
+        sp.is_active && 
+        sp.price_excl_tax
+      );
+      if (supplierProduct?.price_excl_tax) return supplierProduct.price_excl_tax;
+    }
+    
+    // Priority 2: Check any active supplier_products for this product
+    const anySupplierProduct = this.supplierProducts.find(sp => 
+      sp.product_id === productId && 
+      sp.is_active && 
+      sp.price_excl_tax
+    );
+    if (anySupplierProduct?.price_excl_tax) return anySupplierProduct.price_excl_tax;
+    
+    // Priority 3: Try BOM standard cost
     for (const bomItems of Object.values(mockBomItems)) {
       const item = bomItems.find(bi => bi.material_id === productId);
       if (item?.unit_cost_std) return item.unit_cost_std;
     }
     
-    // Fallback to product std_price
+    // Priority 4: Fallback to product std_price
     const product = this.products.find(p => p.id === productId);
     if (product?.std_price) return parseFloat(product.std_price);
     
@@ -185,6 +216,22 @@ class ClientState {
 
   getWarehouses(): Warehouse[] {
     return [...this.warehouses];
+  }
+
+  getTaxCodes(): TaxCode[] {
+    return [...this.taxCodes];
+  }
+
+  getSupplierProducts(): SupplierProduct[] {
+    return [...this.supplierProducts];
+  }
+
+  getRoutings(): Routing[] {
+    return [...this.routings];
+  }
+
+  getProductAllergens(): ProductAllergen[] {
+    return [...this.productAllergens];
   }
 
   getStockMoves(): StockMove[] {
@@ -289,6 +336,34 @@ class ClientState {
     this.warehouseListeners.push(listener);
     return () => {
       this.warehouseListeners = this.warehouseListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToTaxCodes(listener: Listener): () => void {
+    this.taxCodeListeners.push(listener);
+    return () => {
+      this.taxCodeListeners = this.taxCodeListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToSupplierProducts(listener: Listener): () => void {
+    this.supplierProductListeners.push(listener);
+    return () => {
+      this.supplierProductListeners = this.supplierProductListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToRoutings(listener: Listener): () => void {
+    this.routingListeners.push(listener);
+    return () => {
+      this.routingListeners = this.routingListeners.filter(l => l !== listener);
+    };
+  }
+
+  subscribeToProductAllergens(listener: Listener): () => void {
+    this.productAllergenListeners.push(listener);
+    return () => {
+      this.productAllergenListeners = this.productAllergenListeners.filter(l => l !== listener);
     };
   }
 
@@ -1024,6 +1099,81 @@ class ClientState {
     return false;
   }
 
+  // Tax Code methods
+  addTaxCode(taxCode: Omit<TaxCode, 'id'>): TaxCode {
+    const newTaxCode: TaxCode = {
+      ...taxCode,
+      id: Math.max(...this.taxCodes.map(tc => tc.id), 0) + 1,
+    };
+    this.taxCodes = [...this.taxCodes, newTaxCode];
+    this.notifyTaxCodeListeners();
+    return newTaxCode;
+  }
+
+  updateTaxCode(id: number, updates: Partial<TaxCode>): TaxCode | null {
+    const index = this.taxCodes.findIndex(tc => tc.id === id);
+    if (index === -1) return null;
+
+    const updatedTaxCode: TaxCode = {
+      ...this.taxCodes[index],
+      ...updates,
+      id: this.taxCodes[index].id,
+    };
+    
+    this.taxCodes[index] = updatedTaxCode;
+    this.notifyTaxCodeListeners();
+    return updatedTaxCode;
+  }
+
+  deleteTaxCode(id: number): boolean {
+    const initialLength = this.taxCodes.length;
+    this.taxCodes = this.taxCodes.filter(tc => tc.id !== id);
+    if (this.taxCodes.length < initialLength) {
+      this.notifyTaxCodeListeners();
+      return true;
+    }
+    return false;
+  }
+
+  // Routing methods
+  addRouting(routing: Omit<Routing, 'id' | 'created_at' | 'updated_at'>): Routing {
+    const newRouting: Routing = {
+      ...routing,
+      id: Math.max(...this.routings.map(r => r.id), 0) + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.routings = [...this.routings, newRouting];
+    this.notifyRoutingListeners();
+    return newRouting;
+  }
+
+  updateRouting(id: number, updates: Partial<Routing>): Routing | null {
+    const index = this.routings.findIndex(r => r.id === id);
+    if (index === -1) return null;
+
+    const updatedRouting: Routing = {
+      ...this.routings[index],
+      ...updates,
+      id: this.routings[index].id,
+      updated_at: new Date().toISOString(),
+    };
+    
+    this.routings[index] = updatedRouting;
+    this.notifyRoutingListeners();
+    return updatedRouting;
+  }
+
+  deleteRouting(id: number): boolean {
+    const initialLength = this.routings.length;
+    this.routings = this.routings.filter(r => r.id !== id);
+    if (this.routings.length < initialLength) {
+      this.notifyRoutingListeners();
+      return true;
+    }
+    return false;
+  }
+
   saveOrderProgress(woId: number, progress: OrderProgress): void {
     this.orderProgress.set(woId, progress);
   }
@@ -1188,7 +1338,7 @@ class ClientState {
   }
 }
 
-const clientState = new ClientState();
+export const clientState = new ClientState();
 
 export function useWorkOrders() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>(clientState.getWorkOrders());
@@ -1530,6 +1680,58 @@ export function useWarehouses() {
   return warehouses;
 }
 
+export function useTaxCodes() {
+  const [taxCodes, setTaxCodes] = useState<TaxCode[]>(clientState.getTaxCodes());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToTaxCodes(() => {
+      setTaxCodes(clientState.getTaxCodes());
+    });
+    return unsubscribe;
+  }, []);
+
+  return taxCodes;
+}
+
+export function useSupplierProducts() {
+  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>(clientState.getSupplierProducts());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToSupplierProducts(() => {
+      setSupplierProducts(clientState.getSupplierProducts());
+    });
+    return unsubscribe;
+  }, []);
+
+  return supplierProducts;
+}
+
+export function useRoutings() {
+  const [routings, setRoutings] = useState<Routing[]>(clientState.getRoutings());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToRoutings(() => {
+      setRoutings(clientState.getRoutings());
+    });
+    return unsubscribe;
+  }, []);
+
+  return routings;
+}
+
+export function useProductAllergens() {
+  const [productAllergens, setProductAllergens] = useState<ProductAllergen[]>(clientState.getProductAllergens());
+
+  useEffect(() => {
+    const unsubscribe = clientState.subscribeToProductAllergens(() => {
+      setProductAllergens(clientState.getProductAllergens());
+    });
+    return unsubscribe;
+  }, []);
+
+  return productAllergens;
+}
+
 export function addLocation(location: Omit<Location, 'id' | 'created_at' | 'updated_at'>): Location {
   return clientState.addLocation(location);
 }
@@ -1564,6 +1766,30 @@ export function updateAllergen(id: number, updates: Partial<Allergen>): Allergen
 
 export function deleteAllergen(id: number): boolean {
   return clientState.deleteAllergen(id);
+}
+
+export function addTaxCode(taxCode: Omit<TaxCode, 'id'>): TaxCode {
+  return clientState.addTaxCode(taxCode);
+}
+
+export function updateTaxCode(id: number, updates: Partial<TaxCode>): TaxCode | null {
+  return clientState.updateTaxCode(id, updates);
+}
+
+export function deleteTaxCode(id: number): boolean {
+  return clientState.deleteTaxCode(id);
+}
+
+export function addRouting(routing: Omit<Routing, 'id' | 'created_at' | 'updated_at'>): Routing {
+  return clientState.addRouting(routing);
+}
+
+export function updateRouting(id: number, updates: Partial<Routing>): Routing | null {
+  return clientState.updateRouting(id, updates);
+}
+
+export function deleteRouting(id: number): boolean {
+  return clientState.deleteRouting(id);
 }
 
 export function saveOrderProgress(woId: number, progress: OrderProgress): void {

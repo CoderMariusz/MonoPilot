@@ -4,8 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { X, ArrowLeft, Loader2, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/lib/toast';
 import { mockProducts } from '@/lib/mockData';
-import { useAllergens, useProducts, useMachines } from '@/lib/clientState';
-import type { Product, Allergen } from '@/lib/types';
+import { useAllergens, useProducts, useMachines, useTaxCodes, useSuppliers, useRoutings } from '@/lib/clientState';
+import type { Product, Allergen, ProductGroup, ProductType, TaxCode, Supplier, Routing } from '@/lib/types';
 import type { BomComponent } from '@/lib/validation/productSchema';
 import ProductionLinesDropdown from './ProductionLinesDropdown';
 
@@ -29,6 +29,9 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   const allergens = useAllergens();
   const allProducts = useProducts();
   const machines = useMachines();
+  const taxCodes = useTaxCodes();
+  const suppliers = useSuppliers();
+  const routings = useRoutings();
 
   const [formData, setFormData] = useState({
     part_number: '',
@@ -42,6 +45,15 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     allergen_ids: [] as number[],
     rate: '',
     production_lines: [] as string[],
+    // New fields for enhanced BOM system
+    group: '' as ProductGroup | '',
+    product_type: '' as ProductType | '',
+    preferred_supplier_id: '',
+    lead_time_days: '',
+    moq: '',
+    tax_code_id: '',
+    requires_routing: false,
+    default_routing_id: '',
   });
 
   const [bomComponents, setBomComponents] = useState<Array<{
@@ -51,7 +63,23 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     sequence: string;
     priority: string;
     production_lines: string[];
-  }>>([{ product_id: '', quantity: '', uom: '', sequence: '', priority: '', production_lines: [] }]);
+    // New BOM fields
+    scrap_std_pct: string;
+    is_optional: boolean;
+    is_phantom: boolean;
+    unit_cost_std: string;
+  }>>([{ 
+    product_id: '', 
+    quantity: '', 
+    uom: '', 
+    sequence: '', 
+    priority: '', 
+    production_lines: [],
+    scrap_std_pct: '0',
+    is_optional: false,
+    is_phantom: false,
+    unit_cost_std: ''
+  }]);
 
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [autoAllergenIds, setAutoAllergenIds] = useState<number[]>([]);
@@ -64,20 +92,31 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   useEffect(() => {
     if (isEditMode && product && isOpen) {
       setStep(2);
-      setCategory(product.category || null);
+      setCategory(product.group === 'MEAT' ? 'MEAT' : 
+                  product.group === 'DRYGOODS' ? 'DRYGOODS' :
+                  product.product_type === 'FG' ? 'FINISHED_GOODS' : 'PROCESS');
       
       setFormData({
         part_number: product.part_number || '',
         description: product.description || '',
         uom: product.uom || '',
-        std_price: product.std_price || '',
+        std_price: product.std_price?.toString() || '',
         notes: '',
         subtype: product.subtype || '',
         expiry_policy: (product.expiry_policy as ExpiryPolicy) || '',
         shelf_life_days: product.shelf_life_days?.toString() || '',
-        allergen_ids: product.allergen_ids || [],
+        allergen_ids: product.allergens?.map(a => a.allergen_id) || [],
         rate: product.rate?.toString() || '',
         production_lines: (product as any).production_lines || [],
+        // New fields
+        group: product.group || '',
+        product_type: product.product_type || '',
+        preferred_supplier_id: product.preferred_supplier_id?.toString() || '',
+        lead_time_days: product.lead_time_days?.toString() || '',
+        moq: product.moq?.toString() || '',
+        tax_code_id: product.tax_code_id?.toString() || '',
+        requires_routing: product.activeBom?.requires_routing || false,
+        default_routing_id: product.activeBom?.default_routing_id?.toString() || '',
       });
 
       if (product.activeBom?.bomItems && product.activeBom.bomItems.length > 0) {
@@ -89,6 +128,11 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
             sequence: item.sequence?.toString() || '',
             priority: item.priority?.toString() || '',
             production_lines: item.production_lines || [],
+            // New BOM fields
+            scrap_std_pct: item.scrap_std_pct?.toString() || '0',
+            is_optional: item.is_optional || false,
+            is_phantom: item.is_phantom || false,
+            unit_cost_std: item.unit_cost_std?.toString() || '',
           }))
         );
       }
@@ -107,11 +151,11 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   const fetchAvailableProducts = async () => {
     try {
       if (category === 'PROCESS') {
-        const rmProducts = mockProducts.filter(p => p.type === 'RM');
+        const rmProducts = mockProducts.filter(p => p.group === 'MEAT' || p.group === 'DRYGOODS');
         setAvailableProducts(rmProducts);
       } else if (category === 'FINISHED_GOODS') {
-        const rmProducts = mockProducts.filter(p => p.type === 'RM');
-        const prProducts = mockProducts.filter(p => p.type === 'PR');
+        const rmProducts = mockProducts.filter(p => p.group === 'MEAT' || p.group === 'DRYGOODS');
+        const prProducts = mockProducts.filter(p => p.product_type === 'PR');
         setAvailableProducts([...rmProducts, ...prProducts]);
       }
     } catch (error) {
@@ -131,11 +175,14 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       if (component.product_id) {
         const material = allProducts.find(p => p.id === parseInt(component.product_id));
         if (material && material.allergens && material.allergens.length > 0) {
-          material.allergens.forEach(allergen => {
-            if (!allergenMap.has(allergen.id)) {
+          material.allergens.forEach(productAllergen => {
+            const allergen = allergens.find(a => a.id === productAllergen.allergen_id);
+            if (allergen && !allergenMap.has(allergen.id)) {
               allergenMap.set(allergen.id, { allergen, sources: [] });
             }
-            allergenMap.get(allergen.id)!.sources.push(material);
+            if (allergen) {
+              allergenMap.get(allergen.id)!.sources.push(material);
+            }
           });
         }
       }
@@ -156,8 +203,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       bomComponents.forEach(comp => {
         if (comp.product_id) {
           const material = allProducts.find(p => p.id === parseInt(comp.product_id));
-          if (material?.allergen_ids) {
-            material.allergen_ids.forEach(id => allergenSet.add(id));
+          if (material?.allergens) {
+            material.allergens.forEach((pa: any) => allergenSet.add(pa.allergen_id));
           }
         }
       });
@@ -211,8 +258,28 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       allergen_ids: [],
       rate: '',
       production_lines: [],
+      // New fields
+      group: '',
+      product_type: '',
+      preferred_supplier_id: '',
+      lead_time_days: '',
+      moq: '',
+      tax_code_id: '',
+      requires_routing: false,
+      default_routing_id: '',
     });
-    setBomComponents([{ product_id: '', quantity: '', uom: '', sequence: '', priority: '', production_lines: [] }]);
+    setBomComponents([{ 
+      product_id: '', 
+      quantity: '', 
+      uom: '', 
+      sequence: '', 
+      priority: '', 
+      production_lines: [],
+      scrap_std_pct: '0',
+      is_optional: false,
+      is_phantom: false,
+      unit_cost_std: ''
+    }]);
     setAutoAllergenIds([]);
     setSuppressedAutoAllergenIds([]);
     setErrors({});
@@ -228,9 +295,37 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     setStep(2);
     setErrors({});
 
-    if (selectedCategory === 'PROCESS') {
-      setFormData(prev => ({ ...prev, expiry_policy: 'FROM_CREATION_DATE' }));
+    // Set group and product_type based on category selection
+    let group: ProductGroup;
+    let product_type: ProductType;
+
+    switch (selectedCategory) {
+      case 'MEAT':
+        group = 'MEAT';
+        product_type = 'RM_MEAT';
+        break;
+      case 'DRYGOODS':
+        group = 'DRYGOODS';
+        product_type = 'DG_ING'; // Default to ingredient, user can change
+        break;
+      case 'FINISHED_GOODS':
+        group = 'COMPOSITE';
+        product_type = 'FG';
+        break;
+      case 'PROCESS':
+        group = 'COMPOSITE';
+        product_type = 'PR';
+        setFormData(prev => ({ ...prev, expiry_policy: 'FROM_CREATION_DATE' }));
+        break;
     }
+
+    setFormData(prev => ({ 
+      ...prev, 
+      group, 
+      product_type,
+      // Set default values based on category
+      ...(selectedCategory === 'PROCESS' && { expiry_policy: 'FROM_CREATION_DATE' })
+    }));
   };
 
   const handleBack = () => {
@@ -276,7 +371,18 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   };
 
   const addBomComponent = () => {
-    setBomComponents(prev => [...prev, { product_id: '', quantity: '', uom: '', sequence: '', priority: '', production_lines: [] }]);
+    setBomComponents(prev => [...prev, { 
+      product_id: '', 
+      quantity: '', 
+      uom: '', 
+      sequence: '', 
+      priority: '', 
+      production_lines: [],
+      scrap_std_pct: '0',
+      is_optional: false,
+      is_phantom: false,
+      unit_cost_std: ''
+    }]);
   };
 
   const removeBomComponent = (index: number) => {
@@ -285,7 +391,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     }
   };
 
-  const updateBomComponent = (index: number, field: string, value: string | string[]) => {
+  const updateBomComponent = (index: number, field: string, value: string | string[] | boolean) => {
     setBomComponents(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
@@ -396,6 +502,13 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         notes: formData.notes || undefined,
         category: category,
         allergen_ids: formData.allergen_ids,
+        // New fields for enhanced BOM system
+        group: formData.group,
+        product_type: formData.product_type,
+        preferred_supplier_id: formData.preferred_supplier_id ? parseInt(formData.preferred_supplier_id) : undefined,
+        lead_time_days: formData.lead_time_days ? parseInt(formData.lead_time_days) : undefined,
+        moq: formData.moq ? parseFloat(formData.moq) : undefined,
+        tax_code_id: formData.tax_code_id ? parseInt(formData.tax_code_id) : undefined,
       };
 
       if (category === 'MEAT') {
@@ -424,6 +537,11 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
           sequence: c.sequence ? parseInt(c.sequence) : index + 1,
           priority: c.priority ? parseInt(c.priority) : undefined,
           production_lines: c.production_lines,
+          // New BOM fields
+          scrap_std_pct: c.scrap_std_pct ? parseFloat(c.scrap_std_pct) : 0,
+          is_optional: c.is_optional,
+          is_phantom: c.is_phantom,
+          unit_cost_std: c.unit_cost_std ? parseFloat(c.unit_cost_std) : undefined,
         }));
       } else if (category === 'PROCESS') {
         payload.type = 'PR';
@@ -437,6 +555,11 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
           sequence: c.sequence ? parseInt(c.sequence) : index + 1,
           priority: c.priority ? parseInt(c.priority) : undefined,
           production_lines: c.production_lines,
+          // New BOM fields
+          scrap_std_pct: c.scrap_std_pct ? parseFloat(c.scrap_std_pct) : 0,
+          is_optional: c.is_optional,
+          is_phantom: c.is_phantom,
+          unit_cost_std: c.unit_cost_std ? parseFloat(c.unit_cost_std) : undefined,
         }));
       }
 
@@ -462,7 +585,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
             {step === 2 && !isEditMode && (
@@ -784,17 +907,21 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                   </div>
 
                   <div className="space-y-3 border border-slate-200 rounded-lg p-4 bg-slate-50">
-                    <div className="grid grid-cols-6 gap-2 mb-2">
+                    <div className="grid grid-cols-10 gap-2 mb-2">
                       <div className="text-xs font-medium text-slate-600">Material</div>
                       <div className="text-xs font-medium text-slate-600">Quantity</div>
                       <div className="text-xs font-medium text-slate-600">UoM</div>
+                      <div className="text-xs font-medium text-slate-600">Scrap %</div>
+                      <div className="text-xs font-medium text-slate-600">Optional</div>
+                      <div className="text-xs font-medium text-slate-600">Phantom</div>
+                      <div className="text-xs font-medium text-slate-600">Unit Cost</div>
                       <div className="text-xs font-medium text-slate-600">Sequence</div>
-                      <div className="text-xs font-medium text-slate-600">Priority (optional)</div>
-                      <div className="text-xs font-medium text-slate-600">Production Lines</div>
+                      <div className="text-xs font-medium text-slate-600">Priority</div>
+                      <div className="text-xs font-medium text-slate-600">Actions</div>
                     </div>
                     {bomComponents.map((component, index) => (
                       <div key={index} className="flex gap-2 items-start">
-                        <div className="flex-1 grid grid-cols-6 gap-2">
+                        <div className="flex-1 grid grid-cols-10 gap-2">
                           <div>
                             <select
                               value={component.product_id}
@@ -846,6 +973,53 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                             )}
                           </div>
 
+                          {/* Scrap % */}
+                          <div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              value={component.scrap_std_pct}
+                              onChange={(e) => updateBomComponent(index, 'scrap_std_pct', e.target.value)}
+                              placeholder="0.00"
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                            />
+                          </div>
+
+                          {/* Optional checkbox */}
+                          <div className="flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={component.is_optional}
+                              onChange={(e) => updateBomComponent(index, 'is_optional', e.target.checked.toString())}
+                              className="h-4 w-4 text-slate-900 focus:ring-slate-900 border-slate-300 rounded"
+                            />
+                          </div>
+
+                          {/* Phantom checkbox */}
+                          <div className="flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={component.is_phantom}
+                              onChange={(e) => updateBomComponent(index, 'is_phantom', e.target.checked.toString())}
+                              className="h-4 w-4 text-slate-900 focus:ring-slate-900 border-slate-300 rounded"
+                            />
+                          </div>
+
+                          {/* Unit Cost */}
+                          <div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={component.unit_cost_std}
+                              onChange={(e) => updateBomComponent(index, 'unit_cost_std', e.target.value)}
+                              placeholder="0.00"
+                              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                            />
+                          </div>
+
                           <div>
                             <input
                               type="number"
@@ -878,17 +1052,21 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                             />
                             <p className="text-xs text-slate-500 mt-1">Leave empty or select ALL for all lines</p>
                           </div>
-                        </div>
 
-                        {bomComponents.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeBomComponent(index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                          {/* Actions column */}
+                          <div className="flex items-center justify-center">
+                            {bomComponents.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeBomComponent(index)}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="Remove component"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
 
@@ -896,6 +1074,51 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                       <div className="text-xs text-slate-500 italic mt-2 space-y-1">
                         <p>Priority: Lower number = consumed first. Leave empty for simultaneous consumption.</p>
                         <p>Note: Per-line settings can be configured after creation</p>
+                      </div>
+                    )}
+
+                    {/* BOM Versioning Actions */}
+                    {(category === 'FINISHED_GOODS' || category === 'PROCESS') && (
+                      <div className="border-t border-slate-200 pt-4 mt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-medium text-slate-700">BOM Versioning</h4>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {/* TODO: Implement duplicate BOM */}}
+                              className="px-3 py-1 text-xs font-medium text-slate-700 border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+                            >
+                              Duplicate BOM
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {/* TODO: Implement version up */}}
+                              className="px-3 py-1 text-xs font-medium text-slate-700 border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+                            >
+                              Version Up
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {/* TODO: Implement activate */}}
+                              className="px-3 py-1 text-xs font-medium text-white bg-green-600 border border-green-600 rounded hover:bg-green-700 transition-colors"
+                            >
+                              Activate
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {/* TODO: Implement schedule */}}
+                              className="px-3 py-1 text-xs font-medium text-slate-700 border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+                            >
+                              Schedule
+                            </button>
+                          </div>
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          <p>• <strong>Duplicate BOM:</strong> Create a copy with incremented version</p>
+                          <p>• <strong>Version Up:</strong> Create new version, archive current</p>
+                          <p>• <strong>Activate:</strong> Set as active version with current date</p>
+                          <p>• <strong>Schedule:</strong> Set effective dates for version activation</p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -923,6 +1146,147 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                     <p className="text-xs text-amber-700 mt-2">
                       These allergens are inherited from BOM materials
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Section 2: Purchasing */}
+              <div className="border-t border-slate-200 pt-6">
+                <h3 className="text-lg font-medium text-slate-900 mb-4">Purchasing</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Preferred Supplier
+                    </label>
+                    <select
+                      value={formData.preferred_supplier_id}
+                      onChange={(e) => updateFormField('preferred_supplier_id', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    >
+                      <option value="">Select supplier...</option>
+                      {suppliers.map(supplier => (
+                        <option key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Tax Code
+                    </label>
+                    <select
+                      value={formData.tax_code_id}
+                      onChange={(e) => updateFormField('tax_code_id', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    >
+                      <option value="">Select tax code...</option>
+                      {taxCodes.map(taxCode => (
+                        <option key={taxCode.id} value={taxCode.id}>
+                          {taxCode.name} ({taxCode.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Lead Time (days)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.lead_time_days}
+                      onChange={(e) => updateFormField('lead_time_days', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      placeholder="e.g., 7"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      MOQ (Minimum Order Quantity)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.moq}
+                      onChange={(e) => updateFormField('moq', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      placeholder="e.g., 50.0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: BOM & Routing */}
+              {(category === 'FINISHED_GOODS' || category === 'PROCESS') && (
+                <div className="border-t border-slate-200 pt-6">
+                  <h3 className="text-lg font-medium text-slate-900 mb-4">BOM & Routing</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="requires_routing"
+                        checked={formData.requires_routing === true}
+                        onChange={(e) => updateFormField('requires_routing', e.target.checked.toString())}
+                        className="h-4 w-4 text-slate-900 focus:ring-slate-900 border-slate-300 rounded"
+                      />
+                      <label htmlFor="requires_routing" className="ml-2 text-sm font-medium text-slate-700">
+                        Requires Routing
+                      </label>
+                    </div>
+
+                    {formData.requires_routing && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                          Default Routing
+                        </label>
+                        <select
+                          value={formData.default_routing_id}
+                          onChange={(e) => updateFormField('default_routing_id', e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        >
+                          <option value="">Select routing...</option>
+                          {routings.map(routing => (
+                            <option key={routing.id} value={routing.id}>
+                              {routing.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Section 4: Drygoods Specifics */}
+              {category === 'DRYGOODS' && (
+                <div className="border-t border-slate-200 pt-6">
+                  <h3 className="text-lg font-medium text-slate-900 mb-4">Drygoods Specifics</h3>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Product Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.product_type}
+                      onChange={(e) => updateFormField('product_type', e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 ${
+                        errors.product_type ? 'border-red-300' : 'border-slate-300'
+                      }`}
+                    >
+                      <option value="">Select type...</option>
+                      <option value="DG_WEB">Web/Film</option>
+                      <option value="DG_LABEL">Label</option>
+                      <option value="DG_BOX">Box</option>
+                      <option value="DG_ING">Ingredient</option>
+                      <option value="DG_SAUCE">Sauce</option>
+                    </select>
+                    {errors.product_type && (
+                      <p className="text-xs text-red-600 mt-1">{errors.product_type}</p>
+                    )}
                   </div>
                 </div>
               )}

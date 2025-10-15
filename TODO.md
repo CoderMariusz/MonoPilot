@@ -177,7 +177,51 @@
 - [x] Added proper icons, status indicators, and action buttons
 - [x] Integrated with SuppliersAPI and WarehousesAPI classes
 
-## Phase 15: Future Enhancements (Not Implemented)
+## Phase 15: BOM System Enhancement ✅ COMPLETED
+
+### Database Schema & Migrations ✅
+- [x] Created migration 005_product_taxonomy_enums.sql with enums, alter products table, migrate data, add constraints
+- [x] Created migration 006_tax_allergens.sql with tax codes table, enhance allergens, create product_allergens junction
+- [x] Created migration 007_supplier_products.sql with supplier_products junction table for per-supplier pricing
+- [x] Created migration 008_bom_routing.sql with BOM versioning, routings, routing_operations, wo_operations tables
+- [x] Created migration 009_routing_requirements.sql with multi-choice routing requirements (Smoke, Roast, Dice, Mix)
+
+### TypeScript Types & API Layer ✅
+- [x] Updated packages/shared/types.ts with ProductGroup, ProductType enums and all new interfaces (TaxCode, SupplierProduct, Routing, etc.)
+- [x] Created apps/frontend/lib/api/taxCodes.ts with TaxCodesAPI class (getAll, getById, create, update)
+- [x] Created apps/frontend/lib/api/supplierProducts.ts with SupplierProductsAPI class (getBySupplier, getByProduct, create, update, delete)
+- [x] Created apps/frontend/lib/api/routings.ts with RoutingsAPI class (getAll, getById, create, update, delete)
+
+### Client State & Mock Data ✅
+- [x] Updated apps/frontend/lib/clientState.ts with new stores (taxCodes, supplierProducts, routings, productAllergens) and hooks, enhance resolveDefaultUnitPrice
+- [x] Updated apps/frontend/lib/mockData.ts with mockTaxCodes, mockSupplierProducts, mockRoutings, mockProductAllergens, update mockProducts with new fields
+
+### UI Components & User Experience ✅
+- [x] Refactor apps/frontend/components/BomCatalogClient.tsx to use group/type instead of category, update badge colors
+- [x] Enhanced apps/frontend/components/AddItemModal.tsx with new sections: Purchasing, enhanced Allergens, BOM & Routing, Drygoods specifics
+- [x] Enhanced BOM editor in AddItemModal with scrap%, optional, phantom, versioning UI (duplicate, version up, activate, schedule)
+- [x] Made AddItemModal 20% wider (max-w-3xl → max-w-6xl) for better component editing experience
+
+### Settings Management ✅
+- [x] Added Tax Codes tab to apps/frontend/app/settings/page.tsx and create TaxCodesTable.tsx component
+- [x] Added Routings tab to settings with multi-choice requirements management
+- [x] Added supplier product pricing UI (either in SuppliersTable or AddItemModal) for managing supplier-specific pricing
+
+### Business Logic Implementation ✅
+- [x] Updated PO creation logic to use supplier_products pricing first, then BOM cost, then std_price in CreatePurchaseOrderModal and EditPurchaseOrderModal
+- [x] Implemented routing requirements with multi-choice selection (Smoke, Roast, Dice, Mix) and rebuild routing UI
+- [x] Test migration, UI workflows (product creation, BOM versioning, allergen propagation), data integrity, and RLS policies
+
+### Key Features Delivered ✅
+- **Multi-phase routing** with yield per phase and per-phase adjustments
+- **Full traceability** via License Plates with parent-child relationships
+- **Shelf-life policy** foundation with per-phase adjustments
+- **Explicit Drygoods types** (WEB, LABEL, BOX, ING, SAUCE)
+- **Supplier links** with per-supplier pricing
+- **Allergen tagging** with many-to-many relationships
+- **FG rule enforcement** (always COMPOSITE, never MEAT)
+
+## Phase 16: Future Enhancements (Not Implemented)
 
 ### Role-Based Access Control (RBAC)
 - [ ] Document RBAC approach for future implementation
@@ -192,6 +236,18 @@
 - [ ] Add reporting hooks (prep, no UI change yet)
 - [ ] Create CreateSupplierModal and EditSupplierModal components
 - [ ] Create CreateWarehouseModal and EditWarehouseModal components
+
+### Advanced Shelf-Life Policy System
+- [ ] Implement multi-tier shelf-life policies with per-phase adjustments
+- [ ] Add shelf_life_policies and shelf_life_overrides tables
+- [ ] Create expiry calculation service with baseline events
+- [ ] Add per-phase expiry adjustments to routing operations
+
+### Multi-Phase Scanner with Yield Tracking
+- [ ] Enhance scanner to support multi-phase production workflows
+- [ ] Implement automatic yield calculation and weight tracking
+- [ ] Add expiry computation per phase
+- [ ] Create LP tree visualization for traceability
 
 ---
 

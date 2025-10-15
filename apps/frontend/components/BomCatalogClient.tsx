@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Package, Beef, ShoppingBag, FlaskConical, Plus, Loader2, Trash2, Pencil, Search } from 'lucide-react';
-import type { Product } from '@/lib/types';
+import type { Product, ProductGroup, ProductType } from '@/lib/types';
 import { useProducts } from '@/lib/clientState';
 import AddItemModal from '@/components/AddItemModal';
 
@@ -12,6 +12,8 @@ interface TabConfig {
   id: CategoryType;
   label: string;
   icon: any;
+  group: ProductGroup;
+  productTypes: ProductType[];
 }
 
 interface ProductsResponse {
@@ -37,10 +39,10 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const tabs: TabConfig[] = [
-    { id: 'MEAT', label: 'Meat', icon: Beef },
-    { id: 'DRYGOODS', label: 'Dry Goods', icon: ShoppingBag },
-    { id: 'FINISHED_GOODS', label: 'Finished Goods', icon: Package },
-    { id: 'PROCESS', label: 'Process', icon: FlaskConical },
+    { id: 'MEAT', label: 'Meat', icon: Beef, group: 'MEAT', productTypes: ['RM_MEAT'] },
+    { id: 'DRYGOODS', label: 'Dry Goods', icon: ShoppingBag, group: 'DRYGOODS', productTypes: ['DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_ING', 'DG_SAUCE'] },
+    { id: 'FINISHED_GOODS', label: 'Finished Goods', icon: Package, group: 'COMPOSITE', productTypes: ['FG'] },
+    { id: 'PROCESS', label: 'Process', icon: FlaskConical, group: 'COMPOSITE', productTypes: ['PR'] },
   ];
 
   const handleModalSuccess = () => {
@@ -142,7 +144,41 @@ function ProductsTable({
   onEditProduct: (product: Product) => void;
 }) {
   const allProducts = useProducts();
-  const products = allProducts.filter(p => p.category === category);
+  
+  // Get the tab configuration for filtering
+  const tabs: TabConfig[] = [
+    { id: 'MEAT', label: 'Meat', icon: Beef, group: 'MEAT', productTypes: ['RM_MEAT'] },
+    { id: 'DRYGOODS', label: 'Dry Goods', icon: ShoppingBag, group: 'DRYGOODS', productTypes: ['DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_ING', 'DG_SAUCE'] },
+    { id: 'FINISHED_GOODS', label: 'Finished Goods', icon: Package, group: 'COMPOSITE', productTypes: ['FG'] },
+    { id: 'PROCESS', label: 'Process', icon: FlaskConical, group: 'COMPOSITE', productTypes: ['PR'] },
+  ];
+  
+  const currentTab = tabs.find(tab => tab.id === category);
+  const products = allProducts.filter(p => {
+    if (!currentTab) return false;
+    
+    // For MEAT: group === 'MEAT'
+    if (category === 'MEAT') {
+      return p.group === 'MEAT';
+    }
+    
+    // For DRYGOODS: group === 'DRYGOODS'
+    if (category === 'DRYGOODS') {
+      return p.group === 'DRYGOODS';
+    }
+    
+    // For FINISHED_GOODS: group === 'COMPOSITE' AND product_type === 'FG'
+    if (category === 'FINISHED_GOODS') {
+      return p.group === 'COMPOSITE' && p.product_type === 'FG';
+    }
+    
+    // For PROCESS: group === 'COMPOSITE' AND product_type === 'PR'
+    if (category === 'PROCESS') {
+      return p.group === 'COMPOSITE' && p.product_type === 'PR';
+    }
+    
+    return false;
+  });
   const [loading] = useState(false);
   const [error] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -219,11 +255,16 @@ function ProductsTable({
     }
   };
 
-  const getTypeBadgeColor = (type: string) => {
-    switch (type) {
-      case 'RM': return 'bg-blue-100 text-blue-800';
-      case 'WIP': return 'bg-yellow-100 text-yellow-800';
+  const getTypeBadgeColor = (productType: ProductType) => {
+    switch (productType) {
+      case 'RM_MEAT': return 'bg-red-100 text-red-800';
+      case 'PR': return 'bg-purple-100 text-purple-800';
       case 'FG': return 'bg-green-100 text-green-800';
+      case 'DG_WEB': return 'bg-blue-100 text-blue-800';
+      case 'DG_LABEL': return 'bg-yellow-100 text-yellow-800';
+      case 'DG_BOX': return 'bg-orange-100 text-orange-800';
+      case 'DG_ING': return 'bg-indigo-100 text-indigo-800';
+      case 'DG_SAUCE': return 'bg-pink-100 text-pink-800';
       default: return 'bg-slate-100 text-slate-800';
     }
   };
@@ -326,8 +367,8 @@ function ProductsTable({
                       {product.uom}
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getTypeBadgeColor(product.type)}`}>
-                        {product.type}
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${getTypeBadgeColor(product.product_type)}`}>
+                        {product.product_type}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-slate-600">
@@ -337,7 +378,11 @@ function ProductsTable({
                       {product.shelf_life_days ? `${product.shelf_life_days} days` : '-'}
                     </td>
                     <td className="py-3 px-4 text-sm font-medium text-slate-900">
-                      {formatPrice(product.std_price)}
+                      {formatPrice(
+                        typeof product.std_price === "number"
+                          ? product.std_price.toString()
+                          : product.std_price ?? undefined
+                      )}
                     </td>
                     <td className="py-3 px-4 text-sm text-slate-600">
                       {product.activeBom ? (

@@ -1,19 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Package } from 'lucide-react';
 import { SuppliersAPI } from '@/lib/api/suppliers';
-import { useSuppliers } from '@/lib/clientState';
-import type { Supplier } from '@/lib/types';
+import { useSuppliers, useProducts, useTaxCodes } from '@/lib/clientState';
+import type { Supplier, Product, TaxCode, SupplierProduct } from '@/lib/types';
+import { SupplierProductsModal } from './SupplierProductsModal';
 
 export function SuppliersTable() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [showProductsModal, setShowProductsModal] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
 
   // Use mock data for now
   const mockSuppliers = useSuppliers();
+  const products = useProducts();
+  const taxCodes = useTaxCodes();
 
   useEffect(() => {
     const loadSuppliers = async () => {
@@ -53,6 +59,13 @@ export function SuppliersTable() {
     } catch (error) {
       console.error('Error deleting supplier:', error);
     }
+  };
+
+  const handleManageProducts = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setShowProductsModal(true);
+    // TODO: Load supplier products for this supplier
+    setSupplierProducts([]);
   };
 
   if (loading) {
@@ -154,6 +167,13 @@ export function SuppliersTable() {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => handleManageProducts(supplier)}
+                          className="text-blue-600 hover:text-blue-900 p-1"
+                          title="Manage products"
+                        >
+                          <Package className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => setEditingSupplier(supplier)}
                           className="text-slate-600 hover:text-slate-900 p-1"
                           title="Edit supplier"
@@ -233,6 +253,24 @@ export function SuppliersTable() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Supplier Products Modal */}
+      {showProductsModal && selectedSupplier && (
+        <SupplierProductsModal
+          supplier={selectedSupplier}
+          products={products}
+          taxCodes={taxCodes}
+          supplierProducts={supplierProducts}
+          onClose={() => {
+            setShowProductsModal(false);
+            setSelectedSupplier(null);
+          }}
+          onSave={(products) => {
+            setSupplierProducts(products);
+            // TODO: Save to backend
+          }}
+        />
       )}
     </div>
   );

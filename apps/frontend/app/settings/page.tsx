@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, Cog, AlertTriangle, Truck, Warehouse } from 'lucide-react';
+import { MapPin, Cog, AlertTriangle, Truck, Warehouse, Receipt, Route } from 'lucide-react';
 import { LocationsTable } from '@/components/LocationsTable';
 import { MachinesTable } from '@/components/MachinesTable';
 import { AllergensTable } from '@/components/AllergensTable';
 import { SuppliersTable } from '@/components/SuppliersTable';
 import { WarehousesTable } from '@/components/WarehousesTable';
+import { TaxCodesTable } from '@/components/TaxCodesTable';
+import { RoutingsTable } from '@/components/RoutingsTable';
 
-type TabType = 'locations' | 'machines' | 'allergens' | 'suppliers' | 'warehouses';
+type TabType = 'locations' | 'machines' | 'allergens' | 'suppliers' | 'warehouses' | 'tax-codes' | 'routings';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('locations');
@@ -19,6 +21,8 @@ export default function SettingsPage() {
     { id: 'allergens' as TabType, label: 'Allergens', icon: AlertTriangle },
     { id: 'suppliers' as TabType, label: 'Suppliers', icon: Truck },
     { id: 'warehouses' as TabType, label: 'Warehouses', icon: Warehouse },
+    { id: 'tax-codes' as TabType, label: 'Tax Codes', icon: Receipt },
+    { id: 'routings' as TabType, label: 'Routings', icon: Route },
   ];
 
   return (
@@ -58,6 +62,8 @@ export default function SettingsPage() {
           {activeTab === 'allergens' && <AllergensTab />}
           {activeTab === 'suppliers' && <SuppliersTab />}
           {activeTab === 'warehouses' && <WarehousesTab />}
+          {activeTab === 'tax-codes' && <TaxCodesTab />}
+          {activeTab === 'routings' && <RoutingsTab />}
         </div>
       </div>
     </div>
@@ -115,6 +121,28 @@ function WarehousesTab() {
         <h2 className="text-xl font-semibold text-slate-900">Warehouses</h2>
       </div>
       <WarehousesTable />
+    </div>
+  );
+}
+
+function TaxCodesTab() {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-slate-900">Tax Codes</h2>
+      </div>
+      <TaxCodesTable />
+    </div>
+  );
+}
+
+function RoutingsTab() {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-slate-900">Routings</h2>
+      </div>
+      <RoutingsTable />
     </div>
   );
 }
