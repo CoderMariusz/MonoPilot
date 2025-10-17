@@ -67,6 +67,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     scrap_std_pct: string;
     is_optional: boolean;
     is_phantom: boolean;
+    one_to_one: boolean;
     unit_cost_std: string;
   }>>([{ 
     product_id: '', 
@@ -78,6 +79,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     scrap_std_pct: '0',
     is_optional: false,
     is_phantom: false,
+    one_to_one: false,
     unit_cost_std: ''
   }]);
 
@@ -132,6 +134,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
             scrap_std_pct: item.scrap_std_pct?.toString() || '0',
             is_optional: item.is_optional || false,
             is_phantom: item.is_phantom || false,
+            one_to_one: item.one_to_one || false,
             unit_cost_std: item.unit_cost_std?.toString() || '',
           }))
         );
@@ -381,6 +384,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       scrap_std_pct: '0',
       is_optional: false,
       is_phantom: false,
+      one_to_one: false,
       unit_cost_std: ''
     }]);
   };
@@ -541,6 +545,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
           scrap_std_pct: c.scrap_std_pct ? parseFloat(c.scrap_std_pct) : 0,
           is_optional: c.is_optional,
           is_phantom: c.is_phantom,
+          one_to_one: c.one_to_one,
           unit_cost_std: c.unit_cost_std ? parseFloat(c.unit_cost_std) : undefined,
         }));
       } else if (category === 'PROCESS') {
@@ -559,15 +564,16 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
           scrap_std_pct: c.scrap_std_pct ? parseFloat(c.scrap_std_pct) : 0,
           is_optional: c.is_optional,
           is_phantom: c.is_phantom,
+          one_to_one: c.one_to_one,
           unit_cost_std: c.unit_cost_std ? parseFloat(c.unit_cost_std) : undefined,
         }));
       }
 
       if (isEditMode && product) {
-        updateProduct(product.id, payload);
+        await updateProduct(product.id, payload);
         showToast('Product updated successfully', 'success');
       } else {
-        addProduct(payload);
+        await addProduct(payload);
         showToast('Product created successfully', 'success');
       }
       
@@ -907,13 +913,14 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                   </div>
 
                   <div className="space-y-3 border border-slate-200 rounded-lg p-4 bg-slate-50">
-                    <div className="grid grid-cols-10 gap-2 mb-2">
+                    <div className="grid grid-cols-11 gap-2 mb-2">
                       <div className="text-xs font-medium text-slate-600">Material</div>
                       <div className="text-xs font-medium text-slate-600">Quantity</div>
                       <div className="text-xs font-medium text-slate-600">UoM</div>
                       <div className="text-xs font-medium text-slate-600">Scrap %</div>
                       <div className="text-xs font-medium text-slate-600">Optional</div>
                       <div className="text-xs font-medium text-slate-600">Phantom</div>
+                      <div className="text-xs font-medium text-slate-600">1:1 LP</div>
                       <div className="text-xs font-medium text-slate-600">Unit Cost</div>
                       <div className="text-xs font-medium text-slate-600">Sequence</div>
                       <div className="text-xs font-medium text-slate-600">Priority</div>
@@ -921,7 +928,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                     </div>
                     {bomComponents.map((component, index) => (
                       <div key={index} className="flex gap-2 items-start">
-                        <div className="flex-1 grid grid-cols-10 gap-2">
+                        <div className="flex-1 grid grid-cols-11 gap-2">
                           <div>
                             <select
                               value={component.product_id}
@@ -992,7 +999,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                             <input
                               type="checkbox"
                               checked={component.is_optional}
-                              onChange={(e) => updateBomComponent(index, 'is_optional', e.target.checked.toString())}
+                              onChange={(e) => updateBomComponent(index, 'is_optional', e.target.checked)}
                               className="h-4 w-4 text-slate-900 focus:ring-slate-900 border-slate-300 rounded"
                             />
                           </div>
@@ -1002,8 +1009,19 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
                             <input
                               type="checkbox"
                               checked={component.is_phantom}
-                              onChange={(e) => updateBomComponent(index, 'is_phantom', e.target.checked.toString())}
+                              onChange={(e) => updateBomComponent(index, 'is_phantom', e.target.checked)}
                               className="h-4 w-4 text-slate-900 focus:ring-slate-900 border-slate-300 rounded"
+                            />
+                          </div>
+
+                          {/* One-to-One LP checkbox */}
+                          <div className="flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={component.one_to_one}
+                              onChange={(e) => updateBomComponent(index, 'one_to_one', e.target.checked)}
+                              className="h-4 w-4 text-slate-900 focus:ring-slate-900 border-slate-300 rounded"
+                              title="Consume entire LP regardless of quantity"
                             />
                           </div>
 
@@ -1154,23 +1172,26 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
               <div className="border-t border-slate-200 pt-6">
                 <h3 className="text-lg font-medium text-slate-900 mb-4">Purchasing</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Preferred Supplier
-                    </label>
-                    <select
-                      value={formData.preferred_supplier_id}
-                      onChange={(e) => updateFormField('preferred_supplier_id', e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    >
-                      <option value="">Select supplier...</option>
-                      {suppliers.map(supplier => (
-                        <option key={supplier.id} value={supplier.id}>
-                          {supplier.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Only show supplier field for raw materials (MEAT, DRYGOODS) */}
+                  {(category === 'MEAT' || category === 'DRYGOODS') && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        Preferred Supplier
+                      </label>
+                      <select
+                        value={formData.preferred_supplier_id}
+                        onChange={(e) => updateFormField('preferred_supplier_id', e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      >
+                        <option value="">Select supplier...</option>
+                        {suppliers.map(supplier => (
+                          <option key={supplier.id} value={supplier.id}>
+                            {supplier.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">

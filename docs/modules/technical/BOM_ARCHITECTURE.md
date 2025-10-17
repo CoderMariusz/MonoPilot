@@ -1,0 +1,207 @@
+# BOM Module Architecture
+
+## Overview
+The BOM (Bill of Materials) module is the foundation of the MonoPilot MES system, managing product definitions, component relationships, and material consumption logic.
+
+## Data Flow Architecture
+
+### 1. Product Creation Flow
+```
+User Input → AddItemModal → Validation → ProductsAPI → Database
+     ↓
+Category Selection → Field Configuration → BOM Components → Save
+```
+
+### 2. BOM Component Flow
+```
+Material Selection → Quantity/Scrap/Flags → Validation → Database Storage
+     ↓
+Optional/Phantom/One-to-One → Production Planning → Work Orders
+```
+
+### 3. Material Consumption Logic
+```
+Work Order Creation → BOM Snapshot → Material Reservation → Production
+     ↓
+Standard Consumption vs One-to-One LP → Scanner Terminal → Stock Moves
+```
+
+## Product Type Hierarchy
+
+### Raw Materials (RM)
+- **MEAT**: Raw meat products
+- **DRYGOODS**: Ingredients, packaging, labels
+- **Features**: Supplier required, expiry policies, allergen tracking
+
+### Processed Products (PR)
+- **PROCESS**: Intermediate products
+- **Features**: BOM required, fixed expiry policy, production lines
+
+### Finished Goods (FG)
+- **FINISHED_GOODS**: Final products
+- **Features**: Complex BOM, production rates, line-specific settings
+
+## BOM Component Types
+
+### Standard Components
+- **Quantity-based**: Consume based on calculated quantity
+- **Scrap handling**: Account for material loss
+- **Production lines**: Restrict to specific lines
+
+### Special Components
+- **Optional**: Can be omitted from production
+- **Phantom**: Not physically present, used for costing
+- **One-to-One**: Consume entire LP regardless of quantity
+
+## LP Consumption Modes
+
+### Standard Mode
+```
+LP: 500kg Meat
+BOM: 0.5kg per unit
+Production: 100 units
+Consumption: 50kg (0.5 × 100)
+Remaining: 450kg
+```
+
+### One-to-One Mode
+```
+LP: 500kg Meat
+BOM: 0.5kg per unit (one_to_one = true)
+Production: 100 units
+Consumption: 500kg (entire LP)
+Remaining: 0kg
+```
+
+## Allergen Inheritance
+
+### Automatic Inheritance
+```
+Component A: Allergens [Nuts, Dairy]
+Component B: Allergens [Soy]
+Product: Inherits [Nuts, Dairy, Soy]
+```
+
+### Manual Override
+```
+Product: Inherits [Nuts, Dairy, Soy]
+User: Suppresses [Dairy]
+Result: [Nuts, Soy]
+```
+
+## Production Line Integration
+
+### Line-Specific BOM
+```
+Product: Pizza
+Line 1: Standard BOM
+Line 2: Premium BOM (extra cheese)
+Line 3: Vegan BOM (no dairy)
+```
+
+### Line Restrictions
+```
+Component: Premium Cheese
+Restrictions: [Line 2, Line 3]
+Result: Not available on Line 1
+```
+
+## Database Relationships
+
+### Core Tables
+- `products`: Product definitions
+- `bom`: BOM versions
+- `bom_items`: BOM components
+- `wo_materials`: Work order BOM snapshots
+
+### Key Relationships
+```
+products (1) ←→ (many) bom
+bom (1) ←→ (many) bom_items
+bom_items (many) ←→ (1) products (materials)
+wo_materials (many) ←→ (1) bom_items
+```
+
+## API Endpoints
+
+### Products API
+- `GET /api/products` - List all products
+- `GET /api/products/:id` - Get product details
+- `POST /api/products` - Create product
+- `PUT /api/products/:id` - Update product
+- `DELETE /api/products/:id` - Delete product
+
+### BOM API
+- `GET /api/products/:id/bom` - Get product BOM
+- `POST /api/products/:id/bom` - Create/update BOM
+- `DELETE /api/products/:id/bom` - Delete BOM
+
+## Error Handling
+
+### Validation Errors
+- Required fields missing
+- Invalid product types
+- BOM component validation
+- Allergen conflicts
+
+### Business Logic Errors
+- Circular BOM references
+- Invalid material combinations
+- Production line conflicts
+- Cost calculation errors
+
+## Performance Considerations
+
+### Database Indexes
+- `idx_products_category` - Category-based queries
+- `idx_bom_items_bom_id` - BOM component lookups
+- `idx_bom_items_material_id` - Material usage tracking
+
+### Caching Strategy
+- Product data caching
+- BOM structure caching
+- Allergen inheritance caching
+
+## Security Considerations
+
+### Access Control
+- Role-based permissions
+- Product category restrictions
+- BOM modification audit trail
+
+### Data Integrity
+- Foreign key constraints
+- BOM validation rules
+- Material availability checks
+
+## Integration Points
+
+### Planning Module
+- BOM → Work Order creation
+- Material requirement calculation
+- Production scheduling
+
+### Production Module
+- BOM → Material consumption
+- Scanner integration
+- Yield tracking
+
+### Warehouse Module
+- Material availability
+- LP management
+- Stock movements
+
+## Future Enhancements
+
+### Planned Features
+- BOM versioning
+- Cost rollup calculations
+- Supplier integration
+- Quality specifications
+- Regulatory compliance
+
+### Scalability
+- Multi-plant support
+- International standards
+- Advanced routing
+- AI-powered optimization

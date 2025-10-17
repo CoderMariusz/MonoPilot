@@ -120,6 +120,11 @@ CREATE TABLE public.bom_items (
   sequence INTEGER NOT NULL,
   priority INTEGER,
   production_lines TEXT[],
+  scrap_std_pct DECIMAL(5,2) DEFAULT 0,
+  is_optional BOOLEAN DEFAULT false,
+  is_phantom BOOLEAN DEFAULT false,
+  one_to_one BOOLEAN DEFAULT false,
+  unit_cost_std DECIMAL(12,4),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -95,9 +95,92 @@ CREATE TABLE stock_moves (
 - Metadata storage
 - Source tracking
 
+## BOM Management Tables
+
+### 3. bom
+**Purpose**: Bill of Materials with versioning support
+
+```sql
+CREATE TABLE bom (
+  id SERIAL PRIMARY KEY,
+  product_id INTEGER REFERENCES products(id) NOT NULL,
+  version TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id)
+);
+```
+
+**Key Features**:
+- BOM versioning for product changes
+- Active BOM tracking
+- Audit trail with user tracking
+
+### 4. bom_items
+**Purpose**: BOM components with enhanced tracking capabilities
+
+```sql
+CREATE TABLE bom_items (
+  id SERIAL PRIMARY KEY,
+  bom_id INTEGER REFERENCES bom(id) NOT NULL,
+  material_id INTEGER REFERENCES products(id) NOT NULL,
+  quantity DECIMAL(10,4) NOT NULL,
+  uom TEXT NOT NULL,
+  sequence INTEGER NOT NULL,
+  priority INTEGER,
+  production_lines TEXT[],
+  scrap_std_pct DECIMAL(5,2) DEFAULT 0,
+  is_optional BOOLEAN DEFAULT false,
+  is_phantom BOOLEAN DEFAULT false,
+  one_to_one BOOLEAN DEFAULT false,
+  unit_cost_std DECIMAL(12,4),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+**Key Features**:
+- Material consumption tracking
+- Scrap percentage calculation
+- Optional and phantom components
+- One-to-one LP consumption (consume entire LP regardless of quantity)
+- Production line restrictions
+- Standard cost tracking
+
+**Field Descriptions**:
+- `one_to_one`: If true, consume entire LP regardless of quantity (1:1 LP relationship)
+- `is_optional`: Component can be omitted from production
+- `is_phantom`: Component is not physically present but used for costing
+- `scrap_std_pct`: Standard scrap percentage for material loss calculation
+- `unit_cost_std`: Standard unit cost for the material
+
+## Product Categories and Types
+
+### Product Category Mapping
+The system supports four main product categories with specific type mappings:
+
+| Category | Product Type | Description | Supplier Required |
+|----------|--------------|-------------|-------------------|
+| MEAT | RM_MEAT | Raw meat materials | Yes |
+| DRYGOODS | DG_WEB, DG_LABEL, DG_BOX, DG_ING, DG_SAUCE | Dry goods and ingredients | Yes |
+| PROCESS | PR | Processed products (WIP) | No |
+| FINISHED_GOODS | FG | Finished goods | No |
+
+### Category-Specific Features
+- **MEAT & DRYGOODS**: Require supplier information, support all expiry policies
+- **PROCESS**: Manufactured products, fixed expiry policy (FROM_CREATION_DATE), require BOM
+- **FINISHED_GOODS**: Final products, support BOM with both RM and PR materials, require BOM
+
+### BOM Component Rules
+- **PROCESS products**: Can only use MEAT and DRYGOODS materials
+- **FINISHED_GOODS products**: Can use MEAT, DRYGOODS, and PROCESS materials
+- **One-to-One LP consumption**: Available for all BOM components to consume entire LP regardless of quantity
+
 ## New Production Tables
 
-### 4. wo_materials
+### 5. wo_materials
 **Purpose**: BOM snapshots for work orders
 
 ```sql
@@ -122,7 +205,7 @@ CREATE TABLE wo_materials (
 - Optional component support
 - Substitution group management
 
-### 5. lp_reservations
+### 6. lp_reservations
 **Purpose**: License plate reservations for work orders
 
 ```sql
@@ -147,7 +230,7 @@ CREATE TABLE lp_reservations (
 - Cancellation tracking
 - User audit trail
 
-### 6. lp_compositions
+### 7. lp_compositions
 **Purpose**: LP composition tracking for traceability
 
 ```sql
@@ -168,7 +251,7 @@ CREATE TABLE lp_compositions (
 - Work order association
 - Traceability support
 
-### 7. pallets
+### 8. pallets
 **Purpose**: Pallet management system
 
 ```sql
@@ -182,7 +265,7 @@ CREATE TABLE pallets (
 );
 ```
 
-### 8. pallet_items
+### 9. pallet_items
 **Purpose**: Pallet contents tracking
 
 ```sql
@@ -198,7 +281,7 @@ CREATE TABLE pallet_items (
 
 ## Enhanced Tables
 
-### 9. wo_operations
+### 10. wo_operations
 **Purpose**: Per-operation weight tracking and loss calculations
 
 ```sql

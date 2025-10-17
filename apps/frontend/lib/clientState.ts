@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress, BomItem, ProductionOutput, Supplier, Warehouse, TaxCode, SupplierProduct, Routing, ProductAllergen } from './types';
+import { ProductsAPI } from './api/products';
+import { shouldUseMockData } from './api/config';
 
 interface AuditEvent {
   id: string;
@@ -660,7 +662,17 @@ class ClientState {
     return false;
   }
 
-  addProduct(product: any): Product {
+  async addProduct(product: any): Promise<Product> {
+    if (!shouldUseMockData()) {
+      // Use real API
+      const createdProduct = await ProductsAPI.create(product);
+      // Refresh products list
+      this.products = await ProductsAPI.getAll();
+      this.notifyProductListeners();
+      return createdProduct;
+    }
+
+    // Mock mode - use existing logic
     const { bom_items, ...productData } = product;
     const newProductId = Math.max(...this.products.map(p => p.id), 0) + 1;
     
@@ -676,6 +688,11 @@ class ClientState {
         sequence: item.sequence || index + 1,
         priority: item.priority,
         production_lines: item.production_lines || [],
+        scrap_std_pct: item.scrap_std_pct || 0,
+        is_optional: item.is_optional || false,
+        is_phantom: item.is_phantom || false,
+        one_to_one: item.one_to_one || false,
+        unit_cost_std: item.unit_cost_std,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }));
@@ -704,7 +721,17 @@ class ClientState {
     return newProduct;
   }
 
-  updateProduct(id: number, updates: any): Product | null {
+  async updateProduct(id: number, updates: any): Promise<Product | null> {
+    if (!shouldUseMockData()) {
+      // Use real API
+      const updatedProduct = await ProductsAPI.update(id, updates);
+      // Refresh products list
+      this.products = await ProductsAPI.getAll();
+      this.notifyProductListeners();
+      return updatedProduct;
+    }
+
+    // Mock mode - use existing logic
     const index = this.products.findIndex(p => p.id === id);
     if (index === -1) return null;
 
@@ -723,6 +750,11 @@ class ClientState {
           sequence: item.sequence || index + 1,
           priority: item.priority,
           production_lines: item.production_lines || [],
+          scrap_std_pct: item.scrap_std_pct || 0,
+          is_optional: item.is_optional || false,
+          is_phantom: item.is_phantom || false,
+          one_to_one: item.one_to_one || false,
+          unit_cost_std: item.unit_cost_std,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }));
