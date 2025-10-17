@@ -53,6 +53,7 @@ export function AllergensTable() {
       code: formData.code,
       name: formData.name,
       description: formData.description || null,
+      is_active: true,
     };
 
     if (editingAllergen) {

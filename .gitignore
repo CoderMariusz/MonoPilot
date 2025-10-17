@@ -110,3 +110,4 @@ Thumbs.db
 # Replit specific
 .replit
 .replitignore
+.vercel

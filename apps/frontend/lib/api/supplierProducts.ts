@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import type { SupplierProduct } from '@forza/shared/types';
+import type { SupplierProduct } from '@/lib/types';
 import { shouldUseMockData } from './config';
 
 export class SupplierProductsAPI {

@@ -5,7 +5,7 @@ import { ClipboardList, TrendingUp, Package, Loader2 } from 'lucide-react';
 import { WorkOrdersTable } from '@/components/WorkOrdersTable';
 import { mockConsumeReport } from '@/lib/mockData';
 import { useYieldReports, useWorkOrders, getFilteredBomForWorkOrder } from '@/lib/clientState';
-import type { ConsumeReport, YieldReportDetail } from '@/lib/types';
+import type { ConsumeReport } from '@/lib/types';
 
 type TabType = 'work-orders' | 'yield-report' | 'consume-report';
 
@@ -89,7 +89,7 @@ function YieldReportTab() {
   };
 
   const getWorkOrder = (workOrderId: number) => {
-    return workOrders.find(wo => wo.id === workOrderId);
+    return workOrders.find(wo => wo.id === workOrderId.toString());
   };
 
   return (
@@ -132,7 +132,7 @@ function YieldReportTab() {
               </tr>
             ) : (
               sortedReports.map((report) => {
-                const actualQty = report.actual_quantity;
+                const actualQty = report.actual_qty;
 
                 return report.materials_used.length > 0 ? (
                   report.materials_used.map((material, idx) => (

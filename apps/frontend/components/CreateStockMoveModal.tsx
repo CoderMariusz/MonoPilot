@@ -20,7 +20,7 @@ export function CreateStockMoveModal({ isOpen, onClose, onSuccess }: CreateStock
 
   if (!isOpen) return null;
 
-  const selectedLPData = licensePlates.find(lp => lp.id === selectedLP);
+  const selectedLPData = licensePlates.find(lp => lp.id === selectedLP.toString());
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +30,7 @@ export function CreateStockMoveModal({ isOpen, onClose, onSuccess }: CreateStock
       return;
     }
 
-    if (parseFloat(quantity) > parseFloat(selectedLPData.quantity)) {
+    if (parseFloat(quantity) > selectedLPData.quantity) {
       toast.error('Quantity cannot exceed available quantity');
       return;
     }
@@ -39,10 +39,11 @@ export function CreateStockMoveModal({ isOpen, onClose, onSuccess }: CreateStock
 
     addStockMove({
       move_number: moveNumber,
-      lp_id: selectedLP,
+      lp_id: selectedLP.toString(),
       from_location_id: selectedLPData.location_id,
-      to_location_id: toLocationId,
-      quantity,
+      to_location_id: toLocationId.toString(),
+      quantity: parseFloat(quantity),
+      reason: 'Manual Stock Move',
       status: 'draft',
       move_date: null,
     });

@@ -16,12 +16,12 @@ const QA_STATUSES: QAStatus[] = ['Pending', 'Passed', 'Failed', 'Quarantine'];
 
 export function ChangeQAStatusModal({ lpId, isOpen, onClose }: ChangeQAStatusModalProps) {
   const licensePlates = useLicensePlates();
-  const lp = licensePlates.find(l => l.id === lpId);
+  const lp = licensePlates.find(l => l.id === lpId.toString());
   const [qaStatus, setQAStatus] = useState<QAStatus>('Pending');
 
   useEffect(() => {
     if (lp) {
-      setQAStatus(lp.qa_status);
+      setQAStatus(lp.qa_status as QAStatus || 'Pending');
     }
   }, [lp]);
 
@@ -30,7 +30,7 @@ export function ChangeQAStatusModal({ lpId, isOpen, onClose }: ChangeQAStatusMod
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    updateLicensePlate(lp.id, { qa_status: qaStatus });
+    updateLicensePlate(parseInt(lp.id), { qa_status: qaStatus });
 
     toast.success('QA Status updated successfully');
     onClose();

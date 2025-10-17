@@ -37,8 +37,8 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
     if (po?.purchase_order_items) {
       setLineItems(po.purchase_order_items.map(item => ({
         product_id: item.product_id,
-        quantity_ordered: item.quantity,
-        quantity_received: item.quantity,
+        quantity_ordered: item.quantity_ordered.toString(),
+        quantity_received: item.quantity_received.toString(),
         location_id: mockLocations[0].id,
       })));
     }
@@ -63,9 +63,12 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
       
       const newLP = addLicensePlate({
         lp_number: lpNumber,
-        product_id: item.product_id,
-        location_id: item.location_id,
-        quantity: item.quantity_received,
+        lp_code: lpNumber,
+        item_id: item.product_id.toString(),
+        product_id: item.product_id.toString(),
+        location_id: item.location_id.toString(),
+        quantity: parseFloat(item.quantity_received),
+        status: 'Available',
         qa_status: 'Passed',
         grn_id: null,
       });
@@ -74,8 +77,9 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
         move_number: grnNumber,
         lp_id: newLP.id,
         from_location_id: null,
-        to_location_id: warehouseLocationId,
-        quantity: item.quantity_received,
+        to_location_id: warehouseLocationId.toString(),
+        quantity: parseFloat(item.quantity_received),
+        reason: 'Goods Received',
         status: 'completed',
         move_date: timestamp,
         wo_number: selectedPOData?.po_number,
@@ -99,6 +103,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
       po_id: selectedPO,
       status: 'draft',
       received_date: timestamp,
+      created_by: 'System',
       grn_items: grnItems,
     });
 
@@ -133,7 +138,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
               <option value="">Select a PO...</option>
               {availablePOs.map((po) => (
                 <option key={po.id} value={po.id}>
-                  {po.po_number} - {po.supplier}
+                  {po.po_number} - {po.supplier?.name}
                 </option>
               ))}
             </select>

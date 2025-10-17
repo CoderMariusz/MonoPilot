@@ -14,6 +14,7 @@ export function LocationsTable() {
   const [formData, setFormData] = useState({
     code: '',
     name: '',
+    type: '',
     zone: '',
     is_active: true,
   });
@@ -23,6 +24,7 @@ export function LocationsTable() {
     setFormData({
       code: '',
       name: '',
+      type: '',
       zone: '',
       is_active: true,
     });
@@ -34,6 +36,7 @@ export function LocationsTable() {
     setFormData({
       code: location.code,
       name: location.name,
+      type: location.type,
       zone: location.zone || '',
       is_active: location.is_active,
     });
@@ -55,6 +58,8 @@ export function LocationsTable() {
     const locationData = {
       code: formData.code,
       name: formData.name,
+      type: formData.type,
+      warehouse_id: 1, // Default warehouse ID
       zone: formData.zone || null,
       is_active: formData.is_active,
     };
@@ -71,6 +76,7 @@ export function LocationsTable() {
     setFormData({
       code: '',
       name: '',
+      type: '',
       zone: '',
       is_active: true,
     });
@@ -166,6 +172,16 @@ export function LocationsTable() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
+                  <input
+                    type="text"
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />

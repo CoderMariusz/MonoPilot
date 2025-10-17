@@ -4,11 +4,11 @@ import { lazy, Suspense } from 'react';
 
 // Lazy load heavy modals
 export const LazyAddItemModal = lazy(() => import('../AddItemModal'));
-export const LazyWorkOrderDetailsModal = lazy(() => import('../WorkOrderDetailsModal'));
-export const LazyPurchaseOrderDetailsModal = lazy(() => import('../PurchaseOrderDetailsModal'));
-export const LazyTransferOrderDetailsModal = lazy(() => import('../TransferOrderDetailsModal'));
-export const LazyGRNDetailsModal = lazy(() => import('../GRNDetailsModal'));
-export const LazyStockMoveDetailsModal = lazy(() => import('../StockMoveDetailsModal'));
+export const LazyWorkOrderDetailsModal = lazy(() => import('../WorkOrderDetailsModal').then(module => ({ default: module.WorkOrderDetailsModal })));
+export const LazyPurchaseOrderDetailsModal = lazy(() => import('../PurchaseOrderDetailsModal').then(module => ({ default: module.PurchaseOrderDetailsModal })));
+export const LazyTransferOrderDetailsModal = lazy(() => import('../TransferOrderDetailsModal').then(module => ({ default: module.TransferOrderDetailsModal })));
+export const LazyGRNDetailsModal = lazy(() => import('../GRNDetailsModal').then(module => ({ default: module.GRNDetailsModal })));
+export const LazyStockMoveDetailsModal = lazy(() => import('../StockMoveDetailsModal').then(module => ({ default: module.StockMoveDetailsModal })));
 
 // Wrapper component with loading state
 export function LazyModalWrapper({ children }: { children: React.ReactNode }) {

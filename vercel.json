@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "framework": "nextjs",
+  "buildCommand": "pnpm install && pnpm frontend:build",
+  "outputDirectory": "apps/frontend/.next",
+  "installCommand": "pnpm install",
+  "packageManager": "pnpm",
+  "functions": {
+    "apps/frontend/app/api/**/*.ts": {
+      "maxDuration": 10
+    }
+  }
+}
+

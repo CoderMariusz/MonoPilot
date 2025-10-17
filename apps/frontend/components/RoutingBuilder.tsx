@@ -105,6 +105,10 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
       ...formData,
       operations: operations.map(op => ({
         ...op,
+        id: (op as any).id || Date.now() + Math.random(),
+        routing_id: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         requirements: op.requirements || [],
       })),
     });

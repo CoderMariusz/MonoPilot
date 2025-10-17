@@ -15,6 +15,7 @@ interface BomComponent {
   total_qty_needed: number;
   stock_on_hand: number;
   qty_completed: number;
+  production_line_restrictions?: string[];
 }
 
 interface WorkOrderDetails {
@@ -58,7 +59,7 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
     setLoading(true);
     setError(null);
     try {
-      const workOrder = workOrders.find(wo => wo.id === workOrderId);
+      const workOrder = workOrders.find(wo => wo.id === workOrderId.toString());
       if (!workOrder || !workOrder.product) {
         throw new Error('Work order not found');
       }
@@ -69,22 +70,22 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
       
       const data = {
         work_order: {
-          id: workOrder.id,
+          id: parseInt(workOrder.id),
           wo_number: workOrder.wo_number,
-          product_id: workOrder.product_id,
+          product_id: parseInt(workOrder.product_id),
           product_name: workOrder.product?.description || '',
           product_part_number: workOrder.product?.part_number || '',
           quantity: woQuantity || 0,
           uom: workOrder.product?.uom || '',
           status: workOrder.status,
           due_date: workOrder.due_date,
-          machine_id: workOrder.machine_id,
+          machine_id: parseInt(workOrder.machine_id || '0'),
           machine_name: workOrder.machine?.name || null,
         },
         bom_components: bomItems.map(bomItem => {
           const bomQty = typeof bomItem.quantity === 'string' ? parseFloat(bomItem.quantity) : bomItem.quantity;
           return {
-            material_id: bomItem.material_id,
+            material_id: parseInt(bomItem.material_id.toString()),
             part_number: bomItem.material?.part_number || '',
             description: bomItem.material?.description || '',
             uom: bomItem.uom,

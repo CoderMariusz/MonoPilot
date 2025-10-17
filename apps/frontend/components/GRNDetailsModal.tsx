@@ -33,7 +33,7 @@ export function GRNDetailsModal({ grnId, isOpen, onClose }: GRNDetailsModalProps
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Supplier</label>
-              <div className="text-base text-slate-900">{grn.po?.supplier || 'N/A'}</div>
+              <div className="text-base text-slate-900">{grn.po?.supplier?.name || 'N/A'}</div>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>

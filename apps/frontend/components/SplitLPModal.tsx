@@ -18,7 +18,7 @@ interface SplitItem {
 
 export function SplitLPModal({ lpId, isOpen, onClose }: SplitLPModalProps) {
   const licensePlates = useLicensePlates();
-  const lp = licensePlates.find(l => l.id === lpId);
+  const lp = licensePlates.find(l => l.id === lpId.toString());
   const [splitItems, setSplitItems] = useState<SplitItem[]>([
     { id: '1', quantity: '' },
     { id: '2', quantity: '' }
@@ -43,28 +43,31 @@ export function SplitLPModal({ lpId, isOpen, onClose }: SplitLPModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (totalSplitQty > parseFloat(lp.quantity)) {
+    if (totalSplitQty > lp.quantity) {
       toast.error('Total split quantity exceeds available quantity');
       return;
     }
 
-    if (totalSplitQty !== parseFloat(lp.quantity)) {
+    if (totalSplitQty !== lp.quantity) {
       toast.error('Total split quantity must equal available quantity');
       return;
     }
 
     splitItems.forEach((item, index) => {
       if (index === 0) {
-        updateLicensePlate(lp.id, { quantity: item.quantity });
+        updateLicensePlate(parseInt(lp.id), { quantity: parseFloat(item.quantity) });
       } else {
         const newLPNumber = `LP-2024-${String(Date.now() + index).slice(-3)}`;
         addLicensePlate({
           lp_number: newLPNumber,
-          product_id: lp.product_id,
-          location_id: lp.location_id,
-          quantity: item.quantity,
+          lp_code: newLPNumber,
+          product_id: lp.product_id.toString(),
+          location_id: lp.location_id.toString(),
+          quantity: parseFloat(item.quantity),
           qa_status: lp.qa_status,
           grn_id: lp.grn_id,
+          item_id: lp.item_id,
+          status: lp.status,
         });
       }
     });
@@ -101,7 +104,7 @@ export function SplitLPModal({ lpId, isOpen, onClose }: SplitLPModalProps) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">Total Split Qty</label>
-                <div className={`text-base ${totalSplitQty > parseFloat(lp.quantity) ? 'text-red-600' : 'text-slate-900'}`}>
+                <div className={`text-base ${totalSplitQty > lp.quantity ? 'text-red-600' : 'text-slate-900'}`}>
                   {totalSplitQty.toFixed(2)} {lp.product?.uom}
                 </div>
               </div>
@@ -164,7 +167,7 @@ export function SplitLPModal({ lpId, isOpen, onClose }: SplitLPModalProps) {
             <button
               type="submit"
               className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800"
-              disabled={totalSplitQty !== parseFloat(lp.quantity)}
+              disabled={totalSplitQty !== lp.quantity}
             >
               Split LP
             </button>

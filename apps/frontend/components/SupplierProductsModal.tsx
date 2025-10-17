@@ -52,6 +52,8 @@ export function SupplierProductsModal({
       tax_code_id: newProduct.tax_code_id,
       currency: newProduct.currency || 'USD',
       is_active: newProduct.is_active ?? true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     setLocalProducts(prev => [...prev, product]);

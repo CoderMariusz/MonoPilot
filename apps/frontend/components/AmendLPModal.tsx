@@ -14,14 +14,14 @@ interface AmendLPModalProps {
 
 export function AmendLPModal({ lpId, isOpen, onClose }: AmendLPModalProps) {
   const licensePlates = useLicensePlates();
-  const lp = licensePlates.find(l => l.id === lpId);
+  const lp = licensePlates.find(l => l.id === lpId.toString());
   const [quantity, setQuantity] = useState('');
   const [locationId, setLocationId] = useState<number>(0);
 
   useEffect(() => {
     if (lp) {
-      setQuantity(lp.quantity);
-      setLocationId(lp.location_id);
+      setQuantity(lp.quantity.toString());
+      setLocationId(parseInt(lp.location_id || '0'));
     }
   }, [lp]);
 
@@ -30,9 +30,9 @@ export function AmendLPModal({ lpId, isOpen, onClose }: AmendLPModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    updateLicensePlate(lp.id, {
-      quantity,
-      location_id: locationId,
+    updateLicensePlate(parseInt(lp.id), {
+      quantity: parseFloat(quantity),
+      location_id: locationId.toString(),
     });
 
     toast.success('License Plate updated successfully');

@@ -15,7 +15,7 @@ interface CreateWorkOrderModalProps {
 export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOrder }: CreateWorkOrderModalProps) {
   const machines = useMachines();
   const allProducts = useProducts();
-  const products = allProducts.filter(p => p.type === 'PR' || p.type === 'FG');
+  const products = allProducts.filter(p => p.product_type === 'PR' || p.product_type === 'FG');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -53,7 +53,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
     if (editingWorkOrder) {
       setFormData({
         product_id: editingWorkOrder.product_id?.toString() || '',
-        quantity: editingWorkOrder.quantity || '',
+        quantity: editingWorkOrder.quantity?.toString() || '',
         due_date: editingWorkOrder.due_date || '',
         scheduled_start: editingWorkOrder.scheduled_start || '',
         scheduled_end: editingWorkOrder.scheduled_end || '',
@@ -84,15 +84,15 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
 
       if (editingWorkOrder) {
         const { updateWorkOrder } = await import('@/lib/clientState');
-        updateWorkOrder(editingWorkOrder.id, {
-          product_id: Number(formData.product_id),
+        updateWorkOrder(parseInt(editingWorkOrder.id), {
+          product_id: formData.product_id,
           product,
-          quantity: formData.quantity,
+          quantity: parseFloat(formData.quantity),
           status: formData.status,
           due_date: formData.due_date || null,
           scheduled_start: formData.scheduled_start || null,
           scheduled_end: formData.scheduled_end || null,
-          machine_id: Number(formData.machine_id) || null,
+          machine_id: formData.machine_id || null,
           machine,
         });
       } else {
@@ -101,14 +101,14 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         
         addWorkOrder({
           wo_number: nextWoNumber,
-          product_id: Number(formData.product_id),
+          product_id: formData.product_id,
           product,
-          quantity: formData.quantity,
+          quantity: parseFloat(formData.quantity),
           status: formData.status,
           due_date: formData.due_date || null,
           scheduled_start: formData.scheduled_start || null,
           scheduled_end: formData.scheduled_end || null,
-          machine_id: Number(formData.machine_id) || null,
+          machine_id: formData.machine_id || null,
           machine,
           line_number: null,
         });

@@ -61,7 +61,7 @@ export function SessionsTable() {
               <td className="py-3 px-4">
                 {session.status === 'Active' && (
                   <button
-                    onClick={() => handleRevoke(session.id, session.user_name)}
+                    onClick={() => handleRevoke(parseInt(session.id), session.user_name)}
                     className="text-slate-600 hover:text-red-600 transition-colors flex items-center gap-1"
                   >
                     <Ban className="w-4 h-4" />

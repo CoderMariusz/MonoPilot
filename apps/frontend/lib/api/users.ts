@@ -113,7 +113,7 @@ export class UsersAPI {
   // Update user
   static async update(id: string, updates: Partial<User>): Promise<{ user?: User; error?: any }> {
     if (shouldUseMockData()) {
-      const updatedUser = clientState.updateUser(id, updates);
+      const updatedUser = clientState.updateUser(parseInt(id), updates);
       return { user: updatedUser };
     }
     
@@ -140,7 +140,7 @@ export class UsersAPI {
   // Delete user
   static async delete(id: string): Promise<{ error?: any }> {
     if (shouldUseMockData()) {
-      clientState.deleteUser(id);
+      clientState.deleteUser(parseInt(id));
       return {};
     }
     

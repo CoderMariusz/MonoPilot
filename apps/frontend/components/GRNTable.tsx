@@ -40,7 +40,7 @@ export function GRNTable() {
     return grns.filter(grn => 
       grn.grn_number?.toLowerCase().includes(query) ||
       grn.po?.po_number?.toLowerCase().includes(query) ||
-      grn.po?.supplier?.toLowerCase().includes(query)
+      grn.po?.supplier?.name?.toLowerCase().includes(query)
     );
   }, [grns, searchQuery]);
 
@@ -83,7 +83,7 @@ export function GRNTable() {
                 <tr key={grn.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{grn.grn_number}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{grn.po?.po_number || 'N/A'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{grn.po?.supplier || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{grn.po?.supplier?.name || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{formatDateTime(grn.received_date)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${

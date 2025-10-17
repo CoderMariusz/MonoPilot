@@ -31,11 +31,12 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
   const [formData, setFormData] = useState<{
     supplier_id: string;
     due_date: string;
-    status: 'draft' | 'submitted' | 'confirmed' | 'received' | 'cancelled' | 'closed';
+    status: 'draft' | 'sent' | 'submitted' | 'confirmed' | 'partially_received' | 'received' | 'cancelled' | 'closed';
     warehouse_id: string;
     request_delivery_date: string;
     expected_delivery_date: string;
     notes: string;
+    buyer: string;
   }>({
     supplier_id: '',
     due_date: '',
@@ -44,6 +45,7 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
     request_delivery_date: '',
     expected_delivery_date: '',
     notes: '',
+    buyer: '',
   });
 
   const [lineItems, setLineItems] = useState<LineItem[]>([
@@ -59,7 +61,7 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const rmProducts = mockProducts.filter(p => p.type === 'RM');
+      const rmProducts = mockProducts.filter(p => p.product_type === 'RM_MEAT');
       setProducts(rmProducts);
       setLocations(mockLocations);
 
@@ -73,14 +75,15 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
           request_delivery_date: po.request_delivery_date || '',
           expected_delivery_date: po.expected_delivery_date || '',
           notes: po.notes || '',
+          buyer: po.buyer_name || '',
         });
 
         if (po.purchase_order_items && po.purchase_order_items.length > 0) {
           setLineItems(po.purchase_order_items.map((item: PurchaseOrderItem) => ({
             id: item.id.toString(),
             product_id: item.product_id.toString(),
-            quantity: item.quantity,
-            unit_price: item.unit_price,
+            quantity: item.quantity_ordered.toString(),
+            unit_price: item.unit_price.toString(),
           })));
         }
       }
@@ -133,15 +136,17 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
       
       const purchase_order_items = lineItems.map((item, index) => {
         const product = products.find(p => p.id === Number(item.product_id));
+        const quantity = parseFloat(item.quantity);
+        const unitPrice = parseFloat(item.unit_price);
         return {
           id: Number(item.id) || (Date.now() + index),
-          purchase_order_id: purchaseOrderId,
+          po_id: purchaseOrderId,
           product_id: Number(item.product_id),
+          quantity_ordered: quantity,
+          quantity_received: 0,
+          unit_price: unitPrice,
+          total_price: quantity * unitPrice,
           product,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         };
       });
       

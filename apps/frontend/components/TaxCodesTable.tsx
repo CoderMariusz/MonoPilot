@@ -82,6 +82,8 @@ export function TaxCodesTable() {
           name: formData.name.trim(),
           rate: rate,
           is_active: formData.is_active,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         });
         
         if (success) {

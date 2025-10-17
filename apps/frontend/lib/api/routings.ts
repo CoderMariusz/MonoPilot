@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import type { Routing, RoutingOperation } from '@forza/shared/types';
+import type { Routing, RoutingOperation } from '@/lib/types';
 import { shouldUseMockData } from './config';
 
 export interface CreateRoutingDTO {

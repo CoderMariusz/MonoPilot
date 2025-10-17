@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import type { TaxCode } from '@forza/shared/types';
+import type { TaxCode } from '@/lib/types';
 import { shouldUseMockData } from './config';
 
 export class TaxCodesAPI {

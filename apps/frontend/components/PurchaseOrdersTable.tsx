@@ -25,7 +25,7 @@ export function PurchaseOrdersTable() {
     const query = searchQuery.toLowerCase();
     return purchaseOrders.filter(po => {
       const poNumber = po.po_number?.toLowerCase() || '';
-      const supplier = po.supplier?.toLowerCase() || '';
+      const supplier = po.supplier?.name?.toLowerCase() || '';
       const itemCodes = po.purchase_order_items?.map(item => 
         item.product?.part_number?.toLowerCase() || ''
       ).join(' ') || '';
@@ -64,8 +64,8 @@ export function PurchaseOrdersTable() {
           bVal = b.expected_delivery_date ? new Date(b.expected_delivery_date).getTime() : 0;
           break;
         case 'buyer':
-          aVal = a.buyer || '';
-          bVal = b.buyer || '';
+          aVal = a.buyer_name || '';
+          bVal = b.buyer_name || '';
           break;
         case 'status':
           aVal = a.status;
@@ -257,7 +257,7 @@ export function PurchaseOrdersTable() {
               sortedPurchaseOrders.map(po => (
                 <tr key={po.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{po.po_number}</td>
-                  <td className="py-3 px-4 text-sm">{po.supplier}</td>
+                  <td className="py-3 px-4 text-sm">{po.supplier?.name}</td>
                   <td className="py-3 px-4 text-sm">{po.warehouse?.name || '-'}</td>
                   <td className="py-3 px-4 text-sm">
                     {po.request_delivery_date ? new Date(po.request_delivery_date).toLocaleDateString() : '-'}
@@ -265,7 +265,7 @@ export function PurchaseOrdersTable() {
                   <td className="py-3 px-4 text-sm">
                     {po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleDateString() : '-'}
                   </td>
-                  <td className="py-3 px-4 text-sm">{po.buyer || '-'}</td>
+                  <td className="py-3 px-4 text-sm">{po.buyer_name || '-'}</td>
                   <td className="py-3 px-4 text-sm">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
                       po.status === 'received' ? 'bg-green-100 text-green-800' :

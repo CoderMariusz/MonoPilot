@@ -25,8 +25,8 @@ export function TransferOrdersTable() {
     const query = searchQuery.toLowerCase();
     return transferOrders.filter(to => {
       const toNumber = to.to_number?.toLowerCase() || '';
-      const fromLocation = to.from_location?.name?.toLowerCase() || '';
-      const toLocation = to.to_location?.name?.toLowerCase() || '';
+      const fromLocation = to.from_warehouse?.name?.toLowerCase() || '';
+      const toLocation = to.to_warehouse?.name?.toLowerCase() || '';
       const itemCodes = to.transfer_order_items?.map(item => 
         item.product?.part_number?.toLowerCase() || ''
       ).join(' ') || '';
@@ -50,12 +50,12 @@ export function TransferOrdersTable() {
           bVal = b.to_number;
           break;
         case 'from_location':
-          aVal = a.from_location?.name || '';
-          bVal = b.from_location?.name || '';
+          aVal = a.from_warehouse?.name || '';
+          bVal = b.from_warehouse?.name || '';
           break;
         case 'to_location':
-          aVal = a.to_location?.name || '';
-          bVal = b.to_location?.name || '';
+          aVal = a.to_warehouse?.name || '';
+          bVal = b.to_warehouse?.name || '';
           break;
         case 'status':
           aVal = a.status;
@@ -229,8 +229,8 @@ export function TransferOrdersTable() {
               sortedTransferOrders.map(to => (
                 <tr key={to.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{to.to_number}</td>
-                  <td className="py-3 px-4 text-sm">{to.from_location?.name || '-'}</td>
-                  <td className="py-3 px-4 text-sm">{to.to_location?.name || '-'}</td>
+                  <td className="py-3 px-4 text-sm">{to.from_warehouse?.name || '-'}</td>
+                  <td className="py-3 px-4 text-sm">{to.to_warehouse?.name || '-'}</td>
                   <td className="py-3 px-4 text-sm">
                     {to.created_at ? new Date(to.created_at).toLocaleDateString() : '-'}
                   </td>

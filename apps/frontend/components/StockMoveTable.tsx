@@ -99,7 +99,7 @@ export function StockMoveTable() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
-                        onClick={() => setSelectedMove(move.id)}
+                        onClick={() => setSelectedMove(parseInt(move.id))}
                         className="text-slate-600 hover:text-slate-900"
                         title="View Details"
                       >

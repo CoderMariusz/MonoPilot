@@ -23,7 +23,7 @@ export class WorkOrdersAPI {
   static async getById(id: number): Promise<WorkOrder | null> {
     if (shouldUseMockData()) {
       const workOrders = clientState.getWorkOrders();
-      return workOrders.find(wo => wo.id === id) || null;
+      return workOrders.find(wo => wo.id === id.toString()) || null;
     }
     
     // TODO: Implement Supabase query
@@ -32,13 +32,13 @@ export class WorkOrdersAPI {
     
     // Fallback to mock data for now
     const workOrders = clientState.getWorkOrders();
-    return workOrders.find(wo => wo.id === id) || null;
+    return workOrders.find(wo => wo.id === id.toString()) || null;
   }
 
   // Create new work order
   static async create(data: CreateWorkOrderData): Promise<WorkOrder> {
     if (shouldUseMockData()) {
-      return clientState.createWorkOrder(data);
+      return clientState.addWorkOrder(data);
     }
     
     // TODO: Implement Supabase insert
@@ -46,7 +46,7 @@ export class WorkOrdersAPI {
     // return data;
     
     // Fallback to mock data for now
-    return clientState.createWorkOrder(data);
+    return clientState.addWorkOrder(data);
   }
 
   // Update work order
@@ -64,7 +64,7 @@ export class WorkOrdersAPI {
   }
 
   // Delete work order
-  static async delete(id: number): Promise<void> {
+  static async delete(id: number): Promise<boolean> {
     if (shouldUseMockData()) {
       return clientState.deleteWorkOrder(id);
     }

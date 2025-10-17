@@ -52,7 +52,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const rmProducts = mockProducts.filter(p => p.type === 'RM');
+      const rmProducts = mockProducts.filter(p => p.product_type === 'RM_MEAT');
       setProducts(rmProducts);
       setLocations(mockLocations);
     } catch (err: any) {
@@ -103,15 +103,17 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
       
       const purchase_order_items = lineItems.map((item, index) => {
         const product = products.find(p => p.id === Number(item.product_id));
+        const quantity = parseFloat(item.quantity);
+        const unitPrice = parseFloat(item.unit_price);
         return {
           id: Date.now() + index,
-          purchase_order_id: 0,
+          po_id: 0,
           product_id: Number(item.product_id),
+          quantity_ordered: quantity,
+          quantity_received: 0,
+          unit_price: unitPrice,
+          total_price: quantity * unitPrice,
           product,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         };
       });
       
@@ -119,12 +121,15 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
         po_number: nextPoNumber,
         supplier_id: Number(formData.supplier_id),
         status: formData.status,
+        order_date: new Date().toISOString(),
+        expected_delivery: formData.expected_delivery_date || formData.due_date || new Date().toISOString(),
         due_date: formData.due_date || null,
         warehouse_id: formData.warehouse_id ? Number(formData.warehouse_id) : undefined,
         request_delivery_date: formData.request_delivery_date || undefined,
         expected_delivery_date: formData.expected_delivery_date || undefined,
         buyer_id: profile?.id,
         buyer_name: profile?.name || 'Unknown',
+        total_amount: purchase_order_items.reduce((sum, item) => sum + item.total_price, 0),
         notes: formData.notes || undefined,
         purchase_order_items,
       });

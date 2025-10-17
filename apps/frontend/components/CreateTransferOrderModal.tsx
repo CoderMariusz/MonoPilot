@@ -102,6 +102,7 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
         to_warehouse_id: Number(formData.to_warehouse_id),
         to_warehouse,
         status: formData.status,
+        transfer_date: new Date().toISOString(),
         transfer_order_items,
       });
       

@@ -48,7 +48,7 @@ export function EditUserModal({ isOpen, onClose, onSuccess, user }: EditUserModa
         throw new Error('Please fill all required fields');
       }
 
-      updateUser(user.id, {
+      updateUser(parseInt(user.id), {
         name: formData.name,
         email: formData.email,
         role: formData.role,

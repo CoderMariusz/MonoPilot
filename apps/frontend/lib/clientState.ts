@@ -87,8 +87,8 @@ class ClientState {
 
   getWorkOrders(): WorkOrder[] {
     return this.workOrders.map(wo => {
-      const product = wo.product_id ? this.products.find(p => p.id === wo.product_id) : undefined;
-      const machine = wo.machine_id ? this.machines.find(m => m.id === wo.machine_id) : undefined;
+      const product = wo.product_id ? this.products.find(p => p.id === parseInt(wo.product_id)) : undefined;
+      const machine = wo.machine_id ? this.machines.find(m => m.id === parseInt(wo.machine_id)) : undefined;
       
       let enrichedProduct = product;
       if (product && product.activeBom?.bomItems) {
@@ -113,7 +113,7 @@ class ClientState {
   }
 
   getWoProductionStats(woId: number): { madeQty: number; plannedQty: number; progressPct: number } {
-    const wo = this.workOrders.find(w => w.id === woId);
+    const wo = this.workOrders.find(w => w.id === woId.toString());
     if (!wo) return { madeQty: 0, plannedQty: 0, progressPct: 0 };
     
     const outputs = this.productionOutputs.filter(o => o.wo_id === woId);
@@ -152,7 +152,7 @@ class ClientState {
     
     // Priority 4: Fallback to product std_price
     const product = this.products.find(p => p.id === productId);
-    if (product?.std_price) return parseFloat(product.std_price);
+    if (product?.std_price) return product.std_price;
     
     return 0;
   }
@@ -162,7 +162,14 @@ class ClientState {
       const warehouse = po.warehouse_id ? this.locations.find(l => l.id === po.warehouse_id) : undefined;
       return {
         ...po,
-        warehouse,
+        warehouse: warehouse ? {
+          id: warehouse.id,
+          code: warehouse.code,
+          name: warehouse.name,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } : undefined,
       };
     });
   }
@@ -174,9 +181,7 @@ class ClientState {
   getProducts(): Product[] {
     return this.products.map(product => ({
       ...product,
-      allergens: product.allergen_ids 
-        ? product.allergen_ids.map(id => this.allergens.find(a => a.id === id)).filter(Boolean) as Allergen[]
-        : undefined,
+      allergens: product.allergens || undefined,
     }));
   }
 
@@ -193,8 +198,8 @@ class ClientState {
   getLicensePlates(): LicensePlate[] {
     return this.licensePlates.map(lp => ({
       ...lp,
-      product: lp.product_id ? this.products.find(p => p.id === lp.product_id) : undefined,
-      location: lp.location_id ? this.locations.find(loc => loc.id === lp.location_id) : undefined,
+      product: lp.product_id ? this.products.find(p => p.id === parseInt(lp.product_id)) : undefined,
+      location: lp.location_id ? this.locations.find(loc => loc.id === parseInt(lp.location_id)) : undefined,
     }));
   }
 
@@ -237,12 +242,12 @@ class ClientState {
   getStockMoves(): StockMove[] {
     return this.stockMoves.map(move => {
       const lp = this.licensePlates.find(l => l.id === move.lp_id);
-      const from_location = this.locations.find(loc => loc.id === move.from_location_id);
-      const to_location = this.locations.find(loc => loc.id === move.to_location_id);
+      const from_location = this.locations.find(loc => loc.id === parseInt(move.from_location_id));
+      const to_location = this.locations.find(loc => loc.id === parseInt(move.to_location_id));
       
       let enrichedLP = lp;
       if (lp) {
-        const product = this.products.find(p => p.id === lp.product_id);
+        const product = this.products.find(p => p.id === parseInt(lp.product_id));
         enrichedLP = { ...lp, product };
       }
       
@@ -407,10 +412,18 @@ class ClientState {
     this.allergenListeners.forEach(listener => listener());
   }
 
+  private notifyTaxCodeListeners() {
+    this.taxCodeListeners.forEach(listener => listener());
+  }
+
+  private notifyRoutingListeners() {
+    this.routingListeners.forEach(listener => listener());
+  }
+
   addWorkOrder(workOrder: Omit<WorkOrder, 'id' | 'created_at' | 'updated_at'>): WorkOrder {
     const newWorkOrder: WorkOrder = {
       ...workOrder,
-      id: Math.max(...this.workOrders.map(wo => wo.id), 0) + 1,
+      id: (Math.max(...this.workOrders.map(wo => parseInt(wo.id)), 0) + 1).toString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -421,7 +434,7 @@ class ClientState {
   }
 
   updateWorkOrder(id: number, updates: Partial<WorkOrder>): WorkOrder | null {
-    const index = this.workOrders.findIndex(wo => wo.id === id);
+    const index = this.workOrders.findIndex(wo => wo.id === id.toString());
     if (index === -1) return null;
 
     const updatedWorkOrder: WorkOrder = {
@@ -443,7 +456,7 @@ class ClientState {
 
   deleteWorkOrder(id: number): boolean {
     const initialLength = this.workOrders.length;
-    this.workOrders = this.workOrders.filter(wo => wo.id !== id);
+    this.workOrders = this.workOrders.filter(wo => wo.id !== id.toString());
     if (this.workOrders.length < initialLength) {
       this.notifyWorkOrderListeners();
       return true;
@@ -452,7 +465,7 @@ class ClientState {
   }
 
   cancelWorkOrder(id: number, reason?: string): boolean {
-    const index = this.workOrders.findIndex(wo => wo.id === id);
+    const index = this.workOrders.findIndex(wo => wo.id === id.toString());
     if (index === -1) return false;
 
     const oldStatus = this.workOrders[index].status;
@@ -718,7 +731,9 @@ class ClientState {
           id: bomId,
           product_id: id,
           version: activeBom?.version || '1.0',
+          status: 'active',
           is_active: true,
+          requires_routing: false,
           bomItems,
           created_at: activeBom?.created_at || new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -837,7 +852,7 @@ class ClientState {
         });
       });
 
-      const quantityOrdered = parseFloat(poItem.quantity);
+      const quantityOrdered = parseFloat(poItem.quantity_ordered.toString());
       const remainingQty = quantityOrdered - totalReceived;
       const quantityToReceive = remainingQty > 0 ? remainingQty : 0;
 
@@ -845,7 +860,7 @@ class ClientState {
         id: Date.now() + poItem.id,
         grn_id: 0,
         product_id: poItem.product_id,
-        quantity_ordered: poItem.quantity,
+        quantity_ordered: poItem.quantity_ordered,
         quantity_received: quantityToReceive.toString(),
         location_id: po.warehouse_id || 1,
         lp_number: null,
@@ -867,6 +882,7 @@ class ClientState {
       po_id: poId,
       status: 'completed',
       received_date: new Date().toISOString(),
+      created_by: 'system',
       grn_items: grnItems.map(item => ({ ...item, grn_id: Math.max(...this.grns.map(g => g.id), 0) + 1 })),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -887,7 +903,7 @@ class ClientState {
   addLicensePlate(lp: Omit<LicensePlate, 'id' | 'created_at' | 'updated_at'>): LicensePlate {
     const newLP: LicensePlate = {
       ...lp,
-      id: Math.max(...this.licensePlates.map(lp => lp.id), 0) + 1,
+      id: (Math.max(...this.licensePlates.map(lp => parseInt(lp.id)), 0) + 1).toString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -897,7 +913,7 @@ class ClientState {
   }
 
   updateLicensePlate(id: number, updates: Partial<LicensePlate>): LicensePlate | null {
-    const index = this.licensePlates.findIndex(lp => lp.id === id);
+    const index = this.licensePlates.findIndex(lp => lp.id === id.toString());
     if (index === -1) return null;
 
     const updatedLP: LicensePlate = {
@@ -919,7 +935,7 @@ class ClientState {
 
   deleteLicensePlate(id: number): boolean {
     const initialLength = this.licensePlates.length;
-    this.licensePlates = this.licensePlates.filter(lp => lp.id !== id);
+    this.licensePlates = this.licensePlates.filter(lp => lp.id !== id.toString());
     if (this.licensePlates.length < initialLength) {
       this.notifyLicensePlateListeners();
       return true;
@@ -930,7 +946,7 @@ class ClientState {
   addStockMove(move: Omit<StockMove, 'id' | 'created_at' | 'updated_at'>): StockMove {
     const newMove: StockMove = {
       ...move,
-      id: Math.max(...this.stockMoves.map(m => m.id), 0) + 1,
+      id: (Math.max(...this.stockMoves.map(m => parseInt(m.id)), 0) + 1).toString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -940,7 +956,7 @@ class ClientState {
   }
 
   updateStockMove(id: number, updates: Partial<StockMove>): StockMove | null {
-    const index = this.stockMoves.findIndex(m => m.id === id);
+    const index = this.stockMoves.findIndex(m => m.id === id.toString());
     if (index === -1) return null;
 
     const updatedMove: StockMove = {
@@ -962,7 +978,7 @@ class ClientState {
 
   deleteStockMove(id: number): boolean {
     const initialLength = this.stockMoves.length;
-    this.stockMoves = this.stockMoves.filter(m => m.id !== id);
+    this.stockMoves = this.stockMoves.filter(m => m.id !== id.toString());
     if (this.stockMoves.length < initialLength) {
       this.notifyStockMoveListeners();
       return true;
@@ -1234,7 +1250,7 @@ class ClientState {
   addUser(user: Omit<User, 'id' | 'created_at'>): User {
     const newUser: User = {
       ...user,
-      id: Math.max(...this.users.map(u => u.id), 0) + 1,
+      id: (Math.max(...this.users.map(u => parseInt(u.id)), 0) + 1).toString(),
       created_at: new Date().toISOString(),
     };
     this.users = [...this.users, newUser];
@@ -1243,7 +1259,7 @@ class ClientState {
   }
 
   updateUser(id: number, updates: Partial<User>): User | null {
-    const index = this.users.findIndex(u => u.id === id);
+    const index = this.users.findIndex(u => u.id === id.toString());
     if (index === -1) return null;
 
     const updatedUser: User = {
@@ -1264,7 +1280,7 @@ class ClientState {
 
   deleteUser(id: number): boolean {
     const initialLength = this.users.length;
-    this.users = this.users.filter(u => u.id !== id);
+    this.users = this.users.filter(u => u.id !== id.toString());
     if (this.users.length < initialLength) {
       this.notifyUserListeners();
       return true;
@@ -1273,7 +1289,7 @@ class ClientState {
   }
 
   revokeSession(id: number): boolean {
-    const index = this.sessions.findIndex(s => s.id === id);
+    const index = this.sessions.findIndex(s => s.id === id.toString());
     if (index === -1) return false;
 
     const updatedSession: Session = {

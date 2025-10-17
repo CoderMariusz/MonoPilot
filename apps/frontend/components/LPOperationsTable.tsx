@@ -82,21 +82,21 @@ export function LPOperationsTable() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex gap-2">
                       <button
-                        onClick={() => setSplitLPId(lp.id)}
+                        onClick={() => setSplitLPId(parseInt(lp.id))}
                         className="text-blue-600 hover:text-blue-900"
                         title="Split LP"
                       >
                         <Split className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setAmendLPId(lp.id)}
+                        onClick={() => setAmendLPId(parseInt(lp.id))}
                         className="text-slate-600 hover:text-slate-900"
                         title="Amend LP"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setQALPId(lp.id)}
+                        onClick={() => setQALPId(parseInt(lp.id))}
                         className="text-purple-600 hover:text-purple-900"
                         title="Change QA Status"
                       >

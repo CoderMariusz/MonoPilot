@@ -56,7 +56,7 @@ export default function ProcessTerminalPage() {
     wo.product?.type === 'PR'
   );
   
-  const selectedWO = workOrders.find(wo => wo.id === selectedWOId);
+  const selectedWO = selectedWOId ? workOrders.find(wo => wo.id === selectedWOId.toString()) : undefined;
   const stagedLPsForCurrentOrder = selectedWOId ? (stagedLPsByOrder[selectedWOId] || []) : [];
   const bomItems = selectedWO ? getFilteredBomForWorkOrder(selectedWO) : [];
 
@@ -93,26 +93,35 @@ export default function ProcessTerminalPage() {
   useEffect(() => {
     if (selectedWOId && selectedLine && selectedWO) {
       saveOrderProgress(selectedWOId, {
-        wo_id: selectedWOId,
+        id: `progress-${selectedWOId}`,
+        order_id: selectedWOId.toString(),
+        order_type: 'work_order',
+        status: 'in_progress',
+        progress_percentage: 0,
+        wo_id: selectedWOId.toString(),
         staged_lps: stagedLPsForCurrentOrder,
         boxes_created: createdItemsCount,
         line: selectedLine,
         started_at: new Date().toISOString(),
-        consumed_materials: consumedMaterials
+        consumed_materials: consumedMaterials,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
     }
   }, [stagedLPsForCurrentOrder, createdItemsCount, selectedLine, selectedWOId, consumedMaterials]);
 
-  const getStagedMaterialIds = (): Set<number> => {
-    const materialIds = new Set<number>();
+  const getStagedMaterialIds = (): Set<string> => {
+    const materialIds = new Set<string>();
     stagedLPsForCurrentOrder.forEach(staged => {
-      materialIds.add(staged.lp.product_id);
+      if (staged.lp.product_id) {
+        materialIds.add(staged.lp.product_id.toString());
+      }
     });
     return materialIds;
   };
 
   const isBomComponentStaged = (materialId: number): boolean => {
-    return getStagedMaterialIds().has(materialId);
+    return getStagedMaterialIds().has(materialId.toString());
   };
 
   const allBomComponentsStaged = (): boolean => {
@@ -122,8 +131,8 @@ export default function ProcessTerminalPage() {
 
   const getAlreadyStagedFromLP = (lpId: number): number => {
     return stagedLPsForCurrentOrder
-      .filter(staged => staged.lp.id === lpId)
-      .reduce((sum, staged) => sum + staged.stagedQuantity, 0);
+      .filter(staged => staged.lp.id === lpId.toString())
+      .reduce((sum, staged) => sum + staged.quantity, 0);
   };
 
   const handleScanLP = () => {
@@ -145,7 +154,7 @@ export default function ProcessTerminalPage() {
       return;
     }
 
-    const isValidMaterial = bomItems.some(item => item.material_id === lp.product_id);
+    const isValidMaterial = bomItems.some(item => item.material_id.toString() === lp.product_id?.toString());
     if (!isValidMaterial) {
       setAlertMessage("Cannot scan this item - doesn't match order BOM");
       setShowAlert(true);
@@ -167,8 +176,8 @@ export default function ProcessTerminalPage() {
     }
 
     const qty = parseFloat(stageQuantity);
-    const lpTotalQty = parseFloat(currentScannedLP.quantity);
-    const alreadyStaged = getAlreadyStagedFromLP(currentScannedLP.id);
+    const lpTotalQty = currentScannedLP.quantity;
+    const alreadyStaged = getAlreadyStagedFromLP(parseInt(currentScannedLP.id));
     const availableQty = lpTotalQty - alreadyStaged;
 
     if (qty <= 0) {
@@ -188,7 +197,8 @@ export default function ProcessTerminalPage() {
 
     const staged: StagedLP = {
       lp: currentScannedLP,
-      stagedQuantity: qty,
+      quantity: qty,
+      staged_at: new Date().toISOString(),
       line: componentLineSelections[currentScannedLP.product_id] || selectedLine || undefined,
     };
 
@@ -222,7 +232,7 @@ export default function ProcessTerminalPage() {
     const needs: { [materialId: number]: number } = {};
     
     bomItems.forEach(item => {
-      const requiredPerUnit = parseFloat(item.quantity);
+      const requiredPerUnit = item.quantity;
       needs[item.material_id] = requiredPerUnit * qtyToCreate;
     });
     
@@ -238,8 +248,8 @@ export default function ProcessTerminalPage() {
       const needed = needs[materialId];
       
       const availableInStaging = stagedLPsForCurrentOrder
-        .filter(staged => staged.lp.product_id === materialId)
-        .reduce((sum, staged) => sum + staged.stagedQuantity, 0);
+        .filter(staged => staged.lp.product_id === materialId.toString())
+        .reduce((sum, staged) => sum + staged.quantity, 0);
       
       if (availableInStaging < needed) {
         const bomItem = bomItems.find(item => item.material_id === materialId);
@@ -282,29 +292,30 @@ export default function ProcessTerminalPage() {
       for (let i = 0; i < updatedStaging.length && remainingToConsume > 0; i++) {
         const staged = updatedStaging[i];
         
-        if (staged.lp.product_id === materialId) {
+        if (staged.lp.product_id === materialId.toString()) {
           if (selectedLine && staged.line !== selectedLine) {
             continue;
           }
           
-          const toConsume = Math.min(remainingToConsume, staged.stagedQuantity);
+          const toConsume = Math.min(remainingToConsume, staged.quantity);
           
-          const currentLPQty = parseFloat(staged.lp.quantity);
+          const currentLPQty = staged.lp.quantity;
           const newLPQty = currentLPQty - toConsume;
-          updateLicensePlate(staged.lp.id, { quantity: newLPQty.toString() });
+          updateLicensePlate(parseInt(staged.lp.id), { quantity: newLPQty });
           
           addStockMove({
             move_number: `SM-CONSUME-${Date.now()}-${staged.lp.lp_number}`,
             lp_id: staged.lp.id,
             from_location_id: staged.lp.location_id,
             to_location_id: null,
-            quantity: `-${toConsume}`,
+            quantity: -toConsume,
+            reason: 'Consumption for Work Order',
             status: 'completed',
             move_date: moveDate,
             wo_number: selectedWO!.wo_number,
           });
           
-          staged.stagedQuantity -= toConsume;
+          staged.quantity -= toConsume;
           remainingToConsume -= toConsume;
           
           materialConsumed[materialId] = (materialConsumed[materialId] || 0) + toConsume;
@@ -321,7 +332,7 @@ export default function ProcessTerminalPage() {
       return updated;
     });
     
-    const remainingStaging = updatedStaging.filter(staged => staged.stagedQuantity > 0);
+    const remainingStaging = updatedStaging.filter(staged => staged.quantity > 0);
     
     if (selectedWOId) {
       setStagedLPsByOrder(prev => ({
@@ -381,9 +392,12 @@ export default function ProcessTerminalPage() {
     
     const newPRLP = addLicensePlate({
       lp_number: prLPNumber,
+      lp_code: prLPNumber,
+      item_id: selectedWO.product!.id,
       product_id: selectedWO.product!.id,
-      location_id: warehouseLocationId,
-      quantity: qtyToCreate.toString(),
+      location_id: warehouseLocationId.toString(),
+      quantity: qtyToCreate,
+      status: 'Available',
       qa_status: 'Passed',
       grn_id: null,
     });
@@ -395,25 +409,26 @@ export default function ProcessTerminalPage() {
       move_number: `SM-${prLPNumber}`,
       lp_id: newPRLP.id,
       from_location_id: null,
-      to_location_id: warehouseLocationId,
-      quantity: qtyToCreate.toString(),
+      to_location_id: warehouseLocationId.toString(),
+      quantity: qtyToCreate,
+      reason: 'Production Output',
       status: 'completed',
       move_date: moveDate,
       wo_number: selectedWO.wo_number,
     });
 
-    const woQty = parseFloat(selectedWO.quantity);
+    const woQty = selectedWO.quantity;
     const remainingQty = woQty - qtyToCreate;
     
     if (remainingQty <= 0) {
-      updateWorkOrder(selectedWO.id, { 
+      updateWorkOrder(parseInt(selectedWO.id), { 
         status: 'completed',
-        quantity: '0'
+        quantity: 0
       });
       toast.success(`Work Order ${selectedWO.wo_number} completed!`);
     } else {
-      updateWorkOrder(selectedWO.id, { 
-        quantity: remainingQty.toString()
+      updateWorkOrder(parseInt(selectedWO.id), { 
+        quantity: remainingQty
       });
     }
 
@@ -436,19 +451,19 @@ export default function ProcessTerminalPage() {
 
     const { lp, stagedQty } = selectedLPForConsume;
 
-    const currentLPQty = parseFloat(lp.quantity);
+    const currentLPQty = lp.quantity;
     const newLPQty = currentLPQty - quantity;
-    updateLicensePlate(lp.id, { quantity: newLPQty.toString() });
+    updateLicensePlate(parseInt(lp.id), { quantity: newLPQty });
 
     const updatedStaging = stagedLPsForCurrentOrder.map(staged => {
-      if (staged.lp.id === lp.id) {
+      if (staged.lp.id === lp.id.toString()) {
         return {
           ...staged,
-          stagedQuantity: staged.stagedQuantity - quantity
+          quantity: staged.quantity - quantity
         };
       }
       return staged;
-    }).filter(staged => staged.stagedQuantity > 0);
+    }).filter(staged => staged.quantity > 0);
 
     setStagedLPsByOrder(prev => ({
       ...prev,
@@ -468,7 +483,8 @@ export default function ProcessTerminalPage() {
       lp_id: lp.id,
       from_location_id: lp.location_id,
       to_location_id: null,
-      quantity: `-${quantity}`,
+      quantity: -quantity,
+      reason: 'Manual Consumption',
       status: 'completed',
       move_date: moveDate,
       wo_number: selectedWO!.wo_number,
@@ -491,8 +507,8 @@ export default function ProcessTerminalPage() {
     } else {
       const materialRatios = bomItems.map(bomComp => {
         const consumedQty = consumedMaterials[bomComp.material_id] || 0;
-        if (parseFloat(bomComp.quantity) === 0) return Infinity;
-        return consumedQty / parseFloat(bomComp.quantity);
+        if (bomComp.quantity === 0) return Infinity;        
+        return consumedQty / bomComp.quantity;
       });
 
       targetQty = Math.floor(Math.min(...materialRatios));
@@ -507,33 +523,42 @@ export default function ProcessTerminalPage() {
       const material = bomItem?.material;
       
       const consumedQty = consumedMaterials[materialId];
-      const standardQty = createdItemsCount * parseFloat(bomItem?.quantity || '0');
+      const standardQty = createdItemsCount * (bomItem?.quantity || 0);
       const yieldPercentage = consumedQty > 0 
         ? Math.round((standardQty / consumedQty) * 100)
         : 0;
       
       return {
+        material_id: materialId,
+        material_name: material?.description || 'Unknown Material',
+        planned_qty: standardQty,
+        actual_qty: consumedQty,
+        variance: consumedQty - standardQty,
         item_code: material?.part_number || `MAT-${materialId}`,
         item_name: material?.description || 'Unknown Material',
         standard_qty: standardQty,
         consumed_qty: consumedQty,
-        quantity: consumedQty,
         uom: bomItem?.uom || material?.uom || '',
         yield_percentage: yieldPercentage
       };
     });
 
     const yieldReport: YieldReportDetail = {
-      id: `YR-${Date.now()}`,
-      work_order_id: selectedWO.id,
+      id: Date.now(),
+      wo_id: parseInt(selectedWO.id),
+      work_order_id: parseInt(selectedWO.id),
+      material_id: 0, // This will be set per material in materials_used
+      planned_qty: targetQty,
+      actual_qty: createdItemsCount,
+      variance: createdItemsCount - targetQty,
+      created_at: new Date().toISOString(),
+      materials_used: materialsUsed,
       work_order_number: selectedWO.wo_number,
-      line_number: selectedWO.line_number || '',
       product_name: `${selectedWO.product?.part_number} - ${selectedWO.product?.description}`,
+      line_number: selectedWO.line_number || '',
       target_quantity: targetQty,
       actual_quantity: createdItemsCount,
-      materials_used: materialsUsed,
       efficiency_percentage: efficiency,
-      created_at: new Date().toISOString(),
       created_by: 'Operator'
     };
 
@@ -577,7 +602,7 @@ export default function ProcessTerminalPage() {
   const handleStartWorkOrder = () => {
     if (!selectedWO) return;
     
-    updateWorkOrder(selectedWO.id, { status: 'in_progress' });
+    updateWorkOrder(parseInt(selectedWO.id), { status: 'in_progress' });
     toast.success(`Work Order ${selectedWO.wo_number} started successfully`);
   };
 
@@ -804,9 +829,9 @@ export default function ProcessTerminalPage() {
                       <p><span className="font-medium">Location:</span> {currentScannedLP.location?.code} - {currentScannedLP.location?.name}</p>
                       <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
                         <p><span className="font-medium">Original LP Quantity:</span> {currentScannedLP.quantity} {currentScannedLP.product?.uom}</p>
-                        <p><span className="font-medium">Already Staged:</span> {getAlreadyStagedFromLP(currentScannedLP.id)} {currentScannedLP.product?.uom}</p>
+                        <p><span className="font-medium">Already Staged:</span> {getAlreadyStagedFromLP(parseInt(currentScannedLP.id))} {currentScannedLP.product?.uom}</p>
                         <p className="font-bold text-blue-700">
-                          <span className="font-medium">Available to Stage:</span> {parseFloat(currentScannedLP.quantity) - getAlreadyStagedFromLP(currentScannedLP.id)} {currentScannedLP.product?.uom}
+                          <span className="font-medium">Available to Stage:</span> {currentScannedLP.quantity - getAlreadyStagedFromLP(parseInt(currentScannedLP.id))} {currentScannedLP.product?.uom}
                         </p>
                       </div>
                     </div>
@@ -822,7 +847,7 @@ export default function ProcessTerminalPage() {
                           value={stageQuantity}
                           onChange={(e) => setStageQuantity(e.target.value)}
                           onKeyPress={(e) => e.key === 'Enter' && handleConfirmStaging()}
-                          placeholder={`Max: ${parseFloat(currentScannedLP.quantity) - getAlreadyStagedFromLP(currentScannedLP.id)}`}
+                          placeholder={`Max: ${currentScannedLP.quantity - getAlreadyStagedFromLP(parseInt(currentScannedLP.id))}`}
                           className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
                         />
                       </div>
@@ -854,12 +879,12 @@ export default function ProcessTerminalPage() {
                           {staged.lp.product?.part_number} - {staged.lp.product?.description}
                         </p>
                         <p className="text-sm font-semibold text-blue-700">
-                          Staged: {staged.stagedQuantity} {staged.lp.product?.uom}
+                          Staged: {staged.quantity} {staged.lp.product?.uom}
                         </p>
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleManualConsume(staged.lp, staged.stagedQuantity)}
+                          onClick={() => handleManualConsume(staged.lp, staged.quantity)}
                           className="px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors flex items-center gap-1"
                         >
                           <Minus className="w-4 h-4" />

@@ -51,13 +51,13 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
     try {
       setProducts(mockProducts);
 
-      const transferOrders = typeof window !== 'undefined' ? (await import('@/lib/clientState')).default?.getTransferOrders?.() || mockTransferOrders : mockTransferOrders;
+      const transferOrders = mockTransferOrders;
       const to = transferOrders.find((t: any) => t.id === transferOrderId) || mockTransferOrders.find(t => t.id === transferOrderId);
       if (to) {
         setFormData({
           from_warehouse_id: to.from_warehouse_id?.toString() || '',
           to_warehouse_id: to.to_warehouse_id?.toString() || '',
-          status: to.status,
+          status: to.status as 'draft' | 'submitted' | 'in_transit' | 'received' | 'cancelled',
         });
 
         if (to.transfer_order_items && to.transfer_order_items.length > 0) {

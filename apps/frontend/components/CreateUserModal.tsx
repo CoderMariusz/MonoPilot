@@ -56,7 +56,7 @@ export function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUserModalP
         email: '',
         role: 'Operator',
         password: '',
-        status: 'Active',
+        status: 'active',
       });
     } catch (err: any) {
       setError(err.message || 'Failed to create user');

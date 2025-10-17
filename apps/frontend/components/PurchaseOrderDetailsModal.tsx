@@ -72,7 +72,7 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
   const calculateTotal = () => {
     if (!purchaseOrder?.purchase_order_items) return 0;
     return purchaseOrder.purchase_order_items.reduce((sum, item) => {
-      return sum + (parseFloat(item.quantity) * parseFloat(item.unit_price));
+      return sum + (item.quantity_ordered * item.unit_price);
     }, 0);
   };
 
@@ -213,7 +213,7 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
                 </div>
                 <div>
                   <div className="text-sm text-slate-600 mb-1">Supplier</div>
-                  <div className="text-base font-medium text-slate-900">{purchaseOrder.supplier}</div>
+                  <div className="text-base font-medium text-slate-900">{purchaseOrder.supplier?.name}</div>
                 </div>
                 {purchaseOrder.due_date && (
                   <div>
@@ -260,8 +260,8 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
                     </thead>
                     <tbody>
                       {purchaseOrder.purchase_order_items.map((item) => {
-                        const total = parseFloat(item.quantity) * parseFloat(item.unit_price);
-                        const quantityOrdered = parseFloat(item.quantity);
+                        const total = item.quantity_ordered * item.unit_price;
+                        const quantityOrdered = item.quantity_ordered;
                         const quantityReceived = getQuantityReceived(item.product_id);
                         const uom = item.product?.uom || '';
                         const isFullyReceived = quantityReceived >= quantityOrdered;
@@ -305,7 +305,7 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
                               )}
                             </td>
                             <td className="py-3 px-4 text-sm text-right text-slate-700">
-                              ${parseFloat(item.unit_price).toFixed(2)}
+                              ${item.unit_price.toFixed(2)}
                             </td>
                             <td className="py-3 px-4 text-sm text-right font-medium text-slate-900">
                               ${total.toFixed(2)}

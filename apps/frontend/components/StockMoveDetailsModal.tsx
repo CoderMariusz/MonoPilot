@@ -11,7 +11,7 @@ interface StockMoveDetailsModalProps {
 
 export function StockMoveDetailsModal({ moveId, isOpen, onClose }: StockMoveDetailsModalProps) {
   const stockMoves = useStockMoves();
-  const move = stockMoves.find(m => m.id === moveId);
+  const move = stockMoves.find(m => m.id === moveId.toString());
 
   if (!isOpen || !move) return null;
 
