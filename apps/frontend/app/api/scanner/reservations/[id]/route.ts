@@ -3,10 +3,11 @@ import { supabase } from '@/lib/supabase/client';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const reservationId = parseInt(params.id);
+    const reservationId = parseInt(id);
 
     if (isNaN(reservationId)) {
       return NextResponse.json(
@@ -60,7 +61,7 @@ export async function DELETE(
     return NextResponse.json({
       success: true,
       reservation_id: reservationId,
-      lp_number: reservation.license_plate?.lp_number,
+      lp_number: reservation.license_plate?.[0]?.lp_number,
       message: 'Reservation cancelled successfully'
     });
 

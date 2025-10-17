@@ -3,11 +3,12 @@ import { supabase } from '@/lib/supabase/client';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { woId: string; seq: string } }
+  { params }: { params: Promise<{ woId: string; seq: string }> }
 ) {
+  const { woId: woIdStr, seq: seqStr } = await params;
   try {
-    const woId = parseInt(params.woId);
-    const seq = parseInt(params.seq);
+    const woId = parseInt(woIdStr);
+    const seq = parseInt(seqStr);
     const { lp_id, qty, user_id } = await request.json();
 
     if (!woId || isNaN(woId) || !seq || isNaN(seq)) {
@@ -145,7 +146,7 @@ export async function POST(
       .from('lp_reservations')
       .insert({
         lp_id,
-        wo_id,
+        wo_id: woId,
         qty,
         status: 'active',
         created_by: user_id
@@ -159,7 +160,7 @@ export async function POST(
     await supabase
       .from('work_orders_audit')
       .insert({
-        wo_id,
+        wo_id: woId,
         action: 'LP_STAGED',
         details: {
           operation_seq: seq,
@@ -177,7 +178,7 @@ export async function POST(
       success: true,
       message: 'LP staged successfully',
       data: {
-        wo_id,
+        wo_id: woId,
         operation_seq: seq,
         lp_id,
         lp_number: lpData.lp_number,

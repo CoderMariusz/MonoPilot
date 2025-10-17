@@ -53,7 +53,7 @@ export function OperationsTab() {
       const data = await WorkOrdersAPI.getAll({
         status: 'in_progress'
       });
-      setWorkOrders(data);
+      setWorkOrders(data as any);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load work orders');
     } finally {

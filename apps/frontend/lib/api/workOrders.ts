@@ -79,6 +79,7 @@ export class WorkOrdersAPI {
         status: wo.status,
         scheduled_start: wo.scheduled_start,
         scheduled_end: wo.scheduled_end,
+        due_date: wo.scheduled_end, // Use scheduled_end as due_date
         actual_start: wo.actual_start,
         actual_end: wo.actual_end,
         actual_output_qty: wo.actual_output_qty ? parseFloat(wo.actual_output_qty) : null,
@@ -257,7 +258,7 @@ export class WorkOrdersAPI {
     if (shouldUseMockData()) {
       // Mock stage status
       return {
-        wo_id,
+        wo_id: woId,
         operations: [
           {
             seq: 1,
@@ -345,7 +346,7 @@ export class WorkOrdersAPI {
       });
 
       return {
-        wo_id,
+        wo_id: woId,
         operations
       };
     } catch (error) {

@@ -248,8 +248,8 @@ export class YieldAPI {
 
       // Calculate KPIs
       const yield_percent = summary.avg_yield_percent;
-      const consumption_per_kg = summary.total_input_kg > 0 
-        ? summary.total_input_kg / summary.total_output_kg 
+      const consumption_per_kg = (summary as any).total_input_kg > 0 
+        ? (summary as any).total_input_kg / (summary as any).total_output_kg 
         : 0;
       const plan_accuracy_percent = data.length > 0 
         ? data.reduce((sum, row) => sum + (row.plan_accuracy_percent || 0), 0) / data.length 
@@ -262,8 +262,8 @@ export class YieldAPI {
         plan_accuracy_percent,
         on_time_percent,
         total_work_orders: summary.total_work_orders,
-        total_input_kg: summary.total_input_kg,
-        total_output_kg: summary.total_output_kg
+        total_input_kg: (summary as any).total_input_kg || 0,
+        total_output_kg: (summary as any).total_output_kg || 0
       };
     } catch (error) {
       console.error('Error fetching yield KPIs:', error);

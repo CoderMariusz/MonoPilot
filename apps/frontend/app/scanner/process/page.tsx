@@ -1223,7 +1223,7 @@ export default function ProcessTerminalPage() {
               woId={selectedWOId} 
               operationSeq={currentOperationSeq}
               onEditLP={(lp) => {
-                setSelectedLPForQA(lp);
+                setSelectedLPForQA(lp as any);
                 setShowQAOverride(true);
               }}
             />

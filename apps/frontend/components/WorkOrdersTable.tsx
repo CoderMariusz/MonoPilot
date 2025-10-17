@@ -59,7 +59,7 @@ export function WorkOrdersTable() {
       const matchesProduct = productFilter ? (wo.product?.description || '').toLowerCase().includes(productFilter.toLowerCase()) : true;
       // Placeholder QA filter (no QA flags on WO yet)
       const matchesQa = qaFilter ? qaFilter === 'Passed' : true;
-      const matchesKpiScope = kpiScopeFilter ? wo.kpi_scope === kpiScopeFilter : true;
+      const matchesKpiScope = kpiScopeFilter ? (wo as any).kpi_scope === kpiScopeFilter : true;
       return matchesStatus && matchesLine && matchesProduct && matchesQa && matchesKpiScope;
     });
   }, [workOrders, searchQuery, statusFilter, lineFilter, productFilter, qaFilter, kpiScopeFilter]);

@@ -3,10 +3,11 @@ import { supabase } from '@/lib/supabase/client';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { woId: string } }
+  { params }: { params: Promise<{ woId: string }> }
 ) {
+  const { woId: woIdStr } = await params;
   try {
-    const woId = parseInt(params.woId);
+    const woId = parseInt(woIdStr);
     const body = await request.json();
     const { 
       boxes, 
@@ -129,7 +130,7 @@ export async function POST(
         wo_id: woId,
         product_id: workOrder.product_id,
         quantity: totalWeight,
-        uom: workOrder.product.uom,
+        uom: workOrder.product?.[0]?.uom || 'KG',
         lp_id: boxLPId,
         boxes: boxes,
         source: 'scanner'
@@ -151,7 +152,7 @@ export async function POST(
           output_lp_id: boxLPId,
           input_lp_id: inputLP.id,
           quantity_consumed: inputLP.quantity, // Assume full consumption for now
-          uom: workOrder.product.uom // TODO: Get actual UOM from input LP product
+          uom: workOrder.product?.[0]?.uom || 'KG' // TODO: Get actual UOM from input LP product
         }));
 
         await supabase

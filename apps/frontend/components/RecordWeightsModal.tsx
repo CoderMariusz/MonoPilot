@@ -320,11 +320,11 @@ export function RecordWeightsModal({
               {/* Loss Summary */}
               <div className="mt-3 pt-3 border-t border-slate-200">
                 <div className="text-xs text-slate-600 space-y-1">
-                  <div>Cook Loss: {weights.cook_loss.toFixed(2)} kg</div>
-                  <div>Trim Loss: {weights.trim_loss.toFixed(2)} kg</div>
-                  <div>Marinade Gain: +{weights.marinade_gain.toFixed(2)} kg</div>
+                  <div>Cook Loss: {weights.cooking_loss_weight.toFixed(2)} kg</div>
+                  <div>Trim Loss: {weights.trim_loss_weight.toFixed(2)} kg</div>
+                  <div>Marinade Gain: +{weights.marinade_gain_weight.toFixed(2)} kg</div>
                   <div className="font-medium">
-                    Net Loss: {(weights.cook_loss + weights.trim_loss - weights.marinade_gain).toFixed(2)} kg
+                    Net Loss: {(weights.cooking_loss_weight + weights.trim_loss_weight - weights.marinade_gain_weight).toFixed(2)} kg
                   </div>
                 </div>
               </div>

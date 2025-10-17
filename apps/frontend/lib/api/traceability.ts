@@ -161,7 +161,8 @@ export async function getForwardTrace(lpNumber: string): Promise<ForwardTraceRes
     if (!data || data.length === 0) {
       return {
         success: false,
-        error: 'No traceability data found for the specified license plate'
+        error: 'No traceability data found for the specified license plate',
+        data: {} as any
       };
     }
     
@@ -184,7 +185,8 @@ export async function getForwardTrace(lpNumber: string): Promise<ForwardTraceRes
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      data: {} as any
     };
   }
 }
@@ -206,7 +208,8 @@ export async function getBackwardTrace(lpNumber: string): Promise<BackwardTraceR
     if (!data || data.length === 0) {
       return {
         success: false,
-        error: 'No traceability data found for the specified license plate'
+        error: 'No traceability data found for the specified license plate',
+        data: {} as any
       };
     }
     
@@ -229,7 +232,8 @@ export async function getBackwardTrace(lpNumber: string): Promise<BackwardTraceR
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      data: {} as any
     };
   }
 }
@@ -290,12 +294,12 @@ export async function getWOTrace(woNumber: string): Promise<{
     
     // Get forward traces for all input LPs
     const forwardTraces = await Promise.all(
-      inputLPs.map(lp => getForwardTrace(lp.license_plates.lp_number))
+      inputLPs.map(lp => getForwardTrace(lp.license_plates?.[0]?.lp_number || ''))
     );
     
     // Get backward traces for all output LPs
     const backwardTraces = await Promise.all(
-      outputLPs.map(lp => getBackwardTrace(lp.license_plates.lp_number))
+      outputLPs.map(lp => getBackwardTrace(lp.license_plates?.[0]?.lp_number || ''))
     );
     
     // Combine traces
@@ -312,7 +316,8 @@ export async function getWOTrace(woNumber: string): Promise<{
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      data: {} as any
     };
   }
 }

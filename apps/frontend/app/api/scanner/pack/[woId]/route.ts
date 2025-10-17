@@ -3,10 +3,11 @@ import { supabase } from '@/lib/supabase/client';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { woId: string } }
+  { params }: { params: Promise<{ woId: string }> }
 ) {
+  const { woId: woIdStr } = await params;
   try {
-    const woId = parseInt(params.woId);
+    const woId = parseInt(woIdStr);
     const { 
       action, // 'stage' or 'output'
       lp_id, // for staging
@@ -89,7 +90,7 @@ export async function POST(
         .from('lp_reservations')
         .insert({
           lp_id,
-          wo_id,
+          wo_id: woId,
           qty,
           status: 'active',
           created_by: user_id
@@ -103,7 +104,7 @@ export async function POST(
         success: true,
         message: 'LP staged for packing',
         data: {
-          wo_id,
+          wo_id: woId,
           lp_id,
           lp_number: lpData.lp_number,
           product_name: lpData.product?.description,
@@ -139,7 +140,7 @@ export async function POST(
       const { data: productionOutput, error: outputError } = await supabase
         .from('production_outputs')
         .insert({
-          wo_id,
+          wo_id: woId,
           product_id: woData.product_id,
           quantity: boxes * box_weight_kg,
           uom: woData.uom,
@@ -163,7 +164,7 @@ export async function POST(
             qa_status: 'Passed',
             stage_suffix: null,
             origin_type: 'WO_OUTPUT',
-            origin_ref: { wo_id, production_output_id: productionOutput.id },
+            origin_ref: { wo_id: woId, production_output_id: productionOutput.id },
             created_by: user_id
           })
           .select()
@@ -184,7 +185,7 @@ export async function POST(
       await supabase
         .from('work_orders_audit')
         .insert({
-          wo_id,
+          wo_id: woId,
           action: 'PACK_OUTPUT_RECORDED',
           details: {
             boxes,
@@ -201,7 +202,7 @@ export async function POST(
         success: true,
         message: 'Packing output recorded successfully',
         data: {
-          wo_id,
+          wo_id: woId,
           boxes,
           box_weight_kg,
           total_weight_kg: boxes * box_weight_kg,

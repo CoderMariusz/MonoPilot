@@ -3,10 +3,11 @@ import { supabase } from '@/lib/supabase/client';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const palletId = parseInt(params.id);
+    const palletId = parseInt(id);
     const body = await request.json();
     const { box_lp_ids } = body;
 
@@ -109,7 +110,7 @@ export async function POST(
           error: 'Some box LPs are already assigned to other pallets',
           conflicting_lps: existingItems.map(item => ({
             lp_id: item.box_lp_id,
-            pallet_number: item.pallet?.pallet_number
+            pallet_number: item.pallet?.[0]?.pallet_number
           }))
         },
         { status: 400 }
@@ -174,10 +175,11 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const palletId = parseInt(params.id);
+    const palletId = parseInt(id);
     const body = await request.json();
     const { box_lp_ids } = body;
 

@@ -3,11 +3,12 @@ import { supabase } from '@/lib/supabase/client';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; seq: string } }
+  { params }: { params: Promise<{ id: string; seq: string }> }
 ) {
+  const { id, seq: seqStr } = await params;
   try {
-    const woId = parseInt(params.id);
-    const seq = parseInt(params.seq);
+    const woId = parseInt(id);
+    const seq = parseInt(seqStr);
     const { 
       in_kg, 
       out_kg, 

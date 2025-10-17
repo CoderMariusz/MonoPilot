@@ -342,7 +342,7 @@ function YieldReportTab() {
                           <div className="text-xs">
                             {item.per_operation_yield ? 
                               Object.entries(item.per_operation_yield).map(([op, yieldValue]) => (
-                                <div key={op}>{op}: {yieldValue}%</div>
+                                <div key={op}>{op}: {String(yieldValue)}%</div>
                               )) : '-'
                             }
                           </div>
@@ -808,6 +808,8 @@ function OperationsTab() {
           onClose={() => setShowWeightModal(false)}
           operation={selectedOperation}
           onSubmit={handleWeightSubmit}
+          woId={selectedOperation?.wo_id || ''}
+          operationSeq={selectedOperation?.seq_no || 0}
         />
       )}
     </div>

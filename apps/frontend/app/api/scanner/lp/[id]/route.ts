@@ -4,10 +4,11 @@ import { supabase } from '@/lib/supabase/client';
 // GET /api/scanner/lp/[id]/composition - Get LP composition trace
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const lpId = parseInt(params.id);
+    const lpId = parseInt(id);
     const { searchParams } = new URL(request.url);
     const direction = searchParams.get('direction') || 'backward';
 
@@ -76,10 +77,11 @@ export async function GET(
 // POST /api/scanner/lp/[id]/split - Split LP
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const lpId = parseInt(params.id);
+    const lpId = parseInt(id);
     const body = await request.json();
     const { splits } = body; // Array of { quantity, reason }
 
@@ -233,10 +235,11 @@ export async function POST(
 // PUT /api/scanner/lp/[id]/move - Move LP
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const lpId = parseInt(params.id);
+    const lpId = parseInt(id);
     const body = await request.json();
     const { to_location_id, qty } = body;
 
@@ -367,10 +370,11 @@ export async function PUT(
 // PATCH /api/scanner/lp/[id]/qa - Change QA status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const lpId = parseInt(params.id);
+    const lpId = parseInt(id);
     const body = await request.json();
     const { status, reason, pin } = body;
 

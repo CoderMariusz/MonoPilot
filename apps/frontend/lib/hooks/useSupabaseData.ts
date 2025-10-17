@@ -34,6 +34,7 @@ export function useSupabaseWorkOrders() {
           status: wo.status,
           scheduled_start: wo.scheduled_start,
           scheduled_end: wo.scheduled_end,
+          due_date: wo.scheduled_end, // Use scheduled_end as due_date
           actual_start: wo.actual_start,
           actual_end: wo.actual_end,
           machine_id: wo.machine_id,
@@ -100,8 +101,11 @@ export function useSupabasePurchaseOrders() {
           request_delivery_date: po.request_delivery_date,
           expected_delivery_date: po.expected_delivery_date,
           due_date: po.due_date,
+          order_date: po.request_delivery_date, // Use request_delivery_date as order_date
+          expected_delivery: po.expected_delivery_date, // Use expected_delivery_date as expected_delivery
           currency: po.currency || 'USD',
           exchange_rate: po.exchange_rate,
+          total_amount: 0, // TODO: Calculate from items
           buyer_id: po.buyer_id,
           buyer_name: po.buyer_name,
           notes: po.notes,
@@ -114,7 +118,9 @@ export function useSupabasePurchaseOrders() {
             vat_number: po.supplier.vat_number,
             country: po.supplier.country,
             currency: po.supplier.currency,
-            is_active: po.supplier.is_active
+            is_active: po.supplier.is_active,
+            created_at: po.supplier.created_at || new Date().toISOString(),
+            updated_at: po.supplier.updated_at || new Date().toISOString()
           } : undefined,
           items: (po.items || []).map((item: any) => ({
             id: item.id,
@@ -173,6 +179,7 @@ export function useSupabaseTransferOrders() {
           status: to.status,
           planned_ship_date: to.planned_ship_date,
           actual_ship_date: to.actual_ship_date,
+          transfer_date: to.planned_ship_date, // Use planned_ship_date as transfer_date
           planned_receive_date: to.planned_receive_date,
           actual_receive_date: to.actual_receive_date,
           created_at: to.created_at,

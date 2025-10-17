@@ -3,11 +3,12 @@ import { supabase } from '@/lib/supabase/client';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { woId: string; seq: string } }
+  { params }: { params: Promise<{ woId: string; seq: string }> }
 ) {
+  const { woId: woIdStr, seq: seqStr } = await params;
   try {
-    const woId = parseInt(params.woId);
-    const seq = parseInt(params.seq);
+    const woId = parseInt(woIdStr);
+    const seq = parseInt(seqStr);
     const { user_id } = await request.json();
 
     if (!woId || isNaN(woId) || !seq || isNaN(seq)) {
@@ -113,7 +114,7 @@ export async function POST(
     await supabase
       .from('work_orders_audit')
       .insert({
-        wo_id,
+        wo_id: woId,
         action: 'OPERATION_COMPLETED',
         details: {
           operation_seq: seq,
