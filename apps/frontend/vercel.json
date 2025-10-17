@@ -1,26 +1,11 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
-    }
-  ],
+  "framework": "nextjs",
   "env": {
     "NODE_ENV": "production"
   },
   "functions": {
-    "apps/frontend/app/api/**/*.ts": {
+    "app/api/**/*.ts": {
       "maxDuration": 30
     }
   },
@@ -41,12 +26,6 @@
           "value": "Content-Type, Authorization"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/exports/(.*)",
-      "destination": "/api/exports/$1"
     }
   ]
 }
