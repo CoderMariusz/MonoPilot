@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import { Loader2, Eye, Edit, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { useTransferOrders, deleteTransferOrder } from '@/lib/clientState';
+import { useSupabaseTransferOrders } from '@/lib/hooks/useSupabaseData';
+import { deleteTransferOrder } from '@/lib/clientState';
 import { TransferOrderDetailsModal } from '@/components/TransferOrderDetailsModal';
 import { EditTransferOrderModal } from '@/components/EditTransferOrderModal';
 import type { TransferOrder } from '@/lib/types';
 
 export function TransferOrdersTable() {
-  const transferOrders = useTransferOrders();
+  const { data: transferOrders, loading: loadingData, error: loadError } = useSupabaseTransferOrders();
   const [loading] = useState(false);
   const [error] = useState<string | null>(null);
   const [selectedTOId, setSelectedTOId] = useState<number | null>(null);

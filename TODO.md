@@ -221,52 +221,154 @@
 - **Allergen tagging** with many-to-many relationships
 - **FG rule enforcement** (always COMPOSITE, never MEAT)
 
-## Phase 15: Deployment - Vercel & Supabase ✅ COMPLETED
+## Phase 11: Production Module Enhancement - Database Schema ✅ COMPLETED
 
-### Phase 15.1: Vercel Deployment Setup ✅
-- [x] **Pre-deployment verification**: Added typecheck, lint scripts, created health endpoint at `/api/health`
-- [x] **Vercel configuration**: Created `vercel.json` with Next.js framework, build command, function timeout
-- [x] **Local verification**: Fixed TypeScript errors, added `@ts-nocheck` to mockData.ts for build compatibility
-- [x] **Vercel CLI deployment**: Successfully deployed to `https://monopilot-g69hn86qz-codermariuszs-projects.vercel.app`
-- [x] **Initial smoke test**: Health endpoint accessible, deployment successful
+### Database Schema & Migrations ✅
+- [x] **New Tables Created**: wo_materials (BOM snapshot), lp_reservations, lp_compositions, pallets, pallet_items
+- [x] **Enhanced Existing Tables**: Updated enums, license_plates, work_orders, wo_operations with proper constraints
+- [x] **BOM Snapshot Trigger**: Created trigger to automatically snapshot BOM on work order creation
+- [x] **LP Numbering Enhancement**: Updated stage_suffix constraint to allow 2-letter codes
+- [x] **Trace Functions**: Enhanced forward/backward trace to include lp_compositions and pallets
 
-### Phase 15.2: Supabase Database Setup ✅
-- [x] **Migration verification**: Applied all 9 migrations sequentially using Supabase MCP
-  - `001_planning_tables.sql` - Core planning tables ✅
-  - `002_rls_policies.sql` - Row Level Security policies ✅
-  - `003_phase14_schema.sql` - Warehouses, suppliers, production outputs ✅
-  - `004_phase14_rpc_functions.sql` - Business logic RPC functions ✅
-  - `005_product_taxonomy_enums.sql` - Product taxonomy enums ✅
-  - `006_tax_allergens.sql` - Tax codes and allergens ✅
-  - `007_supplier_products.sql` - Supplier products junction ✅
-  - `008_bom_routing.sql` - BOM versioning and routing ✅
-  - `009_routing_requirements.sql` - Routing requirements ✅
-- [x] **Database verification**: All tables created, RLS policies enabled, RPC functions working
-- [x] **Project details**: Supabase project `pgroxddbtaevdegnidaz` ready with all migrations applied
+### Database Tests ✅
+- [x] **LP Numbering Tests**: Test 8-digit LP numbering with parent relationships
+- [x] **Reservation Tests**: Test available quantity calculations and reservation conflicts
+- [x] **Composition Tests**: Test LP composition chains and multi-level relationships
+- [x] **QA Gate Tests**: Test QA blocking and supervisor override functionality
+- [x] **BOM Snapshot Tests**: Test BOM snapshot creation and versioning
 
-### Phase 15.3: Live Testing & Validation 🔄 IN PROGRESS
-- [ ] **Environment configuration**: Set `NEXT_PUBLIC_USE_MOCK_DATA=false` on Vercel production
-- [ ] **Playwright browser setup**: Install Playwright browser in Cursor (requires user approval)
-- [ ] **Health check test**: Navigate to `/api/health` and verify response
-- [ ] **Authentication flow test**: Test `/login` and `/signup` pages
-- [ ] **Planning module test**: Test `/planning` page with Work Orders table
-- [ ] **Production module test**: Test `/production` page
-- [ ] **Warehouse module test**: Test `/warehouse` page with License Plates
-- [ ] **Settings module test**: Test `/settings` page with CRUD operations
-- [ ] **Network request verification**: Check all API calls return valid responses
-- [ ] **E2E workflow test**: Create Work Order and Purchase Order through UI
+## Phase 12: Production Module Enhancement - API Layer ✅ COMPLETED
 
-### Known Issues & Fixes
-- [x] **Vercel functions pattern error**: Fixed by updating `vercel.json` configuration
-- [x] **TypeScript build errors**: Resolved with `@ts-nocheck` in mockData.ts
-- [x] **Supabase migration conflicts**: Fixed duplicate column and reserved keyword issues
+### Read APIs ✅
+- [x] **Work Orders API**: Enhanced with filters, stage status, and Supabase MCP integration
+- [x] **Yield API**: Created PR/FG yield APIs with time bucket filtering
+- [x] **Consume API**: Created consumption tracking with variance calculations
+- [x] **Traceability API**: Enhanced forward/backward trace with composition support
+- [x] **License Plates API**: Created LP management with composition tracking
 
-### Playwright Installation Instructions
-**To approve Playwright installation in Cursor:**
-1. When prompted to install Playwright browser, click "Allow" or "Yes"
-2. If not prompted automatically, run: `mcp_cursor-playwright_browser_install`
-3. The installation may require downloading browser binaries (~100MB)
-4. Once installed, Playwright MCP tools will be available for automated testing
+### Write APIs ✅
+- [x] **Close Work Order**: Implemented with validation and audit trail
+- [x] **Record Weights**: Created operation weight recording with 1:1 validation
+- [x] **Reservations**: Implemented LP reservation system with available quantity checks
+- [x] **BOM Snapshot Updates**: Created manual BOM snapshot update functionality
+- [x] **Pallets**: Implemented pallet creation and LP composition management
+
+### Scanner Integration APIs ✅
+- [x] **Stage Board API**: Real-time operation status with color coding
+- [x] **Process Terminal**: Staging, weight recording, operation completion
+- [x] **Pack Terminal**: Pallet creation and LP composition tracking
+- [x] **QA Override**: Supervisor PIN-based QA status changes
+
+## Phase 13: Production Module Enhancement - Excel Exports ✅ COMPLETED
+
+### Export Infrastructure ✅
+- [x] **SheetJS Integration**: Installed xlsx package and created export utilities
+- [x] **Export Helpers**: Created CSV and XLSX conversion utilities
+- [x] **Export Endpoints**: Created Excel export APIs for all data types:
+  - [x] Yield reports (PR/FG)
+  - [x] Consumption reports
+  - [x] Traceability reports
+  - [x] Work orders export
+  - [x] License plates export
+  - [x] Stock moves export
+
+## Phase 14: Production Module Enhancement - UI Components ✅ COMPLETED
+
+### Production UI Components ✅
+- [x] **Work Orders Tab**: Enhanced with filters, yield calculations, and close actions
+- [x] **Yield Tab**: Created with KPI cards, trend charts, and time bucket selection
+- [x] **Consume Tab**: Created with variance tracking and color-coded indicators
+- [x] **Operations Tab**: Created with per-operation weight tracking
+- [x] **Trace Tab**: Created with tree view for forward/backward traceability
+- [x] **Record Weights Modal**: Enhanced with yield calculation and validation
+
+### Scanner UI Components ✅
+- [x] **Stage Board**: Real-time operation status with color coding (red/amber/green)
+- [x] **Staged LPs List**: LP management with reservation tracking
+- [x] **Scanner Panel**: Enhanced with stage suffix display and LP barcode input
+- [x] **Record Weights Modal**: Scanner-specific weight recording with 1:1 validation
+- [x] **QA Override Modal**: Supervisor PIN-based QA status changes
+
+## Phase 15: Production Module Enhancement - Business Logic ✅ COMPLETED
+
+### Business Rules Implementation ✅
+- [x] **Sequential Routing**: Enforces operation sequence validation
+- [x] **Hard 1:1 Rule**: Validates one-to-one component relationships
+- [x] **Cross-WO PR Validation**: Ensures exact product matching across work orders
+- [x] **Reservation-Safe Operations**: Prevents operations exceeding available quantities
+- [x] **QA Gate Enforcement**: Blocks operations with failed QA status (with supervisor override)
+
+### Business Logic Orchestrator ✅
+- [x] **Staging Validation**: Combines all validation rules for staging operations
+- [x] **Weight Recording Validation**: Validates 1:1 relationships and sequential routing
+- [x] **Operation Completion**: Ensures proper completion sequence and weight recording
+
+## Phase 16: Production Module Enhancement - Testing ✅ COMPLETED
+
+### API Integration Tests ✅
+- [x] **Work Orders Tests**: Test close WO, stage status, and business logic
+- [x] **Operations Tests**: Test weight recording, 1:1 enforcement, and sequential routing
+- [x] **Reservations Tests**: Test create/delete reservations and available quantity
+- [x] **Traceability Tests**: Test forward/backward trace and tree building
+- [x] **Exports Tests**: Test Excel generation and error handling
+
+### UI Component Tests ✅
+- [x] **WorkOrdersTable Tests**: Test filtering, sorting, and action buttons
+- [x] **YieldReportTab Tests**: Test KPI calculations and view toggles
+- [x] **StageBoard Tests**: Test color codes, metrics, and user interactions
+- [x] **RecordWeightsModal Tests**: Test validation, 1:1 enforcement, and yield calculation
+
+### Jest Configuration ✅
+- [x] **Test Setup**: Created jest.config.js and jest.setup.js with proper mocks
+- [x] **Mock Configuration**: Mocked Supabase client, Next.js router, and API modules
+- [x] **Coverage Thresholds**: Set 70% coverage requirements for all modules
+- [x] **Test Scripts**: Added test, test:watch, test:coverage, test:ci scripts
+
+## Phase 17: Production Module Enhancement - Documentation & Deployment 🔄 IN PROGRESS
+
+### Documentation Updates 🔄 IN PROGRESS
+- [ ] **API Reference**: Update API_REFERENCE.md with new endpoints and examples
+- [ ] **Database Schema**: Update DATABASE_SCHEMA.md with new tables and relationships
+- [ ] **Production Delta Guide**: Create production module implementation guide
+- [ ] **Scanner Integration Guide**: Create scanner integration documentation
+
+### Seed Data Enhancement 🔄 IN PROGRESS
+- [ ] **Update Seed Script**: Add 1:1 flags, reservations, compositions, pallets to seed data
+- [ ] **Test Data Sets**: Create comprehensive test data for all scenarios
+- [ ] **Cross-WO Scenarios**: Add test data for cross-WO PR intake validation
+- [ ] **Traceability Chains**: Create complex traceability test data
+
+### Supabase MCP Integration 🔄 IN PROGRESS
+- [ ] **Apply Migrations**: Use Supabase MCP to apply all new migrations (019-025)
+- [ ] **Verify Schema**: Check all tables, indexes, constraints, and triggers
+- [ ] **Test RPC Functions**: Verify all business logic functions work correctly
+- [ ] **RLS Policies**: Test Row Level Security policies for new tables
+
+### Performance Testing 🔄 IN PROGRESS
+- [ ] **Large Dataset Testing**: Test with realistic production data volumes
+- [ ] **Query Performance**: Verify index usage and query optimization
+- [ ] **API Response Times**: Monitor and optimize API endpoint performance
+- [ ] **UI Responsiveness**: Test UI components with large datasets
+
+## Phase 18: Future Enhancements (Not Implemented)
+
+### Advanced Production Features
+- [ ] **Multi-Phase Routing**: Enhanced routing with per-phase yield tracking
+- [ ] **Shelf-Life Policy**: Multi-tier shelf-life policies with per-phase adjustments
+- [ ] **Advanced Traceability**: LP tree visualization and complex composition tracking
+- [ ] **Real-Time Monitoring**: Live production monitoring with WebSocket updates
+
+### Advanced Scanner Features
+- [ ] **Offline Queue**: Handle scanner operations when offline
+- [ ] **Batch Operations**: Process multiple LPs in batch operations
+- [ ] **Advanced QA**: Multi-level QA approval workflows
+- [ ] **Mobile Optimization**: Enhanced mobile scanner interface
+
+### Reporting & Analytics
+- [ ] **Advanced KPIs**: Machine learning-based yield predictions
+- [ ] **Trend Analysis**: Historical trend analysis and forecasting
+- [ ] **Cost Analysis**: Detailed cost tracking per operation
+- [ ] **Quality Metrics**: Advanced quality tracking and reporting
 
 ## Phase 16: Future Enhancements (Not Implemented)
 

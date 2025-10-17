@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import { Loader2, Eye, Edit, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { usePurchaseOrders, deletePurchaseOrder } from '@/lib/clientState';
+import { useSupabasePurchaseOrders } from '@/lib/hooks/useSupabaseData';
+import { deletePurchaseOrder } from '@/lib/clientState';
 import { PurchaseOrderDetailsModal } from '@/components/PurchaseOrderDetailsModal';
 import { EditPurchaseOrderModal } from '@/components/EditPurchaseOrderModal';
 import type { PurchaseOrder } from '@/lib/types';
 
 export function PurchaseOrdersTable() {
-  const purchaseOrders = usePurchaseOrders();
+  const { data: purchaseOrders, loading: loadingData, error: loadError } = useSupabasePurchaseOrders();
   const [loading] = useState(false);
   const [error] = useState<string | null>(null);
   const [selectedPOId, setSelectedPOId] = useState<number | null>(null);

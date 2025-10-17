@@ -1,1067 +1,461 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Package, CheckCircle, X, Check, AlertTriangle, Minus } from 'lucide-react';
-import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports, useSettings, saveOrderProgress, getOrderProgress, clearOrderProgress, useMachines, getFilteredBomForWorkOrder } from '@/lib/clientState';
-import { toast } from '@/lib/toast';
-import { AlertDialog } from '@/components/AlertDialog';
-import { ManualConsumeModal } from '@/components/ManualConsumeModal';
-import type { WorkOrder, LicensePlate, BomItem, StagedLP, YieldReportMaterial, YieldReportDetail } from '@/lib/types';
+import { useState, useEffect } from 'react';
+import { 
+  Package, 
+  Plus, 
+  Box, 
+  Palette, 
+  Upload, 
+  Search,
+  AlertTriangle,
+  CheckCircle,
+  XCircle
+} from 'lucide-react';
 
-interface InsufficientMaterial {
-  material: string;
-  needed: number;
-  available: number;
-  shortage: number;
+interface WorkOrder {
+  id: number;
+  wo_number: string;
+  product_id: number;
+  quantity: number;
+  status: string;
+  kpi_scope: string;
+  product: {
+    part_number: string;
+    description: string;
   uom: string;
+  };
 }
 
-export default function PackTerminalPage() {
-  const router = useRouter();
+interface Pallet {
+  id: number;
+  pallet_number: string;
+  wo_id: number;
+  status: string;
+  created_at: string;
+  work_order: {
+    wo_number: string;
+    product: {
+      part_number: string;
+      description: string;
+    };
+  };
+}
+
+export default function PackTerminal() {
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
   const [selectedWOId, setSelectedWOId] = useState<number | null>(null);
-  const [lpNumber, setLpNumber] = useState('');
-  const [currentScannedLP, setCurrentScannedLP] = useState<LicensePlate | null>(null);
-  const [stageQuantity, setStageQuantity] = useState('');
-  const [stagedLPsByOrder, setStagedLPsByOrder] = useState<{ [key: number]: StagedLP[] }>({});
-  const [showAlert, setShowAlert] = useState(false);
-  const [alertMessage, setAlertMessage] = useState('');
-  const [showInsufficientModal, setShowInsufficientModal] = useState(false);
-  const [insufficientMaterials, setInsufficientMaterials] = useState<InsufficientMaterial[]>([]);
-  const [quantityToCreate, setQuantityToCreate] = useState('');
-  const [createdItemsCount, setCreatedItemsCount] = useState(0);
-  const [consumedMaterials, setConsumedMaterials] = useState<{ [materialId: number]: number }>({});
-  const [showManualConsumeModal, setShowManualConsumeModal] = useState(false);
-  const [selectedLPForConsume, setSelectedLPForConsume] = useState<{ lp: LicensePlate; stagedQty: number } | null>(null);
-  const [showYieldReportsModal, setShowYieldReportsModal] = useState(false);
-
-  const lpInputRef = useRef<HTMLInputElement>(null);
-  const qtyInputRef = useRef<HTMLInputElement>(null);
-  const createQtyInputRef = useRef<HTMLInputElement>(null);
-
-  const workOrders = useWorkOrders();
-  const licensePlates = useLicensePlates();
-  const yieldReports = useYieldReports();
-  const settings = useSettings();
-  const machines = useMachines();
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [pallets, setPallets] = useState<Pallet[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  const [componentLineSelections, setComponentLineSelections] = useState<{[materialId: number]: string}>({});
-
-  const lines = ['Line 1', 'Line 2', 'Line 3', 'Line 4'];
+  // Pack output form
+  const [packForm, setPackForm] = useState({
+    boxes: '',
+    box_weight_kg: '',
+    pallet_id: '',
+    input_lps: [] as number[]
+  });
   
-  const availableWOs = workOrders.filter(wo => 
-    wo.machine?.name === selectedLine &&
-    (wo.status === 'in_progress' || wo.status === 'released') && 
-    wo.product?.type === 'FG'
-  );
+  // Pallet creation form
+  const [palletForm, setPalletForm] = useState({
+    wo_id: '',
+    line_id: ''
+  });
   
-  const selectedWO = selectedWOId ? workOrders.find(wo => wo.id === selectedWOId.toString()) : undefined;
-  const stagedLPsForCurrentOrder = selectedWOId ? (stagedLPsByOrder[selectedWOId] || []) : [];
-  const bomItems = selectedWO ? getFilteredBomForWorkOrder(selectedWO) : [];
+  // Available input LPs
+  const [inputLPs, setInputLPs] = useState<any[]>([]);
 
   useEffect(() => {
-    if (selectedWOId && selectedWO) {
-      const savedProgress = getOrderProgress(selectedWOId);
-      
-      if (savedProgress) {
-        setStagedLPsByOrder(prev => ({
-          ...prev,
-          [selectedWOId]: savedProgress.staged_lps
-        }));
-        setCreatedItemsCount(savedProgress.boxes_created);
-        setConsumedMaterials(savedProgress.consumed_materials || {});
-        toast.success('Order progress restored');
-      } else {
-        setCreatedItemsCount(0);
-        setConsumedMaterials({});
-      }
-      
-      setLpNumber('');
-      setCurrentScannedLP(null);
-      setStageQuantity('');
-      lpInputRef.current?.focus();
+    fetchWorkOrders();
+    fetchPallets();
+  }, []);
+
+  useEffect(() => {
+    if (selectedWOId) {
+      fetchInputLPs(selectedWOId);
     }
   }, [selectedWOId]);
 
-  useEffect(() => {
-    if (selectedLine) {
-      setSelectedWOId(null);
+  const fetchWorkOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/work-orders');
+      if (response.ok) {
+        const data = await response.json();
+        // Filter for Finished Goods (FG) work orders
+        const fgWorkOrders = data.filter((wo: WorkOrder) => wo.kpi_scope === 'FG');
+        setWorkOrders(fgWorkOrders);
+      }
+    } catch (err) {
+      setError('Failed to fetch work orders');
+    } finally {
+      setLoading(false);
     }
-  }, [selectedLine]);
+  };
 
-  useEffect(() => {
-    if (selectedWOId && selectedLine && selectedWO) {
-      saveOrderProgress(selectedWOId, {
-        id: `progress-${selectedWOId}`,
-        order_id: selectedWOId.toString(),
-        order_type: 'work_order',
-        status: 'in_progress',
-        progress_percentage: 0,
-        wo_id: selectedWOId.toString(),
-        staged_lps: stagedLPsForCurrentOrder,
-        boxes_created: createdItemsCount,
-        line: selectedLine,
-        started_at: new Date().toISOString(),
-        consumed_materials: consumedMaterials,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+  const fetchPallets = async () => {
+    try {
+      const response = await fetch('/api/scanner/pallets');
+      if (response.ok) {
+        const data = await response.json();
+        setPallets(data.pallets || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch pallets:', err);
+    }
+  };
+
+  const fetchInputLPs = async (woId: number) => {
+    try {
+      // Fetch available LPs for this work order that can be used for packing
+      const response = await fetch(`/api/license-plates?wo_id=${woId}&status=Available&qa_status=Passed`);
+      if (response.ok) {
+        const data = await response.json();
+        setInputLPs(data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch input LPs:', err);
+    }
+  };
+
+  const handleCreatePallet = async () => {
+    if (!palletForm.wo_id) {
+      alert('Please select a work order');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/scanner/pallets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(palletForm)
       });
-    }
-  }, [stagedLPsForCurrentOrder, createdItemsCount, selectedLine, selectedWOId, consumedMaterials]);
 
-  const getStagedMaterialIds = (): Set<string> => {
-    const materialIds = new Set<string>();
-    stagedLPsForCurrentOrder.forEach(staged => {
-      if (staged.lp.product_id) {
-        materialIds.add(staged.lp.product_id);
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Pallet ${data.pallet.pallet_number} created successfully`);
+        setPalletForm({ wo_id: '', line_id: '' });
+        fetchPallets();
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to create pallet: ${errorData.error}`);
       }
-    });
-    return materialIds;
+    } catch (err) {
+      alert('Failed to create pallet');
+    }
   };
 
-  const isBomComponentStaged = (materialId: number): boolean => {
-    return getStagedMaterialIds().has(materialId.toString());
-  };
-
-  const allBomComponentsStaged = (): boolean => {
-    if (bomItems.length === 0) return false;
-    return bomItems.every(item => isBomComponentStaged(item.material_id));
-  };
-
-  const getAlreadyStagedFromLP = (lpId: number): number => {
-    return stagedLPsForCurrentOrder
-      .filter(staged => staged.lp.id === lpId.toString())
-      .reduce((sum, staged) => sum + staged.quantity, 0);
-  };
-
-  const handleScanLP = () => {
-    if (!selectedWO || !selectedWOId) {
-      toast.error('Please select a work order first');
+  const handleRecordOutput = async () => {
+    if (!selectedWOId || !packForm.boxes || !packForm.box_weight_kg) {
+      alert('Please fill in all required fields');
       return;
     }
 
-    const lp = licensePlates.find(l => l.lp_number === lpNumber.trim());
-    if (!lp) {
-      toast.error('License Plate not found');
-      return;
-    }
-
-    if (lp.qa_status === 'Quarantine') {
-      toast.error(`Cannot scan LP ${lp.lp_number} - Status: Quarantine. This item is quarantined and cannot be used.`);
-      setLpNumber('');
-      setTimeout(() => lpInputRef.current?.focus(), 100);
-      return;
-    }
-
-    const isValidMaterial = bomItems.some(item => item.material_id.toString() === lp.product_id);
-    if (!isValidMaterial) {
-      setAlertMessage("Cannot scan this item - doesn't match order BOM");
-      setShowAlert(true);
-      setLpNumber('');
-      return;
-    }
-
-    setCurrentScannedLP(lp);
-    setLpNumber('');
-    setStageQuantity('');
-    toast.success(`LP ${lp.lp_number} scanned successfully`);
-    setTimeout(() => qtyInputRef.current?.focus(), 100);
-  };
-
-  const handleConfirmStaging = () => {
-    if (!currentScannedLP || !stageQuantity || !selectedWOId) {
-      toast.error('Please enter quantity to stage');
-      return;
-    }
-
-    const qty = parseFloat(stageQuantity);
-    const lpTotalQty = currentScannedLP.quantity;
-    const alreadyStaged = getAlreadyStagedFromLP(parseInt(currentScannedLP.id));
-    const availableQty = lpTotalQty - alreadyStaged;
-
-    if (qty <= 0) {
-      toast.error('Quantity must be greater than 0');
-      return;
-    }
-
-    if (alreadyStaged >= lpTotalQty) {
-      toast.error(`This LP is fully staged (${alreadyStaged} ${currentScannedLP.product?.uom} already used)`);
-      return;
-    }
-
-    if (qty > availableQty) {
-      toast.error(`Only ${availableQty} ${currentScannedLP.product?.uom} available from this LP (${alreadyStaged} already staged)`);
-      return;
-    }
-
-    const staged: StagedLP = {
-      lp: currentScannedLP,
-      quantity: qty,
-      staged_at: new Date().toISOString(),
-    };
-
-    setStagedLPsByOrder(prev => ({
-      ...prev,
-      [selectedWOId]: [...(prev[selectedWOId] || []), staged],
-    }));
-
-    toast.success(`Staged ${qty} ${currentScannedLP.product?.uom} from ${currentScannedLP.lp_number}`);
-    
-    setCurrentScannedLP(null);
-    setStageQuantity('');
-    setTimeout(() => lpInputRef.current?.focus(), 100);
-  };
-
-  const handleRemoveStaged = (index: number) => {
-    if (!selectedWOId) return;
-    
-    const updated = [...stagedLPsForCurrentOrder];
-    const removed = updated.splice(index, 1)[0];
-    
-    setStagedLPsByOrder(prev => ({
-      ...prev,
-      [selectedWOId]: updated,
-    }));
-    
-    toast.success(`Removed ${removed.lp.lp_number} from staging`);
-  };
-
-  const calculateMaterialNeeds = (qtyToCreate: number): { [materialId: number]: number } => {
-    const needs: { [materialId: number]: number } = {};
-    
-    bomItems.forEach(item => {
-      const requiredPerUnit = item.quantity;
-      needs[item.material_id] = requiredPerUnit * qtyToCreate;
-    });
-    
-    return needs;
-  };
-
-  const checkMaterialAvailability = (qtyToCreate: number): InsufficientMaterial[] => {
-    const needs = calculateMaterialNeeds(qtyToCreate);
-    const insufficient: InsufficientMaterial[] = [];
-    
-    Object.keys(needs).forEach(materialIdStr => {
-      const materialId = parseInt(materialIdStr);
-      const needed = needs[materialId];
-      
-      const availableInStaging = stagedLPsForCurrentOrder
-        .filter(staged => staged.lp.product_id === materialId.toString())
-        .reduce((sum, staged) => sum + staged.quantity, 0);
-      
-      if (availableInStaging < needed) {
-        const bomItem = bomItems.find(item => item.material_id === materialId);
-        const material = bomItem?.material;
-        
-        insufficient.push({
-          material: material?.part_number || `Material ${materialId}`,
-          needed,
-          available: availableInStaging,
-          shortage: needed - availableInStaging,
-          uom: bomItem?.uom || '',
-        });
-      }
-    });
-    
-    return insufficient;
-  };
-
-  const consumeMaterialsFIFO = (qtyToCreate: number) => {
-    const needs = calculateMaterialNeeds(qtyToCreate);
-    const updatedStaging = [...stagedLPsForCurrentOrder];
-    const materialConsumed: { [materialId: number]: number } = {};
-    
-    const now = new Date();
-    const moveDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-    
-    const sortedBomItems = [...bomItems].sort((a, b) => {
-      if (a.priority === undefined && b.priority === undefined) return 0;
-      if (a.priority === undefined) return 1;
-      if (b.priority === undefined) return -1;
-      return a.priority - b.priority;
-    });
-    
-    sortedBomItems.forEach(bomItem => {
-      const materialId = bomItem.material_id;
-      let remainingToConsume = needs[materialId];
-      
-      const selectedLine = componentLineSelections[materialId];
-      
-      for (let i = 0; i < updatedStaging.length && remainingToConsume > 0; i++) {
-        const staged = updatedStaging[i];
-        
-        if (staged.lp.product_id === materialId.toString()) {
-          if (selectedLine && staged.line !== selectedLine) {
-            continue;
-          }
-          
-          const toConsume = Math.min(remainingToConsume, staged.quantity);
-          
-          const currentLPQty = staged.lp.quantity;
-          const newLPQty = currentLPQty - toConsume;
-          updateLicensePlate(parseInt(staged.lp.id), { quantity: newLPQty });
-          
-          addStockMove({
-            move_number: `SM-CONSUME-${Date.now()}-${staged.lp.lp_number}`,
-            lp_id: staged.lp.id,
-            from_location_id: staged.lp.location_id,
-            to_location_id: null,
-            quantity: -toConsume,
-            reason: 'Consumption for Work Order',
-            status: 'completed',
-            move_date: moveDate,
-            wo_number: selectedWO!.wo_number,
-          });
-          
-          staged.quantity -= toConsume;
-          remainingToConsume -= toConsume;
-          
-          materialConsumed[materialId] = (materialConsumed[materialId] || 0) + toConsume;
-        }
-      }
-    });
-    
-    setConsumedMaterials(prev => {
-      const updated = { ...prev };
-      Object.keys(materialConsumed).forEach(matId => {
-        const materialId = parseInt(matId);
-        updated[materialId] = (updated[materialId] || 0) + materialConsumed[materialId];
+    try {
+      const response = await fetch(`/api/scanner/pack/${selectedWOId}/output`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(packForm)
       });
-      return updated;
-    });
-    
-    const remainingStaging = updatedStaging.filter(staged => staged.quantity > 0);
-    
-    if (selectedWOId) {
-      setStagedLPsByOrder(prev => ({
-        ...prev,
-        [selectedWOId]: remainingStaging,
-      }));
-    }
-  };
 
-  const generateLPNumber = () => {
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000);
-    return `FG-${timestamp}-${random}`;
-  };
-
-  const handleCreateFG = () => {
-    if (!selectedWO || !selectedWOId || !quantityToCreate) {
-      toast.error('Please enter quantity to create');
-      return;
-    }
-
-    const qtyToCreate = parseFloat(quantityToCreate);
-    
-    if (qtyToCreate <= 0) {
-      toast.error('Invalid quantity');
-      return;
-    }
-
-    for (const item of bomItems) {
-      const productionLines = item.material?.production_lines;
-      const needsLineSelection = productionLines && productionLines.length > 0 && !productionLines.includes('ALL');
-      
-      if (needsLineSelection && !componentLineSelections[item.material_id]) {
-        toast.error(`Please select production line for ${item.material?.part_number || 'component'}`);
-        return;
-      }
-    }
-
-    const insufficient = checkMaterialAvailability(qtyToCreate);
-    
-    if (insufficient.length > 0) {
-      setInsufficientMaterials(insufficient);
-      setShowInsufficientModal(true);
-      return;
-    }
-
-    proceedWithCreation(qtyToCreate);
-  };
-
-  const proceedWithCreation = (qtyToCreate: number) => {
-    if (!selectedWO || !selectedWOId) return;
-
-    consumeMaterialsFIFO(qtyToCreate);
-
-    const fgLPNumber = generateLPNumber();
-    const warehouseLocationId = settings.warehouse.default_location_id || 1;
-
-    const newFGLP = addLicensePlate({
-      lp_code: fgLPNumber,
-      lp_number: fgLPNumber,
-      item_id: selectedWO.product!.id,
-      product_id: selectedWO.product!.id,
-      location_id: warehouseLocationId.toString(),
-      quantity: qtyToCreate,
-      status: 'Available',
-      qa_status: 'Passed',
-      grn_id: null,
-    });
-
-    const now = new Date();
-    const moveDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-    
-    addStockMove({
-      move_number: `SM-${fgLPNumber}`,
-      lp_id: newFGLP.id,
-      from_location_id: null,
-      to_location_id: warehouseLocationId.toString(),
-      quantity: qtyToCreate,
-      reason: 'Production Output',
-      status: 'completed',
-      move_date: moveDate,
-      wo_number: selectedWO.wo_number,
-    });
-
-    const woQty = selectedWO.quantity;
-    const remainingQty = woQty - qtyToCreate;
-    
-    if (remainingQty <= 0) {
-      updateWorkOrder(parseInt(selectedWO.id), { 
-        status: 'completed',
-        quantity: 0
-      });
-      toast.success(`Work Order ${selectedWO.wo_number} completed!`);
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Output recorded successfully: ${data.output.box_lp.lp_number}`);
+        setPackForm({ boxes: '', box_weight_kg: '', pallet_id: '', input_lps: [] });
+        fetchPallets();
     } else {
-      updateWorkOrder(parseInt(selectedWO.id), { 
-        quantity: remainingQty
-      });
-    }
-
-    setCreatedItemsCount(prev => prev + qtyToCreate);
-
-    toast.success(`Created FG ${fgLPNumber} - ${qtyToCreate} ${selectedWO.product!.uom}`);
-    
-    setQuantityToCreate('');
-    setShowInsufficientModal(false);
-    setTimeout(() => createQtyInputRef.current?.focus(), 100);
-  };
-
-  const handleManualConsume = (lp: LicensePlate, stagedQty: number) => {
-    setSelectedLPForConsume({ lp, stagedQty });
-    setShowManualConsumeModal(true);
-  };
-
-  const handleManualConsumeConfirm = (quantity: number) => {
-    if (!selectedLPForConsume || !selectedWOId) return;
-
-    const { lp, stagedQty } = selectedLPForConsume;
-
-    const currentLPQty = lp.quantity;
-    const newLPQty = currentLPQty - quantity;
-    updateLicensePlate(parseInt(lp.id), { quantity: newLPQty });
-
-    const updatedStaging = stagedLPsForCurrentOrder.map(staged => {
-      if (staged.lp.id === lp.id) {
-        return {
-          ...staged,
-          quantity: staged.quantity - quantity
-        };
+        const errorData = await response.json();
+        alert(`Failed to record output: ${errorData.error}`);
       }
-      return staged;
-    }).filter(staged => staged.quantity > 0);
-
-    setStagedLPsByOrder(prev => ({
-      ...prev,
-      [selectedWOId]: updatedStaging,
-    }));
-
-    setConsumedMaterials(prev => ({
-      ...prev,
-      [lp.product_id]: (prev[lp.product_id] || 0) + quantity
-    }));
-
-    const now = new Date();
-    const moveDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-
-    addStockMove({
-      move_number: `SM-MANUAL-${Date.now()}`,
-      lp_id: lp.id,
-      from_location_id: lp.location_id,
-      to_location_id: null,
-      quantity: -quantity,
-      reason: 'Manual Consumption',
-      status: 'completed',
-      move_date: moveDate,
-      wo_number: selectedWO!.wo_number,
-    });
-
-    toast.success(`Consumed ${quantity} ${lp.product?.uom} from ${lp.lp_number}`);
-    setShowManualConsumeModal(false);
-    setSelectedLPForConsume(null);
-  };
-
-  const handleCloseOrder = () => {
-    if (!selectedWO || !selectedWOId) return;
-
-    let targetQty: number;
-    let efficiency: number;
-
-    if (bomItems.length === 0) {
-      targetQty = createdItemsCount;
-      efficiency = 100;
-    } else {
-      const materialRatios = bomItems.map(bomComp => {
-        const consumedQty = consumedMaterials[bomComp.material_id] || 0;
-        if (bomComp.quantity === 0) return Infinity;        
-        return consumedQty / bomComp.quantity;
-      });
-
-      targetQty = Math.floor(Math.min(...materialRatios));
-      efficiency = targetQty > 0 
-        ? Math.round((createdItemsCount / targetQty) * 100) 
-        : 0;
+    } catch (err) {
+      alert('Failed to record output');
     }
-
-    const materialsUsed: YieldReportMaterial[] = Object.keys(consumedMaterials).map(matId => {
-      const materialId = parseInt(matId);
-      const bomItem = bomItems.find(item => item.material_id === materialId);
-      const material = bomItem?.material;
-      
-      const consumedQty = consumedMaterials[materialId];
-      const standardQty = createdItemsCount * (bomItem?.quantity || 0);
-      const yieldPercentage = consumedQty > 0 
-        ? Math.round((standardQty / consumedQty) * 100)
-        : 0;
-      
-      return {
-        material_id: materialId,
-        material_name: material?.description || 'Unknown Material',
-        planned_qty: standardQty,
-        actual_qty: consumedQty,
-        variance: consumedQty - standardQty,
-        item_code: material?.part_number || `MAT-${materialId}`,
-        item_name: material?.description || 'Unknown Material',
-        standard_qty: standardQty,
-        consumed_qty: consumedQty,
-        uom: bomItem?.uom || material?.uom || '',
-        yield_percentage: yieldPercentage
-      };
-    });
-
-    const yieldReport: YieldReportDetail = {
-      id: Date.now(),
-      wo_id: parseInt(selectedWO.id),
-      work_order_id: parseInt(selectedWO.id),
-      material_id: parseInt(selectedWO.product_id),
-      planned_qty: targetQty,
-      actual_qty: createdItemsCount,
-      variance: createdItemsCount - targetQty,
-      work_order_number: selectedWO.wo_number,
-      line_number: selectedWO.line_number || '',
-      product_name: `${selectedWO.product?.part_number} - ${selectedWO.product?.description}`,
-      target_quantity: targetQty,
-      actual_quantity: createdItemsCount,
-      materials_used: materialsUsed,
-      efficiency_percentage: efficiency,
-      created_at: new Date().toISOString(),
-      created_by: 'Operator'
-    };
-
-    addYieldReport(yieldReport);
-
-    clearOrderProgress(selectedWOId);
-
-    toast.success('Order closed, yield report generated');
-
-    setShowYieldReportsModal(true);
-
-    setSelectedLine(null);
-    setSelectedWOId(null);
-    setLpNumber('');
-    setCurrentScannedLP(null);
-    setStageQuantity('');
-    setQuantityToCreate('');
-    setCreatedItemsCount(0);
-    setConsumedMaterials({});
-    setStagedLPsByOrder(prev => {
-      const updated = { ...prev };
-      delete updated[selectedWOId];
-      return updated;
-    });
   };
 
-  const handleReset = () => {
-    setSelectedLine(null);
-    setSelectedWOId(null);
-    setLpNumber('');
-    setCurrentScannedLP(null);
-    setStageQuantity('');
-    setQuantityToCreate('');
-  };
-
-  const handleAlertClose = () => {
-    setShowAlert(false);
-    setTimeout(() => lpInputRef.current?.focus(), 100);
-  };
-
-  const handleStartWorkOrder = () => {
-    if (!selectedWO) return;
-    
-    updateWorkOrder(parseInt(selectedWO.id), { status: 'in_progress' });
-    toast.success(`Work Order ${selectedWO.wo_number} started successfully`);
-  };
+  const selectedWO = selectedWOId ? workOrders.find(wo => wo.id === selectedWOId) : null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <AlertDialog
-        isOpen={showAlert}
-        onClose={handleAlertClose}
-        title="BOM Validation Error"
-        message={alertMessage}
-      />
-
-      {showInsufficientModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <div className="flex items-center gap-3 mb-4">
-              <AlertTriangle className="w-6 h-6 text-orange-500" />
-              <h3 className="text-lg font-bold text-slate-900">Insufficient Materials</h3>
-            </div>
-            
-            <div className="space-y-2 mb-6">
-              {insufficientMaterials.map((item, idx) => (
-                <div key={idx} className="bg-red-50 border border-red-200 rounded p-3">
-                  <p className="font-medium text-slate-900">{item.material}</p>
-                  <p className="text-sm text-slate-600">
-                    Needed: {item.needed} {item.uom} | Available: {item.available} {item.uom}
-                  </p>
-                  <p className="text-sm text-red-600 font-medium">
-                    Short by: {item.shortage} {item.uom}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => proceedWithCreation(parseFloat(quantityToCreate))}
-                className="flex-1 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold"
-              >
-                Proceed Anyway
-              </button>
-              <button
-                onClick={() => setShowInsufficientModal(false)}
-                className="flex-1 px-4 py-3 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors font-semibold"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-green-600 text-white p-4 sticky top-0 z-10 shadow-md">
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push('/scanner')}
-              className="p-2 hover:bg-green-700 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-            <h1 className="text-xl sm:text-2xl font-bold">Pack Terminal</h1>
+            <Package className="w-8 h-8 text-blue-600" />
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Pack Terminal</h1>
+              <p className="text-slate-600">Finished Goods Packing Operations</p>
+            </div>
           </div>
-          <button
-            onClick={() => setShowYieldReportsModal(true)}
-            className="px-4 py-2 bg-green-700 hover:bg-green-800 rounded-lg transition-colors text-sm font-semibold"
-          >
-            View Yield Reports
-          </button>
         </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-red-800">
+              <XCircle className="w-5 h-5" />
+              <span>{error}</span>
       </div>
-
-      <div className="p-4 space-y-4 max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200">
-          <label className="block text-base sm:text-lg font-semibold text-slate-900 mb-3">
-            Step 1: Select Production Line
-          </label>
-          <select
-            value={selectedLine || ''}
-            onChange={(e) => setSelectedLine(e.target.value || null)}
-            className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px]"
-          >
-            <option value="">-- Select Line --</option>
-            {lines.map(line => (
-              <option key={line} value={line}>{line}</option>
-            ))}
-          </select>
         </div>
+        )}
 
-        {selectedLine && (
-          <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200">
-            <label className="block text-base sm:text-lg font-semibold text-slate-900 mb-3">
-              Step 2: Select Work Order ({selectedLine})
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Work Order Selection */}
+          <div className="space-y-6">
+            {/* Work Order Selection */}
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                Select Work Order
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Work Order
             </label>
             <select
               value={selectedWOId || ''}
-              onChange={(e) => setSelectedWOId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px]"
+                    onChange={(e) => setSelectedWOId(e.target.value ? parseInt(e.target.value) : null)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="">-- Select a WO --</option>
-              {availableWOs.map(wo => (
+                    <option value="">Select a work order</option>
+                    {workOrders.map((wo) => (
                 <option key={wo.id} value={wo.id}>
-                  {wo.wo_number} - {wo.product?.part_number} ({wo.quantity} {wo.product?.uom})
+                        {wo.wo_number} - {wo.product.part_number}
                 </option>
               ))}
             </select>
           </div>
-        )}
 
         {selectedWO && (
-          <>
-            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">{selectedWO.wo_number}</h2>
-                  <p className="text-sm text-slate-600 mt-1">
-                    {selectedWO.product?.part_number} - {selectedWO.product?.description}
-                  </p>
-                  <p className="text-sm text-slate-600 mt-1">
-                    Remaining: {selectedWO.quantity} {selectedWO.product?.uom}
-                  </p>
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <h3 className="font-medium text-blue-900 mb-2">Selected Work Order</h3>
+                    <div className="text-sm text-blue-800 space-y-1">
+                      <div><strong>WO:</strong> {selectedWO.wo_number}</div>
+                      <div><strong>Product:</strong> {selectedWO.product.part_number}</div>
+                      <div><strong>Description:</strong> {selectedWO.product.description}</div>
+                      <div><strong>Quantity:</strong> {selectedWO.quantity} {selectedWO.product.uom}</div>
+                      <div><strong>Status:</strong> {selectedWO.status}</div>
+                    </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                    {selectedWO.status}
-                  </span>
-                  {selectedWO.status === 'released' && (
-                    <button
-                      onClick={handleStartWorkOrder}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors shadow-sm"
-                    >
-                      Start Work Order
-                    </button>
                   )}
                 </div>
               </div>
 
-              <div className="border-t border-green-200 pt-3 mt-3">
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">Required Materials (BOM):</h3>
-                <div className="space-y-1">
-                  {bomItems.map((item) => {
-                    const isStaged = isBomComponentStaged(item.material_id);
-                    const productionLines = item.material?.production_lines;
-                    const needsLineSelection = productionLines && productionLines.length > 0 && !productionLines.includes('ALL');
-                    
-                    return (
-                      <div key={item.id} className="bg-white px-3 py-2 rounded">
+            {/* Available Input LPs */}
+            {selectedWOId && (
+              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                  Available Input LPs
+                </h2>
+                
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {inputLPs.map((lp) => (
+                    <div
+                      key={lp.id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        packForm.input_lps.includes(lp.id)
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                      onClick={() => {
+                        setPackForm(prev => ({
+                          ...prev,
+                          input_lps: prev.input_lps.includes(lp.id)
+                            ? prev.input_lps.filter(id => id !== lp.id)
+                            : [...prev.input_lps, lp.id]
+                        }));
+                      }}
+                    >
                         <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-slate-900">
-                              {item.material?.part_number} - {item.material?.description}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              Required: {item.quantity} {item.uom}
-                            </p>
+                        <div>
+                          <div className="font-medium text-slate-900">{lp.lp_number}</div>
+                          <div className="text-sm text-slate-600">
+                            {lp.quantity} {lp.product?.uom || 'kg'}
                           </div>
-                          {isStaged ? (
-                            <Check className="w-5 h-5 text-green-600" />
-                          ) : (
-                            <X className="w-5 h-5 text-red-600" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {lp.qa_status === 'Passed' && (
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                          )}
+                          {lp.stage_suffix && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                              {lp.stage_suffix}
+                            </span>
                           )}
                         </div>
-                        {needsLineSelection && (
-                          <div className="mt-2">
-                            <select
-                              value={componentLineSelections[item.material_id] || ''}
-                              onChange={(e) => setComponentLineSelections({
-                                ...componentLineSelections,
-                                [item.material_id]: e.target.value
-                              })}
-                              className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                            >
-                              <option value="">Select Production Line</option>
-                              {productionLines.map(lineId => {
-                                const machine = machines.find(m => m.id === parseInt(lineId));
-                                return (
-                                  <option key={lineId} value={lineId}>
-                                    {machine?.name || `Line ${lineId}`}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200">
-              <label className="block text-base sm:text-lg font-semibold text-slate-900 mb-3">
-                Step 3: Scan License Plate
-              </label>
-              <div className="flex gap-2">
-                <input
-                  ref={lpInputRef}
-                  type="text"
-                  value={lpNumber}
-                  onChange={(e) => setLpNumber(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleScanLP()}
-                  placeholder="Enter LP number"
-                  className="flex-1 px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px]"
-                />
-                <button
-                  onClick={handleScanLP}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px]"
-                >
-                  Scan
-                </button>
-              </div>
-            </div>
-
-            {currentScannedLP && (
-              <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 mb-2">Scanned LP Details</h3>
-                    <div className="space-y-1 text-sm text-slate-700">
-                      <p><span className="font-medium">LP Number:</span> {currentScannedLP.lp_number}</p>
-                      <p><span className="font-medium">Product:</span> {currentScannedLP.product?.part_number} - {currentScannedLP.product?.description}</p>
-                      <p><span className="font-medium">Location:</span> {currentScannedLP.location?.code} - {currentScannedLP.location?.name}</p>
-                      <div className="mt-2 p-2 bg-green-100 rounded border border-green-300">
-                        <p><span className="font-medium">Original LP Quantity:</span> {currentScannedLP.quantity} {currentScannedLP.product?.uom}</p>
-                        <p><span className="font-medium">Already Staged:</span> {getAlreadyStagedFromLP(parseInt(currentScannedLP.id))} {currentScannedLP.product?.uom}</p>
-                        <p className="font-bold text-green-700">
-                          <span className="font-medium">Available to Stage:</span> {currentScannedLP.quantity - getAlreadyStagedFromLP(parseInt(currentScannedLP.id))} {currentScannedLP.product?.uom}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Quantity to Stage from this LP
-                        </label>
-                        <input
-                          ref={qtyInputRef}
-                          type="number"
-                          value={stageQuantity}
-                          onChange={(e) => setStageQuantity(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleConfirmStaging()}
-                          placeholder={`Max: ${currentScannedLP.quantity - getAlreadyStagedFromLP(parseInt(currentScannedLP.id))}`}
-                          className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px]"
-                        />
-                      </div>
-                      
-                      <button
-                        onClick={handleConfirmStaging}
-                        disabled={!stageQuantity}
-                        className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px] disabled:bg-slate-300 disabled:cursor-not-allowed"
-                      >
-                        Confirm & Add to Staging
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {stagedLPsForCurrentOrder.length > 0 && (
-              <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200">
-                <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3">
-                  Staged Materials ({stagedLPsForCurrentOrder.length})
-                </h3>
-                <div className="space-y-2">
-                  {stagedLPsForCurrentOrder.map((staged, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900">{staged.lp.lp_number}</p>
-                        <p className="text-sm text-slate-600">
-                          {staged.lp.product?.part_number} - {staged.lp.product?.description}
-                        </p>
-                        <p className="text-sm font-semibold text-green-700">
-                          Staged: {staged.quantity} {staged.lp.product?.uom}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleManualConsume(staged.lp, staged.quantity)}
-                          className="px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors flex items-center gap-1"
-                        >
-                          <Minus className="w-4 h-4" />
-                          Consume
-                        </button>
-                        <button
-                          onClick={() => handleRemoveStaged(idx)}
-                          className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                        >
-                          Remove
-                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
+          </div>
 
-            <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200">
-              <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3">
-                Step 4: Create Finished Good
-              </h3>
+          {/* Middle Column - Pack Output */}
+          <div className="space-y-6">
+            {/* Pack Output Form */}
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                Record Pack Output
+              </h2>
               
-              <div className="mb-4">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Quantity to Create ({selectedWO.product?.uom})
+                      Number of Boxes
                 </label>
                 <input
-                  ref={createQtyInputRef}
                   type="number"
-                  value={quantityToCreate}
-                  onChange={(e) => setQuantityToCreate(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && allBomComponentsStaged() && handleCreateFG()}
-                  placeholder="Enter quantity"
-                  className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-[48px]"
+                      value={packForm.boxes}
+                      onChange={(e) => setPackForm(prev => ({ ...prev, boxes: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., 24"
                 />
               </div>
 
-              <button
-                onClick={handleCreateFG}
-                disabled={!allBomComponentsStaged() || !quantityToCreate}
-                className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold min-h-[48px] disabled:bg-slate-300 disabled:cursor-not-allowed"
-              >
-                <Package className="w-5 h-5 inline mr-2" />
-                {allBomComponentsStaged() ? 'Create Finished Good' : 'All BOM Components Required'}
-              </button>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Box Weight (kg)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={packForm.box_weight_kg}
+                      onChange={(e) => setPackForm(prev => ({ ...prev, box_weight_kg: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., 25.0"
+                    />
+                  </div>
+                </div>
 
-              <button
-                onClick={handleCloseOrder}
-                className="w-full mt-3 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold min-h-[48px]"
-              >
-                Close Order
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Assign to Pallet (Optional)
+                  </label>
+                  <select
+                    value={packForm.pallet_id}
+                    onChange={(e) => setPackForm(prev => ({ ...prev, pallet_id: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">No pallet</option>
+                    {pallets
+                      .filter(p => p.status === 'building')
+                      .map((pallet) => (
+                        <option key={pallet.id} value={pallet.id}>
+                          {pallet.pallet_number} - {pallet.work_order.wo_number}
+                        </option>
+                      ))}
+                  </select>
+                </div>
 
-      {showYieldReportsModal && yieldReports.length > 0 && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-slate-900">Order Closed - Yield Summary</h3>
-              <button
-                onClick={() => setShowYieldReportsModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="overflow-auto flex-1">
-              {(() => {
-                const latestReport = yieldReports[yieldReports.length - 1];
-                const getYieldColor = (yieldPct: number) => {
-                  if (yieldPct >= 90) return 'text-green-600';
-                  if (yieldPct >= 70) return 'text-orange-600';
-                  return 'text-red-600';
-                };
-
-                return (
-                  <div className="space-y-4">
-                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-slate-600">Work Order</p>
-                          <p className="text-lg font-semibold text-slate-900">{latestReport.work_order_number}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-slate-600">Product</p>
-                          <p className="text-lg font-semibold text-slate-900">{latestReport.product_name}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-slate-600">Target Quantity</p>
-                          <p className="text-lg font-semibold text-slate-900">{latestReport.target_quantity}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-slate-600">Actual Quantity</p>
-                          <p className="text-lg font-semibold text-slate-900">{latestReport.actual_quantity}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-slate-600">Line</p>
-                          <p className="text-lg font-semibold text-slate-900">{latestReport.line_number}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-slate-600">Efficiency</p>
-                          <p className={`text-lg font-bold ${latestReport.efficiency_percentage >= 90 ? 'text-green-600' : latestReport.efficiency_percentage >= 70 ? 'text-orange-600' : 'text-red-600'}`}>
-                            {latestReport.efficiency_percentage}%
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="text-lg font-semibold text-slate-900 mb-3">Material Yield Details</h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse">
-                          <thead className="bg-slate-100">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 border-b">Material</th>
-                              <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">BOM Standard</th>
-                              <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">Consumed Qty</th>
-                              <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700 border-b">Yield %</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {latestReport.materials_used.map((mat, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50">
-                                <td className="px-4 py-3 text-sm text-slate-900 border-b">
-                                  <div>
-                                    <p className="font-medium">{mat.item_code}</p>
-                                    <p className="text-xs text-slate-600">{mat.item_name}</p>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-sm text-slate-900 border-b text-right">
-                                  {mat.standard_qty} {mat.uom}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-slate-900 border-b text-right">
-                                  {mat.consumed_qty} {mat.uom}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold border-b text-right">
-                                  <span className={getYieldColor(mat.yield_percentage)}>
-                                    {mat.yield_percentage}%
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end pt-4 border-t">
-                      <button
-                        onClick={() => setShowYieldReportsModal(false)}
-                        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
-                      >
-                        Close
-                      </button>
+                {packForm.boxes && packForm.box_weight_kg && (
+                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                    <h3 className="font-medium text-green-900 mb-2">Output Summary</h3>
+                    <div className="text-sm text-green-800 space-y-1">
+                      <div><strong>Boxes:</strong> {packForm.boxes}</div>
+                      <div><strong>Box Weight:</strong> {packForm.box_weight_kg} kg</div>
+                      <div><strong>Total Weight:</strong> {(parseFloat(packForm.boxes) * parseFloat(packForm.box_weight_kg)).toFixed(2)} kg</div>
                     </div>
                   </div>
-                );
-              })()}
+                )}
+
+              <button
+                  onClick={handleRecordOutput}
+                  disabled={!selectedWOId || !packForm.boxes || !packForm.box_weight_kg}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                  <Upload className="w-4 h-4" />
+                  Record Pack Output
+              </button>
+              </div>
+            </div>
+
+            {/* Create Pallet */}
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                Create New Pallet
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Work Order
+                  </label>
+                  <select
+                    value={palletForm.wo_id}
+                    onChange={(e) => setPalletForm(prev => ({ ...prev, wo_id: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select work order</option>
+                    {workOrders.map((wo) => (
+                      <option key={wo.id} value={wo.id}>
+                        {wo.wo_number} - {wo.product.part_number}
+                      </option>
+                    ))}
+                  </select>
+      </div>
+
+              <button
+                  onClick={handleCreatePallet}
+                  disabled={!palletForm.wo_id}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                  <Plus className="w-4 h-4" />
+                  Create Pallet
+              </button>
+              </div>
+            </div>
+            </div>
+            
+          {/* Right Column - Pallets */}
+          <div className="space-y-6">
+            {/* Active Pallets */}
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                Active Pallets
+              </h2>
+              
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {pallets.map((pallet) => (
+                  <div
+                    key={pallet.id}
+                    className="border border-slate-200 rounded-lg p-4"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                        <div>
+                        <div className="font-medium text-slate-900">
+                          {pallet.pallet_number}
+                        </div>
+                        <div className="text-sm text-slate-600">
+                          {pallet.work_order.wo_number}
+                        </div>
+                        <div className="text-sm text-slate-600">
+                          {pallet.work_order.product.part_number}
+                        </div>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        pallet.status === 'building'
+                          ? 'bg-blue-100 text-blue-800'
+                          : pallet.status === 'complete'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {pallet.status}
+                                  </span>
+                    </div>
+
+                    <div className="text-xs text-slate-500">
+                      Created: {new Date(pallet.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      )}
-
-      <ManualConsumeModal
-        isOpen={showManualConsumeModal}
-        onClose={() => {
-          setShowManualConsumeModal(false);
-          setSelectedLPForConsume(null);
-        }}
-        lp={selectedLPForConsume?.lp || null}
-        availableQuantity={selectedLPForConsume?.stagedQty || 0}
-        onConfirm={handleManualConsumeConfirm}
-      />
+      </div>
     </div>
   );
 }

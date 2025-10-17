@@ -59,7 +59,7 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
     setLoading(true);
     setError(null);
     try {
-      const workOrder = workOrders.find(wo => wo.id === workOrderId.toString());
+      const workOrder = workOrders.find(wo => wo.id === workOrderId?.toString());
       if (!workOrder || !workOrder.product) {
         throw new Error('Work order not found');
       }

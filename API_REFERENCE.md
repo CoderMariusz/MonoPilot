@@ -39,7 +39,11 @@ apps/frontend/lib/api/
 ├── routings.ts            # Routings API
 ├── supplierProducts.ts    # Supplier products API
 ├── taxCodes.ts            # Tax codes API
-└── asns.ts                # ASNs API
+├── asns.ts                # ASNs API
+├── yield.ts               # Yield reporting API
+├── consume.ts             # Consumption tracking API
+├── traceability.ts        # Traceability API
+└── licensePlates.ts       # License plates API
 ```
 
 ## Core API Classes
@@ -47,8 +51,13 @@ apps/frontend/lib/api/
 ### WorkOrdersAPI
 ```typescript
 export class WorkOrdersAPI {
-  // Get all work orders
-  static async getAll(): Promise<WorkOrder[]>
+  // Get all work orders with filters
+  static async getAll(filters?: {
+    line?: string;
+    kpi_scope?: 'PR' | 'FG';
+    status?: string;
+    date_bucket?: 'day' | 'week' | 'month';
+  }): Promise<WorkOrder[]>
   
   // Get work order by ID
   static async getById(id: number): Promise<WorkOrder | null>
@@ -62,11 +71,27 @@ export class WorkOrdersAPI {
   // Delete work order
   static async delete(id: number): Promise<void>
   
-  // Get work orders by status
-  static async getByStatus(status: WorkOrderStatus): Promise<WorkOrder[]>
+  // Close work order
+  static async closeWorkOrder(woId: number, userId: string, reason: string, source: string): Promise<{success: boolean, error?: string}>
   
-  // Get work orders by production line
-  static async getByProductionLine(line: string): Promise<WorkOrder[]>
+  // Get work order stage status
+  static async getWorkOrderStageStatus(woId: number): Promise<{
+    wo_id: number;
+    operations: Array<{
+      seq: number;
+      operation_name: string;
+      required_kg: number;
+      staged_kg: number;
+      in_kg: number;
+      remaining_kg: number;
+      color_code: 'green' | 'amber' | 'red';
+      one_to_one_components: Array<{
+        material_id: number;
+        material_name: string;
+        one_to_one: boolean;
+      }>;
+    }>;
+  }>
 }
 ```
 
@@ -139,6 +164,90 @@ export class TransferOrdersAPI {
   
   // Get transfer orders by status
   static async getByStatus(status: string): Promise<TransferOrder[]>
+}
+```
+
+### YieldAPI
+```typescript
+export class YieldAPI {
+  // Get PR yield data
+  static async getPRYield(filters?: {
+    startDate?: string;
+    endDate?: string;
+    line?: string;
+    product_id?: number;
+  }): Promise<YieldReportEntry[]>
+  
+  // Get FG yield data
+  static async getFGYield(filters?: {
+    startDate?: string;
+    endDate?: string;
+    line?: string;
+    product_id?: number;
+  }): Promise<YieldReportEntry[]>
+}
+```
+
+### ConsumeAPI
+```typescript
+export class ConsumeAPI {
+  // Get consumption data
+  static async getConsumption(filters?: {
+    startDate?: string;
+    endDate?: string;
+    line?: string;
+    product_id?: number;
+    material_id?: number;
+  }): Promise<ConsumptionReportEntry[]>
+}
+```
+
+### TraceabilityAPI
+```typescript
+export class TraceabilityAPI {
+  // Get forward trace
+  static async getForwardTrace(lpNumber: string): Promise<ForwardTraceResponse>
+  
+  // Get backward trace
+  static async getBackwardTrace(lpNumber: string): Promise<BackwardTraceResponse>
+  
+  // Build trace tree
+  static buildTraceTree(data: any[], direction: 'forward' | 'backward'): TraceTree
+  
+  // Calculate trace completeness
+  static calculateTraceCompleteness(data: any[]): number
+  
+  // Get overall QA status
+  static getOverallQAStatus(data: any[]): string
+  
+  // Calculate total quantity
+  static calculateTotalQuantity(data: any[]): number
+}
+```
+
+### LicensePlatesAPI
+```typescript
+export class LicensePlatesAPI {
+  // Get all license plates
+  static async getAll(): Promise<LicensePlate[]>
+  
+  // Get license plate by ID
+  static async getById(id: number): Promise<LicensePlate | null>
+  
+  // Create new license plate
+  static async create(data: CreateLicensePlateData): Promise<LicensePlate | null>
+  
+  // Update license plate
+  static async update(id: number, data: UpdateLicensePlateData): Promise<LicensePlate | null>
+  
+  // Delete license plate
+  static async delete(id: number): Promise<boolean>
+  
+  // Split license plate
+  static async splitLP(parentLpId: number, newLpData: CreateLicensePlateData[]): Promise<LicensePlate[] | null>
+  
+  // Get LP compositions
+  static async getLPCompositions(lpId: number): Promise<any[]>
 }
 ```
 
@@ -670,6 +779,227 @@ const user = await UsersAPI.getById('user-id');
 // Purchase Orders
 const purchaseOrders = await PurchaseOrdersAPI.getAll();
 const po = await PurchaseOrdersAPI.getById(1);
+```
+
+## Production Module API Endpoints
+
+### Work Order Operations
+```typescript
+// Close Work Order
+POST /api/production/work-orders/[id]/close
+{
+  "userId": "user-id",
+  "reason": "Completed",
+  "source": "portal"
+}
+
+// Record Operation Weights
+POST /api/production/wo/[id]/operations/[seq]/weights
+{
+  "actual_input_weight": 100.0,
+  "actual_output_weight": 95.0,
+  "cooking_loss_weight": 3.0,
+  "trim_loss_weight": 2.0,
+  "marinade_gain_weight": 0.0,
+  "scrap_breakdown": {"fat": 1.0, "bone": 1.0}
+}
+
+// Update BOM Snapshot
+POST /api/production/work-orders/[id]/update-bom-snapshot
+{
+  "materials": [
+    {
+      "material_id": 1,
+      "quantity": 50.0,
+      "uom": "kg",
+      "one_to_one": true,
+      "is_optional": false
+    }
+  ]
+}
+```
+
+### Scanner Integration
+```typescript
+// Stage Board Status
+GET /api/scanner/wo/[id]/stage-status
+
+// Stage Materials
+POST /api/scanner/process/[woId]/operations/[seq]/stage
+{
+  "lp_number": "LP-001",
+  "quantity": 50.0,
+  "uom": "kg",
+  "user_id": "user-id"
+}
+
+// Record Scanner Weights
+POST /api/scanner/process/[woId]/operations/[seq]/weights
+{
+  "actual_input_weight": 100.0,
+  "actual_output_weight": 95.0,
+  "cooking_loss_weight": 3.0,
+  "trim_loss_weight": 2.0,
+  "marinade_gain_weight": 0.0,
+  "scrap_breakdown": {"fat": 1.0, "bone": 1.0},
+  "user_id": "user-id"
+}
+
+// Complete Operation
+POST /api/scanner/process/[woId]/complete-op/[seq]
+{
+  "output_lp_number": "LP-002",
+  "output_quantity": 95.0,
+  "output_uom": "kg",
+  "user_id": "user-id",
+  "qa_status": "Passed"
+}
+
+// Pack Terminal
+POST /api/scanner/pack/[woId]
+{
+  "pallet_number": "PLT-2024-001",
+  "lp_numbers": ["LP-001", "LP-002"],
+  "location_id": 1,
+  "user_id": "user-id"
+}
+```
+
+### Reservations
+```typescript
+// Create Reservation
+POST /api/scanner/reservations
+{
+  "lp_id": 1,
+  "wo_id": 1,
+  "qty": 50.0,
+  "operation_id": 1,
+  "notes": "Test reservation"
+}
+
+// Get Reservations
+GET /api/scanner/reservations?lp_id=1&wo_id=1&status=active
+
+// Cancel Reservation
+DELETE /api/scanner/reservations/[id]
+```
+
+### Pallets
+```typescript
+// Create Pallet
+POST /api/production/pallets
+{
+  "pallet_number": "PLT-2024-001",
+  "location_id": 1,
+  "status": "packed",
+  "meta": {}
+}
+
+// Add LP to Pallet
+POST /api/production/pallets/[id]/items
+{
+  "lp_id": 1,
+  "quantity": 50.0,
+  "uom": "kg"
+}
+
+// Remove LP from Pallet
+DELETE /api/production/pallets/[id]/items
+{
+  "lp_id": 1
+}
+```
+
+### Excel Exports
+```typescript
+// Export PR Yield
+GET /api/exports/yield-pr.xlsx?startDate=2024-01-01&endDate=2024-01-31&line=Line-1
+
+// Export FG Yield
+GET /api/exports/yield-fg.xlsx?startDate=2024-01-01&endDate=2024-01-31&line=Line-1
+
+// Export Consumption
+GET /api/exports/consume.xlsx?woId=1&startDate=2024-01-01&endDate=2024-01-31
+
+// Export Traceability
+GET /api/exports/trace.xlsx?lp=LP-001&direction=forward
+
+// Export Work Orders
+GET /api/exports/work-orders.xlsx?line=Line-1&status=in_progress
+
+// Export License Plates
+GET /api/exports/license-plates.xlsx?qa_status=Passed&location=1
+
+// Export Stock Moves
+GET /api/exports/stock-moves.xlsx?move_type=WO_ISSUE&startDate=2024-01-01&endDate=2024-01-31
+```
+
+## Business Logic Validation
+
+### Sequential Routing Enforcement
+```typescript
+// Validates operation sequence
+export class SequentialRoutingValidator {
+  static async validateOperationSequence(
+    woId: number, 
+    operationSeq: number, 
+    action: 'start' | 'complete'
+  ): Promise<{isValid: boolean, error?: string}>
+}
+```
+
+### One-to-One Component Rule
+```typescript
+// Validates 1:1 component relationships
+export class OneToOneValidator {
+  static async validateOneToOneRule(
+    woId: number,
+    operationSeq: number,
+    inputLPs: string[],
+    outputLPs: string[]
+  ): Promise<{isOneToOne: boolean, isValid: boolean, error?: string}>
+}
+```
+
+### Cross-WO PR Intake Validation
+```typescript
+// Validates cross-WO PR intake
+export class CrossWOValidator {
+  static async validateCrossWOPRIntake(
+    inputLP: string,
+    expectedProductId: number,
+    expectedStageSuffix: string
+  ): Promise<{isValid: boolean, error?: string}>
+}
+```
+
+### Reservation-Safe Operations
+```typescript
+// Validates reservation safety
+export class ReservationValidator {
+  static async checkAvailableQuantity(lpId: number): Promise<number>
+  static async validateReservation(
+    lpId: number,
+    requestedQty: number
+  ): Promise<{isValid: boolean, error?: string}>
+}
+```
+
+### QA Gate Enforcement
+```typescript
+// Validates QA status
+export class QAGateValidator {
+  static async validateQAStatus(
+    lpId: number,
+    action: 'ISSUE' | 'OUTPUT'
+  ): Promise<{isValid: boolean, error?: string}>
+  
+  static async validateQAOverride(
+    userId: string,
+    pin: string,
+    reason: string
+  ): Promise<{isValid: boolean, error?: string}>
+}
 ```
 
 ## Future Enhancements

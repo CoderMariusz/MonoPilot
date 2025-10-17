@@ -1,0 +1,77 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-supabase"],
+      "env": {
+        "SUPABASE_URL": "https://your-project.supabase.co",
+        "SUPABASE_ANON_KEY": "your-anon-key",
+        "SUPABASE_SERVICE_ROLE_KEY": "your-service-role-key"
+      }
+    },
+    "vercel": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-vercel"],
+      "env": {
+        "VERCEL_TOKEN": "your-vercel-token",
+        "VERCEL_PROJECT_ID": "your-project-id",
+        "VERCEL_ORG_ID": "your-org-id"
+      }
+    }
+  },
+  "database": {
+    "provider": "supabase",
+    "schema": "public",
+    "tables": [
+      "work_orders",
+      "wo_operations",
+      "license_plates",
+      "wo_bom_snapshots",
+      "lp_reservations",
+      "pallets",
+      "pallet_items",
+      "lp_compositions",
+      "qa_override_log",
+      "stock_moves",
+      "production_outputs",
+      "products",
+      "bom",
+      "bom_items",
+      "routings",
+      "routing_operations",
+      "machines",
+      "locations",
+      "users"
+    ]
+  },
+  "scanner": {
+    "features": {
+      "sequential_routing": true,
+      "one_to_one_components": true,
+      "cross_wo_pr_intake": true,
+      "qa_gate": true,
+      "reservations": true,
+      "pallets": true,
+      "compositions": true,
+      "offline_support": true
+    },
+    "validations": {
+      "enforce_sequential_operations": true,
+      "enforce_qa_status": true,
+      "enforce_one_to_one": true,
+      "enforce_stage_suffix": true,
+      "enforce_reservations": true
+    },
+    "api_endpoints": [
+      "/api/scanner/wo/[id]/stage-status",
+      "/api/scanner/process/[woId]/operations/[seq]/stage",
+      "/api/scanner/process/[woId]/operations/[seq]/weights",
+      "/api/scanner/process/[woId]/complete-op/[seq]",
+      "/api/scanner/pack/[woId]/output",
+      "/api/scanner/pallets",
+      "/api/scanner/pallets/[id]",
+      "/api/scanner/lp/[id]",
+      "/api/scanner/reservations"
+    ]
+  }
+}

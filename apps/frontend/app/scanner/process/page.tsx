@@ -2,11 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Package, CheckCircle, X, Check, AlertTriangle, Minus } from 'lucide-react';
+import { ArrowLeft, Package, CheckCircle, X, Check, AlertTriangle, Minus, Calculator, Settings, BarChart3 } from 'lucide-react';
 import { useWorkOrders, useLicensePlates, updateWorkOrder, updateLicensePlate, addLicensePlate, addStockMove, addYieldReport, useYieldReports, useSettings, saveOrderProgress, getOrderProgress, clearOrderProgress, useMachines, getFilteredBomForWorkOrder } from '@/lib/clientState';
 import { toast } from '@/lib/toast';
 import { AlertDialog } from '@/components/AlertDialog';
 import { ManualConsumeModal } from '@/components/ManualConsumeModal';
+import { StageBoard } from '@/components/scanner/StageBoard';
+import { StagedLPsList } from '@/components/scanner/StagedLPsList';
+import { QAOverrideModal } from '@/components/scanner/QAOverrideModal';
 import type { WorkOrder, LicensePlate, BomItem, YieldReportDetail, YieldReportMaterial, StagedLP } from '@/lib/types';
 
 interface InsufficientMaterial {
@@ -35,6 +38,13 @@ export default function ProcessTerminalPage() {
   const [showManualConsumeModal, setShowManualConsumeModal] = useState(false);
   const [selectedLPForConsume, setSelectedLPForConsume] = useState<{ lp: LicensePlate; stagedQty: number } | null>(null);
   const [showYieldReportsModal, setShowYieldReportsModal] = useState(false);
+  const [currentOperationSeq, setCurrentOperationSeq] = useState<number | null>(null);
+  const [showStageBoard, setShowStageBoard] = useState(false);
+  const [showStagedLPs, setShowStagedLPs] = useState(false);
+  const [showQAOverride, setShowQAOverride] = useState(false);
+  const [selectedLPForQA, setSelectedLPForQA] = useState<LicensePlate | null>(null);
+  const [showRecordWeights, setShowRecordWeights] = useState(false);
+  const [selectedOperationForWeights, setSelectedOperationForWeights] = useState<any>(null);
 
   const lpInputRef = useRef<HTMLInputElement>(null);
   const qtyInputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +58,7 @@ export default function ProcessTerminalPage() {
   
   const [componentLineSelections, setComponentLineSelections] = useState<{[materialId: number]: string}>({});
 
-  const lines = ['Line 1', 'Line 2', 'Line 3', 'Line 4'];
+  const lines = ['Line 1', 'Line 2', 'Line 3', 'Line 4', 'Mixer A'];
   
   const availableWOs = workOrders.filter(wo => 
     wo.machine?.name === selectedLine &&
@@ -495,6 +505,73 @@ export default function ProcessTerminalPage() {
     setSelectedLPForConsume(null);
   };
 
+  // New production module handlers
+  const handleOperationSelect = (operation: any) => {
+    setCurrentOperationSeq(operation.seq);
+    setSelectedOperationForWeights(operation);
+  };
+
+  const handleRecordWeights = async (weightsData: any) => {
+    if (!selectedWOId || !currentOperationSeq) return;
+    
+    try {
+      const response = await fetch(`/api/scanner/process/${selectedWOId}/operations/${currentOperationSeq}/weights`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(weightsData)
+      });
+      
+      if (!response.ok) throw new Error('Failed to record weights');
+      
+      toast.success('Weights recorded successfully');
+      setShowRecordWeights(false);
+      setSelectedOperationForWeights(null);
+    } catch (error) {
+      toast.error('Failed to record weights');
+    }
+  };
+
+  const handleQAOverride = async (overrideData: any) => {
+    if (!selectedLPForQA) return;
+    
+    try {
+      const response = await fetch(`/api/scanner/lp/${selectedLPForQA.id}/qa-override`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(overrideData)
+      });
+      
+      if (!response.ok) throw new Error('QA override failed');
+      
+      toast.success('QA status overridden successfully');
+      setShowQAOverride(false);
+      setSelectedLPForQA(null);
+    } catch (error) {
+      toast.error('QA override failed');
+    }
+  };
+
+  const handleCompleteOperation = async () => {
+    if (!selectedWOId || !currentOperationSeq) return;
+    
+    try {
+      const response = await fetch(`/api/scanner/process/${selectedWOId}/complete-op/${currentOperationSeq}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: '00000000-0000-0000-0000-000000000000' // TODO: Get from auth context
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to complete operation');
+      
+      toast.success('Operation completed successfully');
+      setCurrentOperationSeq(null);
+    } catch (error) {
+      toast.error('Failed to complete operation');
+    }
+  };
+
   const handleCloseOrder = () => {
     if (!selectedWO || !selectedWOId) return;
 
@@ -939,6 +1016,54 @@ export default function ProcessTerminalPage() {
                 Close Order
               </button>
             </div>
+
+            {/* Production Module Actions */}
+            <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm border border-slate-200">
+              <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3">
+                Production Module Actions
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  onClick={() => setShowStageBoard(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                >
+                  <BarChart3 className="w-5 h-5" />
+                  Stage Board
+                </button>
+                
+                <button
+                  onClick={() => setShowStagedLPs(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                >
+                  <Package className="w-5 h-5" />
+                  Staged LPs
+                </button>
+                
+                <button
+                  onClick={() => setShowRecordWeights(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold"
+                >
+                  <Calculator className="w-5 h-5" />
+                  Record Weights
+                </button>
+                
+                <button
+                  onClick={handleCompleteOperation}
+                  disabled={!currentOperationSeq}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold disabled:bg-slate-300 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  Complete Operation
+                </button>
+              </div>
+
+              {currentOperationSeq && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                  Current Operation: {currentOperationSeq}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -1062,6 +1187,99 @@ export default function ProcessTerminalPage() {
         lp={selectedLPForConsume?.lp || null}
         availableQuantity={selectedLPForConsume?.stagedQty || 0}
         onConfirm={handleManualConsumeConfirm}
+      />
+
+      {/* Production Module Components */}
+      {selectedWOId && showStageBoard && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Stage Board - WO {selectedWOId}</h3>
+              <button
+                onClick={() => setShowStageBoard(false)}
+                className="p-1 hover:bg-slate-100 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <StageBoard woId={selectedWOId} onOperationSelect={handleOperationSelect} />
+          </div>
+        </div>
+      )}
+
+      {selectedWOId && showStagedLPs && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Staged LPs - WO {selectedWOId}</h3>
+              <button
+                onClick={() => setShowStagedLPs(false)}
+                className="p-1 hover:bg-slate-100 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <StagedLPsList 
+              woId={selectedWOId} 
+              operationSeq={currentOperationSeq}
+              onEditLP={(lp) => {
+                setSelectedLPForQA(lp);
+                setShowQAOverride(true);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {showRecordWeights && selectedOperationForWeights && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Record Weights - {selectedOperationForWeights.operation_name}
+              </h3>
+              <button
+                onClick={() => setShowRecordWeights(false)}
+                className="p-1 hover:bg-slate-100 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">
+                Record actual input and output weights for operation {selectedOperationForWeights.seq}.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowRecordWeights(false)}
+                  className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    // This would open the Record Weights modal
+                    setShowRecordWeights(false);
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Record Weights
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <QAOverrideModal
+        isOpen={showQAOverride}
+        onClose={() => {
+          setShowQAOverride(false);
+          setSelectedLPForQA(null);
+        }}
+        lpNumber={selectedLPForQA?.lp_number || ''}
+        currentQAStatus={selectedLPForQA?.qa_status || 'Pending'}
+        onOverride={handleQAOverride}
       />
     </div>
   );

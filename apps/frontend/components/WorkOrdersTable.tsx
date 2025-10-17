@@ -2,14 +2,15 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Loader2, Eye, Edit, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, MoreVertical, X } from 'lucide-react';
-import { useWorkOrders, deleteWorkOrder, cancelWorkOrder, getWoProductionStats } from '@/lib/clientState';
+import { useSupabaseWorkOrders } from '@/lib/hooks/useSupabaseData';
+import { deleteWorkOrder, cancelWorkOrder, getWoProductionStats } from '@/lib/clientState';
 import { WorkOrderDetailsModal } from '@/components/WorkOrderDetailsModal';
 import { CreateWorkOrderModal } from '@/components/CreateWorkOrderModal';
 import { toast } from '@/lib/toast';
 import type { WorkOrder } from '@/lib/types';
 
 export function WorkOrdersTable() {
-  const workOrders = useWorkOrders();
+  const { data: workOrders, loading: loadingData, error: loadError } = useSupabaseWorkOrders();
   const [loading] = useState(false);
   const [error] = useState<string | null>(null);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<number | null>(null);
@@ -17,6 +18,12 @@ export function WorkOrdersTable() {
   const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [lineFilter, setLineFilter] = useState<string>('');
+  const [productFilter, setProductFilter] = useState<string>('');
+  const [bucketFilter, setBucketFilter] = useState<'day' | 'week' | 'month'>('day');
+  const [qaFilter, setQaFilter] = useState<string>('');
+  const [kpiScopeFilter, setKpiScopeFilter] = useState<'PR' | 'FG' | ''>('');
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [actionsMenuOpen, setActionsMenuOpen] = useState<number | null>(null);
@@ -36,19 +43,26 @@ export function WorkOrdersTable() {
   }, [actionsMenuOpen]);
 
   const filteredWorkOrders = useMemo(() => {
-    if (!searchQuery.trim()) return workOrders;
-    
-    const query = searchQuery.toLowerCase();
-    return workOrders.filter(wo => {
-      const woNumber = wo.wo_number?.toLowerCase() || '';
-      const productName = wo.product?.description?.toLowerCase() || '';
-      const itemCode = wo.product?.part_number?.toLowerCase() || '';
-      
-      return woNumber.includes(query) || 
-             productName.includes(query) || 
-             itemCode.includes(query);
+    const base = !searchQuery.trim()
+      ? workOrders
+      : workOrders.filter(wo => {
+          const query = searchQuery.toLowerCase();
+          const woNumber = wo.wo_number?.toLowerCase() || '';
+          const productName = wo.product?.description?.toLowerCase() || '';
+          const itemCode = wo.product?.part_number?.toLowerCase() || '';
+          return woNumber.includes(query) || productName.includes(query) || itemCode.includes(query);
+        });
+
+    return base.filter(wo => {
+      const matchesStatus = statusFilter ? wo.status === statusFilter : true;
+      const matchesLine = lineFilter ? (wo.machine?.name || wo.line_number || '').toLowerCase().includes(lineFilter.toLowerCase()) : true;
+      const matchesProduct = productFilter ? (wo.product?.description || '').toLowerCase().includes(productFilter.toLowerCase()) : true;
+      // Placeholder QA filter (no QA flags on WO yet)
+      const matchesQa = qaFilter ? qaFilter === 'Passed' : true;
+      const matchesKpiScope = kpiScopeFilter ? wo.kpi_scope === kpiScopeFilter : true;
+      return matchesStatus && matchesLine && matchesProduct && matchesQa && matchesKpiScope;
     });
-  }, [workOrders, searchQuery]);
+  }, [workOrders, searchQuery, statusFilter, lineFilter, productFilter, qaFilter, kpiScopeFilter]);
 
   const sortedWorkOrders = useMemo(() => {
     if (!sortColumn) return filteredWorkOrders;
@@ -132,6 +146,29 @@ export function WorkOrdersTable() {
     setDeleteConfirmId(null);
   };
 
+  const handleCloseWO = async (wo: WorkOrder) => {
+    try {
+      const res = await fetch(`/api/production/work-orders/${wo.id}/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actual_end: new Date().toISOString(),
+          actual_output_qty: Number(wo.quantity) || 0,
+          actual_boxes: null,
+          notes: 'Closed from UI',
+          quality_checks: { passed: true, issues: [] }
+        })
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to close work order');
+      }
+      toast.success(`Work Order ${wo.wo_number} closed`);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to close work order');
+    }
+  };
+
   // Helper functions for new columns
   const calculateProgress = (workOrder: WorkOrder) => {
     // For now, return placeholder - will be calculated from actual data later
@@ -187,7 +224,7 @@ export function WorkOrdersTable() {
 
   return (
     <>
-      <div className="mb-4">
+      <div className="mb-4 space-y-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input
@@ -197,6 +234,35 @@ export function WorkOrdersTable() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
           />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
+          <select value={bucketFilter} onChange={(e) => setBucketFilter(e.target.value as any)} className="px-3 py-2 border border-slate-300 rounded-md text-sm">
+            <option value="day">Day</option>
+            <option value="week">Week</option>
+            <option value="month">Month</option>
+          </select>
+          <input value={lineFilter} onChange={(e) => setLineFilter(e.target.value)} placeholder="Filter: Line" className="px-3 py-2 border border-slate-300 rounded-md text-sm" />
+          <input value={productFilter} onChange={(e) => setProductFilter(e.target.value)} placeholder="Filter: Product" className="px-3 py-2 border border-slate-300 rounded-md text-sm" />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md text-sm">
+            <option value="">Status: All</option>
+            <option value="planned">Planned</option>
+            <option value="released">Released</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <select value={kpiScopeFilter} onChange={(e) => setKpiScopeFilter(e.target.value as 'PR' | 'FG' | '')} className="px-3 py-2 border border-slate-300 rounded-md text-sm">
+            <option value="">KPI Scope: All</option>
+            <option value="PR">Process (PR)</option>
+            <option value="FG">Finished Goods (FG)</option>
+          </select>
+          <select value={qaFilter} onChange={(e) => setQaFilter(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md text-sm">
+            <option value="">QA: All</option>
+            <option value="Passed">Passed</option>
+            <option value="Pending">Pending</option>
+            <option value="Failed">Failed</option>
+            <option value="Quarantine">Quarantine</option>
+          </select>
         </div>
       </div>
 
@@ -271,6 +337,7 @@ export function WorkOrdersTable() {
                 </button>
               </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Priority</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">QA</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Made</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Progress %</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Shortages</th>
@@ -329,6 +396,9 @@ export function WorkOrdersTable() {
                     </span>
                   </td>
                   <td className="py-3 px-4 text-sm">
+                    <span className="text-xs text-slate-500">–</span>
+                  </td>
+                  <td className="py-3 px-4 text-sm">
                     {(() => {
                       const stats = getWoProductionStats(parseInt(wo.id));
                       return (
@@ -378,6 +448,15 @@ export function WorkOrdersTable() {
                           >
                             <Eye className="w-4 h-4" />
                             View details
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleCloseWO(wo);
+                              setActionsMenuOpen(null);
+                            }}
+                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                          >
+                            Close
                           </button>
                           <button
                             onClick={() => {
