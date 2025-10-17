@@ -5,10 +5,6 @@
 NEXT_PUBLIC_SUPABASE_URL=https://pgroxddbtaevdegnidaz.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncm94ZGRidGFldmRlZ25pZGF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NTgzNzMsImV4cCI6MjA3NTUzNDM3M30.ZeNq9j3n6JZ1dVgnfZ8rjxsIu9kC7tk07DKspEoqEnU
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
-```
-
-## Application Configuration
-```bash
 NEXT_PUBLIC_USE_MOCK_DATA=false
 NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
 NODE_ENV=production
