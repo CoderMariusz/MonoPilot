@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { WarehousesAPI } from '@/lib/api/warehouses';
-import { useWarehouses } from '@/lib/clientState';
+import { WarehousesAPI } from '@/lib/api/warehouses';
 import type { Warehouse } from '@/lib/types';
 
 export function WarehousesTable() {
@@ -13,7 +13,8 @@ export function WarehousesTable() {
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
 
   // Use mock data for now
-  const mockWarehouses = useWarehouses();
+  const [warehouses, setWarehouses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadWarehouses = async () => {

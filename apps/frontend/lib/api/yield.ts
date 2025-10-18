@@ -1,4 +1,3 @@
-import { shouldUseMockData } from './config';
 import { supabase } from '../supabase/client';
 
 // Yield API - Production yield calculations
@@ -30,24 +29,7 @@ export class YieldAPI {
       total_output_kg: number;
     };
   }> {
-    if (shouldUseMockData()) {
-      // Mock PR yield data
-      return {
-        data: [
-          {
-            production_date: '2024-01-15',
-            production_date_utc: '2024-01-15T00:00:00Z',
-            production_line: 'Line 1',
-            product: 'Ground Beef',
-            part_number: 'GB-001',
-            work_order_count: 3,
-            total_input_kg: 1500,
-            total_output_kg: 1350,
-            pr_yield_percent: 90.0,
-            pr_consumption_per_kg: 1.11,
-            plan_accuracy_percent: 95.0
-          }
-        ],
+    ],
         summary: {
           total_work_orders: 3,
           avg_yield_percent: 90.0,
@@ -140,27 +122,7 @@ export class YieldAPI {
       total_waste_kg: number;
     };
   }> {
-    if (shouldUseMockData()) {
-      // Mock FG yield data
-      return {
-        data: [
-          {
-            production_date: '2024-01-15',
-            production_date_utc: '2024-01-15T00:00:00Z',
-            production_line: 'Line 1',
-            product: 'Beef Sausage',
-            part_number: 'BS-001',
-            work_order_count: 2,
-            total_planned_boxes: 100,
-            total_actual_boxes: 95,
-            avg_box_weight_kg: 2.5,
-            total_fg_weight_kg: 237.5,
-            total_meat_input_kg: 300,
-            fg_yield_percent: 79.17,
-            plan_accuracy_percent: 95.0,
-            waste_kg: 62.5
-          }
-        ],
+    ],
         summary: {
           total_work_orders: 2,
           avg_yield_percent: 79.17,

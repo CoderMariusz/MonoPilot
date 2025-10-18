@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pencil, Trash2, Plus } from 'lucide-react';
-import { useLocations, addLocation, updateLocation, deleteLocation } from '@/lib/clientState';
+import { LocationsAPI } from '@/lib/api/locations';
 import type { Location } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 
 export function LocationsTable() {
-  const locations = useLocations();
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [loading, setLoading] = useState(true);
   const { showToast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
@@ -18,6 +19,24 @@ export function LocationsTable() {
     zone: '',
     is_active: true,
   });
+
+  // Fetch locations on component mount
+  useEffect(() => {
+    async function fetchLocations() {
+      try {
+        setLoading(true);
+        const data = await LocationsAPI.getAll();
+        setLocations(data);
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+        showToast('Failed to fetch locations', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchLocations();
+  }, [showToast]);
 
   const handleAdd = () => {
     setEditingLocation(null);
@@ -43,16 +62,20 @@ export function LocationsTable() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this location?')) {
-      const success = deleteLocation(id);
-      if (success) {
+      try {
+        await LocationsAPI.delete(id);
+        setLocations(prev => prev.filter(loc => loc.id !== id));
         showToast('Location deleted successfully', 'success');
+      } catch (error) {
+        console.error('Error deleting location:', error);
+        showToast('Failed to delete location', 'error');
       }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const locationData = {
@@ -64,22 +87,29 @@ export function LocationsTable() {
       is_active: formData.is_active,
     };
 
-    if (editingLocation) {
-      updateLocation(editingLocation.id, locationData);
-      showToast('Location updated successfully', 'success');
-    } else {
-      addLocation(locationData);
-      showToast('Location added successfully', 'success');
+    try {
+      if (editingLocation) {
+        const updatedLocation = await LocationsAPI.update(editingLocation.id, locationData);
+        setLocations(prev => prev.map(loc => loc.id === editingLocation.id ? updatedLocation : loc));
+        showToast('Location updated successfully', 'success');
+      } else {
+        const newLocation = await LocationsAPI.create(locationData);
+        setLocations(prev => [...prev, newLocation]);
+        showToast('Location added successfully', 'success');
+      }
+      
+      setIsModalOpen(false);
+      setFormData({
+        code: '',
+        name: '',
+        type: '',
+        zone: '',
+        is_active: true,
+      });
+    } catch (error) {
+      console.error('Error saving location:', error);
+      showToast('Failed to save location', 'error');
     }
-    
-    setIsModalOpen(false);
-    setFormData({
-      code: '',
-      name: '',
-      type: '',
-      zone: '',
-      is_active: true,
-    });
   };
 
   return (
@@ -106,7 +136,13 @@ export function LocationsTable() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-200">
-            {locations.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
+                  Loading locations...
+                </td>
+              </tr>
+            ) : locations.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
                   No locations configured yet

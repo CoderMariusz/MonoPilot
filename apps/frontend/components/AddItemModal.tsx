@@ -3,9 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, ArrowLeft, Loader2, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/lib/toast';
-import { mockProducts } from '@/lib/mockData';
-import { useAllergens, useProducts, useMachines, useTaxCodes, useSuppliers, useRoutings } from '@/lib/clientState';
-import type { Product, Allergen, ProductGroup, ProductType, TaxCode, Supplier, Routing } from '@/lib/types';
+import { ProductsAPI } from '@/lib/api/products';
+import { AllergensAPI } from '@/lib/api/allergens';
+import { MachinesAPI } from '@/lib/api/machines';
+import { TaxCodesAPI } from '@/lib/api/taxCodes';
+import { SuppliersAPI } from '@/lib/api/suppliers';
+import { RoutingsAPI } from '@/lib/api/routings';
+import type { Product, Allergen, ProductGroup, ProductType, TaxCode, Supplier, Routing, Machine } from '@/lib/types';
 import type { BomComponent } from '@/lib/validation/productSchema';
 import ProductionLinesDropdown from './ProductionLinesDropdown';
 
@@ -26,12 +30,44 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { showToast } = useToast();
-  const allergens = useAllergens();
-  const allProducts = useProducts();
-  const machines = useMachines();
-  const taxCodes = useTaxCodes();
-  const suppliers = useSuppliers();
-  const routings = useRoutings();
+  const [allergens, setAllergens] = useState<Allergen[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [machines, setMachines] = useState<Machine[]>([]);
+  const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [routings, setRoutings] = useState<Routing[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // Fetch data on component mount
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setDataLoading(true);
+        const [allergensData, productsData, machinesData, taxCodesData, suppliersData, routingsData] = await Promise.all([
+          AllergensAPI.getAll(),
+          ProductsAPI.getAll(),
+          MachinesAPI.getAll(),
+          TaxCodesAPI.getAll(),
+          SuppliersAPI.getAll(),
+          RoutingsAPI.getAll()
+        ]);
+        
+        setAllergens(allergensData);
+        setAllProducts(productsData);
+        setMachines(machinesData);
+        setTaxCodes(taxCodesData);
+        setSuppliers(suppliersData);
+        setRoutings(routingsData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        showToast('Failed to load data', 'error');
+      } finally {
+        setDataLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [showToast]);
 
   const [formData, setFormData] = useState({
     part_number: '',
@@ -497,7 +533,6 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
 
     setLoading(true);
     try {
-      const { addProduct, updateProduct } = await import('@/lib/clientState');
       const payload: any = {
         part_number: formData.part_number,
         description: formData.description,
@@ -570,10 +605,10 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       }
 
       if (isEditMode && product) {
-        await updateProduct(product.id, payload);
+        await ProductsAPI.update(product.id, payload);
         showToast('Product updated successfully', 'success');
       } else {
-        await addProduct(payload);
+        await ProductsAPI.create(payload);
         showToast('Product created successfully', 'success');
       }
       

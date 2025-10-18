@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { ClipboardList, TrendingUp, Package, Loader2, Route, Workflow } from 'lucide-react';
 import { WorkOrdersTable } from '@/components/WorkOrdersTable';
 import { RecordWeightsModal } from '@/components/RecordWeightsModal';
-import { mockConsumeReport } from '@/lib/mockData';
-import { useYieldReports, useWorkOrders, getFilteredBomForWorkOrder } from '@/lib/clientState';
+import { WorkOrdersAPI } from '@/lib/api/workOrders';
 import type { ConsumeReport } from '@/lib/types';
 
 type TabType = 'work-orders' | 'yield-report' | 'consume-report' | 'operations' | 'trace';

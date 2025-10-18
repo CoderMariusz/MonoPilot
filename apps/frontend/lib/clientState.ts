@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress, BomItem, ProductionOutput, Supplier, Warehouse, TaxCode, SupplierProduct, Routing, ProductAllergen } from './types';
 import { ProductsAPI } from './api/products';
-import { shouldUseMockData } from './api/config';
 
 interface AuditEvent {
   id: string;
@@ -653,133 +652,19 @@ class ClientState {
   }
 
   async addProduct(product: any): Promise<Product> {
-    if (!shouldUseMockData()) {
-      // Use real API
-      const createdProduct = await ProductsAPI.create(product);
-      // Refresh products list
-      this.products = await ProductsAPI.getAll();
-      this.notifyProductListeners();
-      return createdProduct;
-    }
-
-    // Mock mode - use existing logic
-    const { bom_items, ...productData } = product;
-    const newProductId = Math.max(...this.products.map(p => p.id), 0) + 1;
-    
-    let activeBom = null;
-    if (bom_items && bom_items.length > 0) {
-      const bomId = Date.now();
-      const bomItems = bom_items.map((item: any, index: number) => ({
-        id: bomId + index + 1,
-        bom_id: bomId,
-        material_id: item.material_id,
-        quantity: item.quantity.toString(),
-        uom: item.uom,
-        sequence: item.sequence || index + 1,
-        priority: item.priority,
-        production_lines: item.production_lines || [],
-        scrap_std_pct: item.scrap_std_pct || 0,
-        is_optional: item.is_optional || false,
-        is_phantom: item.is_phantom || false,
-        one_to_one: item.one_to_one || false,
-        unit_cost_std: item.unit_cost_std,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }));
-      
-      activeBom = {
-        id: bomId,
-        product_id: newProductId,
-        version: '1.0',
-        is_active: true,
-        bomItems,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-    }
-    
-    const newProduct: Product = {
-      ...productData,
-      id: newProductId,
-      production_lines: product.production_lines || [],
-      activeBom,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    this.products = [...this.products, newProduct];
+    // Use real API
+    const createdProduct = await ProductsAPI.create(product);
+    // Refresh products list
+    this.products = await ProductsAPI.getAll();
     this.notifyProductListeners();
-    return newProduct;
+    return createdProduct;
   }
 
   async updateProduct(id: number, updates: any): Promise<Product | null> {
-    if (!shouldUseMockData()) {
-      // Use real API
-      const updatedProduct = await ProductsAPI.update(id, updates);
-      // Refresh products list
-      this.products = await ProductsAPI.getAll();
-      this.notifyProductListeners();
-      return updatedProduct;
-    }
-
-    // Mock mode - use existing logic
-    const index = this.products.findIndex(p => p.id === id);
-    if (index === -1) return null;
-
-    const { bom_items, ...productUpdates } = updates;
-    
-    let activeBom = this.products[index].activeBom;
-    if (bom_items !== undefined) {
-      if (bom_items && bom_items.length > 0) {
-        const bomId = activeBom?.id || Date.now();
-        const bomItems = bom_items.map((item: any, index: number) => ({
-          id: bomId + index + 1,
-          bom_id: bomId,
-          material_id: item.material_id,
-          quantity: item.quantity.toString(),
-          uom: item.uom,
-          sequence: item.sequence || index + 1,
-          priority: item.priority,
-          production_lines: item.production_lines || [],
-          scrap_std_pct: item.scrap_std_pct || 0,
-          is_optional: item.is_optional || false,
-          is_phantom: item.is_phantom || false,
-          one_to_one: item.one_to_one || false,
-          unit_cost_std: item.unit_cost_std,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }));
-        
-        activeBom = {
-          id: bomId,
-          product_id: id,
-          version: activeBom?.version || '1.0',
-          status: 'active',
-          is_active: true,
-          requires_routing: false,
-          bomItems,
-          created_at: activeBom?.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-      } else {
-        activeBom = null;
-      }
-    }
-
-    const updatedProduct: Product = {
-      ...this.products[index],
-      ...productUpdates,
-      production_lines: updates.production_lines !== undefined ? updates.production_lines : this.products[index].production_lines,
-      activeBom,
-      id: this.products[index].id,
-      updated_at: new Date().toISOString(),
-    };
-    
-    this.products = [
-      ...this.products.slice(0, index),
-      updatedProduct,
-      ...this.products.slice(index + 1),
-    ];
-    
+    // Use real API
+    const updatedProduct = await ProductsAPI.update(id, updates);
+    // Refresh products list
+    this.products = await ProductsAPI.getAll();
     this.notifyProductListeners();
     return updatedProduct;
   }

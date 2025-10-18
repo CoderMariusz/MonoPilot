@@ -1,14 +1,8 @@
 import { supabase } from '@/lib/supabase/client';
 import type { SupplierProduct } from '@/lib/types';
-import { shouldUseMockData } from './config';
 
 export class SupplierProductsAPI {
   static async getBySupplier(supplierId: number): Promise<SupplierProduct[]> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      return [];
-    }
-
     const { data, error } = await supabase
       .from('supplier_products')
       .select(`
@@ -29,11 +23,6 @@ export class SupplierProductsAPI {
   }
 
   static async getByProduct(productId: number): Promise<SupplierProduct[]> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      return [];
-    }
-
     const { data, error } = await supabase
       .from('supplier_products')
       .select(`
@@ -54,11 +43,6 @@ export class SupplierProductsAPI {
   }
 
   static async create(data: Omit<SupplierProduct, 'id' | 'created_at' | 'updated_at'>): Promise<SupplierProduct> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { data: result, error } = await supabase
       .from('supplier_products')
       .insert({
@@ -84,11 +68,6 @@ export class SupplierProductsAPI {
   }
 
   static async update(id: number, data: Partial<Omit<SupplierProduct, 'id' | 'created_at' | 'updated_at'>>): Promise<SupplierProduct> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { data: result, error } = await supabase
       .from('supplier_products')
       .update({
@@ -108,11 +87,6 @@ export class SupplierProductsAPI {
   }
 
   static async delete(id: number): Promise<void> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { error } = await supabase
       .from('supplier_products')
       .delete()
@@ -125,11 +99,6 @@ export class SupplierProductsAPI {
   }
 
   static async getPricingForProduct(productId: number, supplierId?: number): Promise<SupplierProduct | null> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      return null;
-    }
-
     let query = supabase
       .from('supplier_products')
       .select('*')

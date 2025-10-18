@@ -1,15 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, Route } from 'lucide-react';
-import { useRoutings, addRouting, updateRouting, deleteRouting } from '@/lib/clientState';
+import { RoutingsAPI } from '@/lib/api/routings';
 import type { Routing } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 import { RoutingBuilder } from './RoutingBuilder';
 
 export function RoutingsTable() {
-  const routings = useRoutings();
-  const { showToast } = useToast();
+  const [routings, setRoutings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch data on component mount
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const data = await RoutingsAPI.getAll();
+        setRoutings(data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        showToast('Failed to fetch data', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [showToast]);const { showToast } = useToast();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRouting, setEditingRouting] = useState<Routing | null>(null);
@@ -26,7 +44,8 @@ export function RoutingsTable() {
 
   const handleDelete = (routing: Routing) => {
     if (confirm(`Are you sure you want to delete "${routing.name}"?`)) {
-      const success = deleteRouting(routing.id);
+      const success = await RoutingsAPI.delete(itemId);
+        setRoutings(prev => prev.filter(item => item.id !== itemId));
       if (success) {
         showToast('Routing deleted successfully', 'success');
       } else {
@@ -38,7 +57,8 @@ export function RoutingsTable() {
   const handleSave = (routingData: Omit<Routing, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       if (editingRouting) {
-        const success = updateRouting(editingRouting.id, routingData);
+        const success = const updatedItem = await RoutingsAPI.update(itemId, itemData);
+        setRoutings(prev => prev.map(item => item.id === itemId ? updatedItem : item));
         if (success) {
           showToast('Routing updated successfully', 'success');
           setShowEditModal(false);
@@ -47,7 +67,8 @@ export function RoutingsTable() {
           showToast('Failed to update routing', 'error');
         }
       } else {
-        const success = addRouting(routingData);
+        const success = const newItem = await RoutingsAPI.create(itemData);
+        setRoutings(prev => [...prev, newItem]);
         if (success) {
           showToast('Routing created successfully', 'success');
           setShowCreateModal(false);

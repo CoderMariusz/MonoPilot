@@ -1,41 +1,25 @@
-import { shouldUseMockData } from './config';
 import { supabase } from '../supabase/client';
-import { clientState } from '../clientState';
 import type { User } from '../types';
 
-// User API - Dual mode (mock/real data)
+// User API - Database-first operation
 export class UsersAPI {
   // Get all users
   static async getAll(): Promise<User[]> {
-    if (shouldUseMockData()) {
-      return clientState.getUsers();
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching users:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
+    if (error) {
       console.error('Error fetching users:', error);
-      return [];
+      throw new Error('Failed to fetch users');
     }
+
+    return data || [];
   }
 
   // Get user by ID
   static async getById(id: string): Promise<User | null> {
-    if (shouldUseMockData()) {
-      const users = clientState.getUsers();
-      return users.find(user => user.id === id) || null;
-    }
-    
     try {
       const { data, error } = await supabase
         .from('users')
@@ -63,14 +47,7 @@ export class UsersAPI {
     role: string;
     status?: string;
   }): Promise<{ user?: User; error?: any }> {
-    if (shouldUseMockData()) {
-      const newUser = clientState.addUser({
-        name: userData.name,
-        email: userData.email,
-        role: userData.role as any,
-        status: userData.status as any || 'Active',
-        last_login: null,
-      });
+    );
       return { user: newUser };
     }
     
@@ -112,9 +89,7 @@ export class UsersAPI {
 
   // Update user
   static async update(id: string, updates: Partial<User>): Promise<{ user?: User; error?: any }> {
-    if (shouldUseMockData()) {
-      const updatedUser = clientState.updateUser(parseInt(id), updates);
-      return { user: updatedUser };
+    ;
     }
     
     try {
@@ -139,9 +114,7 @@ export class UsersAPI {
 
   // Delete user
   static async delete(id: string): Promise<{ error?: any }> {
-    if (shouldUseMockData()) {
-      clientState.deleteUser(parseInt(id));
-      return {};
+    ;
     }
     
     try {

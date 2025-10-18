@@ -238,10 +238,6 @@ export class ProductsAPI {
   }
 
   static async getByCategory(category: string): Promise<Product[]> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      return [];
-    }
 
     const { data, error } = await supabase
       .from('products')

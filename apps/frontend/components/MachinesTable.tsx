@@ -1,14 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pencil, Trash2, Plus } from 'lucide-react';
-import { useMachines, addMachine, updateMachine, deleteMachine } from '@/lib/clientState';
+import { MachinesAPI } from '@/lib/api/machines';
 import type { Machine } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 
 export function MachinesTable() {
-  const machines = useMachines();
-  const { showToast } = useToast();
+  const [machines, setMachines] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch data on component mount
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const data = await MachinesAPI.getAll();
+        setMachines(data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        showToast('Failed to fetch data', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [showToast]);const { showToast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [formData, setFormData] = useState({
@@ -42,7 +60,8 @@ export function MachinesTable() {
 
   const handleDelete = (id: number) => {
     if (confirm('Are you sure you want to delete this machine?')) {
-      const success = deleteMachine(id);
+      const success = await MachinesAPI.delete(itemId);
+        setMachines(prev => prev.filter(item => item.id !== itemId));
       if (success) {
         showToast('Machine deleted successfully', 'success');
       }
@@ -60,10 +79,12 @@ export function MachinesTable() {
     };
 
     if (editingMachine) {
-      updateMachine(editingMachine.id, machineData);
+      const updatedItem = await MachinesAPI.update(itemId, itemData);
+        setMachines(prev => prev.map(item => item.id === itemId ? updatedItem : item));
       showToast('Machine updated successfully', 'success');
     } else {
-      addMachine(machineData);
+      const newItem = await MachinesAPI.create(itemData);
+        setMachines(prev => [...prev, newItem]);
       showToast('Machine added successfully', 'success');
     }
     

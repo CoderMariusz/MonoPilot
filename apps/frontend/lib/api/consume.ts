@@ -1,4 +1,3 @@
-import { shouldUseMockData } from './config';
 import { supabase } from '../supabase/client';
 
 // Consume API - Material consumption analysis
@@ -35,27 +34,7 @@ export class ConsumeAPI {
       total_variance_kg: number;
     };
   }> {
-    if (shouldUseMockData()) {
-      // Mock consumption data
-      return {
-        data: [
-          {
-            wo_number: 'WO-2024-001',
-            production_date_london: '2024-01-15T10:00:00+00:00',
-            production_date_utc: '2024-01-15T10:00:00Z',
-            product: 'Beef Sausage',
-            material: 'Ground Beef',
-            material_part_number: 'GB-001',
-            bom_standard_kg: 100,
-            actual_consumed_kg: 95,
-            variance_kg: -5,
-            variance_percent: -5.0,
-            production_line: 'Line 1',
-            work_order_status: 'completed',
-            one_to_one: true,
-            is_optional: false
-          }
-        ],
+    ],
         summary: {
           total_materials: 1,
           avg_variance_percent: -5.0,
@@ -128,20 +107,7 @@ export class ConsumeAPI {
     work_order_count: number;
     one_to_one_count: number;
   }>> {
-    if (shouldUseMockData()) {
-      return [
-        {
-          material_id: 1,
-          material_name: 'Ground Beef',
-          material_part_number: 'GB-001',
-          total_standard_kg: 500,
-          total_actual_kg: 475,
-          total_variance_kg: -25,
-          avg_variance_percent: -5.0,
-          work_order_count: 5,
-          one_to_one_count: 3
-        }
-      ];
+    ];
     }
 
     try {
@@ -223,17 +189,7 @@ export class ConsumeAPI {
     variance_percent: number;
     work_order_count: number;
   }>> {
-    if (shouldUseMockData()) {
-      return [
-        {
-          date: '2024-01-15',
-          standard_kg: 100,
-          actual_kg: 95,
-          variance_kg: -5,
-          variance_percent: -5.0,
-          work_order_count: 1
-        }
-      ];
+    ];
     }
 
     try {

@@ -1,14 +1,8 @@
 import { supabase } from '@/lib/supabase/client';
 import type { TaxCode } from '@/lib/types';
-import { shouldUseMockData } from './config';
 
 export class TaxCodesAPI {
   static async getAll(): Promise<TaxCode[]> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      return [];
-    }
-
     const { data, error } = await supabase
       .from('settings_tax_codes')
       .select('*')
@@ -23,11 +17,6 @@ export class TaxCodesAPI {
   }
 
   static async getById(id: number): Promise<TaxCode> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { data, error } = await supabase
       .from('settings_tax_codes')
       .select('*')
@@ -43,11 +32,6 @@ export class TaxCodesAPI {
   }
 
   static async create(data: Omit<TaxCode, 'id' | 'created_at' | 'updated_at'>): Promise<TaxCode> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { data: result, error } = await supabase
       .from('settings_tax_codes')
       .insert({
@@ -68,11 +52,6 @@ export class TaxCodesAPI {
   }
 
   static async update(id: number, data: Partial<Omit<TaxCode, 'id' | 'created_at' | 'updated_at'>>): Promise<TaxCode> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { data: result, error } = await supabase
       .from('settings_tax_codes')
       .update({
@@ -92,11 +71,6 @@ export class TaxCodesAPI {
   }
 
   static async delete(id: number): Promise<void> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { error } = await supabase
       .from('settings_tax_codes')
       .delete()

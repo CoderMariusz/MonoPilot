@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, Package } from 'lucide-react';
 import { SuppliersAPI } from '@/lib/api/suppliers';
-import { useSuppliers, useProducts, useTaxCodes } from '@/lib/clientState';
+import { SuppliersAPI } from '@/lib/api/suppliers';
 import type { Supplier, Product, TaxCode, SupplierProduct } from '@/lib/types';
 import { SupplierProductsModal } from './SupplierProductsModal';
 
@@ -17,7 +17,8 @@ export function SuppliersTable() {
   const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
 
   // Use mock data for now
-  const mockSuppliers = useSuppliers();
+  const [suppliers, setSuppliers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const products = useProducts();
   const taxCodes = useTaxCodes();
 

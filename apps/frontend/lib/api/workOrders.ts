@@ -1,9 +1,7 @@
-import { shouldUseMockData } from './config';
-import { clientState } from '../clientState';
 import { supabase } from '../supabase/client';
 import type { WorkOrder, CreateWorkOrderData, UpdateWorkOrderData } from '../types';
 
-// Work Orders API - Dual mode (mock/real data)
+// Work Orders API - Database-first operation
 export class WorkOrdersAPI {
   // Get all work orders with enhanced filters
   static async getAll(filters?: {
@@ -13,9 +11,6 @@ export class WorkOrdersAPI {
     kpi_scope?: 'PR' | 'FG';
     status?: string;
   }): Promise<WorkOrder[]> {
-    if (shouldUseMockData()) {
-      return clientState.getWorkOrders();
-    }
     
     try {
       let query = supabase
@@ -131,67 +126,97 @@ export class WorkOrdersAPI {
 
   // Get work order by ID
   static async getById(id: number): Promise<WorkOrder | null> {
-    if (shouldUseMockData()) {
-      const workOrders = clientState.getWorkOrders();
-      return workOrders.find(wo => wo.id === id.toString()) || null;
+    const { data, error } = await supabase
+      .from('work_orders')
+      .select(`
+        *,
+        product:products(*),
+        bom:boms(*),
+        routing:routings(*),
+        wo_materials:wo_materials(
+          *,
+          material:products(*)
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching work order:', error);
+      return null;
     }
-    
-    // TODO: Implement Supabase query
-    // const { data, error } = await supabase.from('work_orders').select('*').eq('id', id).single();
-    // return data;
-    
-    // Fallback to mock data for now
-    const workOrders = clientState.getWorkOrders();
-    return workOrders.find(wo => wo.id === id.toString()) || null;
+
+    return data;
   }
 
   // Create new work order
   static async create(data: CreateWorkOrderData): Promise<WorkOrder> {
-    if (shouldUseMockData()) {
-      return clientState.addWorkOrder(data);
+    const { data: workOrder, error } = await supabase
+      .from('work_orders')
+      .insert(data)
+      .select(`
+        *,
+        product:products(*),
+        bom:boms(*),
+        routing:routings(*),
+        wo_materials:wo_materials(
+          *,
+          material:products(*)
+        )
+      `)
+      .single();
+
+    if (error) {
+      console.error('Error creating work order:', error);
+      throw new Error('Failed to create work order');
     }
-    
-    // TODO: Implement Supabase insert
-    // const { data, error } = await supabase.from('work_orders').insert(data).select().single();
-    // return data;
-    
-    // Fallback to mock data for now
-    return clientState.addWorkOrder(data);
+
+    return workOrder;
   }
 
   // Update work order
   static async update(id: number, data: UpdateWorkOrderData): Promise<WorkOrder> {
-    if (shouldUseMockData()) {
-      return clientState.updateWorkOrder(id, data);
+    const { data: workOrder, error } = await supabase
+      .from('work_orders')
+      .update(data)
+      .eq('id', id)
+      .select(`
+        *,
+        product:products(*),
+        bom:boms(*),
+        routing:routings(*),
+        wo_materials:wo_materials(
+          *,
+          material:products(*)
+        )
+      `)
+      .single();
+
+    if (error) {
+      console.error('Error updating work order:', error);
+      throw new Error('Failed to update work order');
     }
-    
-    // TODO: Implement Supabase update
-    // const { data, error } = await supabase.from('work_orders').update(data).eq('id', id).select().single();
-    // return data;
-    
-    // Fallback to mock data for now
-    return clientState.updateWorkOrder(id, data);
+
+    return workOrder;
   }
 
   // Delete work order
   static async delete(id: number): Promise<boolean> {
-    if (shouldUseMockData()) {
-      return clientState.deleteWorkOrder(id);
+    const { error } = await supabase
+      .from('work_orders')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting work order:', error);
+      throw new Error('Failed to delete work order');
     }
-    
-    // TODO: Implement Supabase delete
-    // await supabase.from('work_orders').delete().eq('id', id);
-    
-    // Fallback to mock data for now
-    return clientState.deleteWorkOrder(id);
+
+    return true;
   }
 
   // Get production stats for a work order
   static async getProductionStats(woId: number): Promise<{ madeQty: number; plannedQty: number; progressPct: number }> {
-    if (shouldUseMockData()) {
-      return clientState.getWoProductionStats(woId);
-    }
-    
     try {
       const { data: wo } = await supabase
         .from('work_orders')
@@ -218,9 +243,7 @@ export class WorkOrdersAPI {
   }
 
   static async cancel(id: number, reason?: string): Promise<{ success: boolean; message: string }> {
-    if (shouldUseMockData()) {
-      const success = clientState.cancelWorkOrder(id, reason);
-      return { success, message: success ? 'Work order cancelled' : 'Failed to cancel' };
+    ;
     }
     
     try {
@@ -255,22 +278,7 @@ export class WorkOrdersAPI {
       }>;
     }>;
   }> {
-    if (shouldUseMockData()) {
-      // Mock stage status
-      return {
-        wo_id: woId,
-        operations: [
-          {
-            seq: 1,
-            operation_name: 'Grind',
-            required_kg: 100,
-            staged_kg: 50,
-            in_kg: 0,
-            remaining_kg: 100,
-            color_code: 'red',
-            one_to_one_components: []
-          }
-        ]
+    ]
       };
     }
 

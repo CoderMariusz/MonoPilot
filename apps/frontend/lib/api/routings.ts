@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
 import type { Routing, RoutingOperation } from '@/lib/types';
-import { shouldUseMockData } from './config';
 
 export interface CreateRoutingDTO {
   name: string;
@@ -12,11 +11,6 @@ export interface CreateRoutingDTO {
 
 export class RoutingsAPI {
   static async getAll(): Promise<Routing[]> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      return [];
-    }
-
     const { data, error } = await supabase
       .from('routings')
       .select(`
@@ -35,11 +29,6 @@ export class RoutingsAPI {
   }
 
   static async getById(id: number): Promise<Routing> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { data, error } = await supabase
       .from('routings')
       .select(`
@@ -59,11 +48,6 @@ export class RoutingsAPI {
   }
 
   static async create(data: CreateRoutingDTO): Promise<Routing> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { data: routing, error: routingError } = await supabase
       .from('routings')
       .insert({
@@ -104,11 +88,6 @@ export class RoutingsAPI {
   }
 
   static async update(id: number, data: Partial<Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'>>): Promise<Routing> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { data: result, error } = await supabase
       .from('routings')
       .update({
@@ -128,11 +107,6 @@ export class RoutingsAPI {
   }
 
   static async delete(id: number): Promise<void> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { error } = await supabase
       .from('routings')
       .delete()
@@ -145,11 +119,6 @@ export class RoutingsAPI {
   }
 
   static async addOperation(routingId: number, operation: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>): Promise<RoutingOperation> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { data, error } = await supabase
       .from('routing_operations')
       .insert({
@@ -171,11 +140,6 @@ export class RoutingsAPI {
   }
 
   static async updateOperation(operationId: number, data: Partial<Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>>): Promise<RoutingOperation> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { data: result, error } = await supabase
       .from('routing_operations')
       .update({
@@ -195,11 +159,6 @@ export class RoutingsAPI {
   }
 
   static async deleteOperation(operationId: number): Promise<void> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Mock data not implemented');
-    }
-
     const { error } = await supabase
       .from('routing_operations')
       .delete()

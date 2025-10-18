@@ -1,4 +1,3 @@
-import { shouldUseMockData } from './config';
 import { supabase } from '../supabase/client';
 
 // License Plates API - Warehouse license plate management
@@ -40,26 +39,7 @@ export class LicensePlatesAPI {
       location_counts: Record<string, number>;
     };
   }> {
-    if (shouldUseMockData()) {
-      // Mock license plates data
-      return {
-        data: [
-          {
-            id: 1,
-            lp_number: '00000001',
-            product_id: 1,
-            product_description: 'Ground Beef',
-            product_part_number: 'GB-001',
-            location_id: 1,
-            location_name: 'Main Warehouse',
-            quantity: 100,
-            uom: 'kg',
-            qa_status: 'Passed',
-            stage_suffix: null,
-            parent_lp_id: null,
-            parent_lp_number: null,
-            origin_type: 'GRN',
-            origin_ref: { grn_id: 1 },
+    ,
             available_qty: 100,
             reserved_qty: 0,
             created_at: '2024-01-15T10:00:00Z',
@@ -206,11 +186,7 @@ export class LicensePlatesAPI {
       pallet_code: string;
     }>;
   }> {
-    if (shouldUseMockData()) {
-      return {
-        forward: [],
-        backward: []
-      };
+    ;
     }
 
     try {
@@ -301,17 +277,7 @@ export class LicensePlatesAPI {
       move_date: string;
     }>;
   }> {
-    if (shouldUseMockData()) {
-      return {
-        id: lpId,
-        lp_number: '00000001',
-        product: {
-          id: 1,
-          part_number: 'GB-001',
-          description: 'Ground Beef',
-          type: 'RM',
-          uom: 'kg'
-        },
+    ,
         location: {
           id: 1,
           name: 'Main Warehouse',

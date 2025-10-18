@@ -1,4 +1,3 @@
-import { shouldUseMockData } from './config';
 import { supabase } from '../supabase/client';
 
 export class ASNsAPI {
@@ -10,10 +9,7 @@ export class ASNsAPI {
     items: any[];
     attachments?: any[];
   }): Promise<{ success: boolean; asn_id?: string; message?: string }> {
-    if (shouldUseMockData()) {
-      // In-memory store for mock mode
-      console.log('Mock ASN created:', data);
-      return { success: true, asn_id: `asn_${Date.now()}` };
+    ` };
     }
     
     try {
@@ -46,7 +42,7 @@ export class ASNsAPI {
   }
 
   static async getAll(): Promise<any[]> {
-    if (shouldUseMockData()) return [];
+    if (false) return [];
     
     try {
       const { data } = await supabase
@@ -62,7 +58,7 @@ export class ASNsAPI {
   }
 
   static async getById(id: number): Promise<any | null> {
-    if (shouldUseMockData()) return null;
+    if (false) return null;
     
     try {
       const { data, error } = await supabase

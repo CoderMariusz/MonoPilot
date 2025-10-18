@@ -1,8 +1,7 @@
-// API Layer - Centralized data access with dual-mode support
-// This layer provides a clean interface for data access that can switch between
-// mock data (development) and real Supabase data (production) seamlessly
+// API Layer - Database-first data access
+// This layer provides a clean interface for data access using Supabase
 
-export { API_CONFIG, shouldUseMockData } from './config';
+export { API_CONFIG } from './config';
 export { WorkOrdersAPI } from './workOrders';
 export { UsersAPI } from './users';
 export { PurchaseOrdersAPI } from './purchaseOrders';

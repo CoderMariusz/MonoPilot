@@ -1,14 +1,8 @@
-import { shouldUseMockData } from './config';
 import { supabase } from '../supabase/client';
-import { clientState } from '../clientState';
 import type { TransferOrder } from '../types';
 
 export class TransferOrdersAPI {
   static async getAll(): Promise<TransferOrder[]> {
-    if (shouldUseMockData()) {
-      return clientState.getTransferOrders();
-    }
-    
     try {
       const { data, error } = await supabase
         .from('transfer_orders')
@@ -27,11 +21,6 @@ export class TransferOrdersAPI {
   }
 
   static async getById(id: number): Promise<TransferOrder | null> {
-    if (shouldUseMockData()) {
-      const orders = clientState.getTransferOrders();
-      return orders.find(to => to.id === id) || null;
-    }
-    
     try {
       const { data, error } = await supabase
         .from('transfer_orders')
@@ -51,10 +40,6 @@ export class TransferOrdersAPI {
   }
 
   static async cancel(id: number, reason?: string): Promise<{ success: boolean; message: string }> {
-    if (shouldUseMockData()) {
-      return clientState.cancelTransferOrder(id, reason);
-    }
-    
     try {
       const { data, error } = await supabase.rpc('cancel_transfer_order', {
         p_to_id: id,

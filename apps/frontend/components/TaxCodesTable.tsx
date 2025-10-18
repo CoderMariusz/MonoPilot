@@ -1,14 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pencil, Trash2, Plus } from 'lucide-react';
-import { useTaxCodes, addTaxCode, updateTaxCode, deleteTaxCode } from '@/lib/clientState';
+import { TaxCodesAPI } from '@/lib/api/taxCodes';
 import type { TaxCode } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 
 export function TaxCodesTable() {
-  const taxCodes = useTaxCodes();
-  const { showToast } = useToast();
+  const [taxcodes, setTaxCodes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch data on component mount
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const data = await TaxCodesAPI.getAll();
+        setTaxCodes(data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        showToast('Failed to fetch data', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [showToast]);const { showToast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTaxCode, setEditingTaxCode] = useState<TaxCode | null>(null);
   const [formData, setFormData] = useState({
@@ -42,7 +60,8 @@ export function TaxCodesTable() {
 
   const handleDelete = (id: number) => {
     if (confirm('Are you sure you want to delete this tax code?')) {
-      const success = deleteTaxCode(id);
+      const success = await TaxCodesAPI.delete(itemId);
+        setTaxCodes(prev => prev.filter(item => item.id !== itemId));
       if (success) {
         showToast('Tax code deleted successfully', 'success');
       }

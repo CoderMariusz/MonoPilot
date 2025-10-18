@@ -1,14 +1,8 @@
-import { shouldUseMockData } from './config';
 import { supabase } from '../supabase/client';
-import { clientState } from '../clientState';
 import type { PurchaseOrder } from '../types';
 
 export class PurchaseOrdersAPI {
   static async getAll(): Promise<PurchaseOrder[]> {
-    if (shouldUseMockData()) {
-      return clientState.getPurchaseOrders();
-    }
-    
     try {
       const { data, error } = await supabase
         .from('purchase_orders')
@@ -28,11 +22,6 @@ export class PurchaseOrdersAPI {
   }
 
   static async getById(id: number): Promise<PurchaseOrder | null> {
-    if (shouldUseMockData()) {
-      const orders = clientState.getPurchaseOrders();
-      return orders.find(po => po.id === id) || null;
-    }
-    
     try {
       const { data, error } = await supabase
         .from('purchase_orders')
@@ -54,10 +43,6 @@ export class PurchaseOrdersAPI {
 
   // Get default unit price for a product
   static async getDefaultUnitPrice(productId: number, supplierId?: number): Promise<number> {
-    if (shouldUseMockData()) {
-      return clientState.resolveDefaultUnitPrice(productId, supplierId);
-    }
-    
     try {
       // Call RPC function to get material std cost
       const { data, error } = await supabase.rpc('get_material_std_cost', { 
@@ -73,10 +58,6 @@ export class PurchaseOrdersAPI {
   }
 
   static async cancel(id: number, reason?: string): Promise<{ success: boolean; message: string }> {
-    if (shouldUseMockData()) {
-      return clientState.cancelPurchaseOrder(id, reason);
-    }
-    
     try {
       const { data, error } = await supabase.rpc('cancel_purchase_order', {
         p_po_id: id,
@@ -92,10 +73,6 @@ export class PurchaseOrdersAPI {
   }
 
   static async close(id: number): Promise<{ success: boolean; message: string; grnNumber?: string }> {
-    if (shouldUseMockData()) {
-      return clientState.closePurchaseOrder(id);
-    }
-    
     try {
       // Get PO details
       const { data: po, error: poError } = await supabase

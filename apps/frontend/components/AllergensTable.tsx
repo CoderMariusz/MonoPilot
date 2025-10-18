@@ -1,14 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pencil, Trash2, Plus } from 'lucide-react';
-import { useAllergens, addAllergen, updateAllergen, deleteAllergen } from '@/lib/clientState';
+import { AllergensAPI } from '@/lib/api/allergens';
 import type { Allergen } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 
 export function AllergensTable() {
-  const allergens = useAllergens();
-  const { showToast } = useToast();
+  const [allergens, setAllergens] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch data on component mount
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const data = await AllergensAPI.getAll();
+        setAllergens(data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        showToast('Failed to fetch data', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [showToast]);const { showToast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAllergen, setEditingAllergen] = useState<Allergen | null>(null);
   const [formData, setFormData] = useState({
@@ -39,7 +57,8 @@ export function AllergensTable() {
 
   const handleDelete = (id: number) => {
     if (confirm('Are you sure you want to delete this allergen?')) {
-      const success = deleteAllergen(id);
+      const success = await AllergensAPI.delete(itemId);
+        setAllergens(prev => prev.filter(item => item.id !== itemId));
       if (success) {
         showToast('Allergen deleted successfully', 'success');
       }
@@ -57,10 +76,12 @@ export function AllergensTable() {
     };
 
     if (editingAllergen) {
-      updateAllergen(editingAllergen.id, allergenData);
+      const updatedItem = await AllergensAPI.update(itemId, itemData);
+        setAllergens(prev => prev.map(item => item.id === itemId ? updatedItem : item));
       showToast('Allergen updated successfully', 'success');
     } else {
-      addAllergen(allergenData);
+      const newItem = await AllergensAPI.create(itemData);
+        setAllergens(prev => [...prev, newItem]);
       showToast('Allergen added successfully', 'success');
     }
     
