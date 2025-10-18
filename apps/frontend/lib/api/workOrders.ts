@@ -243,8 +243,6 @@ export class WorkOrdersAPI {
   }
 
   static async cancel(id: number, reason?: string): Promise<{ success: boolean; message: string }> {
-    ;
-    }
     
     try {
       const { data, error } = await supabase.rpc('cancel_work_order', {

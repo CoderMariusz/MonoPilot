@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { getRoleBasedRoute } from '@/lib/auth/roleRedirect';
-import { shouldUseMockData } from '@/lib/api/config';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
@@ -19,12 +18,12 @@ export default function Home() {
     console.log('Has User:', !!user);
     console.log('Has Profile:', !!profile);
     console.log('Profile Role:', profile?.role);
-    console.log('Using Mock Data:', shouldUseMockData());
+    console.log('Database-first mode enabled');
     console.log('==============================');
   }, [user, profile, loading]);
 
   // Show loading while checking authentication
-  if (!shouldUseMockData() && loading) {
+  if (loading) {
     
 
     return (
@@ -42,13 +41,13 @@ export default function Home() {
     <div className="p-8">
       <h1 className="text-3xl font-bold text-slate-900 mb-4">Dashboard</h1>
       <p className="text-base text-slate-600">Welcome to Forza Manufacturing Execution System</p>
-      {!shouldUseMockData() && profile && (
+      {profile && (
         <div className="mt-4">
           <p className="text-slate-700">Logged in as: <strong>{profile.name}</strong></p>
           <p className="text-slate-600">Role: <strong>{profile.role}</strong></p>
         </div>
       )}
-      {!shouldUseMockData() && !profile && !loading && (
+      {!profile && !loading && (
         <div className="mt-4">
           <p className="text-slate-600">Not logged in. <Link href="/login" className="text-slate-900 font-medium">Go to login</Link></p>
         </div>

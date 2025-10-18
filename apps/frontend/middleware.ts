@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { updateSession } from './lib/supabase/middleware';
-import { shouldUseMockData } from './lib/api/config';
 import { getRoleBasedRoute } from './lib/auth/roleRedirect';
 
 export async function middleware(request: NextRequest) {
   console.log('Main Middleware - Path:', request.nextUrl.pathname);
 
-  // Skip auth middleware if using mock data
-  if (shouldUseMockData()) {
-    console.log('Main Middleware - Using mock data, skipping');
-    return NextResponse.next();
-  }
+  // Database-first mode - always run auth middleware
 
   // Allow auth pages without any checks
   if (request.nextUrl.pathname.startsWith('/login') || 
