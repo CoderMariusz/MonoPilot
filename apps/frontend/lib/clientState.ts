@@ -16,52 +16,32 @@ interface AuditEvent {
   timestamp: string;
   reason?: string;
 }
-import { 
-  mockWorkOrders, 
-  mockPurchaseOrders, 
-  mockTransferOrders, 
-  mockProducts,
-  mockGRNs,
-  mockLicensePlates,
-  mockStockMoves,
-  mockUsers,
-  mockSessions,
-  mockSettings,
-  mockLocations,
-  mockMachines,
-  mockAllergens,
-  mockSuppliers,
-  mockWarehouses,
-  mockTaxCodes,
-  mockSupplierProducts,
-  mockRoutings,
-  mockProductAllergens
-} from './mockData';
-import { mockBomItems } from './mockData';
+// Mock data imports removed - using database-first approach
 
 type Listener = () => void;
 
 class ClientState {
-  private workOrders: WorkOrder[] = [...mockWorkOrders];
-  private purchaseOrders: PurchaseOrder[] = [...mockPurchaseOrders];
-  private transferOrders: TransferOrder[] = [...mockTransferOrders];
-  private products: Product[] = [...mockProducts];
-  private grns: GRN[] = [...mockGRNs];
-  private licensePlates: LicensePlate[] = [...mockLicensePlates];
-  private stockMoves: StockMove[] = [...mockStockMoves];
-  private users: User[] = [...mockUsers];
-  private sessions: Session[] = [...mockSessions];
-  private settings: Settings = { ...mockSettings };
+  // Initialize with empty arrays - data will be loaded from APIs
+  private workOrders: WorkOrder[] = [];
+  private purchaseOrders: PurchaseOrder[] = [];
+  private transferOrders: TransferOrder[] = [];
+  private products: Product[] = [];
+  private grns: GRN[] = [];
+  private licensePlates: LicensePlate[] = [];
+  private stockMoves: StockMove[] = [];
+  private users: User[] = [];
+  private sessions: Session[] = [];
+  private settings: Settings = {} as Settings;
   private yieldReports: YieldReportDetail[] = [];
-  private locations: Location[] = [...mockLocations];
-  private machines: Machine[] = [...mockMachines];
-  private allergens: Allergen[] = [...mockAllergens];
-  private suppliers: Supplier[] = [...mockSuppliers];
-  private warehouses: Warehouse[] = [...mockWarehouses];
-  private taxCodes: TaxCode[] = [...mockTaxCodes];
-  private supplierProducts: SupplierProduct[] = [...mockSupplierProducts];
-  private routings: Routing[] = [...mockRoutings];
-  private productAllergens: ProductAllergen[] = [...mockProductAllergens];
+  private locations: Location[] = [];
+  private machines: Machine[] = [];
+  private allergens: Allergen[] = [];
+  private suppliers: Supplier[] = [];
+  private warehouses: Warehouse[] = [];
+  private taxCodes: TaxCode[] = [];
+  private supplierProducts: SupplierProduct[] = [];
+  private routings: Routing[] = [];
+  private productAllergens: ProductAllergen[] = [];
   private productionOutputs: ProductionOutput[] = [];
   private orderProgress: Map<number, OrderProgress> = new Map();
   private auditEvents: AuditEvent[] = [];
@@ -180,7 +160,17 @@ class ClientState {
     return [...this.transferOrders];
   }
 
-  getProducts(): Product[] {
+  async getProducts(): Promise<Product[]> {
+    // Fetch from API if empty
+    if (this.products.length === 0) {
+      try {
+        this.products = await ProductsAPI.getAll();
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        return [];
+      }
+    }
+    
     return this.products.map(product => ({
       ...product,
       allergens: product.allergens || undefined,
@@ -1428,16 +1418,37 @@ export function useTransferOrders() {
 }
 
 export function useProducts() {
-  const [products, setProducts] = useState<Product[]>(clientState.getProducts());
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = clientState.subscribeToProducts(() => {
-      setProducts(clientState.getProducts());
+    async function fetchProducts() {
+      try {
+        setLoading(true);
+        const data = await clientState.getProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchProducts();
+
+    const unsubscribe = clientState.subscribeToProducts(async () => {
+      try {
+        const data = await clientState.getProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error('Error refreshing products:', error);
+      }
     });
+    
     return unsubscribe;
   }, []);
 
-  return products;
+  return { products, loading };
 }
 
 export function addWorkOrder(workOrder: Omit<WorkOrder, 'id' | 'created_at' | 'updated_at'>): WorkOrder {

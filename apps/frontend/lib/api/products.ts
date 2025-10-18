@@ -1,13 +1,8 @@
 import { supabase } from '@/lib/supabase/client';
 import type { Product, CreateProductData, UpdateProductData } from '@/lib/types';
-import { shouldUseMockData } from './config';
 
 export class ProductsAPI {
   static async getAll(): Promise<Product[]> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      return [];
-    }
 
     const { data, error } = await supabase
       .from('products')
@@ -30,10 +25,6 @@ export class ProductsAPI {
   }
 
   static async getById(id: number): Promise<Product | null> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      return null;
-    }
 
     const { data, error } = await supabase
       .from('products')
@@ -56,10 +47,6 @@ export class ProductsAPI {
   }
 
   static async create(data: CreateProductData): Promise<Product> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Cannot create products in mock mode');
-    }
 
     const { bom_items, ...productData } = data;
 
@@ -124,10 +111,6 @@ export class ProductsAPI {
   }
 
   static async update(id: number, data: UpdateProductData): Promise<Product> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Cannot update products in mock mode');
-    }
 
     const { bom_items, ...productData } = data;
 
@@ -242,10 +225,6 @@ export class ProductsAPI {
   }
 
   static async delete(id: number): Promise<void> {
-    if (shouldUseMockData()) {
-      // Mock data will be provided by clientState
-      throw new Error('Cannot delete products in mock mode');
-    }
 
     const { error } = await supabase
       .from('products')

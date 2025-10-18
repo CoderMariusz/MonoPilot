@@ -5,25 +5,109 @@ The BOM (Bill of Materials) module is the foundation of the MonoPilot MES system
 
 ## Data Flow Architecture
 
-### 1. Product Creation Flow
+### 1. Product Creation Flow (Next.js 15 App Router)
 ```
-User Input → AddItemModal → Validation → ProductsAPI → Database
+Server Component → ProductsAPI → Supabase Database
+     ↓
+Client Component → AddItemModal → Real-time Updates
      ↓
 Category Selection → Field Configuration → BOM Components → Save
 ```
 
-### 2. BOM Component Flow
+### 2. BOM Component Flow (Server-Side Data Fetching)
 ```
-Material Selection → Quantity/Scrap/Flags → Validation → Database Storage
+Server Component → ProductsAPI.getAll() → Initial Data
      ↓
-Optional/Phantom/One-to-One → Production Planning → Work Orders
+Client Component → Real-time Updates → Optimistic Updates
+     ↓
+Material Selection → Quantity/Scrap/Flags → Validation → Database Storage
 ```
 
-### 3. Material Consumption Logic
+### 3. Material Consumption Logic (Hybrid Approach)
 ```
-Work Order Creation → BOM Snapshot → Material Reservation → Production
+Server Component → Work Orders API → Initial Data
+     ↓
+Client Component → Real-time Subscriptions → Live Updates
      ↓
 Standard Consumption vs One-to-One LP → Scanner Terminal → Stock Moves
+```
+
+## Next.js 15 Integration Patterns
+
+### Server Components for Data Fetching
+```typescript
+// app/technical/bom/page.tsx (Server Component)
+import { ProductsAPI } from '@/lib/api/products'
+
+export default async function BOMPage() {
+  // Server-side data fetching with caching
+  const meatProducts = await ProductsAPI.getByCategory('MEAT')
+  const dryGoodsProducts = await ProductsAPI.getByCategory('DRYGOODS')
+  
+  return (
+    <BomCatalogClient 
+      initialData={{
+        meat: meatProducts,
+        dryGoods: dryGoodsProducts
+      }}
+    />
+  )
+}
+```
+
+### Client Components for Interactivity
+```typescript
+// components/BomCatalogClient.tsx (Client Component)
+'use client'
+
+import { useState } from 'react'
+import { ProductsAPI } from '@/lib/api/products'
+
+export default function BomCatalogClient({ initialData }) {
+  const [products, setProducts] = useState(initialData)
+  
+  const handleProductCreate = async (productData) => {
+    try {
+      const newProduct = await ProductsAPI.create(productData)
+      setProducts(prev => ({
+        ...prev,
+        [activeTab]: [...prev[activeTab], newProduct]
+      }))
+    } catch (error) {
+      console.error('Error creating product:', error)
+    }
+  }
+  
+  return <ProductsTable products={products} onProductCreate={handleProductCreate} />
+}
+```
+
+### Supabase Integration
+```typescript
+// lib/api/products.ts
+import { supabase } from '@/lib/supabase/client'
+
+export class ProductsAPI {
+  static async getAll(): Promise<Product[]> {
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        bom_items(
+          *,
+          material:products(*)
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching products:', error)
+      throw new Error('Failed to fetch products')
+    }
+
+    return data || []
+  }
+}
 ```
 
 ## Product Type Hierarchy
