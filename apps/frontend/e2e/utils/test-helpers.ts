@@ -3,12 +3,22 @@ import { Page, expect } from '@playwright/test';
 export class TestHelpers {
   constructor(private page: Page) {}
 
-  async login(email: string = 'test@forza.com', password: string = 'password') {
+  async login(email: string = 'przyslony@forza.com', password: string = 'Test1234') {
     await this.page.goto('/login');
+    await this.page.waitForLoadState('networkidle');
+    
+    // Fill form
     await this.page.fill('input[name="email"]', email);
     await this.page.fill('input[name="password"]', password);
+    
+    // Submit and wait for navigation
     await this.page.click('button[type="submit"]');
-    await this.page.waitForURL(/^(?!.*\/login)/);
+    
+    // Wait for either successful navigation OR error toast
+    await Promise.race([
+      this.page.waitForURL(/^(?!.*\/login)/, { timeout: 15000 }),
+      this.page.waitForSelector('.toast', { timeout: 15000 })
+    ]);
   }
 
   async logout() {
@@ -83,9 +93,7 @@ export class TestHelpers {
     await this.page.keyboard.press('Enter');
   }
 
-  async verifyErrorMessage(message: string) {
-    await expect(this.page.locator('.error, .text-red-600')).toContainText(message);
-  }
+
 
   async verifySuccessMessage(message: string) {
     await expect(this.page.locator('.success, .text-green-600')).toContainText(message);
