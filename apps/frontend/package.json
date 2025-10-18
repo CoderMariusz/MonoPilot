@@ -21,7 +21,20 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
-    "playwright:install": "playwright install chromium"
+    "playwright:install": "playwright install chromium",
+    "seed:test-users": "tsx scripts/seed-test-users.ts",
+    "test:e2e:auth": "playwright test --grep auth",
+    "test:e2e:bom": "playwright test --grep BOM",
+    "test:e2e:planning": "playwright test --grep Planning",
+    "test:e2e:production": "playwright test --grep Production",
+    "test:e2e:warehouse": "playwright test --grep Warehouse",
+    "test:e2e:scanner": "playwright test --grep Scanner",
+    "test:e2e:settings": "playwright test --grep Settings",
+    "test:e2e:admin": "playwright test --grep Admin",
+    "test:e2e:performance": "playwright test --grep performance",
+    "test:e2e:error-handling": "playwright test --grep error-handling",
+    "test:e2e:components": "playwright test --grep components",
+    "test:reports": "tsx scripts/generate-all-reports.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
@@ -46,6 +59,7 @@
     "postcss": "^8.4.49",
     "prettier": "^3.3.3",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.6",
     "typescript": "^5.7.2"
   }
 }

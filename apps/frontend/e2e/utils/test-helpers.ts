@@ -209,4 +209,164 @@ export class TestHelpers {
     // This is a basic check - actual download verification would need more complex setup
     await expect(this.page.locator(`text="${filename}"`)).toBeVisible();
   }
+
+  // Navigation methods
+  async navigateToProduction() {
+    await this.page.goto('/production');
+    await this.waitForNavigation();
+  }
+
+  async navigateToBOM() {
+    await this.page.goto('/technical/bom');
+    await this.waitForNavigation();
+  }
+
+  async navigateToPlanning() {
+    await this.page.goto('/planning');
+    await this.waitForNavigation();
+  }
+
+  async navigateToWarehouse() {
+    await this.page.goto('/warehouse');
+    await this.waitForNavigation();
+  }
+
+  async navigateToSettings() {
+    await this.page.goto('/settings');
+    await this.waitForNavigation();
+  }
+
+  async navigateToAdmin() {
+    await this.page.goto('/admin');
+    await this.waitForNavigation();
+  }
+
+  // Loading state methods
+  async expectLoadingVisible() {
+    await expect(this.page.locator('[data-testid="loading"], .loading, .spinner')).toBeVisible();
+  }
+
+  async expectLoadingHidden() {
+    await expect(this.page.locator('[data-testid="loading"], .loading, .spinner')).toBeHidden();
+  }
+
+  // Error handling methods
+  async verifyErrorMessage(message: string) {
+    await expect(this.page.locator('.error, .text-red-600, .toast-error')).toContainText(message);
+  }
+
+  // Cleanup methods
+  async cleanupTestStockMove(id: string) {
+    try {
+      // Navigate to stock moves if not already there
+      if (!this.page.url().includes('/warehouse')) {
+        await this.navigateToWarehouse();
+      }
+      
+      // Find and delete the stock move
+      const row = this.page.locator(`tr:has-text("${id}")`);
+      if (await row.count() > 0) {
+        await row.locator('button:has-text("Delete")').click();
+        await this.page.click('button:has-text("Confirm"), button:has-text("Delete")');
+        await this.waitForToast('Stock move deleted successfully');
+      }
+    } catch (error) {
+      console.warn(`Failed to cleanup stock move ${id}:`, error);
+    }
+  }
+
+  async cleanupTestGRN(id: string) {
+    try {
+      // Navigate to GRN if not already there
+      if (!this.page.url().includes('/warehouse')) {
+        await this.navigateToWarehouse();
+      }
+      
+      // Find and delete the GRN
+      const row = this.page.locator(`tr:has-text("${id}")`);
+      if (await row.count() > 0) {
+        await row.locator('button:has-text("Delete")').click();
+        await this.page.click('button:has-text("Confirm"), button:has-text("Delete")');
+        await this.waitForToast('GRN deleted successfully');
+      }
+    } catch (error) {
+      console.warn(`Failed to cleanup GRN ${id}:`, error);
+    }
+  }
+
+  async cleanupTestLP(id: string) {
+    try {
+      // Navigate to LP operations if not already there
+      if (!this.page.url().includes('/warehouse')) {
+        await this.navigateToWarehouse();
+      }
+      
+      // Find and delete the LP
+      const row = this.page.locator(`tr:has-text("${id}")`);
+      if (await row.count() > 0) {
+        await row.locator('button:has-text("Delete")').click();
+        await this.page.click('button:has-text("Confirm"), button:has-text("Delete")');
+        await this.waitForToast('License plate deleted successfully');
+      }
+    } catch (error) {
+      console.warn(`Failed to cleanup LP ${id}:`, error);
+    }
+  }
+
+  async cleanupTestWorkOrder(id: string) {
+    try {
+      // Navigate to work orders if not already there
+      if (!this.page.url().includes('/planning')) {
+        await this.navigateToPlanning();
+      }
+      
+      // Find and delete the work order
+      const row = this.page.locator(`tr:has-text("${id}")`);
+      if (await row.count() > 0) {
+        await row.locator('button:has-text("Delete")').click();
+        await this.page.click('button:has-text("Confirm"), button:has-text("Delete")');
+        await this.waitForToast('Work order deleted successfully');
+      }
+    } catch (error) {
+      console.warn(`Failed to cleanup work order ${id}:`, error);
+    }
+  }
+
+  async cleanupTestPO(id: string) {
+    try {
+      // Navigate to purchase orders if not already there
+      if (!this.page.url().includes('/planning')) {
+        await this.navigateToPlanning();
+      }
+      
+      // Find and delete the purchase order
+      const row = this.page.locator(`tr:has-text("${id}")`);
+      if (await row.count() > 0) {
+        await row.locator('button:has-text("Delete")').click();
+        await this.page.click('button:has-text("Confirm"), button:has-text("Delete")');
+        await this.waitForToast('Purchase order deleted successfully');
+      }
+    } catch (error) {
+      console.warn(`Failed to cleanup purchase order ${id}:`, error);
+    }
+  }
+
+  async cleanupTestTO(id: string) {
+    try {
+      // Navigate to transfer orders if not already there
+      if (!this.page.url().includes('/planning')) {
+        await this.navigateToPlanning();
+      }
+      
+      // Find and delete the transfer order
+      const row = this.page.locator(`tr:has-text("${id}")`);
+      if (await row.count() > 0) {
+        await row.locator('button:has-text("Delete")').click();
+        await this.page.click('button:has-text("Confirm"), button:has-text("Delete")');
+        await this.waitForToast('Transfer order deleted successfully');
+      }
+    } catch (error) {
+      console.warn(`Failed to cleanup transfer order ${id}:`, error);
+    }
+  }
 }
