@@ -143,7 +143,7 @@ function ProductsTable({
   refreshTrigger: number;
   onEditProduct: (product: Product) => void;
 }) {
-  const allProducts = useProducts();
+  const { products: allProducts, loading: productsLoading } = useProducts();
   
   // Get the tab configuration for filtering
   const tabs: TabConfig[] = [
@@ -154,33 +154,34 @@ function ProductsTable({
   ];
   
   const currentTab = tabs.find(tab => tab.id === category);
-  const products = allProducts.filter(p => {
+  const products = allProducts?.filter(p => {
     if (!currentTab) return false;
     
-    // For MEAT: group === 'MEAT'
+    // For MEAT: product_group === 'MEAT'
     if (category === 'MEAT') {
-      return p.group === 'MEAT';
+      return p.product_group === 'MEAT';
     }
     
-    // For DRYGOODS: group === 'DRYGOODS'
+    // For DRYGOODS: product_group === 'DRYGOODS'
     if (category === 'DRYGOODS') {
-      return p.group === 'DRYGOODS';
+      return p.product_group === 'DRYGOODS';
     }
     
-    // For FINISHED_GOODS: group === 'COMPOSITE' AND product_type === 'FG'
+    // For FINISHED_GOODS: product_group === 'COMPOSITE' AND product_type === 'FG'
     if (category === 'FINISHED_GOODS') {
-      return p.group === 'COMPOSITE' && p.product_type === 'FG';
+      return p.product_group === 'COMPOSITE' && p.product_type === 'FG';
     }
     
-    // For PROCESS: group === 'COMPOSITE' AND product_type === 'PR'
+    // For PROCESS: product_group === 'COMPOSITE' AND product_type === 'PR'
     if (category === 'PROCESS') {
-      return p.group === 'COMPOSITE' && p.product_type === 'PR';
+      return p.product_group === 'COMPOSITE' && p.product_type === 'PR';
     }
     
     return false;
-  });
-  const [loading] = useState(false);
-  const [error] = useState<string | null>(null);
+  }) || [];
+  
+  const loading = productsLoading;
+  const error = null;
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<keyof Product | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');

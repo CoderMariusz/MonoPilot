@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { mockProducts } from '@/lib/mockData';
+import { ProductsAPI } from '@/lib/api/products';
+import type { Product } from '@/lib/types';
 import { useWarehouses } from '@/lib/clientState';
 import type { Product, Warehouse } from '@/lib/types';
 

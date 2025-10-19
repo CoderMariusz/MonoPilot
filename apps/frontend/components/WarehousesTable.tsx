@@ -3,18 +3,15 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { WarehousesAPI } from '@/lib/api/warehouses';
-import { WarehousesAPI } from '@/lib/api/warehouses';
 import type { Warehouse } from '@/lib/types';
+import { useToast } from '@/lib/toast';
 
 export function WarehousesTable() {
+  const { showToast } = useToast();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
-
-  // Use mock data for now
-  const [warehouses, setWarehouses] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadWarehouses = async () => {
@@ -24,15 +21,14 @@ export function WarehousesTable() {
         setWarehouses(data);
       } catch (error) {
         console.error('Error loading warehouses:', error);
-        // Fallback to mock data
-        setWarehouses(mockWarehouses);
+        showToast('Failed to load warehouses', 'error');
       } finally {
         setLoading(false);
       }
     };
 
     loadWarehouses();
-  }, [mockWarehouses]);
+  }, [showToast]);
 
   const handleToggleActive = async (warehouse: Warehouse) => {
     try {

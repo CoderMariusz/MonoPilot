@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 import type { WorkOrder, CreateWorkOrderData, UpdateWorkOrderData } from '../types';
 
 // Work Orders API - Database-first operation
@@ -276,10 +276,6 @@ export class WorkOrdersAPI {
       }>;
     }>;
   }> {
-    ]
-      };
-    }
-
     try {
       // Get work order materials and operations
       const { data: woData, error: woError } = await supabase

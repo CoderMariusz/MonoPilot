@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { toast } from '@/lib/toast';
@@ -15,6 +15,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { signIn, profile, user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
 
   // LOG AUTH STATE CHANGES
   useEffect(() => {
@@ -28,17 +30,17 @@ export default function LoginPage() {
     console.log('Current Path:', typeof window !== 'undefined' ? window.location.pathname : 'unknown');
     console.log('======================================');
 
-    // REDIRECT CODE - Uncomment below to enable automatic redirect after login
-    /*
+    // Enable redirect after login
     if (!authLoading && user && profile) {
-      console.log('>>> REDIRECT: User is authenticated, redirecting to /');
-      window.location.href = '/';
+      const redirectPath = returnTo || '/';
+      console.log('>>> REDIRECT: User is authenticated, redirecting to', redirectPath);
+      router.push(redirectPath);
     }
-    */
-  }, [user, profile, authLoading]);
+  }, [user, profile, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return; // Prevent multiple submissions
     setLoading(true);
 
     console.log('=== LOGIN ATTEMPT ===');
@@ -118,7 +120,7 @@ export default function LoginPage() {
   return (
     <div className="bg-white py-8 px-6 shadow rounded-lg">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Forza MES</h1>
+        <h1 className="text-3xl font-bold text-slate-900">Sign in</h1>
         <h2 className="mt-2 text-xl text-slate-600">Sign in to your account</h2>
       </div>
 

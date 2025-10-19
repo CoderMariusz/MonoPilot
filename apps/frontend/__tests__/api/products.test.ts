@@ -1,5 +1,5 @@
 import { ProductsAPI } from '@/lib/api/products';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client-browser';
 import { shouldUseMockData } from '@/lib/api/config';
 
 // Mock the Supabase client

@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 import type { Warehouse, CreateWarehouseData, UpdateWarehouseData } from '../types';
 
 export class WarehousesAPI {

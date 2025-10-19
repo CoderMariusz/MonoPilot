@@ -3,7 +3,7 @@ import { Page, expect } from '@playwright/test';
 export class TestHelpers {
   constructor(private page: Page) {}
 
-  async login(email: string = 'przyslony@forza.com', password: string = 'Test1234') {
+  async login(email: string = 'przyslony@gmail.com', password: string = 'Test1234') {
     await this.page.goto('/login');
     await this.page.waitForLoadState('networkidle');
     
@@ -15,10 +15,31 @@ export class TestHelpers {
     await this.page.click('button[type="submit"]');
     
     // Wait for either successful navigation OR error toast
-    await Promise.race([
-      this.page.waitForURL(/^(?!.*\/login)/, { timeout: 15000 }),
-      this.page.waitForSelector('.toast', { timeout: 15000 })
-    ]);
+    try {
+      await Promise.race([
+        this.page.waitForURL(/^(?!.*\/login)/, { timeout: 10000 }),
+        this.page.waitForSelector('.toast', { timeout: 10000 })
+      ]);
+    } catch (error) {
+      // If timeout, check current URL and see if we're actually logged in
+      const currentUrl = this.page.url();
+      console.log('Login timeout, current URL:', currentUrl);
+      
+      // If we're not on login page, consider it successful
+      if (!currentUrl.includes('/login')) {
+        console.log('Login successful despite timeout');
+        return;
+      }
+      
+      // If still on login page, check for error messages
+      const errorToast = this.page.locator('.toast');
+      if (await errorToast.count() > 0) {
+        const errorText = await errorToast.textContent();
+        throw new Error(`Login failed: ${errorText}`);
+      }
+      
+      throw error;
+    }
   }
 
   async logout() {

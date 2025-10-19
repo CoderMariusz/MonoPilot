@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client-browser';
 import type { Routing, RoutingOperation } from '@/lib/types';
 
 export interface CreateRoutingDTO {
@@ -15,8 +15,7 @@ export class RoutingsAPI {
       .from('routings')
       .select(`
         *,
-        products(id, part_number, description),
-        routing_operations(*)
+        products(id, part_number, description)
       `)
       .order('name');
 
@@ -25,7 +24,29 @@ export class RoutingsAPI {
       throw new Error('Failed to fetch routings');
     }
 
-    return data || [];
+    // Try to fetch routing operations separately if the table exists
+    let routingOperations: any[] = [];
+    try {
+      const { data: operationsData, error: operationsError } = await supabase
+        .from('routing_operations')
+        .select('*');
+      
+      if (operationsError) {
+        console.warn('Routing operations table not available:', operationsError.message);
+      } else {
+        routingOperations = operationsData || [];
+      }
+    } catch (operationsError) {
+      console.warn('Routing operations table not available:', operationsError);
+    }
+
+    // Manually join the data
+    const routingsWithOperations = (data || []).map(routing => ({
+      ...routing,
+      routing_operations: routingOperations.filter(op => op.routing_id === routing.id)
+    }));
+
+    return routingsWithOperations;
   }
 
   static async getById(id: number): Promise<Routing> {
@@ -33,8 +54,7 @@ export class RoutingsAPI {
       .from('routings')
       .select(`
         *,
-        products(id, part_number, description),
-        routing_operations(*)
+        products(id, part_number, description)
       `)
       .eq('id', id)
       .single();
@@ -44,7 +64,22 @@ export class RoutingsAPI {
       throw new Error('Failed to fetch routing');
     }
 
-    return data;
+    // Try to fetch routing operations separately if the table exists
+    let routingOperations: any[] = [];
+    try {
+      const { data: operationsData } = await supabase
+        .from('routing_operations')
+        .select('*')
+        .eq('routing_id', id);
+      routingOperations = operationsData || [];
+    } catch (operationsError) {
+      console.warn('Routing operations table not available:', operationsError);
+    }
+
+    return {
+      ...data,
+      routing_operations: routingOperations
+    };
   }
 
   static async create(data: CreateRoutingDTO): Promise<Routing> {

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client-browser';
 import type { Machine, CreateMachineData, UpdateMachineData } from '@/lib/types';
 
 export class MachinesAPI {

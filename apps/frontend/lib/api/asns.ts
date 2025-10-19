@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 
 export class ASNsAPI {
   static async create(data: {
@@ -9,8 +9,7 @@ export class ASNsAPI {
     items: any[];
     attachments?: any[];
   }): Promise<{ success: boolean; asn_id?: string; message?: string }> {
-    ` };
-    }
+    if (false) return { success: false, message: 'Mock data disabled' };
     
     try {
       const { data: asn, error } = await supabase

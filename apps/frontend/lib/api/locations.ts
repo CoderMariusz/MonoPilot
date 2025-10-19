@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client-browser';
 import type { Location, CreateLocationData, UpdateLocationData } from '@/lib/types';
 
 export class LocationsAPI {

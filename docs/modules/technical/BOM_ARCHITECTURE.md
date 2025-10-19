@@ -43,12 +43,16 @@ export default async function BOMPage() {
   // Server-side data fetching with caching
   const meatProducts = await ProductsAPI.getByCategory('MEAT')
   const dryGoodsProducts = await ProductsAPI.getByCategory('DRYGOODS')
+  const finishedGoodsProducts = await ProductsAPI.getByCategory('FINISHED_GOODS')
+  const processProducts = await ProductsAPI.getByCategory('PROCESS')
   
   return (
     <BomCatalogClient 
       initialData={{
         meat: meatProducts,
-        dryGoods: dryGoodsProducts
+        dryGoods: dryGoodsProducts,
+        finishedGoods: finishedGoodsProducts,
+        process: processProducts
       }}
     />
   )
@@ -110,20 +114,75 @@ export class ProductsAPI {
 }
 ```
 
+## Product Categorization System
+
+### Category Logic
+Products are categorized based on their `part_number` patterns and assigned to appropriate `product_group` and `product_type`:
+
+```typescript
+// MEAT products
+if (partNumber.startsWith('RM-BEEF-') || partNumber.startsWith('RM-PORK-') || 
+    partNumber.startsWith('RM-LAMB-') || partNumber.startsWith('RM-CHICKEN-')) {
+  product_group = 'MEAT'
+  product_type = 'RM_MEAT'
+}
+
+// DRYGOODS - Ingredients
+if (partNumber.startsWith('RM-SALT-') || partNumber.startsWith('RM-PEPPER-') || 
+    partNumber.startsWith('RM-SPICE-') || partNumber.startsWith('RM-ONION-') || 
+    partNumber.startsWith('RM-GARLIC-') || partNumber.startsWith('RM-FAT-')) {
+  product_group = 'DRYGOODS'
+  product_type = 'DG_ING'
+}
+
+// DRYGOODS - Casings
+if (partNumber.startsWith('RM-CASING-')) {
+  product_group = 'DRYGOODS'
+  product_type = 'DG_WEB'
+}
+
+// DRYGOODS - Labels
+if (partNumber.startsWith('RM-PAPER-')) {
+  product_group = 'DRYGOODS'
+  product_type = 'DG_LABEL'
+}
+
+// PROCESS products
+if (partNumber.startsWith('PR-')) {
+  product_group = 'COMPOSITE'
+  product_type = 'PR'
+}
+
+// FINISHED_GOODS products
+if (partNumber.startsWith('FG-')) {
+  product_group = 'COMPOSITE'
+  product_type = 'FG'
+}
+```
+
 ## Product Type Hierarchy
 
 ### Raw Materials (RM)
-- **MEAT**: Raw meat products
-- **DRYGOODS**: Ingredients, packaging, labels
-- **Features**: Supplier required, expiry policies, allergen tracking
+- **MEAT**: Raw meat products (beef, pork, lamb, chicken)
+  - `product_group = 'MEAT'`, `product_type = 'RM_MEAT'`
+  - Features: Supplier required, expiry policies, allergen tracking
+- **DRYGOODS**: Ingredients, packaging, labels, casings
+  - `product_group = 'DRYGOODS'`, `product_type = 'DG_ING'` (ingredients)
+  - `product_group = 'DRYGOODS'`, `product_type = 'DG_LABEL'` (labels/paper)
+  - `product_group = 'DRYGOODS'`, `product_type = 'DG_WEB'` (casings/webs)
+  - `product_group = 'DRYGOODS'`, `product_type = 'DG_BOX'` (packaging boxes)
+  - `product_group = 'DRYGOODS'`, `product_type = 'DG_SAUCE'` (sauces)
+  - Features: Supplier required, expiry policies, allergen tracking
 
 ### Processed Products (PR)
 - **PROCESS**: Intermediate products
-- **Features**: BOM required, fixed expiry policy, production lines
+  - `product_group = 'COMPOSITE'`, `product_type = 'PR'`
+  - Features: BOM required, fixed expiry policy, production lines
 
 ### Finished Goods (FG)
 - **FINISHED_GOODS**: Final products
-- **Features**: Complex BOM, production rates, line-specific settings
+  - `product_group = 'COMPOSITE'`, `product_type = 'FG'`
+  - Features: Complex BOM, production rates, line-specific settings
 
 ## BOM Component Types
 
@@ -237,7 +296,8 @@ wo_materials (many) ←→ (1) bom_items
 ## Performance Considerations
 
 ### Database Indexes
-- `idx_products_category` - Category-based queries
+- `idx_products_product_group` - Product group-based queries
+- `idx_products_product_type` - Product type-based queries
 - `idx_bom_items_bom_id` - BOM component lookups
 - `idx_bom_items_material_id` - Material usage tracking
 

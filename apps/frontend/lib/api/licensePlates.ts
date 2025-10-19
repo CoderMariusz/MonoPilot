@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 
 // License Plates API - Warehouse license plate management
 export class LicensePlatesAPI {

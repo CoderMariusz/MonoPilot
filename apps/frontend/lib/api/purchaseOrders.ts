@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 import type { PurchaseOrder } from '../types';
 
 export class PurchaseOrdersAPI {

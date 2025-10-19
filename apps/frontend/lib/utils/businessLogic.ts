@@ -3,7 +3,7 @@
  * Implements the core business rules for the production system
  */
 
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 
 export interface ValidationResult {
   isValid: boolean;

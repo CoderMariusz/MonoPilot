@@ -5,29 +5,12 @@ import { Plus, Edit, Trash2, Eye, EyeOff, Route } from 'lucide-react';
 import { RoutingsAPI } from '@/lib/api/routings';
 import type { Routing } from '@/lib/types';
 import { useToast } from '@/lib/toast';
+import { useRoutings } from '@/lib/clientState';
 import { RoutingBuilder } from './RoutingBuilder';
 
 export function RoutingsTable() {
-  const [routings, setRoutings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Fetch data on component mount
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        const data = await RoutingsAPI.getAll();
-        setRoutings(data);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        showToast('Failed to fetch data', 'error');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, [showToast]);const { showToast } = useToast();
+  const { showToast } = useToast();
+  const { routings, loading } = useRoutings();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRouting, setEditingRouting] = useState<Routing | null>(null);

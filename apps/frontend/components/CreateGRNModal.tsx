@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { usePurchaseOrders, useProducts, addGRN, addLicensePlate, addStockMove, useSettings } from '@/lib/clientState';
-import { mockLocations } from '@/lib/mockData';
+import { LocationsAPI } from '@/lib/api/locations';
+import type { Location } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
 interface CreateGRNModalProps {
@@ -21,7 +22,7 @@ interface GRNLineItem {
 
 export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalProps) {
   const purchaseOrders = usePurchaseOrders();
-  const products = useProducts();
+  const { products } = useProducts();
   const settings = useSettings();
   const [selectedPO, setSelectedPO] = useState<number | null>(null);
   const [lineItems, setLineItems] = useState<GRNLineItem[]>([]);

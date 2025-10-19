@@ -1,8 +1,8 @@
 export const testUsers = {
   admin: {
-    email: 'admin@forza.com',
-    password: 'password123',
-    name: 'Admin User',
+    email: 'przyslony@gmail.com',
+    password: 'Test1234',
+    name: 'Mariusz Krawczyk',
     role: 'Admin'
   },
   planner: {

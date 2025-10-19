@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 import type { TransferOrder } from '../types';
 
 export class TransferOrdersAPI {

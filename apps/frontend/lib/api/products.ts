@@ -1,9 +1,8 @@
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client-browser';
 import type { Product, CreateProductData, UpdateProductData } from '@/lib/types';
 
 export class ProductsAPI {
   static async getAll(): Promise<Product[]> {
-
     const { data, error } = await supabase
       .from('products')
       .select(`
@@ -25,7 +24,6 @@ export class ProductsAPI {
   }
 
   static async getById(id: number): Promise<Product | null> {
-
     const { data, error } = await supabase
       .from('products')
       .select(`

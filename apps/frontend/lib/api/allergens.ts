@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client-browser';
 import type { Allergen, CreateAllergenData, UpdateAllergenData } from '@/lib/types';
 
 export class AllergensAPI {

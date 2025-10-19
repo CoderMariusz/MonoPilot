@@ -82,36 +82,36 @@ INSERT INTO machines (id, name, code, type, location_id, is_active) VALUES
 -- =====================================================
 
 -- Raw Materials (10 items)
-INSERT INTO products (id, part_number, description, type, category, subtype, uom, expiry_policy, shelf_life_days, is_active) VALUES
-(1, 'RM-BEEF-001', 'Premium Beef Trim', 'RM', 'Meat', 'Beef', 'kg', 'use_by', 5, true),
-(2, 'RM-PORK-001', 'Pork Shoulder', 'RM', 'Meat', 'Pork', 'kg', 'use_by', 4, true),
-(3, 'RM-SALT-001', 'Table Salt', 'RM', 'Seasoning', 'Salt', 'kg', 'best_before', 365, true),
-(4, 'RM-PEPPER-001', 'Black Pepper Ground', 'RM', 'Seasoning', 'Pepper', 'kg', 'best_before', 730, true),
-(5, 'RM-SPICE-001', 'Mixed Spices', 'RM', 'Seasoning', 'Spices', 'kg', 'best_before', 365, true),
-(6, 'RM-FAT-001', 'Beef Fat', 'RM', 'Meat', 'Fat', 'kg', 'use_by', 3, true),
-(7, 'RM-CASING-001', 'Natural Hog Casings', 'RM', 'Packaging', 'Casing', 'm', 'use_by', 30, true),
-(8, 'RM-ONION-001', 'Dried Onion Powder', 'RM', 'Vegetable', 'Onion', 'kg', 'best_before', 730, true),
-(9, 'RM-GARLIC-001', 'Garlic Powder', 'RM', 'Vegetable', 'Garlic', 'kg', 'best_before', 365, true),
-(10, 'RM-PAPER-001', 'Butcher Paper', 'RM', 'Packaging', 'Paper', 'roll', 'indefinite', 0, true);
+INSERT INTO products (id, part_number, description, type, product_group, product_type, subtype, uom, expiry_policy, shelf_life_days, is_active) VALUES
+(1, 'RM-BEEF-001', 'Premium Beef Trim', 'RM', 'MEAT', 'RM_MEAT', 'Beef', 'kg', 'use_by', 5, true),
+(2, 'RM-PORK-001', 'Pork Shoulder', 'RM', 'MEAT', 'RM_MEAT', 'Pork', 'kg', 'use_by', 4, true),
+(3, 'RM-SALT-001', 'Table Salt', 'RM', 'DRYGOODS', 'DG_ING', 'Salt', 'kg', 'best_before', 365, true),
+(4, 'RM-PEPPER-001', 'Black Pepper Ground', 'RM', 'DRYGOODS', 'DG_ING', 'Pepper', 'kg', 'best_before', 730, true),
+(5, 'RM-SPICE-001', 'Mixed Spices', 'RM', 'DRYGOODS', 'DG_ING', 'Spices', 'kg', 'best_before', 365, true),
+(6, 'RM-FAT-001', 'Beef Fat', 'RM', 'MEAT', 'RM_MEAT', 'Fat', 'kg', 'use_by', 3, true),
+(7, 'RM-CASING-001', 'Natural Hog Casings', 'RM', 'DRYGOODS', 'DG_ING', 'Casing', 'm', 'use_by', 30, true),
+(8, 'RM-ONION-001', 'Dried Onion Powder', 'RM', 'DRYGOODS', 'DG_ING', 'Onion', 'kg', 'best_before', 730, true),
+(9, 'RM-GARLIC-001', 'Garlic Powder', 'RM', 'DRYGOODS', 'DG_ING', 'Garlic', 'kg', 'best_before', 365, true),
+(10, 'RM-PAPER-001', 'Butcher Paper', 'RM', 'DRYGOODS', 'DG_ING', 'Paper', 'roll', 'indefinite', 0, true);
 
 -- Intermediate Products (5 items)
-INSERT INTO products (id, part_number, description, type, category, subtype, uom, expiry_policy, shelf_life_days, is_active) VALUES
-(11, 'PR-GRIND-001', 'Ground Beef Mix', 'PR', 'Processed', 'Ground', 'kg', 'use_by', 2, true),
-(12, 'PR-MIX-001', 'Seasoned Meat Mix', 'PR', 'Processed', 'Mixed', 'kg', 'use_by', 1, true),
-(13, 'PR-FILL-001', 'Sausage Filling', 'PR', 'Processed', 'Filling', 'kg', 'use_by', 1, true),
-(14, 'PR-COOK-001', 'Cooked Sausage', 'PR', 'Processed', 'Cooked', 'kg', 'use_by', 3, true),
-(15, 'PR-CHILL-001', 'Chilled Product', 'PR', 'Processed', 'Chilled', 'kg', 'use_by', 7, true);
+INSERT INTO products (id, part_number, description, type, product_group, product_type, subtype, uom, expiry_policy, shelf_life_days, is_active) VALUES
+(11, 'PR-GRIND-001', 'Ground Beef Mix', 'PR', 'COMPOSITE', 'PR', 'Ground', 'kg', 'use_by', 2, true),
+(12, 'PR-MIX-001', 'Seasoned Meat Mix', 'PR', 'COMPOSITE', 'PR', 'Mixed', 'kg', 'use_by', 1, true),
+(13, 'PR-FILL-001', 'Sausage Filling', 'PR', 'COMPOSITE', 'PR', 'Filling', 'kg', 'use_by', 1, true),
+(14, 'PR-COOK-001', 'Cooked Sausage', 'PR', 'COMPOSITE', 'PR', 'Cooked', 'kg', 'use_by', 3, true),
+(15, 'PR-CHILL-001', 'Chilled Product', 'PR', 'COMPOSITE', 'PR', 'Chilled', 'kg', 'use_by', 7, true);
 
 -- Finished Goods (8 items)
-INSERT INTO products (id, part_number, description, type, category, subtype, uom, expiry_policy, shelf_life_days, is_active) VALUES
-(16, 'FG-SAUS-001', 'Premium Beef Sausage', 'FG', 'Sausage', 'Beef', 'kg', 'use_by', 5, true),
-(17, 'FG-SAUS-002', 'Classic Pork Sausage', 'FG', 'Sausage', 'Pork', 'kg', 'use_by', 5, true),
-(18, 'FG-SAUS-003', 'Mixed Meat Sausage', 'FG', 'Sausage', 'Mixed', 'kg', 'use_by', 5, true),
-(19, 'FG-BURG-001', 'Beef Burger Patty', 'FG', 'Burger', 'Beef', 'piece', 'use_by', 3, true),
-(20, 'FG-BURG-002', 'Mixed Burger Patty', 'FG', 'Burger', 'Mixed', 'piece', 'use_by', 3, true),
-(21, 'FG-MEAT-001', 'Seasoned Ground Beef', 'FG', 'Meat', 'Ground', 'kg', 'use_by', 2, true),
-(22, 'FG-MEAT-002', 'Premium Steak', 'FG', 'Meat', 'Steak', 'kg', 'use_by', 5, true),
-(23, 'FG-MEAT-003', 'Marinated Chicken', 'FG', 'Meat', 'Chicken', 'kg', 'use_by', 3, true);
+INSERT INTO products (id, part_number, description, type, product_group, product_type, subtype, uom, expiry_policy, shelf_life_days, is_active) VALUES
+(16, 'FG-SAUS-001', 'Premium Beef Sausage', 'FG', 'COMPOSITE', 'FG', 'Beef', 'kg', 'use_by', 5, true),
+(17, 'FG-SAUS-002', 'Classic Pork Sausage', 'FG', 'COMPOSITE', 'FG', 'Pork', 'kg', 'use_by', 5, true),
+(18, 'FG-SAUS-003', 'Mixed Meat Sausage', 'FG', 'COMPOSITE', 'FG', 'Mixed', 'kg', 'use_by', 5, true),
+(19, 'FG-BURG-001', 'Beef Burger Patty', 'FG', 'COMPOSITE', 'FG', 'Beef', 'piece', 'use_by', 3, true),
+(20, 'FG-BURG-002', 'Mixed Burger Patty', 'FG', 'COMPOSITE', 'FG', 'Mixed', 'piece', 'use_by', 3, true),
+(21, 'FG-MEAT-001', 'Seasoned Ground Beef', 'FG', 'COMPOSITE', 'FG', 'Ground', 'kg', 'use_by', 2, true),
+(22, 'FG-MEAT-002', 'Premium Steak', 'FG', 'COMPOSITE', 'FG', 'Steak', 'kg', 'use_by', 5, true),
+(23, 'FG-MEAT-003', 'Marinated Chicken', 'FG', 'COMPOSITE', 'FG', 'Chicken', 'kg', 'use_by', 3, true);
 
 -- Product Allergens (link products to allergens)
 INSERT INTO product_allergens (product_id, allergen_id) VALUES

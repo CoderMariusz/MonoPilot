@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 
 // Consume API - Material consumption analysis
 export class ConsumeAPI {

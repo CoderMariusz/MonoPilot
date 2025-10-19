@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress, BomItem, ProductionOutput, Supplier, Warehouse, TaxCode, SupplierProduct, Routing, ProductAllergen } from './types';
 import { ProductsAPI } from './api/products';
+import { RoutingsAPI } from './api/routings';
 
 interface AuditEvent {
   id: string;
@@ -174,6 +175,20 @@ class ClientState {
       ...product,
       allergens: product.allergens || undefined,
     }));
+  }
+
+  async getRoutings(): Promise<Routing[]> {
+    // Fetch from API if empty
+    if (this.routings.length === 0) {
+      try {
+        this.routings = await RoutingsAPI.getAll();
+      } catch (error) {
+        console.error('Error fetching routings:', error);
+        return [];
+      }
+    }
+    
+    return [...this.routings];
   }
 
   getGRNs(): GRN[] {
@@ -1651,16 +1666,37 @@ export function useSupplierProducts() {
 }
 
 export function useRoutings() {
-  const [routings, setRoutings] = useState<Routing[]>(clientState.getRoutings());
+  const [routings, setRoutings] = useState<Routing[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = clientState.subscribeToRoutings(() => {
-      setRoutings(clientState.getRoutings());
+    async function fetchRoutings() {
+      try {
+        setLoading(true);
+        const data = await clientState.getRoutings();
+        setRoutings(data);
+      } catch (error) {
+        console.error('Error fetching routings:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchRoutings();
+
+    const unsubscribe = clientState.subscribeToRoutings(async () => {
+      try {
+        const data = await clientState.getRoutings();
+        setRoutings(data);
+      } catch (error) {
+        console.error('Error refreshing routings:', error);
+      }
     });
+    
     return unsubscribe;
   }, []);
 
-  return routings;
+  return { routings, loading };
 }
 
 export function useProductAllergens() {

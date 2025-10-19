@@ -40,6 +40,7 @@ export default function Topbar() {
           ) : user ? (
             <div className="relative">
               <button
+                data-testid="user-menu"
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
               >
@@ -53,7 +54,13 @@ export default function Topbar() {
               </button>
 
               {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 py-1 z-50">
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
+                  {/* User info section */}
+                  <div className="px-4 py-3 border-b border-slate-200">
+                    <p className="text-sm font-medium text-slate-900">{profile?.name || 'User'}</p>
+                    <p className="text-xs text-slate-500">{profile?.role || 'No role'}</p>
+                    <p className="text-xs text-slate-400 mt-1">{user?.email}</p>
+                  </div>
                   <Link
                     href="/settings"
                     className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -63,6 +70,7 @@ export default function Topbar() {
                     Settings
                   </Link>
                   <button
+                    data-testid="logout-button"
                     onClick={async (e) => {
                       e.stopPropagation();
                       setShowUserMenu(false);

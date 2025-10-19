@@ -43,13 +43,14 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
     async function fetchData() {
       try {
         setDataLoading(true);
-        const [allergensData, productsData, machinesData, taxCodesData, suppliersData, routingsData] = await Promise.all([
+        
+        // Fetch core data first
+        const [allergensData, productsData, machinesData, taxCodesData, suppliersData] = await Promise.all([
           AllergensAPI.getAll(),
           ProductsAPI.getAll(),
           MachinesAPI.getAll(),
           TaxCodesAPI.getAll(),
-          SuppliersAPI.getAll(),
-          RoutingsAPI.getAll()
+          SuppliersAPI.getAll()
         ]);
         
         setAllergens(allergensData);
@@ -57,7 +58,16 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         setMachines(machinesData);
         setTaxCodes(taxCodesData);
         setSuppliers(suppliersData);
-        setRoutings(routingsData);
+        
+        // Try to fetch routings separately, but don't fail if it doesn't work
+        try {
+          const routingsData = await RoutingsAPI.getAll();
+          setRoutings(routingsData);
+        } catch (routingError) {
+          console.warn('Routings not available:', routingError);
+          setRoutings([]); // Set empty array as fallback
+        }
+        
       } catch (error) {
         console.error('Error fetching data:', error);
         showToast('Failed to load data', 'error');

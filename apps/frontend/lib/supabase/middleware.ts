@@ -28,25 +28,64 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+  // Try to refresh the session first
+  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  console.log('Middleware - Path:', request.nextUrl.pathname, 'User:', !!user, 'Session:', !!session);
 
-  console.log('Middleware - Path:', request.nextUrl.pathname, 'User:', !!user);
-
-  // REDIRECT DISABLED - Uncomment below to enable redirect to login for unauthenticated users
-  /*
-  if (!user) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    console.log('Middleware - Redirecting to login');
-    return NextResponse.redirect(url);
+  // Redirect unauthenticated users to login
+  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/signup')) {
+    const loginUrl = new URL('/login', request.url);
+    // Add returnTo parameter to remember where user was trying to go
+    loginUrl.searchParams.set('returnTo', request.nextUrl.pathname);
+    console.log('Middleware - Redirecting to login with returnTo:', request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
   }
-  */
+
+  // Check role-based access for authenticated users
+  if (user) {
+    try {
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (userProfile?.role) {
+        console.log('Middleware - User role:', userProfile.role);
+        
+        // Define role-based access rules
+        const roleAccess: Record<string, string[]> = {
+          'Admin': ['/admin', '/planning', '/production', '/warehouse', '/technical', '/scanner', '/settings'],
+          'Planner': ['/planning', '/production', '/warehouse'],
+          'Operator': ['/production', '/scanner'],
+          'Warehouse': ['/warehouse', '/scanner'],
+          'QC': ['/warehouse', '/scanner'],
+          'Technical': ['/technical', '/settings'],
+          'Purchasing': ['/planning', '/warehouse']
+        };
+
+        const allowedPaths = roleAccess[userProfile.role] || [];
+        const currentPath = request.nextUrl.pathname;
+        
+        // Check if user has access to current path
+        const hasAccess = allowedPaths.some(path => currentPath.startsWith(path)) || 
+                         currentPath === '/' || 
+                         currentPath.startsWith('/login') || 
+                         currentPath.startsWith('/signup');
+        
+        if (!hasAccess) {
+          console.log('Middleware - Access denied for role:', userProfile.role, 'to path:', currentPath);
+          const loginUrl = new URL('/login', request.url);
+          loginUrl.searchParams.set('returnTo', currentPath);
+          return NextResponse.redirect(loginUrl);
+        }
+      }
+    } catch (error) {
+      console.error('Middleware - Error checking user role:', error);
+    }
+  }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
   // creating a new response object with NextResponse.next() make sure to:

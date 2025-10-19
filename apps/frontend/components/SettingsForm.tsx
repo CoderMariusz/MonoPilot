@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect  } from 'react';
 import { Save } from 'lucide-react';
 import { useSettings, updateSettings } from '@/lib/clientState';
-import { mockLocations } from '@/lib/mockData';
+import { LocationsAPI } from '@/lib/api/locations';
+import type { Location } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
 export function SettingsForm() {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client-browser';
 
 // GET /api/scanner/lp/[id]/composition - Get LP composition trace
 export async function GET(

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useLicensePlates, addStockMove } from '@/lib/clientState';
-import { mockLocations } from '@/lib/mockData';
+import { LocationsAPI } from '@/lib/api/locations';
 import { toast } from '@/lib/toast';
+import type { Location } from '@/lib/types';
 
 interface CreateStockMoveModalProps {
   isOpen: boolean;
@@ -15,8 +16,29 @@ interface CreateStockMoveModalProps {
 export function CreateStockMoveModal({ isOpen, onClose, onSuccess }: CreateStockMoveModalProps) {
   const licensePlates = useLicensePlates();
   const [selectedLP, setSelectedLP] = useState<number | null>(null);
-  const [toLocationId, setToLocationId] = useState<number>(mockLocations[0].id);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [toLocationId, setToLocationId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState('');
+
+  // Load locations on component mount
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const data = await LocationsAPI.getAll();
+        setLocations(data);
+        if (data.length > 0) {
+          setToLocationId(data[0].id);
+        }
+      } catch (error) {
+        console.error('Error loading locations:', error);
+        toast.error('Failed to load locations');
+      }
+    };
+
+    if (isOpen) {
+      loadLocations();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -110,7 +132,7 @@ export function CreateStockMoveModal({ isOpen, onClose, onSuccess }: CreateStock
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
                     required
                   >
-                    {mockLocations.map((loc) => (
+                    {locations.map((loc) => (
                       <option key={loc.id} value={loc.id}>{loc.name}</option>
                     ))}
                   </select>

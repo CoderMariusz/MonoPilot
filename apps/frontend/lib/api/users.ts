@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 import type { User } from '../types';
 
 // User API - Database-first operation
@@ -46,12 +46,7 @@ export class UsersAPI {
     password: string;
     role: string;
     status?: string;
-  }): Promise<{ user?: User; error?: any }> {
-    );
-      return { user: newUser };
-    }
-    
-    try {
+  }): Promise<{ user?: User; error?: any }> {    try {
       // Create auth user
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: userData.email,
@@ -89,9 +84,6 @@ export class UsersAPI {
 
   // Update user
   static async update(id: string, updates: Partial<User>): Promise<{ user?: User; error?: any }> {
-    ;
-    }
-    
     try {
       const { data, error } = await supabase
         .from('users')
@@ -114,9 +106,6 @@ export class UsersAPI {
 
   // Delete user
   static async delete(id: string): Promise<{ error?: any }> {
-    ;
-    }
-    
     try {
       // Delete the auth user (this will cascade to the profile due to foreign key)
       const { error } = await supabase.auth.admin.deleteUser(id);

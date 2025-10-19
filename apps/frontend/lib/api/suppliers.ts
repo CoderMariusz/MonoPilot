@@ -1,4 +1,4 @@
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 import type { Supplier, CreateSupplierData, UpdateSupplierData } from '../types';
 
 export class SuppliersAPI {

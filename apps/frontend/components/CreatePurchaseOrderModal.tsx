@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { mockProducts, mockLocations } from '@/lib/mockData';
+import { LocationsAPI } from '@/lib/api/locations';
+import type { Location } from '@/lib/types';
 import { useSuppliers, resolveDefaultUnitPrice } from '@/lib/clientState';
 import { useAuth } from '@/lib/auth/AuthContext';
 import type { Product, Location } from '@/lib/types';

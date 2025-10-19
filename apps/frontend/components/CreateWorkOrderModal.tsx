@@ -14,8 +14,8 @@ interface CreateWorkOrderModalProps {
 
 export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOrder }: CreateWorkOrderModalProps) {
   const machines = useMachines();
-  const allProducts = useProducts();
-  const products = allProducts.filter(p => p.product_type === 'PR' || p.product_type === 'FG');
+  const { products: allProducts } = useProducts();
+  const products = allProducts?.filter(p => p.product_type === 'PR' || p.product_type === 'FG') || [];
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   

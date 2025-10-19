@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client-browser';
 import type { TaxCode } from '@/lib/types';
 
 export class TaxCodesAPI {

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect  } from 'react';
 import { X } from 'lucide-react';
 import { useLicensePlates, updateLicensePlate } from '@/lib/clientState';
-import { mockLocations } from '@/lib/mockData';
+import { LocationsAPI } from '@/lib/api/locations';
+import type { Location } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
 interface AmendLPModalProps {

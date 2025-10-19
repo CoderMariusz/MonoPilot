@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, Package } from 'lucide-react';
 import { SuppliersAPI } from '@/lib/api/suppliers';
-import { SuppliersAPI } from '@/lib/api/suppliers';
 import type { Supplier, Product, TaxCode, SupplierProduct } from '@/lib/types';
 import { SupplierProductsModal } from './SupplierProductsModal';
+import { useToast } from '@/lib/toast';
+import { useProducts, useTaxCodes } from '@/lib/clientState';
 
 export function SuppliersTable() {
+  const { showToast } = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -15,11 +17,7 @@ export function SuppliersTable() {
   const [showProductsModal, setShowProductsModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
-
-  // Use mock data for now
-  const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const products = useProducts();
+  const { products } = useProducts();
   const taxCodes = useTaxCodes();
 
   useEffect(() => {
@@ -30,15 +28,14 @@ export function SuppliersTable() {
         setSuppliers(data);
       } catch (error) {
         console.error('Error loading suppliers:', error);
-        // Fallback to mock data
-        setSuppliers(mockSuppliers);
+        showToast('Failed to load suppliers', 'error');
       } finally {
         setLoading(false);
       }
     };
 
     loadSuppliers();
-  }, [mockSuppliers]);
+  }, [showToast]);
 
   const handleToggleActive = async (supplier: Supplier) => {
     try {

@@ -73,7 +73,7 @@ export default function SignupPage() {
   return (
     <div className="bg-white py-8 px-6 shadow rounded-lg">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Forza MES</h1>
+        <h1 className="text-3xl font-bold text-slate-900">Sign up</h1>
         <h2 className="mt-2 text-xl text-slate-600">Create your account</h2>
       </div>
 

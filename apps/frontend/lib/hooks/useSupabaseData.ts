@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../supabase/client';
+import { supabase } from '../supabase/client-browser';
 import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate } from '../types';
 
 // Hook to load Work Orders from Supabase

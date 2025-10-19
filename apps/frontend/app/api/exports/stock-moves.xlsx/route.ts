@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client-browser';
 import { exportStockMovesToExcel, generateExcelFile } from '@/lib/utils/exportHelpers';
 
 export async function GET(request: NextRequest) {

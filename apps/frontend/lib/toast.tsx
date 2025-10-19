@@ -40,7 +40,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map(toast => (
           <div
             key={toast.id}
-            className={`
+            className={`toast
               flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg min-w-[300px] max-w-md
               ${toast.type === 'success' 
                 ? 'bg-green-50 border border-green-200 text-green-800' 
