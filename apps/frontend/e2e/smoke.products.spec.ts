@@ -84,8 +84,9 @@ test.describe('Products smoke', () => {
     await page.locator('label:has-text("Description") + input').fill('Seasoned Mix');
     await page.locator('label:has-text("UoM") + input').fill('kg');
     await page.getByRole('button', { name: 'Add Item' }).click();
-    const row = page.locator('input[placeholder="Material ID"]').first();
-    await row.fill('1');
+    const productSelect = page.locator('input[placeholder="Search product…"]').first();
+    await productSelect.fill('DG-SALT');
+    await page.locator('button:has-text("DG-SALT")').first().click();
     await page.locator('input[placeholder="Qty"]').first().fill('0.95');
     await page.locator('input[placeholder="UoM"]').first().fill('kg');
     await page.getByRole('button', { name: 'Save Composite' }).click();
@@ -106,7 +107,9 @@ test.describe('Products smoke', () => {
     await page.locator('label:has-text("Description") + input').fill('Beef Burger 180g');
     await page.locator('label:has-text("UoM") + input').fill('ea');
     await page.getByRole('button', { name: 'Add Item' }).click();
-    await page.locator('input[placeholder="Material ID"]').first().fill('1');
+    const productSelect = page.locator('input[placeholder="Search product…"]').first();
+    await productSelect.fill('RM-BEEF');
+    await page.locator('button:has-text("RM-BEEF")').first().click();
     await page.locator('input[placeholder="Qty"]').first().fill('1');
     await page.locator('input[placeholder="UoM"]').first().fill('ea');
     await page.getByRole('button', { name: 'Save Composite' }).click();

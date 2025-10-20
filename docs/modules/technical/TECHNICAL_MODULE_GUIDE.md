@@ -11,6 +11,21 @@ The Technical Module is responsible for product catalog management, bill of mate
   - COMPOSITE + PR → PR
   - COMPOSITE + FG → FG
 
+### Product Creation Flows
+
+#### Single Products (MEAT/DRYGOODS)
+- Direct creation via `createSingle` API
+- Product type selection based on group (MEAT: RM_MEAT, DRYGOODS: DG_ING/DG_LABEL/DG_WEB/DG_BOX/DG_SAUCE)
+- Supplier and tax code selection
+- Allergen management with compact chip UI
+
+#### Composite Products (PR/FG)
+- Two-step creation via `createComposite` API
+- Product details without supplier/tax (not applicable for PR/FG)
+- Default routing selection
+- BOM items with searchable component selection (ProductSelect)
+- Allergen management with compact chip UI
+
 ## APIs
 
 - createSingle: inserts into `products` with validation of group/type mapping.

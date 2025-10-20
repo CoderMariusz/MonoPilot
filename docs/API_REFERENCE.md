@@ -51,7 +51,7 @@ apps/frontend/lib/api/
 | API Class | Tables Read | Tables Write | Business Rules Enforced |
 |-----------|-------------|--------------|------------------------|
 | `WorkOrdersAPI` | `work_orders`, `wo_operations`, `wo_materials`, `products` | `work_orders`, `wo_operations` | Sequential routing, 1:1 components, status transitions |
-| `ProductsAPI` | `products`, `product_allergens`, `allergens` | `products`, `product_allergens` | Unique part numbers, allergen inheritance |
+| `ProductsAPI` | `products`, `product_allergens`, `allergens`, `boms`, `bom_items` | `products`, `product_allergens`, `boms`, `bom_items` | Unique part numbers, allergen inheritance, BOM management |
 | `PurchaseOrdersAPI` | `purchase_orders`, `purchase_order_items`, `suppliers` | `purchase_orders`, `purchase_order_items` | GRN validation, status transitions |
 | `TransferOrdersAPI` | `transfer_orders`, `transfer_order_items`, `warehouses` | `transfer_orders`, `transfer_order_items` | Warehouse validation, status transitions |
 | `GRNsAPI` | `grns`, `grn_items`, `license_plates`, `purchase_orders` | `grns`, `grn_items`, `license_plates` | PO validation, LP creation |
@@ -63,7 +63,7 @@ apps/frontend/lib/api/
 
 | Page | Primary APIs | Secondary APIs | Data Flow |
 |------|--------------|----------------|-----------|
-| `/technical/bom` | `ProductsAPI`, `RoutingsAPI` | `AllergensAPI`, `TaxCodesAPI` | Product CRUD → BOM management |
+| `/technical/bom` | `ProductsAPI`, `RoutingsAPI` | `AllergensAPI`, `TaxCodesAPI` | Product CRUD → BOM management with ProductSelect UI |
 | `/production` | `WorkOrdersAPI`, `YieldAPI` | `TraceabilityAPI`, `LicensePlatesAPI` | WO management → Yield tracking |
 | `/planning` | `PurchaseOrdersAPI`, `TransferOrdersAPI` | `SuppliersAPI`, `WarehousesAPI` | Order management → Supplier integration |
 | `/warehouse` | `GRNsAPI`, `LicensePlatesAPI` | `StockMovesAPI`, `TraceabilityAPI` | Receipt processing → Inventory tracking |
