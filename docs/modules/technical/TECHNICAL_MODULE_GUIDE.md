@@ -3,6 +3,19 @@
 ## Overview
 The Technical Module is responsible for product catalog management, bill of materials (BOM) definition, and routing setup. It serves as the foundation for all other modules by defining products and their manufacturing requirements.
 
+## Single vs Composite
+
+- Mapping rules (DbType):
+  - MEAT → RM
+  - DRYGOODS → DG
+  - COMPOSITE + PR → PR
+  - COMPOSITE + FG → FG
+
+## APIs
+
+- createSingle: inserts into `products` with validation of group/type mapping.
+- createComposite: RPC `create_composite_product` performing transactional insert of product, BOM, and items.
+
 ## Module Architecture
 
 ### Page Structure

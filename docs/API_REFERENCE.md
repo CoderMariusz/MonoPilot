@@ -1172,3 +1172,17 @@ export async function withRetry<T>(
 6. **Rate Limiting**: API rate limiting and throttling
 7. **Caching**: Advanced caching strategies
 8. **Monitoring**: API performance monitoring
+
+# API Reference (Frontend Integration)
+
+## Products
+
+### POST /products/single
+- Body: `{ product: ProductInsert }`
+- Behavior: inserts product with type in {'RM','DG'} based on group mapping.
+- Errors: 23505 → "Part number already exists".
+
+### POST /products/composite
+- Body: `{ product, bom, items }`
+- Behavior: calls RPC `create_composite_product` to create product + BOM + items.
+- Returns: `{ product_id, bom_id }`.

@@ -14,7 +14,7 @@ CREATE TABLE products (
   id SERIAL PRIMARY KEY,
   part_number TEXT NOT NULL UNIQUE,
   description TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('RM', 'PR', 'FG', 'WIP')),
+  type TEXT NOT NULL CHECK (type IN ('RM', 'DG', 'PR', 'FG', 'WIP')),
   uom TEXT NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT true,
   -- App taxonomy
@@ -47,6 +47,12 @@ CREATE INDEX IF NOT EXISTS idx_products_is_active ON products(is_active);
 **Used By**
 - Pages: /technical/bom, /production, /planning, /warehouse, /scanner
 - APIs: ProductsAPI, WorkOrdersAPI, PurchaseOrdersAPI, GRNsAPI, LicensePlatesAPI
+
+-- Example inserts (including DG)
+```sql
+INSERT INTO products (part_number, description, type, uom, product_group, product_type)
+VALUES ('DG-SALT-002', 'Iodized Salt', 'DG', 'kg', 'DRYGOODS', 'DG_ING');
+```
 
 ### 1. work_orders
 **Purpose**: Production work orders with enhanced tracking capabilities
