@@ -275,11 +275,12 @@ export type ProductType = 'RM_MEAT' | 'PR' | 'FG' | 'DG_WEB' | 'DG_LABEL' | 'DG_
 
 // Enhanced Product interface
 export interface Product {
-  product_group: any;
   id: number;
   part_number: string;
   description: string;
+  type: 'RM' | 'DG' | 'PR' | 'FG' | 'WIP';  // DB required field
   group: ProductGroup;
+  product_group?: ProductGroup; // keep optional for backward compatibility in UI
   product_type: ProductType;
   subtype?: string;
   category?: string;
@@ -304,6 +305,67 @@ export interface Product {
   allergens?: ProductAllergen[];
   supplierProducts?: SupplierProduct[];
 }
+
+// Types for product creation and BOM inputs (align UI and API)
+export type ProductGroup = 'MEAT' | 'DRYGOODS' | 'COMPOSITE';
+export type ProductType = 'RM_MEAT' | 'DG_ING' | 'DG_LABEL' | 'DG_WEB' | 'DG_BOX' | 'DG_SAUCE' | 'PR' | 'FG';
+export type DbType = 'RM' | 'DG' | 'PR' | 'FG' | 'WIP';
+export type ExpiryPolicy = 'DAYS_STATIC' | 'FROM_MFG_DATE' | 'FROM_DELIVERY_DATE' | 'FROM_CREATION_DATE';
+
+export interface ProductInsert {
+  type: DbType;
+  part_number: string;
+  description: string;
+  uom: string;
+  product_group?: ProductGroup;
+  product_type?: ProductType;
+  preferred_supplier_id?: number | null;
+  tax_code_id?: number | null;
+  lead_time_days?: number | null;
+  moq?: number | null;
+  expiry_policy?: ExpiryPolicy | null;
+  shelf_life_days?: number | null;
+  std_price?: number | null;
+  production_lines?: string[];
+}
+
+export interface BomItemInput {
+  material_id: number;
+  quantity: number;
+  uom: string;
+  sequence?: number;
+  priority?: number | null;
+  production_lines?: string[];
+  production_line_restrictions?: string[];
+  scrap_std_pct?: number | null;
+  is_optional?: boolean;
+  is_phantom?: boolean;
+  one_to_one?: boolean;
+  unit_cost_std?: number | null;
+}
+
+export interface CreateSinglePayload {
+  product: ProductInsert;
+}
+
+export interface CreateCompositePayload {
+  product: ProductInsert;
+  bom: { version?: string; status?: 'active' | 'draft' };
+  items: BomItemInput[];
+}
+
+export interface CreateProductData {
+  productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>;
+  bom_items?: BomItemInput[];
+  bom_meta?: {
+    requires_routing?: boolean;
+    default_routing_id?: number;
+    version?: string;
+    status?: 'active' | 'inactive' | 'draft';
+  };
+}
+
+export type UpdateProductData = Partial<CreateProductData>;
 
 // Tax codes
 export interface TaxCode {

@@ -471,7 +471,8 @@ export class TestHelpers {
     
     // Fill shelf life days if provided (only for MEAT and PROCESS)
     if (data.shelfLifeDays) {
-      const shelfLifeInput = this.page.locator('input[placeholder="e.g., 30"], input[placeholder="e.g., 7"]');
+      // Try to find shelf life input more specifically
+      const shelfLifeInput = this.page.locator('input[placeholder="e.g., 30"]').first();
       if (await shelfLifeInput.count() > 0) {
         await shelfLifeInput.fill(data.shelfLifeDays);
       }
@@ -629,8 +630,8 @@ export class TestHelpers {
     const uom = await this.page.inputValue('input[placeholder="e.g., KG, LB, EA"]');
     console.log(`uom: "${uom}"`);
     
-    // Check price
-    const price = await this.page.inputValue('input[placeholder="0.00"]');
+    // Check price (std_price field)
+    const price = await this.page.inputValue('input[placeholder="0.00"]').first();
     console.log(`price: "${price}"`);
     
     // Check rate

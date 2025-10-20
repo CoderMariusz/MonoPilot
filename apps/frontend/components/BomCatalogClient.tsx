@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Package, Beef, ShoppingBag, FlaskConical, Plus, Loader2, Trash2, Pencil, Search } from 'lucide-react';
 import type { Product, ProductGroup, ProductType } from '@/lib/types';
 import { useProducts } from '@/lib/clientState';
-import AddItemModal from '@/components/AddItemModal';
+import SingleProductModal from '@/components/SingleProductModal';
+import CompositeProductModal from '@/components/CompositeProductModal';
 
 type CategoryType = 'MEAT' | 'DRYGOODS' | 'FINISHED_GOODS' | 'PROCESS';
 
@@ -34,7 +35,8 @@ interface BomCatalogClientProps {
 
 export default function BomCatalogClient({ initialData }: BomCatalogClientProps) {
   const [activeTab, setActiveTab] = useState<CategoryType>('MEAT');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSingleOpen, setIsSingleOpen] = useState(false);
+  const [isCompositeOpen, setIsCompositeOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -49,14 +51,15 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
     setRefreshTrigger(prev => prev + 1);
   };
 
-  const handleModalClose = () => {
-    setIsModalOpen(false);
+  const handleClose = () => {
+    setIsSingleOpen(false);
+    setIsCompositeOpen(false);
     setEditingProduct(undefined);
   };
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
-    setIsModalOpen(true);
+    // Future: support editing via appropriate modal
   };
 
   const getInitialDataForCategory = (category: CategoryType): ProductsResponse => {
@@ -76,21 +79,26 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-slate-900">BOM & Items Catalog</h1>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Add Item
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setIsSingleOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add Single
+          </button>
+          <button 
+            onClick={() => setIsCompositeOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-600 transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add Composite
+          </button>
+        </div>
       </div>
       
-      <AddItemModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        onSuccess={handleModalSuccess}
-        product={editingProduct}
-      />
+      <SingleProductModal isOpen={isSingleOpen} onClose={handleClose} onSuccess={handleModalSuccess} />
+      <CompositeProductModal isOpen={isCompositeOpen} onClose={handleClose} onSuccess={handleModalSuccess} />
       
       <div className="bg-white rounded-lg shadow-sm border border-slate-200">
         <div className="border-b border-slate-200">
