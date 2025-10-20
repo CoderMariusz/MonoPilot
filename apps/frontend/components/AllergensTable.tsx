@@ -7,8 +7,9 @@ import type { Allergen } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 
 export function AllergensTable() {
-  const [allergens, setAllergens] = useState([]);
+  const [allergens, setAllergens] = useState<Allergen[]>([]);
   const [loading, setLoading] = useState(true);
+  const { showToast } = useToast();
   
   // Fetch data on component mount
   useEffect(() => {
@@ -26,7 +27,7 @@ export function AllergensTable() {
     }
 
     fetchData();
-  }, [showToast]);const { showToast } = useToast();
+  }, [showToast]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAllergen, setEditingAllergen] = useState<Allergen | null>(null);
   const [formData, setFormData] = useState({
@@ -55,17 +56,20 @@ export function AllergensTable() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this allergen?')) {
-      const success = await AllergensAPI.delete(itemId);
-        setAllergens(prev => prev.filter(item => item.id !== itemId));
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this allergen?')) return;
+    try {
+      const success = await AllergensAPI.delete(id);
       if (success) {
+        setAllergens(prev => prev.filter(item => item.id !== id));
         showToast('Allergen deleted successfully', 'success');
       }
+    } catch (e: any) {
+      showToast(e?.message || 'Failed to delete allergen', 'error');
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const allergenData = {
@@ -75,14 +79,19 @@ export function AllergensTable() {
       is_active: true,
     };
 
-    if (editingAllergen) {
-      const updatedItem = await AllergensAPI.update(itemId, itemData);
-        setAllergens(prev => prev.map(item => item.id === itemId ? updatedItem : item));
-      showToast('Allergen updated successfully', 'success');
-    } else {
-      const newItem = await AllergensAPI.create(itemData);
-        setAllergens(prev => [...prev, newItem]);
-      showToast('Allergen added successfully', 'success');
+    try {
+      if (editingAllergen) {
+        const updatedItem = await AllergensAPI.update(editingAllergen.id as any, allergenData as any);
+        setAllergens(prev => prev.map(item => item.id === editingAllergen.id ? (updatedItem as Allergen) : item));
+        showToast('Allergen updated successfully', 'success');
+      } else {
+        const newItem = await AllergensAPI.create(allergenData as any);
+        setAllergens(prev => [...prev, newItem as Allergen]);
+        showToast('Allergen added successfully', 'success');
+      }
+    } catch (e: any) {
+      showToast(e?.message || 'Failed to save allergen', 'error');
+      return;
     }
     
     setIsModalOpen(false);

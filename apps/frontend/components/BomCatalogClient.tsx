@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Package, Beef, ShoppingBag, FlaskConical, Plus, Loader2, Trash2, Pencil, Search } from 'lucide-react';
 import type { Product, ProductGroup, ProductType } from '@/lib/types';
 import { useProducts } from '@/lib/clientState';
+import { ProductsAPI } from '@/lib/api/products';
 import SingleProductModal from '@/components/SingleProductModal';
 import CompositeProductModal from '@/components/CompositeProductModal';
 
@@ -152,6 +153,26 @@ function ProductsTable({
   onEditProduct: (product: Product) => void;
 }) {
   const { products: allProducts, loading: productsLoading } = useProducts();
+  const [localProducts, setLocalProducts] = useState<Product[]>(allProducts || []);
+
+  // Keep local list in sync with global on first load or when global changes
+  useEffect(() => {
+    if (allProducts && allProducts.length) {
+      setLocalProducts(allProducts);
+    }
+  }, [allProducts]);
+
+  // Hard refresh list when refreshTrigger changes (after create)
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await ProductsAPI.getAll();
+        setLocalProducts(data || []);
+      } catch (e) {
+        console.warn('Failed to refresh products after create', e);
+      }
+    })();
+  }, [refreshTrigger]);
   
   // Get the tab configuration for filtering
   const tabs: TabConfig[] = [
@@ -162,7 +183,7 @@ function ProductsTable({
   ];
   
   const currentTab = tabs.find(tab => tab.id === category);
-  const products = allProducts?.filter(p => {
+  const products = (localProducts || []).filter(p => {
     if (!currentTab) return false;
     
     // For MEAT: product_group === 'MEAT'
