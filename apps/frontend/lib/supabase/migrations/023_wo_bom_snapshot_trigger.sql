@@ -13,9 +13,9 @@ BEGIN
     SELECT b.id INTO bom_id_var
     FROM work_orders wo
     JOIN products p ON wo.product_id = p.id
-    JOIN bom b ON p.id = b.product_id
+    JOIN boms b ON p.id = b.product_id
     WHERE wo.id = wo_id_param
-      AND b.is_active = true;
+      AND b.status = 'active';
     
     -- Check if BOM exists
     IF bom_id_var IS NULL THEN

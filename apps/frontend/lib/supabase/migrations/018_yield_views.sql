@@ -249,7 +249,7 @@ SELECT
     wo.status as work_order_status
 FROM work_orders wo
 JOIN products p ON wo.product_id = p.id
-JOIN bom b ON p.id = b.product_id AND b.is_active = true
+JOIN boms b ON p.id = b.product_id AND b.status = 'active'
 JOIN bom_items bi ON b.id = bi.bom_id
 JOIN products mat ON bi.material_id = mat.id
 LEFT JOIN stock_moves sm ON wo.id = sm.wo_id 

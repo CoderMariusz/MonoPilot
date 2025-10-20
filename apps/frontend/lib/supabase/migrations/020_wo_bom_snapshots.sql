@@ -5,7 +5,7 @@
 CREATE TABLE wo_bom_snapshots (
     id SERIAL PRIMARY KEY,
     wo_id INTEGER NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
-    bom_id INTEGER NOT NULL REFERENCES bom(id),
+    bom_id INTEGER NOT NULL REFERENCES boms(id),
     bom_version TEXT NOT NULL,
     snapshot_data JSONB NOT NULL,
     one_to_one_flags JSONB DEFAULT '{}',
@@ -45,9 +45,9 @@ BEGIN
         
         -- Get the BOM for this product
         SELECT b.* INTO bom_record
-        FROM bom b
+        FROM boms b
         WHERE b.product_id = NEW.product_id 
-        AND b.is_active = true
+        AND b.status = 'active'
         ORDER BY b.created_at DESC
         LIMIT 1;
         
@@ -77,7 +77,7 @@ BEGIN
                 'uom', bom_items_record.uom,
                 'sequence', bom_items_record.sequence,
                 'priority', bom_items_record.priority,
-                'production_lines', bom_items_record.production_lines,
+                'production_line_restrictions', bom_items_record.production_line_restrictions,
                 'scrap_std_pct', bom_items_record.scrap_std_pct,
                 'is_optional', bom_items_record.is_optional,
                 'is_phantom', bom_items_record.is_phantom,

@@ -154,15 +154,15 @@ INSERT INTO product_allergens (product_id, allergen_id) VALUES
 -- =====================================================
 
 -- Create BOMs for finished goods
-INSERT INTO bom (id, product_id, version, status, is_active, requires_routing, notes) VALUES
-(1, 33, '1.0', 'active', true, true, 'Premium Beef Sausage BOM'),
-(2, 34, '1.0', 'active', true, true, 'Classic Pork Sausage BOM'),
-(3, 35, '1.0', 'active', true, true, 'Mixed Meat Sausage BOM'),
-(4, 36, '1.0', 'active', true, true, 'Beef Burger Patty BOM'),
-(5, 37, '1.0', 'active', true, true, 'Mixed Burger Patty BOM');
+INSERT INTO boms (id, product_id, version, status, requires_routing, notes) VALUES
+(1, 33, '1.0', 'active', true, 'Premium Beef Sausage BOM'),
+(2, 34, '1.0', 'active', true, 'Classic Pork Sausage BOM'),
+(3, 35, '1.0', 'active', true, 'Mixed Meat Sausage BOM'),
+(4, 36, '1.0', 'active', true, 'Beef Burger Patty BOM'),
+(5, 37, '1.0', 'active', true, 'Mixed Burger Patty BOM');
 
 -- BOM Items for Premium Beef Sausage
-INSERT INTO bom_items (bom_id, material_id, quantity, uom, sequence, priority, production_lines, scrap_std_pct, is_optional, is_phantom, one_to_one, unit_cost_std) VALUES
+INSERT INTO bom_items (bom_id, material_id, quantity, uom, sequence, priority, production_line_restrictions, scrap_std_pct, is_optional, is_phantom, one_to_one, unit_cost_std) VALUES
 (1, 1, 0.8, 'kg', 1, 1, ARRAY['P-01', 'P-02'], 0.05, false, false, false, 12.50),
 (1, 3, 0.2, 'kg', 2, 1, ARRAY['P-01', 'P-02'], 0.02, false, false, false, 8.00),
 (1, 8, 0.02, 'kg', 3, 2, ARRAY['P-01', 'P-02'], 0.01, false, false, false, 2.00),
@@ -171,7 +171,7 @@ INSERT INTO bom_items (bom_id, material_id, quantity, uom, sequence, priority, p
 (1, 17, 0.5, 'm', 6, 3, ARRAY['P-03'], 0.1, false, false, false, 0.50);
 
 -- BOM Items for Classic Pork Sausage
-INSERT INTO bom_items (bom_id, material_id, quantity, uom, sequence, priority, production_lines, scrap_std_pct, is_optional, is_phantom, one_to_one, unit_cost_std) VALUES
+INSERT INTO bom_items (bom_id, material_id, quantity, uom, sequence, priority, production_line_restrictions, scrap_std_pct, is_optional, is_phantom, one_to_one, unit_cost_std) VALUES
 (2, 4, 0.7, 'kg', 1, 1, ARRAY['P-01', 'P-02'], 0.05, false, false, false, 10.50),
 (2, 3, 0.3, 'kg', 2, 1, ARRAY['P-01', 'P-02'], 0.02, false, false, false, 8.00),
 (2, 8, 0.02, 'kg', 3, 2, ARRAY['P-01', 'P-02'], 0.01, false, false, false, 2.00),
@@ -189,14 +189,14 @@ INSERT INTO routings (id, name, product_id, is_active, notes) VALUES
 (3, 'Burger Patty Production', 36, true, 'Standard routing for burger patty production');
 
 -- Routing operations
-INSERT INTO routing_operations (id, routing_id, seq_no, name, code, description, requirements) VALUES
-(1, 1, 1, 'Preparation', 'PREP', 'Prepare materials and setup', ARRAY['Clean', 'Sanitize']),
-(2, 1, 2, 'Grinding', 'GRIND', 'Grind meat to desired consistency', ARRAY['Grind', 'Mix']),
-(3, 1, 3, 'Seasoning', 'SEASON', 'Add spices and seasonings', ARRAY['Mix', 'Season']),
-(4, 1, 4, 'Stuffing', 'STUFF', 'Stuff into casings', ARRAY['Stuff', 'Link']),
-(5, 1, 5, 'Cooking', 'COOK', 'Cook to proper temperature', ARRAY['Cook', 'Smoke']),
-(6, 1, 6, 'Cooling', 'COOL', 'Cool to storage temperature', ARRAY['Cool', 'Chill']),
-(7, 1, 7, 'Packaging', 'PACK', 'Package for distribution', ARRAY['Pack', 'Label']);
+INSERT INTO routing_operations (id, routing_id, sequence_number, operation_name, machine_id, estimated_duration_minutes) VALUES
+(1, 1, 1, 'Preparation', 1, 15),
+(2, 1, 2, 'Grinding', 1, 30),
+(3, 1, 3, 'Seasoning', 2, 10),
+(4, 1, 4, 'Stuffing', 3, 20),
+(5, 1, 5, 'Cooking', 4, 45),
+(6, 1, 6, 'Cooling', NULL, 30),
+(7, 1, 7, 'Packaging', 5, 25);
 
 -- SECTION 5: SUMMARY
 -- =====================================================

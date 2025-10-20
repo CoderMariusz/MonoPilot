@@ -2,7 +2,7 @@
 -- This migration adds BOM versioning, routing tables, and WO operations
 
 -- Update BOMs table with versioning
-ALTER TABLE bom
+ALTER TABLE boms
   ADD COLUMN status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'archived')),
   ADD COLUMN effective_from TIMESTAMPTZ,
   ADD COLUMN effective_to TIMESTAMPTZ,
@@ -33,13 +33,13 @@ CREATE TABLE routings (
 CREATE TABLE routing_operations (
   id SERIAL PRIMARY KEY,
   routing_id INTEGER NOT NULL REFERENCES routings(id) ON DELETE CASCADE,
-  seq_no INTEGER NOT NULL,
-  name VARCHAR(200) NOT NULL,
+  sequence_number INTEGER NOT NULL,
+  operation_name VARCHAR(200) NOT NULL,
   code VARCHAR(50),
   description TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(routing_id, seq_no)
+  UNIQUE(routing_id, sequence_number)
 );
 
 CREATE INDEX idx_routing_operations_routing ON routing_operations(routing_id);
@@ -63,7 +63,7 @@ CREATE INDEX idx_wo_operations_wo ON wo_operations(wo_id);
 CREATE INDEX idx_wo_operations_status ON wo_operations(status);
 
 -- Add FK constraint after table creation
-ALTER TABLE bom ADD CONSTRAINT fk_bom_routing 
+ALTER TABLE boms ADD CONSTRAINT fk_bom_routing 
   FOREIGN KEY (default_routing_id) REFERENCES routings(id);
 
 -- Sample routing data for existing products
@@ -80,7 +80,7 @@ WHERE p.product_type IN ('PR', 'FG')
 LIMIT 5;
 
 -- Sample routing operations for the created routings
-INSERT INTO routing_operations (routing_id, seq_no, name, code, description)
+INSERT INTO routing_operations (routing_id, sequence_number, operation_name, code, description)
 SELECT 
   r.id as routing_id,
   op.seq_no,
