@@ -92,6 +92,9 @@ CREATE TABLE public.products (
   allergen_ids INTEGER[],
   rate DECIMAL(10,2),
   production_lines TEXT[],
+  notes TEXT,
+  requires_routing BOOLEAN DEFAULT false,
+  default_routing_id INTEGER,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_by UUID REFERENCES public.users(id),
@@ -99,11 +102,16 @@ CREATE TABLE public.products (
 );
 
 -- BOM table
-CREATE TABLE public.bom (
+CREATE TABLE public.boms (
   id SERIAL PRIMARY KEY,
   product_id INTEGER REFERENCES public.products(id) NOT NULL,
   version TEXT NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT false,
+  status TEXT NOT NULL DEFAULT 'active',
+  effective_from TIMESTAMP WITH TIME ZONE,
+  effective_to TIMESTAMP WITH TIME ZONE,
+  requires_routing BOOLEAN DEFAULT false,
+  default_routing_id INTEGER,
+  notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_by UUID REFERENCES public.users(id),
@@ -113,13 +121,14 @@ CREATE TABLE public.bom (
 -- BOM Items table
 CREATE TABLE public.bom_items (
   id SERIAL PRIMARY KEY,
-  bom_id INTEGER REFERENCES public.bom(id) NOT NULL,
+  bom_id INTEGER REFERENCES public.boms(id) NOT NULL,
   material_id INTEGER REFERENCES public.products(id) NOT NULL,
   quantity DECIMAL(10,4) NOT NULL,
   uom TEXT NOT NULL,
   sequence INTEGER NOT NULL,
   priority INTEGER,
   production_lines TEXT[],
+  production_line_restrictions TEXT[] DEFAULT '{}',
   scrap_std_pct DECIMAL(5,2) DEFAULT 0,
   is_optional BOOLEAN DEFAULT false,
   is_phantom BOOLEAN DEFAULT false,

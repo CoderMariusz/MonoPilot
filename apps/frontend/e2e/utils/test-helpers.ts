@@ -103,13 +103,14 @@ export class TestHelpers {
   }
 
   async searchInTable(searchTerm: string) {
-    const searchInput = this.page.locator('input[placeholder*="Search"], input[type="search"]');
+    // Use the more specific search input for BOM table
+    const searchInput = this.page.locator('input[placeholder*="Search by item # or name"]');
     await searchInput.fill(searchTerm);
     await this.page.keyboard.press('Enter');
   }
 
   async clearSearch() {
-    const searchInput = this.page.locator('input[placeholder*="Search"], input[type="search"]');
+    const searchInput = this.page.locator('input[placeholder*="Search by item # or name"]');
     await searchInput.clear();
     await this.page.keyboard.press('Enter');
   }
@@ -397,5 +398,258 @@ export class TestHelpers {
     } catch (error) {
       console.warn(`Failed to cleanup transfer order ${id}:`, error);
     }
+  }
+
+  // BOM-specific methods
+  async openAddItemModal() {
+    await this.page.click('button:has-text("Add Item")');
+    // Wait for modal to appear
+    await this.waitForModal('Add Item');
+  }
+
+  async selectCategory(category: string) {
+    // In the modal, categories are buttons, not a select dropdown
+    // Map category codes to display names
+    const categoryMap: Record<string, string> = {
+      'MEAT': 'Meat',
+      'DRYGOODS': 'Dry Goods', 
+      'FINISHED_GOODS': 'Finished Goods',
+      'PROCESS': 'Process'
+    };
+    
+    const displayName = categoryMap[category] || category;
+    await this.page.click(`button:has-text("${displayName}")`);
+  }
+
+  async cleanupTestProduct(partNumber: string) {
+    try {
+      // Navigate to BOM if not already there
+      if (!this.page.url().includes('/technical/bom')) {
+        await this.navigateToBOM();
+      }
+      
+      // Search for the product
+      await this.searchInTable(partNumber);
+      
+      // Find and delete the product
+      const row = this.page.locator(`tr:has-text("${partNumber}")`);
+      if (await row.count() > 0) {
+        await row.locator('button:has-text("Delete")').click();
+        await this.page.click('button:has-text("Confirm"), button:has-text("Delete")');
+        await this.waitForToast('Product deleted successfully');
+      }
+      
+      // Clear search
+      await this.clearSearch();
+    } catch (error) {
+      console.warn(`Failed to cleanup product ${partNumber}:`, error);
+    }
+  }
+
+  // Product form methods
+  async fillProductForm(data: {
+    partNumber: string;
+    description: string;
+    uom: string;
+    std_price: string;
+    rate?: string;
+    shelfLifeDays?: string;
+    leadTimeDays?: string;
+    moq?: string;
+    notes?: string;
+  }) {
+    // Use placeholder-based selectors since inputs don't have name attributes
+    await this.page.fill('input[placeholder="e.g., MT-001"]', data.partNumber);
+    await this.page.fill('input[placeholder="Product name"]', data.description);
+    await this.page.fill('input[placeholder="e.g., KG, LB, EA"]', data.uom);
+    await this.page.fill('input[placeholder="0.00"]', data.std_price);
+    
+    // Fill rate if provided (required for FINISHED_GOODS)
+    if (data.rate) {
+      await this.page.fill('input[placeholder="e.g., 100"]', data.rate);
+    }
+    
+    // Fill shelf life days if provided (only for MEAT and PROCESS)
+    if (data.shelfLifeDays) {
+      const shelfLifeInput = this.page.locator('input[placeholder="e.g., 30"], input[placeholder="e.g., 7"]');
+      if (await shelfLifeInput.count() > 0) {
+        await shelfLifeInput.fill(data.shelfLifeDays);
+      }
+    }
+    
+    // Fill lead time days if provided
+    if (data.leadTimeDays) {
+      const leadTimeInput = this.page.locator('input[placeholder="e.g., 7"]');
+      if (await leadTimeInput.count() > 0) {
+        await leadTimeInput.fill(data.leadTimeDays);
+      }
+    }
+    
+    // Fill MOQ if provided
+    if (data.moq) {
+      const moqInput = this.page.locator('input[placeholder="e.g., 50.0"]');
+      if (await moqInput.count() > 0) {
+        await moqInput.fill(data.moq);
+      }
+    }
+    
+    // Fill notes if provided
+    if (data.notes) {
+      const notesInput = this.page.locator('textarea[placeholder="Additional notes..."]');
+      if (await notesInput.count() > 0) {
+        await notesInput.fill(data.notes);
+      }
+    }
+  }
+
+  async addBomComponent() {
+    await this.page.click('button:has-text("Add Component")');
+  }
+
+  async fillBomComponent(index: number, data: {
+    materialId?: number;
+    quantity: string;
+    unitCost?: string;
+  }) {
+    // Select material from dropdown - use specific selector for BOM components section
+    if (data.materialId) {
+      // Find ALL selects on the page
+      const allSelects = await this.page.locator('select').count();
+      console.log(`Total selects on page: ${allSelects}`);
+      
+      // Find the select within the BOM components section (after "BOM Components" label)
+      // The BOM components section starts after production lines, so we need to find selects AFTER the label "BOM Components"
+      const bomSection = this.page.locator('label:has-text("BOM Components")').locator('xpath=following::select').nth(index);
+      await bomSection.waitFor({ state: 'visible' });
+      
+      // Debug: Check if select has options
+      const options = await bomSection.locator('option').count();
+      console.log(`BOM component select has ${options} options`);
+      
+      // Try to select by value (ID 1 = RM-BEEF-001) and trigger change event
+      await bomSection.click();
+      await bomSection.selectOption({ value: '1' });
+      console.log('Successfully selected BOM component material');
+      
+      // Force React to update by triggering multiple events
+      await bomSection.dispatchEvent('change');
+      await bomSection.dispatchEvent('input');
+      await bomSection.dispatchEvent('blur');
+      
+      // Also try to trigger focus and change again
+      await bomSection.focus();
+      await bomSection.dispatchEvent('change');
+      
+      // Wait for React to process the change and auto-populate UoM
+      await this.page.waitForTimeout(1000);
+    }
+    
+    // Fill quantity - use more specific selector within BOM section
+    const quantityInput = this.page.locator('label:has-text("BOM Components")').locator('xpath=following::input[contains(@placeholder, "Quantity")]').nth(index);
+    await quantityInput.fill(data.quantity);
+    
+    // Fill unit cost if provided
+    if (data.unitCost) {
+      const unitCostInput = this.page.locator('label:has-text("BOM Components")').locator('xpath=following::input[contains(@placeholder, "0.00")]').nth(index);
+      await unitCostInput.fill(data.unitCost);
+    }
+  }
+
+  async selectProductionLines(lines: string[] = ['ALL']) {
+    // Click on production lines dropdown
+    await this.page.click('button:has-text("Select lines..."), button:has-text("All lines")');
+    
+    // Wait for dropdown to open
+    await this.page.waitForSelector('input[type="checkbox"]', { timeout: 5000 });
+    
+    // Select lines
+    for (const line of lines) {
+      if (line === 'ALL') {
+        // Find the checkbox for "All lines" option
+        const allLinesCheckbox = this.page.locator('input[type="checkbox"]').first();
+        await allLinesCheckbox.check();
+      } else {
+        // Find checkbox for specific line
+        const lineCheckbox = this.page.locator(`input[type="checkbox"]:near(label:has-text("${line}"))`);
+        await lineCheckbox.check();
+      }
+    }
+    
+    // Click outside to close dropdown
+    await this.page.click('body');
+  }
+
+  async saveProduct() {
+    await this.page.click('button:has-text("Create Item")');
+  }
+
+  async verifyToast(message: string) {
+    await this.waitForToast(message);
+  }
+
+  async debugFormErrors() {
+    // Check for any visible error messages in the form
+    const errorElements = this.page.locator('.text-red-600, .text-red-500, .border-red-300');
+    const errorCount = await errorElements.count();
+    
+    console.log(`Found ${errorCount} error elements`);
+    
+    for (let i = 0; i < errorCount; i++) {
+      const element = errorElements.nth(i);
+      const text = await element.textContent();
+      const className = await element.getAttribute('class');
+      console.log(`Error ${i}: "${text}" (class: ${className})`);
+    }
+    
+    // Check for any validation errors in the form
+    const validationErrors = this.page.locator('[class*="error"], [class*="invalid"]');
+    const validationCount = await validationErrors.count();
+    
+    console.log(`Found ${validationCount} validation error elements`);
+    
+    for (let i = 0; i < validationCount; i++) {
+      const element = validationErrors.nth(i);
+      const text = await element.textContent();
+      const className = await element.getAttribute('class');
+      console.log(`Validation Error ${i}: "${text}" (class: ${className})`);
+    }
+    
+    // Debug form data values
+    console.log('=== FORM DATA DEBUG ===');
+    
+    // Check part_number
+    const partNumber = await this.page.inputValue('input[placeholder="e.g., MT-001"]');
+    console.log(`part_number: "${partNumber}"`);
+    
+    // Check description
+    const description = await this.page.inputValue('input[placeholder="Product name"]');
+    console.log(`description: "${description}"`);
+    
+    // Check uom
+    const uom = await this.page.inputValue('input[placeholder="e.g., KG, LB, EA"]');
+    console.log(`uom: "${uom}"`);
+    
+    // Check price
+    const price = await this.page.inputValue('input[placeholder="0.00"]');
+    console.log(`price: "${price}"`);
+    
+    // Check rate
+    const rate = await this.page.inputValue('input[placeholder="e.g., 100"]');
+    console.log(`rate: "${rate}"`);
+    
+    // Check production lines
+    const productionLinesButton = this.page.locator('button:has-text("All lines")').first();
+    const productionLinesText = await productionLinesButton.textContent();
+    console.log(`production_lines: "${productionLinesText}"`);
+    
+    // Check BOM component select
+    const bomSelect = this.page.locator('label:has-text("BOM Components")').locator('xpath=following::select').first();
+    const bomSelectValue = await bomSelect.inputValue();
+    console.log(`bom_component_select: "${bomSelectValue}"`);
+    
+    // Check BOM component quantity
+    const bomQuantity = this.page.locator('label:has-text("BOM Components")').locator('xpath=following::input[contains(@placeholder, "Quantity")]').first();
+    const bomQuantityValue = await bomQuantity.inputValue();
+    console.log(`bom_component_quantity: "${bomQuantityValue}"`);
   }
 }

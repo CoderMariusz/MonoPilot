@@ -63,11 +63,11 @@ export class ProductsAPI {
     // Create BOM if bom_items are provided
     if (bom_items && bom_items.length > 0) {
       const { data: bom, error: bomError } = await supabase
-        .from('bom')
+        .from('boms')
         .insert([{
           product_id: product.id,
           version: '1.0',
-          is_active: true,
+          status: 'active',
           created_by: null, // TODO: Get from auth context
           updated_by: null
         }])
@@ -87,7 +87,7 @@ export class ProductsAPI {
         uom: item.uom,
         sequence: item.sequence || index + 1,
         priority: item.priority,
-        production_lines: item.production_lines || [],
+        production_line_restrictions: item.production_lines || [],
         scrap_std_pct: item.scrap_std_pct || 0,
         is_optional: item.is_optional || false,
         is_phantom: item.is_phantom || false,
@@ -129,10 +129,10 @@ export class ProductsAPI {
     if (bom_items !== undefined) {
       // Get existing BOM
       const { data: existingBom } = await supabase
-        .from('bom')
-        .select('id')
+        .from('boms')
+        .select('id, status, product_id')
         .eq('product_id', id)
-        .eq('is_active', true)
+        .eq('status', 'active')
         .single();
 
       if (bom_items && bom_items.length > 0) {
@@ -141,11 +141,11 @@ export class ProductsAPI {
         // Create new BOM if none exists
         if (!bomId) {
           const { data: newBom, error: bomError } = await supabase
-            .from('bom')
+            .from('boms')
             .insert([{
               product_id: id,
               version: '1.0',
-              is_active: true,
+              status: 'active',
               created_by: null, // TODO: Get from auth context
               updated_by: null
             }])
@@ -179,7 +179,7 @@ export class ProductsAPI {
           uom: item.uom,
           sequence: item.sequence || index + 1,
           priority: item.priority,
-          production_lines: item.production_lines || [],
+          production_line_restrictions: item.production_lines || [],
           scrap_std_pct: item.scrap_std_pct || 0,
           is_optional: item.is_optional || false,
           is_phantom: item.is_phantom || false,
@@ -208,7 +208,7 @@ export class ProductsAPI {
         }
 
         const { error: bomDeleteError } = await supabase
-          .from('bom')
+          .from('boms')
           .delete()
           .eq('id', existingBom.id);
 

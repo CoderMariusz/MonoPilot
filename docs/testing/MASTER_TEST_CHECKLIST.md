@@ -21,6 +21,25 @@ This document provides a comprehensive checklist for testing the entire MonoPilo
 - [ ] Work orders in various states
 - [ ] Material inventory data
 
+### Database State Requirements (per module)
+
+- Technical:
+  - [ ] products contain valid taxonomy (product_group, product_type)
+  - [ ] boms and bom_items exist for PR/FG products
+  - [ ] routings and routing_operations exist for routed products
+- Production:
+  - [ ] work_orders exist across statuses (planned, released, in_progress, completed)
+  - [ ] wo_operations sequences exist per routing
+  - [ ] lp_reservations seeded for staging scenarios
+- Planning:
+  - [ ] purchase_orders with purchase_order_items exist
+  - [ ] transfer_orders with transfer_order_items exist
+  - [ ] suppliers and supplier_products seeded
+- Warehouse:
+  - [ ] grns with grn_items exist and link to POs
+  - [ ] license_plates exist with valid locations and QA status
+  - [ ] stock_moves exist for move types (TRANSFER, ISSUE, RECEIPT)
+
 ## BOM Module Testing
 
 ### Critical Bug Fixes

@@ -31,7 +31,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: testProductNumber,
       description: 'E2E Test Flour',
       uom: 'kg',
-      price: '2.50',
+      std_price: '2.50',
     });
 
     // Save product
@@ -94,7 +94,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: testProductNumber,
       description: 'E2E Test Flour',
       uom: 'kg',
-      price: '-2.50',
+      std_price: '-2.50',
     });
 
     await page.click('button:has-text("Save")');
@@ -112,7 +112,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: testProductNumber,
       description: 'E2E Test Flour',
       uom: 'kg',
-      price: '2.50',
+      std_price: '2.50',
     });
     await helpers.saveProduct();
 
@@ -163,7 +163,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: testProductNumber,
       description: 'E2E Test Flour',
       uom: 'kg',
-      price: '2.50',
+      std_price: '2.50',
     });
 
     // Click save and check for loading state
@@ -184,7 +184,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: testProductNumber,
       description: 'E2E Test Flour',
       uom: 'kg',
-      price: '2.50',
+      std_price: '2.50',
     });
     await page.click('button:has-text("Save")');
 
@@ -202,7 +202,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: testProductNumber,
       description: 'E2E Test Flour',
       uom: '',
-      price: '2.50',
+      std_price: '2.50',
     });
 
     await page.click('button:has-text("Save")');
@@ -221,7 +221,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: testProductNumber,
       description: '',
       uom: 'kg',
-      price: '2.50',
+      std_price: '2.50',
     });
 
     await page.click('button:has-text("Save")');
@@ -240,7 +240,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: '',
       description: 'E2E Test Flour',
       uom: 'kg',
-      price: '2.50',
+      std_price: '2.50',
     });
 
     await page.click('button:has-text("Save")');
@@ -259,7 +259,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: 'invalid part number!',
       description: 'E2E Test Flour',
       uom: 'kg',
-      price: '2.50',
+      std_price: '2.50',
     });
 
     await page.click('button:has-text("Save")');
@@ -297,7 +297,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: testProductNumber,
       description: 'E2E Test Flour',
       uom: 'invalid uom!',
-      price: '2.50',
+      std_price: '2.50',
     });
 
     await page.click('button:has-text("Save")');
@@ -317,7 +317,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: testProductNumber,
       description: longDescription,
       uom: 'kg',
-      price: '2.50',
+      std_price: '2.50',
     });
 
     await page.click('button:has-text("Save")');
@@ -337,7 +337,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: longPartNumber,
       description: 'E2E Test Flour',
       uom: 'kg',
-      price: '2.50',
+      std_price: '2.50',
     });
 
     await page.click('button:has-text("Save")');
@@ -357,7 +357,7 @@ test.describe('BOM - Create DRYGOODS Product', () => {
       partNumber: testProductNumber,
       description: 'E2E Test Flour',
       uom: longUOM,
-      price: '2.50',
+      std_price: '2.50',
     });
 
     await page.click('button:has-text("Save")');

@@ -199,15 +199,29 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
 
   const fetchAvailableProducts = async () => {
     try {
+      // Fetch products from Supabase
+      const products = await ProductsAPI.getAll();
+      console.log('Fetched products:', products.length, 'products');
+      console.log('Product groups:', [...new Set(products.map(p => p.product_group))]);
+      console.log('Product types:', [...new Set(products.map(p => p.product_type))]);
+
       if (category === 'PROCESS') {
-        const rmProducts = mockProducts.filter(p => p.group === 'MEAT' || p.group === 'DRYGOODS');
+        const rmProducts = products.filter(p => p.product_group === 'MEAT' || p.product_group === 'DRYGOODS');
+        console.log('PROCESS - RM products:', rmProducts.length);
         setAvailableProducts(rmProducts);
       } else if (category === 'FINISHED_GOODS') {
-        const rmProducts = mockProducts.filter(p => p.group === 'MEAT' || p.group === 'DRYGOODS');
-        const prProducts = mockProducts.filter(p => p.product_type === 'PR');
-        setAvailableProducts([...rmProducts, ...prProducts]);
+        const rmProducts = products.filter(
+          p => p.product_group === 'MEAT' || p.product_group === 'DRYGOODS'
+        );
+        const prProducts = products.filter(p => p.product_type === 'PR');
+        console.log('FINISHED_GOODS - RM products:', rmProducts.length);
+        console.log('FINISHED_GOODS - PR products:', prProducts.length);
+        const allProducts = [...rmProducts, ...prProducts];
+        console.log('FINISHED_GOODS - Total available products:', allProducts.length);
+        setAvailableProducts(allProducts);
       }
     } catch (error) {
+      console.error('Failed to load products:', error);
       showToast('Failed to load products', 'error');
     }
   };
@@ -317,17 +331,18 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       requires_routing: false,
       default_routing_id: '',
     });
-    setBomComponents([{ 
-      product_id: '', 
-      quantity: '', 
-      uom: '', 
-      sequence: '', 
-      priority: '', 
+    setBomComponents([{
+      product_id: '',
+      quantity: '',
+      uom: '',
+      sequence: '',
+      priority: '',
       production_lines: [],
       scrap_std_pct: '0',
       is_optional: false,
       is_phantom: false,
-      unit_cost_std: ''
+      unit_cost_std: '',
+      one_to_one: false
     }]);
     setAutoAllergenIds([]);
     setSuppressedAutoAllergenIds([]);
@@ -536,6 +551,15 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   };
 
   const handleSubmit = async () => {
+    // Backward-compat: tolerate legacy field aliases and normalize inputs before validation
+    if ((formData as any).price && !formData.std_price) {
+      updateFormField('std_price', String((formData as any).price));
+    }
+    if (typeof (formData as any).production_lines === 'string') {
+      const norm = (formData as any).production_lines === 'ALL' ? ['ALL'] : [];
+      setFormData(prev => ({ ...prev, production_lines: norm }));
+    }
+
     if (!validateForm()) {
       showToast('Please fix the errors in the form', 'error');
       return;
@@ -547,39 +571,46 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         part_number: formData.part_number,
         description: formData.description,
         uom: formData.uom,
-        std_price: parseFloat(formData.std_price),
-        notes: formData.notes || undefined,
-        category: category,
-        allergen_ids: formData.allergen_ids,
-        // New fields for enhanced BOM system
-        group: formData.group,
+        product_group: category === 'FINISHED_GOODS' ? 'COMPOSITE' : 
+                      category === 'PROCESS' ? 'COMPOSITE' : 
+                      category === 'MEAT' ? 'MEAT' : 
+                      category === 'DRYGOODS' ? 'DRYGOODS' : category,
         product_type: formData.product_type,
+        subtype: formData.subtype || undefined,
+        expiry_policy: formData.expiry_policy || undefined,
+        shelf_life_days: formData.shelf_life_days ? parseInt(formData.shelf_life_days) : undefined,
+        production_lines: formData.production_lines || undefined,
+        is_active: true,
         preferred_supplier_id: formData.preferred_supplier_id ? parseInt(formData.preferred_supplier_id) : undefined,
         lead_time_days: formData.lead_time_days ? parseInt(formData.lead_time_days) : undefined,
         moq: formData.moq ? parseFloat(formData.moq) : undefined,
         tax_code_id: formData.tax_code_id ? parseInt(formData.tax_code_id) : undefined,
+        // Now using all columns that exist in database
+        std_price: formData.std_price ? parseFloat(formData.std_price) : undefined,
+        notes: formData.notes || undefined,
+        category: category,
+        allergen_ids: formData.allergen_ids || [],
+        rate: formData.rate ? parseFloat(formData.rate) : undefined,
+        requires_routing: formData.requires_routing || false,
+        default_routing_id: formData.default_routing_id ? parseInt(formData.default_routing_id) : undefined,
       };
 
+      // Remove any potential id field to avoid duplicate key errors
+      delete payload.id;
+
+      // Set category-specific fields and create bom_items
+      let bom_items: any[] = [];
+      
       if (category === 'MEAT') {
         payload.type = 'RM';
-        payload.expiry_policy = formData.expiry_policy;
-        if (formData.shelf_life_days) {
-          payload.shelf_life_days = parseInt(formData.shelf_life_days);
-        }
+        // expiry_policy and shelf_life_days already set above
       } else if (category === 'DRYGOODS') {
         payload.type = 'RM';
-        payload.subtype = formData.subtype;
-        payload.expiry_policy = formData.expiry_policy;
-        if (formData.shelf_life_days) {
-          payload.shelf_life_days = parseInt(formData.shelf_life_days);
-        }
+        // subtype, expiry_policy and shelf_life_days already set above
       } else if (category === 'FINISHED_GOODS') {
         payload.type = 'FG';
-        if (formData.rate) {
-          payload.rate = parseFloat(formData.rate);
-        }
-        payload.production_lines = formData.production_lines;
-        payload.bom_items = bomComponents.map((c, index) => ({
+        // production_lines already set above
+        bom_items = bomComponents.map((c, index) => ({
           material_id: parseInt(c.product_id),
           quantity: parseFloat(c.quantity),
           uom: c.uom,
@@ -596,9 +627,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
       } else if (category === 'PROCESS') {
         payload.type = 'PR';
         payload.expiry_policy = 'FROM_CREATION_DATE';
-        payload.shelf_life_days = parseInt(formData.shelf_life_days);
-        payload.production_lines = formData.production_lines;
-        payload.bom_items = bomComponents.map((c, index) => ({
+        // shelf_life_days and production_lines already set above
+        bom_items = bomComponents.map((c, index) => ({
           material_id: parseInt(c.product_id),
           quantity: parseFloat(c.quantity),
           uom: c.uom,
@@ -614,11 +644,19 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
         }));
       }
 
+      // Debug: Log the payload before sending
+      console.log('=== PAYLOAD DEBUG ===');
+      console.log('Payload being sent:', JSON.stringify(payload, null, 2));
+      console.log('BOM components:', bomComponents);
+      console.log('BOM items for API:', bom_items);
+      console.log('Form data:', formData);
+      console.log('Category:', category);
+
       if (isEditMode && product) {
         await ProductsAPI.update(product.id, payload);
         showToast('Product updated successfully', 'success');
       } else {
-        await ProductsAPI.create(payload);
+        await ProductsAPI.create({ ...payload, bom_items });
         showToast('Product created successfully', 'success');
       }
       
@@ -635,7 +673,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, product }: Ad
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-testid="modal-Add Item">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div className="flex items-center gap-3">

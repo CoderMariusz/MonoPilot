@@ -275,6 +275,7 @@ export type ProductType = 'RM_MEAT' | 'PR' | 'FG' | 'DG_WEB' | 'DG_LABEL' | 'DG_
 
 // Enhanced Product interface
 export interface Product {
+  product_group: any;
   id: number;
   part_number: string;
   description: string;

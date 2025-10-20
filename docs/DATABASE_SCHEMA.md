@@ -6,6 +6,48 @@ This document describes the complete database schema for the MonoPilot MES syste
 
 ## Core Tables
 
+### 0. products
+**Purpose**: Product catalog with taxonomy aligned to application logic
+
+```sql
+CREATE TABLE products (
+  id SERIAL PRIMARY KEY,
+  part_number TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('RM', 'PR', 'FG', 'WIP')),
+  uom TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  -- App taxonomy
+  product_group TEXT CHECK (product_group IN ('MEAT', 'DRYGOODS', 'COMPOSITE')),
+  product_type TEXT CHECK (product_type IN ('RM_MEAT', 'PR', 'FG', 'DG_ING', 'DG_LABEL', 'DG_WEB', 'DG_BOX', 'DG_SAUCE')),
+  -- Planning & commercial
+  preferred_supplier_id INTEGER REFERENCES suppliers(id),
+  tax_code_id INTEGER REFERENCES settings_tax_codes(id),
+  lead_time_days INTEGER,
+  moq DECIMAL(10,4),
+  -- Lifecycle
+  expiry_policy TEXT CHECK (expiry_policy IN ('DAYS_STATIC', 'FROM_MFG_DATE', 'FROM_DELIVERY_DATE', 'FROM_CREATION_DATE')),
+  shelf_life_days INTEGER,
+  -- Audit
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id)
+);
+```
+
+**Indexes**
+```sql
+CREATE INDEX IF NOT EXISTS idx_products_part_number ON products(part_number);
+CREATE INDEX IF NOT EXISTS idx_products_product_group ON products(product_group);
+CREATE INDEX IF NOT EXISTS idx_products_product_type ON products(product_type);
+CREATE INDEX IF NOT EXISTS idx_products_is_active ON products(is_active);
+```
+
+**Used By**
+- Pages: /technical/bom, /production, /planning, /warehouse, /scanner
+- APIs: ProductsAPI, WorkOrdersAPI, PurchaseOrdersAPI, GRNsAPI, LicensePlatesAPI
+
 ### 1. work_orders
 **Purpose**: Production work orders with enhanced tracking capabilities
 
@@ -97,15 +139,15 @@ CREATE TABLE stock_moves (
 
 ## BOM Management Tables
 
-### 3. bom
+### 3. boms
 **Purpose**: Bill of Materials with versioning support
 
 ```sql
-CREATE TABLE bom (
+CREATE TABLE boms (
   id SERIAL PRIMARY KEY,
   product_id INTEGER REFERENCES products(id) NOT NULL,
   version TEXT NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT false,
+  status TEXT DEFAULT 'active',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_by UUID REFERENCES users(id),
@@ -130,7 +172,7 @@ CREATE TABLE bom_items (
   uom TEXT NOT NULL,
   sequence INTEGER NOT NULL,
   priority INTEGER,
-  production_lines TEXT[],
+  production_line_restrictions TEXT[],
   scrap_std_pct DECIMAL(5,2) DEFAULT 0,
   is_optional BOOLEAN DEFAULT false,
   is_phantom BOOLEAN DEFAULT false,

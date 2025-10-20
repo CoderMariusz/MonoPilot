@@ -16,11 +16,11 @@ Category Selection → Field Configuration → BOM Components → Save
 
 ### 2. BOM Component Flow (Server-Side Data Fetching)
 ```
-Server Component → ProductsAPI.getAll() → Initial Data
+Server Component → ProductsAPI.getAll() → Initial Data (products)
      ↓
 Client Component → Real-time Updates → Optimistic Updates
      ↓
-Material Selection → Quantity/Scrap/Flags → Validation → Database Storage
+Material Selection → Quantity/Scrap/Flags → Validation → Database Storage (`boms` → `bom_items`)
 ```
 
 ### 3. Material Consumption Logic (Hybrid Approach)
@@ -95,21 +95,27 @@ export class ProductsAPI {
   static async getAll(): Promise<Product[]> {
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        bom_items(
-          *,
-          material:products(*)
-        )
-      `)
-      .order('created_at', { ascending: false })
+      .select('*')
+      .order('part_number');
+    if (error) throw new Error('Failed to fetch products');
+    return data || [];
+  }
 
-    if (error) {
-      console.error('Error fetching products:', error)
-      throw new Error('Failed to fetch products')
-    }
+  static async getBom(productId: number) {
+    const { data: bom } = await supabase
+      .from('boms')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('status', 'active')
+      .single();
+    if (!bom) return null;
 
-    return data || []
+    const { data: items } = await supabase
+      .from('bom_items')
+      .select('*')
+      .eq('bom_id', bom.id)
+      .order('sequence');
+    return { ...bom, items: items || [] };
   }
 }
 ```
@@ -253,14 +259,14 @@ Result: Not available on Line 1
 
 ### Core Tables
 - `products`: Product definitions
-- `bom`: BOM versions
-- `bom_items`: BOM components
+- `boms`: BOM versions
+- `bom_items`: BOM components (uses `production_line_restrictions` TEXT[])
 - `wo_materials`: Work order BOM snapshots
 
 ### Key Relationships
 ```
-products (1) ←→ (many) bom
-bom (1) ←→ (many) bom_items
+products (1) ←→ (many) boms
+boms (1) ←→ (many) bom_items
 bom_items (many) ←→ (1) products (materials)
 wo_materials (many) ←→ (1) bom_items
 ```
@@ -275,9 +281,9 @@ wo_materials (many) ←→ (1) bom_items
 - `DELETE /api/products/:id` - Delete product
 
 ### BOM API
-- `GET /api/products/:id/bom` - Get product BOM
-- `POST /api/products/:id/bom` - Create/update BOM
-- `DELETE /api/products/:id/bom` - Delete BOM
+- `GET /api/products/:id/bom` - Get product BOM (reads `boms`, `bom_items`)
+- `POST /api/products/:id/bom` - Create/update BOM (inserts into `boms`, `bom_items`)
+- `DELETE /api/products/:id/bom` - Delete BOM (removes from `boms` and related `bom_items`)
 
 ## Error Handling
 

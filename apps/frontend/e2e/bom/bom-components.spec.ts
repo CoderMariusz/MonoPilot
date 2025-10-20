@@ -4,11 +4,13 @@ import { testUsers } from '../fixtures/test-data';
 
 test.describe('BOM - BOM Components', () => {
   let helpers: TestHelpers;
-  const testProductNumber = `FG-COMPONENTS-${Date.now()}`;
+  let testProductNumber: string;
 
   test.beforeEach(async ({ page }) => {
     helpers = new TestHelpers(page);
     await helpers.login(testUsers.admin.email, testUsers.admin.password);
+    // Generate unique product number for each test
+    testProductNumber = `FG-COMPONENTS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   });
 
   test.afterEach(async () => {
@@ -25,23 +27,35 @@ test.describe('BOM - BOM Components', () => {
     await helpers.fillProductForm({
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
-      uom: 'box',
-      price: '50.00',
+      uom: 'EA', // Each - correct UoM for finished goods
+      std_price: '50.00', // Fixed: use std_price instead of price
+      rate: '100', // Required for FINISHED_GOODS
+      shelfLifeDays: '30', // Add shelf life
+      leadTimeDays: '7', // Add lead time
+      moq: '10.0', // Add MOQ
+      notes: 'Test product for BOM components' // Add notes
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Select production lines (required for FINISHED_GOODS)
+    await helpers.selectProductionLines(['ALL']);
 
-    // Add BOM component
-    await page.click('button:has-text("Add Component")');
+    // Modal automatically goes to step 2 after category selection
+
+    // Add BOM component (required for FINISHED_GOODS)
+    await helpers.addBomComponent();
     
     // Fill BOM component details
-    await page.selectOption('select[name="bom_components[0].material_id"]', { index: 1 });
-    await page.fill('input[name="bom_components[0].quantity"]', '10');
-    await page.fill('input[name="bom_components[0].uom"]', 'kg');
+    await helpers.fillBomComponent(0, {
+      materialId: 1, // Select first available material (RM-BEEF-001)
+      quantity: '10',
+      unitCost: '5.50' // Add unit cost
+    });
 
     // Save product
     await helpers.saveProduct();
+
+    // Debug form errors if validation fails
+    await helpers.debugFormErrors();
 
     // Verify success
     await helpers.verifyToast('Product created successfully');
@@ -57,11 +71,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component
     await page.click('button:has-text("Add Component")');
@@ -86,11 +99,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component
     await page.click('button:has-text("Add Component")');
@@ -118,11 +130,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component
     await page.click('button:has-text("Add Component")');
@@ -162,11 +173,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with Multiple BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add first BOM component
     await page.click('button:has-text("Add Component")');
@@ -203,11 +213,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with Multiple BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add first BOM component
     await page.click('button:has-text("Add Component")');
@@ -248,11 +257,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component without filling required fields
     await page.click('button:has-text("Add Component")');
@@ -274,11 +282,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component with invalid quantity
     await page.click('button:has-text("Add Component")');
@@ -301,11 +308,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component with invalid UOM
     await page.click('button:has-text("Add Component")');
@@ -328,11 +334,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add first BOM component
     await page.click('button:has-text("Add Component")');
@@ -360,11 +365,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component with all flags enabled
     await page.click('button:has-text("Add Component")');
@@ -392,11 +396,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component with no flags enabled
     await page.click('button:has-text("Add Component")');
@@ -426,11 +429,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component with mixed flags
     await page.click('button:has-text("Add Component")');
@@ -466,11 +468,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component
     await page.click('button:has-text("Add Component")');
@@ -495,11 +496,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component
     await page.click('button:has-text("Add Component")');
@@ -524,11 +524,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component
     await page.click('button:has-text("Add Component")');
@@ -553,11 +552,10 @@ test.describe('BOM - BOM Components', () => {
       partNumber: testProductNumber,
       description: 'FG Product with BOM Components',
       uom: 'box',
-      price: '50.00',
+      std_price: '50.00',
     });
 
-    // Click next to go to BOM step
-    await page.click('button:has-text("Next")');
+    // Modal automatically goes to step 2 after category selection
 
     // Add BOM component
     await page.click('button:has-text("Add Component")');

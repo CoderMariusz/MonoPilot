@@ -46,6 +46,30 @@ apps/frontend/lib/api/
 └── licensePlates.ts       # License plates API
 ```
 
+## API Table Access Matrix
+
+| API Class | Tables Read | Tables Write | Business Rules Enforced |
+|-----------|-------------|--------------|------------------------|
+| `WorkOrdersAPI` | `work_orders`, `wo_operations`, `wo_materials`, `products` | `work_orders`, `wo_operations` | Sequential routing, 1:1 components, status transitions |
+| `ProductsAPI` | `products`, `product_allergens`, `allergens` | `products`, `product_allergens` | Unique part numbers, allergen inheritance |
+| `PurchaseOrdersAPI` | `purchase_orders`, `purchase_order_items`, `suppliers` | `purchase_orders`, `purchase_order_items` | GRN validation, status transitions |
+| `TransferOrdersAPI` | `transfer_orders`, `transfer_order_items`, `warehouses` | `transfer_orders`, `transfer_order_items` | Warehouse validation, status transitions |
+| `GRNsAPI` | `grns`, `grn_items`, `license_plates`, `purchase_orders` | `grns`, `grn_items`, `license_plates` | PO validation, LP creation |
+| `LicensePlatesAPI` | `license_plates`, `locations`, `products` | `license_plates` | LP numbering, status management |
+| `YieldAPI` | `wo_operations`, `production_outputs`, `work_orders` | `production_outputs` | Yield calculations, variance tracking |
+| `TraceabilityAPI` | `license_plates`, `lp_genealogy`, `lp_compositions` | `lp_genealogy`, `lp_compositions` | Trace chain integrity |
+
+## Page-to-API Mapping
+
+| Page | Primary APIs | Secondary APIs | Data Flow |
+|------|--------------|----------------|-----------|
+| `/technical/bom` | `ProductsAPI`, `RoutingsAPI` | `AllergensAPI`, `TaxCodesAPI` | Product CRUD → BOM management |
+| `/production` | `WorkOrdersAPI`, `YieldAPI` | `TraceabilityAPI`, `LicensePlatesAPI` | WO management → Yield tracking |
+| `/planning` | `PurchaseOrdersAPI`, `TransferOrdersAPI` | `SuppliersAPI`, `WarehousesAPI` | Order management → Supplier integration |
+| `/warehouse` | `GRNsAPI`, `LicensePlatesAPI` | `StockMovesAPI`, `TraceabilityAPI` | Receipt processing → Inventory tracking |
+| `/scanner/process` | `WorkOrdersAPI`, `ScannerAPI` | `LicensePlatesAPI` | Operation execution → LP management |
+| `/scanner/pack` | `PalletsAPI`, `ScannerAPI` | `LicensePlatesAPI` | Pallet creation → LP composition |
+
 ## Core API Classes
 
 ### WorkOrdersAPI
@@ -1001,6 +1025,141 @@ export class QAGateValidator {
   ): Promise<{isValid: boolean, error?: string}>
 }
 ```
+
+## Business Flow Diagrams
+
+### Work Order Creation Flow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant P as Planning Page
+    participant WO as WorkOrdersAPI
+    participant DB as Database
+    participant R as RoutingsAPI
+    
+    U->>P: Create Work Order
+    P->>WO: create(woData)
+    WO->>DB: Validate product exists
+    WO->>R: Get routing for product
+    R->>DB: Query routings table
+    R-->>WO: Return routing operations
+    WO->>DB: Create work_orders record
+    WO->>DB: Create wo_operations records
+    WO-->>P: Return created WO
+    P-->>U: Show success message
+```
+
+### GRN Processing Flow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant W as Warehouse Page
+    participant G as GRNsAPI
+    participant DB as Database
+    participant L as LicensePlatesAPI
+    
+    U->>W: Create GRN
+    W->>G: create(grnData)
+    G->>DB: Validate PO exists
+    G->>DB: Create grns record
+    G->>DB: Create grn_items records
+    loop For each item
+        G->>L: createLicensePlate(item)
+        L->>DB: Create license_plates record
+    end
+    G-->>W: Return created GRN
+    W-->>U: Show success message
+```
+
+### Production Execution Flow
+```mermaid
+sequenceDiagram
+    participant O as Operator
+    participant S as Scanner
+    participant WO as WorkOrdersAPI
+    participant DB as Database
+    participant Y as YieldAPI
+    
+    O->>S: Start Operation
+    S->>WO: getWorkOrderStageStatus(woId)
+    WO->>DB: Query wo_operations
+    WO-->>S: Return stage status
+    S->>WO: completeOperation(woId, seq, data)
+    WO->>DB: Update wo_operations
+    WO->>Y: recordYield(woId, data)
+    Y->>DB: Create production_outputs
+    WO-->>S: Return success
+    S-->>O: Show completion status
+```
+
+## Error Handling Patterns
+
+### Common Error Codes
+| Code | Description | Resolution |
+|------|-------------|------------|
+| `VALIDATION_ERROR` | Input validation failed | Check required fields and data types |
+| `NOT_FOUND` | Resource not found | Verify ID exists and user has access |
+| `DUPLICATE_KEY` | Unique constraint violation | Check for existing records |
+| `FOREIGN_KEY_ERROR` | Referenced record missing | Verify related records exist |
+| `RLS_VIOLATION` | Row Level Security violation | Check user permissions |
+| `BUSINESS_RULE_ERROR` | Business logic violation | Review business rules |
+
+### Error Response Format
+```typescript
+interface APIError {
+  code: string;
+  message: string;
+  details?: {
+    field?: string;
+    value?: any;
+    constraint?: string;
+  };
+  timestamp: string;
+  requestId: string;
+}
+```
+
+### Retry Logic
+```typescript
+// Automatic retry for transient errors
+const RETRYABLE_ERRORS = ['NETWORK_ERROR', 'TIMEOUT', 'RATE_LIMIT'];
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // ms
+
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries = MAX_RETRIES
+): Promise<T> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (i === maxRetries - 1 || !RETRYABLE_ERRORS.includes(error.code)) {
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (i + 1)));
+    }
+  }
+}
+```
+
+## Performance Considerations
+
+### Caching Strategy
+- **Server-side**: Next.js caching for static data
+- **Client-side**: SWR for dynamic data with revalidation
+- **Database**: Query result caching for frequently accessed data
+
+### Query Optimization
+- Use specific column selection instead of `SELECT *`
+- Implement pagination for large datasets
+- Use database indexes for common query patterns
+- Batch operations when possible
+
+### Rate Limiting
+- API calls limited per user per minute
+- Bulk operations have separate limits
+- Real-time updates use WebSocket connections
 
 ## Future Enhancements
 

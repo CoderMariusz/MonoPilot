@@ -18,7 +18,7 @@ test.describe('BOM - Search & Filter', () => {
       partNumber: testProductNumber,
       description: 'Search Test Product',
       uom: 'kg',
-      price: '10.00',
+      std_price: '10.00',
     });
     await helpers.saveProduct();
   });
