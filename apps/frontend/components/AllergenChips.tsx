@@ -25,8 +25,7 @@ export default function AllergenChips({ allergens, selectedIds, onToggle }: Alle
             key={a.id}
             type="button"
             onClick={() => onToggle(a.id)}
-            className={`px-2 py-1 text-xs rounded-md border transition-colors ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
-            style={{ transform: 'scale(0.7)', transformOrigin: 'left center' }}
+            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-200 text-slate-700 border-slate-300 hover:bg-slate-300'}`}
             aria-pressed={active}
           >
             {a.code} — {a.name}

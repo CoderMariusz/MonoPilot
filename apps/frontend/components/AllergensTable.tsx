@@ -59,11 +59,9 @@ export function AllergensTable() {
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this allergen?')) return;
     try {
-      const success = await AllergensAPI.delete(id);
-      if (success) {
-        setAllergens(prev => prev.filter(item => item.id !== id));
-        showToast('Allergen deleted successfully', 'success');
-      }
+      await AllergensAPI.delete(id);
+      setAllergens(prev => prev.filter(item => item.id !== id));
+      showToast('Allergen deleted successfully', 'success');
     } catch (e: any) {
       showToast(e?.message || 'Failed to delete allergen', 'error');
     }

@@ -33,11 +33,12 @@ BEGIN
   ) RETURNING id INTO v_product_id;
 
   -- 2) boms (PLURAL)
-  INSERT INTO boms (product_id, version, status)
+  INSERT INTO boms (product_id, version, status, default_routing_id)
   VALUES (
     v_product_id,
     COALESCE(p->'bom'->>'version','1.0'),
-    COALESCE(p->'bom'->>'status','active')
+    COALESCE(p->'bom'->>'status','active'),
+    NULLIF(p->'bom'->>'default_routing_id','')::int
   )
   RETURNING id INTO v_bom_id;
 

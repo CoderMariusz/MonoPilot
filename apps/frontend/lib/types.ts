@@ -307,10 +307,11 @@ export interface Product {
 }
 
 // Types for product creation and BOM inputs (align UI and API)
-export type ProductGroup = 'MEAT' | 'DRYGOODS' | 'COMPOSITE';
-export type ProductType = 'RM_MEAT' | 'DG_ING' | 'DG_LABEL' | 'DG_WEB' | 'DG_BOX' | 'DG_SAUCE' | 'PR' | 'FG';
+// Note: ProductGroup and ProductType are already declared above; only declare if not present, else fix duplication.
+
 export type DbType = 'RM' | 'DG' | 'PR' | 'FG' | 'WIP';
 export type ExpiryPolicy = 'DAYS_STATIC' | 'FROM_MFG_DATE' | 'FROM_DELIVERY_DATE' | 'FROM_CREATION_DATE';
+
 
 export interface ProductInsert {
   type: DbType;
@@ -330,7 +331,7 @@ export interface ProductInsert {
 }
 
 export interface BomItemInput {
-  material_id: number;
+  material_id: number | null;
   quantity: number;
   uom: string;
   sequence?: number;
@@ -340,8 +341,11 @@ export interface BomItemInput {
   scrap_std_pct?: number | null;
   is_optional?: boolean;
   is_phantom?: boolean;
-  one_to_one?: boolean;
+  consume_whole_lp?: boolean;  // renamed from one_to_one
   unit_cost_std?: number | null;
+  tax_code_id?: number | null;
+  lead_time_days?: number | null;
+  moq?: number | null;
 }
 
 export interface CreateSinglePayload {
@@ -350,7 +354,7 @@ export interface CreateSinglePayload {
 
 export interface CreateCompositePayload {
   product: ProductInsert;
-  bom: { version?: string; status?: 'active' | 'draft' };
+  bom: { version?: string; status?: 'active' | 'draft' | 'archived' };
   items: BomItemInput[];
 }
 
@@ -549,6 +553,8 @@ export interface Bom {
   requires_routing: boolean;
   default_routing_id?: number;
   notes?: string;
+  archived_at?: string | null;
+  deleted_at?: string | null;
   created_at: string;
   updated_at: string;
   created_by?: string;
@@ -570,7 +576,32 @@ export interface BomItem {
   scrap_std_pct?: number;
   is_optional: boolean;
   is_phantom: boolean;
+  consume_whole_lp: boolean;  // renamed from one_to_one
   unit_cost_std?: number;
+  tax_code_id?: number | null;
+  lead_time_days?: number | null;
+  moq?: number | null;
+  created_at: string;
+  updated_at: string;
+  // Enhanced relationships
+  material?: Product;
+}
+
+// WO Materials interface for BOM snapshot functionality
+export interface WoMaterial {
+  id: number;
+  wo_id: number;
+  material_id: number;
+  qty_per_unit: number;
+  uom: string;
+  sequence: number;
+  consume_whole_lp: boolean;
+  is_optional: boolean;
+  scrap_std_pct?: number;
+  unit_cost_std?: number;
+  tax_code_id?: number;
+  lead_time_days?: number;
+  moq?: number;
   created_at: string;
   updated_at: string;
   // Enhanced relationships

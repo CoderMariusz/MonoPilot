@@ -33,7 +33,7 @@ export default function ProductSelect({ value, onChange, placeholder = 'Search p
       const { data, error } = await supabase
         .from('products')
         .select('id, part_number, description, uom, product_group, product_type')
-        .ilike('part_number', like)
+        .or(`part_number.ilike.${like},description.ilike.${like}`)
         .in('product_group', groups)
         .limit(20);
       if (!active) return;

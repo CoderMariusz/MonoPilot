@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Package, Beef, ShoppingBag, FlaskConical, Plus, Loader2, Trash2, Pencil, Search } from 'lucide-react';
 import type { Product, ProductGroup, ProductType } from '@/lib/types';
-import { useProducts } from '@/lib/clientState';
 import { ProductsAPI } from '@/lib/api/products';
+import { BomsAPI } from '@/lib/api/boms';
+import { supabase } from '@/lib/supabase/client-browser';
 import SingleProductModal from '@/components/SingleProductModal';
 import CompositeProductModal from '@/components/CompositeProductModal';
 
@@ -60,7 +61,11 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
-    // Future: support editing via appropriate modal
+    if (product.product_group === 'COMPOSITE') {
+      setIsCompositeOpen(true);
+    } else {
+      setIsSingleOpen(true);
+    }
   };
 
   const getInitialDataForCategory = (category: CategoryType): ProductsResponse => {
@@ -98,8 +103,18 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
         </div>
       </div>
       
-      <SingleProductModal isOpen={isSingleOpen} onClose={handleClose} onSuccess={handleModalSuccess} />
-      <CompositeProductModal isOpen={isCompositeOpen} onClose={handleClose} onSuccess={handleModalSuccess} />
+      <SingleProductModal 
+        isOpen={isSingleOpen} 
+        onClose={handleClose} 
+        onSuccess={handleModalSuccess}
+        product={editingProduct}
+      />
+      <CompositeProductModal 
+        isOpen={isCompositeOpen} 
+        onClose={handleClose} 
+        onSuccess={handleModalSuccess}
+        product={editingProduct}
+      />
       
       <div className="bg-white rounded-lg shadow-sm border border-slate-200">
         <div className="border-b border-slate-200">
@@ -152,24 +167,20 @@ function ProductsTable({
   refreshTrigger: number;
   onEditProduct: (product: Product) => void;
 }) {
-  const { products: allProducts, loading: productsLoading } = useProducts();
-  const [localProducts, setLocalProducts] = useState<Product[]>(allProducts || []);
-
-  // Keep local list in sync with global on first load or when global changes
-  useEffect(() => {
-    if (allProducts && allProducts.length) {
-      setLocalProducts(allProducts);
-    }
-  }, [allProducts]);
+  const [localProducts, setLocalProducts] = useState<Product[]>(initialData.data || []);
+  const [loading, setLoading] = useState(false);
 
   // Hard refresh list when refreshTrigger changes (after create)
   useEffect(() => {
     (async () => {
+      setLoading(true);
       try {
         const data = await ProductsAPI.getAll();
         setLocalProducts(data || []);
       } catch (e) {
         console.warn('Failed to refresh products after create', e);
+      } finally {
+        setLoading(false);
       }
     })();
   }, [refreshTrigger]);
@@ -209,7 +220,6 @@ function ProductsTable({
     return false;
   }) || [];
   
-  const loading = productsLoading;
   const error = null;
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<keyof Product | null>(null);
@@ -217,6 +227,7 @@ function ProductsTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [bomActionLoading, setBomActionLoading] = useState<number | null>(null);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -276,12 +287,53 @@ function ProductsTable({
 
     try {
       setDeletingId(product.id);
-      const { deleteProduct } = await import('@/lib/clientState');
-      deleteProduct(product.id);
+      const { error } = await supabase
+        .from('products')
+        .update({ is_active: false })
+        .eq('id', product.id);
+      
+      if (error) throw error;
+      
+      // Remove from local list
+      setLocalProducts(prev => prev.filter(p => p.id !== product.id));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete product');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleActivateBom = async (product: Product) => {
+    if (!product.activeBom) return;
+    
+    try {
+      setBomActionLoading(product.id);
+      await BomsAPI.activate(product.activeBom.id);
+      
+      // Refresh the product data
+      const updatedData = await ProductsAPI.getAll();
+      setLocalProducts(updatedData);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to activate BOM');
+    } finally {
+      setBomActionLoading(null);
+    }
+  };
+
+  const handleArchiveBom = async (product: Product) => {
+    if (!product.activeBom) return;
+    
+    try {
+      setBomActionLoading(product.id);
+      await BomsAPI.archive(product.activeBom.id);
+      
+      // Refresh the product data
+      const updatedData = await ProductsAPI.getAll();
+      setLocalProducts(updatedData);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to archive BOM');
+    } finally {
+      setBomActionLoading(null);
     }
   };
 
@@ -374,7 +426,10 @@ function ProductsTable({
                   >
                     Std. Price {sortColumn === 'std_price' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Is Active</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Active BOM</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">BOM Status</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">BOM Actions</th>
                   <th 
                     className="text-left py-3 px-4 text-sm font-semibold text-slate-700 cursor-pointer hover:bg-slate-50"
                     onClick={() => handleSort('updated_at')}
@@ -415,6 +470,15 @@ function ProductsTable({
                       )}
                     </td>
                     <td className="py-3 px-4 text-sm text-slate-600">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        product.is_active 
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {product.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-sm text-slate-600">
                       {product.activeBom ? (
                         <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
                           v{product.activeBom.version}
@@ -424,22 +488,77 @@ function ProductsTable({
                       )}
                     </td>
                     <td className="py-3 px-4 text-sm text-slate-600">
+                      {product.activeBom ? (
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          product.activeBom.status === 'active' 
+                            ? 'bg-green-100 text-green-800'
+                            : product.activeBom.status === 'draft'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {product.activeBom.status}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-slate-600">
+                      {product.activeBom ? (
+                        <div className="flex items-center gap-1">
+                          {product.activeBom.status === 'draft' && (
+                            <button
+                              onClick={() => handleActivateBom(product)}
+                              disabled={bomActionLoading === product.id}
+                              className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium hover:bg-green-200 disabled:opacity-50"
+                              title="Activate BOM"
+                            >
+                              {bomActionLoading === product.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                'Activate'
+                              )}
+                            </button>
+                          )}
+                          {product.activeBom.status === 'active' && (
+                            <button
+                              onClick={() => handleArchiveBom(product)}
+                              disabled={bomActionLoading === product.id}
+                              className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium hover:bg-red-200 disabled:opacity-50"
+                              title="Archive BOM"
+                            >
+                              {bomActionLoading === product.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                'Archive'
+                              )}
+                            </button>
+                          )}
+                          {product.activeBom.status === 'archived' && (
+                            <span className="text-slate-400 text-xs">No actions</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs">No BOM</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-slate-600">
                       {formatDate(product.updated_at)}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => onEditProduct(product)}
-                          className="p-1 hover:bg-slate-200 rounded transition-colors"
-                          title="Edit item"
+                          className="p-1 hover:bg-blue-100 rounded transition-colors"
+                          title="Edit Product"
                         >
-                          <Pencil className="w-4 h-4 text-slate-600" />
+                          <Pencil className="w-4 h-4 text-blue-600" />
                         </button>
+
                         <button 
                           onClick={() => handleDelete(product)}
                           disabled={deletingId === product.id}
                           className="p-1 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
-                          title="Delete item"
+                          title="Delete product"
                         >
                           {deletingId === product.id ? (
                             <Loader2 className="w-4 h-4 text-red-600 animate-spin" />
