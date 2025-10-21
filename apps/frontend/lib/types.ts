@@ -320,6 +320,7 @@ export interface ProductInsert {
   uom: string;
   product_group?: ProductGroup;
   product_type?: ProductType;
+  is_active?: boolean;
   preferred_supplier_id?: number | null;
   tax_code_id?: number | null;
   lead_time_days?: number | null;

@@ -17,7 +17,16 @@ interface Props {
 export default function CompositeProductModal({ isOpen, onClose, onSuccess, product: editingProduct }: Props) {
   const [product, setProduct] = useState<Partial<ProductInsert>>({ product_group: 'COMPOSITE', uom: 'ea' });
   const [bomStatus, setBomStatus] = useState<'draft' | 'active' | 'archived'>('draft');
+  const [bomVersion, setBomVersion] = useState<string>('1.0');
+  const [currentBomId, setCurrentBomId] = useState<number | null>(null);
+  const [showVersionModal, setShowVersionModal] = useState(false);
+  const [newVersionNumber, setNewVersionNumber] = useState<string>('');
   const [items, setItems] = useState<BomItemInput[]>([]);
+  
+  // Store initial state for change detection
+  const [initialProduct, setInitialProduct] = useState<Partial<ProductInsert>>({});
+  const [initialItems, setInitialItems] = useState<BomItemInput[]>([]);
+  const [initialAllergens, setInitialAllergens] = useState<number[]>([]);
   
   // Debug: log items when they change
   useEffect(() => {
@@ -78,29 +87,37 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
   const [allergens, setAllergens] = useState<Array<{ id: number; code: string; name: string }>>([]);
   const [selectedAllergens, setSelectedAllergens] = useState<number[]>([]);
   const [inheritedAllergens, setInheritedAllergens] = useState<number[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     
     (async () => {
-      const [{ data: rData }, { data: aData }, { data: cData }] = await Promise.all([
-        supabase.from('routings').select('id,name').order('name'),
-        supabase.from('allergens').select('id,code,name').order('code'),
-        supabase.from('products')
-          .select('id, part_number, description, uom')
-          .in('product_group', ['MEAT', 'DRYGOODS', 'COMPOSITE'])
-          .eq('is_active', true)
-          .order('part_number')
-      ]);
-      setRoutings(rData || []);
-      setAllergens(aData || []);
-      setComponents(cData || []);
+      setLoadingData(true);
+      try {
+        const [{ data: rData }, { data: aData }, { data: cData }] = await Promise.all([
+          supabase.from('routings').select('id,name').order('name'),
+          supabase.from('allergens').select('id,code,name').order('code'),
+          supabase.from('products')
+            .select('id, part_number, description, uom')
+            .in('product_group', ['MEAT', 'DRYGOODS', 'COMPOSITE'])
+            .eq('is_active', true)
+            .order('part_number')
+        ]);
+        setRoutings(rData || []);
+        setAllergens(aData || []);
+        setComponents(cData || []);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setLoadingData(false);
+      }
     })();
     
     // Fill form when editing existing product
     if (editingProduct) {
       console.log('Editing product:', editingProduct);
-      setProduct({
+      const productData = {
         part_number: editingProduct.part_number,
         description: editingProduct.description,
         product_group: editingProduct.product_group,
@@ -114,11 +131,15 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
         lead_time_days: editingProduct.lead_time_days,
         moq: editingProduct.moq,
         production_lines: editingProduct.production_lines,
-      });
+      };
+      setProduct(productData);
+      setInitialProduct(JSON.parse(JSON.stringify(productData))); // Deep copy
       
       // Load existing allergens
       if (editingProduct.allergens) {
-        setSelectedAllergens(editingProduct.allergens.map(a => a.allergen_id));
+        const allergenIds = editingProduct.allergens.map(a => a.allergen_id);
+        setSelectedAllergens(allergenIds);
+        setInitialAllergens(JSON.parse(JSON.stringify(allergenIds))); // Deep copy
       }
     } else {
       // Reset form for new product
@@ -141,7 +162,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
       (async () => {
         const { data: bomsData, error: bomsError } = await supabase
           .from('boms')
-          .select('id, status')
+          .select('id, status, version')
           .eq('product_id', editingProduct.id)
           .order('created_at', { ascending: false })
           .limit(1);
@@ -154,6 +175,8 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
         if (bomsData && bomsData.length > 0) {
           const bom = bomsData[0];
           console.log('Found BOM:', bom);
+          setCurrentBomId(bom.id);
+          setBomVersion(bom.version);
           setBomStatus(bom.status as 'draft' | 'active' | 'archived');
           
           // Load BOM items with material details
@@ -214,6 +237,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
             }));
             console.log('Mapped items:', mappedItems);
             setItems(mappedItems);
+            setInitialItems(JSON.parse(JSON.stringify(mappedItems))); // Deep copy for change detection
             
             // Set item names
             const names: Record<number, string> = {};
@@ -236,6 +260,71 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
     setItems(prev => [...prev, { material_id: null, quantity: 1, uom: product.uom || 'ea', sequence: prev.length + 1 }]);
     // Don't need to reset itemNames as new items start without names
   };
+  
+  const calculateNextVersion = (currentVersion: string, isMajor: boolean = false): string => {
+    const parts = currentVersion.split('.');
+    if (parts.length !== 2) return '1.0';
+    
+    const [major, minor] = parts.map(Number);
+    if (isMajor) {
+      return `${major + 1}.0`;
+    } else {
+      return `${major}.${minor + 1}`;
+    }
+  };
+
+  const detectChanges = (): { hasMinorChanges: boolean; hasMajorChanges: boolean } => {
+    if (!editingProduct) return { hasMinorChanges: false, hasMajorChanges: false };
+    
+    // Minor changes: Description, Std Price, Default Routing, Expiry Policy, Shelf Life, Allergens
+    const minorChangeFields = ['description', 'std_price', 'expiry_policy', 'shelf_life_days'] as const;
+    const hasMinorChanges = minorChangeFields.some(field => 
+      JSON.stringify(initialProduct[field]) !== JSON.stringify(product[field])
+    ) || JSON.stringify(initialAllergens.sort()) !== JSON.stringify(selectedAllergens.sort());
+    
+    // Major changes: BOM items (added, removed, or modified)
+    const hasMajorChanges = JSON.stringify(initialItems) !== JSON.stringify(items);
+    
+    console.log('Change detection:', { 
+      hasMinorChanges, 
+      hasMajorChanges,
+      initialProduct,
+      currentProduct: product,
+      initialItems,
+      currentItems: items,
+      initialAllergens,
+      currentAllergens: selectedAllergens
+    });
+    
+    return { hasMinorChanges, hasMajorChanges };
+  };
+
+  const getNewVersion = (): string => {
+    const { hasMinorChanges, hasMajorChanges } = detectChanges();
+    
+    if (hasMajorChanges) {
+      // Major change: increment major version
+      return calculateNextVersion(bomVersion, true);
+    } else if (hasMinorChanges) {
+      // Minor change: increment minor version
+      return calculateNextVersion(bomVersion, false);
+    }
+    
+    // No changes
+    return bomVersion;
+  };
+
+  const handleChangeVersion = async () => {
+    if (!editingProduct || !currentBomId) return;
+    
+    // Calculate suggested next versions
+    const nextMinor = calculateNextVersion(bomVersion, false);
+    const nextMajor = calculateNextVersion(bomVersion, true);
+    
+    setNewVersionNumber(nextMinor);
+    setShowVersionModal(true);
+  };
+  
   const handleChangeItem = (idx: number, field: keyof BomItemInput, value: any) => {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
   };
@@ -348,10 +437,19 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
         if (existingBoms && existingBoms.length > 0) {
           const bomId = existingBoms[0].id;
           
-          // Update BOM status
+          // Detect changes and get new version
+          const newVersion = getNewVersion();
+          const hasChanges = newVersion !== bomVersion;
+          
+          console.log('Version check:', { currentVersion: bomVersion, newVersion, hasChanges });
+          
+          // Update BOM with new version and status
           await supabase
             .from('boms')
-            .update({ status: bomStatus })
+            .update({ 
+              status: bomStatus,
+              version: newVersion
+            })
             .eq('id', bomId);
           
           // Update product is_active based on BOM status
@@ -457,15 +555,14 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">BOM Status</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Product Status (is_active)</label>
             <select
-              value={bomStatus}
-              onChange={e => setBomStatus(e.target.value as 'draft' | 'active' | 'archived')}
+              value={product.is_active ? 'active' : 'inactive'}
+              onChange={e => setProduct(p => ({ ...p, is_active: e.target.value === 'active' }))}
               className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
             >
-              <option value="draft">Draft</option>
               <option value="active">Active</option>
-              <option value="archived">Archived</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
           <div>
@@ -538,35 +635,98 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           </div>
             <div className="col-span-3">
               <label className="block text-sm font-medium text-slate-700 mb-1">Allergens</label>
-              <div className="space-y-2">
-                {inheritedAllergens.length > 0 && (
-                  <div className="text-xs text-slate-600">
-                    <span className="font-medium">Inherited from components:</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {inheritedAllergens.map(allergenId => {
-                        const allergen = allergens.find(a => a.id === allergenId);
-                        return allergen ? (
-                          <span key={allergenId} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                            {allergen.code}
-                          </span>
-                        ) : null;
-                      })}
-                    </div>
-                  </div>
-                )}
-                <AllergenChips
-                  allergens={allergens}
-                  selectedIds={selectedAllergens}
-                  onToggle={(id) => setSelectedAllergens(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
-                />
-                <div className="text-xs text-slate-500 italic">
-                  Select additional allergens or override inherited ones
+              {loadingData ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+                  <span className="ml-3 text-sm text-slate-600">Loading allergens...</span>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-2">
+                  {inheritedAllergens.length > 0 && (
+                    <div className="text-xs text-slate-600">
+                      <span className="font-medium">Inherited from components:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {inheritedAllergens.map(allergenId => {
+                          const allergen = allergens.find(a => a.id === allergenId);
+                          return allergen ? (
+                            <span key={allergenId} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                              {allergen.code}
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <AllergenChips
+                    allergens={allergens}
+                    selectedIds={selectedAllergens}
+                    onToggle={(id) => setSelectedAllergens(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                  />
+                  <div className="text-xs text-slate-500 italic">
+                    Select additional allergens or override inherited ones
+                  </div>
+                </div>
+              )}
             </div>
             </div>
 
             <div className="border-t border-slate-200 pt-6">
+              {/* BOM Version Management */}
+              {editingProduct && (
+                <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <h3 className="text-sm font-medium text-slate-900 mb-3">BOM Management</h3>
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-600">Version:</span>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                        {bomVersion}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-600">Status:</span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        bomStatus === 'active' 
+                          ? 'bg-green-100 text-green-800'
+                          : bomStatus === 'draft'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {bomStatus}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      onClick={() => setBomStatus('active')}
+                      disabled={bomStatus === 'active'}
+                      className="px-3 py-1.5 bg-green-100 text-green-800 rounded text-xs font-medium hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Set Active
+                    </button>
+                    <button
+                      onClick={() => setBomStatus('draft')}
+                      disabled={bomStatus === 'draft'}
+                      className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded text-xs font-medium hover:bg-yellow-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Set Draft
+                    </button>
+                    <button
+                      onClick={() => setBomStatus('archived')}
+                      disabled={bomStatus === 'archived'}
+                      className="px-3 py-1.5 bg-red-100 text-red-800 rounded text-xs font-medium hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Archive
+                    </button>
+                    <button
+                      onClick={handleChangeVersion}
+                      className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded text-xs font-medium hover:bg-blue-200"
+                    >
+                      Change Version
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-slate-900">BOM Items</h3>
                 <button 

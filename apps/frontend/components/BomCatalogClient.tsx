@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase/client-browser';
 import SingleProductModal from '@/components/SingleProductModal';
 import CompositeProductModal from '@/components/CompositeProductModal';
 
-type CategoryType = 'MEAT' | 'DRYGOODS' | 'FINISHED_GOODS' | 'PROCESS';
+type CategoryType = 'MEAT' | 'DRYGOODS' | 'FINISHED_GOODS' | 'PROCESS' | 'ARCHIVE';
 
 interface TabConfig {
   id: CategoryType;
@@ -47,6 +47,7 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
     { id: 'DRYGOODS', label: 'Dry Goods', icon: ShoppingBag, group: 'DRYGOODS', productTypes: ['DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_ING', 'DG_SAUCE'] },
     { id: 'FINISHED_GOODS', label: 'Finished Goods', icon: Package, group: 'COMPOSITE', productTypes: ['FG'] },
     { id: 'PROCESS', label: 'Process', icon: FlaskConical, group: 'COMPOSITE', productTypes: ['PR'] },
+    { id: 'ARCHIVE', label: 'Archive', icon: Package, group: 'COMPOSITE', productTypes: [] },
   ];
 
   const handleModalSuccess = () => {
@@ -78,6 +79,10 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
         return initialData.finishedGoods;
       case 'PROCESS':
         return initialData.process;
+      case 'ARCHIVE':
+        return { data: [], current_page: 1, last_page: 1, total: 0 };
+      default:
+        return { data: [], current_page: 1, last_page: 1, total: 0 };
     }
   };
 
@@ -191,30 +196,43 @@ function ProductsTable({
     { id: 'DRYGOODS', label: 'Dry Goods', icon: ShoppingBag, group: 'DRYGOODS', productTypes: ['DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_ING', 'DG_SAUCE'] },
     { id: 'FINISHED_GOODS', label: 'Finished Goods', icon: Package, group: 'COMPOSITE', productTypes: ['FG'] },
     { id: 'PROCESS', label: 'Process', icon: FlaskConical, group: 'COMPOSITE', productTypes: ['PR'] },
+    { id: 'ARCHIVE', label: 'Archive', icon: Package, group: 'COMPOSITE', productTypes: [] },
   ];
   
   const currentTab = tabs.find(tab => tab.id === category);
   const products = (localProducts || []).filter(p => {
     if (!currentTab) return false;
     
-    // For MEAT: product_group === 'MEAT'
+    // For MEAT: product_group === 'MEAT' AND is_active === true
     if (category === 'MEAT') {
-      return p.product_group === 'MEAT';
+      return p.product_group === 'MEAT' && p.is_active === true;
     }
     
-    // For DRYGOODS: product_group === 'DRYGOODS'
+    // For DRYGOODS: product_group === 'DRYGOODS' AND is_active === true
     if (category === 'DRYGOODS') {
-      return p.product_group === 'DRYGOODS';
+      return p.product_group === 'DRYGOODS' && p.is_active === true;
     }
     
-    // For FINISHED_GOODS: product_group === 'COMPOSITE' AND product_type === 'FG'
+    // For FINISHED_GOODS: product_group === 'COMPOSITE' AND product_type === 'FG' AND BOM not archived
     if (category === 'FINISHED_GOODS') {
-      return p.product_group === 'COMPOSITE' && p.product_type === 'FG';
+      return p.product_group === 'COMPOSITE' && p.product_type === 'FG' && p.activeBom?.status !== 'archived';
     }
     
-    // For PROCESS: product_group === 'COMPOSITE' AND product_type === 'PR'
+    // For PROCESS: product_group === 'COMPOSITE' AND product_type === 'PR' AND BOM not archived
     if (category === 'PROCESS') {
-      return p.product_group === 'COMPOSITE' && p.product_type === 'PR';
+      return p.product_group === 'COMPOSITE' && p.product_type === 'PR' && p.activeBom?.status !== 'archived';
+    }
+    
+    // For ARCHIVE: 
+    // - MEAT/DRYGOODS with is_active = false
+    // - COMPOSITE (FG/PR) with activeBom.status = 'archived'
+    if (category === 'ARCHIVE') {
+      if (p.product_group === 'MEAT' || p.product_group === 'DRYGOODS') {
+        return p.is_active === false;
+      }
+      if (p.product_group === 'COMPOSITE') {
+        return p.activeBom?.status === 'archived';
+      }
     }
     
     return false;
@@ -427,9 +445,13 @@ function ProductsTable({
                     Std. Price {sortColumn === 'std_price' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Is Active</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Active BOM</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">BOM Status</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">BOM Actions</th>
+                  {(category === 'FINISHED_GOODS' || category === 'PROCESS') && (
+                    <>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Active BOM</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">BOM Status</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">BOM Actions</th>
+                    </>
+                  )}
                   <th 
                     className="text-left py-3 px-4 text-sm font-semibold text-slate-700 cursor-pointer hover:bg-slate-50"
                     onClick={() => handleSort('updated_at')}
@@ -478,69 +500,73 @@ function ProductsTable({
                         {product.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-sm text-slate-600">
-                      {product.activeBom ? (
-                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
-                          v{product.activeBom.version}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-slate-600">
-                      {product.activeBom ? (
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          product.activeBom.status === 'active' 
-                            ? 'bg-green-100 text-green-800'
-                            : product.activeBom.status === 'draft'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {product.activeBom.status}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-slate-600">
-                      {product.activeBom ? (
-                        <div className="flex items-center gap-1">
-                          {product.activeBom.status === 'draft' && (
-                            <button
-                              onClick={() => handleActivateBom(product)}
-                              disabled={bomActionLoading === product.id}
-                              className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium hover:bg-green-200 disabled:opacity-50"
-                              title="Activate BOM"
-                            >
-                              {bomActionLoading === product.id ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                'Activate'
+                    {(category === 'FINISHED_GOODS' || category === 'PROCESS') && (
+                      <>
+                        <td className="py-3 px-4 text-sm text-slate-600">
+                          {product.activeBom ? (
+                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
+                              v{product.activeBom.version}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-slate-600">
+                          {product.activeBom ? (
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              product.activeBom.status === 'active' 
+                                ? 'bg-green-100 text-green-800'
+                                : product.activeBom.status === 'draft'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {product.activeBom.status}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-slate-600">
+                          {product.activeBom ? (
+                            <div className="flex items-center gap-1">
+                              {product.activeBom.status === 'draft' && (
+                                <button
+                                  onClick={() => handleActivateBom(product)}
+                                  disabled={bomActionLoading === product.id}
+                                  className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium hover:bg-green-200 disabled:opacity-50"
+                                  title="Activate BOM"
+                                >
+                                  {bomActionLoading === product.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    'Activate'
+                                  )}
+                                </button>
                               )}
-                            </button>
-                          )}
-                          {product.activeBom.status === 'active' && (
-                            <button
-                              onClick={() => handleArchiveBom(product)}
-                              disabled={bomActionLoading === product.id}
-                              className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium hover:bg-red-200 disabled:opacity-50"
-                              title="Archive BOM"
-                            >
-                              {bomActionLoading === product.id ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                'Archive'
+                              {product.activeBom.status === 'active' && (
+                                <button
+                                  onClick={() => handleArchiveBom(product)}
+                                  disabled={bomActionLoading === product.id}
+                                  className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium hover:bg-red-200 disabled:opacity-50"
+                                  title="Archive BOM"
+                                >
+                                  {bomActionLoading === product.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    'Archive'
+                                  )}
+                                </button>
                               )}
-                            </button>
+                              {product.activeBom.status === 'archived' && (
+                                <span className="text-slate-400 text-xs">No actions</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs">No BOM</span>
                           )}
-                          {product.activeBom.status === 'archived' && (
-                            <span className="text-slate-400 text-xs">No actions</span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 text-xs">No BOM</span>
-                      )}
-                    </td>
+                        </td>
+                      </>
+                    )}
                     <td className="py-3 px-4 text-sm text-slate-600">
                       {formatDate(product.updated_at)}
                     </td>

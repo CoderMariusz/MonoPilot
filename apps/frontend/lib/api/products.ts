@@ -61,16 +61,31 @@ export class ProductsAPI {
       throw new Error('Failed to fetch products');
     }
 
-    // Filter to only include activeBom for products with active BOMs
-    const filteredData = (data || []).map(product => ({
-      ...product,
-      activeBom: product.activeBom?.status === 'active' ? product.activeBom : null
-    }));
+    // Process data to get the latest BOM for each product (regardless of status)
+    const processedData = (data || []).map(product => {
+      // activeBom is returned as an array by Supabase
+      let latestBom = null;
+      
+      if (Array.isArray(product.activeBom) && product.activeBom.length > 0) {
+        // Sort by created_at descending and get the first (latest) one
+        const sortedBoms = [...product.activeBom].sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        latestBom = sortedBoms[0];
+      } else if (product.activeBom && !Array.isArray(product.activeBom)) {
+        // If it's already a single object, use it
+        latestBom = product.activeBom;
+      }
+      
+      return {
+        ...product,
+        activeBom: latestBom
+      };
+    });
 
-    console.log('ProductsAPI.getAll() - Raw data:', data);
-    console.log('ProductsAPI.getAll() - Filtered data:', filteredData);
+    console.log('ProductsAPI.getAll() - Processed data:', processedData);
     
-    return filteredData;
+    return processedData;
   }
 
   static async getById(id: number): Promise<Product | null> {
