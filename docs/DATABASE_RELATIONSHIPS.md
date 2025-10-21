@@ -3,6 +3,9 @@
 ## Overview
 This document provides comprehensive documentation of all database relationships in the MonoPilot MES system, including entity relationship diagrams, relationship types, cascade behaviors, and common join patterns.
 
+**Last Updated**: 2025-01-21
+**Version**: 2.0 - BOM Lifecycle & Archive Update
+
 ## Complete Entity Relationship Diagram
 
 ```mermaid
@@ -17,8 +20,9 @@ erDiagram
     users ||--o{ products : "creates"
     users ||--o{ boms : "creates"
     users ||--o{ routings : "creates"
+    users ||--o{ audit_log : "performs"
     
-    products ||--o{ boms : "has"
+    products ||--o{ boms : "has_versions"
     products ||--o{ bom_items : "material_in"
     products ||--o{ work_orders : "produces"
     products ||--o{ license_plates : "contains"
@@ -30,6 +34,7 @@ erDiagram
     
     boms ||--o{ bom_items : "contains"
     boms ||--o{ work_orders : "defines"
+    boms ||--o{ wo_materials : "snapshots_to"
     
     work_orders ||--o{ wo_operations : "has"
     work_orders ||--o{ wo_materials : "requires"
@@ -69,26 +74,12 @@ erDiagram
     allergens ||--o{ product_allergens : "assigned_to"
     
     settings_tax_codes ||--o{ products : "applies_to"
+    settings_tax_codes ||--o{ bom_items : "prefills_to"
     
     pallets ||--o{ pallet_items : "contains"
     
     wo_operations ||--o{ production_outputs : "generates"
     wo_operations ||--o{ lp_reservations : "reserves"
-    
-    users {
-        uuid id PK
-        text name
-        text email
-        text role
-        text status
-        text avatar_url
-        text phone
-        text department
-        timestamp created_at
-        timestamp updated_at
-        uuid created_by FK
-        uuid updated_by FK
-    }
     
     products {
         int id PK
@@ -96,359 +87,483 @@ erDiagram
         text description
         text type
         text uom
-        boolean is_active
+        boolean is_active "Archive control for MEAT/DRYGOODS"
+        decimal std_price
         text product_group
         text product_type
-        text subtype
-        text expiry_policy
-        int shelf_life_days
-        decimal std_price
-        text[] production_lines
         int preferred_supplier_id FK
+        int tax_code_id FK
         int lead_time_days
         decimal moq
-        int tax_code_id FK
+        text expiry_policy
+        int shelf_life_days
+        text_array production_lines
         timestamp created_at
         timestamp updated_at
         uuid created_by FK
         uuid updated_by FK
     }
     
-    work_orders {
+    boms {
         int id PK
-        text wo_number UK
         int product_id FK
-        decimal quantity
-        text status
-        timestamp due_date
-        timestamp scheduled_start
-        timestamp scheduled_end
-        int machine_id FK
-        text line_number
+        text version "e.g. 1.0, 1.1, 2.0"
+        bom_status status "draft/active/archived"
+        timestamp archived_at "Soft archive timestamp"
+        timestamp deleted_at "Soft delete timestamp"
+        boolean requires_routing
+        int default_routing_id FK
+        text notes
+        date effective_from
+        date effective_to
         timestamp created_at
         timestamp updated_at
         uuid created_by FK
         uuid updated_by FK
     }
     
-    license_plates {
+    bom_items {
         int id PK
-        text lp_number UK
+        int bom_id FK
+        int material_id FK
+        decimal quantity
+        text uom
+        int sequence
+        int priority
+        text_array production_lines
+        text_array production_line_restrictions
+        decimal scrap_std_pct
+        boolean is_optional
+        boolean is_phantom
+        boolean consume_whole_lp "1:1 LP consumption"
+        decimal unit_cost_std "PO prefill"
+        int tax_code_id FK "PO prefill"
+        int lead_time_days "PO prefill"
+        decimal moq "PO prefill"
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    wo_materials {
+        int id PK
+        int wo_id FK
+        int material_id FK
+        decimal qty_per_unit
+        text uom
+        int sequence
+        boolean consume_whole_lp "Snapshot from bom_items"
+        boolean is_optional
+        decimal scrap_std_pct
+        decimal unit_cost_std "Snapshot from bom_items"
+        int tax_code_id FK "Snapshot from bom_items"
+        int lead_time_days "Snapshot from bom_items"
+        decimal moq "Snapshot from bom_items"
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    product_allergens {
+        int id PK
         int product_id FK
-        int location_id FK
-        decimal quantity
-        text status
-        int grn_id FK
+        int allergen_id FK
+        boolean contains
         timestamp created_at
-        timestamp updated_at
-        uuid created_by FK
-        uuid updated_by FK
     }
     
-    purchase_orders {
+    allergens {
         int id PK
-        text po_number UK
-        int supplier_id FK
-        text status
-        timestamp order_date
-        timestamp expected_delivery
-        decimal total_amount
-        text notes
+        text code UK
+        text name
+        text description
+        boolean is_active
         timestamp created_at
         timestamp updated_at
-        uuid created_by FK
-        uuid updated_by FK
-    }
-    
-    grns {
-        int id PK
-        text grn_number UK
-        int purchase_order_id FK
-        text status
-        timestamp receipt_date
-        text notes
-        timestamp created_at
-        timestamp updated_at
-        uuid created_by FK
-        uuid updated_by FK
     }
 ```
 
-## Relationship Types and Cardinalities
+## Core Relationships
 
-### One-to-Many (1:N) Relationships
+### 1. Products ↔ BOMs (One-to-Many with Versioning)
 
-| Parent Table | Child Table | Relationship | Cascade Behavior |
-|--------------|-------------|--------------|------------------|
-| `users` | `sessions` | User has many sessions | CASCADE DELETE |
-| `users` | `work_orders` | User creates many work orders | SET NULL |
-| `users` | `purchase_orders` | User creates many purchase orders | SET NULL |
-| `users` | `products` | User creates many products | SET NULL |
-| `products` | `boms` | Product has many BOMs | CASCADE DELETE |
-| `products` | `bom_items` | Product is material in many BOM items | CASCADE DELETE |
-| `products` | `work_orders` | Product produces many work orders | RESTRICT |
-| `products` | `license_plates` | Product is in many license plates | RESTRICT |
-| `boms` | `bom_items` | BOM contains many items | CASCADE DELETE |
-| `work_orders` | `wo_operations` | Work order has many operations | CASCADE DELETE |
-| `work_orders` | `wo_materials` | Work order requires many materials | CASCADE DELETE |
-| `suppliers` | `purchase_orders` | Supplier has many purchase orders | RESTRICT |
-| `warehouses` | `locations` | Warehouse contains many locations | CASCADE DELETE |
-| `locations` | `license_plates` | Location stores many license plates | RESTRICT |
-| `purchase_orders` | `purchase_order_items` | PO contains many items | CASCADE DELETE |
-| `purchase_orders` | `grns` | PO generates many GRNs | RESTRICT |
-| `grns` | `grn_items` | GRN contains many items | CASCADE DELETE |
-| `routings` | `routing_operations` | Routing defines many operations | CASCADE DELETE |
+**Relationship Type**: One-to-Many
+**Foreign Key**: `boms.product_id` → `products.id`
 
-### Many-to-Many (N:M) Relationships
+**Business Rules**:
+- One product can have multiple BOM versions (1.0, 1.1, 2.0, etc.)
+- Only ONE BOM can be active at a time per product (enforced by unique index)
+- BOM lifecycle: draft → active → archived
+- Draft BOMs can be edited directly
+- Active BOMs use clone-on-edit (creates new draft)
+- Archived BOMs are read-only
 
-| Table A | Table B | Junction Table | Purpose |
-|---------|---------|----------------|---------|
-| `products` | `allergens` | `product_allergens` | Product allergen assignments |
-| `suppliers` | `products` | `supplier_products` | Supplier product relationships |
-| `license_plates` | `license_plates` | `lp_genealogy` | Parent-child LP relationships |
-| `license_plates` | `products` | `lp_compositions` | LP composition tracking |
-| `license_plates` | `pallets` | `pallet_items` | LP pallet assignments |
+**Cascade Behavior**:
+- Deleting a product: Cascades to BOMs if no work orders reference them
+- Deleting an active/archived BOM: **BLOCKED** by trigger
+- Deleting a draft BOM: Allowed if not referenced by work orders
 
-### Self-Referencing Relationships
+**Common Queries**:
+```sql
+-- Get active BOM for a product
+SELECT b.* FROM boms b
+WHERE b.product_id = $1 AND b.status = 'active';
 
-| Table | Column | References | Purpose |
-|-------|--------|------------|---------|
-| `users` | `created_by` | `users.id` | Audit trail |
-| `users` | `updated_by` | `users.id` | Audit trail |
-| `license_plates` | `parent_lp_id` | `license_plates.id` | LP genealogy |
+-- Get all BOM versions for a product (history)
+SELECT b.* FROM boms b
+WHERE b.product_id = $1
+ORDER BY b.created_at DESC;
 
-## Common Join Patterns
+-- Get latest BOM regardless of status
+SELECT b.* FROM boms b
+WHERE b.product_id = $1
+ORDER BY b.created_at DESC
+LIMIT 1;
+```
 
-### Product with BOM Information
+### 2. BOMs ↔ BOM Items (One-to-Many)
+
+**Relationship Type**: One-to-Many
+**Foreign Key**: `bom_items.bom_id` → `boms.id`
+
+**Business Rules**:
+- One BOM contains multiple materials
+- Each BOM item references a material (product)
+- Sequence determines order of consumption
+- `consume_whole_lp` flag enforces 1:1 LP consumption in scanner
+- PO prefill data stored for each material
+
+**Cascade Behavior**:
+- Deleting a BOM: Cascades to bom_items (orphan deletion)
+- Deleting a BOM item: Allowed for draft BOMs only
+
+**Common Queries**:
+```sql
+-- Get all materials for a BOM with product details
+SELECT 
+  bi.*,
+  p.part_number,
+  p.description,
+  p.uom
+FROM bom_items bi
+JOIN products p ON bi.material_id = p.id
+WHERE bi.bom_id = $1
+ORDER BY bi.sequence;
+
+-- Get active components for a product (with PO prefill data)
+SELECT 
+  bi.material_id,
+  p.part_number,
+  p.description,
+  bi.quantity,
+  bi.uom,
+  bi.unit_cost_std,
+  bi.tax_code_id,
+  bi.lead_time_days,
+  bi.moq
+FROM boms b
+JOIN bom_items bi ON b.id = bi.bom_id
+JOIN products p ON bi.material_id = p.id
+WHERE b.product_id = $1 AND b.status = 'active';
+```
+
+### 3. BOMs ↔ WO Materials (One-to-Many Snapshot)
+
+**Relationship Type**: One-to-Many (Snapshot)
+**Foreign Key**: `wo_materials.wo_id` → `work_orders.id`
+
+**Business Rules**:
+- BOM is snapshotted into `wo_materials` when work order is created
+- Snapshot is immutable (cannot be changed once WO is in progress)
+- For PLANNED WOs, snapshot can be updated if no issues/outputs exist
+- `consume_whole_lp` flag is preserved in snapshot
+
+**Cascade Behavior**:
+- Deleting a work order: Cascades to wo_materials
+- Deleting a BOM: Does NOT affect existing wo_materials (snapshot preserved)
+
+**Common Queries**:
+```sql
+-- Get all materials for a work order
+SELECT 
+  wm.*,
+  p.part_number,
+  p.description
+FROM wo_materials wm
+JOIN products p ON wm.material_id = p.id
+WHERE wm.wo_id = $1
+ORDER BY wm.sequence;
+
+-- Check if WO snapshot can be updated
+SELECT 
+  CASE 
+    WHEN wo.status = 'planned' 
+         AND NOT EXISTS (SELECT 1 FROM production_outputs WHERE wo_id = wo.id)
+         AND NOT EXISTS (SELECT 1 FROM wo_issues WHERE wo_id = wo.id)
+    THEN true
+    ELSE false
+  END as can_update_snapshot
+FROM work_orders wo
+WHERE wo.id = $1;
+```
+
+### 4. Products ↔ Product Allergens (Many-to-Many)
+
+**Relationship Type**: Many-to-Many
+**Foreign Keys**: 
+- `product_allergens.product_id` → `products.id`
+- `product_allergens.allergen_id` → `allergens.id`
+
+**Business Rules**:
+- Composite products inherit allergens from BOM components
+- Manual override allowed (can add additional allergens)
+- Combined set of inherited + manual allergens saved
+- UI displays both inherited and manually selected allergens
+
+**Cascade Behavior**:
+- Deleting a product: Cascades to product_allergens
+- Deleting an allergen: Cascades to product_allergens
+
+**Common Queries**:
+```sql
+-- Get all allergens for a product
+SELECT 
+  a.*
+FROM product_allergens pa
+JOIN allergens a ON pa.allergen_id = a.id
+WHERE pa.product_id = $1;
+
+-- Get inherited allergens from BOM components
+SELECT DISTINCT a.*
+FROM boms b
+JOIN bom_items bi ON b.id = bi.bom_id
+JOIN product_allergens pa ON bi.material_id = pa.product_id
+JOIN allergens a ON pa.allergen_id = a.id
+WHERE b.product_id = $1 AND b.status = 'active';
+```
+
+### 5. BOM Items ↔ Tax Codes (Many-to-One - PO Prefill)
+
+**Relationship Type**: Many-to-One
+**Foreign Key**: `bom_items.tax_code_id` → `settings_tax_codes.id`
+
+**Business Rules**:
+- Tax code stored in BOM item for PO prefill
+- Auto-populated when creating PO from BOM
+- Can be overridden during PO creation
+
+**Common Queries**:
+```sql
+-- Get BOM items with tax codes for PO creation
+SELECT 
+  bi.material_id,
+  p.part_number,
+  bi.quantity,
+  bi.unit_cost_std,
+  tc.code as tax_code,
+  tc.rate as tax_rate,
+  bi.lead_time_days,
+  bi.moq
+FROM bom_items bi
+JOIN products p ON bi.material_id = p.id
+LEFT JOIN settings_tax_codes tc ON bi.tax_code_id = tc.id
+WHERE bi.bom_id = $1;
+```
+
+## Archive & Audit Relationships
+
+### 1. Products Archive Logic
+
+**Archive Control**:
+- **MEAT/DRYGOODS**: Controlled by `products.is_active`
+  - `is_active = true`: Visible in main tabs
+  - `is_active = false`: Visible in ARCHIVE tab only
+  
+- **COMPOSITE (PR/FG)**: Controlled by `boms.status`
+  - `status = 'active'` or `'draft'`: Visible in main tabs
+  - `status = 'archived'`: Visible in ARCHIVE tab only
+
+**Archive Tab Query**:
+```sql
+-- Get all archived products
+SELECT p.* FROM products p
+LEFT JOIN boms b ON p.id = b.product_id AND b.status IN ('active', 'draft')
+WHERE 
+  (p.product_group IN ('MEAT', 'DRYGOODS') AND p.is_active = false)
+  OR 
+  (p.product_group = 'COMPOSITE' AND b.id IS NULL AND EXISTS (
+    SELECT 1 FROM boms WHERE product_id = p.id AND status = 'archived'
+  ));
+```
+
+### 2. BOM Version History
+
+**Version Tracking**:
+- All BOM versions retained (draft, active, archived)
+- `archived_at` timestamp when BOM is archived
+- `deleted_at` timestamp for soft-deleted BOMs
+- User tracking via `created_by`, `updated_by`
+
+**Version History Query**:
+```sql
+-- Get BOM version history for a product
+SELECT 
+  b.version,
+  b.status,
+  b.created_at,
+  b.updated_at,
+  b.archived_at,
+  u1.name as created_by_name,
+  u2.name as updated_by_name
+FROM boms b
+LEFT JOIN users u1 ON b.created_by = u1.id
+LEFT JOIN users u2 ON b.updated_by = u2.id
+WHERE b.product_id = $1
+ORDER BY b.created_at DESC;
+```
+
+## Join Patterns
+
+### 1. Products with Active BOM and Items
 ```sql
 SELECT 
-    p.*,
-    b.version as bom_version,
-    b.is_active as bom_active,
-    COUNT(bi.id) as bom_item_count
+  p.*,
+  b.id as bom_id,
+  b.version as bom_version,
+  b.status as bom_status,
+  json_agg(
+    json_build_object(
+      'material_id', bi.material_id,
+      'part_number', m.part_number,
+      'description', m.description,
+      'quantity', bi.quantity,
+      'uom', bi.uom,
+      'consume_whole_lp', bi.consume_whole_lp
+    )
+  ) as bom_items
 FROM products p
-LEFT JOIN boms b ON p.id = b.product_id AND b.is_active = true
+LEFT JOIN boms b ON p.id = b.product_id AND b.status = 'active'
 LEFT JOIN bom_items bi ON b.id = bi.bom_id
-WHERE p.is_active = true
+LEFT JOIN products m ON bi.material_id = m.id
+WHERE p.product_group = 'COMPOSITE'
 GROUP BY p.id, b.id;
 ```
 
-### Work Order with Product and Operations
+### 2. Work Orders with BOM Snapshot
 ```sql
 SELECT 
-    wo.*,
-    p.part_number,
-    p.description,
-    COUNT(wo_op.id) as operation_count,
-    COUNT(CASE WHEN wo_op.status = 'completed' THEN 1 END) as completed_operations
+  wo.*,
+  p.part_number,
+  p.description,
+  json_agg(
+    json_build_object(
+      'material_id', wm.material_id,
+      'part_number', m.part_number,
+      'quantity', wm.qty_per_unit,
+      'consume_whole_lp', wm.consume_whole_lp
+    )
+  ) as materials
 FROM work_orders wo
 JOIN products p ON wo.product_id = p.id
-LEFT JOIN wo_operations wo_op ON wo.id = wo_op.wo_id
-WHERE wo.status = 'in_progress'
+LEFT JOIN wo_materials wm ON wo.id = wm.wo_id
+LEFT JOIN products m ON wm.material_id = m.id
 GROUP BY wo.id, p.id;
 ```
 
-### License Plate with Location and Product
+### 3. Products with Allergens (Inherited + Manual)
 ```sql
 SELECT 
-    lp.*,
-    p.part_number,
-    p.description,
-    l.code as location_code,
-    l.name as location_name,
-    w.name as warehouse_name
-FROM license_plates lp
-JOIN products p ON lp.product_id = p.id
-JOIN locations l ON lp.location_id = l.id
-JOIN warehouses w ON l.warehouse_id = w.id
-WHERE lp.status = 'available';
+  p.*,
+  json_agg(DISTINCT a.*) as allergens
+FROM products p
+LEFT JOIN product_allergens pa ON p.product_id = pa.product_id
+LEFT JOIN allergens a ON pa.allergen_id = a.id
+WHERE p.id = $1
+GROUP BY p.id;
 ```
 
-### Purchase Order with Items and Supplier
+## Cascade Rules Summary
+
+| Parent Table | Child Table | Cascade Type | Notes |
+|--------------|-------------|--------------|-------|
+| products | boms | CASCADE | Only if no WO references |
+| products | product_allergens | CASCADE | Always |
+| boms | bom_items | CASCADE | Always |
+| boms | wo_materials | NO CASCADE | Snapshot preserved |
+| work_orders | wo_materials | CASCADE | Always |
+| allergens | product_allergens | CASCADE | Always |
+| settings_tax_codes | bom_items | SET NULL | On delete |
+
+## Constraints & Triggers
+
+### 1. Single Active BOM per Product
 ```sql
-SELECT 
-    po.*,
-    s.name as supplier_name,
-    s.contact_email,
-    COUNT(poi.id) as item_count,
-    SUM(poi.quantity * poi.unit_price) as total_value
-FROM purchase_orders po
-JOIN suppliers s ON po.supplier_id = s.id
-LEFT JOIN purchase_order_items poi ON po.id = poi.purchase_order_id
-GROUP BY po.id, s.id;
+CREATE UNIQUE INDEX boms_single_active_idx 
+ON boms(product_id) WHERE status = 'active';
 ```
 
-### GRN with Items and License Plates
+### 2. Guard BOM Hard Delete
 ```sql
-SELECT 
-    g.*,
-    po.po_number,
-    COUNT(gi.id) as item_count,
-    COUNT(lp.id) as lp_count
-FROM grns g
-JOIN purchase_orders po ON g.purchase_order_id = po.id
-LEFT JOIN grn_items gi ON g.id = gi.grn_id
-LEFT JOIN license_plates lp ON g.id = lp.grn_id
-GROUP BY g.id, po.id;
+CREATE TRIGGER trg_boms_guard_delete 
+BEFORE DELETE ON boms 
+FOR EACH ROW EXECUTE FUNCTION guard_boms_hard_delete();
 ```
+- Blocks deletion of active/archived BOMs
+- Blocks deletion if referenced by work orders
 
-### Traceability Chain (Forward)
+### 3. BOM Snapshot on WO Create
 ```sql
-WITH RECURSIVE trace_forward AS (
-    -- Base case: starting LP
-    SELECT 
-        lp.id,
-        lp.lp_number,
-        lp.product_id,
-        0 as level
-    FROM license_plates lp
-    WHERE lp.lp_number = 'LP-001'
-    
-    UNION ALL
-    
-    -- Recursive case: child LPs
-    SELECT 
-        child.id,
-        child.lp_number,
-        child.product_id,
-        tf.level + 1
-    FROM license_plates child
-    JOIN lp_genealogy lg ON child.id = lg.child_lp_id
-    JOIN trace_forward tf ON lg.parent_lp_id = tf.id
-)
-SELECT * FROM trace_forward ORDER BY level, lp_number;
+CREATE TRIGGER trg_snapshot_bom_on_wo_create
+AFTER INSERT ON work_orders
+FOR EACH ROW EXECUTE FUNCTION snapshot_bom_to_wo_materials();
 ```
+- Automatically copies BOM items to wo_materials on WO creation
 
-### Traceability Chain (Backward)
+## TODO: Future Relationship Enhancements
+
+### Audit Trail Table
 ```sql
-WITH RECURSIVE trace_backward AS (
-    -- Base case: starting LP
-    SELECT 
-        lp.id,
-        lp.lp_number,
-        lp.product_id,
-        0 as level
-    FROM license_plates lp
-    WHERE lp.lp_number = 'LP-001'
-    
-    UNION ALL
-    
-    -- Recursive case: parent LPs
-    SELECT 
-        parent.id,
-        parent.lp_number,
-        parent.product_id,
-        tb.level + 1
-    FROM license_plates parent
-    JOIN lp_genealogy lg ON parent.id = lg.parent_lp_id
-    JOIN trace_backward tb ON lg.child_lp_id = tb.id
-)
-SELECT * FROM trace_backward ORDER BY level, lp_number;
+CREATE TABLE audit_log (
+  id SERIAL PRIMARY KEY,
+  table_name TEXT NOT NULL,
+  record_id INTEGER NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE', 'ARCHIVE')),
+  old_values JSONB,
+  new_values JSONB,
+  changed_by UUID REFERENCES users(id),
+  changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  change_reason TEXT
+);
 ```
 
-## Cascade Behaviors
+**Relationships**:
+- `audit_log.changed_by` → `users.id`
+- Tracks changes to: products, boms, bom_items, work_orders
 
-### CASCADE DELETE
-- `users` → `sessions` (when user is deleted, sessions are deleted)
-- `products` → `boms` (when product is deleted, BOMs are deleted)
-- `boms` → `bom_items` (when BOM is deleted, items are deleted)
-- `work_orders` → `wo_operations` (when WO is deleted, operations are deleted)
-- `warehouses` → `locations` (when warehouse is deleted, locations are deleted)
+**Use Cases**:
+- BOM version change history
+- Product activation/deactivation trail
+- Price change tracking
+- Allergen modification audit
 
-### SET NULL
-- `users` → `work_orders.created_by` (when user is deleted, created_by is set to NULL)
-- `users` → `products.created_by` (when user is deleted, created_by is set to NULL)
-- `suppliers` → `products.preferred_supplier_id` (when supplier is deleted, preferred_supplier_id is set to NULL)
-
-### RESTRICT
-- `products` → `work_orders` (cannot delete product if work orders exist)
-- `products` → `license_plates` (cannot delete product if license plates exist)
-- `suppliers` → `purchase_orders` (cannot delete supplier if purchase orders exist)
-- `purchase_orders` → `grns` (cannot delete PO if GRNs exist)
-
-## Index Strategy for Relationships
-
-### Foreign Key Indexes
+### BOM Approval Workflow
 ```sql
--- Primary foreign key indexes
-CREATE INDEX idx_work_orders_product_id ON work_orders(product_id);
-CREATE INDEX idx_work_orders_created_by ON work_orders(created_by);
-CREATE INDEX idx_license_plates_product_id ON license_plates(product_id);
-CREATE INDEX idx_license_plates_location_id ON license_plates(location_id);
-CREATE INDEX idx_bom_items_bom_id ON bom_items(bom_id);
-CREATE INDEX idx_bom_items_material_id ON bom_items(material_id);
-CREATE INDEX idx_wo_operations_wo_id ON wo_operations(wo_id);
-CREATE INDEX idx_purchase_orders_supplier_id ON purchase_orders(supplier_id);
-CREATE INDEX idx_grns_purchase_order_id ON grns(purchase_order_id);
+CREATE TABLE bom_approvals (
+  id SERIAL PRIMARY KEY,
+  bom_id INTEGER REFERENCES boms(id),
+  requested_by UUID REFERENCES users(id),
+  approved_by UUID REFERENCES users(id),
+  status TEXT CHECK (status IN ('pending', 'approved', 'rejected')),
+  comments TEXT,
+  requested_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  approved_at TIMESTAMP WITH TIME ZONE
+);
 ```
 
-### Composite Indexes for Common Queries
-```sql
--- Work orders by product and status
-CREATE INDEX idx_work_orders_product_status ON work_orders(product_id, status);
+**Relationships**:
+- `bom_approvals.bom_id` → `boms.id`
+- `bom_approvals.requested_by` → `users.id`
+- `bom_approvals.approved_by` → `users.id`
 
--- License plates by product and location
-CREATE INDEX idx_license_plates_product_location ON license_plates(product_id, location_id);
-
--- BOM items by BOM and sequence
-CREATE INDEX idx_bom_items_bom_sequence ON bom_items(bom_id, sequence);
-
--- WO operations by work order and sequence
-CREATE INDEX idx_wo_operations_wo_seq ON wo_operations(wo_id, sequence);
-```
-
-## Query Optimization Notes
-
-### Join Optimization
-- Use `INNER JOIN` when you need matching records
-- Use `LEFT JOIN` when you need all records from the left table
-- Use `EXISTS` instead of `IN` for subqueries
-- Use `LIMIT` with `ORDER BY` for pagination
-
-### Index Usage
-- Ensure WHERE clauses use indexed columns
-- Use composite indexes for multi-column queries
-- Consider covering indexes for SELECT-only queries
-- Monitor query performance with EXPLAIN ANALYZE
-
-### Common Anti-patterns
-- Avoid `SELECT *` in production queries
-- Don't use functions in WHERE clauses
-- Avoid unnecessary subqueries
-- Don't forget to add indexes for foreign keys
-
-## Data Integrity Constraints
-
-### Check Constraints
-```sql
--- Product type validation
-ALTER TABLE products ADD CONSTRAINT chk_product_type 
-CHECK (type IN ('RM', 'PR', 'FG', 'WIP'));
-
--- Work order status validation
-ALTER TABLE work_orders ADD CONSTRAINT chk_wo_status 
-CHECK (status IN ('planned', 'released', 'in_progress', 'completed', 'cancelled'));
-
--- License plate status validation
-ALTER TABLE license_plates ADD CONSTRAINT chk_lp_status 
-CHECK (status IN ('available', 'reserved', 'consumed', 'quarantine'));
-```
-
-### Unique Constraints
-```sql
--- Ensure unique part numbers
-ALTER TABLE products ADD CONSTRAINT uk_products_part_number UNIQUE (part_number);
-
--- Ensure unique work order numbers
-ALTER TABLE work_orders ADD CONSTRAINT uk_work_orders_wo_number UNIQUE (wo_number);
-
--- Ensure unique license plate numbers
-ALTER TABLE license_plates ADD CONSTRAINT uk_license_plates_lp_number UNIQUE (lp_number);
-```
-
-## See Also
-
-- [Database Schema](DATABASE_SCHEMA.md) - Detailed table definitions
-- [System Overview](SYSTEM_OVERVIEW.md) - High-level system architecture
-- [API Reference](API_REFERENCE.md) - API documentation
-- [Business Flows](BUSINESS_FLOWS.md) - Process workflows
+**Use Cases**:
+- Require manager approval before activating BOM
+- Track approval history
+- Compliance documentation

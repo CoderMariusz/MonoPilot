@@ -350,7 +350,222 @@
 - [ ] **API Response Times**: Monitor and optimize API endpoint performance
 - [ ] **UI Responsiveness**: Test UI components with large datasets
 
-## Phase 18: Future Enhancements (Not Implemented)
+## Phase 18: BOM Lifecycle & Versioning ✅ COMPLETED
+
+### BOM Lifecycle Management ✅
+- [x] Renamed `one_to_one` → `consume_whole_lp` in `bom_items` and `wo_materials`
+- [x] Added BOM status ENUM ('draft', 'active', 'archived')
+- [x] Implemented single active BOM per product (unique index)
+- [x] Created guard trigger to prevent hard delete of active/archived BOMs
+- [x] Added `archived_at` and `deleted_at` timestamps for audit trail
+
+### BOM Versioning ✅
+- [x] Implemented automatic version bumping (minor vs major changes)
+- [x] Minor changes: Description, Std Price, Expiry Policy, Shelf Life, Allergens
+- [x] Major changes: BOM items added/removed/modified
+- [x] Added "Change Version" button for manual override
+- [x] Version format: X.Y (e.g., 1.0, 1.1, 2.0)
+
+### Clone-on-Edit Pattern ✅
+- [x] Editing active BOM creates new draft version
+- [x] Draft BOMs can be edited directly
+- [x] Activating draft BOM archives previous active
+- [x] Preserves BOM history for audit and rollback
+
+### PO Prefill from BOM ✅
+- [x] Added `tax_code_id`, `lead_time_days`, `moq` to `bom_items`
+- [x] Snapshot prefill data to `wo_materials` on WO creation
+- [x] PO creation can use BOM prefill data
+
+### Archive Tab ✅
+- [x] Added ARCHIVE tab to BomCatalogClient
+- [x] MEAT/DRYGOODS: Archive when `is_active = false`
+- [x] COMPOSITE (PR/FG): Archive when `boms.status = 'archived'`
+- [x] Proper filtering logic for all tabs
+
+### UI Enhancements ✅
+- [x] Updated CompositeProductModal with BOM management UI
+- [x] Added BOM status buttons (Active/Draft/Archive)
+- [x] Implemented allergen inheritance from BOM components
+- [x] Added loading indicators for allergens
+- [x] Hidden BOM columns for MEAT/DRYGOODS tabs
+- [x] Updated SingleProductModal with Product Status (is_active)
+
+### Documentation ✅
+- [x] Updated DATABASE_SCHEMA.md with BOM lifecycle tables
+- [x] Updated DATABASE_RELATIONSHIPS.md with BOM versioning
+- [x] Updated BOM_ARCHITECTURE.md with lifecycle management
+- [x] Updated TODO.md with completed tasks
+
+## Phase 19: Data Validation & Audit Trail (TODO)
+
+### BOM Data Validation
+- [ ] **Circular BOM Reference Detection**: Prevent infinite loops in BOM structure
+  - Create recursive query to detect circular references
+  - Add validation before BOM activation
+  - Display error message with circular path
+  
+- [ ] **Version Format Validation**: Ensure version follows X.Y format
+  - Add regex validation: `^[0-9]+\.[0-9]+$`
+  - Validate in frontend (CompositeProductModal)
+  - Validate in backend (BOM API endpoints)
+  
+- [ ] **Product Type Material Validation**: Enforce allowed materials per product type
+  - PR can only use MEAT, DRYGOODS
+  - FG can use MEAT, DRYGOODS, PR
+  - Add database constraint or trigger
+  - Frontend validation in component selection
+  
+- [ ] **Max BOM Depth Limit**: Prevent excessively nested BOMs
+  - Define max depth (e.g., 5 levels)
+  - Create recursive function to calculate depth
+  - Block BOM activation if depth exceeded
+
+### Audit Trail System
+- [ ] **Create audit_log Table**: Track all changes to critical data
+  ```sql
+  CREATE TABLE audit_log (
+    id SERIAL PRIMARY KEY,
+    table_name TEXT NOT NULL,
+    record_id INTEGER NOT NULL,
+    action TEXT NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE', 'ARCHIVE', 'ACTIVATE')),
+    old_values JSONB,
+    new_values JSONB,
+    changed_by UUID REFERENCES users(id),
+    changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    change_reason TEXT,
+    ip_address INET,
+    user_agent TEXT
+  );
+  ```
+  
+- [ ] **Add Triggers for Audit Logging**: Auto-populate audit_log
+  - BOM status changes (draft → active → archived)
+  - Product activation/deactivation (`is_active`)
+  - BOM version bumps
+  - Critical field changes (price, allergens, BOM items)
+  - Work order snapshot updates
+  
+- [ ] **Implement Change Reason Field**: Require user to explain changes
+  - Add "Change Reason" modal for major changes
+  - Required for: BOM activation, version bumps, archiving
+  - Optional for: Minor edits (description, price)
+  - Store in `audit_log.change_reason`
+  
+- [ ] **Create Audit Trail Viewer UI**: Admin panel to view change history
+  - Filter by: table, user, date range, action type
+  - Display: old values → new values (diff view)
+  - Export audit log to Excel
+  - Search functionality
+
+### BOM Approval Workflow
+- [ ] **Create bom_approvals Table**: Track approval requests
+  ```sql
+  CREATE TABLE bom_approvals (
+    id SERIAL PRIMARY KEY,
+    bom_id INTEGER REFERENCES boms(id),
+    requested_by UUID REFERENCES users(id),
+    approved_by UUID REFERENCES users(id),
+    status TEXT CHECK (status IN ('pending', 'approved', 'rejected')),
+    comments TEXT,
+    requested_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    approved_at TIMESTAMP WITH TIME ZONE
+  );
+  ```
+  
+- [ ] **Implement Approval Workflow**: Require manager approval for BOM activation
+  - User submits BOM for approval
+  - Manager reviews and approves/rejects
+  - Email notifications for approval requests
+  - BOM can only be activated after approval
+
+### BOM Comparison & History
+- [ ] **BOM Comparison Tool**: Visual diff between BOM versions
+  - Side-by-side comparison view
+  - Highlight added/removed/modified items
+  - Show field-level changes
+  - Export comparison to PDF
+  
+- [ ] **BOM History Viewer**: Display all BOM versions
+  - Timeline view of BOM changes
+  - Version metadata (created by, date, status)
+  - Restore previous version (clone)
+  - Version notes/comments
+
+## Phase 20: Work Order Snapshot Management (TODO)
+
+### WO Snapshot Update
+- [ ] **Implement Snapshot Update API**: `POST /api/production/work-orders/:id/snapshot-update`
+  - Allowed only for PLANNED WOs
+  - Blocked if issues or outputs exist
+  - Preview diff before applying
+  - Confirm update with user
+  
+- [ ] **Snapshot Preview with Diff**: Show changes before applying
+  - Display added materials
+  - Display removed materials
+  - Display modified quantities
+  - Highlight breaking changes
+  
+- [ ] **Conflict Detection**: Identify issues before update
+  - Check for reserved LPs
+  - Check for issued materials
+  - Check for production outputs
+  - Block update if conflicts exist
+  
+- [ ] **Snapshot Update Approval**: Require approval for critical updates
+  - Production manager approval
+  - Audit trail for snapshot changes
+  - Rollback capability
+
+### Scanner Validation
+- [ ] **Enforce 1:1 Validation**: For `consume_whole_lp` materials
+  - Check `wo_materials.consume_whole_lp` flag
+  - Validate: scanned qty = LP qty
+  - Display error if partial consumption attempted
+  - Track 1:1 violations in audit log
+  
+- [ ] **Scanner Validation Rules Table**: Configurable validation rules
+  ```sql
+  CREATE TABLE scanner_validation_rules (
+    id SERIAL PRIMARY KEY,
+    rule_name TEXT NOT NULL,
+    rule_type TEXT CHECK (rule_type IN ('qty_match', 'expiry_check', 'qa_gate', 'location_check')),
+    is_active BOOLEAN DEFAULT true,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  );
+  ```
+  
+- [ ] **Real-time Validation Feedback**: Instant validation in scanner UI
+  - Visual indicators (green/red)
+  - Audio feedback (beep on error)
+  - Detailed error messages
+  - Override capability for supervisors
+  
+- [ ] **Scanner Error Logging**: Track all scanner errors
+  - Error type and message
+  - User who encountered error
+  - Timestamp and location
+  - Resolution (override, corrected, cancelled)
+
+### PO Prefill Enhancement
+- [ ] **Modify PO Creation Endpoint**: Use BOM prefill data
+  - `GET /api/planning/boms/:bomId/prefill-data`
+  - Return: unit_cost_std, tax_code_id, lead_time_days, moq
+  - Auto-populate PO line items
+  
+- [ ] **Override Capability**: Allow manual override of prefilled values
+  - Track prefilled vs manual values
+  - Display indicator for prefilled fields
+  - Audit trail for overrides
+  
+- [ ] **Prefill Accuracy Reporting**: Track prefill vs actual values
+  - Compare prefilled price vs final PO price
+  - Identify materials with frequent overrides
+  - Suggest BOM cost updates
+
+## Phase 21: Future Enhancements (Not Implemented)
 
 ### Advanced Production Features
 - [ ] **Multi-Phase Routing**: Enhanced routing with per-phase yield tracking
