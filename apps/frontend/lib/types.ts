@@ -181,14 +181,132 @@ export interface Supplier {
 export type CreateSupplierData = Omit<Supplier, 'id' | 'created_at' | 'updated_at'>;
 export type UpdateSupplierData = Partial<CreateSupplierData>;
 
-export type PurchaseOrderStatus = 'draft' | 'sent' | 'confirmed' | 'partially_received' | 'received' | 'cancelled' | 'submitted' | 'closed';
+// Phase 1 Planning Types - Updated for new schema
 
-export interface PurchaseOrder {
+export type POStatus = 'draft' | 'approved' | 'closed';
+export type TOStatus = 'draft' | 'approved' | 'closed';
+
+// PO Header (replacing PurchaseOrder)
+export interface POHeader {
   id: number;
-  po_number: string;
+  number: string;
   supplier_id: number;
-  status: PurchaseOrderStatus;
+  status: POStatus;
+  currency: string;
+  exchange_rate?: number;
   order_date: string;
+  requested_delivery_date?: string;
+  promised_delivery_date?: string;
+  snapshot_supplier_name?: string;
+  snapshot_supplier_vat?: string;
+  snapshot_supplier_address?: string;
+  asn_ref?: string;
+  net_total?: number;
+  vat_total?: number;
+  gross_total?: number;
+  created_by?: string;
+  approved_by?: string;
+  created_at: string;
+  updated_at: string;
+  // Relationships
+  supplier?: Supplier;
+  po_lines?: POLine[];
+  po_corrections?: POCorrection[];
+}
+
+// PO Line (replacing PurchaseOrderItem)
+export interface POLine {
+  id: number;
+  po_id: number;
+  line_no: number;
+  item_id: number;
+  uom: string;
+  qty_ordered: number;
+  qty_received: number;
+  unit_price: number;
+  vat_rate: number;
+  requested_delivery_date?: string;
+  promised_delivery_date?: string;
+  default_location_id?: number;
+  note?: string;
+  created_at: string;
+  updated_at: string;
+  // Relationships
+  item?: Product;
+  default_location?: Location;
+}
+
+// PO Correction (new table)
+export interface POCorrection {
+  id: number;
+  po_id: number;
+  po_line_id?: number;
+  reason: string;
+  delta_amount: number;
+  created_by?: string;
+  created_at: string;
+  // Relationships
+  po_header?: POHeader;
+  po_line?: POLine;
+}
+
+// TO Header (replacing TransferOrder)
+export interface TOHeader {
+  id: number;
+  number: string;
+  status: TOStatus;
+  from_wh_id: number;
+  to_wh_id: number;
+  requested_date?: string;
+  created_by?: string;
+  approved_by?: string;
+  created_at: string;
+  updated_at: string;
+  // Relationships
+  from_warehouse?: Warehouse;
+  to_warehouse?: Warehouse;
+  to_lines?: TOLine[];
+}
+
+// TO Line (replacing TransferOrderItem)
+export interface TOLine {
+  id: number;
+  to_id: number;
+  line_no: number;
+  item_id: number;
+  uom: string;
+  qty_planned: number;
+  qty_moved: number;
+  from_location_id?: number;
+  to_location_id?: number;
+  scan_required: boolean;
+  approved_line: boolean;
+  created_at: string;
+  updated_at: string;
+  // Relationships
+  item?: Product;
+  from_location?: Location;
+  to_location?: Location;
+}
+
+// Audit Log (enhanced audit_events)
+export interface AuditLogEntry {
+  id: number;
+  entity: string;
+  entity_id: number;
+  action: string;
+  before?: any;
+  after?: any;
+  actor_id?: string;
+  created_at: string;
+  // Relationships
+  actor?: User;
+}
+
+// Legacy types for backward compatibility (deprecated)
+export type PurchaseOrderStatus = POStatus;
+export interface PurchaseOrder extends POHeader {
+  po_number: string;
   expected_delivery: string;
   due_date?: string;
   warehouse_id?: number;
@@ -198,16 +316,10 @@ export interface PurchaseOrder {
   buyer_name?: string;
   total_amount: number;
   notes?: string;
-  supplier?: Supplier;
-  warehouse?: Warehouse;
   purchase_order_items?: PurchaseOrderItem[];
-  created_at: string;
-  updated_at: string;
 }
 
-export interface PurchaseOrderItem {
-  id: number;
-  po_id: number;
+export interface PurchaseOrderItem extends POLine {
   product_id: number;
   quantity_ordered: number;
   quantity_received: number;
@@ -243,19 +355,12 @@ export interface Warehouse {
 export type CreateWarehouseData = Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>;
 export type UpdateWarehouseData = Partial<CreateWarehouseData>;
 
-export interface TransferOrder {
-  id: number;
+// Legacy TransferOrder for backward compatibility (deprecated)
+export interface TransferOrder extends TOHeader {
   to_number: string;
-  from_warehouse_id: number;
-  to_warehouse_id: number;
-  status: string;
   transfer_date: string;
   notes?: string;
-  from_warehouse?: Warehouse;
-  to_warehouse?: Warehouse;
   transfer_order_items?: any[];
-  created_at: string;
-  updated_at: string;
 }
 
 export interface ProductionOutput {

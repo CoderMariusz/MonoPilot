@@ -2,11 +2,10 @@
 
 import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { LocationsAPI } from '@/lib/api/locations';
-import type { Location } from '@/lib/types';
-import { useSuppliers, resolveDefaultUnitPrice } from '@/lib/clientState';
+import { supabase } from '@/lib/supabase/client';
+import { useSuppliers } from '@/lib/clientState';
 import { useAuth } from '@/lib/auth/AuthContext';
-import type { Product, Location } from '@/lib/types';
+import type { Product, Warehouse } from '@/lib/types';
 
 interface CreatePurchaseOrderModalProps {
   isOpen: boolean;
@@ -23,7 +22,7 @@ interface LineItem {
 
 export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreatePurchaseOrderModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const suppliers = useSuppliers();
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -40,6 +39,8 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
     notes: '',
   });
 
+  const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
+
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: '1', product_id: '', quantity: '', unit_price: '' }
   ]);
@@ -53,9 +54,27 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const rmProducts = mockProducts.filter(p => p.product_type === 'RM_MEAT');
-      setProducts(rmProducts);
-      setLocations(mockLocations);
+      // Load products from MEAT and DRYGOODS categories
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .in('product_group', ['MEAT', 'DRYGOODS'])
+        .eq('is_active', true)
+        .order('part_number');
+
+      if (productsError) throw productsError;
+
+      // Load warehouses
+      const { data: warehousesData, error: warehousesError } = await supabase
+        .from('warehouses')
+        .select('*')
+        .eq('is_active', true)
+        .order('code');
+
+      if (warehousesError) throw warehousesError;
+
+      setProducts(productsData || []);
+      setWarehouses(warehousesData || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {
@@ -81,10 +100,24 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
         
-        // Auto-fill unit price when product changes
+        // Auto-fill unit price and supplier when product changes
         if (field === 'product_id' && value) {
-          const defaultPrice = resolveDefaultUnitPrice(Number(value), Number(formData.supplier_id));
-          updatedItem.unit_price = defaultPrice.toString();
+          const product = products.find(p => p.id === Number(value));
+          if (product) {
+            // Auto-fill unit price from std_price
+            if (product.std_price) {
+              updatedItem.unit_price = product.std_price.toString();
+            }
+            
+            // Auto-select supplier from preferred_supplier_id
+            if (product.preferred_supplier_id) {
+              const supplier = suppliers.find(s => s.id === product.preferred_supplier_id);
+              if (supplier) {
+                setFormData(prev => ({ ...prev, supplier_id: supplier.id.toString() }));
+                setSelectedSupplier(supplier);
+              }
+            }
+          }
         }
         
         return updatedItem;
@@ -182,100 +215,8 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Supplier <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.supplier_id}
-                    onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select Supplier</option>
-                    {suppliers.filter(s => s.is_active).map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Warehouse
-                  </label>
-                  <select
-                    value={formData.warehouse_id}
-                    onChange={(e) => setFormData({ ...formData, warehouse_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  >
-                    <option value="">Select warehouse...</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Request Delivery Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.request_delivery_date}
-                    onChange={(e) => setFormData({ ...formData, request_delivery_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Expected Delivery Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.expected_delivery_date}
-                    onChange={(e) => setFormData({ ...formData, expected_delivery_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="submitted">Submitted</option>
-                    <option value="confirmed">Confirmed</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Notes
-                </label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  rows={3}
-                  placeholder="Add any additional notes or special instructions..."
-                />
-              </div>
-
-              <div className="border-t border-slate-200 pt-4 mt-6">
+              {/* LINE ITEMS - GÓRA */}
+              <div className="border border-slate-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-slate-900">Line Items</h3>
                   <button
@@ -351,6 +292,101 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* PO HEADER FIELDS - DÓŁ */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Supplier <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedSupplier ? selectedSupplier.name : 'Select a product first'}
+                    disabled
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md bg-slate-50 text-slate-600 cursor-not-allowed"
+                    placeholder="Supplier will be auto-selected from product"
+                  />
+                  {selectedSupplier && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Auto-selected from product: {selectedSupplier.name}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Warehouse
+                  </label>
+                  <select
+                    value={formData.warehouse_id}
+                    onChange={(e) => setFormData({ ...formData, warehouse_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  >
+                    <option value="">Select warehouse...</option>
+                    {warehouses.map((warehouse) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.code} - {warehouse.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Request Delivery Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.request_delivery_date}
+                    onChange={(e) => setFormData({ ...formData, request_delivery_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Expected Delivery Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.expected_delivery_date}
+                    onChange={(e) => setFormData({ ...formData, expected_delivery_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="confirmed">Confirmed</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  rows={3}
+                  placeholder="Add any additional notes or special instructions..."
+                />
               </div>
             </div>
 
