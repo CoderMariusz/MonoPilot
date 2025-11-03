@@ -1,5 +1,8 @@
 # AI Context Guide
 
+**Last Updated**: 2025-11-03  
+**Version**: 1.1
+
 ## Overview
 This document provides templates and patterns for building effective AI context when working with the MonoPilot MES system. Use these templates to create comprehensive, accurate prompts.
 
@@ -91,7 +94,7 @@ Context:
 - Current Fields: id, part_number, description, type, uom, is_active, product_group, product_type
 - Relationships: supplier_id → suppliers, tax_code_id → settings_tax_codes
 - Used By Pages: /technical/bom, /production, /planning, /warehouse
-- Used By APIs: ProductsAPI, WorkOrdersAPI, PurchaseOrdersAPI, GRNsAPI
+- Used By APIs: ProductsAPI, WorkOrdersAPI, PurchaseOrdersAPI
 - Used By Components: ProductsTable, AddItemModal, BomCatalogClient
 
 New Field Details:
@@ -306,7 +309,7 @@ Integration Points:
 
 ### By API
 - **CRUD**: ProductsAPI, WorkOrdersAPI, PurchaseOrdersAPI
-- **Specialized**: YieldAPI, TraceabilityAPI, ScannerAPI
+- **Specialized**: YieldAPI, TraceabilityAPI
 - **Management**: SuppliersAPI, WarehousesAPI, UsersAPI
 
 ## See Also

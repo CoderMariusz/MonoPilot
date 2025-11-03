@@ -1,5 +1,8 @@
 # AI Quick Reference Guide
 
+**Last Updated**: 2025-11-03  
+**Version**: 1.1
+
 ## Overview
 This document provides quick lookup tables and matrices for AI prompt engineering, enabling efficient context building and system understanding.
 
@@ -52,7 +55,6 @@ This document provides quick lookup tables and matrices for AI prompt engineerin
 | `WorkOrdersAPI` | `work_orders`, `wo_operations`, `wo_materials`, `products` | `work_orders`, `wo_operations` | Sequential routing, 1:1 components |
 | `PurchaseOrdersAPI` | `purchase_orders`, `purchase_order_items`, `suppliers` | `purchase_orders`, `purchase_order_items` | GRN validation, status transitions |
 | `TransferOrdersAPI` | `transfer_orders`, `transfer_order_items`, `warehouses` | `transfer_orders`, `transfer_order_items` | Warehouse validation |
-| `GRNsAPI` | `grns`, `grn_items`, `license_plates`, `purchase_orders` | `grns`, `grn_items`, `license_plates` | PO validation, LP creation |
 | `LicensePlatesAPI` | `license_plates`, `locations`, `products` | `license_plates` | LP numbering, status management |
 | `YieldAPI` | `wo_operations`, `production_outputs`, `work_orders` | `production_outputs` | Yield calculations |
 | `TraceabilityAPI` | `license_plates`, `lp_genealogy`, `lp_compositions` | `lp_genealogy`, `lp_compositions` | Trace chain integrity |
@@ -69,12 +71,12 @@ This document provides quick lookup tables and matrices for AI prompt engineerin
 | `ProductsTable` | `ProductsAPI` | - | Product listing and management |
 | `PurchaseOrdersTable` | `PurchaseOrdersAPI` | `SuppliersAPI` | PO management → Supplier integration |
 | `TransferOrdersTable` | `TransferOrdersAPI` | `WarehousesAPI` | Transfer management |
-| `GRNsTable` | `GRNsAPI` | `LicensePlatesAPI` | GRN processing → LP creation |
-| `LicensePlatesTable` | `LicensePlatesAPI` | `StockMovesAPI` | LP management → Stock tracking |
-| `StageBoard` | `WorkOrdersAPI`, `ScannerAPI` | `LicensePlatesAPI` | Operation execution → LP management |
+| `GRNsTable` | `WorkOrdersAPI` | `LicensePlatesAPI` | GRN processing → LP creation |
+| `LicensePlatesTable` | `LicensePlatesAPI` | - | LP management → Stock tracking |
+| `StageBoard` | `WorkOrdersAPI` | `LicensePlatesAPI` | Operation execution → LP management |
 | `AddItemModal` | `ProductsAPI`, `RoutingsAPI` | `AllergensAPI`, `TaxCodesAPI` | Product creation → BOM setup |
 | `CreateWorkOrderModal` | `WorkOrdersAPI` | `ProductsAPI`, `MachinesAPI` | WO creation → Product validation |
-| `CreateGRNModal` | `GRNsAPI` | `PurchaseOrdersAPI`, `LicensePlatesAPI` | GRN creation → PO validation |
+| `CreateGRNModal` | `WorkOrdersAPI` | `PurchaseOrdersAPI`, `LicensePlatesAPI` | GRN creation → PO validation |
 | `TraceTab` | `TraceabilityAPI` | - | Trace queries → Data visualization |
 
 ## Business Rule Quick Reference
@@ -181,13 +183,13 @@ WHERE sm.move_date BETWEEN ? AND ?;
 ### Warehouse Module
 - **Purpose**: Inventory management
 - **Key Tables**: `grns`, `stock_moves`, `license_plates`
-- **Key APIs**: `GRNsAPI`, `LicensePlatesAPI`
+- **Key APIs**: `WorkOrdersAPI`, `LicensePlatesAPI`
 - **Key Components**: `GRNsTable`, `LicensePlatesTable`
 
 ### Scanner Module
 - **Purpose**: Production execution
 - **Key Tables**: `wo_operations`, `license_plates`, `lp_reservations`
-- **Key APIs**: `WorkOrdersAPI`, `ScannerAPI`
+- **Key APIs**: `WorkOrdersAPI`
 - **Key Components**: `StageBoard`, `ProcessInterface`
 
 ## Performance Quick Reference

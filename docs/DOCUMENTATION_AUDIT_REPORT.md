@@ -1,6 +1,6 @@
 # Raport Audytu Dokumentacji - MonoPilot
 
-**Data audytu**: 2025-01-XX  
+**Data audytu**: 2025-11-03  
 **Zakres**: Kompleksowa weryfikacja 41 plików dokumentacji
 
 ## Podsumowanie
@@ -184,5 +184,8 @@
 3. ✅ Zaktualizować PAGE_REFERENCE.md - poprawić mapowania
 4. ✅ Zaktualizować SYSTEM_OVERVIEW.md - poprawić mapowania API
 5. ✅ Zaktualizować BUSINESS_FLOWS.md - poprawić odniesienia
-6. ✅ Zaktualizować index.ts - dodać brakujące eksporty API
+6. ✅ Zaktualizować dokumentację modułów (WAREHOUSE_MODULE_GUIDE.md, PRODUCTION_MODULE_GUIDE.md)
+7. ✅ Zaktualizować dokumentację testów (TEST_COVERAGE_MAP.md, PRODUCTION_TEST_PLAN.md)
+8. ✅ Zaktualizować AI dokumentację (AI_QUICK_REFERENCE.md, AI_CONTEXT_GUIDE.md)
+9. ⚠️ Rozważyć aktualizację index.ts - dodać brakujące eksporty API (opcjonalne)
 
