@@ -7,7 +7,8 @@ import type { Machine } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 
 export function MachinesTable() {
-  const [machines, setMachines] = useState([]);
+  const { showToast } = useToast();
+  const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Fetch data on component mount
@@ -26,7 +27,7 @@ export function MachinesTable() {
     }
 
     fetchData();
-  }, [showToast]);const { showToast } = useToast();
+  }, [showToast]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [formData, setFormData] = useState({
@@ -58,17 +59,20 @@ export function MachinesTable() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this machine?')) {
-      const success = await MachinesAPI.delete(itemId);
-        setMachines(prev => prev.filter(item => item.id !== itemId));
-      if (success) {
+      try {
+        await MachinesAPI.delete(id);
+        setMachines(prev => prev.filter(item => item.id !== id));
         showToast('Machine deleted successfully', 'success');
+      } catch (error) {
+        console.error('Error deleting machine:', error);
+        showToast('Failed to delete machine', 'error');
       }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const machineData = {
@@ -78,23 +82,28 @@ export function MachinesTable() {
       is_active: formData.is_active,
     };
 
-    if (editingMachine) {
-      const updatedItem = await MachinesAPI.update(itemId, itemData);
-        setMachines(prev => prev.map(item => item.id === itemId ? updatedItem : item));
-      showToast('Machine updated successfully', 'success');
-    } else {
-      const newItem = await MachinesAPI.create(itemData);
+    try {
+      if (editingMachine) {
+        const updatedItem = await MachinesAPI.update(editingMachine.id, machineData);
+        setMachines(prev => prev.map(item => item.id === editingMachine.id ? updatedItem : item));
+        showToast('Machine updated successfully', 'success');
+      } else {
+        const newItem = await MachinesAPI.create(machineData);
         setMachines(prev => [...prev, newItem]);
-      showToast('Machine added successfully', 'success');
+        showToast('Machine added successfully', 'success');
+      }
+      
+      setIsModalOpen(false);
+      setFormData({
+        code: '',
+        name: '',
+        type: '',
+        is_active: true,
+      });
+    } catch (error) {
+      console.error('Error saving machine:', error);
+      showToast('Failed to save machine', 'error');
     }
-    
-    setIsModalOpen(false);
-    setFormData({
-      code: '',
-      name: '',
-      type: '',
-      is_active: true,
-    });
   };
 
   return (

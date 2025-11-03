@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { WarehousesAPI } from '@/lib/api/warehouses';
 import type { Warehouse } from '@/lib/types';
+import { WarehouseModal } from './WarehouseModal';
 import { useToast } from '@/lib/toast';
 
 export function WarehousesTable() {
@@ -47,9 +48,24 @@ export function WarehousesTable() {
     try {
       await WarehousesAPI.delete(warehouse.id);
       setWarehouses(prev => prev.filter(w => w.id !== warehouse.id));
+      showToast('Warehouse deleted successfully', 'success');
     } catch (error) {
       console.error('Error deleting warehouse:', error);
+      showToast('Failed to delete warehouse', 'error');
     }
+  };
+
+  const handleSuccess = () => {
+    const loadWarehouses = async () => {
+      try {
+        const data = await WarehousesAPI.getAll();
+        setWarehouses(data);
+      } catch (error) {
+        console.error('Error loading warehouses:', error);
+        showToast('Failed to load warehouses', 'error');
+      }
+    };
+    loadWarehouses();
   };
 
   if (loading) {
@@ -169,52 +185,15 @@ export function WarehousesTable() {
         </div>
       </div>
 
-      {/* TODO: Add CreateWarehouseModal and EditWarehouseModal components */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Create Warehouse</h3>
-            <p className="text-slate-600 mb-4">Create warehouse modal will be implemented here.</p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-slate-600 hover:text-slate-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg"
-              >
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingWarehouse && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Edit Warehouse</h3>
-            <p className="text-slate-600 mb-4">Edit warehouse modal will be implemented here.</p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setEditingWarehouse(null)}
-                className="px-4 py-2 text-slate-600 hover:text-slate-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setEditingWarehouse(null)}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <WarehouseModal
+        isOpen={showCreateModal || !!editingWarehouse}
+        onClose={() => {
+          setShowCreateModal(false);
+          setEditingWarehouse(null);
+        }}
+        warehouse={editingWarehouse}
+        onSuccess={handleSuccess}
+      />
     </div>
   );
 }

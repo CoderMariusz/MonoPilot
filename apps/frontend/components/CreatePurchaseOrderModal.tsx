@@ -132,41 +132,46 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
     setError(null);
 
     try {
-      const { addPurchaseOrder } = await import('@/lib/clientState');
-      const nextPoNumber = `PO-2024-${String(Date.now()).slice(-3).padStart(3, '0')}`;
-      
-      const purchase_order_items = lineItems.map((item, index) => {
+      if (!formData.supplier_id) {
+        setError('Please select a supplier');
+        setLoading(false);
+        return;
+      }
+
+      // Get product details for UOM
+      const lines = lineItems.map((item, index) => {
         const product = products.find(p => p.id === Number(item.product_id));
-        const quantity = parseFloat(item.quantity);
-        const unitPrice = parseFloat(item.unit_price);
+        if (!product) throw new Error(`Product not found for item ${index + 1}`);
+        
         return {
-          id: Date.now() + index,
-          po_id: 0,
-          product_id: Number(item.product_id),
-          quantity_ordered: quantity,
-          quantity_received: 0,
-          unit_price: unitPrice,
-          total_price: quantity * unitPrice,
-          product,
+          item_id: Number(item.product_id),
+          uom: product.uom,
+          qty_ordered: parseFloat(item.quantity),
+          unit_price: parseFloat(item.unit_price),
+          vat_rate: 0, // Default VAT rate
+          default_location_id: formData.warehouse_id ? Number(formData.warehouse_id) : null
         };
       });
-      
-      addPurchaseOrder({
-        po_number: nextPoNumber,
-        supplier_id: Number(formData.supplier_id),
-        status: formData.status,
-        order_date: new Date().toISOString(),
-        expected_delivery: formData.expected_delivery_date || formData.due_date || new Date().toISOString(),
-        due_date: formData.due_date || null,
-        warehouse_id: formData.warehouse_id ? Number(formData.warehouse_id) : undefined,
-        request_delivery_date: formData.request_delivery_date || undefined,
-        expected_delivery_date: formData.expected_delivery_date || undefined,
-        buyer_id: profile?.id,
-        buyer_name: profile?.name || 'Unknown',
-        total_amount: purchase_order_items.reduce((sum, item) => sum + item.total_price, 0),
-        notes: formData.notes || undefined,
-        purchase_order_items,
+
+      // Use API endpoint to create PO
+      const response = await fetch('/api/planning/po', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplier_id: Number(formData.supplier_id),
+          currency: 'USD',
+          order_date: new Date().toISOString(),
+          requested_delivery_date: formData.request_delivery_date || null,
+          promised_delivery_date: formData.expected_delivery_date || null,
+          lines
+        })
       });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create purchase order');
+      }
       
       onSuccess();
       onClose();
@@ -300,16 +305,27 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Supplier <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    value={selectedSupplier ? selectedSupplier.name : 'Select a product first'}
-                    disabled
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md bg-slate-50 text-slate-600 cursor-not-allowed"
-                    placeholder="Supplier will be auto-selected from product"
-                  />
+                  <select
+                    value={formData.supplier_id}
+                    onChange={(e) => {
+                      const supplierId = e.target.value;
+                      setFormData({ ...formData, supplier_id: supplierId });
+                      const supplier = suppliers.find(s => s.id === Number(supplierId));
+                      setSelectedSupplier(supplier || null);
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select supplier...</option>
+                    {suppliers.map((supplier) => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
                   {selectedSupplier && (
                     <p className="text-xs text-slate-500 mt-1">
-                      Auto-selected from product: {selectedSupplier.name}
+                      Selected: {selectedSupplier.name}
                     </p>
                   )}
                 </div>

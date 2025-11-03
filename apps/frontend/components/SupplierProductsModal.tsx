@@ -41,8 +41,19 @@ export function SupplierProductsModal({
   const handleAddProduct = () => {
     if (!newProduct.product_id) return;
 
+    // Check if product already exists for this supplier
+    const existing = localProducts.find(p => p.product_id === newProduct.product_id);
+    if (existing) {
+      alert('This product is already added to this supplier');
+      return;
+    }
+
+    // Use negative ID for new items (will be replaced with real ID after save)
+    const maxId = localProducts.length > 0 ? Math.max(...localProducts.map(p => p.id), 0) : 0;
+    const tempId = maxId < 0 ? maxId - 1 : -1;
+
     const product: SupplierProduct = {
-      id: Math.max(...localProducts.map(p => p.id), 0) + 1,
+      id: tempId,
       supplier_id: supplier.id,
       product_id: newProduct.product_id,
       supplier_sku: newProduct.supplier_sku || '',

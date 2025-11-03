@@ -4,8 +4,8 @@
 
 This document describes the complete database schema for the MonoPilot MES system, including all tables, relationships, constraints, and business rules.
 
-**Last Updated**: 2025-01-21
-**Version**: 2.0 - BOM Lifecycle & Versioning Update
+**Last Updated**: 2025-01-22
+**Version**: 2.1 - BOM History & Packaging Fields Update
 
 ## Core Tables
 
@@ -36,6 +36,10 @@ CREATE TABLE products (
   -- Lifecycle
   expiry_policy TEXT CHECK (expiry_policy IN ('DAYS_STATIC', 'FROM_MFG_DATE', 'FROM_DELIVERY_DATE', 'FROM_CREATION_DATE')),
   shelf_life_days INTEGER,
+  
+  -- Packaging (for Finished Goods)
+  boxes_per_pallet INTEGER,  -- Number of boxes that fit on one pallet
+  packs_per_box INTEGER,     -- Number of packs (units) that fit in one box
   
   -- Audit
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -247,6 +251,56 @@ FOR EACH ROW EXECUTE FUNCTION guard_boms_hard_delete();
 -- Managed by UI and application logic
 -- product_allergens table stores both inherited and manually selected allergens
 ```
+
+### 3. bom_history
+**Purpose**: Track BOM changes when status changes from draft to active
+
+```sql
+CREATE TABLE bom_history (
+  id SERIAL PRIMARY KEY,
+  bom_id INTEGER NOT NULL REFERENCES boms(id) ON DELETE CASCADE,
+  version VARCHAR(50) NOT NULL,
+  changed_by UUID REFERENCES users(id),
+  changed_at TIMESTAMPTZ DEFAULT NOW(),
+  status_from VARCHAR(20),
+  status_to VARCHAR(20),
+  changes JSONB NOT NULL,
+  description TEXT,
+  CONSTRAINT fk_bom_history_bom FOREIGN KEY (bom_id) REFERENCES boms(id)
+);
+```
+
+**Indexes**:
+```sql
+CREATE INDEX idx_bom_history_bom_id ON bom_history(bom_id);
+CREATE INDEX idx_bom_history_changed_at ON bom_history(changed_at DESC);
+```
+
+**Business Rules**:
+- History entries are created automatically when BOM status changes from 'draft' to 'active'
+- Changes JSONB contains detailed field-level and item-level changes
+- History entries are immutable (read-only)
+- RLS policies allow authenticated users to read and create history
+
+**Change JSON Structure**:
+```json
+{
+  "bom": {
+    "status": {"old": "draft", "new": "active"},
+    "version": {"old": "1.0", "new": "1.1"}
+  },
+  "items": {
+    "added": [...],
+    "removed": [...],
+    "modified": [...]
+  }
+}
+```
+
+**Used By**:
+- `/bom-history` page - View all BOM changes
+- `BomHistoryModal` - View changes for a specific BOM
+- `CompositeProductModal` - Automatic history creation on status change
 
 ## New Production Tables
 

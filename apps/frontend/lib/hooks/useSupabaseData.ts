@@ -72,7 +72,7 @@ export function useSupabaseWorkOrders() {
   return { data, loading, error };
 }
 
-// Hook to load Purchase Orders from Supabase
+// Hook to load Purchase Orders from Supabase using new schema
 export function useSupabasePurchaseOrders() {
   const [data, setData] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,34 +81,37 @@ export function useSupabasePurchaseOrders() {
   useEffect(() => {
     async function loadData() {
       try {
+        // Use new po_header table
         const { data: pos, error } = await supabase
-          .from('purchase_orders')
+          .from('po_header')
           .select(`
             *,
             supplier:suppliers(*),
-            items:purchase_order_items(*)
+            po_lines:po_line(*, item:products(*))
           `)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
 
+        // Map to PurchaseOrder for backward compatibility
         const mapped: PurchaseOrder[] = (pos || []).map(po => ({
           id: po.id,
-          po_number: po.po_number,
+          po_number: po.number,
           supplier_id: po.supplier_id,
-          warehouse_id: po.warehouse_id,
           status: po.status,
-          request_delivery_date: po.request_delivery_date,
-          expected_delivery_date: po.expected_delivery_date,
-          due_date: po.due_date,
-          order_date: po.request_delivery_date, // Use request_delivery_date as order_date
-          expected_delivery: po.expected_delivery_date, // Use expected_delivery_date as expected_delivery
+          requested_delivery_date: po.requested_delivery_date,
+          promised_delivery_date: po.promised_delivery_date,
+          request_delivery_date: po.requested_delivery_date,
+          expected_delivery_date: po.promised_delivery_date,
+          due_date: po.promised_delivery_date,
+          order_date: po.order_date,
+          expected_delivery: po.promised_delivery_date,
           currency: po.currency || 'USD',
           exchange_rate: po.exchange_rate,
-          total_amount: 0, // TODO: Calculate from items
-          buyer_id: po.buyer_id,
-          buyer_name: po.buyer_name,
-          notes: po.notes,
+          net_total: po.net_total || 0,
+          vat_total: po.vat_total || 0,
+          gross_total: po.gross_total || 0,
+          total_amount: po.gross_total || 0,
           created_at: po.created_at,
           updated_at: po.updated_at,
           supplier: po.supplier ? {
@@ -122,15 +125,17 @@ export function useSupabasePurchaseOrders() {
             created_at: po.supplier.created_at || new Date().toISOString(),
             updated_at: po.supplier.updated_at || new Date().toISOString()
           } : undefined,
-          items: (po.items || []).map((item: any) => ({
-            id: item.id,
-            po_id: item.po_id,
-            product_id: item.product_id,
-            uom: item.uom,
-            quantity_ordered: parseFloat(item.quantity_ordered),
-            quantity_received: parseFloat(item.quantity_received || 0),
-            unit_price: parseFloat(item.unit_price),
-            confirmed: item.confirmed
+          purchase_order_items: (po.po_lines || []).map((line: any) => ({
+            id: line.id,
+            po_id: line.po_id,
+            product_id: line.item_id,
+            item_id: line.item_id,
+            uom: line.uom,
+            quantity: line.qty_ordered,
+            quantity_ordered: parseFloat(line.qty_ordered),
+            quantity_received: parseFloat(line.qty_received || 0),
+            unit_price: parseFloat(line.unit_price),
+            tax_rate: line.vat_rate || 0
           }))
         }));
 
@@ -150,7 +155,7 @@ export function useSupabasePurchaseOrders() {
   return { data, loading, error };
 }
 
-// Hook to load Transfer Orders from Supabase
+// Hook to load Transfer Orders from Supabase using new schema
 export function useSupabaseTransferOrders() {
   const [data, setData] = useState<TransferOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,37 +164,45 @@ export function useSupabaseTransferOrders() {
   useEffect(() => {
     async function loadData() {
       try {
+        // Use new to_header table
         const { data: tos, error } = await supabase
-          .from('transfer_orders')
+          .from('to_header')
           .select(`
             *,
-            from_warehouse:from_warehouse_id(code, name),
-            to_warehouse:to_warehouse_id(code, name),
-            items:transfer_order_items(*)
+            from_warehouse:warehouses!to_header_from_wh_id_fkey(code, name),
+            to_warehouse:warehouses!to_header_to_wh_id_fkey(code, name),
+            to_lines:to_line(*, item:products(*))
           `)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
 
+        // Map to TransferOrder for backward compatibility
         const mapped: TransferOrder[] = (tos || []).map(to => ({
           id: to.id,
-          to_number: to.to_number,
-          from_warehouse_id: to.from_warehouse_id,
-          to_warehouse_id: to.to_warehouse_id,
+          number: to.number,
+          to_number: to.number,
+          from_wh_id: to.from_wh_id,
+          to_wh_id: to.to_wh_id,
+          from_warehouse_id: to.from_wh_id,
+          to_warehouse_id: to.to_wh_id,
           status: to.status,
-          planned_ship_date: to.planned_ship_date,
-          actual_ship_date: to.actual_ship_date,
-          transfer_date: to.planned_ship_date, // Use planned_ship_date as transfer_date
-          planned_receive_date: to.planned_receive_date,
-          actual_receive_date: to.actual_receive_date,
+          requested_date: to.requested_date,
+          planned_ship_date: to.requested_date,
+          transfer_date: to.requested_date,
           created_at: to.created_at,
           updated_at: to.updated_at,
-          items: (to.items || []).map((item: any) => ({
-            id: item.id,
-            to_id: item.to_id,
-            product_id: item.product_id,
-            uom: item.uom,
-            quantity: parseFloat(item.quantity)
+          from_warehouse: to.from_warehouse,
+          to_warehouse: to.to_warehouse,
+          transfer_order_items: (to.to_lines || []).map((line: any) => ({
+            id: line.id,
+            to_id: line.to_id,
+            product_id: line.item_id,
+            item_id: line.item_id,
+            uom: line.uom,
+            quantity: parseFloat(line.qty_planned),
+            quantity_planned: parseFloat(line.qty_planned),
+            quantity_actual: parseFloat(line.qty_moved || 0)
           }))
         }));
 

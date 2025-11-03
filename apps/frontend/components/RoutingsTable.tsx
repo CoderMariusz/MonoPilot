@@ -5,15 +5,31 @@ import { Plus, Edit, Trash2, Eye, EyeOff, Route } from 'lucide-react';
 import { RoutingsAPI } from '@/lib/api/routings';
 import type { Routing } from '@/lib/types';
 import { useToast } from '@/lib/toast';
-import { useRoutings } from '@/lib/clientState';
 import { RoutingBuilder } from './RoutingBuilder';
 
 export function RoutingsTable() {
   const { showToast } = useToast();
-  const { routings, loading } = useRoutings();
+  const [routings, setRoutings] = useState<Routing[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRouting, setEditingRouting] = useState<Routing | null>(null);
+
+  useEffect(() => {
+    async function fetchRoutings() {
+      try {
+        setLoading(true);
+        const data = await RoutingsAPI.getAll();
+        setRoutings(data);
+      } catch (error) {
+        console.error('Error fetching routings:', error);
+        showToast('Failed to load routings', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchRoutings();
+  }, [showToast]);
 
   const handleCreate = () => {
     setEditingRouting(null);
@@ -25,41 +41,35 @@ export function RoutingsTable() {
     setShowEditModal(true);
   };
 
-  const handleDelete = (routing: Routing) => {
+  const handleDelete = async (routing: Routing) => {
     if (confirm(`Are you sure you want to delete "${routing.name}"?`)) {
-      const success = await RoutingsAPI.delete(itemId);
-        setRoutings(prev => prev.filter(item => item.id !== itemId));
-      if (success) {
+      try {
+        await RoutingsAPI.delete(routing.id);
+        setRoutings(prev => prev.filter(item => item.id !== routing.id));
         showToast('Routing deleted successfully', 'success');
-      } else {
+      } catch (error) {
+        console.error('Error deleting routing:', error);
         showToast('Failed to delete routing', 'error');
       }
     }
   };
 
-  const handleSave = (routingData: Omit<Routing, 'id' | 'created_at' | 'updated_at'>) => {
+  const handleSave = async (routingData: Omit<Routing, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       if (editingRouting) {
-        const success = const updatedItem = await RoutingsAPI.update(itemId, itemData);
-        setRoutings(prev => prev.map(item => item.id === itemId ? updatedItem : item));
-        if (success) {
-          showToast('Routing updated successfully', 'success');
-          setShowEditModal(false);
-          setEditingRouting(null);
-        } else {
-          showToast('Failed to update routing', 'error');
-        }
+        const updatedItem = await RoutingsAPI.update(editingRouting.id, routingData);
+        setRoutings(prev => prev.map(item => item.id === editingRouting.id ? updatedItem : item));
+        showToast('Routing updated successfully', 'success');
+        setShowEditModal(false);
+        setEditingRouting(null);
       } else {
-        const success = const newItem = await RoutingsAPI.create(itemData);
+        const newItem = await RoutingsAPI.create(routingData);
         setRoutings(prev => [...prev, newItem]);
-        if (success) {
-          showToast('Routing created successfully', 'success');
-          setShowCreateModal(false);
-        } else {
-          showToast('Failed to create routing', 'error');
-        }
+        showToast('Routing created successfully', 'success');
+        setShowCreateModal(false);
       }
     } catch (error) {
+      console.error('Error saving routing:', error);
       showToast('An error occurred while saving routing', 'error');
     }
   };

@@ -163,6 +163,7 @@ export interface Supplier {
   name: string;
   legal_name?: string;
   vat_number?: string;
+  tax_number?: string;
   country?: string;
   currency?: string;
   payment_terms?: string;
@@ -252,6 +253,7 @@ export interface POCorrection {
 
 // TO Header (replacing TransferOrder)
 export interface TOHeader {
+  transfer_date: any;
   id: number;
   number: string;
   status: TOStatus;
@@ -404,6 +406,8 @@ export interface Product {
   updated_at: string;
   created_by?: string;
   updated_by?: string;
+  boxes_per_pallet?: number;
+  packs_per_box?: number;
   // Remove: category (migrated to group/product_type)
   // Enhanced relationships
   activeBom?: Bom;
@@ -691,6 +695,25 @@ export interface BomItem {
   updated_at: string;
   // Enhanced relationships
   material?: Product;
+}
+
+export interface BomHistory {
+  id: number;
+  bom_id: number;
+  version: string;
+  changed_by?: string;
+  changed_at: string;
+  status_from?: string;
+  status_to?: string;
+  changes: {
+    bom?: Record<string, { old: any; new: any }>;
+    items?: {
+      added?: any[];
+      removed?: any[];
+      modified?: any[];
+    };
+  };
+  description?: string;
 }
 
 // WO Materials interface for BOM snapshot functionality

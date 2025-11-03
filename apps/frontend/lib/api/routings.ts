@@ -40,10 +40,22 @@ export class RoutingsAPI {
       console.warn('Routing operations table not available:', operationsError);
     }
 
-    // Manually join the data
+    // Manually join the data and map to RoutingOperation format
     const routingsWithOperations = (data || []).map(routing => ({
       ...routing,
-      routing_operations: routingOperations.filter(op => op.routing_id === routing.id)
+      operations: routingOperations
+        .filter(op => op.routing_id === routing.id)
+        .map(op => ({
+          id: op.id,
+          routing_id: op.routing_id,
+          seq_no: op.sequence_number,
+          name: op.operation_name,
+          code: op.code || undefined,
+          description: op.description || undefined,
+          requirements: op.requirements || [],
+          created_at: op.created_at,
+          updated_at: op.updated_at,
+        }))
     }));
 
     return routingsWithOperations;
@@ -78,7 +90,17 @@ export class RoutingsAPI {
 
     return {
       ...data,
-      routing_operations: routingOperations
+      operations: routingOperations.map(op => ({
+        id: op.id,
+        routing_id: op.routing_id,
+        seq_no: op.sequence_number,
+        name: op.operation_name,
+        code: op.code || undefined,
+        description: op.description || undefined,
+        requirements: op.requirements || [],
+        created_at: op.created_at,
+        updated_at: op.updated_at,
+      }))
     };
   }
 
@@ -91,7 +113,7 @@ export class RoutingsAPI {
         is_active: data.is_active ?? true,
         notes: data.notes
       })
-      .select()
+      .select('*')
       .single();
 
     if (routingError) {
@@ -103,23 +125,46 @@ export class RoutingsAPI {
     if (data.operations && data.operations.length > 0) {
       const operations = data.operations.map(op => ({
         routing_id: routing.id,
-        seq_no: op.seq_no,
-        name: op.name,
-        code: op.code,
-        description: op.description
+        sequence_number: op.seq_no,
+        operation_name: op.name,
+        code: op.code || null,
+        description: op.description || null,
+        requirements: op.requirements && op.requirements.length > 0 ? op.requirements : []
       }));
 
-      const { error: operationsError } = await supabase
+      const { error: operationsError, data: insertedOperations } = await supabase
         .from('routing_operations')
-        .insert(operations);
+        .insert(operations)
+        .select();
 
       if (operationsError) {
         console.error('Error creating routing operations:', operationsError);
-        // Don't throw here, routing was created successfully
+        throw new Error(`Failed to create routing operations: ${operationsError.message}`);
       }
+
+      // Map inserted operations to RoutingOperation format
+      const mappedOperations = (insertedOperations || []).map(op => ({
+        id: op.id,
+        routing_id: op.routing_id,
+        seq_no: op.sequence_number,
+        name: op.operation_name,
+        code: op.code || undefined,
+        description: op.description || undefined,
+        requirements: op.requirements || [],
+        created_at: op.created_at,
+        updated_at: op.updated_at,
+      }));
+
+      return {
+        ...routing,
+        operations: mappedOperations
+      };
     }
 
-    return routing;
+    return {
+      ...routing,
+      operations: []
+    };
   }
 
   static async update(id: number, data: Partial<Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'>>): Promise<Routing> {

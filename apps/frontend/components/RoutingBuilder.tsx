@@ -96,6 +96,11 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
       return;
     }
 
+    if (operations.length === 0) {
+      alert('Routing must have at least one operation');
+      return;
+    }
+
     if (operations.some(op => !op.name.trim())) {
       alert('Please fill in all operation names');
       return;
@@ -103,12 +108,11 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
 
     onSave({
       ...formData,
-      operations: operations.map(op => ({
-        ...op,
-        id: (op as any).id || Date.now() + Math.random(),
-        routing_id: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+      operations: operations.map((op, index) => ({
+        seq_no: index + 1, // Auto-numeruj: 1, 2, 3...
+        name: op.name,
+        code: op.code,
+        description: op.description,
         requirements: op.requirements || [],
       })),
     });

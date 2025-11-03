@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import { LocationsAPI } from '@/lib/api/locations';
-import type { Location } from '@/lib/types';
+import { WarehousesAPI } from '@/lib/api/warehouses';
+import type { Location, Warehouse } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 
 export function LocationsTable() {
   const [locations, setLocations] = useState<Location[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const { showToast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,27 +17,30 @@ export function LocationsTable() {
   const [formData, setFormData] = useState({
     code: '',
     name: '',
-    type: '',
-    zone: '',
+    warehouse_id: '',
     is_active: true,
   });
 
-  // Fetch locations on component mount
+  // Fetch locations and warehouses on component mount
   useEffect(() => {
-    async function fetchLocations() {
+    async function fetchData() {
       try {
         setLoading(true);
-        const data = await LocationsAPI.getAll();
-        setLocations(data);
+        const [locationsData, warehousesData] = await Promise.all([
+          LocationsAPI.getAll(),
+          WarehousesAPI.getAll(),
+        ]);
+        setLocations(locationsData);
+        setWarehouses(warehousesData);
       } catch (error) {
-        console.error('Error fetching locations:', error);
-        showToast('Failed to fetch locations', 'error');
+        console.error('Error fetching data:', error);
+        showToast('Failed to fetch data', 'error');
       } finally {
         setLoading(false);
       }
     }
 
-    fetchLocations();
+    fetchData();
   }, [showToast]);
 
   const handleAdd = () => {
@@ -43,8 +48,7 @@ export function LocationsTable() {
     setFormData({
       code: '',
       name: '',
-      type: '',
-      zone: '',
+      warehouse_id: '',
       is_active: true,
     });
     setIsModalOpen(true);
@@ -55,8 +59,7 @@ export function LocationsTable() {
     setFormData({
       code: location.code,
       name: location.name,
-      type: location.type,
-      zone: location.zone || '',
+      warehouse_id: location.warehouse_id?.toString() || '',
       is_active: location.is_active,
     });
     setIsModalOpen(true);
@@ -78,12 +81,15 @@ export function LocationsTable() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.warehouse_id) {
+      showToast('Warehouse is required', 'error');
+      return;
+    }
+
     const locationData = {
       code: formData.code,
       name: formData.name,
-      type: formData.type,
-      warehouse_id: 1, // Default warehouse ID
-      zone: formData.zone || null,
+      warehouse_id: parseInt(formData.warehouse_id),
       is_active: formData.is_active,
     };
 
@@ -102,8 +108,7 @@ export function LocationsTable() {
       setFormData({
         code: '',
         name: '',
-        type: '',
-        zone: '',
+        warehouse_id: '',
         is_active: true,
       });
     } catch (error) {
@@ -130,7 +135,7 @@ export function LocationsTable() {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Code</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Zone</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Warehouse</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
             </tr>
@@ -149,36 +154,39 @@ export function LocationsTable() {
                 </td>
               </tr>
             ) : (
-              locations.map((location) => (
-                <tr key={location.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{location.code}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{location.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{location.zone || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      location.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {location.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEdit(location)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(location.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              locations.map((location) => {
+                const warehouse = warehouses.find(w => w.id === location.warehouse_id);
+                return (
+                  <tr key={location.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{location.code}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{location.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{warehouse?.name || '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        location.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {location.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEdit(location)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(location.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -213,23 +221,24 @@ export function LocationsTable() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-                  <input
-                    type="text"
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Warehouse <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.warehouse_id}
+                    onChange={(e) => setFormData({ ...formData, warehouse_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Zone</label>
-                  <input
-                    type="text"
-                    value={formData.zone}
-                    onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  >
+                    <option value="">Select Warehouse</option>
+                    {warehouses
+                      .filter(w => w.is_active)
+                      .map(w => (
+                        <option key={w.id} value={w.id}>
+                          {w.code} - {w.name}
+                        </option>
+                      ))}
+                  </select>
                 </div>
                 <div className="flex items-center">
                   <input

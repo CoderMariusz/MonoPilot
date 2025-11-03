@@ -7,7 +7,8 @@ import type { TaxCode } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 
 export function TaxCodesTable() {
-  const [taxcodes, setTaxCodes] = useState([]);
+  const { showToast } = useToast();
+  const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Fetch data on component mount
@@ -26,7 +27,7 @@ export function TaxCodesTable() {
     }
 
     fetchData();
-  }, [showToast]);const { showToast } = useToast();
+  }, [showToast]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTaxCode, setEditingTaxCode] = useState<TaxCode | null>(null);
   const [formData, setFormData] = useState({
@@ -58,17 +59,20 @@ export function TaxCodesTable() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this tax code?')) {
-      const success = await TaxCodesAPI.delete(itemId);
-        setTaxCodes(prev => prev.filter(item => item.id !== itemId));
-      if (success) {
+      try {
+        await TaxCodesAPI.delete(id);
+        setTaxCodes(prev => prev.filter(item => item.id !== id));
         showToast('Tax code deleted successfully', 'success');
+      } catch (error) {
+        console.error('Error deleting tax code:', error);
+        showToast('Failed to delete tax code', 'error');
       }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.code.trim() || !formData.name.trim() || !formData.rate.trim()) {
@@ -84,33 +88,34 @@ export function TaxCodesTable() {
 
     try {
       if (editingTaxCode) {
-        const success = updateTaxCode(editingTaxCode.id, {
+        const updatedItem = await TaxCodesAPI.update(editingTaxCode.id, {
           code: formData.code.trim(),
           name: formData.name.trim(),
           rate: rate,
           is_active: formData.is_active,
         });
-        
-        if (success) {
-          showToast('Tax code updated successfully', 'success');
-          setIsModalOpen(false);
-        }
+        setTaxCodes(prev => prev.map(item => item.id === editingTaxCode.id ? updatedItem : item));
+        showToast('Tax code updated successfully', 'success');
       } else {
-        const success = addTaxCode({
+        const newItem = await TaxCodesAPI.create({
           code: formData.code.trim(),
           name: formData.name.trim(),
           rate: rate,
           is_active: formData.is_active,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         });
-        
-        if (success) {
-          showToast('Tax code created successfully', 'success');
-          setIsModalOpen(false);
-        }
+        setTaxCodes(prev => [...prev, newItem]);
+        showToast('Tax code created successfully', 'success');
       }
+      
+      setIsModalOpen(false);
+      setFormData({
+        code: '',
+        name: '',
+        rate: '',
+        is_active: true,
+      });
     } catch (error) {
+      console.error('Error saving tax code:', error);
       showToast('Failed to save tax code', 'error');
     }
   };

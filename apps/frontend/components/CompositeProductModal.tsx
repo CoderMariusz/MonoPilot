@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase/client-browser';
 import { toast } from '@/lib/toast';
 import ProductSelect from '@/components/ProductSelect';
 import AllergenChips from '@/components/AllergenChips';
+import { BomHistoryAPI } from '@/lib/api/bomHistory';
+import { BomHistoryModal } from '@/components/BomHistoryModal';
 
 interface Props {
   isOpen: boolean;
@@ -17,11 +19,13 @@ interface Props {
 export default function CompositeProductModal({ isOpen, onClose, onSuccess, product: editingProduct }: Props) {
   const [product, setProduct] = useState<Partial<ProductInsert>>({ product_group: 'COMPOSITE', uom: 'ea' });
   const [bomStatus, setBomStatus] = useState<'draft' | 'active' | 'archived'>('draft');
+  const [initialBomStatus, setInitialBomStatus] = useState<'draft' | 'active' | 'archived' | null>(null);
   const [bomVersion, setBomVersion] = useState<string>('1.0');
   const [currentBomId, setCurrentBomId] = useState<number | null>(null);
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [newVersionNumber, setNewVersionNumber] = useState<string>('');
   const [items, setItems] = useState<BomItemInput[]>([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   
   // Store initial state for change detection
   const [initialProduct, setInitialProduct] = useState<Partial<ProductInsert>>({});
@@ -177,7 +181,9 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           console.log('Found BOM:', bom);
           setCurrentBomId(bom.id);
           setBomVersion(bom.version);
-          setBomStatus(bom.status as 'draft' | 'active' | 'archived');
+          const status = bom.status as 'draft' | 'active' | 'archived';
+          setBomStatus(status);
+          setInitialBomStatus(status);
           
           // Load BOM items with material details
           const { data: bomItemsData, error: bomItemsError } = await supabase
@@ -402,6 +408,8 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           production_lines: product.production_lines ?? [],
           preferred_supplier_id: product.preferred_supplier_id ?? null,
           tax_code_id: product.tax_code_id ?? null,
+          packs_per_box: (product as any).packs_per_box ?? null,
+          boxes_per_pallet: (product as any).boxes_per_pallet ?? null,
           lead_time_days: product.lead_time_days ?? null,
           moq: product.moq ?? null,
         },
@@ -409,10 +417,15 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
         items,
       };
       if (editingProduct) {
-        // Update existing product
+        // Update existing product (including packaging fields)
+        const productUpdate: any = {
+          ...payload.product,
+          packs_per_box: (product as any).packs_per_box ?? null,
+          boxes_per_pallet: (product as any).boxes_per_pallet ?? null,
+        };
         const { error: updateError } = await supabase
           .from('products')
-          .update(payload.product)
+          .update(productUpdate)
           .eq('id', editingProduct.id);
         
         if (updateError) throw updateError;
@@ -437,6 +450,19 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
         if (existingBoms && existingBoms.length > 0) {
           const bomId = existingBoms[0].id;
           
+          // Fetch old BOM data for comparison
+          const { data: oldBomData } = await supabase
+            .from('boms')
+            .select('status, version, notes, effective_from, effective_to, default_routing_id')
+            .eq('id', bomId)
+            .single();
+          
+          const { data: oldBomItems } = await supabase
+            .from('bom_items')
+            .select('*')
+            .eq('bom_id', bomId)
+            .order('sequence');
+          
           // Detect changes and get new version
           const newVersion = getNewVersion();
           const hasChanges = newVersion !== bomVersion;
@@ -451,6 +477,100 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               version: newVersion
             })
             .eq('id', bomId);
+          
+          // Track changes if status changed from draft to active
+          if (initialBomStatus === 'draft' && bomStatus === 'active') {
+            try {
+              const changes: any = {
+                bom: {},
+                items: {
+                  added: [],
+                  removed: [],
+                  modified: []
+                }
+              };
+              
+              // Compare BOM header fields
+              if (oldBomData) {
+                // Status always changes in this case (draft -> active)
+                changes.bom.status = { old: oldBomData.status, new: bomStatus };
+                
+                // Version may have changed
+                if (oldBomData.version !== newVersion) {
+                  changes.bom.version = { old: oldBomData.version, new: newVersion };
+                }
+                
+                // Note: notes, effective_from, effective_to, default_routing_id are not updated in this flow
+                // but we could add them to comparison if needed in the future
+              }
+              
+              // Compare BOM items
+              const oldItemsMap = new Map((oldBomItems || []).map((item: any) => [item.material_id, item]));
+              const newItemsMap = new Map(items.map(item => [item.material_id!, item]));
+              
+              // Find added items
+              items.forEach(item => {
+                if (!oldItemsMap.has(item.material_id!)) {
+                  changes.items.added.push({
+                    material_id: item.material_id,
+                    quantity: item.quantity,
+                    uom: item.uom,
+                    sequence: item.sequence
+                  });
+                }
+              });
+              
+              // Find removed items
+              (oldBomItems || []).forEach((oldItem: any) => {
+                if (!newItemsMap.has(oldItem.material_id)) {
+                  changes.items.removed.push({
+                    id: oldItem.id,
+                    material_id: oldItem.material_id,
+                    quantity: oldItem.quantity
+                  });
+                }
+              });
+              
+              // Find modified items
+              items.forEach(newItem => {
+                const oldItem = oldItemsMap.get(newItem.material_id!);
+                if (oldItem) {
+                  const itemChanges: any = {};
+                  const fieldsToCompare = ['quantity', 'uom', 'sequence', 'priority', 'scrap_std_pct', 'is_optional', 'is_phantom', 'consume_whole_lp', 'unit_cost_std'];
+                  
+                  fieldsToCompare.forEach(field => {
+                    if (oldItem[field] !== newItem[field as keyof BomItemInput]) {
+                      itemChanges[field] = {
+                        old: oldItem[field],
+                        new: newItem[field as keyof BomItemInput]
+                      };
+                    }
+                  });
+                  
+                  if (Object.keys(itemChanges).length > 0) {
+                    changes.items.modified.push({
+                      id: oldItem.id,
+                      material_id: newItem.material_id,
+                      changes: itemChanges
+                    });
+                  }
+                }
+              });
+              
+              // Create history entry
+              await BomHistoryAPI.create({
+                bom_id: bomId,
+                version: newVersion,
+                status_from: initialBomStatus || 'draft',
+                status_to: bomStatus,
+                changes,
+                description: `BOM status changed from ${initialBomStatus} to ${bomStatus}. Version updated to ${newVersion}.`
+              });
+            } catch (historyError) {
+              console.error('Failed to create BOM history:', historyError);
+              // Don't block save if history creation fails
+            }
+          }
           
           // Update product is_active based on BOM status
           const isActive = bomStatus === 'active';
@@ -633,6 +753,47 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
             />
           </div>
+          
+          {/* Packaging fields - only for Finished Goods */}
+          {(product.product_type === 'FG' || editingProduct?.product_type === 'FG') && (
+            <>
+              <div className="col-span-3">
+                <h4 className="text-sm font-semibold text-slate-900 mb-2">Packaging</h4>
+                <p className="text-xs text-slate-600 mb-3">
+                  Packaging hierarchy: Unit → Pack → Box (packs_per_box) → Pallet (boxes_per_pallet)
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Packs per Box <span className="text-slate-400">(packs_per_box)</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={(product as any).packs_per_box ?? ''}
+                  onChange={e => setProduct(p => ({ ...p, packs_per_box: e.target.value ? Number(e.target.value) : null }))}
+                  className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
+                  placeholder="e.g., 12"
+                />
+                <p className="text-xs text-slate-500 mt-1">Number of packs (units) that fit in one box</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Boxes per Pallet <span className="text-slate-400">(boxes_per_pallet)</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={(product as any).boxes_per_pallet ?? ''}
+                  onChange={e => setProduct(p => ({ ...p, boxes_per_pallet: e.target.value ? Number(e.target.value) : null }))}
+                  className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
+                  placeholder="e.g., 60"
+                />
+                <p className="text-xs text-slate-500 mt-1">Number of boxes that fit on one pallet</p>
+              </div>
+            </>
+          )}
+          
             <div className="col-span-3">
               <label className="block text-sm font-medium text-slate-700 mb-1">Allergens</label>
               {loadingData ? (
@@ -723,6 +884,14 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
                     >
                       Change Version
                     </button>
+                    {currentBomId && (
+                      <button
+                        onClick={() => setShowHistoryModal(true)}
+                        className="px-3 py-1.5 bg-purple-100 text-purple-800 rounded text-xs font-medium hover:bg-purple-200"
+                      >
+                        View History
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -841,6 +1010,14 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           </button>
         </div>
       </div>
+      
+      {currentBomId && (
+        <BomHistoryModal
+          isOpen={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          bomId={currentBomId}
+        />
+      )}
     </div>
   );
 }

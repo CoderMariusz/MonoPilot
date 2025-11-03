@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, Eye, EyeOff, Package } from 'lucide-react';
 import { SuppliersAPI } from '@/lib/api/suppliers';
 import type { Supplier, Product, TaxCode, SupplierProduct } from '@/lib/types';
 import { SupplierProductsModal } from './SupplierProductsModal';
+import { SupplierModal } from './SupplierModal';
 import { useToast } from '@/lib/toast';
 import { useProducts, useTaxCodes } from '@/lib/clientState';
 
@@ -54,16 +55,42 @@ export function SuppliersTable() {
     try {
       await SuppliersAPI.delete(supplier.id);
       setSuppliers(prev => prev.filter(s => s.id !== supplier.id));
+      showToast('Supplier deleted successfully', 'success');
     } catch (error) {
       console.error('Error deleting supplier:', error);
+      showToast('Failed to delete supplier', 'error');
     }
   };
 
-  const handleManageProducts = (supplier: Supplier) => {
+  const handleEdit = (supplier: Supplier) => {
+    setEditingSupplier(supplier);
+  };
+
+  const handleCreateSuccess = () => {
+    const loadSuppliers = async () => {
+      try {
+        const data = await SuppliersAPI.getAll();
+        setSuppliers(data);
+      } catch (error) {
+        console.error('Error loading suppliers:', error);
+        showToast('Failed to load suppliers', 'error');
+      }
+    };
+    loadSuppliers();
+  };
+
+  const handleManageProducts = async (supplier: Supplier) => {
     setSelectedSupplier(supplier);
+    try {
+      const { SupplierProductsAPI } = await import('@/lib/api/supplierProducts');
+      const products = await SupplierProductsAPI.getBySupplier(supplier.id);
+      setSupplierProducts(products);
+    } catch (error) {
+      console.error('Failed to load supplier products:', error);
+      showToast('Failed to load supplier products', 'error');
+      setSupplierProducts([]);
+    }
     setShowProductsModal(true);
-    // TODO: Load supplier products for this supplier
-    setSupplierProducts([]);
   };
 
   if (loading) {
@@ -207,51 +234,15 @@ export function SuppliersTable() {
       </div>
 
       {/* TODO: Add CreateSupplierModal and EditSupplierModal components */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Create Supplier</h3>
-            <p className="text-slate-600 mb-4">Create supplier modal will be implemented here.</p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-slate-600 hover:text-slate-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg"
-              >
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingSupplier && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Edit Supplier</h3>
-            <p className="text-slate-600 mb-4">Edit supplier modal will be implemented here.</p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setEditingSupplier(null)}
-                className="px-4 py-2 text-slate-600 hover:text-slate-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setEditingSupplier(null)}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SupplierModal
+        isOpen={showCreateModal || !!editingSupplier}
+        onClose={() => {
+          setShowCreateModal(false);
+          setEditingSupplier(null);
+        }}
+        supplier={editingSupplier}
+        onSuccess={handleCreateSuccess}
+      />
 
       {/* Supplier Products Modal */}
       {showProductsModal && selectedSupplier && (
@@ -264,9 +255,69 @@ export function SuppliersTable() {
             setShowProductsModal(false);
             setSelectedSupplier(null);
           }}
-          onSave={(products) => {
-            setSupplierProducts(products);
-            // TODO: Save to backend
+          onSave={async (products) => {
+            try {
+              const { SupplierProductsAPI } = await import('@/lib/api/supplierProducts');
+              
+              // Get original products to compare
+              const originalIds = new Set(supplierProducts.map(p => p.id));
+              const currentIds = new Set(products.map(p => p.id));
+              
+              // Find products to delete (in original but not in current)
+              const toDelete = supplierProducts.filter(p => !currentIds.has(p.id) && p.id > 0);
+              for (const product of toDelete) {
+                await SupplierProductsAPI.delete(product.id);
+              }
+              
+              // Find products to create (negative IDs or not in original)
+              const toCreate = products.filter(p => p.id < 0 || !originalIds.has(p.id));
+              for (const product of toCreate) {
+                await SupplierProductsAPI.create({
+                  supplier_id: product.supplier_id,
+                  product_id: product.product_id,
+                  supplier_sku: product.supplier_sku,
+                  lead_time_days: product.lead_time_days,
+                  moq: product.moq,
+                  price_excl_tax: product.price_excl_tax,
+                  tax_code_id: product.tax_code_id,
+                  currency: product.currency,
+                  is_active: product.is_active ?? true,
+                });
+              }
+              
+              // Find products to update (positive IDs that exist in both)
+              const toUpdate = products.filter(p => p.id > 0 && originalIds.has(p.id));
+              for (const product of toUpdate) {
+                const original = supplierProducts.find(op => op.id === product.id);
+                if (original && (
+                  original.supplier_sku !== product.supplier_sku ||
+                  original.lead_time_days !== product.lead_time_days ||
+                  original.moq !== product.moq ||
+                  original.price_excl_tax !== product.price_excl_tax ||
+                  original.tax_code_id !== product.tax_code_id ||
+                  original.currency !== product.currency ||
+                  original.is_active !== product.is_active
+                )) {
+                  await SupplierProductsAPI.update(product.id, {
+                    supplier_sku: product.supplier_sku,
+                    lead_time_days: product.lead_time_days,
+                    moq: product.moq,
+                    price_excl_tax: product.price_excl_tax,
+                    tax_code_id: product.tax_code_id,
+                    currency: product.currency,
+                    is_active: product.is_active ?? true,
+                  });
+                }
+              }
+              
+              // Reload products from backend
+              const updatedProducts = await SupplierProductsAPI.getBySupplier(selectedSupplier!.id);
+              setSupplierProducts(updatedProducts);
+              showToast('Supplier products saved successfully', 'success');
+            } catch (error) {
+              console.error('Failed to save supplier products:', error);
+              showToast('Failed to save supplier products', 'error');
+            }
           }}
         />
       )}
