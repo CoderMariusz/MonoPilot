@@ -207,10 +207,6 @@ class ClientState {
     return [...this.taxCodes];
   }
 
-  getRoutings(): Routing[] {
-    return [...this.routings];
-  }
-
   getProductAllergens(): ProductAllergen[] {
     return [...this.productAllergens];
   }
@@ -387,6 +383,14 @@ class ClientState {
 
   private notifyRoutingListeners() {
     this.routingListeners.forEach(listener => listener());
+  }
+
+  private notifySupplierListeners() {
+    this.supplierListeners.forEach(listener => listener());
+  }
+
+  private notifyWarehouseListeners() {
+    this.warehouseListeners.forEach(listener => listener());
   }
 
   addWorkOrder(workOrder: Omit<WorkOrder, 'id' | 'created_at' | 'updated_at'>): WorkOrder {
@@ -630,21 +634,19 @@ class ClientState {
   }
 
   async addProduct(product: any): Promise<Product> {
-    // Use real API
-    const createdProduct = await ProductsAPI.create(product);
-    // Refresh products list
+    // TODO: Implement product creation using createSingle or createComposite API
+    // For now, refresh products list to keep state in sync
     this.products = await ProductsAPI.getAll();
     this.notifyProductListeners();
-    return createdProduct;
+    throw new Error('Product creation not yet implemented - use createSingle or createComposite API directly');
   }
 
   async updateProduct(id: number, updates: any): Promise<Product | null> {
-    // Use real API
-    const updatedProduct = await ProductsAPI.update(id, updates);
-    // Refresh products list
+    // TODO: Implement product update API
+    // For now, refresh products list to keep state in sync
     this.products = await ProductsAPI.getAll();
     this.notifyProductListeners();
-    return updatedProduct;
+    throw new Error('Product update not yet implemented - use direct Supabase API');
   }
 
   deleteProduct(id: number): boolean {
@@ -995,6 +997,94 @@ class ClientState {
     this.allergens = this.allergens.filter(a => a.id !== id);
     if (this.allergens.length < initialLength) {
       this.notifyAllergenListeners();
+      return true;
+    }
+    return false;
+  }
+
+  // Supplier methods
+  addSupplier(supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>): Supplier {
+    const newSupplier: Supplier = {
+      ...supplier,
+      id: Math.max(...this.suppliers.map(s => s.id), 0) + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.suppliers = [...this.suppliers, newSupplier];
+    this.notifySupplierListeners();
+    return newSupplier;
+  }
+
+  updateSupplier(id: number, updates: Partial<Supplier>): Supplier | null {
+    const index = this.suppliers.findIndex(s => s.id === id);
+    if (index === -1) return null;
+
+    const updatedSupplier: Supplier = {
+      ...this.suppliers[index],
+      ...updates,
+      id: this.suppliers[index].id,
+      updated_at: new Date().toISOString(),
+    };
+    
+    this.suppliers = [
+      ...this.suppliers.slice(0, index),
+      updatedSupplier,
+      ...this.suppliers.slice(index + 1),
+    ];
+    
+    this.notifySupplierListeners();
+    return updatedSupplier;
+  }
+
+  deleteSupplier(id: number): boolean {
+    const initialLength = this.suppliers.length;
+    this.suppliers = this.suppliers.filter(s => s.id !== id);
+    if (this.suppliers.length < initialLength) {
+      this.notifySupplierListeners();
+      return true;
+    }
+    return false;
+  }
+
+  // Warehouse methods
+  addWarehouse(warehouse: Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>): Warehouse {
+    const newWarehouse: Warehouse = {
+      ...warehouse,
+      id: Math.max(...this.warehouses.map(w => w.id), 0) + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.warehouses = [...this.warehouses, newWarehouse];
+    this.notifyWarehouseListeners();
+    return newWarehouse;
+  }
+
+  updateWarehouse(id: number, updates: Partial<Warehouse>): Warehouse | null {
+    const index = this.warehouses.findIndex(w => w.id === id);
+    if (index === -1) return null;
+
+    const updatedWarehouse: Warehouse = {
+      ...this.warehouses[index],
+      ...updates,
+      id: this.warehouses[index].id,
+      updated_at: new Date().toISOString(),
+    };
+    
+    this.warehouses = [
+      ...this.warehouses.slice(0, index),
+      updatedWarehouse,
+      ...this.warehouses.slice(index + 1),
+    ];
+    
+    this.notifyWarehouseListeners();
+    return updatedWarehouse;
+  }
+
+  deleteWarehouse(id: number): boolean {
+    const initialLength = this.warehouses.length;
+    this.warehouses = this.warehouses.filter(w => w.id !== id);
+    if (this.warehouses.length < initialLength) {
+      this.notifyWarehouseListeners();
       return true;
     }
     return false;
@@ -1374,11 +1464,11 @@ export function deleteTransferOrder(id: number): boolean {
   return clientState.deleteTransferOrder(id);
 }
 
-export function addProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Product {
+export async function addProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Promise<Product> {
   return clientState.addProduct(product);
 }
 
-export function updateProduct(id: number, updates: Partial<Product>): Product | null {
+export async function updateProduct(id: number, updates: Partial<Product>): Promise<Product | null> {
   return clientState.updateProduct(id, updates);
 }
 
@@ -1720,6 +1810,30 @@ export function updateRouting(id: number, updates: Partial<Routing>): Routing | 
 
 export function deleteRouting(id: number): boolean {
   return clientState.deleteRouting(id);
+}
+
+export function addSupplier(supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>): Supplier {
+  return clientState.addSupplier(supplier);
+}
+
+export function updateSupplier(id: number, updates: Partial<Supplier>): Supplier | null {
+  return clientState.updateSupplier(id, updates);
+}
+
+export function deleteSupplier(id: number): boolean {
+  return clientState.deleteSupplier(id);
+}
+
+export function addWarehouse(warehouse: Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>): Warehouse {
+  return clientState.addWarehouse(warehouse);
+}
+
+export function updateWarehouse(id: number, updates: Partial<Warehouse>): Warehouse | null {
+  return clientState.updateWarehouse(id, updates);
+}
+
+export function deleteWarehouse(id: number): boolean {
+  return clientState.deleteWarehouse(id);
 }
 
 export function saveOrderProgress(woId: number, progress: OrderProgress): void {

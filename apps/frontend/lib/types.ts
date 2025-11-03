@@ -184,8 +184,8 @@ export type UpdateSupplierData = Partial<CreateSupplierData>;
 
 // Phase 1 Planning Types - Updated for new schema
 
-export type POStatus = 'draft' | 'approved' | 'closed';
-export type TOStatus = 'draft' | 'approved' | 'closed';
+export type POStatus = 'draft' | 'approved' | 'closed' | 'cancelled';
+export type TOStatus = 'draft' | 'approved' | 'closed' | 'cancelled' | 'sent' | 'in_transit' | 'received';
 
 // PO Header (replacing PurchaseOrder)
 export interface POHeader {
@@ -306,7 +306,7 @@ export interface AuditLogEntry {
 }
 
 // Legacy types for backward compatibility (deprecated)
-export type PurchaseOrderStatus = POStatus;
+export type PurchaseOrderStatus = 'draft' | 'sent' | 'confirmed' | 'partially_received' | 'received' | 'cancelled' | 'submitted' | 'closed';
 export interface PurchaseOrder extends POHeader {
   po_number: string;
   expected_delivery: string;
@@ -357,12 +357,23 @@ export interface Warehouse {
 export type CreateWarehouseData = Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>;
 export type UpdateWarehouseData = Partial<CreateWarehouseData>;
 
+// TransferOrderStatus type for legacy TransferOrder
+export type TransferOrderStatus = 'draft' | 'sent' | 'in_transit' | 'received' | 'cancelled';
+
 // Legacy TransferOrder for backward compatibility (deprecated)
-export interface TransferOrder extends TOHeader {
+export interface TransferOrder {
+  id: number;
   to_number: string;
+  from_warehouse_id: number;
+  to_warehouse_id: number;
+  status: TransferOrderStatus;
   transfer_date: string;
   notes?: string;
+  from_warehouse?: Warehouse;
+  to_warehouse?: Warehouse;
   transfer_order_items?: any[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ProductionOutput {

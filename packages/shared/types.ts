@@ -160,6 +160,7 @@ export interface Supplier {
   name: string;
   legal_name?: string;
   vat_number?: string;
+  tax_number?: string;
   country?: string;
   currency?: string;
   payment_terms?: string;
@@ -240,12 +241,14 @@ export interface Warehouse {
 export type CreateWarehouseData = Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>;
 export type UpdateWarehouseData = Partial<CreateWarehouseData>;
 
+export type TransferOrderStatus = 'draft' | 'sent' | 'in_transit' | 'received' | 'cancelled';
+
 export interface TransferOrder {
   id: number;
   to_number: string;
   from_warehouse_id: number;
   to_warehouse_id: number;
-  status: string;
+  status: TransferOrderStatus;
   transfer_date: string;
   notes?: string;
   from_warehouse?: Warehouse;
