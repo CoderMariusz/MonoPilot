@@ -27,7 +27,7 @@ CREATE TABLE products (
   product_type TEXT CHECK (product_type IN ('RM_MEAT', 'PR', 'FG', 'DG_ING', 'DG_LABEL', 'DG_WEB', 'DG_BOX', 'DG_SAUCE')),
   
   -- Planning & commercial
-  preferred_supplier_id INTEGER REFERENCES suppliers(id),
+  supplier_id INTEGER REFERENCES suppliers(id),
   tax_code_id INTEGER REFERENCES settings_tax_codes(id),
   lead_time_days INTEGER,
   moq DECIMAL(10,4),

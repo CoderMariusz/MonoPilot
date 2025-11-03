@@ -89,7 +89,7 @@ I want to add expiry_date field to products table.
 Context:
 - Table: products - Product catalog management
 - Current Fields: id, part_number, description, type, uom, is_active, product_group, product_type
-- Relationships: preferred_supplier_id → suppliers, tax_code_id → settings_tax_codes
+- Relationships: supplier_id → suppliers, tax_code_id → settings_tax_codes
 - Used By Pages: /technical/bom, /production, /planning, /warehouse
 - Used By APIs: ProductsAPI, WorkOrdersAPI, PurchaseOrdersAPI, GRNsAPI
 - Used By Components: ProductsTable, AddItemModal, BomCatalogClient

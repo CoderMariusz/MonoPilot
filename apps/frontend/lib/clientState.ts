@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress, BomItem, ProductionOutput, Supplier, Warehouse, TaxCode, SupplierProduct, Routing, ProductAllergen } from './types';
+import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate, StockMove, User, Session, Settings, YieldReportDetail, Location, Machine, Allergen, OrderProgress, BomItem, ProductionOutput, Supplier, Warehouse, TaxCode, Routing, ProductAllergen } from './types';
 import { ProductsAPI } from './api/products';
 import { RoutingsAPI } from './api/routings';
 
@@ -39,7 +39,6 @@ class ClientState {
   private suppliers: Supplier[] = [];
   private warehouses: Warehouse[] = [];
   private taxCodes: TaxCode[] = [];
-  private supplierProducts: SupplierProduct[] = [];
   private routings: Routing[] = [];
   private productAllergens: ProductAllergen[] = [];
   private productionOutputs: ProductionOutput[] = [];
@@ -63,7 +62,6 @@ class ClientState {
   private supplierListeners: Listener[] = [];
   private warehouseListeners: Listener[] = [];
   private taxCodeListeners: Listener[] = [];
-  private supplierProductListeners: Listener[] = [];
   private routingListeners: Listener[] = [];
   private productAllergenListeners: Listener[] = [];
 
@@ -107,35 +105,11 @@ class ClientState {
   }
 
   resolveDefaultUnitPrice(productId: number, supplierId?: number): number {
-    // Priority 1: Check supplier_products pricing (for specific supplier + product)
-    if (supplierId) {
-      const supplierProduct = this.supplierProducts.find(sp => 
-        sp.supplier_id === supplierId && 
-        sp.product_id === productId && 
-        sp.is_active && 
-        sp.price_excl_tax
-      );
-      if (supplierProduct?.price_excl_tax) return supplierProduct.price_excl_tax;
-    }
-    
-    // Priority 2: Check any active supplier_products for this product
-    const anySupplierProduct = this.supplierProducts.find(sp => 
-      sp.product_id === productId && 
-      sp.is_active && 
-      sp.price_excl_tax
-    );
-    if (anySupplierProduct?.price_excl_tax) return anySupplierProduct.price_excl_tax;
-    
-    // Priority 3: Try BOM standard cost
-    for (const bomItems of Object.values(mockBomItems)) {
-      const item = bomItems.find(bi => bi.material_id === productId);
-      if (item?.unit_cost_std) return item.unit_cost_std;
-    }
-    
-    // Priority 4: Fallback to product std_price
+    // Check product's std_price
     const product = this.products.find(p => p.id === productId);
     if (product?.std_price) return product.std_price;
     
+    // No price found - return 0
     return 0;
   }
 
@@ -231,10 +205,6 @@ class ClientState {
 
   getTaxCodes(): TaxCode[] {
     return [...this.taxCodes];
-  }
-
-  getSupplierProducts(): SupplierProduct[] {
-    return [...this.supplierProducts];
   }
 
   getRoutings(): Routing[] {
@@ -354,13 +324,6 @@ class ClientState {
     this.taxCodeListeners.push(listener);
     return () => {
       this.taxCodeListeners = this.taxCodeListeners.filter(l => l !== listener);
-    };
-  }
-
-  subscribeToSupplierProducts(listener: Listener): () => void {
-    this.supplierProductListeners.push(listener);
-    return () => {
-      this.supplierProductListeners = this.supplierProductListeners.filter(l => l !== listener);
     };
   }
 
@@ -1650,19 +1613,6 @@ export function useTaxCodes() {
   }, []);
 
   return taxCodes;
-}
-
-export function useSupplierProducts() {
-  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>(clientState.getSupplierProducts());
-
-  useEffect(() => {
-    const unsubscribe = clientState.subscribeToSupplierProducts(() => {
-      setSupplierProducts(clientState.getSupplierProducts());
-    });
-    return unsubscribe;
-  }, []);
-
-  return supplierProducts;
 }
 
 export function useRoutings() {

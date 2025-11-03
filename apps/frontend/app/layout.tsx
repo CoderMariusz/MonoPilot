@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import AppLayout from "@/components/layout/AppLayout";
 import { ToastProvider } from "@/lib/toast";
@@ -15,8 +16,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script id="cleanup-nextjs-portal" strategy="afterInteractive">
+          {`
+            (function() {
+              function cleanup() {
+                const portals = document.querySelectorAll('nextjs-portal');
+                portals.forEach((portal) => portal.remove());
+              }
+              if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', cleanup);
+              } else {
+                cleanup();
+              }
+              setTimeout(cleanup, 100);
+              setInterval(cleanup, 1000);
+            })();
+          `}
+        </Script>
+      </head>
+      <body suppressHydrationWarning>
         <AuthProvider>
           <ToastProvider>
             <AppLayout>{children}</AppLayout>

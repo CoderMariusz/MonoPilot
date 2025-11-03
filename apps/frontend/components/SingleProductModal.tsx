@@ -44,7 +44,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
         expiry_policy: product.expiry_policy as ExpiryPolicy,
         shelf_life_days: product.shelf_life_days,
         std_price: product.std_price,
-        preferred_supplier_id: product.preferred_supplier_id,
+        supplier_id: product.supplier_id,
         tax_code_id: product.tax_code_id,
         lead_time_days: product.lead_time_days,
         moq: product.moq,
@@ -74,7 +74,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
         expiry_policy: null,
         shelf_life_days: null,
         std_price: null,
-        preferred_supplier_id: null,
+        supplier_id: null,
         tax_code_id: null,
         lead_time_days: null,
         moq: null,
@@ -121,7 +121,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
         uom: form.uom!,
         product_group: group,
         product_type: form.product_type,
-        preferred_supplier_id: form.preferred_supplier_id || null,
+        supplier_id: form.supplier_id || null,
         tax_code_id: form.tax_code_id || null,
         lead_time_days: form.lead_time_days || null,
         moq: form.moq || null,
@@ -268,10 +268,10 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Preferred Supplier</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Supplier</label>
             <select
-              value={form.preferred_supplier_id ?? ''}
-              onChange={e => handleChange('preferred_supplier_id', e.target.value ? Number(e.target.value) : null)}
+              value={form.supplier_id ?? ''}
+              onChange={e => handleChange('supplier_id', e.target.value ? Number(e.target.value) : null)}
               className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
             >
               <option value="">Select…</option>

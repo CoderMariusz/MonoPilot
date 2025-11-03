@@ -43,7 +43,7 @@ The Technical Module is responsible for product catalog management, bill of mate
 #### Primary Tables (Read/Write)
 | Table | Purpose | Key Fields | Relationships |
 |-------|---------|------------|---------------|
-| `products` | Product catalog | `id`, `part_number`, `description`, `product_group`, `product_type` | `preferred_supplier_id`, `tax_code_id` |
+| `products` | Product catalog | `id`, `part_number`, `description`, `product_group`, `product_type` | `supplier_id`, `tax_code_id` |
 | `boms` | Bill of materials | `id`, `product_id`, `version`, `status` | `products.id` |
 | `bom_items` | BOM components | `id`, `bom_id`, `material_id`, `quantity`, `sequence` | `boms.id`, `products.id` |
 | `routings` | Production routings | `id`, `product_id`, `name`, `version` | `products.id` |

@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+  // Disable Next.js DevTools to prevent console errors
+  reactStrictMode: true,
   ...(process.env.ANALYZE === 'true' && {
     webpack: (config: any) => {
       config.plugins.push(

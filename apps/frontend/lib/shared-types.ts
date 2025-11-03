@@ -281,7 +281,7 @@ export interface Product {
   category?: string;
   uom: string;
   is_active: boolean;
-  preferred_supplier_id?: number;
+  supplier_id?: number;
   lead_time_days?: number;
   moq?: number;
   tax_code_id?: number;
@@ -298,7 +298,6 @@ export interface Product {
   // Enhanced relationships
   activeBom?: Bom;
   allergens?: ProductAllergen[];
-  supplierProducts?: SupplierProduct[];
 }
 
 // Tax codes
@@ -329,22 +328,6 @@ export interface Allergen {
   name: string;
   description?: string;
   icon?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-// Supplier products junction
-export interface SupplierProduct {
-  id: number;
-  supplier_id: number;
-  product_id: number;
-  supplier_sku?: string;
-  lead_time_days?: number;
-  moq?: number;
-  price_excl_tax?: number;
-  tax_code_id?: number;
-  currency: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

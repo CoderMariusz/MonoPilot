@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, Package } from 'lucide-react';
 import { SuppliersAPI } from '@/lib/api/suppliers';
-import type { Supplier, Product, TaxCode, SupplierProduct } from '@/lib/types';
+import type { Supplier, Product, TaxCode } from '@/lib/types';
 import { SupplierProductsModal } from './SupplierProductsModal';
+import { ProductsAPI } from '@/lib/api/products';
 import { SupplierModal } from './SupplierModal';
 import { useToast } from '@/lib/toast';
 import { useProducts, useTaxCodes } from '@/lib/clientState';
@@ -17,7 +18,7 @@ export function SuppliersTable() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [showProductsModal, setShowProductsModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [supplierProducts, setSupplierProducts] = useState<SupplierProduct[]>([]);
+  const [supplierProducts, setSupplierProducts] = useState<Product[]>([]);
   const { products } = useProducts();
   const taxCodes = useTaxCodes();
 
@@ -82,15 +83,28 @@ export function SuppliersTable() {
   const handleManageProducts = async (supplier: Supplier) => {
     setSelectedSupplier(supplier);
     try {
-      const { SupplierProductsAPI } = await import('@/lib/api/supplierProducts');
-      const products = await SupplierProductsAPI.getBySupplier(supplier.id);
-      setSupplierProducts(products);
+      // Load all products and filter by supplier_id
+      const allProducts = await ProductsAPI.getAll();
+      const filteredProducts = allProducts.filter(p => p.supplier_id === supplier.id);
+      console.log('Loaded supplier products:', filteredProducts);
+      setSupplierProducts(filteredProducts);
     } catch (error) {
       console.error('Failed to load supplier products:', error);
       showToast('Failed to load supplier products', 'error');
       setSupplierProducts([]);
     }
     setShowProductsModal(true);
+  };
+
+  const handleRefreshProducts = async () => {
+    if (!selectedSupplier) return;
+    try {
+      const allProducts = await ProductsAPI.getAll();
+      const filteredProducts = allProducts.filter(p => p.supplier_id === selectedSupplier.id);
+      setSupplierProducts(filteredProducts);
+    } catch (error) {
+      console.error('Failed to refresh products:', error);
+    }
   };
 
   if (loading) {
@@ -250,74 +264,14 @@ export function SuppliersTable() {
           supplier={selectedSupplier}
           products={products}
           taxCodes={taxCodes}
-          supplierProducts={supplierProducts}
           onClose={() => {
             setShowProductsModal(false);
             setSelectedSupplier(null);
           }}
-          onSave={async (products) => {
-            try {
-              const { SupplierProductsAPI } = await import('@/lib/api/supplierProducts');
-              
-              // Get original products to compare
-              const originalIds = new Set(supplierProducts.map(p => p.id));
-              const currentIds = new Set(products.map(p => p.id));
-              
-              // Find products to delete (in original but not in current)
-              const toDelete = supplierProducts.filter(p => !currentIds.has(p.id) && p.id > 0);
-              for (const product of toDelete) {
-                await SupplierProductsAPI.delete(product.id);
-              }
-              
-              // Find products to create (negative IDs or not in original)
-              const toCreate = products.filter(p => p.id < 0 || !originalIds.has(p.id));
-              for (const product of toCreate) {
-                await SupplierProductsAPI.create({
-                  supplier_id: product.supplier_id,
-                  product_id: product.product_id,
-                  supplier_sku: product.supplier_sku,
-                  lead_time_days: product.lead_time_days,
-                  moq: product.moq,
-                  price_excl_tax: product.price_excl_tax,
-                  tax_code_id: product.tax_code_id,
-                  currency: product.currency,
-                  is_active: product.is_active ?? true,
-                });
-              }
-              
-              // Find products to update (positive IDs that exist in both)
-              const toUpdate = products.filter(p => p.id > 0 && originalIds.has(p.id));
-              for (const product of toUpdate) {
-                const original = supplierProducts.find(op => op.id === product.id);
-                if (original && (
-                  original.supplier_sku !== product.supplier_sku ||
-                  original.lead_time_days !== product.lead_time_days ||
-                  original.moq !== product.moq ||
-                  original.price_excl_tax !== product.price_excl_tax ||
-                  original.tax_code_id !== product.tax_code_id ||
-                  original.currency !== product.currency ||
-                  original.is_active !== product.is_active
-                )) {
-                  await SupplierProductsAPI.update(product.id, {
-                    supplier_sku: product.supplier_sku,
-                    lead_time_days: product.lead_time_days,
-                    moq: product.moq,
-                    price_excl_tax: product.price_excl_tax,
-                    tax_code_id: product.tax_code_id,
-                    currency: product.currency,
-                    is_active: product.is_active ?? true,
-                  });
-                }
-              }
-              
-              // Reload products from backend
-              const updatedProducts = await SupplierProductsAPI.getBySupplier(selectedSupplier!.id);
-              setSupplierProducts(updatedProducts);
-              showToast('Supplier products saved successfully', 'success');
-            } catch (error) {
-              console.error('Failed to save supplier products:', error);
-              showToast('Failed to save supplier products', 'error');
-            }
+          onSave={async () => {
+            // Refresh products list after modal saves
+            await handleRefreshProducts();
+            showToast('Supplier products updated successfully', 'success');
           }}
         />
       )}

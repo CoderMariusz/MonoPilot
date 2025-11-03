@@ -18,7 +18,7 @@ function pickInsertColumns(product: ProductInsert) {
     uom: product.uom,
     product_group: product.product_group,
     product_type: product.product_type,
-    preferred_supplier_id: product.preferred_supplier_id ?? null,
+    supplier_id: product.supplier_id ?? null,
     tax_code_id: product.tax_code_id ?? null,
     lead_time_days: product.lead_time_days ?? null,
     moq: product.moq ?? null,

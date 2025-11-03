@@ -109,9 +109,9 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
               updatedItem.unit_price = product.std_price.toString();
             }
             
-            // Auto-select supplier from preferred_supplier_id
-            if (product.preferred_supplier_id) {
-              const supplier = suppliers.find(s => s.id === product.preferred_supplier_id);
+            // Auto-select supplier from supplier_id
+            if (product.supplier_id) {
+              const supplier = suppliers.find(s => s.id === product.supplier_id);
               if (supplier) {
                 setFormData(prev => ({ ...prev, supplier_id: supplier.id.toString() }));
                 setSelectedSupplier(supplier);

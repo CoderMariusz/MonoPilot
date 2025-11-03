@@ -33,7 +33,7 @@ INSERT INTO suppliers (id, name, legal_name, vat_number, country, currency, paym
 (3, 'Packaging Solutions', 'Packaging Solutions Ltd', 'GB456789123', 'UK', 'GBP', 'Net 30', 'info@packaging.com', '+44 20 4567 8912', true, 5);
 
 -- Insert products
-INSERT INTO products (id, part_number, description, type, uom, product_group, product_type, is_active, preferred_supplier_id, lead_time_days, moq, tax_code_id, std_price, shelf_life_days, expiry_policy) VALUES
+INSERT INTO products (id, part_number, description, type, uom, product_group, product_type, is_active, supplier_id, lead_time_days, moq, tax_code_id, std_price, shelf_life_days, expiry_policy) VALUES
 -- Raw Materials (Meat)
 (1, 'RM-001', 'Beef trim', 'RM', 'kg', 'MEAT', 'RM_MEAT', true, 1, 2, 10, 1, 4.20, 3, 'DAYS_STATIC'),
 (2, 'RM-002', 'Pork shoulder', 'RM', 'kg', 'MEAT', 'RM_MEAT', true, 1, 2, 15, 1, 3.80, 3, 'DAYS_STATIC'),

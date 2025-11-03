@@ -116,7 +116,7 @@ LEFT JOIN bom b ON p.id = b.product_id AND b.is_active = true;
 
 -- Get products by supplier
 SELECT p.*, s.name as supplier_name FROM products p
-JOIN suppliers s ON p.preferred_supplier_id = s.id;
+JOIN suppliers s ON p.supplier_id = s.id;
 ```
 
 ### Work Order Queries
