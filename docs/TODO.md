@@ -1,6 +1,13 @@
 # Forza MES - TODO List
 
-## Phase 0-2: Planning UI Enhancements ✅ COMPLETED
+**Priorytety:**
+- 🟢 **P0** - MVP (Tydz. 1-8, Deadline: 28 XII 2025)
+- 🟡 **P1** - Po MVP (Q1 2026)
+- ⚪ **P2** - Nice-to-have (Future)
+
+---
+
+## Phase 0-2: Planning UI Enhancements ✅ COMPLETED (P0 - Częściowo zrobione)
 
 ### Work Orders Table Enhancements ✅
 - [x] Added new columns: WO #, Product, Qty + UoM, Status, Line/Machine, Dates, Priority, Progress %, Shortages, Actions
@@ -73,7 +80,7 @@
 - [x] Maintained existing hooks (useWorkOrders, usePurchaseOrders, useTransferOrders)
 - [x] Added proper error handling and user feedback
 
-## Phase 9: RLS Policies ✅ COMPLETED
+## Phase 9: RLS Policies ✅ COMPLETED (🟢 P0 - MVP)
 
 ### Basic Security Implementation ✅
 - [x] Created 002_rls_policies.sql with Row Level Security
@@ -82,7 +89,12 @@
 - [x] Added basic write policies (authenticated users)
 - [x] Applied policies to work_orders, purchase_orders, transfer_orders, audit_events
 
-## Phase 10: ASN Upload Modal ✅ COMPLETED
+### 🟢 P0 MVP - Wymagane dodatkowo:
+- [ ] **Smoke-test przecieków danych** (multi-tenant testing)
+- [ ] **RLS policies dla wszystkich tabel** (production, warehouse, technical)
+- [ ] **Test scenariuszy zabezpieczeń** (unauthorized access, cross-tenant)
+
+## Phase 10: ASN → GRN → LP Flow ✅ COMPLETED PARTIALLY (🟢 P0 - MVP)
 
 ### UploadASNModal Component ✅
 - [x] Created UploadASNModal with form fields (ASN number, expected arrival, PO reference)
@@ -90,6 +102,15 @@
 - [x] Added form validation and error handling
 - [x] Integrated modal into PurchaseOrderDetailsModal
 - [x] Added "Coming Soon" note for file upload/item entry features
+
+### 🟢 P0 MVP - Pełny flow ASN→GRN→LP:
+- [ ] **Walidacja ASN vs PO** (quantity matching, product matching)
+- [ ] **Różnice ilości** (over/under delivery handling)
+- [ ] **Autogeneracja LP** z GRN (automatic license plate creation)
+- [ ] **Lokacje wejściowe** (receiving locations setup)
+- [ ] **Numeracja dokumentów** (GRN numbering system)
+- [ ] **GRN → LP** (complete integration with license plates)
+- [ ] **ASN Items management** (full item entry, not just header)
 
 ## Phase 11: Role-Based Access Control (Future Enhancement)
 
@@ -272,7 +293,7 @@
   - [x] License plates export
   - [x] Stock moves export
 
-## Phase 14: Production Module Enhancement - UI Components ✅ COMPLETED
+## Phase 14: Production Module Enhancement - UI Components ✅ COMPLETED (🟢 P0 - MVP wymagają usprawnień)
 
 ### Production UI Components ✅
 - [x] **Work Orders Tab**: Enhanced with filters, yield calculations, and close actions
@@ -289,6 +310,19 @@
 - [x] **Record Weights Modal**: Scanner-specific weight recording with 1:1 validation
 - [x] **QA Override Modal**: Supervisor PIN-based QA status changes
 
+### 🟢 P0 MVP - Scanner UX Improvements:
+- [ ] **Ścieżki błędów** (comprehensive error handling and user feedback)
+- [ ] **Retry mechanisms** (graceful retry on failures)
+- [ ] **Skan kodów** (improved barcode scanning with validation)
+- [ ] **Komunikaty** (clear user messages in Polish/English)
+- [ ] **Ergonomia** (mobile-first design, large buttons, touch-friendly)
+
+### 🟢 P0 MVP - Warehouse Mobile (Pick/Putaway):
+- [ ] **Reguły lokacji** (location rules and validation)
+- [ ] **Rezerwacje LP** (LP reservation management)
+- [ ] **Tryb "gruba rękawica"** (glove-friendly UI, large touch targets)
+- [ ] **Responsywność** (mobile optimization for warehouse devices)
+
 ## Phase 15: Production Module Enhancement - Business Logic ✅ COMPLETED
 
 ### Business Rules Implementation ✅
@@ -303,9 +337,114 @@
 - [x] **Weight Recording Validation**: Validates 1:1 relationships and sequential routing
 - [x] **Operation Completion**: Ensures proper completion sequence and weight recording
 
-## Phase 16: Production Module Enhancement - Testing ✅ COMPLETED
+## 🟢 P0 MVP - QA Lite + COA (Tydz. 3-4)
 
-### API Integration Tests ✅
+### QA System Enhancement (NOWE)
+- [ ] **Statusy LP** (Pending/Passed/Failed/Quarantine - rozszerzenie obecnych)
+- [ ] **COA PDF Generation** (Certificate of Analysis per LP)
+  - [ ] Tabela wyników testów per LP
+  - [ ] Format PDF z logo i danymi firmy
+  - [ ] Download/print functionality
+  - [ ] Email COA to supplier
+- [ ] **QA Test Results** (tabela wyników QA)
+- [ ] **QA Workflow** (proces testowania z assignee)
+
+## 🟢 P0 MVP - Drukowanie Etykiet (Tydz. 3-4)
+
+### Label Printing System (NOWE)
+- [ ] **LP Labels (ZPL)** 
+  - [ ] ZPL template for license plates
+  - [ ] Barcode generation (LP number)
+  - [ ] Product info, quantity, dates
+  - [ ] Zebra printer integration
+- [ ] **PO/NCR Labels (PDF)**
+  - [ ] PDF templates for PO
+  - [ ] PDF templates for NCR
+  - [ ] Standard label printer support
+  - [ ] Batch printing capability
+
+## 🟢 P0 MVP - NCR → RTS System (Tydz. 3-4)
+
+### Non-Conformance Report (NOWE)
+- [ ] **NCR Creation** (zgłoszenie z produkcji)
+  - [ ] NCR form with issue description
+  - [ ] Auto-trace (automatic traceability)
+  - [ ] LP → Quarantine (automatic status change)
+  - [ ] Severity levels
+- [ ] **MRB Process** (Material Review Board)
+  - [ ] Review workflow
+  - [ ] Disposition options (scrap/rework/use-as-is/return)
+  - [ ] Approval workflow
+- [ ] **RTS - Return to Supplier** (Stage 1-3)
+  - [ ] Stage 1: Create RTS request
+  - [ ] Stage 2: Supplier notification (auto-email)
+  - [ ] Stage 3: Track return status
+- [ ] **Auto-mail do dostawcy** (email notifications)
+
+## 🟢 P0 MVP - Supplier Portal (Tydz. 5-6)
+
+### Supplier Collaboration Portal (NOWE)
+- [ ] **Public Link/Token** (unauthenticated access with token)
+- [ ] **PO View** (supplier can view their POs)
+- [ ] **Accept/Reject** PO with comment
+- [ ] **Timeline** (PO history and status changes)
+- [ ] **ASN Upload** (supplier uploads ASN)
+- [ ] **NCR View** (supplier sees NCR related to them)
+- [ ] **Email Notifications** (automatic alerts)
+
+## 🟢 P0 MVP - Costing Basic (Tydz. 5-6)
+
+### WO P&L Reporting (NOWE)
+- [ ] **Unit Cost Standard** (`unit_cost_std` integration)
+- [ ] **Actual vs Standard** comparison
+  - [ ] Material costs (zużycia)
+  - [ ] Output values (wyjścia)
+  - [ ] Variance analysis
+- [ ] **WO P&L Report** (per Work Order profitability)
+  - [ ] Total material cost
+  - [ ] Total output value
+  - [ ] Labor cost (basic)
+  - [ ] Profit/Loss calculation
+- [ ] **Export to Excel**
+
+## 🟢 P0 MVP - Settings (Tydz. 5-6)
+
+### Cost Variance Thresholds (NOWE)
+- [ ] **Settings Modal** (`/settings/costing`)
+- [ ] **Progi % odchyleń** (percentage thresholds)
+  - [ ] Material cost variance %
+  - [ ] Yield variance %
+- [ ] **Progi kwotowe** (absolute value thresholds)
+  - [ ] Max material cost variance
+  - [ ] Max P&L variance
+- [ ] **Database Table** (`costing_settings`)
+- [ ] **Alerts** (trigger alerts when thresholds exceeded)
+
+## 🟢 P0 MVP - QA Reporting (Tydz. 7-8)
+
+### Quality Metrics (NOWE - rozszerzenie Phase 13)
+- [ ] **FPY** (First Pass Yield calculation)
+- [ ] **Scrap Rate** (scrap percentage tracking)
+- [ ] **MV/Rollups** (material variance rollups)
+- [ ] **Filtry** (org/plant/line/product filters)
+- [ ] **Eksport CSV/PDF** (export capabilities)
+- [ ] **Dashboard** (QA metrics visualization)
+
+## 🟢 P0 MVP - Hardening (Tydz. 7-8)
+
+### Production Readiness (rozszerzenie Phase 17)
+- [ ] **Indeksy/Performance** (database index optimization)
+- [ ] **Logi błędów** (comprehensive error logging)
+- [ ] **Retry/Idempotencja** (retry logic and idempotent APIs)
+- [ ] **DPIA** (Data Protection Impact Assessment)
+- [ ] **DPA** (Data Processing Agreement)
+- [ ] **NDA** (Non-Disclosure Agreement templates)
+- [ ] **Backup Strategy** (database backup plan)
+- [ ] **Monitoring** (application monitoring setup)
+
+## Phase 16: Production Module Enhancement - Testing ✅ COMPLETED (🟢 P0 - Brak większości testów)
+
+### API Integration Tests ✅ (DO USUNIĘCIA - user nie ma testów)
 - [x] **Work Orders Tests**: Test close WO, stage status, and business logic
 - [x] **Operations Tests**: Test weight recording, 1:1 enforcement, and sequential routing
 - [x] **Reservations Tests**: Test create/delete reservations and available quantity
@@ -324,31 +463,36 @@
 - [x] **Coverage Thresholds**: Set 70% coverage requirements for all modules
 - [x] **Test Scripts**: Added test, test:watch, test:coverage, test:ci scripts
 
-## Phase 17: Production Module Enhancement - Documentation & Deployment 🔄 IN PROGRESS
+## Phase 17: Production Module Enhancement - Documentation & Deployment 🔄 IN PROGRESS (🟢 P0 - MVP)
 
-### Documentation Updates 🔄 IN PROGRESS
+### Documentation Updates 🔄 IN PROGRESS (🟢 P0)
 - [ ] **API Reference**: Update API_REFERENCE.md with new endpoints and examples
 - [ ] **Database Schema**: Update DATABASE_SCHEMA.md with new tables and relationships
 - [ ] **Production Delta Guide**: Create production module implementation guide
 - [ ] **Scanner Integration Guide**: Create scanner integration documentation
+- [ ] **Automatic Docs Update Script**: Create script to auto-generate docs from code
 
-### Seed Data Enhancement 🔄 IN PROGRESS
+### Seed Data Enhancement 🔄 IN PROGRESS (🟢 P0)
 - [ ] **Update Seed Script**: Add 1:1 flags, reservations, compositions, pallets to seed data
 - [ ] **Test Data Sets**: Create comprehensive test data for all scenarios
 - [ ] **Cross-WO Scenarios**: Add test data for cross-WO PR intake validation
 - [ ] **Traceability Chains**: Create complex traceability test data
 
-### Supabase MCP Integration 🔄 IN PROGRESS
+### Supabase MCP Integration 🔄 IN PROGRESS (🟢 P0)
 - [ ] **Apply Migrations**: Use Supabase MCP to apply all new migrations (019-025)
 - [ ] **Verify Schema**: Check all tables, indexes, constraints, and triggers
 - [ ] **Test RPC Functions**: Verify all business logic functions work correctly
 - [ ] **RLS Policies**: Test Row Level Security policies for new tables
 
-### Performance Testing 🔄 IN PROGRESS
+### Performance Testing 🔄 IN PROGRESS (🟢 P0 - część Hardening)
 - [ ] **Large Dataset Testing**: Test with realistic production data volumes
 - [ ] **Query Performance**: Verify index usage and query optimization
 - [ ] **API Response Times**: Monitor and optimize API endpoint performance
 - [ ] **UI Responsiveness**: Test UI components with large datasets
+
+### 🟢 P0 MVP - Testy E2E (Playwright + Supabase):
+- [x] **Auth Tests**: Zachowane (login, signup, auth-state, debug-login)
+- [ ] **P0 Coverage**: Planning, Production, Warehouse, Scanner E2E tests (DO STWORZENIA)
 
 ## Phase 18: BOM Lifecycle & Versioning ✅ COMPLETED
 
@@ -397,9 +541,9 @@
 - [x] Updated BOM_ARCHITECTURE.md with lifecycle management
 - [x] Updated TODO.md with completed tasks
 
-## Phase 19: Data Validation & Audit Trail (TODO)
+## Phase 19: Data Validation & Audit Trail (🟡 P1 - Po MVP)
 
-### BOM Data Validation
+### BOM Data Validation (🟡 P1)
 - [ ] **Circular BOM Reference Detection**: Prevent infinite loops in BOM structure
   - Create recursive query to detect circular references
   - Add validation before BOM activation
@@ -421,7 +565,7 @@
   - Create recursive function to calculate depth
   - Block BOM activation if depth exceeded
 
-### Audit Trail System
+### Audit Trail System (🟡 P1)
 - [ ] **Create audit_log Table**: Track all changes to critical data
   ```sql
   CREATE TABLE audit_log (
@@ -458,7 +602,7 @@
   - Export audit log to Excel
   - Search functionality
 
-### BOM Approval Workflow
+### BOM Approval Workflow (🟡 P1)
 - [ ] **Create bom_approvals Table**: Track approval requests
   ```sql
   CREATE TABLE bom_approvals (
@@ -479,7 +623,7 @@
   - Email notifications for approval requests
   - BOM can only be activated after approval
 
-### BOM Comparison & History
+### BOM Comparison & History (🟡 P1)
 - [ ] **BOM Comparison Tool**: Visual diff between BOM versions
   - Side-by-side comparison view
   - Highlight added/removed/modified items
@@ -492,9 +636,9 @@
   - Restore previous version (clone)
   - Version notes/comments
 
-## Phase 20: Work Order Snapshot Management (TODO)
+## Phase 20: Work Order Snapshot Management (🟡 P1 - Po MVP)
 
-### WO Snapshot Update
+### WO Snapshot Update (🟡 P1)
 - [ ] **Implement Snapshot Update API**: `POST /api/production/work-orders/:id/snapshot-update`
   - Allowed only for PLANNED WOs
   - Blocked if issues or outputs exist
@@ -518,7 +662,7 @@
   - Audit trail for snapshot changes
   - Rollback capability
 
-### Scanner Validation
+### Scanner Validation (🟡 P1)
 - [ ] **Enforce 1:1 Validation**: For `consume_whole_lp` materials
   - Check `wo_materials.consume_whole_lp` flag
   - Validate: scanned qty = LP qty
@@ -549,7 +693,7 @@
   - Timestamp and location
   - Resolution (override, corrected, cancelled)
 
-### PO Prefill Enhancement
+### PO Prefill Enhancement (🟡 P1)
 - [ ] **Modify PO Creation Endpoint**: Use BOM prefill data
   - `GET /api/planning/boms/:bomId/prefill-data`
   - Return: unit_cost_std, tax_code_id, lead_time_days, moq
@@ -565,49 +709,89 @@
   - Identify materials with frequent overrides
   - Suggest BOM cost updates
 
-## Phase 21: Future Enhancements (Not Implemented)
+## Phase 21: Future Enhancements (⚪ P2 - Nice-to-have)
 
-### Advanced Production Features
+### Advanced Production Features (⚪ P2)
 - [ ] **Multi-Phase Routing**: Enhanced routing with per-phase yield tracking
 - [ ] **Shelf-Life Policy**: Multi-tier shelf-life policies with per-phase adjustments
 - [ ] **Advanced Traceability**: LP tree visualization and complex composition tracking
 - [ ] **Real-Time Monitoring**: Live production monitoring with WebSocket updates
 
-### Advanced Scanner Features
+### Advanced Scanner Features (⚪ P2)
 - [ ] **Offline Queue**: Handle scanner operations when offline
 - [ ] **Batch Operations**: Process multiple LPs in batch operations
 - [ ] **Advanced QA**: Multi-level QA approval workflows
 - [ ] **Mobile Optimization**: Enhanced mobile scanner interface
 
-### Reporting & Analytics
+### Reporting & Analytics (⚪ P2)
 - [ ] **Advanced KPIs**: Machine learning-based yield predictions
 - [ ] **Trend Analysis**: Historical trend analysis and forecasting
 - [ ] **Cost Analysis**: Detailed cost tracking per operation
 - [ ] **Quality Metrics**: Advanced quality tracking and reporting
 
-## Phase 16: Future Enhancements (Not Implemented)
+## 🟡 P1 - NPD / Idea Management (Po MVP - BRAK w obecnym TODO)
 
-### Role-Based Access Control (RBAC)
+### ETAP 1: Pomysły (🟡 P1 - NOWE)
+- [ ] **Idea Submission** (formularz zgłaszania pomysłów)
+- [ ] **Idea Review** (proces oceny pomysłów)
+- [ ] **Idea Board** (tablica pomysłów w stylu Kanban)
+- [ ] **Voting System** (głosowanie na pomysły)
+
+### ETAP 2: NPD Pipeline (🟡 P1 - NOWE)
+- [ ] **Project Creation** (tworzenie projektów NPD)
+- [ ] **Stage Gates** (bramy etapowe)
+- [ ] **Approval Workflow** (przepływ zatwierdzeń)
+- [ ] **Resource Allocation** (alokacja zasobów)
+
+### ETAP 3: Commercialization (🟡 P1 - NOWE)
+- [ ] **Product Launch** (wprowadzenie produktu)
+- [ ] **Recipe Management** (zarządzanie recepturami)
+- [ ] **Cost Estimation** (szacowanie kosztów)
+- [ ] **Market Readiness** (gotowość rynkowa)
+
+## 🟡 P1 - Engineering / CMMS-lite (Po MVP - BRAK w obecnym TODO)
+
+### Equipment Management (🟡 P1 - NOWE)
+- [ ] **Equipment Registry** (rejestr wyposażenia)
+- [ ] **Maintenance Schedule** (harmonogram konserwacji)
+- [ ] **Work Orders** (zlecenia prac)
+- [ ] **Spare Parts** (części zamienne)
+
+### Calibration Management (🟡 P1 - NOWE)
+- [ ] **Calibration Schedule** (harmonogram kalibracji)
+- [ ] **Calibration Records** (rekordy kalibracji)
+- [ ] **Certificate Management** (zarządzanie certyfikatami)
+- [ ] **Alerts** (powiadomienia o upływających terminach)
+
+### Preventive Maintenance (🟡 P1 - NOWE)
+- [ ] **PM Plans** (plany konserwacji zapobiegawczej)
+- [ ] **PM Execution** (wykonanie PM)
+- [ ] **Checklist Management** (zarządzanie checklistami)
+- [ ] **History Tracking** (historia konserwacji)
+
+## Phase 11: Role-Based Access Control (🟡 P1 - Future Enhancement)
+
+### RBAC Implementation (Placeholder) (🟡 P1)
 - [ ] Document RBAC approach for future implementation
 - [ ] Add role column to users table
 - [ ] Update RLS policies to check user roles
 - [ ] Hide/disable UI elements based on role
 - [ ] Add role checks in API methods
 
-### Advanced Features
+### Advanced Features (⚪ P2)
 - [ ] Add BOM snapshot on WO creation
 - [ ] Implement GRN expiry calculation logic
 - [ ] Add reporting hooks (prep, no UI change yet)
 - [ ] Create CreateSupplierModal and EditSupplierModal components
 - [ ] Create CreateWarehouseModal and EditWarehouseModal components
 
-### Advanced Shelf-Life Policy System
+### Advanced Shelf-Life Policy System (⚪ P2)
 - [ ] Implement multi-tier shelf-life policies with per-phase adjustments
 - [ ] Add shelf_life_policies and shelf_life_overrides tables
 - [ ] Create expiry calculation service with baseline events
 - [ ] Add per-phase expiry adjustments to routing operations
 
-### Multi-Phase Scanner with Yield Tracking
+### Multi-Phase Scanner with Yield Tracking (⚪ P2)
 - [ ] Enhance scanner to support multi-phase production workflows
 - [ ] Implement automatic yield calculation and weight tracking
 - [ ] Add expiry computation per phase
@@ -641,14 +825,63 @@
 
 ---
 
-## Current Status
-- ✅ **Phase 0-14**: Fully implemented and tested
-- 🔄 **Phase 15**: Future enhancements (RBAC, advanced features)
-- 📋 **Ready for**: Supabase migration deployment and production testing
+---
 
-## Next Steps
-1. Deploy SQL migrations to Supabase (001_planning_tables.sql, 002_rls_policies.sql, 003_phase14_schema.sql, 004_phase14_rpc_functions.sql)
-2. Test with `NEXT_PUBLIC_USE_MOCK_DATA=false` to verify Supabase integration
-3. Implement Phase 15 RBAC when user roles are defined
-4. Add Phase 15 advanced features as needed
-5. Create modal components for Supplier and Warehouse CRUD operations
+## 📊 Current Status Summary
+
+### ✅ Completed (Phases 0-18)
+- Planning UI & Backend (WO/PO/TO)
+- BOM System Enhancement (versioning, routing, taxonomy)
+- Production Module (database, API, UI, business logic)
+- Scanner Integration (Stage Board, terminals)
+- BOM Lifecycle & Versioning
+
+### 🔄 In Progress (Phase 17)
+- Documentation & Deployment
+- Seed Data Enhancement
+- Supabase MCP Integration
+- Performance Testing
+
+### 🟢 P0 MVP - Do Zrobienia (Deadline: 28 XII 2025)
+**Tydz. 1-2: Fundamenty**
+- RLS + multi-tenant smoke tests
+- ASN→GRN→LP pełny flow
+- Scanner UX improvements
+- Warehouse Mobile (Pick/Putaway)
+
+**Tydz. 3-4: QA & Etykiety & NCR**
+- QA Lite + COA PDF
+- Drukowanie etykiet (LP ZPL, PO/NCR PDF)
+- NCR → RTS (lite) z auto-mail
+
+**Tydz. 5-6: Dostawcy & Koszty & Settings**
+- Supplier Portal (MVP)
+- Costing Basic (WO P&L)
+- Settings — progi odchyleń
+
+**Tydz. 7-8: Raporty & Hardening & Testy**
+- QA Reporting (lite)
+- Hardening (indeksy, logi, retry, DPIA/DPA/NDA)
+- Testy E2E (Playwright + Supabase)
+
+### 🟡 P1 - Po MVP (Q1 2026)
+- Data Validation & Audit Trail (Phase 19)
+- Work Order Snapshot Management (Phase 20)
+- NPD / Idea Management (ETAP 1-3)
+- Engineering / CMMS-lite
+
+### ⚪ P2 - Nice-to-have (Future)
+- Advanced Production Features (Phase 21)
+- Advanced Scanner Features
+- Reporting & Analytics (ML-based)
+- Advanced Shelf-Life Policy System
+
+---
+
+## 🎯 Next Steps (MVP)
+1. ✅ Zaktualizować TODO.md z priorytetami P0/P1/P2
+2. 🔄 Usunąć testy (poza auth)
+3. 🔄 Stworzyć automatyczny skrypt aktualizacji dokumentacji
+4. 🟢 Zaimplementować zadania P0 MVP (Tydz. 1-8)
+5. 🔄 Deploy SQL migrations to Supabase
+6. 🔄 Test with `NEXT_PUBLIC_USE_MOCK_DATA=false`
