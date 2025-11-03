@@ -1,5 +1,8 @@
 # Export API Specifications
 
+**Last Updated**: 2025-01-XX  
+**Version**: 2.0 - Documentation Audit Update
+
 ## Overview
 This document defines the export API specifications for the Production Module, including endpoint definitions, column sets, file naming conventions, and data formatting requirements.
 

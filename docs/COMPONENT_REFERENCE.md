@@ -1,5 +1,8 @@
 # Component Reference Guide
 
+**Last Updated**: 2025-01-XX  
+**Version**: 2.0 - Documentation Audit Update
+
 ## Overview
 This document provides comprehensive documentation of all major React components in the MonoPilot MES system, including their props, state management, API dependencies, and usage patterns.
 

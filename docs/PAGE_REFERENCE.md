@@ -1,5 +1,8 @@
 # Page Reference Guide
 
+**Last Updated**: 2025-01-XX  
+**Version**: 2.0 - Documentation Audit Update
+
 ## Overview
 This document provides comprehensive mapping of all pages in the MonoPilot MES system, showing their relationships to database tables, API endpoints, and React components.
 
@@ -147,16 +150,13 @@ This document provides comprehensive mapping of all pages in the MonoPilot MES s
 - **Write**: `grns`, `grn_items`, `license_plates`, `stock_moves`
 
 **API Endpoints**:
-- `GRNsAPI.getAll()` - Fetch GRNs
-- `GRNsAPI.create()` - Create GRN
 - `LicensePlatesAPI.getAll()` - Fetch license plates
-- `StockMovesAPI.getAll()` - Fetch stock moves
-- `StockMovesAPI.create()` - Create stock move
+- `WorkOrdersAPI.getAll()` - Fetch work orders (for GRN context)
 
 **Key Components**:
 - `GRNsTable` - GRN listing
 - `CreateGRNModal` - GRN creation modal
-- `StockMovesTable` - Stock moves listing
+- `StockMoveTable` - Stock moves listing
 - `LicensePlatesTable` - License plate management
 
 **Business Rules**:
@@ -177,9 +177,8 @@ This document provides comprehensive mapping of all pages in the MonoPilot MES s
 
 **API Endpoints**:
 - `WorkOrdersAPI.getWorkOrderStageStatus()` - Get stage status
-- `ScannerAPI.completeOperation()` - Complete operation
-- `ScannerAPI.stageMaterials()` - Stage materials
-- `ScannerAPI.recordYield()` - Record yield
+- `WorkOrdersAPI.recordWeights()` - Record operation weights
+- `WorkOrdersAPI.completeOperation()` - Complete operation
 
 **Key Components**:
 - `ProcessInterface` - Main scanner interface

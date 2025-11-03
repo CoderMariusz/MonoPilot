@@ -1,5 +1,8 @@
 # Production Module Guide
 
+**Last Updated**: 2025-01-XX  
+**Version**: 2.0 - Documentation Audit Update
+
 ## Overview
 The Production Module manages work order execution, production tracking, yield reporting, and material consumption analysis. It provides real-time visibility into production operations and performance metrics.
 
@@ -31,10 +34,13 @@ The Production Module manages work order execution, production tracking, yield r
 ## API Integration
 
 ### Primary APIs
-- **`WorkOrdersAPI`**: CRUD operations for work orders
+- **`WorkOrdersAPI`**: CRUD operations for work orders, includes scanner operations
 - **`YieldAPI`**: Yield reporting and analysis
+- **`ConsumeAPI`**: Consumption tracking and analysis
 - **`TraceabilityAPI`**: Material traceability tracking
-- **`ScannerAPI`**: Production terminal operations
+- **`LicensePlatesAPI`**: License plate management
+
+**Note**: Scanner operations are handled through WorkOrdersAPI methods like `getWorkOrderStageStatus()`, `recordWeights()`, and `completeOperation()`.
 
 ### API Usage Patterns
 ```typescript
@@ -58,8 +64,8 @@ const yield = await YieldAPI.recordYield(woId, {
   notes: 'Good yield'
 });
 
-// Complete operation
-const result = await ScannerAPI.completeOperation(woId, 1, {
+// Complete operation (via WorkOrdersAPI)
+const result = await WorkOrdersAPI.completeOperation(woId, 1, {
   input_lps: ['LP-001', 'LP-002'],
   output_lps: ['LP-003'],
   yield_data: { output_qty: 95, waste_qty: 5 }
@@ -84,7 +90,7 @@ graph TD
     A --> E[TraceTab]
     
     B --> F[WorkOrdersAPI]
-    C --> G[ScannerAPI]
+    C --> G[WorkOrdersAPI]
     D --> H[YieldAPI]
     E --> I[TraceabilityAPI]
     
@@ -157,7 +163,7 @@ sequenceDiagram
 sequenceDiagram
     participant O as Operator
     participant S as Scanner
-    participant API as ScannerAPI
+    participant API as WorkOrdersAPI
     participant DB as Database
     
     O->>S: Start operation

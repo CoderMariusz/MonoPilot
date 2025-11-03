@@ -421,7 +421,7 @@ describe('Scanner Integration', () => {
       wo_id: 1,
       operation: 'consume'
     };
-    const result = await ScannerAPI.scanLP(scanData);
+    const result = await WorkOrdersAPI.scanLP(scanData); // Scanner functionality via WorkOrdersAPI
     expect(result.success).toBe(true);
     expect(result.material_consumed).toBeDefined();
   });

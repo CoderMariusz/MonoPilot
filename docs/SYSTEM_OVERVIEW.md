@@ -1,5 +1,8 @@
 # MonoPilot MES System Overview
 
+**Last Updated**: 2025-01-XX  
+**Version**: 2.0 - Documentation Audit Update
+
 ## System Architecture
 
 MonoPilot is a Manufacturing Execution System (MES) built as a Next.js 15 monorepo with Supabase backend. The system manages the complete production lifecycle from planning to warehouse operations.
@@ -109,14 +112,12 @@ graph LR
 | `WorkOrdersAPI` | Work Order Management | `work_orders`, `wo_materials`, `wo_operations` | `/production`, `/scanner` |
 | `PurchaseOrdersAPI` | Purchase Order Management | `purchase_orders`, `purchase_order_items` | `/planning` |
 | `TransferOrdersAPI` | Transfer Order Management | `transfer_orders`, `transfer_order_items` | `/planning` |
-| `GRNsAPI` | Goods Receipt Management | `grns`, `grn_items`, `license_plates` | `/warehouse` |
 
 ### Specialized APIs
 | API Class | Purpose | Tables Accessed | Used By Pages |
 |-----------|---------|-----------------|---------------|
 | `YieldAPI` | Yield Reporting | `wo_operations`, `production_outputs` | `/production` |
 | `TraceabilityAPI` | Traceability Queries | `license_plates`, `lp_genealogy`, `lp_compositions` | `/production`, `/warehouse` |
-| `ScannerAPI` | Scanner Operations | `wo_operations`, `lp_reservations` | `/scanner` |
 | `RoutingsAPI` | Routing Management | `routings`, `routing_operations` | `/technical/bom` |
 
 ## Component Dependency Graph

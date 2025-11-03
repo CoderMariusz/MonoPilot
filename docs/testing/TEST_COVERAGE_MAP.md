@@ -1,5 +1,8 @@
 # Test Coverage Map
 
+**Last Updated**: 2025-01-XX  
+**Version**: 2.0 - Documentation Audit Update
+
 ## Overview
 This document maps tests to database tables, APIs, and business rules to ensure comprehensive coverage.
 
@@ -27,9 +30,7 @@ This document maps tests to database tables, APIs, and business rules to ensure 
 | ProductsAPI | ✔ | ✔ | ✔ |
 | WorkOrdersAPI | ✔ | ✔ | ✔ |
 | RoutingsAPI | ✔ | ✔ |  |
-| GRNsAPI | ✔ | ✔ | ✔ |
 | LicensePlatesAPI | ✔ | ✔ | ✔ |
-| StockMovesAPI | ✔ | ✔ | ✔ |
 | PurchaseOrdersAPI | ✔ | ✔ | ✔ |
 | TransferOrdersAPI | ✔ | ✔ | ✔ |
 | TraceabilityAPI | ✔ | ✔ | ✔ |

@@ -1,5 +1,10 @@
 # Scanner Module API Documentation
 
+**Last Updated**: 2025-01-XX  
+**Version**: 2.0 - Documentation Audit Update
+
+**Note**: This document describes API **endpoints**, not API classes. Scanner functionality is implemented through WorkOrdersAPI methods and dedicated API routes.
+
 ## Overview
 
 The Scanner Module provides comprehensive APIs for production operations including material staging, weight recording, operation completion, and pallet management. All endpoints are designed to work with the sequential routing system and enforce strict validation rules.

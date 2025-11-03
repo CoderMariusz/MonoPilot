@@ -1,5 +1,8 @@
 # Warehouse Module Guide
 
+**Last Updated**: 2025-01-XX  
+**Version**: 2.0 - Documentation Audit Update
+
 ## Overview
 The Warehouse Module manages inventory operations including goods receipt processing, stock movements, license plate management, and location tracking. It provides real-time visibility into inventory levels and material locations.
 
@@ -33,24 +36,15 @@ The Warehouse Module manages inventory operations including goods receipt proces
 ## API Integration
 
 ### Primary APIs
-- **`GRNsAPI`**: CRUD operations for goods receipt notes
 - **`LicensePlatesAPI`**: License plate management
-- **`StockMovesAPI`**: Stock movement tracking
+- **`WorkOrdersAPI`**: Work order integration for GRN context
 - **`LocationsAPI`**: Location management
 - **`TraceabilityAPI`**: Material traceability
 
+**Note**: GRN and Stock Move operations are handled through API endpoints, not dedicated API classes.
+
 ### API Usage Patterns
 ```typescript
-// GRN creation
-const grn = await GRNsAPI.create({
-  purchase_order_id: 1,
-  receipt_date: '2024-01-15',
-  items: [
-    { product_id: 1, quantity: 100, received_qty: 100 },
-    { product_id: 2, quantity: 50, received_qty: 50 }
-  ]
-});
-
 // License plate creation
 const licensePlate = await LicensePlatesAPI.create({
   product_id: 1,
@@ -59,14 +53,17 @@ const licensePlate = await LicensePlatesAPI.create({
   grn_id: 1
 });
 
-// Stock move creation
-const stockMove = await StockMovesAPI.create({
-  lp_id: 1,
-  from_location_id: 1,
-  to_location_id: 2,
-  quantity: 50,
-  move_type: 'TRANSFER'
+// License plate update
+const updated = await LicensePlatesAPI.update(lpId, {
+  location_id: 2,
+  quantity: 95
 });
+
+// Get license plates
+const licensePlates = await LicensePlatesAPI.getAll();
+
+// Traceability tracking
+const trace = await TraceabilityAPI.forwardTrace(lpId);
 ```
 
 ## Component Architecture
@@ -86,9 +83,9 @@ graph TD
     A --> D[StockMovesTable]
     A --> E[LocationsTable]
     
-    B --> F[GRNsAPI]
+    B --> F[WorkOrdersAPI]
     C --> G[LicensePlatesAPI]
-    D --> H[StockMovesAPI]
+    D --> H[WorkOrdersAPI]
     E --> I[LocationsAPI]
     
     F --> J[grns table]
@@ -135,7 +132,7 @@ graph TD
 sequenceDiagram
     participant W as Warehouse User
     participant UI as Warehouse Page
-    participant API as GRNsAPI
+    participant API as API Endpoint
     participant DB as Database
     
     W->>UI: Create GRN
@@ -158,7 +155,7 @@ sequenceDiagram
 sequenceDiagram
     participant W as Warehouse User
     participant UI as Warehouse Page
-    participant API as StockMovesAPI
+    participant API as API Endpoint
     participant DB as Database
     
     W->>UI: Create stock move
