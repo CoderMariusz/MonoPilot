@@ -167,11 +167,13 @@ export class RoutingsAPI {
     };
   }
 
-  static async update(id: number, data: Partial<Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'>>): Promise<Routing> {
+  static async update(id: number, data: Partial<Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'>> & { operations?: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>[] }): Promise<Routing> {
+    const { operations, ...routingData } = data;
+    
     const { data: result, error } = await supabase
       .from('routings')
       .update({
-        ...data,
+        ...routingData,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -183,7 +185,86 @@ export class RoutingsAPI {
       throw new Error('Failed to update routing');
     }
 
-    return result;
+    // Handle operations if provided
+    if (operations !== undefined) {
+      // Delete existing operations
+      const { error: deleteError } = await supabase
+        .from('routing_operations')
+        .delete()
+        .eq('routing_id', id);
+
+      if (deleteError) {
+        console.error('Error deleting old routing operations:', deleteError);
+        throw new Error('Failed to delete old routing operations');
+      }
+
+      // Insert new operations if any
+      if (operations.length > 0) {
+        const operationsToInsert = operations.map(op => ({
+          routing_id: id,
+          sequence_number: op.seq_no,
+          operation_name: op.name,
+          code: op.code || null,
+          description: op.description || null,
+          requirements: op.requirements && op.requirements.length > 0 ? op.requirements : []
+        }));
+
+        const { error: insertError, data: insertedOperations } = await supabase
+          .from('routing_operations')
+          .insert(operationsToInsert)
+          .select();
+
+        if (insertError) {
+          console.error('Error creating routing operations:', insertError);
+          throw new Error('Failed to create routing operations');
+        }
+
+        // Map inserted operations to RoutingOperation format
+        const mappedOperations = (insertedOperations || []).map(op => ({
+          id: op.id,
+          routing_id: op.routing_id,
+          seq_no: op.sequence_number,
+          name: op.operation_name,
+          code: op.code || undefined,
+          description: op.description || undefined,
+          requirements: op.requirements || [],
+          created_at: op.created_at,
+          updated_at: op.updated_at,
+        }));
+
+        return {
+          ...result,
+          operations: mappedOperations
+        };
+      }
+    }
+
+    // Fetch existing operations if no operations update was provided
+    let routingOperations: any[] = [];
+    try {
+      const { data: operationsData } = await supabase
+        .from('routing_operations')
+        .select('*')
+        .eq('routing_id', id);
+      routingOperations = operationsData || [];
+    } catch (operationsError) {
+      console.warn('Routing operations table not available:', operationsError);
+    }
+
+    return {
+      ...result,
+      operations: routingOperations.map(op => ({
+        id: op.id,
+        routing_id: op.routing_id,
+        seq_no: op.sequence_number,
+        name: op.operation_name,
+        code: op.code || undefined,
+        description: op.description || undefined,
+        requirements: op.requirements || [],
+        created_at: op.created_at,
+        updated_at: op.updated_at,
+      }))
+    };
   }
 
   static async delete(id: number): Promise<void> {

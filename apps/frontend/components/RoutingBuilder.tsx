@@ -26,15 +26,15 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
     routing?.operations?.map(op => ({
       seq_no: op.seq_no,
       name: op.name,
-      code: op.code,
-      description: op.description,
+      code: op.code || undefined,
+      description: op.description || undefined,
       requirements: op.requirements || [],
     })) || [
       {
         seq_no: 1,
         name: '',
-        code: '',
-        description: '',
+        code: undefined,
+        description: undefined,
         requirements: [],
       }
     ]
@@ -64,8 +64,8 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
     setOperations(prev => [...prev, {
       seq_no: nextSeqNo,
       name: '',
-      code: '',
-      description: '',
+      code: undefined,
+      description: undefined,
       requirements: [],
     }]);
   };
@@ -113,8 +113,8 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
       operations: operations.map((op, index) => ({
         seq_no: index + 1, // Auto-numeruj: 1, 2, 3...
         name: op.name,
-        code: op.code,
-        description: op.description,
+        code: op.code || undefined,
+        description: op.description || undefined,
         requirements: op.requirements || [],
       })),
     });

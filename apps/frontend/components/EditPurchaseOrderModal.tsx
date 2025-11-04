@@ -34,7 +34,7 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
     supplier_id: string;
     due_date: string;
     payment_due_date: string;
-    status: 'draft' | 'sent' | 'submitted' | 'confirmed' | 'approved' | 'partially_received' | 'received' | 'cancelled' | 'closed';
+    status: POStatus;
     warehouse_id: string;
     request_delivery_date: string;
     expected_delivery_date: string;
@@ -182,23 +182,10 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
         };
       });
       
-      // Map status to POStatus if needed
-      const statusMap: Record<string, POStatus> = {
-        'draft': 'draft',
-        'approved': 'approved',
-        'closed': 'closed',
-        'cancelled': 'cancelled',
-        'sent': 'approved', // Map sent to approved
-        'submitted': 'approved', // Map submitted to approved
-        'confirmed': 'approved', // Map confirmed to approved
-        'partially_received': 'approved', // Map partially_received to approved
-        'received': 'approved', // Map received to approved
-      };
-      const mappedStatus: POStatus = statusMap[formData.status] || formData.status as POStatus;
-      
+      // Status from formData is already POStatus type
       updatePurchaseOrder(purchaseOrderId, {
         supplier_id: Number(formData.supplier_id),
-        status: mappedStatus,
+        status: formData.status,
         due_date: formData.due_date || null,
         payment_due_date: formData.payment_due_date || undefined,
         currency: formData.currency || 'USD',

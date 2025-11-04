@@ -44,7 +44,10 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
 
   if (!isOpen) return null;
 
-  const availablePOs = purchaseOrders.filter(po => po.status === 'approved');
+  // GRN can be created for submitted, confirmed, or received POs
+  const availablePOs = purchaseOrders.filter(po => 
+    po.status === 'submitted' || po.status === 'confirmed' || po.status === 'received'
+  );
   const selectedPOData = availablePOs.find(po => po.id === selectedPO);
 
   const handlePOSelect = (poId: number) => {

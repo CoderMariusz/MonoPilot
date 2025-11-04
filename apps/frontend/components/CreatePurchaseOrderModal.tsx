@@ -2,7 +2,7 @@
 
 import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client-browser';
 import { useSuppliers } from '@/lib/clientState';
 import { useAuth } from '@/lib/auth/AuthContext';
 import type { Product, Warehouse } from '@/lib/types';

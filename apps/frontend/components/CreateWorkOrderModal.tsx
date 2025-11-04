@@ -373,7 +373,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
                 >
                   <option value="">Select Transfer Order...</option>
                   {transferOrders
-                    .filter(to => to.status !== 'cancelled' && to.status !== 'closed')
+                    .filter(to => to.status !== 'cancelled')
                     .map((to) => (
                       <option key={to.id} value={to.id}>
                         {to.to_number} - {to.from_warehouse?.name} → {to.to_warehouse?.name}

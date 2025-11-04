@@ -5,7 +5,7 @@ import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ProductsAPI } from '@/lib/api/products';
 import { TransferOrdersAPI } from '@/lib/api/transferOrders';
 import { useWarehouses } from '@/lib/clientState';
-import type { Product, Warehouse } from '@/lib/types';
+import type { Product, Warehouse, TOStatus } from '@/lib/types';
 
 interface EditTransferOrderModalProps {
   isOpen: boolean;
@@ -30,7 +30,7 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
   const [formData, setFormData] = useState<{
     from_warehouse_id: string;
     to_warehouse_id: string;
-    status: 'draft' | 'submitted' | 'in_transit' | 'received' | 'cancelled';
+    status: TOStatus;
     planned_ship_date: string;
     planned_receive_date: string;
   }>({
@@ -64,7 +64,7 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
         setFormData({
           from_warehouse_id: to.from_warehouse_id?.toString() || '',
           to_warehouse_id: to.to_warehouse_id?.toString() || '',
-          status: to.status as 'draft' | 'submitted' | 'in_transit' | 'received' | 'cancelled',
+          status: to.status as TOStatus,
           planned_ship_date: to.planned_ship_date ? new Date(to.planned_ship_date).toISOString().split('T')[0] : '',
           planned_receive_date: to.planned_receive_date ? new Date(to.planned_receive_date).toISOString().split('T')[0] : '',
         });

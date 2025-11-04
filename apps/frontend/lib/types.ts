@@ -106,7 +106,8 @@ export interface WorkOrder {
 export type CreateWorkOrderData = Omit<WorkOrder, 'id'>;
 export type UpdateWorkOrderData = Partial<CreateWorkOrderData>;
 
-export type WorkOrderStatus = 'draft' | 'planned' | 'released' | 'in_progress' | 'completed' | 'cancelled';
+// WO status values must match database schema constraint (no 'draft' status in DB)
+export type WorkOrderStatus = 'planned' | 'released' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface LicensePlate {
   id: string;
@@ -159,6 +160,9 @@ export interface Location {
   updated_at: string;
 }
 
+export type CreateLocationData = Omit<Location, 'id' | 'created_at' | 'updated_at'>;
+export type UpdateLocationData = Partial<CreateLocationData>;
+
 export interface Machine {
   id: number;
   code: string;
@@ -168,6 +172,9 @@ export interface Machine {
   created_at: string;
   updated_at: string;
 }
+
+export type CreateMachineData = Omit<Machine, 'id' | 'created_at' | 'updated_at'>;
+export type UpdateMachineData = Partial<CreateMachineData>;
 
 export interface Supplier {
   id: number;
@@ -195,8 +202,10 @@ export type UpdateSupplierData = Partial<CreateSupplierData>;
 
 // Phase 1 Planning Types - Updated for new schema
 
-export type POStatus = 'draft' | 'approved' | 'closed' | 'cancelled';
-export type TOStatus = 'draft' | 'submitted' | 'in_transit' | 'received' | 'closed' | 'cancelled';
+// PO status values must match database schema constraint
+export type POStatus = 'draft' | 'submitted' | 'confirmed' | 'received' | 'cancelled' | 'closed';
+// TO status values must match database schema constraint (no 'closed' status in DB)
+export type TOStatus = 'draft' | 'submitted' | 'in_transit' | 'received' | 'cancelled';
 
 // PO Header (replacing PurchaseOrder)
 export interface POHeader {
@@ -377,7 +386,8 @@ export type CreateWarehouseData = Omit<Warehouse, 'id' | 'created_at' | 'updated
 export type UpdateWarehouseData = Partial<CreateWarehouseData>;
 
 // TransferOrderStatus type for legacy TransferOrder
-export type TransferOrderStatus = 'draft' | 'submitted' | 'in_transit' | 'received' | 'closed' | 'cancelled';
+// TransferOrderStatus is deprecated, use TOStatus instead (which matches DB schema)
+export type TransferOrderStatus = TOStatus;
 
 // Legacy TransferOrder for backward compatibility (deprecated)
 export interface TransferOrder {
@@ -522,7 +532,7 @@ export interface CreateProductData {
   };
 }
 
-export type UpdateProductData = Partial<CreateProductData>;
+export type UpdateProductData = Partial<Omit<Product, 'id' | 'created_at' | 'updated_at' | 'activeBom'>>;
 
 // Tax codes
 export interface TaxCode {
@@ -556,6 +566,9 @@ export interface Allergen {
   created_at: string;
   updated_at: string;
 }
+
+export type CreateAllergenData = Omit<Allergen, 'id' | 'created_at' | 'updated_at'>;
+export type UpdateAllergenData = Partial<CreateAllergenData>;
 
 // Routing interfaces
 export interface Routing {

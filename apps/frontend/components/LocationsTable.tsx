@@ -17,7 +17,9 @@ export function LocationsTable() {
   const [formData, setFormData] = useState({
     code: '',
     name: '',
+    type: 'standard',
     warehouse_id: '',
+    zone: '',
     is_active: true,
   });
 
@@ -48,7 +50,9 @@ export function LocationsTable() {
     setFormData({
       code: '',
       name: '',
+      type: 'standard',
       warehouse_id: '',
+      zone: '',
       is_active: true,
     });
     setIsModalOpen(true);
@@ -59,7 +63,9 @@ export function LocationsTable() {
     setFormData({
       code: location.code,
       name: location.name,
+      type: location.type,
       warehouse_id: location.warehouse_id?.toString() || '',
+      zone: location.zone || '',
       is_active: location.is_active,
     });
     setIsModalOpen(true);
@@ -89,7 +95,9 @@ export function LocationsTable() {
     const locationData = {
       code: formData.code,
       name: formData.name,
+      type: formData.type || 'standard',
       warehouse_id: parseInt(formData.warehouse_id),
+      zone: formData.zone,
       is_active: formData.is_active,
     };
 
@@ -108,6 +116,8 @@ export function LocationsTable() {
       setFormData({
         code: '',
         name: '',
+        type: 'standard',
+        zone: '',
         warehouse_id: '',
         is_active: true,
       });

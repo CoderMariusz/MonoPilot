@@ -17,10 +17,11 @@ export interface POStatusTransition {
   validationRules: string[];
 }
 
+// PO workflow: draft -> submitted -> confirmed -> received -> closed
 export const PO_STATUS_TRANSITIONS: POStatusTransition[] = [
   {
     from: 'draft',
-    to: 'approved',
+    to: 'submitted',
     action: 'approve',
     requiredFields: ['approved_by'],
     validationRules: [
@@ -31,7 +32,7 @@ export const PO_STATUS_TRANSITIONS: POStatusTransition[] = [
     ]
   },
   {
-    from: 'approved',
+    from: 'submitted',
     to: 'closed',
     action: 'close',
     requiredFields: ['close_reason'],
@@ -41,7 +42,26 @@ export const PO_STATUS_TRANSITIONS: POStatusTransition[] = [
     ]
   },
   {
-    from: 'approved',
+    from: 'confirmed',
+    to: 'closed',
+    action: 'close',
+    requiredFields: ['close_reason'],
+    validationRules: [
+      'po_has_lines',
+      'close_reason_provided'
+    ]
+  },
+  {
+    from: 'received',
+    to: 'closed',
+    action: 'close',
+    requiredFields: [],
+    validationRules: [
+      'po_has_lines'
+    ]
+  },
+  {
+    from: 'submitted',
     to: 'draft',
     action: 'reopen',
     requiredFields: ['reopen_reason'],
@@ -66,7 +86,7 @@ export const PO_STATUS_TRANSITIONS: POStatusTransition[] = [
 // TO STATUS MACHINE
 // =============================================
 
-export type TOAction = 'approve' | 'close' | 'reopen';
+export type TOAction = 'approve' | 'reopen';
 
 export interface TOStatusTransition {
   from: TOStatus;
@@ -76,10 +96,11 @@ export interface TOStatusTransition {
   validationRules: string[];
 }
 
+// TO workflow: draft -> submitted -> in_transit -> received (no 'closed' status in DB schema)
 export const TO_STATUS_TRANSITIONS: TOStatusTransition[] = [
   {
     from: 'draft',
-    to: 'approved',
+    to: 'submitted',
     action: 'approve',
     requiredFields: ['approved_by'],
     validationRules: [
@@ -89,17 +110,7 @@ export const TO_STATUS_TRANSITIONS: TOStatusTransition[] = [
     ]
   },
   {
-    from: 'approved',
-    to: 'closed',
-    action: 'close',
-    requiredFields: ['close_reason'],
-    validationRules: [
-      'to_has_lines',
-      'close_reason_provided'
-    ]
-  },
-  {
-    from: 'approved',
+    from: 'submitted',
     to: 'draft',
     action: 'reopen',
     requiredFields: ['reopen_reason'],
@@ -109,7 +120,7 @@ export const TO_STATUS_TRANSITIONS: TOStatusTransition[] = [
     ]
   },
   {
-    from: 'closed',
+    from: 'received',
     to: 'draft',
     action: 'reopen',
     requiredFields: ['reopen_reason'],
@@ -395,16 +406,7 @@ export function canApproveTO(to: TOHeader, lines: TOLine[], userRole: string): b
   return result.isValid;
 }
 
-export function canCloseTO(to: TOHeader, lines: TOLine[], userRole: string): boolean {
-  const result = validateTOAction({
-    to,
-    lines,
-    userRole,
-    action: 'close',
-    formData: { close_reason: 'test' }
-  });
-  return result.isValid;
-}
+// canCloseTO removed - TO does not have 'close' action in database schema
 
 export function canReopenTO(to: TOHeader, userRole: string): boolean {
   const result = validateTOAction({

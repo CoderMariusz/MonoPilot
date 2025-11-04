@@ -110,5 +110,21 @@ export class ProductsAPI {
   }
 
 
+  static async update(id: number, data: UpdateProductData): Promise<Product> {
+    const { data: updated, error } = await supabase
+      .from('products')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating product:', error);
+      throw new Error('Failed to update product');
+    }
+
+    return updated;
+  }
+
   // legacy getByCategory removed in favor of group/type filters in clientState
 }

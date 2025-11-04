@@ -327,7 +327,8 @@ export function PurchaseOrdersTable() {
                   <td className="py-3 px-4 text-sm">{po.buyer_name || '-'}</td>
                   <td className="py-3 px-4 text-sm">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      po.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                      po.status === 'submitted' || po.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                      po.status === 'received' ? 'bg-green-100 text-green-800' :
                       po.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                       po.status === 'closed' ? 'bg-slate-700 text-white' :
                       'bg-slate-100 text-slate-800'

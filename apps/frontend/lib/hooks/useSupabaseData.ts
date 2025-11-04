@@ -96,6 +96,7 @@ export function useSupabasePurchaseOrders() {
         // Map to PurchaseOrder for backward compatibility
         const mapped: PurchaseOrder[] = (pos || []).map(po => ({
           id: po.id,
+          number: po.number,
           po_number: po.number,
           supplier_id: po.supplier_id,
           status: po.status,
