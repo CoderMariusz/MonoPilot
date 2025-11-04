@@ -9,6 +9,7 @@ import { ProductsAPI } from '@/lib/api/products';
 import { SupplierModal } from './SupplierModal';
 import { useToast } from '@/lib/toast';
 import { useProducts, useTaxCodes } from '@/lib/clientState';
+import { useAuthAwareEffect } from '@/lib/hooks/useAuthAwareEffect';
 
 export function SuppliersTable() {
   const { showToast } = useToast();
@@ -22,7 +23,7 @@ export function SuppliersTable() {
   const { products } = useProducts();
   const taxCodes = useTaxCodes();
 
-  useEffect(() => {
+  useAuthAwareEffect(() => {
     const loadSuppliers = async () => {
       try {
         setLoading(true);

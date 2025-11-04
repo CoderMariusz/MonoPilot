@@ -6,6 +6,7 @@ import { LocationsAPI } from '@/lib/api/locations';
 import { WarehousesAPI } from '@/lib/api/warehouses';
 import type { Location, Warehouse } from '@/lib/types';
 import { useToast } from '@/lib/toast';
+import { useAuthAwareEffect } from '@/lib/hooks/useAuthAwareEffect';
 
 export function LocationsTable() {
   const [locations, setLocations] = useState<Location[]>([]);
@@ -23,8 +24,8 @@ export function LocationsTable() {
     is_active: true,
   });
 
-  // Fetch locations and warehouses on component mount
-  useEffect(() => {
+  // Fetch locations and warehouses after auth is ready
+  useAuthAwareEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);

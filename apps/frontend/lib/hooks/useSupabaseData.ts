@@ -3,16 +3,25 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase/client-browser';
 import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate } from '../types';
+import { useAuth } from '../auth/AuthContext';
 
 // Hook to load Work Orders from Supabase
 export function useSupabaseWorkOrders() {
   const [data, setData] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { loading: authLoading } = useAuth();
 
   useEffect(() => {
+    // Wait for auth to be ready before fetching
+    if (authLoading) {
+      console.log('[useSupabaseWorkOrders] Auth still loading, waiting...');
+      return;
+    }
+
     async function loadData() {
       try {
+        console.log('[useSupabaseWorkOrders] Auth ready, fetching work orders...');
         const { data: workOrders, error } = await supabase
           .from('work_orders')
           .select(`
@@ -67,7 +76,7 @@ export function useSupabaseWorkOrders() {
     }
 
     loadData();
-  }, []);
+  }, [authLoading]);
 
   return { data, loading, error };
 }
@@ -77,10 +86,18 @@ export function useSupabasePurchaseOrders() {
   const [data, setData] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { loading: authLoading } = useAuth();
 
   useEffect(() => {
+    // Wait for auth to be ready before fetching
+    if (authLoading) {
+      console.log('[useSupabasePurchaseOrders] Auth still loading, waiting...');
+      return;
+    }
+
     async function loadData() {
       try {
+        console.log('[useSupabasePurchaseOrders] Auth ready, fetching purchase orders...');
         // Use new po_header table
         const { data: pos, error } = await supabase
           .from('po_header')
@@ -151,7 +168,7 @@ export function useSupabasePurchaseOrders() {
     }
 
     loadData();
-  }, []);
+  }, [authLoading]);
 
   return { data, loading, error };
 }
@@ -161,10 +178,18 @@ export function useSupabaseTransferOrders() {
   const [data, setData] = useState<TransferOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { loading: authLoading } = useAuth();
 
   useEffect(() => {
+    // Wait for auth to be ready before fetching
+    if (authLoading) {
+      console.log('[useSupabaseTransferOrders] Auth still loading, waiting...');
+      return;
+    }
+
     async function loadData() {
       try {
+        console.log('[useSupabaseTransferOrders] Auth ready, fetching transfer orders...');
         // Use new to_header table
         const { data: tos, error } = await supabase
           .from('to_header')
@@ -218,7 +243,7 @@ export function useSupabaseTransferOrders() {
     }
 
     loadData();
-  }, []);
+  }, [authLoading]);
 
   return { data, loading, error };
 }

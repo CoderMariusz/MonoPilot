@@ -245,16 +245,28 @@ export class WorkOrdersAPI {
     }
   }
 
-  static async cancel(id: number, reason?: string): Promise<{ success: boolean; message: string }> {
-    
+  static async cancel(id: number, reason?: string, source?: string): Promise<{ success: boolean; message: string }> {
     try {
+      // Get current user from Supabase auth
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data, error } = await supabase.rpc('cancel_work_order', {
         p_wo_id: id,
-        p_user_id: 1, // TODO: Get from auth context
-        p_reason: reason
+        p_user_id: user?.id || null,
+        p_reason: reason || null,
+        p_source: source || 'web_ui'
       });
       
       if (error) throw error;
+      
+      // New RPC returns JSONB with success/note
+      if (data && typeof data === 'object') {
+        return { 
+          success: data.success || true, 
+          message: data.note || 'Work order cancelled successfully' 
+        };
+      }
+      
       return { success: true, message: 'Work order cancelled' };
     } catch (error: any) {
       return { success: false, message: error.message || 'Failed to cancel' };

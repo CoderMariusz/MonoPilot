@@ -5,14 +5,15 @@ import { Pencil, Trash2, Plus } from 'lucide-react';
 import { AllergensAPI } from '@/lib/api/allergens';
 import type { Allergen } from '@/lib/types';
 import { useToast } from '@/lib/toast';
+import { useAuthAwareEffect } from '@/lib/hooks/useAuthAwareEffect';
 
 export function AllergensTable() {
   const [allergens, setAllergens] = useState<Allergen[]>([]);
   const [loading, setLoading] = useState(true);
   const { showToast } = useToast();
   
-  // Fetch data on component mount
-  useEffect(() => {
+  // Fetch data after auth is ready
+  useAuthAwareEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);

@@ -6,6 +6,7 @@ import { RoutingsAPI } from '@/lib/api/routings';
 import type { Routing, RoutingOperation } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 import { RoutingBuilder } from './RoutingBuilder';
+import { useAuthAwareEffect } from '@/lib/hooks/useAuthAwareEffect';
 
 export function RoutingsTable() {
   const { showToast } = useToast();
@@ -15,7 +16,7 @@ export function RoutingsTable() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRouting, setEditingRouting] = useState<Routing | null>(null);
 
-  useEffect(() => {
+  useAuthAwareEffect(() => {
     async function fetchRoutings() {
       try {
         setLoading(true);

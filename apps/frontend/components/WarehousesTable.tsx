@@ -6,6 +6,7 @@ import { WarehousesAPI } from '@/lib/api/warehouses';
 import type { Warehouse } from '@/lib/types';
 import { WarehouseModal } from './WarehouseModal';
 import { useToast } from '@/lib/toast';
+import { useAuthAwareEffect } from '@/lib/hooks/useAuthAwareEffect';
 
 export function WarehousesTable() {
   const { showToast } = useToast();
@@ -14,7 +15,7 @@ export function WarehousesTable() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
 
-  useEffect(() => {
+  useAuthAwareEffect(() => {
     const loadWarehouses = async () => {
       try {
         setLoading(true);

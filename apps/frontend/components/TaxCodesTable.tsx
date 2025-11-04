@@ -5,14 +5,15 @@ import { Pencil, Trash2, Plus } from 'lucide-react';
 import { TaxCodesAPI } from '@/lib/api/taxCodes';
 import type { TaxCode } from '@/lib/types';
 import { useToast } from '@/lib/toast';
+import { useAuthAwareEffect } from '@/lib/hooks/useAuthAwareEffect';
 
 export function TaxCodesTable() {
   const { showToast } = useToast();
   const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Fetch data on component mount
-  useEffect(() => {
+  // Fetch data after auth is ready
+  useAuthAwareEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
