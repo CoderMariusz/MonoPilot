@@ -29,7 +29,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
 
   if (!isOpen) return null;
 
-  const availablePOs = purchaseOrders.filter(po => po.status === 'confirmed');
+  const availablePOs = purchaseOrders.filter(po => po.status === 'approved');
   const selectedPOData = availablePOs.find(po => po.id === selectedPO);
 
   const handlePOSelect = (poId: number) => {
