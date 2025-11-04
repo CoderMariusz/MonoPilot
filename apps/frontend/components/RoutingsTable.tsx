@@ -54,7 +54,7 @@ export function RoutingsTable() {
     }
   };
 
-  const handleSave = async (routingData: Omit<Routing, 'id' | 'created_at' | 'updated_at'> & { 
+  const handleSave = async (routingData: Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'> & { 
     operations?: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>[] 
   }) => {
     try {
