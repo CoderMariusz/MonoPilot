@@ -782,21 +782,6 @@ static async update(id: number, data: UpdateProductData): Promise<Product>
 
 ---
 
-#### `checkPartNumberExists()`
-
-**Signature**:
-```typescript
-static async checkPartNumberExists(partNumber: string, excludeId?: number): Promise<boolean>
-```
-
-**Parameters**:
-- `partNumber: string`
-- `excludeId?: number`
-
-**Returns**: `Promise<boolean>`
-
----
-
 ### PurchaseOrdersAPI
 
 **Source**: `apps/frontend/lib/api/purchaseOrders.ts`
@@ -832,14 +817,12 @@ static async getById(id: number): Promise<PurchaseOrder | null>
 
 **Signature**:
 ```typescript
-static async getDefaultUnitPrice(productId: number, supplierId?: number, asOfDate?: Date, currency?: string): Promise<number>
+static async getDefaultUnitPrice(productId: number, supplierId?: number): Promise<number>
 ```
 
 **Parameters**:
 - `productId: number`
 - `supplierId?: number`
-- `asOfDate?: Date`
-- `currency?: string`
 
 **Returns**: `Promise<number>`
 
@@ -849,13 +832,12 @@ static async getDefaultUnitPrice(productId: number, supplierId?: number, asOfDat
 
 **Signature**:
 ```typescript
-static async cancel(id: number, reason?: string, source?: string): Promise<{ success: boolean; message: string }>
+static async cancel(id: number, reason?: string): Promise<{ success: boolean; message: string }>
 ```
 
 **Parameters**:
 - `id: number`
 - `reason?: string`
-- `source?: string`
 
 **Returns**: `Promise<{ success: boolean; message: string }>`
 
@@ -1182,13 +1164,12 @@ static async getById(id: number): Promise<TransferOrder | null>
 
 **Signature**:
 ```typescript
-static async cancel(id: number, reason?: string, source?: string): Promise<{ success: boolean; message: string }>
+static async cancel(id: number, reason?: string): Promise<{ success: boolean; message: string }>
 ```
 
 **Parameters**:
 - `id: number`
 - `reason?: string`
-- `source?: string`
 
 **Returns**: `Promise<{ success: boolean; message: string }>`
 
@@ -1525,13 +1506,12 @@ static async getProductionStats(woId: number): Promise<{ madeQty: number; planne
 
 **Signature**:
 ```typescript
-static async cancel(id: number, reason?: string, source?: string): Promise<{ success: boolean; message: string }>
+static async cancel(id: number, reason?: string): Promise<{ success: boolean; message: string }>
 ```
 
 **Parameters**:
 - `id: number`
 - `reason?: string`
-- `source?: string`
 
 **Returns**: `Promise<{ success: boolean; message: string }>`
 

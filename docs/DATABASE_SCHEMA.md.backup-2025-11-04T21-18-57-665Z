@@ -25,6 +25,7 @@ This document describes the complete database schema for the MonoPilot MES syste
 | expiry_policy | VARCHAR(50) | - |
 | shelf_life_days | INTEGER | - |
 | production_lines | TEXT | DEFAULT '{}' |
+| product_version | VARCHAR(10) | DEFAULT '1.0' (X.Y format) |
 | is_active | BOOLEAN | DEFAULT true |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
@@ -85,6 +86,44 @@ CREATE TABLE IF NOT EXISTS products (
 
 ---
 
+### production_lines
+
+**Purpose**: Represents physical manufacturing production lines
+
+**Columns**:
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| code | VARCHAR(50) | UNIQUE NOT NULL |
+| name | VARCHAR(200) | NOT NULL |
+| status | VARCHAR(20) | DEFAULT 'active', CHECK ('active', 'inactive') |
+| warehouse_id | INTEGER | REFERENCES warehouses(id) |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| created_by | UUID | REFERENCES users(id) |
+| updated_by | UUID | REFERENCES users(id) |
+
+**Foreign Keys**:
+
+- `warehouse_id` → `warehouses.id`
+- `created_by` → `users.id`
+- `updated_by` → `users.id`
+
+**Indexes**:
+
+- idx_production_lines_warehouse ON (warehouse_id)
+- idx_production_lines_active ON (is_active)
+- idx_production_lines_status ON (status)
+
+**Notes**:
+
+- Production lines enable line-specific materials and BOM restrictions
+- See [PRODUCTION_LINES_GUIDE.md](./PRODUCTION_LINES_GUIDE.md) for usage patterns
+
+---
+
 ### boms
 
 **Columns**:
@@ -95,6 +134,8 @@ CREATE TABLE IF NOT EXISTS products (
 | product_id | INTEGER | REFERENCES products(id) |
 | version | VARCHAR(50) | NOT NULL |
 | status | VARCHAR(20) | DEFAULT 'active' |
+| line_id | INTEGER[] | NULL (array of production line IDs) |
+| product_version | VARCHAR(10) | Product version at time of BOM |
 | effective_from | TIMESTAMPTZ | - |
 | effective_to | TIMESTAMPTZ | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
@@ -116,7 +157,6 @@ CREATE TABLE IF NOT EXISTS products (
 - idx_boms_status ON (status)
 - idx_boms_routing ON (default_routing_id)
 - boms_single_active_idx ON (product_id)
-- idx_boms_product_version ON (product_id, version)
 
 <details>
 <summary>SQL Definition</summary>
@@ -177,7 +217,6 @@ CREATE TABLE IF NOT EXISTS boms (
 - idx_bom_items_material ON (material_id)
 - idx_bom_items_tax_code ON (tax_code_id)
 - idx_bom_items_lead_time ON (lead_time_days)
-- idx_bom_items_bom_sequence ON (bom_id, sequence)
 
 <details>
 <summary>SQL Definition</summary>
@@ -249,7 +288,6 @@ CREATE TABLE IF NOT EXISTS bom_items (
 - idx_work_orders_kpi_scope ON (kpi_scope)
 - idx_work_orders_closed_at ON (closed_at)
 - idx_work_orders_actual_start ON (actual_start)
-- idx_work_orders_line ON (line_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -323,8 +361,6 @@ CREATE TABLE IF NOT EXISTS work_orders (
 - idx_wo_materials_sequence ON (wo_id, sequence)
 - idx_wo_materials_wo_material_unique ON (wo_id, material_id, sequence)
 - idx_wo_materials_material ON (material_id)
-- idx_wo_materials_wo_material ON (wo_id, material_id)
-- idx_wo_materials_snapshot ON (wo_id, created_at)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1163,7 +1199,6 @@ CREATE TABLE routings (
 - idx_routing_ops_routing ON (routing_id)
 - idx_routing_ops_machine ON (machine_id)
 - idx_routing_ops_sequence ON (routing_id, sequence_number)
-- idx_routing_operations_machine ON (machine_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -2472,104 +2507,6 @@ CREATE TABLE bom_history (
   changes JSONB NOT NULL,
   description TEXT,
   CONSTRAINT fk_bom_history_bom FOREIGN KEY (bom_id) REFERENCES boms(id)
-);
-```
-
-</details>
-
----
-
-### production_lines
-
-**Columns**:
-
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | SERIAL | PRIMARY KEY |
-| code | VARCHAR(50) | NOT NULL, UNIQUE |
-| name | VARCHAR(200) | NOT NULL |
-| status | VARCHAR(20) | DEFAULT 'active' CHECK (status IN ('active' |
-| warehouse_id | INTEGER | REFERENCES warehouses(id) |
-| is_active | BOOLEAN | DEFAULT true |
-| created_at | TIMESTAMPTZ | DEFAULT NOW() |
-| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
-| created_by | UUID | REFERENCES users(id) |
-| updated_by | UUID | REFERENCES users(id) |
-
-**Foreign Keys**:
-
-- `warehouse_id` → `warehouses.id`
-- `created_by` → `users.id`
-- `updated_by` → `users.id`
-
-**Indexes**:
-
-- idx_production_lines_warehouse ON (warehouse_id)
-- idx_production_lines_active ON (is_active)
-- idx_production_lines_status ON (status)
-
-<details>
-<summary>SQL Definition</summary>
-
-```sql
-CREATE TABLE IF NOT EXISTS production_lines (
-  id SERIAL PRIMARY KEY,
-  code VARCHAR(50) UNIQUE NOT NULL,
-  name VARCHAR(200) NOT NULL,
-  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
-  warehouse_id INTEGER REFERENCES warehouses(id),
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES users(id),
-  updated_by UUID REFERENCES users(id)
-);
-```
-
-</details>
-
----
-
-### routing_operation_names
-
-**Columns**:
-
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | SERIAL | PRIMARY KEY |
-| name | VARCHAR(100) | NOT NULL, UNIQUE |
-| alias | VARCHAR(100) | - |
-| description | TEXT | - |
-| is_active | BOOLEAN | DEFAULT true |
-| created_at | TIMESTAMPTZ | DEFAULT NOW() |
-| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
-| created_by | UUID | REFERENCES users(id) |
-| updated_by | UUID | REFERENCES users(id) |
-
-**Foreign Keys**:
-
-- `created_by` → `users.id`
-- `updated_by` → `users.id`
-
-**Indexes**:
-
-- idx_routing_operation_names_active ON (is_active)
-- idx_routing_operation_names_name ON (name)
-
-<details>
-<summary>SQL Definition</summary>
-
-```sql
-CREATE TABLE IF NOT EXISTS routing_operation_names (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(100) UNIQUE NOT NULL,
-  alias VARCHAR(100),
-  description TEXT,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES users(id),
-  updated_by UUID REFERENCES users(id)
 );
 ```
 

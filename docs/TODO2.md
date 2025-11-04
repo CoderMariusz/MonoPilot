@@ -1013,6 +1013,286 @@ Status: 🔄 ~50% - Basic components, NO visual workflow
 
 Status: ⬜ Not started - Critical for production management
 
+4.0 Moduł Produkcji – Plan Implementacji (tłumaczenie)
+
+Uwaga: Moduł Produkcji będzie integrowany z istniejącym systemem (nie jako osobna wtyczka), aby uwzględnić szeroki zakres zmian i aktualizacji. Przygotuj ewentualne aktualizacje schematu bazy poprzez migracje (np. dodanie pól) tak, by wspierały nową funkcjonalność.
+
+4.1 Realizacja Zleceń Produkcyjnych (rozszerzenia schematu i API)
+
+Śledzenie operacji WO i materiałów: Wykorzystaj istniejące tabele wo_operations i wo_materials jako fundament wykonania zleceń. Zaimplementuj UI (np. OperationsTab w szczegółach WO), który listuje wszystkie operacje (wo_operations) z ich sekwencją, statusem i zarejestrowanymi wynikami. Upewnij się też, że szczegóły WO wyświetlają wymagania materiałowe z wo_materials (snapshot BOM: ilości wymagane oraz wystagowane), by użytkownik widział alokacje materiałów. To zapewnia widoczność każdej operacji i jej potrzeb materiałowych.
+
+Obliczanie statusu etapów: Wykorzystaj metody API (np. WorkOrdersAPI.getWorkOrderStageStatus) do wyliczania statusu ukończenia każdego etapu/operacji w WO. Jeśli brak implementacji, utwórz logikę zwracającą operację bieżącą, ukończone i postęp całości. Będzie to użyte do pokazywania statusu w czasie zbliżonym do rzeczywistego w UI (np. pasek postępu lub lista etapów). API ma bazować na statusach wo_operations oraz ewentualnie zapisach w production_outputs, by ocenić, czy operacja ma zarejestrowane wyjście (oznaka ukończenia).
+
+Wymuszanie sekwencyjnego routingu: Wymuś, aby operacje były kończone w zdefiniowanej kolejności. Na poziomie API zabezpiecz endpoint kończenia operacji (np. completeOperation), aby operacja o sekwencji n nie mogła zostać ukończona, zanim n-1 będzie ukończona. Próby „poza kolejką” zwracają błąd/ostrzeżenie. To egzekwuje regułę biznesową Sequential Processing.
+
+Twarda zasada 1:1 (consume_whole_lp): Zaimplementuj regułę consume_whole_lp dla komponentów wymagających konsumpcji całej jednostki/LP. Flaga na poziomie składnika BOM lub wpisu wo_materials powinna oznaczać, że dany materiał musi być zużyty w całości (np. całe LP). Zaktualizuj logikę konsumpcji: jeśli flaga jest ustawiona, system pozwala użyć tylko jednego, całego LP na jedną operację wyjściową – bez konsumpcji częściowej. Jeśli operacja daje wiele wyjść, każde powinno mieć własne pojedyncze wejście LP (bez mieszania). Niespełnienie → błąd.
+
+Walidacja między-WO (Cross-WO): Dodaj kontrole zapobiegające mieszaniu materiałów pomiędzy różnymi WO. Upewnij się, że materiały/wyroby pośrednie zarezerwowane/wyprodukowane dla jednego WO nie są konsumowane w innym bez jawnego powiązania. Przy rejestracji konsumpcji/ukończenia operacji waliduj, że wejściowe LP należą do rezerwacji tego WO lub są nieprzypisanym stanem. Zachowuje to integralność genealogii i unika niezamierzonego mieszania.
+
+Operacje bezpieczne względem rezerwacji: Zanim pozwolisz rozpocząć/ukończyć operację, zweryfikuj, że wymagane materiały są wystagowane/zarezerwowane. Użyj lp_reservations, by sprawdzić, czy WO i dana operacja mają zarezerwowane LP. API powinno odmawiać startu/ukończenia, jeśli brakuje rezerwacji lub są niewystarczające. To egzekwuje Reservation System i zapobiega niespójnościom stanów.
+
+Integracja z terminalem/skanerem: Większość funkcji będzie wywoływana z terminala produkcyjnego. Upewnij się, że metody WorkOrdersAPI (np. recordWeights, completeOperation) są dostępne i przetestowane z UI skanera. Operator powinien móc skanować i uruchamiać te akcje. UI musi być uproszczone (duże przyciski, minimum wprowadzania) dla terminali – dedykowane formularze/modale w StageBoard lub pokrewnych.
+
+Rejestrowanie wyników (outputs): Kontynuuj użycie production_outputs do logowania wyników i odpadu dla każdej operacji. Przy ukończeniu operacji zapisuj wo_id, sekwencję, output_qty, waste_qty. To zasili obliczenia wydajności (yield). API ma uzupełniać tę tabelę przy YieldAPI.recordYield lub completeOperation z danymi o wydajności. Zaktualizuj też wo_operations.status na „completed” i przechowuj metryki yield dla szybkiego dostępu.
+
+Ostrzeżenia przy zamknięciu WO: Przy finalizacji WO (status completed po ostatniej operacji) waliduj bilans. Jeśli sumaryczne wyjście vs plan różni się albo nie wszystkie materiały zużyto, pokaż ostrzeżenie. Pozwalamy zakończyć, ale sygnalizujemy i umożliwiamy wpis przyczyn lub korektę przez manualne zużycie. To zasili późniejsze raporty niezgodności.
+
+4.2 Śledzenie Wydajności (Yield – raportowanie wyników)
+
+Endpointy Yield API: Rozszerz YieldAPI o raportowanie na dwóch poziomach: (a) PR yield (operacje/wyroby pośrednie) i (b) FG yield (wyrobów gotowych) – oba z filtrowaniem czasowym (dzień/tydzień/miesiąc). PR yield raportuje procenty na poszczególnych etapach/operacjach; FG yield – finalną wydajność WO/produktu. Agreguj sumy/średnie dla okresów.
+
+Obliczenia yield per operacja: Przy zapisie yield licz procent i procent odpadu na etapie. Yield% = (Output Qty / Required Qty) × 100. „Required” to oczekiwany wynik/wejście dla operacji (wg BOM/routingu). Przy recordYield/completeOperation oblicz i zapisz (np. w production_outputs lub wo_operations.yield_data). Oblicz yield skumulowany dla finalnego FG: iloczyn yieldów operacji. Udostępnij w FG yield API.
+
+Komponent YieldReportTab (tabela): Zakończ YieldReportTab jako prostą tabelę. Widoki:
+
+Lista WO z finalnym yield% (oraz output/waste).
+
+Opcjonalny breakdown per operacja dla wybranego WO lub przekrojowo.
+
+Kolumny: WO, produkt, data zakończenia, output, waste, yield%.
+
+Filtrowanie po okresie (przełącznik dzień/tydzień/miesiąc), paginacja/grupowanie wg potrzeb.
+
+Wybór kubełków czasu: Dodaj w UI przełącznik/selector: Dzienny, Tygodniowy, Miesięczny, lub zakres niestandardowy. API przyjmuje typ kubełka lub zakres i agreguje. Na start wystarczą dzienny i miesięczny. API może zwracać też metryki podsumowujące (średni yield, całkowity waste) do nagłówka tabeli.
+
+Prosty wykres Yield: Dodaj co najmniej jeden prosty wykres (np. linia trendu yield% w czasie dla zakresu) lub słupek/pie good vs waste. Minimalny, bez rozbudowanej analityki – zdefiniuj typy TS dla danych wykresu.
+
+Eksport do Excel (Yield): (Później) Dodaj przycisk „Export to Excel”. Zaprojektuj API tak, by łatwo produkowało CSV/XLSX (rekordy z jednoznacznymi polami).
+
+Przyszła analityka Yield: Post-MVP rozbuduj do pełnego dashboardu:
+
+Trend Analysis: długie okresy, porównania per produkt/linia.
+
+Straty per operacja: słupki waste% per etap.
+
+Dystrybucja yield: histogram zmienności.
+
+Wymaga bibliotek wykresów i typów TS (zgodnie z wymaganiami type-safety). Na teraz kluczowe jest poprawne gromadzenie danych.
+
+4.3 Śledzenie Konsumpcji (zużycie materiałów i odchylenia)
+
+Implementacja Consume API: Rozszerz ConsumeAPI o obsługę zdarzeń konsumpcji i wyliczenie odchyleń. Po ukończeniu operacji (lub zapisie yield) system automatycznie rejestruje zużycie materiałów tej operacji:
+
+Zmniejsz ilości na LP lub oznacz LP jako skonsumowane (dla 1:1 – do 0).
+
+Przy konsumpcji częściowej (tam gdzie dozwolone) zaktualizuj LP z ilością pozostałą.
+
+Utwórz zapisy genealogii łączące wejściowe LP z wyjściowym LP (tabela typu lp_genealogy).
+
+Rozważ dodanie consumed_qty w wo_materials (migracja) dla łatwiejszego raportowania. W przeciwnym razie konsumpcja może być wnioskowana po pozostałościach – ale jawne pole upraszcza raporty.
+
+Oblicz natychmiast odchylenie dla każdego materiału: variance = consumed_qty – required_qty. Konsoliduj przy zamknięciu WO lub inkrementalnie.
+
+ManualConsumeModal (korekty): Zbuduj ManualConsumeModal do ręcznego dopisania zużycia (na końcu WO lub w trakcie). Przykłady:
+
+BOM wymagał 100 kg, użyto +5 kg ekstra → wpis 5 kg.
+
+Materiał zniszczony → dopisz do zużycia/odpadu.
+
+Modal listuje materiały BOM z required vs consumed i pozwala edytować consumed lub dodać waste. Po zapisie ConsumeAPI aktualizuje rejestry i odchylenia.
+
+Dla 1:1: jeśli otwarto LP i nie zużyto w pełni – czy reszta to waste czy nowy LP resztkowy? Do decyzji biznesowej. Na teraz załóż: pozostałość dla 1:1 traktujemy jako waste (jeśli reguła zabrania częściowego użycia).
+
+ConsumeReportTab (tabela odchyleń): Zbuduj ConsumeReportTab jako tabelę zużycia vs plan z wyróżnieniem odchyleń:
+
+Wiersze per materiał w WO (grupowanie wg WO) lub płaskie – wybierz czytelniejszy wariant.
+
+Kolumny przykładowe: WO, Materiał, Required, Consumed, Variance.
+
+Koloruj variance: nadkonsumpcja (dodatnie) czerwony, niedokonsumpcja (ujemne) zielony/niebieski, zero neutralnie.
+
+Pokaż output WO jako kontekst (korelacja z yield).
+
+Filtrowanie po czasie (dzień/tydzień/miesiąc); paginacja.
+
+Logika odchyleń: Backend:
+
+Material Variance: dla każdego wpisu wo_materials licz consumed_qty - required_qty. Możesz zapisać lub wyliczać „on-the-fly” do raportu.
+
+Yield Variance: odchylenie wyjścia (actual vs plan) uzupełnia obraz; yield w raporcie yield.
+
+Upewnij się, że waste (odpady) jest wliczony do consumed (bo to materiał zużyty, choć nie „good”).
+
+Aktualizacje stanów i traceability: Po konsumpcji:
+
+Aktualizuj license_plates (ilości/stan).
+
+Dla nowych LP wyjściowych (z completeOperation) zapewnij wpisy i genealogie wejście→wyjście.
+
+Operacje konsumpcji + output + inwentarz transakcyjnie (all-or-nothing).
+
+Raporty czasowe konsumpcji: Podobnie jak yield, filtruj po czasie:
+
+Dzienny: zużycie dziś vs plan dla dzisiejszych ukończonych WO.
+
+Tygodniowy/Miesięczny: sumy required i consumed w oknie czasu.
+
+Dodaj wiersz sumaryczny: „Total variance w okresie: …”.
+
+Eksport Excel (Consumption): (Później) Dodaj eksport tabeli konsumpcji do Excel/CSV.
+
+Przyszła analityka konsumpcji: Post-MVP Consumption Dashboard:
+
+Top materiały z największym odchyleniem.
+
+Serie czasowe zużycia vs plan.
+
+Wpływ kosztowy (jeśli dostępne koszty).
+
+Tagowanie przyczyn odchyleń (scrap, rework itp.) – spójne z raportami niezgodności.
+
+4.4 Zarządzanie Operacjami (workflow i UI)
+
+Komponent OperationsTab: W szczegółach WO wyświetl listę operacji (wo_operations) – prosta tabela (brak „workflow graficznego” na start). Kolumny: nazwa operacji (ze słownika/routingu), sekwencja, maszyna (jeśli przypisana), status (planned/in_progress/completed), metryki (np. output/yield%). Wyróżnij operację bieżącą.
+
+Start/Complete Operation: Zaimplementuj uruchamianie i kończenie operacji:
+
+Start może ustawiać wo_operations.status = in_progress (jeśli śledzimy jawnie). Waliduj rezerwacje materiałów (staged).
+
+Complete = WorkOrdersAPI.completeOperation(woId, seq, data):
+
+Sprawdź sekwencję (poprzednia ukończona).
+
+Sprawdź ewentualny QA (przyszłe rozszerzenie – na razie pomiń lub ostrzegaj).
+
+Konsumuj wejścia (ConsumeAPI) i rejestruj wyjścia (YieldAPI).
+
+Zapisz wagi/ilości, ustaw „completed”, przejdź do następnej.
+
+UI: operator wyzwala „Complete” (skaner/przycisk). RecordWeightsModal (niżej) przechwytuje dane.
+
+Śledzenie wag per operacja: Dla procesów wagowych:
+
+Rozszerz zapis yield o wagę (gdy jednostką produktu jest waga). output_qty reprezentuje odpowiednią jednostkę (szt./kg). UI czytelnie opisuje jednostkę.
+
+RecordWeightsModal: modal do wpisu wagi/ilości oraz odpadu. Pokazuje oczekiwane i pozwala wprowadzić faktyczne. Po zatwierdzeniu wywołuje YieldAPI.recordYield lub completeOperation z danymi. Może pokazać wejściowe materiały do potwierdzenia.
+
+Walidacje 1:1 w ważeniu: W modalu/ API egzekwuj 1:1:
+
+Dla komponentu 1:1 użycie więcej niż jednego wejściowego LP dla jednego wyjścia – błąd.
+
+Sprawdzenie bilansu masy: output_qty + waste_qty ≤ suma wejść. Przekroczenie → błąd.
+
+Przy wielu wyjściach z jednego LP (w 1:1 najlepiej niedozwolone) – pilnuj sum.
+
+Aktualizacja statusów w (quasi)-RT: Po ukończeniu operacji odśwież stan w UI (refetch/polling). WebSocket/SSE później; na MVP wystarczy odświeżanie ręczne/okresowe. Supervisor zobaczy zmiany bez przeładowań ręcznych (np. auto-refresh).
+
+Prosta wizualizacja postępu: Lista + wyróżnienie bieżącej operacji; opcjonalnie pasek postępu („2/5 zakończone”). Wykorzystaj API „stage status”.
+
+Przyszłe rozszerzenia workflow: Post-MVP:
+
+Interaktywny workflow (diagram/kanban).
+
+Real-time monitoring zbiorczy.
+
+Operations Dashboard: czasy cykli, wąskie gardła; potrzebne znaczniki started_at/completed_at w wo_operations.
+
+Punkty QA: blokady i akceptacje (dodatkowy stan „pending QA”).
+
+4.5 Dashboard Produkcji i Analityka
+
+Production Overview Dashboard: Zaprojektuj ekran przeglądowy:
+
+Karty KPI: „WO w toku: X”, „Wyprodukowane dziś: N”, „Yield dziś: Y%”, „Waste dziś: Z%”.
+
+Lista aktywnych WO: produkt, ilość, bieżąca operacja, ETA (opcjonalnie).
+
+Odświeżanie okresowe (np. co 1 min).
+
+Monitoring przybliżony do RT:
+
+Wykorzystanie maszyn: jeśli machine_id w WO, pokaż które maszyny są zajęte vs wolne.
+
+Throughput: ile WO zakończono dziś/tydzień.
+
+Alerty: WO po terminie, operacja zbyt długo w toku (na razie proste progi).
+
+Wykresy wykorzystania zasobów: Prosty słupek/wskaźnik dla zajętości maszyn (np. % maszyn z aktywnym WO). Na start liczba/tekst też wystarczy.
+
+Wizualizacja KPI produkcji: Priorytetowe wskaźniki:
+
+Yield, Throughput, On-time Delivery, Waste.
+
+Na MVP – wartości liczbowe; później sparklines/strzałki trendu. Aktualizowane wraz z danymi (odświeżanie okresowe).
+
+Link do planowania: Szybkie przejście do modułu Planning / tworzenia WO. Ewentualna podstawowa edycja z Dashboardu w przyszłości.
+
+Zbieranie danych pod analitykę: Loguj kluczowe znaczniki czasu:
+
+actual_start/actual_end w work_orders (jeśli brak – dodać).
+
+started_at/completed_at w wo_operations.
+
+To umożliwi KPI i wydajnościowe analizy w następnych etapach.
+
+Przyszła analityka produkcji: Post-MVP rozbudowa:
+
+Zaawansowane wykresy (produkcja w czasie, per produkt/maszyna/zmiana).
+
+Trendy KPI (week-over-week vs cele).
+
+Drill-down z KPI do raportów Yield/Consume.
+
+Personalizowane panele. Projektuj teraz elastyczny layout.
+
+Dodatkowe uwagi
+
+Migracje & schema: W trakcie implementacji mogą być potrzebne zmiany w DB (np. consumed_qty w wo_materials, flaga consume_whole_lp na poziomie BOM; actual_start/actual_end w work_orders). Migracje muszą być kompatybilne wstecz i udokumentowane.
+
+Integracja z istniejącymi modułami:
+
+BOM z Planning → snapshot do wo_materials przy tworzeniu WO.
+
+Stany magazynowe – aktualizacje poprzez LP; unikaj podwójnych odjęć gdzie indziej.
+
+Traceability – zapisuj genealogie przy konsumpcji/produkcji, by TraceabilityAPI miał dane.
+
+Jakość – odpady/odchylenia będą zasilały raporty jakości; flaguj scrap/waste jednoznacznie.
+
+Walidacje i komunikaty:
+
+Brak rezerwacji → błąd („Materials not staged/reserved…”).
+
+Yield > 100% lub dane nierealne → ostrzeżenie/odrzucenie.
+
+Zamknięcie WO przy niewykorzystanych rezerwacjach → prompt do zwrotu na stan lub oznaczenia jako waste (ManualConsumeModal).
+
+To poprawia jakość danych i redukuje potrzebę „pełnej weryfikacji” później.
+
+Wydajność: Indeksy pod filtry czasowe/statusy; paginacja w UI dla dużych zakresów. Konsumpcja/yield/inwentarz – transakcyjnie. Uwaga na konflikty rezerwacji.
+
+Testy:
+
+Yield workflow: API poprawnie tworzy production_outputs, liczy yield, aktualizuje statusy; przypadki brzegowe (0 output, 100% yield).
+
+Consumption & variance: konsumpcja po operacji aktualizuje consumed i variance; nadkonsumpcja zaznaczona.
+
+Sekwencja: kończenie poza kolejnością – blokowane.
+
+1:1: użycie >1 LP dla 1:1 – błąd.
+
+Testy regresji przy rozszerzeniach.
+
+Dokumentacja & szkolenia: Zaktualizuj przewodnik modułu Produkcji o nowe API/UI. Opisz korzystanie z raportów Yield/Consume i interpretację odchyleń. Rozważ krótki manual dla operatorów (start/complete, ważenie, błędy). Dodaj typy TS dla danych wykresów/raportów (wymogi type-safety).
+
+Plan funkcji post-MVP: Utrzymuj listę TODO (w TODO2.md/tracker) dla przyszłych rozszerzeń (dashboardy, analityka, QA). Ten plan pokrywa krytyczne P0 (egzekucja, podstawowe yield & consumption). KPI/analizy/trace wizualny – następne fazy. Projektuj teraz z myślą o łatwym rozszerzaniu.
+
+Pytania otwarte (doprecyzowanie)
+
+Szczegóły walidacji Cross-WO: Czy chodzi o blokadę zużycia zarezerwowanych surowców/PR z jednego WO w innym bez jawnego powiązania? Potwierdź, aby poprawnie ustawić kontrole.
+
+„G/A” przy zamknięciu WO: Czy „G/A” = Good/Accepted vs waste? Rejestrujemy output_qty i waste_qty per operacja. Czy na zamknięciu WO potrzebny dodatkowy krok potwierdzenia sumarycznego Good/Waste? Czym różni się to od sumy operacji? Może to związać z akceptacją jakościową – proszę o doprecyzowanie.
+
+Obsługa nadstagingu: Jeśli wystagowano więcej niż finalnie zużyto (np. 110 vs 100), czy system ma proponować zwrot na stan (consumed=100, variance=0, 10 wraca) czy liczyć niezużyte jako niedokonsumpcja (variance ujemne)? Czy pozostałość tworzy nowy LP resztkowy, czy pozostaje na tym samym LP? Jasne reguły są kluczowe dla inventory i raportów.
+
+Zakres wymuszania consume_whole_lp: Czy reguła dotyczy wybranych pozycji BOM (flaga per pozycja) czy klas materiałów? Gdzie definiujemy flagę (BOM vs produkt)? Jeśli LP zawiera więcej niż potrzeba, a reguła wymaga całości – czy nadwyżka automatycznie staje się waste? (domyślnie tak, jeśli częściowe użycie jest zabronione).
+
+Mechanizm „real-time”: Czy na Dashboardzie wymagamy push (WebSocket/SSE) już teraz, czy wystarczy odświeżanie okresowe na MVP? Push wymaga dodatkowej infrastruktury – preferujemy polling, o ile nie ma twardego wymagania RT.
+
+Interfejs planowania produkcji: W Dashboardzie Produkcji wystarczy link do modułu Planning, czy przewidujemy tworzenie/planowanie WO bezpośrednio stąd? To zdeterminuje, czy potrzebujemy elementów planowania w tym module.
+
+Priorytety KPI: Które KPI są najważniejsze na start (yield, waste, on-time, wykorzystanie maszyn…)? Proszę o ranking – ułatwi to priorytetyzację elementów Dashboardu.
+
 5.0 Warehouse Module - Inventory
 5.1 Goods Receipt Notes (GRN)
 

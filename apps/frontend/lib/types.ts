@@ -98,6 +98,7 @@ export interface WorkOrder {
     status: string;
   };
   line_number?: string;
+  line_id?: number;  // Production line FK
   priority?: number;
   created_at: string;
   updated_at: string;
@@ -175,6 +176,23 @@ export interface Machine {
 
 export type CreateMachineData = Omit<Machine, 'id' | 'created_at' | 'updated_at'>;
 export type UpdateMachineData = Partial<CreateMachineData>;
+
+// Production Lines
+export interface ProductionLine {
+  id: number;
+  code: string;
+  name: string;
+  status: 'active' | 'inactive';
+  warehouse_id: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+}
+
+export type CreateProductionLineData = Omit<ProductionLine, 'id' | 'created_at' | 'updated_at'>;
+export type UpdateProductionLineData = Partial<CreateProductionLineData>;
 
 export interface Supplier {
   id: number;
@@ -482,6 +500,7 @@ export interface ProductInsert {
   uom: string;
   product_group?: ProductGroup;
   product_type?: ProductType;
+  product_version?: string;  // Product version
   is_active?: boolean;
   supplier_id?: number | null;
   tax_code_id?: number | null;

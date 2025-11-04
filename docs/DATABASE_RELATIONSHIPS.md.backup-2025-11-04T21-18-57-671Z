@@ -61,10 +61,6 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `users.created_by` → `users.id`
 - `users.updated_by` → `users.id`
 - `bom_history.changed_by` → `users.id`
-- `production_lines.created_by` → `users.id`
-- `production_lines.updated_by` → `users.id`
-- `routing_operation_names.created_by` → `users.id`
-- `routing_operation_names.updated_by` → `users.id`
 
 ### products
 
@@ -224,7 +220,6 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `to_header.from_wh_id` → `warehouses.id`
 - `to_header.to_wh_id` → `warehouses.id`
 - `locations.warehouse_id` → `warehouses.id`
-- `production_lines.warehouse_id` → `warehouses.id`
 
 ### to_header
 
