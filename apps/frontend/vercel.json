@@ -1,9 +1,9 @@
 {
   "version": 2,
+  "buildCommand": "pnpm install && pnpm build",
+  "outputDirectory": ".next",
+  "installCommand": "pnpm install --no-frozen-lockfile",
   "framework": "nextjs",
-  "env": {
-    "NODE_ENV": "production"
-  },
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 30

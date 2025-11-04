@@ -352,7 +352,8 @@ export function TransferOrdersTable() {
                     </div>
                   </td>
                 </tr>
-              ))
+              )}
+            )
             )}
           </tbody>
         </table>
@@ -369,5 +370,5 @@ export function TransferOrdersTable() {
         onSuccess={handleEditSuccess}
       />
     </>
-  );
+  )
 }

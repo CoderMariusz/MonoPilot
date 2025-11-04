@@ -46,6 +46,9 @@ jobs:
       - name: Run unit tests
         run: pnpm test:unit
 
+      - name: Install Playwright browsers
+        run: cd apps/frontend && pnpm playwright:install
+
       - name: Run E2E tests (auth module)
         run: pnpm test:e2e:critical
         env:

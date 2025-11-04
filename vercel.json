@@ -1,9 +1,0 @@
-{
-  "version": 2,
-  "framework": "nextjs",
-  "buildCommand": "cd apps/frontend && pnpm install && pnpm build",
-  "outputDirectory": "apps/frontend/.next",
-  "installCommand": "pnpm install",
-  "rootDirectory": "apps/frontend"
-}
-
