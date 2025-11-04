@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { usePurchaseOrders, useProducts, addGRN, addLicensePlate, addStockMove, useSettings } from '@/lib/clientState';
 import { LocationsAPI } from '@/lib/api/locations';
@@ -26,6 +26,21 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
   const settings = useSettings();
   const [selectedPO, setSelectedPO] = useState<number | null>(null);
   const [lineItems, setLineItems] = useState<GRNLineItem[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const data = await LocationsAPI.getAll();
+        setLocations(data);
+      } catch (error) {
+        console.error('Failed to load locations:', error);
+      }
+    };
+    if (isOpen) {
+      loadLocations();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -36,11 +51,12 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
     setSelectedPO(poId);
     const po = purchaseOrders.find(p => p.id === poId);
     if (po?.purchase_order_items) {
+      const defaultLocationId = locations.length > 0 ? locations[0].id : (settings.warehouse?.default_location_id || 0);
       setLineItems(po.purchase_order_items.map(item => ({
         product_id: item.product_id,
         quantity_ordered: item.quantity_ordered.toString(),
         quantity_received: item.quantity_received.toString(),
-        location_id: mockLocations[0].id,
+        location_id: defaultLocationId,
       })));
     }
   };
