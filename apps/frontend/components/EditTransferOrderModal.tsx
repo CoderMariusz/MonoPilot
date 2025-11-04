@@ -117,12 +117,15 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
       
       const transfer_order_items = transferItems.map((item, index) => {
         const product = products.find(p => p.id === Number(item.product_id));
+        const quantityNum = typeof item.quantity === 'string' ? Number(item.quantity) || 0 : item.quantity || 0;
         return {
           id: Number(item.id) || (Date.now() + index),
           transfer_order_id: transferOrderId,
           product_id: Number(item.product_id),
           product,
-          quantity: item.quantity,
+          quantity: quantityNum,
+          quantity_planned: quantityNum,
+          quantity_actual: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };

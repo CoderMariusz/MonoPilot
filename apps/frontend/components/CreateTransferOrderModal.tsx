@@ -87,12 +87,15 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
       
       const transfer_order_items = transferItems.map((item, index) => {
         const product = products.find(p => p.id === Number(item.product_id));
+        const quantityNum = Number(item.quantity) || 0;
         return {
           id: Date.now() + index,
           transfer_order_id: 0,
           product_id: Number(item.product_id),
           product,
-          quantity: item.quantity,
+          quantity: quantityNum,
+          quantity_planned: quantityNum,
+          quantity_actual: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
