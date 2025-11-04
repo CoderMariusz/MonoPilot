@@ -39,22 +39,6 @@ export class LicensePlatesAPI {
       location_counts: Record<string, number>;
     };
   }> {
-    ,
-            available_qty: 100,
-            reserved_qty: 0,
-            created_at: '2024-01-15T10:00:00Z',
-            updated_at: '2024-01-15T10:00:00Z'
-          }
-        ],
-        summary: {
-          total_lps: 1,
-          total_quantity: 100,
-          qa_status_counts: { 'Passed': 1 },
-          location_counts: { 'Main Warehouse': 1 }
-        }
-      };
-    }
-
     try {
       let query = supabase
         .from('license_plates')
@@ -186,9 +170,6 @@ export class LicensePlatesAPI {
       pallet_code: string;
     }>;
   }> {
-    ;
-    }
-
     try {
       // Get LP number first
       const { data: lpData, error: lpError } = await supabase
@@ -277,26 +258,6 @@ export class LicensePlatesAPI {
       move_date: string;
     }>;
   }> {
-    ,
-        location: {
-          id: 1,
-          name: 'Main Warehouse',
-          code: 'MW-001'
-        },
-        quantity: 100,
-        qa_status: 'Passed',
-        stage_suffix: null,
-        parent_lp: null,
-        origin: {
-          type: 'GRN',
-          ref: { grn_id: 1 }
-        },
-        reservations: [],
-        compositions: [],
-        stock_moves: []
-      };
-    }
-
     try {
       // Get LP with all related data
       const { data: lpData, error: lpError } = await supabase

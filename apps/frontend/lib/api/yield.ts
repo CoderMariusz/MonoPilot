@@ -29,16 +29,6 @@ export class YieldAPI {
       total_output_kg: number;
     };
   }> {
-    ],
-        summary: {
-          total_work_orders: 3,
-          avg_yield_percent: 90.0,
-          total_input_kg: 1500,
-          total_output_kg: 1350
-        }
-      };
-    }
-
     try {
       let viewName: string;
       switch (params.bucket) {
@@ -122,16 +112,6 @@ export class YieldAPI {
       total_waste_kg: number;
     };
   }> {
-    ],
-        summary: {
-          total_work_orders: 2,
-          avg_yield_percent: 79.17,
-          total_boxes: 95,
-          total_waste_kg: 62.5
-        }
-      };
-    }
-
     try {
       let viewName: string;
       switch (params.bucket) {

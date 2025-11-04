@@ -34,17 +34,6 @@ export class ConsumeAPI {
       total_variance_kg: number;
     };
   }> {
-    ],
-        summary: {
-          total_materials: 1,
-          avg_variance_percent: -5.0,
-          total_standard_kg: 100,
-          total_actual_kg: 95,
-          total_variance_kg: -5
-        }
-      };
-    }
-
     try {
       let query = supabase.from('vw_consume').select('*');
 
@@ -107,9 +96,6 @@ export class ConsumeAPI {
     work_order_count: number;
     one_to_one_count: number;
   }>> {
-    ];
-    }
-
     try {
       const { data, error } = await supabase
         .from('vw_consume')
@@ -189,9 +175,6 @@ export class ConsumeAPI {
     variance_percent: number;
     work_order_count: number;
   }>> {
-    ];
-    }
-
     try {
       // This would require a more complex query to group by time buckets
       // For now, return the basic consumption data
