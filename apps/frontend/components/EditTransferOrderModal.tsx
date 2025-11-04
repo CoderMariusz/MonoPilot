@@ -31,10 +31,14 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
     from_warehouse_id: string;
     to_warehouse_id: string;
     status: 'draft' | 'submitted' | 'in_transit' | 'received' | 'cancelled';
+    planned_ship_date: string;
+    planned_receive_date: string;
   }>({
     from_warehouse_id: '',
     to_warehouse_id: '',
     status: 'draft',
+    planned_ship_date: '',
+    planned_receive_date: '',
   });
 
   const [transferItems, setTransferItems] = useState<TransferItem[]>([
@@ -59,6 +63,8 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
           from_warehouse_id: to.from_warehouse_id?.toString() || '',
           to_warehouse_id: to.to_warehouse_id?.toString() || '',
           status: to.status as 'draft' | 'submitted' | 'in_transit' | 'received' | 'cancelled',
+          planned_ship_date: to.planned_ship_date ? new Date(to.planned_ship_date).toISOString().split('T')[0] : '',
+          planned_receive_date: to.planned_receive_date ? new Date(to.planned_receive_date).toISOString().split('T')[0] : '',
         });
 
         if (to.transfer_order_items && to.transfer_order_items.length > 0) {
@@ -126,6 +132,8 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
         to_warehouse_id: Number(formData.to_warehouse_id),
         to_warehouse,
         status: formData.status,
+        planned_ship_date: formData.planned_ship_date || undefined,
+        planned_receive_date: formData.planned_receive_date || undefined,
         transfer_order_items,
       });
       
@@ -203,6 +211,52 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Planned Ship Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.planned_ship_date}
+                    onChange={(e) => setFormData({ ...formData, planned_ship_date: e.target.value })}
+                    disabled={formData.status !== 'draft' && formData.status !== 'submitted'}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    {formData.status !== 'draft' && formData.status !== 'submitted' 
+                      ? 'Cannot edit after submission' 
+                      : 'Optional: When goods will be shipped'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Planned Receive Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.planned_receive_date}
+                    onChange={(e) => {
+                      const receiveDate = e.target.value;
+                      if (formData.planned_ship_date && receiveDate < formData.planned_ship_date) {
+                        setError('Planned receive date must be after planned ship date');
+                        return;
+                      }
+                      setFormData({ ...formData, planned_receive_date: receiveDate });
+                    }}
+                    min={formData.planned_ship_date || undefined}
+                    disabled={formData.status !== 'draft' && formData.status !== 'submitted'}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    {formData.status !== 'draft' && formData.status !== 'submitted' 
+                      ? 'Cannot edit after submission' 
+                      : 'Optional: When goods should arrive'}
+                  </p>
                 </div>
               </div>
 

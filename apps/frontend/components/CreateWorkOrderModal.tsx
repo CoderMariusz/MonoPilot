@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { useMachines, useProducts } from '@/lib/clientState';
+import { useMachines, useProducts, useTransferOrders } from '@/lib/clientState';
+import { supabase } from '@/lib/supabase/client-browser';
 import type { Product, WorkOrder } from '@/lib/types';
 
 interface CreateWorkOrderModalProps {
@@ -16,8 +17,11 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
   const machines = useMachines();
   const { products: allProducts } = useProducts();
   const products = allProducts?.filter(p => p.product_type === 'PR' || p.product_type === 'FG') || [];
+  const transferOrders = useTransferOrders();
   const [loading, setLoading] = useState(false);
+  const [loadingBoms, setLoadingBoms] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableBoms, setAvailableBoms] = useState<Array<{id: number; version: number; status: string}>>([]);
   
   const [formData, setFormData] = useState({
     product_id: '',
@@ -27,9 +31,67 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
     scheduled_end: '',
     machine_id: '',
     status: 'planned' as WorkOrder['status'],
+    source_demand_type: 'Manual' as 'Manual' | 'TO' | 'PO' | 'SO',
+    source_demand_id: '',
+    bom_id: '',
   });
 
   const selectedProduct = products.find(p => p.id === Number(formData.product_id));
+
+  // Load BOMs when product changes
+  useEffect(() => {
+    if (formData.product_id) {
+      loadBoms(Number(formData.product_id));
+    } else {
+      setAvailableBoms([]);
+      setFormData(prev => ({ ...prev, bom_id: '' }));
+    }
+  }, [formData.product_id]);
+
+  const loadBoms = async (productId: number) => {
+    setLoadingBoms(true);
+    try {
+      const { data, error } = await supabase
+        .from('boms')
+        .select('id, version, status')
+        .eq('product_id', productId)
+        .in('status', ['active', 'draft'])
+        .order('version', { ascending: false });
+      
+      if (error) throw error;
+      
+      setAvailableBoms(data || []);
+      
+      // Auto-select latest active BOM if available
+      const activeBom = data?.find(b => b.status === 'active');
+      if (activeBom) {
+        setFormData(prev => ({ ...prev, bom_id: activeBom.id.toString() }));
+      } else if (data && data.length > 0) {
+        // Or select latest BOM if no active
+        setFormData(prev => ({ ...prev, bom_id: data[0].id.toString() }));
+      }
+    } catch (err: any) {
+      console.error('Error loading BOMs:', err);
+      setAvailableBoms([]);
+    } finally {
+      setLoadingBoms(false);
+    }
+  };
+
+  // Auto-fill quantity from TO if source is TO
+  const selectedTO = formData.source_demand_type === 'TO' && formData.source_demand_id
+    ? transferOrders.find(to => to.id === Number(formData.source_demand_id))
+    : null;
+
+  useEffect(() => {
+    if (selectedTO && selectedTO.transfer_order_items && selectedTO.transfer_order_items.length > 0) {
+      // Pre-fill quantity from first TO item (could be enhanced to match product)
+      const firstItem = selectedTO.transfer_order_items[0];
+      if (firstItem.quantity && !formData.quantity) {
+        setFormData(prev => ({ ...prev, quantity: firstItem.quantity.toString() }));
+      }
+    }
+  }, [selectedTO]);
 
   const calculateAvailableLines = () => {
     if (!selectedProduct) {
@@ -59,6 +121,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         scheduled_end: editingWorkOrder.scheduled_end || '',
         machine_id: editingWorkOrder.machine_id?.toString() || '',
         status: editingWorkOrder.status || 'planned',
+        source_demand_type: (editingWorkOrder.source_demand_type as 'Manual' | 'TO' | 'PO' | 'SO') || 'Manual',
+        source_demand_id: editingWorkOrder.source_demand_id?.toString() || '',
+        bom_id: editingWorkOrder.bom_id?.toString() || '',
       });
     } else {
       setFormData({
@@ -111,6 +176,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
           machine_id: formData.machine_id || null,
           machine,
           line_number: null,
+          source_demand_type: formData.source_demand_type === 'Manual' ? undefined : formData.source_demand_type,
+          source_demand_id: formData.source_demand_id ? Number(formData.source_demand_id) : undefined,
+          bom_id: formData.bom_id ? Number(formData.bom_id) : undefined,
         });
       }
       
@@ -124,6 +192,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         scheduled_end: '',
         machine_id: '',
         status: 'planned',
+        source_demand_type: 'Manual',
+        source_demand_id: '',
+        bom_id: '',
       });
     } catch (err: any) {
       setError(err.message || `Failed to ${editingWorkOrder ? 'update' : 'create'} work order`);
@@ -266,6 +337,81 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Source
+              </label>
+              <select
+                value={formData.source_demand_type}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  source_demand_type: e.target.value as 'Manual' | 'TO' | 'PO' | 'SO',
+                  source_demand_id: '' // Reset when source changes
+                })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+              >
+                <option value="Manual">Manual</option>
+                <option value="TO">From Transfer Order</option>
+                <option value="PO">From Purchase Order</option>
+                <option value="SO">From Sales Order</option>
+              </select>
+            </div>
+
+            {formData.source_demand_type === 'TO' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Transfer Order
+                </label>
+                <select
+                  value={formData.source_demand_id}
+                  onChange={(e) => setFormData({ ...formData, source_demand_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                >
+                  <option value="">Select Transfer Order...</option>
+                  {transferOrders
+                    .filter(to => to.status !== 'cancelled' && to.status !== 'closed')
+                    .map((to) => (
+                      <option key={to.id} value={to.id}>
+                        {to.to_number} - {to.from_warehouse?.name} → {to.to_warehouse?.name}
+                      </option>
+                    ))}
+                </select>
+                {selectedTO && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Selected: {selectedTO.to_number} ({selectedTO.transfer_order_items?.length || 0} items)
+                  </p>
+                )}
+              </div>
+            )}
+
+            {formData.product_id && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  BOM {loadingBoms && <span className="text-xs text-slate-500">(Loading...)</span>}
+                </label>
+                <select
+                  value={formData.bom_id}
+                  onChange={(e) => setFormData({ ...formData, bom_id: e.target.value })}
+                  disabled={loadingBoms || availableBoms.length === 0}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">{availableBoms.length === 0 ? 'No BOMs available' : 'Select BOM...'}</option>
+                  {availableBoms.map((bom) => (
+                    <option key={bom.id} value={bom.id}>
+                      BOM v{bom.version} ({bom.status})
+                    </option>
+                  ))}
+                </select>
+                {availableBoms.length > 0 && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    {availableBoms.find(b => b.status === 'active') 
+                      ? 'Active BOM auto-selected' 
+                      : 'Using latest BOM version'}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">

@@ -197,6 +197,158 @@ sequenceDiagram
     UI-->>S: Show success message
 ```
 
+## Transfer Orders - Shipping & Receiving Workflow
+
+### Overview
+Transfer Orders now support a complete shipping and receiving workflow with planned and actual dates for tracking material movement between warehouses.
+
+### Date Fields
+
+**Planned Dates**:
+- `planned_ship_date`: Planned date for shipping goods from source warehouse
+- `planned_receive_date`: Planned date for receiving goods at destination warehouse
+
+**Actual Dates**:
+- `actual_ship_date`: Actual date when goods were shipped (set via `markShipped()`)
+- `actual_receive_date`: Actual date when goods were received (set via `markReceived()`)
+
+### Status Workflow
+```
+draft → submitted → in_transit → received → closed
+                ↑              ↑
+          markShipped()   markReceived()
+```
+
+### API Methods
+
+**markShipped()**:
+```typescript
+// Marks transfer order as shipped
+const result = await TransferOrdersAPI.markShipped(toId, actualShipDate?);
+// Sets actual_ship_date and updates status to 'in_transit'
+// Only works if current status is 'submitted'
+```
+
+**markReceived()**:
+```typescript
+// Marks transfer order as received
+const result = await TransferOrdersAPI.markReceived(toId, actualReceiveDate?);
+// Sets actual_receive_date and updates status to 'received'
+// Only works if current status is 'in_transit'
+```
+
+### Tracking Fields (Line Items)
+- `lp_id`: License Plate ID for tracking specific pallets during transfer
+- `batch`: Batch/lot number of transferred material
+
+### Validation Rules
+- `planned_receive_date` must be after or equal to `planned_ship_date`
+- Status transitions are enforced: can only mark as shipped if status is 'submitted'
+- Status transitions are enforced: can only mark as received if status is 'in_transit'
+
+### UI Components
+- **TransferOrdersTable**: Displays 4 date columns (Planned Ship, Actual Ship, Planned Receive, Actual Receive)
+- **TransferOrderDetailsModal**: Shows shipping & receiving section with action buttons (Mark as Shipped, Mark as Received)
+- **CreateTransferOrderModal**: Includes planned_ship_date and planned_receive_date fields
+- **EditTransferOrderModal**: Allows editing planned dates (disabled after submission)
+
+## Purchase Orders - Payment Terms & Currency
+
+### Overview
+Purchase Orders now support multi-currency transactions with separate payment due dates and exchange rate tracking.
+
+### Financial Fields
+
+**Currency & Exchange Rate**:
+- `currency`: Currency code (e.g., 'USD', 'EUR', 'GBP', 'PLN')
+- `exchange_rate`: Exchange rate to base currency (default: 1.0 for USD)
+
+**Payment Terms**:
+- `payment_due_date`: Payment deadline (e.g., Net 30 from invoice date)
+- Separate from delivery dates (`requested_delivery_date`, `promised_delivery_date`)
+
+**Totals**:
+- `net_total`: Total amount excluding VAT
+- `vat_total`: Total VAT amount
+- `gross_total`: Total amount including VAT (calculated as net_total + vat_total)
+
+### Currency Handling
+
+**Default Currency**:
+- Default currency is 'USD' with exchange_rate = 1.0
+- When currency is changed from 'USD', exchange_rate field becomes visible
+
+**Exchange Rate Calculation**:
+- Exchange rates are stored as decimal values (e.g., 1.2345)
+- Used for converting order totals to base currency for reporting
+
+### UI Components
+- **PurchaseOrdersTable**: Displays Payment Due, Currency, and Total Amount columns
+- **PurchaseOrderDetailsModal**: Shows Financial Information section with currency, exchange rate, payment due date, and total amount
+- **CreatePurchaseOrderModal**: Includes currency dropdown, exchange rate input (conditional), and payment due date field
+- **EditPurchaseOrderModal**: Allows editing all financial fields
+
+### Business Rules
+- Currency must be a valid 3-character code
+- Exchange rate must be positive (> 0)
+- Payment due date is optional but recommended for tracking payment deadlines
+- Total amounts are calculated automatically from line items (quantity * unit_price * (1 + vat_rate/100))
+
+## Work Orders - Source Tracking & Execution Times
+
+### Overview
+Work Orders now track their source of demand and actual execution times for better production planning and traceability.
+
+### Source Demand Tracking
+
+**Source Fields**:
+- `source_demand_type`: Source of demand - 'Manual' | 'TO' | 'PO' | 'SO'
+- `source_demand_id`: ID of the source demand (Transfer Order, Purchase Order, or Sales Order)
+
+**Source Types**:
+- **Manual**: Work order created manually (no source_demand_id)
+- **TO**: Created from Transfer Order (source_demand_id references `to_header.id`)
+- **PO**: Created from Purchase Order (source_demand_id references `po_header.id`)
+- **SO**: Created from Sales Order (source_demand_id references sales order)
+
+### Execution Time Tracking
+
+**Scheduled Times**:
+- `scheduled_start`: Planned start date/time for production
+- `scheduled_end`: Planned completion date/time (also used as `due_date`)
+
+**Actual Times**:
+- `actual_start`: Actual start date/time when production began
+- `actual_end`: Actual completion date/time
+
+### BOM Tracking
+- `bom_id`: BOM version used for this work order
+- BOM is automatically selected when creating WO from source demand
+- Active BOM is preferred, or latest draft BOM if no active exists
+
+### User Tracking
+- `created_by`: User who created the work order
+
+### UI Components
+- **WorkOrdersTable**: Displays Scheduled End, Actual Start, Actual End, and Source columns
+- **WorkOrderDetailsModal**: Shows "Execution Times" section (scheduled vs actual) and "Source & BOM" section (source demand, BOM version, created by)
+- **CreateWorkOrderModal**: Includes Source dropdown (Manual/TO/PO/SO), conditional Source ID selection (for TO), and BOM selection dropdown
+
+### Workflow Integration
+
+**Creating WO from Transfer Order**:
+1. Select Source = 'TO'
+2. Select Transfer Order from dropdown
+3. Quantity is pre-filled from first TO line item
+4. BOM is auto-selected based on product
+5. `source_demand_type` = 'TO', `source_demand_id` = selected TO ID
+
+**Creating WO Manually**:
+1. Select Source = 'Manual'
+2. Select product and quantity
+3. BOM is auto-selected based on product
+4. `source_demand_type` = 'Manual', `source_demand_id` = NULL
+
 ## Material Requirement Calculation
 
 ### MRP Logic

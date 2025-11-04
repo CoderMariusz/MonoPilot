@@ -30,6 +30,8 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
     from_warehouse_id: '',
     to_warehouse_id: '',
     status: 'draft' as const,
+    planned_ship_date: '',
+    planned_receive_date: '',
   });
 
   const [transferItems, setTransferItems] = useState<TransferItem[]>([
@@ -104,6 +106,8 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
         to_warehouse,
         status: formData.status,
         transfer_date: new Date().toISOString(),
+        planned_ship_date: formData.planned_ship_date || undefined,
+        planned_receive_date: formData.planned_receive_date || undefined,
         transfer_order_items,
       });
       
@@ -113,6 +117,8 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
         from_warehouse_id: '',
         to_warehouse_id: '',
         status: 'draft',
+        planned_ship_date: '',
+        planned_receive_date: '',
       });
       setTransferItems([{ id: '1', product_id: '', quantity: '' }]);
     } catch (err: any) {
@@ -187,6 +193,43 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Planned Ship Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.planned_ship_date}
+                    onChange={(e) => setFormData({ ...formData, planned_ship_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Optional: When goods will be shipped</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Planned Receive Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.planned_receive_date}
+                    onChange={(e) => {
+                      const receiveDate = e.target.value;
+                      // Validate: receive date must be >= ship date if both set
+                      if (formData.planned_ship_date && receiveDate < formData.planned_ship_date) {
+                        setError('Planned receive date must be after planned ship date');
+                        return;
+                      }
+                      setFormData({ ...formData, planned_receive_date: receiveDate });
+                    }}
+                    min={formData.planned_ship_date || undefined}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Optional: When goods should arrive</p>
                 </div>
               </div>
 

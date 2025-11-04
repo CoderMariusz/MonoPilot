@@ -26,15 +26,15 @@ export function TransferOrdersTable() {
     const query = searchQuery.toLowerCase();
     return transferOrders.filter(to => {
       const toNumber = to.to_number?.toLowerCase() || '';
-      const fromLocation = to.from_warehouse?.name?.toLowerCase() || '';
-      const toLocation = to.to_warehouse?.name?.toLowerCase() || '';
+      const fromWarehouse = to.from_warehouse?.name?.toLowerCase() || '';
+      const toWarehouse = to.to_warehouse?.name?.toLowerCase() || '';
       const itemCodes = to.transfer_order_items?.map(item => 
         item.product?.part_number?.toLowerCase() || ''
       ).join(' ') || '';
       
       return toNumber.includes(query) || 
-             fromLocation.includes(query) || 
-             toLocation.includes(query) || 
+             fromWarehouse.includes(query) || 
+             toWarehouse.includes(query) || 
              itemCodes.includes(query);
     });
   }, [transferOrders, searchQuery]);
@@ -50,13 +50,31 @@ export function TransferOrdersTable() {
           aVal = a.to_number;
           bVal = b.to_number;
           break;
+        case 'from_warehouse':
         case 'from_location':
           aVal = a.from_warehouse?.name || '';
           bVal = b.from_warehouse?.name || '';
           break;
+        case 'to_warehouse':
         case 'to_location':
           aVal = a.to_warehouse?.name || '';
           bVal = b.to_warehouse?.name || '';
+          break;
+        case 'planned_ship_date':
+          aVal = a.planned_ship_date ? new Date(a.planned_ship_date).getTime() : 0;
+          bVal = b.planned_ship_date ? new Date(b.planned_ship_date).getTime() : 0;
+          break;
+        case 'actual_ship_date':
+          aVal = a.actual_ship_date ? new Date(a.actual_ship_date).getTime() : 0;
+          bVal = b.actual_ship_date ? new Date(b.actual_ship_date).getTime() : 0;
+          break;
+        case 'planned_receive_date':
+          aVal = a.planned_receive_date ? new Date(a.planned_receive_date).getTime() : 0;
+          bVal = b.planned_receive_date ? new Date(b.planned_receive_date).getTime() : 0;
+          break;
+        case 'actual_receive_date':
+          aVal = a.actual_receive_date ? new Date(a.actual_receive_date).getTime() : 0;
+          bVal = b.actual_receive_date ? new Date(b.actual_receive_date).getTime() : 0;
           break;
         case 'status':
           aVal = a.status;
@@ -163,33 +181,66 @@ export function TransferOrdersTable() {
               </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
                 <button 
-                  onClick={() => handleSort('from_location')} 
+                  onClick={() => handleSort('from_warehouse')} 
                   className="flex items-center gap-1 hover:text-slate-900"
                 >
-                  From Location
-                  {sortColumn === 'from_location' ? (
+                  From Warehouse
+                  {sortColumn === 'from_warehouse' ? (
                     sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                   ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
                 </button>
               </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
                 <button 
-                  onClick={() => handleSort('to_location')} 
+                  onClick={() => handleSort('to_warehouse')} 
                   className="flex items-center gap-1 hover:text-slate-900"
                 >
-                  To Location
-                  {sortColumn === 'to_location' ? (
+                  To Warehouse
+                  {sortColumn === 'to_warehouse' ? (
                     sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                   ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
                 </button>
               </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
                 <button 
-                  onClick={() => handleSort('created_at')} 
+                  onClick={() => handleSort('planned_ship_date')} 
                   className="flex items-center gap-1 hover:text-slate-900"
                 >
-                  Date
-                  {sortColumn === 'created_at' ? (
+                  Planned Ship
+                  {sortColumn === 'planned_ship_date' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('actual_ship_date')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Actual Ship
+                  {sortColumn === 'actual_ship_date' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('planned_receive_date')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Planned Receive
+                  {sortColumn === 'planned_receive_date' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('actual_receive_date')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Actual Receive
+                  {sortColumn === 'actual_receive_date' ? (
                     sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                   ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
                 </button>
@@ -222,18 +273,29 @@ export function TransferOrdersTable() {
           <tbody>
             {sortedTransferOrders.length === 0 ? (
               <tr className="border-b border-slate-100">
-                <td colSpan={7} className="py-8 text-center text-slate-500 text-sm">
+                <td colSpan={10} className="py-8 text-center text-slate-500 text-sm">
                   {searchQuery ? 'No transfer orders found matching your search' : 'No transfer orders found'}
                 </td>
               </tr>
             ) : (
-              sortedTransferOrders.map(to => (
+              sortedTransferOrders.map(to => {
+                const formatDate = (dateString?: string) => {
+                  if (!dateString) return '–';
+                  return new Date(dateString).toLocaleDateString();
+                };
+                
+                return (
                 <tr key={to.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{to.to_number}</td>
                   <td className="py-3 px-4 text-sm">{to.from_warehouse?.name || '-'}</td>
                   <td className="py-3 px-4 text-sm">{to.to_warehouse?.name || '-'}</td>
-                  <td className="py-3 px-4 text-sm">
-                    {to.created_at ? new Date(to.created_at).toLocaleDateString() : '-'}
+                  <td className="py-3 px-4 text-sm">{formatDate(to.planned_ship_date)}</td>
+                  <td className={`py-3 px-4 text-sm ${to.actual_ship_date ? 'font-bold text-green-700' : ''}`}>
+                    {formatDate(to.actual_ship_date)}
+                  </td>
+                  <td className="py-3 px-4 text-sm">{formatDate(to.planned_receive_date)}</td>
+                  <td className={`py-3 px-4 text-sm ${to.actual_receive_date ? 'font-bold text-green-700' : ''}`}>
+                    {formatDate(to.actual_receive_date)}
                   </td>
                   <td className="py-3 px-4 text-sm">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${

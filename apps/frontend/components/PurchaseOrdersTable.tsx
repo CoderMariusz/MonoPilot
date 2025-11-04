@@ -64,6 +64,18 @@ export function PurchaseOrdersTable() {
           aVal = a.expected_delivery_date ? new Date(a.expected_delivery_date).getTime() : 0;
           bVal = b.expected_delivery_date ? new Date(b.expected_delivery_date).getTime() : 0;
           break;
+        case 'payment_due_date':
+          aVal = a.payment_due_date ? new Date(a.payment_due_date).getTime() : 0;
+          bVal = b.payment_due_date ? new Date(b.payment_due_date).getTime() : 0;
+          break;
+        case 'currency':
+          aVal = a.currency || 'USD';
+          bVal = b.currency || 'USD';
+          break;
+        case 'total_amount':
+          aVal = a.total_amount || a.gross_total || 0;
+          bVal = b.total_amount || b.gross_total || 0;
+          break;
         case 'buyer':
           aVal = a.buyer_name || '';
           bVal = b.buyer_name || '';
@@ -213,6 +225,39 @@ export function PurchaseOrdersTable() {
               </th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
                 <button 
+                  onClick={() => handleSort('payment_due_date')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Payment Due
+                  {sortColumn === 'payment_due_date' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('currency')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Currency
+                  {sortColumn === 'currency' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
+                  onClick={() => handleSort('total_amount')} 
+                  className="flex items-center gap-1 hover:text-slate-900"
+                >
+                  Total Amount
+                  {sortColumn === 'total_amount' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                </button>
+              </th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">
+                <button 
                   onClick={() => handleSort('buyer')} 
                   className="flex items-center gap-1 hover:text-slate-900"
                 >
@@ -250,12 +295,18 @@ export function PurchaseOrdersTable() {
           <tbody>
             {sortedPurchaseOrders.length === 0 ? (
               <tr className="border-b border-slate-100">
-                <td colSpan={9} className="py-8 text-center text-slate-500 text-sm">
+                <td colSpan={12} className="py-8 text-center text-slate-500 text-sm">
                   {searchQuery ? 'No purchase orders found matching your search' : 'No purchase orders found'}
                 </td>
               </tr>
             ) : (
-              sortedPurchaseOrders.map(po => (
+              sortedPurchaseOrders.map(po => {
+                const formatMoney = (amount?: number) => {
+                  if (!amount) return '0.00';
+                  return amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                };
+                
+                return (
                 <tr key={po.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{po.po_number}</td>
                   <td className="py-3 px-4 text-sm">{po.supplier?.name}</td>
@@ -265,6 +316,13 @@ export function PurchaseOrdersTable() {
                   </td>
                   <td className="py-3 px-4 text-sm">
                     {po.expected_delivery_date ? new Date(po.expected_delivery_date).toLocaleDateString() : '-'}
+                  </td>
+                  <td className="py-3 px-4 text-sm">
+                    {po.payment_due_date ? new Date(po.payment_due_date).toLocaleDateString() : '–'}
+                  </td>
+                  <td className="py-3 px-4 text-sm">{po.currency || 'USD'}</td>
+                  <td className="py-3 px-4 text-sm font-medium">
+                    {po.currency || 'USD'} {formatMoney(po.total_amount || po.gross_total)}
                   </td>
                   <td className="py-3 px-4 text-sm">{po.buyer_name || '-'}</td>
                   <td className="py-3 px-4 text-sm">
@@ -323,7 +381,8 @@ export function PurchaseOrdersTable() {
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

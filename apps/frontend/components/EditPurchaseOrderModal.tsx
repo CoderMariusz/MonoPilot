@@ -32,19 +32,25 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
   const [formData, setFormData] = useState<{
     supplier_id: string;
     due_date: string;
+    payment_due_date: string;
     status: 'draft' | 'sent' | 'submitted' | 'confirmed' | 'partially_received' | 'received' | 'cancelled' | 'closed';
     warehouse_id: string;
     request_delivery_date: string;
     expected_delivery_date: string;
+    currency: string;
+    exchange_rate: string;
     notes: string;
     buyer: string;
   }>({
     supplier_id: '',
     due_date: '',
+    payment_due_date: '',
     status: 'draft',
     warehouse_id: '',
     request_delivery_date: '',
     expected_delivery_date: '',
+    currency: 'USD',
+    exchange_rate: '1.0',
     notes: '',
     buyer: '',
   });
@@ -71,10 +77,13 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
         setFormData({
           supplier_id: po.supplier_id?.toString() || '',
           due_date: po.due_date || '',
+          payment_due_date: po.payment_due_date ? new Date(po.payment_due_date).toISOString().split('T')[0] : '',
           status: po.status,
           warehouse_id: po.warehouse_id?.toString() || '',
-          request_delivery_date: po.request_delivery_date || '',
-          expected_delivery_date: po.expected_delivery_date || '',
+          request_delivery_date: po.request_delivery_date ? new Date(po.request_delivery_date).toISOString().split('T')[0] : '',
+          expected_delivery_date: po.expected_delivery_date ? new Date(po.expected_delivery_date).toISOString().split('T')[0] : '',
+          currency: po.currency || 'USD',
+          exchange_rate: (po.exchange_rate || 1.0).toString(),
           notes: po.notes || '',
           buyer: po.buyer_name || '',
         });
@@ -155,6 +164,9 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
         supplier_id: Number(formData.supplier_id),
         status: formData.status,
         due_date: formData.due_date || null,
+        payment_due_date: formData.payment_due_date || undefined,
+        currency: formData.currency || 'USD',
+        exchange_rate: formData.currency !== 'USD' ? parseFloat(formData.exchange_rate) : 1.0,
         warehouse_id: formData.warehouse_id ? Number(formData.warehouse_id) : undefined,
         request_delivery_date: formData.request_delivery_date || undefined,
         expected_delivery_date: formData.expected_delivery_date || undefined,
@@ -259,6 +271,54 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
                     onChange={(e) => setFormData({ ...formData, expected_delivery_date: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Currency
+                  </label>
+                  <select
+                    value={formData.currency}
+                    onChange={(e) => setFormData({ ...formData, currency: e.target.value, exchange_rate: e.target.value === 'USD' ? '1.0' : formData.exchange_rate })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="PLN">PLN</option>
+                  </select>
+                </div>
+
+                {formData.currency !== 'USD' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Exchange Rate
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      value={formData.exchange_rate}
+                      onChange={(e) => setFormData({ ...formData, exchange_rate: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                      placeholder="1.0000"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Payment Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.payment_due_date}
+                    onChange={(e) => setFormData({ ...formData, payment_due_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Optional: Payment deadline</p>
                 </div>
               </div>
 

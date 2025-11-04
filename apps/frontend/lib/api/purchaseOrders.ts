@@ -33,9 +33,12 @@ export class PurchaseOrdersAPI {
           ...po,
           po_number: po.number,
           expected_delivery: po.promised_delivery_date || po.requested_delivery_date || null,
-          due_date: po.promised_delivery_date || null,
+          due_date: po.payment_due_date || po.promised_delivery_date || null,
+          payment_due_date: po.payment_due_date || null,
           expected_delivery_date: po.promised_delivery_date || null,
           request_delivery_date: po.requested_delivery_date || null,
+          currency: po.currency || 'USD',
+          exchange_rate: po.exchange_rate || 1.0,
           total_amount: po.gross_total || calculatedTotal,
           purchase_order_items: poLines.map((line: any) => {
             const qty = typeof line.qty_ordered === 'number' ? line.qty_ordered : 0;
@@ -92,9 +95,12 @@ export class PurchaseOrdersAPI {
         ...data,
         po_number: data.number,
         expected_delivery: data.promised_delivery_date || data.requested_delivery_date || null,
-        due_date: data.promised_delivery_date || null,
+        due_date: data.payment_due_date || data.promised_delivery_date || null,
+        payment_due_date: data.payment_due_date || null,
         expected_delivery_date: data.promised_delivery_date || null,
         request_delivery_date: data.requested_delivery_date || null,
+        currency: data.currency || 'USD',
+        exchange_rate: data.exchange_rate || 1.0,
         total_amount: data.gross_total || calculatedTotal,
         purchase_order_items: poLines.map((line: any) => {
           const qty = typeof line.qty_ordered === 'number' ? line.qty_ordered : 0;

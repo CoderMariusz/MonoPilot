@@ -83,9 +83,20 @@ export interface WorkOrder {
   due_date: string;
   scheduled_start?: string;
   scheduled_end?: string;
+  actual_start?: string;
+  actual_end?: string;
+  source_demand_type?: string; // 'Manual' | 'TO' | 'PO' | 'SO'
+  source_demand_id?: number;
+  bom_id?: string | number;
+  created_by?: string;
   machine_id?: string;
   machine?: any;
   product?: any;
+  bom?: {
+    id: number;
+    version: number;
+    status: string;
+  };
   line_number?: string;
   priority?: number;
   created_at: string;
@@ -185,7 +196,7 @@ export type UpdateSupplierData = Partial<CreateSupplierData>;
 // Phase 1 Planning Types - Updated for new schema
 
 export type POStatus = 'draft' | 'approved' | 'closed' | 'cancelled';
-export type TOStatus = 'draft' | 'approved' | 'closed' | 'cancelled' | 'sent' | 'in_transit' | 'received';
+export type TOStatus = 'draft' | 'submitted' | 'in_transit' | 'received' | 'closed' | 'cancelled';
 
 // PO Header (replacing PurchaseOrder)
 export interface POHeader {
@@ -198,6 +209,7 @@ export interface POHeader {
   order_date: string;
   requested_delivery_date?: string;
   promised_delivery_date?: string;
+  payment_due_date?: string;
   snapshot_supplier_name?: string;
   snapshot_supplier_vat?: string;
   snapshot_supplier_address?: string;
@@ -260,6 +272,10 @@ export interface TOHeader {
   from_wh_id: number;
   to_wh_id: number;
   requested_date?: string;
+  planned_ship_date?: string;
+  actual_ship_date?: string;
+  planned_receive_date?: string;
+  actual_receive_date?: string;
   created_by?: string;
   approved_by?: string;
   created_at: string;
@@ -281,6 +297,8 @@ export interface TOLine {
   qty_moved: number;
   from_location_id?: number;
   to_location_id?: number;
+  lp_id?: number;
+  batch?: string;
   scan_required: boolean;
   approved_line: boolean;
   created_at: string;
@@ -311,6 +329,7 @@ export interface PurchaseOrder extends POHeader {
   po_number: string;
   expected_delivery: string;
   due_date?: string;
+  payment_due_date?: string;
   warehouse_id?: number;
   request_delivery_date?: string;
   expected_delivery_date?: string;
@@ -358,7 +377,7 @@ export type CreateWarehouseData = Omit<Warehouse, 'id' | 'created_at' | 'updated
 export type UpdateWarehouseData = Partial<CreateWarehouseData>;
 
 // TransferOrderStatus type for legacy TransferOrder
-export type TransferOrderStatus = 'draft' | 'sent' | 'in_transit' | 'received' | 'cancelled';
+export type TransferOrderStatus = 'draft' | 'submitted' | 'in_transit' | 'received' | 'closed' | 'cancelled';
 
 // Legacy TransferOrder for backward compatibility (deprecated)
 export interface TransferOrder {
@@ -368,10 +387,24 @@ export interface TransferOrder {
   to_warehouse_id: number;
   status: TransferOrderStatus;
   transfer_date: string;
+  planned_ship_date?: string;
+  actual_ship_date?: string;
+  planned_receive_date?: string;
+  actual_receive_date?: string;
   notes?: string;
   from_warehouse?: Warehouse;
   to_warehouse?: Warehouse;
-  transfer_order_items?: any[];
+  transfer_order_items?: Array<{
+    id: number;
+    product_id: number;
+    quantity: number;
+    quantity_planned: number;
+    quantity_actual: number;
+    lp_id?: number;
+    batch?: string;
+    product?: Product;
+    [key: string]: any;
+  }>;
   created_at: string;
   updated_at: string;
 }

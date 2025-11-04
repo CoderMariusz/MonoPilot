@@ -81,10 +81,41 @@ function parseSQLMigrations(): TableSchema[] {
   
   console.log(`📄 Found ${migrationFiles.length} migration files`);
   
+  // First pass: parse CREATE TABLE statements
   for (const file of migrationFiles) {
     const content = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8');
     const fileTables = parseCreateTableStatements(content, file);
-    tables.push(...fileTables);
+    for (const table of fileTables) {
+      const existingTable = tables.find(t => t.name === table.name);
+      if (existingTable) {
+        // Merge columns (avoid duplicates)
+        for (const col of table.columns) {
+          if (!existingTable.columns.find(c => c.name === col.name)) {
+            existingTable.columns.push(col);
+          }
+        }
+        // Merge indexes
+        for (const idx of table.indexes) {
+          if (!existingTable.indexes.includes(idx)) {
+            existingTable.indexes.push(idx);
+          }
+        }
+        // Merge foreign keys
+        for (const fk of table.foreignKeys) {
+          if (!existingTable.foreignKeys.find(f => f.column === fk.column)) {
+            existingTable.foreignKeys.push(fk);
+          }
+        }
+      } else {
+        tables.push(table);
+      }
+    }
+  }
+  
+  // Second pass: parse ALTER TABLE statements to add new columns
+  for (const file of migrationFiles) {
+    const content = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8');
+    applyAlterTableStatements(content, tables);
   }
   
   return tables;
@@ -174,6 +205,98 @@ function parseCreateTableStatements(sql: string, sourceFile: string): TableSchem
   }
   
   return tables;
+}
+
+/**
+ * Parse ALTER TABLE statements and apply changes to existing tables
+ */
+function applyAlterTableStatements(sql: string, tables: TableSchema[]): void {
+  // Match ALTER TABLE blocks (handles multiple ADD COLUMN separated by commas or newlines)
+  // Pattern: ALTER TABLE table_name ADD COLUMN ... , ADD COLUMN ... ; or multiple lines
+  // Important: Match across newlines, but stop at semicolon
+  const alterTableRegex = /ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+([\s\S]*?);/gi;
+  let blockMatch;
+  
+  while ((blockMatch = alterTableRegex.exec(sql)) !== null) {
+    const tableName = blockMatch[1];
+    let blockContent = blockMatch[2].trim();
+    
+    const table = tables.find(t => t.name === tableName);
+    if (!table) {
+      console.warn(`⚠️  Table ${tableName} not found for ALTER TABLE ADD COLUMN`);
+      continue;
+    }
+    
+    // Normalize: replace newlines with spaces for easier parsing
+    blockContent = blockContent.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+    
+    // Find all ADD COLUMN statements (including IF NOT EXISTS)
+    // Pattern: ADD COLUMN [IF NOT EXISTS] column_name type [constraints]
+    // Must handle multiple ADD COLUMN in one statement separated by commas
+    const addColumnPattern = /ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s+(\w+(?:\([^)]+\))?)(?:\s+([^,;]+))?/gi;
+    let colMatch;
+    
+    // Reset regex lastIndex to ensure we catch all matches
+    addColumnPattern.lastIndex = 0;
+    
+    while ((colMatch = addColumnPattern.exec(blockContent)) !== null) {
+      const colName = colMatch[1]; // Group 1 is column name
+      const colType = colMatch[2].trim(); // Group 2 is type
+      const rest = (colMatch[3] || '').trim(); // Group 3 is constraints/options
+      
+      if (table.columns.find(c => c.name === colName)) {
+        // Column already exists, skip
+        continue;
+      }
+      const constraints: string[] = [];
+        
+      // Check for NOT NULL
+      if (rest.includes('NOT NULL')) {
+        constraints.push('NOT NULL');
+      }
+      
+      // Check for DEFAULT
+      const defaultMatch = rest.match(/DEFAULT\s+([^,;]+)/i);
+      if (defaultMatch) {
+        constraints.push(`DEFAULT ${defaultMatch[1].trim()}`);
+      }
+      
+      // Check for REFERENCES
+      const referencesMatch = rest.match(/REFERENCES\s+(\w+)\((\w+)\)/);
+      if (referencesMatch) {
+        table.foreignKeys.push({
+          column: colName,
+          referencesTable: referencesMatch[1],
+          referencesColumn: referencesMatch[2],
+        });
+        constraints.push(`REFERENCES ${referencesMatch[1]}(${referencesMatch[2]})`);
+      }
+      
+      table.columns.push({
+        name: colName,
+        type: colType,
+        constraints,
+      });
+    }
+  }
+  
+  // Match CREATE INDEX statements that might be in ALTER TABLE migrations
+  const createIndexRegex = /CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s+ON\s+(\w+)\s*\(([\s\S]*?)\)/gi;
+  let match;
+  
+  while ((match = createIndexRegex.exec(sql)) !== null) {
+    const indexName = match[1];
+    const tableName = match[2];
+    const columns = match[3].trim();
+    
+    const table = tables.find(t => t.name === tableName);
+    if (table) {
+      const indexStr = `${indexName} ON (${columns})`;
+      if (!table.indexes.includes(indexStr)) {
+        table.indexes.push(indexStr);
+      }
+    }
+  }
 }
 
 // ========================================

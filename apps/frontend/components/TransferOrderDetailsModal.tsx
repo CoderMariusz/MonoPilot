@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useTransferOrders, useWarehouses } from '@/lib/clientState';
-import { TransferOrdersAPI } from '@/lib/api';
+import { TransferOrdersAPI } from '@/lib/api/transferOrders';
 import type { TransferOrder } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
@@ -75,7 +75,33 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
     
     if (result.success) {
       toast.success(result.message);
-      onClose();
+      loadDetails(); // Reload to refresh status
+    } else {
+      toast.error(result.message);
+    }
+  };
+
+  const handleMarkShipped = async () => {
+    if (!transferOrder) return;
+    
+    const result = await TransferOrdersAPI.markShipped(transferOrder.id);
+    
+    if (result.success) {
+      toast.success(result.message);
+      loadDetails(); // Reload to refresh dates and status
+    } else {
+      toast.error(result.message);
+    }
+  };
+
+  const handleMarkReceived = async () => {
+    if (!transferOrder) return;
+    
+    const result = await TransferOrdersAPI.markReceived(transferOrder.id);
+    
+    if (result.success) {
+      toast.success(result.message);
+      loadDetails(); // Reload to refresh dates and status
     } else {
       toast.error(result.message);
     }
@@ -153,6 +179,44 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
               </div>
             </div>
 
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Shipping & Receiving</h3>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <div className="text-sm text-slate-600 mb-2">Planned Ship Date</div>
+                  <div className="text-base font-medium text-slate-900">
+                    {transferOrder.planned_ship_date 
+                      ? new Date(transferOrder.planned_ship_date).toLocaleDateString() 
+                      : '–'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-slate-600 mb-2">Actual Ship Date</div>
+                  <div className={`text-base font-bold ${transferOrder.actual_ship_date ? 'text-green-700' : 'text-slate-400'}`}>
+                    {transferOrder.actual_ship_date 
+                      ? new Date(transferOrder.actual_ship_date).toLocaleDateString() 
+                      : 'Not shipped'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-slate-600 mb-2">Planned Receive Date</div>
+                  <div className="text-base font-medium text-slate-900">
+                    {transferOrder.planned_receive_date 
+                      ? new Date(transferOrder.planned_receive_date).toLocaleDateString() 
+                      : '–'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-slate-600 mb-2">Actual Receive Date</div>
+                  <div className={`text-base font-bold ${transferOrder.actual_receive_date ? 'text-green-700' : 'text-slate-400'}`}>
+                    {transferOrder.actual_receive_date 
+                      ? new Date(transferOrder.actual_receive_date).toLocaleDateString() 
+                      : 'Not received'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="p-6">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Transfer Items</h3>
               
@@ -167,6 +231,8 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                       <tr className="border-b border-slate-200">
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Product</th>
                         <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Quantity</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">License Plate</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Batch</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -183,6 +249,12 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                           <td className="py-3 px-4 text-sm text-right text-slate-700">
                             {item.quantity} {item.product?.uom || ''}
                           </td>
+                          <td className="py-3 px-4 text-sm text-slate-600">
+                            {item.lp_id ? `LP-${item.lp_id}` : '–'}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-slate-600">
+                            {item.batch || '–'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -195,7 +267,24 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
 
         <div className="p-6 border-t border-slate-200">
           <div className="flex items-center justify-between">
-            <div></div>
+            <div className="flex items-center gap-3">
+              {transferOrder?.status === 'submitted' && (
+                <button
+                  onClick={handleMarkShipped}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Mark as Shipped
+                </button>
+              )}
+              {transferOrder?.status === 'in_transit' && (
+                <button
+                  onClick={handleMarkReceived}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                >
+                  Mark as Received
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               {canCancel() && (
                 <button

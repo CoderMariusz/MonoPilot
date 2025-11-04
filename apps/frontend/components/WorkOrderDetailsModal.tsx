@@ -29,6 +29,16 @@ interface WorkOrderDetails {
     uom: string;
     status: string;
     due_date: string | null;
+    scheduled_start?: string;
+    scheduled_end?: string;
+    actual_start?: string;
+    actual_end?: string;
+    source_demand_type?: string;
+    source_demand_id?: number;
+    bom_id?: string | number;
+    bom_version?: number;
+    bom_status?: string;
+    created_by?: string;
     machine_id: number | null;
     machine_name: string | null;
   };
@@ -79,6 +89,16 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
           uom: workOrder.product?.uom || '',
           status: workOrder.status,
           due_date: workOrder.due_date,
+          scheduled_start: workOrder.scheduled_start,
+          scheduled_end: workOrder.scheduled_end,
+          actual_start: workOrder.actual_start,
+          actual_end: workOrder.actual_end,
+          source_demand_type: workOrder.source_demand_type,
+          source_demand_id: workOrder.source_demand_id,
+          bom_id: workOrder.bom_id,
+          bom_version: workOrder.bom?.version,
+          bom_status: workOrder.bom?.status,
+          created_by: workOrder.created_by,
           machine_id: parseInt(workOrder.machine_id || '0'),
           machine_name: workOrder.machine?.name || null,
         },
@@ -222,8 +242,14 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
                     <div className="text-xs">
                       {details.work_order.due_date ? formatDate(details.work_order.due_date) : 'Not set'}
                     </div>
-                    {/* TODO: Add actual start/end when available */}
-                    <div className="text-xs text-blue-500 mt-1">Actual: Not started</div>
+                    {details.work_order.actual_start ? (
+                      <div className="text-xs text-blue-700 font-bold mt-1">
+                        Actual: {formatDate(details.work_order.actual_start)}
+                        {details.work_order.actual_end && ` → ${formatDate(details.work_order.actual_end)}`}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-blue-500 mt-1">Actual: Not started</div>
+                    )}
                   </div>
                 </div>
                 
@@ -312,6 +338,62 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Execution Times Section */}
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Execution Times</h3>
+              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded">
+                <div>
+                  <span className="text-sm text-slate-600">Scheduled:</span>
+                  <div className="font-medium text-slate-900 mt-1">
+                    {details.work_order.scheduled_start 
+                      ? `${formatDate(details.work_order.scheduled_start)} → ${formatDate(details.work_order.scheduled_end)}` 
+                      : 'Not scheduled'}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm text-slate-600">Actual:</span>
+                  <div className={`font-bold mt-1 ${
+                    details.work_order.actual_start ? 'text-blue-700' : 'text-slate-400'
+                  }`}>
+                    {details.work_order.actual_start 
+                      ? `${formatDate(details.work_order.actual_start)} → ${details.work_order.actual_end ? formatDate(details.work_order.actual_end) : 'In progress'}`
+                      : 'Not started'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Source & BOM Section */}
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Source & BOM</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-sm text-slate-600">Source:</span>
+                  <span className="ml-2 font-medium text-slate-900">
+                    {details.work_order.source_demand_type === 'Manual' || !details.work_order.source_demand_type 
+                      ? 'Manual' 
+                      : details.work_order.source_demand_type && details.work_order.source_demand_id
+                        ? `${details.work_order.source_demand_type} #${details.work_order.source_demand_id}`
+                        : 'Manual'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-sm text-slate-600">BOM Used:</span>
+                  <span className="ml-2 font-medium text-slate-900">
+                    {details.work_order.bom_version 
+                      ? `BOM v${details.work_order.bom_version} (${details.work_order.bom_status || 'N/A'})` 
+                      : 'Not specified'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-sm text-slate-600">Created By:</span>
+                  <span className="ml-2 text-slate-900">
+                    {details.work_order.created_by || 'System'}
+                  </span>
+                </div>
               </div>
             </div>
 

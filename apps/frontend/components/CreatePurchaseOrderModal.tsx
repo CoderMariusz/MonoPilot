@@ -32,10 +32,13 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
   const [formData, setFormData] = useState({
     supplier_id: '',
     due_date: '',
+    payment_due_date: '',
     status: 'draft' as const,
     warehouse_id: '',
     request_delivery_date: '',
     expected_delivery_date: '',
+    currency: 'USD',
+    exchange_rate: '1.0',
     notes: '',
   });
 
@@ -159,10 +162,12 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           supplier_id: Number(formData.supplier_id),
-          currency: 'USD',
+          currency: formData.currency || 'USD',
+          exchange_rate: formData.currency !== 'USD' ? parseFloat(formData.exchange_rate) : 1.0,
           order_date: new Date().toISOString(),
           requested_delivery_date: formData.request_delivery_date || null,
           promised_delivery_date: formData.expected_delivery_date || null,
+          payment_due_date: formData.payment_due_date || null,
           lines
         })
       });
@@ -178,10 +183,13 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
       setFormData({
         supplier_id: '',
         due_date: '',
+        payment_due_date: '',
         status: 'draft',
         warehouse_id: '',
         request_delivery_date: '',
         expected_delivery_date: '',
+        currency: 'USD',
+        exchange_rate: '1.0',
         notes: '',
       });
       setLineItems([{ id: '1', product_id: '', quantity: '', unit_price: '' }]);
@@ -372,6 +380,54 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                     onChange={(e) => setFormData({ ...formData, expected_delivery_date: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Currency
+                  </label>
+                  <select
+                    value={formData.currency}
+                    onChange={(e) => setFormData({ ...formData, currency: e.target.value, exchange_rate: e.target.value === 'USD' ? '1.0' : formData.exchange_rate })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="PLN">PLN</option>
+                  </select>
+                </div>
+
+                {formData.currency !== 'USD' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Exchange Rate
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      value={formData.exchange_rate}
+                      onChange={(e) => setFormData({ ...formData, exchange_rate: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                      placeholder="1.0000"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Payment Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.payment_due_date}
+                    onChange={(e) => setFormData({ ...formData, payment_due_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Optional: Payment deadline (e.g., Net 30)</p>
                 </div>
               </div>
 

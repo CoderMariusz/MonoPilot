@@ -16,7 +16,12 @@
     "playwright:install": "playwright install chromium",
     "seed:test-users": "tsx scripts/seed-test-users.ts",
     "test:e2e:auth": "playwright test --grep auth",
-    "docs:update": "tsx scripts/update-docs.ts"
+    "docs:update": "tsx scripts/update-docs.ts",
+    "gen-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID --schema public > lib/supabase/generated.types.ts",
+    "test": "vitest",
+    "test:unit": "vitest run",
+    "test:watch": "vitest watch",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

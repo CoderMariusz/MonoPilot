@@ -76,6 +76,11 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
     }, 0);
   };
 
+  const formatMoney = (amount?: number) => {
+    if (!amount) return '0.00';
+    return amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
   const getQuantityReceived = (productId: number): number => {
     let totalReceived = 0;
     grns.forEach(grn => {
@@ -215,6 +220,10 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
                   <div className="text-sm text-slate-600 mb-1">Supplier</div>
                   <div className="text-base font-medium text-slate-900">{purchaseOrder.supplier?.name}</div>
                 </div>
+                <div>
+                  <div className="text-sm text-slate-600 mb-1">Warehouse</div>
+                  <div className="text-base font-medium text-slate-900">{purchaseOrder.warehouse?.name || '–'}</div>
+                </div>
                 {purchaseOrder.due_date && (
                   <div>
                     <div className="text-sm text-slate-600 mb-1">Due Date</div>
@@ -232,7 +241,35 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
                 <div>
                   <div className="text-sm text-slate-600 mb-1">Total Amount</div>
                   <div className="text-base font-medium text-slate-900">
-                    ${calculateTotal().toFixed(2)}
+                    {purchaseOrder.currency || 'USD'} {formatMoney(purchaseOrder.total_amount || purchaseOrder.gross_total || calculateTotal())}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Financial Information</h3>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <div className="text-sm text-slate-600 mb-2">Currency</div>
+                  <div className="text-base font-medium text-slate-900">{purchaseOrder.currency || 'USD'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-slate-600 mb-2">Exchange Rate</div>
+                  <div className="text-base font-medium text-slate-900">{purchaseOrder.exchange_rate || '1.0000'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-slate-600 mb-2">Payment Due Date</div>
+                  <div className="text-base font-medium text-slate-900">
+                    {purchaseOrder.payment_due_date 
+                      ? new Date(purchaseOrder.payment_due_date).toLocaleDateString() 
+                      : '–'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-slate-600 mb-2">Total Amount</div>
+                  <div className="text-lg font-bold text-slate-900">
+                    {purchaseOrder.currency || 'USD'} {formatMoney(purchaseOrder.gross_total || purchaseOrder.total_amount || calculateTotal())}
                   </div>
                 </div>
               </div>

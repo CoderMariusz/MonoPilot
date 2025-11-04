@@ -18,7 +18,24 @@
     "format:check": "pnpm --recursive format:check",
     "type-check": "pnpm --recursive type-check",
     "clean": "pnpm --recursive clean && rm -rf node_modules",
-    "install:all": "pnpm install"
+    "install:all": "pnpm install",
+    "prepare": "husky",
+    "docs:update": "cd apps/frontend && pnpm docs:update",
+    "gen-types": "cd apps/frontend && pnpm gen-types",
+    "test": "pnpm test:unit && pnpm test:e2e:critical",
+    "test:unit": "pnpm --recursive test:unit",
+    "test:e2e:critical": "cd apps/frontend && pnpm test:e2e:auth",
+    "pre-commit": "pnpm docs:update && pnpm gen-types && lint-staged",
+    "pre-push": "pnpm test"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   },
   "engines": {
     "node": ">=20.0.0",
