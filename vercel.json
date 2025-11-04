@@ -1,12 +1,11 @@
 {
   "version": 2,
-  "buildCommand": "pnpm install && pnpm build",
-  "outputDirectory": ".next",
+  "buildCommand": "pnpm --filter apps/frontend build",
+  "outputDirectory": "apps/frontend/.next",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "framework": "nextjs",
-  "rootDirectory": "apps/frontend",
   "functions": {
-    "app/api/**/*.ts": {
+    "apps/frontend/app/api/**/*.ts": {
       "maxDuration": 30
     }
   },
