@@ -90,7 +90,10 @@ export class WorkOrdersAPI {
         closed_at: wo.closed_at,
         closed_source: wo.closed_source,
         source_demand_type: wo.source_demand_type || undefined,
-        source_demand_id: wo.source_demand_id || undefined,
+        source_demand_id:
+          wo.source_demand_type === 'Manual'
+            ? null
+            : wo.source_demand_id ?? null,
         created_by: wo.created_by || undefined,
         approved_by: wo.approved_by,
         created_at: wo.created_at,

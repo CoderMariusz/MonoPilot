@@ -24,7 +24,7 @@
     "gen-types": "cd apps/frontend && pnpm gen-types",
     "test": "pnpm test:unit && pnpm test:e2e:critical",
     "test:unit": "pnpm --recursive test:unit",
-    "test:e2e:critical": "cd apps/frontend && pnpm test:e2e:auth",
+    "test:e2e:critical": "node scripts/run-e2e-critical.mjs",
     "pre-commit": "pnpm type-check && pnpm docs:update && (pnpm gen-types || echo '⚠️ Supabase CLI not available - skipping type generation') && (npx lint-staged || echo '⚠️ Lint-staged skipped - format code manually if needed')",
     "pre-push": "pnpm test"
   },
