@@ -19,7 +19,7 @@
     "type-check": "pnpm --recursive type-check",
     "clean": "pnpm --recursive clean && rm -rf node_modules",
     "install:all": "pnpm install",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "docs:update": "cd apps/frontend && pnpm docs:update",
     "gen-types": "cd apps/frontend && pnpm gen-types",
     "test": "pnpm test:unit && pnpm test:e2e:critical",
