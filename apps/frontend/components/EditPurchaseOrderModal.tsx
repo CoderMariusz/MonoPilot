@@ -5,7 +5,6 @@ import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { LocationsAPI } from '@/lib/api/locations';
 import { ProductsAPI } from '@/lib/api/products';
 import { PurchaseOrdersAPI } from '@/lib/api/purchaseOrders';
-import type { Location } from '@/lib/types';
 import { useSuppliers, resolveDefaultUnitPrice } from '@/lib/clientState';
 import type { Product, PurchaseOrderItem, Location } from '@/lib/types';
 

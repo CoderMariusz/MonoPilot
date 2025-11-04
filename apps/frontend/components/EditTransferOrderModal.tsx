@@ -4,7 +4,6 @@ import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ProductsAPI } from '@/lib/api/products';
 import { TransferOrdersAPI } from '@/lib/api/transferOrders';
-import type { Product } from '@/lib/types';
 import { useWarehouses } from '@/lib/clientState';
 import type { Product, Warehouse } from '@/lib/types';
 
