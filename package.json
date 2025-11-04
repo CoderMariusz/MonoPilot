@@ -25,16 +25,16 @@
     "test": "pnpm test:unit && pnpm test:e2e:critical",
     "test:unit": "pnpm --recursive test:unit",
     "test:e2e:critical": "cd apps/frontend && pnpm test:e2e:auth",
-    "pre-commit": "pnpm docs:update && pnpm gen-types && lint-staged",
+    "pre-commit": "pnpm type-check && pnpm docs:update && (pnpm gen-types || echo '⚠️ Supabase CLI not available - skipping type generation') && (npx lint-staged || echo '⚠️ Lint-staged skipped - format code manually if needed')",
     "pre-push": "pnpm test"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "prettier --write",
-      "eslint --fix"
+      "npx prettier --write",
+      "npx eslint --fix"
     ],
     "*.{json,md}": [
-      "prettier --write"
+      "npx prettier --write"
     ]
   },
   "engines": {

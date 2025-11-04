@@ -336,9 +336,6 @@ export interface Allergen {
   updated_at: string;
 }
 
-  updated_at: string;
-}
-
 // Routing interfaces
 export interface Routing {
   id: number;
