@@ -7,13 +7,14 @@ import { createClient } from '@/lib/supabase/server';
 // GET /api/planning/to/line/[lineId] - Get TO line
 export async function GET(
   request: NextRequest,
-  { params }: { params: { lineId: string } }
+  { params }: { params: Promise<{ lineId: string }> }
 ) {
   try {
     const supabase = createClient();
-    const lineId = parseInt(params.lineId);
+    const { lineId } = await params;
+    const lineIdNum = parseInt(lineId);
     
-    if (isNaN(lineId)) {
+    if (isNaN(lineIdNum)) {
       return NextResponse.json({ error: 'Invalid line ID' }, { status: 400 });
     }
     
@@ -26,7 +27,7 @@ export async function GET(
         to_location:locations(*),
         to_header:to_header(*)
       `)
-      .eq('id', lineId)
+      .eq('id', lineIdNum)
       .single();
     
     if (error || !line) {
@@ -44,14 +45,15 @@ export async function GET(
 // PUT /api/planning/to/line/[lineId] - Update TO line
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { lineId: string } }
+  { params }: { params: Promise<{ lineId: string }> }
 ) {
   try {
     const supabase = createClient();
-    const lineId = parseInt(params.lineId);
+    const { lineId } = await params;
+    const lineIdNum = parseInt(lineId);
     const body = await request.json();
     
-    if (isNaN(lineId)) {
+    if (isNaN(lineIdNum)) {
       return NextResponse.json({ error: 'Invalid line ID' }, { status: 400 });
     }
     
@@ -72,7 +74,7 @@ export async function PUT(
         *,
         to_header:to_header(status)
       `)
-      .eq('id', lineId)
+      .eq('id', lineIdNum)
       .single();
     
     if (!existingLine) {
@@ -99,7 +101,7 @@ export async function PUT(
         approved_line,
         updated_at: new Date().toISOString()
       })
-      .eq('id', lineId)
+      .eq('id', lineIdNum)
       .select(`
         *,
         item:products(*),
@@ -127,13 +129,14 @@ export async function PUT(
 // DELETE /api/planning/to/line/[lineId] - Delete TO line
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { lineId: string } }
+  { params }: { params: Promise<{ lineId: string }> }
 ) {
   try {
     const supabase = createClient();
-    const lineId = parseInt(params.lineId);
+    const { lineId } = await params;
+    const lineIdNum = parseInt(lineId);
     
-    if (isNaN(lineId)) {
+    if (isNaN(lineIdNum)) {
       return NextResponse.json({ error: 'Invalid line ID' }, { status: 400 });
     }
     
@@ -144,7 +147,7 @@ export async function DELETE(
         *,
         to_header:to_header(status)
       `)
-      .eq('id', lineId)
+      .eq('id', lineIdNum)
       .single();
     
     if (!existingLine) {
@@ -162,7 +165,7 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from('to_line')
       .delete()
-      .eq('id', lineId);
+      .eq('id', lineIdNum);
     
     if (deleteError) {
       console.error('Error deleting TO line:', deleteError);

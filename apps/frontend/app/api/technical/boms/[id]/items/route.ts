@@ -3,11 +3,12 @@ import { supabase } from '@/lib/supabase/server';
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { items } = await req.json();
-    const bomId = parseInt(params.id);
+    const { id } = await params;
+    const bomId = parseInt(id);
 
     if (isNaN(bomId)) {
       return NextResponse.json({ error: 'Invalid BOM ID' }, { status: 400 });

@@ -7,11 +7,12 @@ import { createClient } from '@/lib/supabase/server';
 // GET /api/planning/po/[id]/lines - Get PO lines
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const poId = parseInt(params.id);
+    const { id } = await params;
+    const poId = parseInt(id);
     
     if (isNaN(poId)) {
       return NextResponse.json({ error: 'Invalid PO ID' }, { status: 400 });
@@ -43,11 +44,12 @@ export async function GET(
 // POST /api/planning/po/[id]/lines - Add PO line
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const poId = parseInt(params.id);
+    const { id } = await params;
+    const poId = parseInt(id);
     const body = await request.json();
     
     if (isNaN(poId)) {

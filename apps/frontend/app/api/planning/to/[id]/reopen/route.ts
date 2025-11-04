@@ -8,11 +8,12 @@ import { validateTOAction } from '@/lib/planning/status';
 // PATCH /api/planning/to/[id]/reopen - Reopen TO
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const toId = parseInt(params.id);
+    const { id } = await params;
+    const toId = parseInt(id);
     const body = await request.json();
     
     if (isNaN(toId)) {

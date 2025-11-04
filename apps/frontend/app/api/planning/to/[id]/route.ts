@@ -7,11 +7,12 @@ import { createClient } from '@/lib/supabase/server';
 // GET /api/planning/to/[id] - Get single TO
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const toId = parseInt(params.id);
+    const { id } = await params;
+    const toId = parseInt(id);
     
     if (isNaN(toId)) {
       return NextResponse.json({ error: 'Invalid TO ID' }, { status: 400 });
@@ -44,11 +45,12 @@ export async function GET(
 // PUT /api/planning/to/[id] - Update TO
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const toId = parseInt(params.id);
+    const { id } = await params;
+    const toId = parseInt(id);
     const body = await request.json();
     
     if (isNaN(toId)) {
@@ -111,11 +113,12 @@ export async function PUT(
 // DELETE /api/planning/to/[id] - Delete TO (soft delete)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const toId = parseInt(params.id);
+    const { id } = await params;
+    const toId = parseInt(id);
     
     if (isNaN(toId)) {
       return NextResponse.json({ error: 'Invalid TO ID' }, { status: 400 });

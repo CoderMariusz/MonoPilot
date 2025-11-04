@@ -8,11 +8,12 @@ import { validatePOAction } from '@/lib/planning/status';
 // PATCH /api/planning/po/[id]/close - Close PO
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const poId = parseInt(params.id);
+    const { id } = await params;
+    const poId = parseInt(id);
     const body = await request.json();
     
     if (isNaN(poId)) {

@@ -3,11 +3,12 @@ import { supabase } from '@/lib/supabase/server';
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await req.json();
-    const bomId = parseInt(params.id);
+    const { id } = await params;
+    const bomId = parseInt(id);
 
     if (isNaN(bomId)) {
       return NextResponse.json({ error: 'Invalid BOM ID' }, { status: 400 });
@@ -119,10 +120,11 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const bomId = parseInt(params.id);
+    const { id } = await params;
+    const bomId = parseInt(id);
     const url = new URL(req.url);
     const mode = url.searchParams.get('mode') ?? 'soft';
 
