@@ -1,5 +1,26 @@
+# Dependencies and build artifacts
 node_modules
 .next
 .git
 *.log
 .DS_Store
+
+# Test files and directories
+__tests__
+e2e
+tests
+test-reports
+test-results
+playwright-report
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+jest.config.js
+jest.setup.js
+playwright.config.ts
+vitest.config.ts
+lighthouserc.json
+
+# Temporary files
+temp-deploy

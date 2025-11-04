@@ -23,5 +23,21 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "__tests__", "**/*.test.ts", "**/*.test.tsx", "jest.config.js", "jest.setup.js"]
+  "exclude": [
+    "node_modules",
+    "__tests__",
+    "e2e",
+    "tests",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "jest.config.js",
+    "jest.setup.js",
+    "playwright.config.ts",
+    "vitest.config.ts",
+    "test-reports",
+    "test-results",
+    "playwright-report"
+  ]
 }
