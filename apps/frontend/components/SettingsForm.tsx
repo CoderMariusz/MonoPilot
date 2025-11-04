@@ -10,10 +10,23 @@ import { toast } from '@/lib/toast';
 export function SettingsForm() {
   const settings = useSettings();
   const [formData, setFormData] = useState(settings);
+  const [locations, setLocations] = useState<Location[]>([]);
 
   useEffect(() => {
     setFormData(settings);
   }, [settings]);
+
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const data = await LocationsAPI.getAll();
+        setLocations(data);
+      } catch (error) {
+        console.error('Failed to load locations:', error);
+      }
+    };
+    loadLocations();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,7 +179,7 @@ export function SettingsForm() {
               className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent text-sm"
             >
               <option value="">Select location</option>
-              {mockLocations.map((location) => (
+              {locations.map((location) => (
                 <option key={location.id} value={location.id}>
                   {location.name} ({location.code})
                 </option>

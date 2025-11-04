@@ -3,6 +3,8 @@
 import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { LocationsAPI } from '@/lib/api/locations';
+import { ProductsAPI } from '@/lib/api/products';
+import { PurchaseOrdersAPI } from '@/lib/api/purchaseOrders';
 import type { Location } from '@/lib/types';
 import { useSuppliers, resolveDefaultUnitPrice } from '@/lib/clientState';
 import type { Product, PurchaseOrderItem, Location } from '@/lib/types';
@@ -68,11 +70,17 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const rmProducts = mockProducts.filter(p => p.product_type === 'RM_MEAT');
+      // Load products
+      const allProducts = await ProductsAPI.getAll();
+      const rmProducts = allProducts.filter(p => p.product_type === 'RM_MEAT');
       setProducts(rmProducts);
-      setLocations(mockLocations);
+      
+      // Load locations
+      const locationsData = await LocationsAPI.getAll();
+      setLocations(locationsData);
 
-      const po = mockPurchaseOrders.find(p => p.id === purchaseOrderId);
+      // Load purchase order
+      const po = await PurchaseOrdersAPI.getById(purchaseOrderId);
       if (po) {
         setFormData({
           supplier_id: po.supplier_id?.toString() || '',

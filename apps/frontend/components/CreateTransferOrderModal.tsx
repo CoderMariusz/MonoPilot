@@ -47,7 +47,8 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
   const loadData = async () => {
     setLoadingData(true);
     try {
-      setProducts(mockProducts);
+      const productsData = await ProductsAPI.getAll();
+      setProducts(productsData);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {

@@ -201,7 +201,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                         }}
                         className="w-full px-2 py-1 border border-slate-300 rounded text-sm"
                       >
-                        {mockLocations.map((loc) => (
+                        {locations.map((loc) => (
                           <option key={loc.id} value={loc.id}>{loc.name}</option>
                         ))}
                       </select>

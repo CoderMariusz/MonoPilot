@@ -3,6 +3,7 @@
 import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ProductsAPI } from '@/lib/api/products';
+import { TransferOrdersAPI } from '@/lib/api/transferOrders';
 import type { Product } from '@/lib/types';
 import { useWarehouses } from '@/lib/clientState';
 import type { Product, Warehouse } from '@/lib/types';
@@ -54,10 +55,12 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
   const loadData = async () => {
     setLoadingData(true);
     try {
-      setProducts(mockProducts);
+      // Load products
+      const productsData = await ProductsAPI.getAll();
+      setProducts(productsData);
 
-      const transferOrders = mockTransferOrders;
-      const to = transferOrders.find((t: any) => t.id === transferOrderId) || mockTransferOrders.find(t => t.id === transferOrderId);
+      // Load transfer order
+      const to = await TransferOrdersAPI.getById(transferOrderId);
       if (to) {
         setFormData({
           from_warehouse_id: to.from_warehouse_id?.toString() || '',
