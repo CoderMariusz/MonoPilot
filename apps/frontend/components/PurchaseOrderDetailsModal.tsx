@@ -222,7 +222,7 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
                 </div>
                 <div>
                   <div className="text-sm text-slate-600 mb-1">Warehouse</div>
-                  <div className="text-base font-medium text-slate-900">{purchaseOrder.warehouse?.name || '–'}</div>
+                  <div className="text-base font-medium text-slate-900">{purchaseOrder.warehouse_id ? `Warehouse ID: ${purchaseOrder.warehouse_id}` : '–'}</div>
                 </div>
                 {purchaseOrder.due_date && (
                   <div>
