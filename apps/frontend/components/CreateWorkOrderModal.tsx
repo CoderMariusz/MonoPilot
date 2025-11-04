@@ -134,6 +134,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         scheduled_end: '',
         machine_id: '',
         status: 'planned',
+        source_demand_type: 'Manual',
+        source_demand_id: '',
+        bom_id: '',
       });
     }
   }, [editingWorkOrder]);
