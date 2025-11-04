@@ -22,5 +22,8 @@ playwright.config.ts
 vitest.config.ts
 lighthouserc.json
 
+# Scripts (utility scripts not needed for deployment)
+scripts
+
 # Temporary files
 temp-deploy
