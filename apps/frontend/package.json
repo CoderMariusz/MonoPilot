@@ -26,6 +26,8 @@
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.75.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "autoprefixer": "^10.4.20",
     "lucide-react": "^0.469.0",
     "next": "^15.5.4",
@@ -42,8 +44,6 @@
     "@next/bundle-analyzer": "^15.5.4",
     "@playwright/test": "^1.56.1",
     "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.4",
     "prettier": "^3.3.3",
