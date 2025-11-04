@@ -18,6 +18,7 @@ export function AmendLPModal({ lpId, isOpen, onClose }: AmendLPModalProps) {
   const lp = licensePlates.find(l => l.id === lpId.toString());
   const [quantity, setQuantity] = useState('');
   const [locationId, setLocationId] = useState<number>(0);
+  const [locations, setLocations] = useState<Location[]>([]);
 
   useEffect(() => {
     if (lp) {
@@ -25,6 +26,20 @@ export function AmendLPModal({ lpId, isOpen, onClose }: AmendLPModalProps) {
       setLocationId(parseInt(lp.location_id || '0'));
     }
   }, [lp]);
+
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const data = await LocationsAPI.getAll();
+        setLocations(data);
+      } catch (error) {
+        console.error('Failed to load locations:', error);
+      }
+    };
+    if (isOpen) {
+      loadLocations();
+    }
+  }, [isOpen]);
 
   if (!isOpen || !lp) return null;
 
@@ -100,7 +115,7 @@ export function AmendLPModal({ lpId, isOpen, onClose }: AmendLPModalProps) {
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
                 required
               >
-                {mockLocations.map((loc) => (
+                {locations.map((loc) => (
                   <option key={loc.id} value={loc.id}>{loc.name}</option>
                 ))}
               </select>
