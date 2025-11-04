@@ -4,6 +4,7 @@
   "outputDirectory": ".next",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "framework": "nextjs",
+  "rootDirectory": "apps/frontend",
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 30
