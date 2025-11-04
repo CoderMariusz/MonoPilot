@@ -509,6 +509,7 @@ export interface BomItemInput {
   tax_code_id?: number | null;
   lead_time_days?: number | null;
   moq?: number | null;
+  line_id?: number[] | null;  // Array of production line IDs for line-specific materials
 }
 
 export interface CreateSinglePayload {
@@ -702,6 +703,7 @@ export interface Bom {
   effective_to?: string;
   requires_routing: boolean;
   default_routing_id?: number;
+  line_id?: number[] | null;  // Array of production line IDs
   notes?: string;
   archived_at?: string | null;
   deleted_at?: string | null;

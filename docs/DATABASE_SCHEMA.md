@@ -25,6 +25,7 @@ This document describes the complete database schema for the MonoPilot MES syste
 | expiry_policy | VARCHAR(50) | - |
 | shelf_life_days | INTEGER | - |
 | production_lines | TEXT | DEFAULT '{}' |
+| product_version | VARCHAR(10) | DEFAULT '1.0' (X.Y format) |
 | is_active | BOOLEAN | DEFAULT true |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
@@ -85,6 +86,44 @@ CREATE TABLE IF NOT EXISTS products (
 
 ---
 
+### production_lines
+
+**Purpose**: Represents physical manufacturing production lines
+
+**Columns**:
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| code | VARCHAR(50) | UNIQUE NOT NULL |
+| name | VARCHAR(200) | NOT NULL |
+| status | VARCHAR(20) | DEFAULT 'active', CHECK ('active', 'inactive') |
+| warehouse_id | INTEGER | REFERENCES warehouses(id) |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| created_by | UUID | REFERENCES users(id) |
+| updated_by | UUID | REFERENCES users(id) |
+
+**Foreign Keys**:
+
+- `warehouse_id` → `warehouses.id`
+- `created_by` → `users.id`
+- `updated_by` → `users.id`
+
+**Indexes**:
+
+- idx_production_lines_warehouse ON (warehouse_id)
+- idx_production_lines_active ON (is_active)
+- idx_production_lines_status ON (status)
+
+**Notes**:
+
+- Production lines enable line-specific materials and BOM restrictions
+- See [PRODUCTION_LINES_GUIDE.md](./PRODUCTION_LINES_GUIDE.md) for usage patterns
+
+---
+
 ### boms
 
 **Columns**:
@@ -95,6 +134,8 @@ CREATE TABLE IF NOT EXISTS products (
 | product_id | INTEGER | REFERENCES products(id) |
 | version | VARCHAR(50) | NOT NULL |
 | status | VARCHAR(20) | DEFAULT 'active' |
+| line_id | INTEGER[] | NULL (array of production line IDs) |
+| product_version | VARCHAR(10) | Product version at time of BOM |
 | effective_from | TIMESTAMPTZ | - |
 | effective_to | TIMESTAMPTZ | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |

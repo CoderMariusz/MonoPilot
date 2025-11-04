@@ -14,11 +14,22 @@ export async function createComposite(payload: CreateCompositePayload) {
     throw new Error('At least one BOM item is required');
   }
 
+  // Check if part_number already exists
+  const { data: existing } = await supabase
+    .from('products')
+    .select('id')
+    .eq('part_number', product.part_number)
+    .limit(1);
+  
+  if (existing && existing.length > 0) {
+    throw new Error(`Part number "${product.part_number}" already exists. Please use a unique part number.`);
+  }
+
   const { data, error } = await supabase.rpc('create_composite_product', { p: payload as any });
 
   if (error) {
     if ((error as any).code === '23505') {
-      throw new Error('Part number already exists');
+      throw new Error(`Part number "${product.part_number}" already exists. Please use a unique part number.`);
     }
     throw new Error('Failed to create composite product');
   }

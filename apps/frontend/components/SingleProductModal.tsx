@@ -17,7 +17,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
   const [form, setForm] = useState<Partial<ProductInsert>>({
     product_group: 'MEAT',
     product_type: 'RM_MEAT',
-    uom: 'kg',
+    uom: 'KG',
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +26,18 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
   const [allergens, setAllergens] = useState<Array<{ id: number; code: string; name: string }>>([]);
   const [selectedAllergens, setSelectedAllergens] = useState<number[]>([]);
   const [isActive, setIsActive] = useState<boolean>(true);
+  const [productVersion, setProductVersion] = useState<string>('1.0');  // NEW: Product version
+  
+  // Normalize UoM to match dropdown values (KG, EACH, METER, LITER)
+  const normalizeUomForSelect = (uom: string): 'KG' | 'EACH' | 'METER' | 'LITER' => {
+    const upper = uom.toUpperCase().trim();
+    if (upper === 'EA' || upper === 'EACH' || upper === 'PC' || upper === 'PCS') return 'EACH';
+    if (upper === 'KG' || upper === 'KGS' || upper === 'KILO' || upper === 'KILOGRAM') return 'KG';
+    if (upper === 'M' || upper === 'MTR' || upper === 'METER' || upper === 'METERS') return 'METER';
+    if (upper === 'L' || upper === 'LTR' || upper === 'LITER' || upper === 'LITERS') return 'LITER';
+    // Default fallback
+    return 'KG';
+  };
   
   // Debug: log is_active when it changes
   useEffect(() => {
@@ -40,7 +52,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
         description: product.description,
         product_group: product.product_group,
         product_type: product.product_type,
-        uom: product.uom,
+        uom: product.uom ? normalizeUomForSelect(product.uom) : 'KG',
         expiry_policy: product.expiry_policy as ExpiryPolicy,
         shelf_life_days: product.shelf_life_days,
         std_price: product.std_price,
@@ -57,6 +69,9 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
       
       // Set is_active from existing product
       setIsActive(product.is_active);
+      
+      // Set product_version from existing product
+      setProductVersion((product as any).product_version || '1.0');
     }
   }, [product]);
 
@@ -68,7 +83,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
       setForm({
         product_group: 'MEAT',
         product_type: 'RM_MEAT',
-        uom: 'kg',
+        uom: 'KG',
         part_number: '',
         description: '',
         expiry_policy: null,
@@ -82,6 +97,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
       });
       setSelectedAllergens([]);
       setIsActive(true);
+      setProductVersion('1.0');  // Reset version for new product
     }
     
     (async () => {
@@ -121,6 +137,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
         uom: form.uom!,
         product_group: group,
         product_type: form.product_type,
+        product_version: productVersion,  // NEW: Product version
         supplier_id: form.supplier_id || null,
         tax_code_id: form.tax_code_id || null,
         lead_time_days: form.lead_time_days || null,
@@ -224,13 +241,17 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
             <select
               value={form.product_type ?? ''}
               onChange={e => handleChange('product_type', e.target.value as ProductType)}
-              className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
+              disabled={!!product}
+              className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
             >
               <option value="">Select…</option>
               {(form.product_group === 'DRYGOODS' ? ['DG_ING','DG_LABEL','DG_WEB','DG_BOX','DG_SAUCE'] : ['RM_MEAT']).map((opt) => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
             </select>
+            {product && (
+              <p className="text-xs text-slate-500 mt-1">Product type cannot be changed after creation</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Product Status</label>
@@ -248,8 +269,12 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
             <input
               value={form.part_number ?? ''}
               onChange={e => handleChange('part_number', e.target.value)}
-              className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
+              disabled={!!product}
+              className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
             />
+            {product && (
+              <p className="text-xs text-slate-500 mt-1">Part number cannot be changed after creation</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
@@ -261,11 +286,17 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">UoM</label>
-            <input
+            <select
               value={form.uom ?? ''}
               onChange={e => handleChange('uom', e.target.value)}
               className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
-            />
+            >
+              <option value="">Select…</option>
+              <option value="KG">KG</option>
+              <option value="EACH">EACH</option>
+              <option value="METER">METER</option>
+              <option value="LITER">LITER</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Supplier</label>
@@ -350,6 +381,35 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
               onToggle={(id) => setSelectedAllergens(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
             />
           </div>
+          </div>
+          
+          {/* Product Version Section */}
+          <div className="col-span-2 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <h4 className="text-sm font-medium text-slate-900 mb-3">Product Version</h4>
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-mono font-bold text-slate-900">{productVersion}</span>
+              <button
+                onClick={() => {
+                  const [major, minor] = productVersion.split('.').map(Number);
+                  setProductVersion(`${major}.${minor + 1}`);
+                }}
+                className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded text-xs font-medium hover:bg-blue-200"
+              >
+                Bump Minor (→ {productVersion.split('.')[0]}.{parseInt(productVersion.split('.')[1]) + 1})
+              </button>
+              <button
+                onClick={() => {
+                  const [major] = productVersion.split('.').map(Number);
+                  setProductVersion(`${major + 1}.0`);
+                }}
+                className="px-3 py-1.5 bg-purple-100 text-purple-800 rounded text-xs font-medium hover:bg-purple-200"
+              >
+                Bump Major (→ {parseInt(productVersion.split('.')[0]) + 1}.0)
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              Minor: metadata changes. Major: manual bump for significant changes.
+            </p>
           </div>
         </div>
 

@@ -251,6 +251,16 @@ export function LocationsTable() {
                       ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Zone</label>
+                  <input
+                    type="text"
+                    value={formData.zone}
+                    onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., A1, B2"
+                  />
+                </div>
                 <div className="flex items-center">
                   <input
                     type="checkbox"

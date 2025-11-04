@@ -83,7 +83,8 @@ export interface WorkOrder {
   machine_id?: string;
   machine?: any;
   product?: any;
-  line_number?: string;
+  line_id?: number;  // Changed from line_number to FK reference
+  line?: ProductionLine;
   priority?: number;
   created_at: string;
   updated_at: string;
@@ -154,6 +155,23 @@ export interface Machine {
   created_at: string;
   updated_at: string;
 }
+
+// Production Lines
+export interface ProductionLine {
+  id: number;
+  code: string;
+  name: string;
+  status: 'active' | 'inactive';
+  warehouse_id: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+}
+
+export type CreateProductionLineData = Omit<ProductionLine, 'id' | 'created_at' | 'updated_at'>;
+export type UpdateProductionLineData = Partial<CreateProductionLineData>;
 
 export interface Supplier {
   id: number;
@@ -293,6 +311,7 @@ export interface Product {
   expiry_policy?: string;
   rate?: number;
   production_lines?: string[];
+  product_version?: string;  // NEW: Product version in X.Y format
   created_at: string;
   updated_at: string;
   created_by?: string;
@@ -358,6 +377,19 @@ export interface RoutingOperation {
   code?: string;
   description?: string;
   requirements?: string[];
+  machine_id?: number;  // NEW: Machine assignment
+  expected_yield_pct?: number;  // NEW: Expected yield percentage
+  created_at: string;
+  updated_at: string;
+}
+
+// Routing operation names dictionary
+export interface RoutingOperationName {
+  id: number;
+  name: string;
+  alias?: string;
+  description?: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -457,6 +489,9 @@ export interface YieldReport {
   }>;
 }
 
+// Unit of Measure enum
+export type UomType = 'KG' | 'EACH' | 'METER' | 'LITER';
+
 // Enhanced BOM interfaces
 export interface Bom {
   id: number;
@@ -464,6 +499,8 @@ export interface Bom {
   version: string;
   status: 'draft' | 'active' | 'archived';
   is_active: boolean;
+  line_id?: number[] | null;  // NEW: Array of production line IDs, NULL = all lines
+  product_version?: string;  // Product version at time of BOM
   effective_from?: string;
   effective_to?: string;
   requires_routing: boolean;
@@ -482,14 +519,16 @@ export interface BomItem {
   bom_id: number;
   material_id: number;
   quantity: number;
-  uom: string;
+  uom: UomType;  // CHANGED: Enforced enum instead of string
   sequence: number;
   priority?: number;
   production_lines?: string[];
   production_line_restrictions?: string[];
+  line_id?: number[] | null;  // NEW: Line-specific materials (e.g., Box 12 for Line 4)
   scrap_std_pct?: number;
   is_optional: boolean;
   is_phantom: boolean;
+  consume_whole_lp?: boolean;  // RENAMED: from one_to_one to consume_whole_lp (1:1 rule)
   unit_cost_std?: number;
   created_at: string;
   updated_at: string;

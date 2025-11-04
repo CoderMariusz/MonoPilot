@@ -31,6 +31,18 @@ function pickInsertColumns(product: ProductInsert) {
 
 export async function createSingle({ product }: CreateSinglePayload) {
   assertMapping(product);
+  
+  // Check if part_number already exists
+  const { data: existing } = await supabase
+    .from('products')
+    .select('id')
+    .eq('part_number', product.part_number)
+    .limit(1);
+  
+  if (existing && existing.length > 0) {
+    throw new Error(`Part number "${product.part_number}" already exists. Please use a unique part number.`);
+  }
+  
   const insert = pickInsertColumns(product);
 
   const { data, error } = await supabase
@@ -41,7 +53,7 @@ export async function createSingle({ product }: CreateSinglePayload) {
 
   if (error) {
     if ((error as any).code === '23505') {
-      throw new Error('Part number already exists');
+      throw new Error(`Part number "${product.part_number}" already exists. Please use a unique part number.`);
     }
     throw new Error('Failed to create product');
   }

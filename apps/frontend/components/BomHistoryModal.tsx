@@ -77,8 +77,19 @@ export function BomHistoryModal({ isOpen, onClose, bomId }: BomHistoryModalProps
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-500">
-                      {new Date(entry.changed_at).toLocaleString()}
+                    <div className="text-xs text-slate-500 flex flex-col items-end gap-1">
+                      <div>{new Date(entry.changed_at).toLocaleString()}</div>
+                      {entry.changed_by_user?.email && (
+                        <div className="text-slate-600">
+                          by {entry.changed_by_user.email}
+                        </div>
+                      )}
+                      {!entry.changed_by_user && entry.changed_by && (
+                        <div className="text-slate-400 italic">by user {entry.changed_by}</div>
+                      )}
+                      {!entry.changed_by_user && !entry.changed_by && (
+                        <div className="text-slate-400 italic">by Unknown user</div>
+                      )}
                     </div>
                   </div>
                   

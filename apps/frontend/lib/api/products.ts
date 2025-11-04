@@ -111,9 +111,20 @@ export class ProductsAPI {
 
 
   static async update(id: number, data: UpdateProductData): Promise<Product> {
+    // Prevent updating part_number and product_type after creation
+    const { part_number, product_type, ...updateData } = data as any;
+    
+    if (part_number !== undefined) {
+      console.warn('Attempted to update part_number, which is not allowed. Ignoring.');
+    }
+    
+    if (product_type !== undefined) {
+      console.warn('Attempted to update product_type, which is not allowed. Ignoring.');
+    }
+    
     const { data: updated, error } = await supabase
       .from('products')
-      .update(data)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -124,6 +135,27 @@ export class ProductsAPI {
     }
 
     return updated;
+  }
+
+  static async checkPartNumberExists(partNumber: string, excludeId?: number): Promise<boolean> {
+    let query = supabase
+      .from('products')
+      .select('id')
+      .eq('part_number', partNumber)
+      .limit(1);
+
+    if (excludeId) {
+      query = query.neq('id', excludeId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error checking part number:', error);
+      throw new Error('Failed to check part number');
+    }
+
+    return (data?.length ?? 0) > 0;
   }
 
   // legacy getByCategory removed in favor of group/type filters in clientState

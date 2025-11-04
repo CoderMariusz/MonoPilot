@@ -64,6 +64,103 @@ export interface BomItemsUpdateResponse {
   status: 'draft' | 'active' | 'archived';
 }
 
+/**
+ * Helper functions for BOM version management
+ */
+export const BomVersionHelper = {
+  /**
+   * Parse version string into major and minor numbers
+   */
+  parseVersion(version: string): { major: number; minor: number } {
+    const parts = version.split('.');
+    return {
+      major: parseInt(parts[0]) || 1,
+      minor: parseInt(parts[1]) || 0,
+    };
+  },
+
+  /**
+   * Calculate next version based on change type
+   */
+  calculateNextVersion(current: string, changeType: 'major' | 'minor' | 'none'): string {
+    if (changeType === 'none') return current;
+    
+    const { major, minor } = this.parseVersion(current);
+    
+    if (changeType === 'major') {
+      return `${major + 1}.0`;
+    } else {
+      return `${major}.${minor + 1}`;
+    }
+  },
+
+  /**
+   * Detect type of change between old and new BOM items
+   * Major: material_id changed
+   * Minor: qty, scrap%, or metadata changed
+   * None: no changes
+   */
+  detectChangeType(oldItems: BomItemUpdateData[], newItems: BomItemUpdateData[]): 'major' | 'minor' | 'none' {
+    // Create maps by material_id for comparison
+    const oldMap = new Map(oldItems.map(item => [item.material_id, item]));
+    const newMap = new Map(newItems.map(item => [item.material_id, item]));
+
+    // Check for added or removed items (major change)
+    if (oldMap.size !== newMap.size) {
+      return 'major';
+    }
+
+    // Check for material_id changes (major change)
+    for (const newItem of newItems) {
+      if (!oldMap.has(newItem.material_id)) {
+        return 'major';
+      }
+    }
+
+    for (const oldItem of oldItems) {
+      if (!newMap.has(oldItem.material_id)) {
+        return 'major';
+      }
+    }
+
+    // Check for quantity or other changes (minor change)
+    for (const newItem of newItems) {
+      const oldItem = oldMap.get(newItem.material_id);
+      if (!oldItem) continue;
+
+      if (
+        oldItem.quantity !== newItem.quantity ||
+        oldItem.scrap_std_pct !== newItem.scrap_std_pct ||
+        oldItem.uom !== newItem.uom ||
+        oldItem.sequence !== newItem.sequence ||
+        JSON.stringify(oldItem.line_id) !== JSON.stringify(newItem.line_id)
+      ) {
+        return 'minor';
+      }
+    }
+
+    return 'none';
+  },
+
+  /**
+   * Validate line compatibility between BOM and BOM items
+   */
+  validateLineCompatibility(bomLineIds: number[] | null, itemLineIds: number[] | null): boolean {
+    // If BOM has no line restrictions, item can have any lines
+    if (!bomLineIds || bomLineIds.length === 0) {
+      return true;
+    }
+
+    // If item has no line restrictions, it inherits from BOM (valid)
+    if (!itemLineIds || itemLineIds.length === 0) {
+      return true;
+    }
+
+    // Item lines must be a subset of BOM lines
+    return itemLineIds.every(lineId => bomLineIds.includes(lineId));
+  },
+};
+
 export const BomsAPI = {
   /**
    * Update BOM header information

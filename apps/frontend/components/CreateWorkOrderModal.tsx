@@ -21,7 +21,8 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
   const [loading, setLoading] = useState(false);
   const [loadingBoms, setLoadingBoms] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [availableBoms, setAvailableBoms] = useState<Array<{id: number; version: number; status: string}>>([]);
+  const [availableBoms, setAvailableBoms] = useState<Array<{id: number; version: string; status: string; line_id: number[] | null}>>([]);
+  const [productionLines, setProductionLines] = useState<Array<{id: number; code: string; name: string}>>([]);
   
   const [formData, setFormData] = useState({
     product_id: '',
@@ -30,6 +31,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
     scheduled_start: '',
     scheduled_end: '',
     machine_id: '',
+    line_id: '',  // NEW: Production line FK
     status: 'planned' as WorkOrder['status'],
     source_demand_type: 'Manual' as 'Manual' | 'TO' | 'PO' | 'SO',
     source_demand_id: '',
@@ -48,12 +50,35 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
     }
   }, [formData.product_id]);
 
+  // Load production lines on mount
+  useEffect(() => {
+    const loadProductionLines = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('production_lines')
+          .select('id, code, name')
+          .eq('is_active', true)
+          .eq('status', 'active')
+          .order('code');
+        
+        if (error) throw error;
+        setProductionLines(data || []);
+      } catch (err: any) {
+        console.error('Error loading production lines:', err);
+      }
+    };
+    
+    if (isOpen) {
+      loadProductionLines();
+    }
+  }, [isOpen]);
+
   const loadBoms = async (productId: number) => {
     setLoadingBoms(true);
     try {
       const { data, error } = await supabase
         .from('boms')
-        .select('id, version, status')
+        .select('id, version, status, line_id')
         .eq('product_id', productId)
         .in('status', ['active', 'draft'])
         .order('version', { ascending: false });
@@ -66,9 +91,18 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
       const activeBom = data?.find(b => b.status === 'active');
       if (activeBom) {
         setFormData(prev => ({ ...prev, bom_id: activeBom.id.toString() }));
+        
+        // Auto-select first compatible line if BOM has restrictions
+        if (activeBom.line_id && activeBom.line_id.length > 0) {
+          setFormData(prev => ({ ...prev, line_id: activeBom.line_id![0].toString() }));
+        }
       } else if (data && data.length > 0) {
         // Or select latest BOM if no active
         setFormData(prev => ({ ...prev, bom_id: data[0].id.toString() }));
+        
+        if (data[0].line_id && data[0].line_id.length > 0) {
+          setFormData(prev => ({ ...prev, line_id: data[0].line_id![0].toString() }));
+        }
       }
     } catch (err: any) {
       console.error('Error loading BOMs:', err);
@@ -94,19 +128,15 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
   }, [selectedTO]);
 
   const calculateAvailableLines = () => {
-    if (!selectedProduct) {
-      return machines;
-    }
-
-    const productLines = selectedProduct.production_lines;
+    const selectedBom = availableBoms.find(b => b.id === Number(formData.bom_id));
     
-    // If product has no lines defined or includes ALL, show all machines
-    if (!productLines || productLines.length === 0 || productLines.includes('ALL')) {
-      return machines;
+    // If BOM has line restrictions, only show those lines
+    if (selectedBom && selectedBom.line_id && selectedBom.line_id.length > 0) {
+      return productionLines.filter(line => selectedBom.line_id!.includes(line.id));
     }
-
-    // Filter machines to only those in product's production_lines
-    return machines.filter(m => productLines.includes(String(m.id)));
+    
+    // Otherwise, show all active production lines
+    return productionLines;
   };
 
   const availableLines = calculateAvailableLines();
@@ -120,6 +150,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         scheduled_start: editingWorkOrder.scheduled_start || '',
         scheduled_end: editingWorkOrder.scheduled_end || '',
         machine_id: editingWorkOrder.machine_id?.toString() || '',
+        line_id: (editingWorkOrder as any).line_id?.toString() || '',
         status: editingWorkOrder.status || 'planned',
         source_demand_type: (editingWorkOrder.source_demand_type as 'Manual' | 'TO' | 'PO' | 'SO') || 'Manual',
         source_demand_id: editingWorkOrder.source_demand_id?.toString() || '',
@@ -133,6 +164,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         scheduled_start: '',
         scheduled_end: '',
         machine_id: '',
+        line_id: '',
         status: 'planned',
         source_demand_type: 'Manual',
         source_demand_id: '',
@@ -145,6 +177,13 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // Validate line_id is provided
+    if (!formData.line_id) {
+      setError('Production Line is required');
+      setLoading(false);
+      return;
+    }
 
     try {
       const product = products.find(p => p.id === Number(formData.product_id));
@@ -162,6 +201,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
           scheduled_end: formData.scheduled_end || null,
           machine_id: formData.machine_id || null,
           machine,
+          line_id: Number(formData.line_id),  // NEW: Production line FK
         });
       } else {
         const { addWorkOrder } = await import('@/lib/clientState');
@@ -178,7 +218,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
           scheduled_end: formData.scheduled_end || null,
           machine_id: formData.machine_id || null,
           machine,
-          line_number: null,
+          line_id: Number(formData.line_id),  // NEW: Production line FK (required)
           source_demand_type: formData.source_demand_type === 'Manual' ? undefined : formData.source_demand_type,
           source_demand_id: formData.source_demand_id ? Number(formData.source_demand_id) : undefined,
           bom_id: formData.bom_id ? Number(formData.bom_id) : undefined,
@@ -194,6 +234,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         scheduled_start: '',
         scheduled_end: '',
         machine_id: '',
+        line_id: '',
         status: 'planned',
         source_demand_type: 'Manual',
         source_demand_id: '',
@@ -267,9 +308,66 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
                   />
                 </div>
 
+                {/* BOM Selection */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Line
+                    BOM
+                  </label>
+                  {loadingBoms ? (
+                    <div className="flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-md bg-slate-50">
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                      <span className="text-sm text-slate-500">Loading BOMs...</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={formData.bom_id}
+                      onChange={(e) => setFormData({ ...formData, bom_id: e.target.value, line_id: '' })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    >
+                      <option value="">Select BOM...</option>
+                      {availableBoms.map((bom) => (
+                        <option key={bom.id} value={bom.id}>
+                          v{bom.version} - {bom.status} 
+                          {bom.line_id && bom.line_id.length > 0 ? ` (Lines: ${bom.line_id.join(', ')})` : ' (All lines)'}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {availableBoms.length === 0 && !loadingBoms && (
+                    <p className="text-xs text-amber-600 mt-1">⚠️ No active or draft BOMs found for this product</p>
+                  )}
+                </div>
+
+                {/* Production Line Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Production Line <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.line_id}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      line_id: e.target.value
+                    })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select Production Line...</option>
+                    {availableLines.map((line) => (
+                      <option key={line.id} value={line.id}>
+                        {line.code} - {line.name}
+                      </option>
+                    ))}
+                  </select>
+                  {availableLines.length === 0 && formData.bom_id && (
+                    <p className="text-xs text-red-600 mt-1">⚠️ No compatible production lines for selected BOM</p>
+                  )}
+                </div>
+                
+                {/* Machine Selection (optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Machine (Optional)
                   </label>
                   <select
                     value={formData.machine_id}
@@ -279,8 +377,8 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
                     })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                   >
-                    <option value="">Select Line</option>
-                    {availableLines.map((machine) => (
+                    <option value="">No specific machine</option>
+                    {machines.map((machine) => (
                       <option key={machine.id} value={machine.id}>
                         {machine.name}
                       </option>

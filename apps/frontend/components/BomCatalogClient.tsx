@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Package, Beef, ShoppingBag, FlaskConical, Plus, Loader2, Trash2, Pencil, Search } from 'lucide-react';
+import { Package, Beef, ShoppingBag, FlaskConical, Plus, Loader2, Pencil, Search, History } from 'lucide-react';
 import type { Product, ProductGroup, ProductType } from '@/lib/types';
 import { ProductsAPI } from '@/lib/api/products';
 import { BomsAPI } from '@/lib/api/boms';
 import { supabase } from '@/lib/supabase/client-browser';
 import SingleProductModal from '@/components/SingleProductModal';
 import CompositeProductModal from '@/components/CompositeProductModal';
+import { BomHistoryModal } from '@/components/BomHistoryModal';
 
 type CategoryType = 'MEAT' | 'DRYGOODS' | 'FINISHED_GOODS' | 'PROCESS' | 'ARCHIVE';
 
@@ -244,8 +245,9 @@ function ProductsTable({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages] = useState(1);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [bomActionLoading, setBomActionLoading] = useState<number | null>(null);
+  const [historyBomId, setHistoryBomId] = useState<number | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -298,26 +300,10 @@ function ProductsTable({
     });
   };
 
-  const handleDelete = async (product: Product) => {
-    if (!confirm(`Are you sure you want to delete "${product.description}" (${product.part_number})?`)) {
-      return;
-    }
-
-    try {
-      setDeletingId(product.id);
-      const { error } = await supabase
-        .from('products')
-        .update({ is_active: false })
-        .eq('id', product.id);
-      
-      if (error) throw error;
-      
-      // Remove from local list
-      setLocalProducts(prev => prev.filter(p => p.id !== product.id));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete product');
-    } finally {
-      setDeletingId(null);
+  const handleOpenHistory = (product: Product) => {
+    if (product.activeBom?.id) {
+      setHistoryBomId(product.activeBom.id);
+      setIsHistoryOpen(true);
     }
   };
 
@@ -567,31 +553,30 @@ function ProductsTable({
                         </td>
                       </>
                     )}
-                    <td className="py-3 px-4 text-sm text-slate-600">
+                    <td className="py-3 px-4 text-sm text-slate-600 whitespace-nowrap">
                       {formatDate(product.updated_at)}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => onEditProduct(product)}
                           className="p-1 hover:bg-blue-100 rounded transition-colors"
                           title="Edit Product"
+                          type="button"
                         >
                           <Pencil className="w-4 h-4 text-blue-600" />
                         </button>
 
-                        <button 
-                          onClick={() => handleDelete(product)}
-                          disabled={deletingId === product.id}
-                          className="p-1 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
-                          title="Delete product"
-                        >
-                          {deletingId === product.id ? (
-                            <Loader2 className="w-4 h-4 text-red-600 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          )}
-                        </button>
+                        {product.activeBom && (
+                          <button 
+                            onClick={() => handleOpenHistory(product)}
+                            className="p-1 hover:bg-purple-100 rounded transition-colors"
+                            title="View BOM History"
+                            type="button"
+                          >
+                            <History className="w-4 h-4 text-purple-600" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -624,6 +609,16 @@ function ProductsTable({
             </div>
           )}
         </>
+      )}
+      {historyBomId && (
+        <BomHistoryModal
+          isOpen={isHistoryOpen}
+          onClose={() => {
+            setIsHistoryOpen(false);
+            setHistoryBomId(null);
+          }}
+          bomId={historyBomId}
+        />
       )}
     </div>
   );
