@@ -1,7 +1,7 @@
 # AI Quick Reference Guide
 
-**Last Updated**: 2025-11-03  
-**Version**: 1.1
+**Last Updated**: 2025-11-04  
+**Version**: 1.2 - Type Safety Update
 
 ## Overview
 This document provides quick lookup tables and matrices for AI prompt engineering, enabling efficient context building and system understanding.
@@ -192,6 +192,87 @@ WHERE sm.move_date BETWEEN ? AND ?;
 - **Key APIs**: `WorkOrdersAPI`
 - **Key Components**: `StageBoard`, `ProcessInterface`
 
+## TypeScript Error Quick Reference
+
+> 🔒 **Critical**: 100% of deployment failures were TypeScript errors  
+> ✅ **Prevention**: Pre-commit hooks now operational (see SETUP_TYPE_CHECKING.md)  
+> 📄 **Full Analysis**: DEPLOYMENT_ERRORS_ANALYSIS.md
+
+### Common Deployment Errors (by frequency)
+
+| Error Pattern | Cause | Fix | Priority | % of Failures |
+|---------------|-------|-----|----------|---------------|
+| **Missing properties** | Incomplete object types | Use `Omit<T, 'id' \| 'created_at' \| 'updated_at'>` | 🔴 P0 | 60% |
+| **Type not assignable** | Incompatible types | Use `Partial<T>` or check enum values | 🟡 P0 | 25% |
+| **Cannot find module** | Wrong import path | Verify file exists, check API_REFERENCE.md | 🟢 P0 | 15% |
+| **Implicit any type** | Missing type annotation | Add explicit type annotation | 🟡 P1 | - |
+| **Object possibly undefined** | No null check | Use optional chaining `?.` or null check | 🟢 P1 | - |
+
+### TypeScript Utility Types - Quick Lookup
+
+| Utility Type | Usage | Example | When to Use |
+|-------------|--------|---------|-------------|
+| `Omit<T, K>` | Exclude properties | `Omit<Product, 'id' \| 'created_at'>` | CREATE operations (exclude DB fields) |
+| `Partial<T>` | All properties optional | `Partial<WorkOrder>` | UPDATE operations |
+| `Pick<T, K>` | Include only specific properties | `Pick<Product, 'id' \| 'name'>` | API responses (minimal data) |
+| `Required<T>` | All properties required | `Required<PartialProduct>` | Validation before save |
+| `Record<K, T>` | Object with specific keys | `Record<string, number>` | Lookup maps |
+
+### Status Enum Quick Reference
+
+| Type | Valid Values | Common Mistake |
+|------|--------------|----------------|
+| `WorkOrderStatus` | `'draft' \| 'planned' \| 'released' \| 'in_progress' \| 'completed' \| 'cancelled'` | Using 'pending' instead of 'planned' |
+| `POStatus` | `'draft' \| 'pending' \| 'approved' \| 'rejected' \| 'closed' \| 'cancelled'` | Using 'open' instead of 'pending' |
+| `QAStatus` | `'pending' \| 'passed' \| 'failed' \| 'quarantine'` | Using 'approved' instead of 'passed' |
+| `TOStatus` | `'draft' \| 'submitted' \| 'in_transit' \| 'received' \| 'cancelled'` | Using 'shipped' instead of 'in_transit' |
+
+### API Method Type Patterns
+
+| Operation | Type Pattern | Example |
+|-----------|--------------|---------|
+| **CREATE** | `Omit<T, 'id' \| 'created_at' \| 'updated_at'>` | `const newWO: Omit<WorkOrder, 'id' \| 'created_at' \| 'updated_at'>` |
+| **UPDATE** | `Partial<Omit<T, 'id'>> & { id: number }` | `const updates: Partial<WorkOrder> = { status: 'completed' }` |
+| **READ** | `T` or `T \| null` | `const wo: WorkOrder \| null = await WorkOrdersAPI.getById(id)` |
+| **LIST** | `T[]` | `const orders: WorkOrder[] = await WorkOrdersAPI.getAll()` |
+
+### Form Data Type Conversions
+
+| From | To | Conversion | Example |
+|------|-----|-----------|---------|
+| `string` (input) | `number` | `parseFloat()` or `parseInt()` | `const qty: number = parseFloat(formData.quantity) \|\| 0` |
+| `string` (date) | `Date` | `new Date()` | `const date: Date = new Date(formData.scheduledDate)` |
+| `string` (enum) | Enum type | Type assertion after validation | `const status: POStatus = formData.status as POStatus` |
+| `string[]` (multi-select) | Array | Direct (already array) | `const lines: string[] = formData.productionLines` |
+
+### Pre-deployment Type-Check Commands
+
+```bash
+# Full project type-check
+pnpm type-check
+
+# Frontend only
+cd apps/frontend && pnpm type-check
+
+# Backend only
+cd apps/backend && pnpm type-check
+
+# Pre-commit simulation (all checks)
+pnpm pre-commit
+```
+
+### Type Safety Checklist
+
+Before committing code:
+- [ ] Run `pnpm type-check` - **MUST pass**
+- [ ] Verify all imports exist
+- [ ] Check enum values match type definitions
+- [ ] Use `Omit<>` for CREATE operations
+- [ ] Use `Partial<>` for UPDATE operations
+- [ ] Parse form strings to numbers properly
+
+---
+
 ## Performance Quick Reference
 
 ### Common Indexes
@@ -212,3 +293,6 @@ WHERE sm.move_date BETWEEN ? AND ?;
 - [System Overview](SYSTEM_OVERVIEW.md) - High-level architecture
 - [Database Schema](DATABASE_SCHEMA.md) - Table definitions
 - [API Reference](API_REFERENCE.md) - Complete API documentation
+- **[DEPLOYMENT_ERRORS_ANALYSIS.md](../DEPLOYMENT_ERRORS_ANALYSIS.md)** - ✨ Detailed type error patterns
+- **[SETUP_TYPE_CHECKING.md](../SETUP_TYPE_CHECKING.md)** - ✨ Pre-commit hooks setup
+- **[TODO.md](TODO.md)** - ✨ Section 9.5: Type Safety & Deployment Prevention

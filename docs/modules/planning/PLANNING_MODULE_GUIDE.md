@@ -1,7 +1,28 @@
 # Planning Module Guide
 
+**Last Updated**: 2025-11-04  
+**Type Safety Risk**: 🔴 HIGH - See DEPLOYMENT_ERRORS_ANALYSIS.md  
+**Completion**: ~77% - Schema→UI gap (dates, currency fields)
+
 ## Overview
 The Planning Module manages procurement and material transfer operations through purchase orders, transfer orders, and supplier relationships. It serves as the bridge between demand planning and material acquisition.
+
+### ⚠️ Type Safety Notes
+
+**Common Type Errors** (from DEPLOYMENT_ERRORS_ANALYSIS.md):
+- **Status Enums**: Use `POStatus = 'pending' | 'approved' | 'rejected'` (NOT 'open')
+- **Form Data**: Parse strings to numbers with `parseFloat(formData.amount) || 0`
+- **CREATE Operations**: Use `Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>`
+
+**Schema→UI Gap** (from TODO.md):
+- **PO**: `due_date`, `currency`, `exchange_rate`, `total_amount` in schema, partially in UI
+- **WO**: `actual_start`, `actual_end`, `source_demand`, `bom_id` in schema, UI in progress
+- **TO**: `planned_ship_date`, `actual_ship_date`, `planned_receive_date`, `actual_receive_date` pending
+
+**Before Implementing Features**:
+1. Check DEPLOYMENT_ERRORS_ANALYSIS.md for common patterns
+2. Run `pnpm type-check` before commit
+3. Verify status enum values in `packages/shared/types.ts`
 
 ## Module Architecture
 

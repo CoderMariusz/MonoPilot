@@ -1,7 +1,30 @@
 # Technical Module Guide
 
+**Last Updated**: 2025-11-04  
+**Type Safety Risk**: 🟢 LOW - Stable module  
+**Completion**: ~95% - Nearly complete
+
 ## Overview
 The Technical Module is responsible for product catalog management, bill of materials (BOM) definition, and routing setup. It serves as the foundation for all other modules by defining products and their manufacturing requirements.
+
+### ⚠️ Known Issues & Type Safety
+
+**Type Safety Notes**:
+- **RoutingBuilder.tsx** was source of major deployment errors (see DEPLOYMENT_ERRORS_ANALYSIS.md)
+- Fix applied: Use `Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>`
+
+**Field Name Mismatches** (from REPAIR_PLAN.md):
+- Some fields may have different names in DB vs UI
+- Always verify against `packages/shared/types.ts`
+
+**Type Patterns**:
+```typescript
+// BOM Creation
+type NewBOM = Omit<BOM, 'id' | 'created_at' | 'updated_at'>;
+
+// Product Creation
+type NewProduct = Omit<Product, 'id' | 'created_at' | 'updated_at'>;
+```
 
 ## Single vs Composite
 

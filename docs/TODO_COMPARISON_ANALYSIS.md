@@ -1,9 +1,10 @@
 # Analiza Porównawcza TODO - MonoPilot
 
-**Data analizy**: 2025-01-XX
+**Data analizy**: 2025-11-04  
 **Źródła**: 
 - TODO z Downloads (182 linie) - MVP do Świąt + Roadmap
-- TODO z docs (655 linii) - Historia implementacji (Phases 0-21)
+- TODO z docs (755+ linii) - Historia implementacji + Type Safety (updated 2025-11-04)
+- DEPLOYMENT_ERRORS_ANALYSIS.md - 20 consecutive deployment failures analysis
 
 ## Podsumowanie
 
@@ -164,11 +165,77 @@
 #### Roadmap po MVP 🆕
 - Wszystkie zadania z Tydz. 9-24: ❌ Brak (nie ma w docs TODO)
 
+## 🔴 What Caused 100% Deployment Failures
+
+> **CRITICAL FINDING**: Analysis of 20 consecutive failed deployments revealed **100% were TypeScript errors**
+
+### Kategorie Błędów (z DEPLOYMENT_ERRORS_ANALYSIS.md)
+
+| Kategoria | % Przypadków | Type Safety Risk | MVP Impact |
+|-----------|--------------|------------------|------------|
+| **Niekompletne Typy** | 60% | 🔴 HIGH | BLOCKS: Planning module UI updates |
+| **Niekompatybilne Typy** | 25% | 🟡 MEDIUM | BLOCKS: Status enums, form validation |
+| **Stare/Błędne Importy** | 15% | 🟢 LOW | BLOCKS: Component refactoring |
+
+### MVP Tasks Blocked by Type Errors
+
+#### 🔴 HIGH RISK - Currently Blocking MVP
+1. **Planning Module (~77% complete)**
+   - **Blokowane**: WO/PO/TO schema→UI updates
+   - **Przyczyna**: Niekompletne typy w form submissions
+   - **Przykład**: `RoutingBuilder.tsx:113` - Missing id, routing_id, timestamps
+   - **Fix**: Use `Omit<T, 'id' | 'created_at' | 'updated_at'>`
+   
+2. **Production Module (~50% complete)**
+   - **Blokowane**: Dashboard components implementation
+   - **Przyczyna**: Type mismatches between API response and UI components
+   - **Fix**: Define proper TypeScript interfaces for all dashboard props
+
+#### 🟡 MEDIUM RISK - May Block MVP Features
+3. **QA Module**
+   - **Blokowane**: COA PDF generation
+   - **Przyczyna**: Status enum mismatches (Pending/Passed/Failed/Quarantine)
+   - **Fix**: Verify enum values match database schema
+
+4. **Label Printing** 
+   - **Blokowane**: ZPL template generation
+   - **Przyczyna**: Missing type definitions for printer API
+   - **Fix**: Create TypeScript interfaces for ZPL commands
+
+#### 🟢 LOW RISK - Won't Block MVP
+5. **Advanced Features (P1/P2)**
+   - NPD/Idea Management
+   - Engineering/CMMS-lite
+   - **Status**: Future enhancements, not affected by current type errors
+
+### Type Safety Risk Assessment per Module
+
+| Module | Completion | Type Safety Risk | Deployment Risk | Action Required |
+|--------|------------|------------------|-----------------|-----------------|
+| Planning | ~77% | 🔴 HIGH | BLOCKS deploy | Audit forms & API calls |
+| Production | ~50% | 🔴 HIGH | BLOCKS deploy | Define dashboard types |
+| Warehouse | ~70% | 🟡 MEDIUM | May block | Fix GRN/LP types |
+| Quality | ~45% | 🟡 MEDIUM | May block | Fix QA status enums |
+| Scanner | ~60% | 🟢 LOW | OK | Minor fixes only |
+| Technical | ~95% | 🟢 LOW | OK | Stable |
+
+### Deployment Prevention Strategy
+
+**✅ IMPLEMENTED (as of 2025-11-04)**:
+- Pre-commit hooks with type-check (see SETUP_TYPE_CHECKING.md)
+- Automated ESLint + Prettier
+- Import validation
+
+**⏳ PENDING**:
+- Audit all MVP components for type completeness
+- Fix status enum usages across codebase
+- Update Planning module form types
+
 ## Różnice strukturalne
 
 ### Priorytety
 - **Downloads TODO**: P0/P1/P2 z emoji (🟢/🟡/⚪)
-- **docs TODO**: Brak priorytetów, tylko statusy (✅/🔄/⏳)
+- **docs TODO**: P0/P1/P2 z emoji + Type Safety focus (updated 2025-11-04)
 
 ### Struktura czasowa
 - **Downloads TODO**: Konkretne daty (tygodnie XI-XII 2025)
@@ -178,15 +245,39 @@
 - **Downloads TODO**: Biznesowy, user-focused, MVP-driven
 - **docs TODO**: Techniczny, implementacyjny, historyczny
 
-## Rekomendacje dla scalonego TODO
+## Rekomendacje dla scalonego TODO (✅ IMPLEMENTED 2025-11-04)
 
-1. **Zachować historię**: Phases 0-18 z docs/TODO.md jako "Historia Implementacji"
-2. **Integrować nowy plan**: MVP z Downloads TODO jako "Plan MVP do Świąt"
-3. **Dodać brakujące**: Zadania z Phase 19-21 jako "Future Enhancements"
-4. **Ujednolicić statusy**: 
+1. ✅ **Zachować historię**: Phases 0-18 z docs/TODO.md jako "Historia Implementacji"
+2. ✅ **Integrować nowy plan**: MVP z Downloads TODO jako "Plan MVP do Świąt"
+3. ✅ **Dodać brakujące**: Zadania z Phase 19-21 jako "Future Enhancements"
+4. ✅ **Ujednolicić statusy**: 
    - ✅ Zrobione (Phases 0-18)
-   - 🔄 W toku (Phase 17 + część MVP)
+   - 🔄 W toku (Phase 17 + część MVP + Type Safety)
    - ⏳ Do zrobienia (MVP + Future)
-5. **Dodać priorytety**: P0/P1/P2 z nowego TODO
-6. **Mapowanie**: Pokazać, które zadania MVP są już zrobione (Phases 0-18)
+5. ✅ **Dodać priorytety**: P0/P1/P2 z emoji w całym dokumencie
+6. ✅ **Mapowanie**: Pokazane które zadania MVP są już zrobione (Phases 0-18)
+7. ✅ **NEW: Type Safety & Deployment Prevention** (Section 9.5)
+   - Pre-commit hooks operational
+   - Common deployment errors documented
+   - Deployment checklist created
+   - Reference to DEPLOYMENT_ERRORS_ANALYSIS.md
+
+## Key Learnings
+
+### What We Learned from 20 Failed Deployments
+1. **100% TypeScript errors** - Every single deployment failure was preventable
+2. **60% incomplete types** - Missing required properties in object mappings
+3. **25% enum mismatches** - Wrong status literals used
+4. **15% stale imports** - Importing non-existent components
+
+### Prevention Measures Now in Place
+1. ✅ **Automated type-check** before every commit (Husky pre-commit hooks)
+2. ✅ **Deployment error patterns documented** (DEPLOYMENT_ERRORS_ANALYSIS.md)
+3. ✅ **Pre-deployment checklist** added to TODO.md (Section 9.5.5)
+4. ⏳ **Audit pending** - Need to fix existing type issues in codebase
+
+### Impact on MVP Timeline
+- **Planning Module**: May require 1-2 days for type fixes before UI updates
+- **Production Module**: Needs type definitions before dashboard implementation
+- **Overall**: Type safety should prevent future deployment failures (0% vs 100%)
 

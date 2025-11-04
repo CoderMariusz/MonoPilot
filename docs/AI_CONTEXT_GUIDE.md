@@ -1,7 +1,7 @@
 # AI Context Guide
 
-**Last Updated**: 2025-11-03  
-**Version**: 1.1
+**Last Updated**: 2025-11-04  
+**Version**: 1.2 - Type Safety Update
 
 ## Overview
 This document provides templates and patterns for building effective AI context when working with the MonoPilot MES system. Use these templates to create comprehensive, accurate prompts.
@@ -232,6 +232,151 @@ Integration Points:
 - Related APIs: WorkOrdersAPI (existing methods)
 - Database Changes: None (uses existing tables)
 ```
+
+---
+
+## When Implementing New Features
+
+> 🔒 **Critical**: 100% of deployment failures were TypeScript errors  
+> ✅ **Prevention**: Follow type safety checklist before implementing features  
+> 📄 **Full Analysis**: DEPLOYMENT_ERRORS_ANALYSIS.md
+
+### Step 1: Type Safety First
+
+**Before writing any code**, check:
+
+1. **DEPLOYMENT_ERRORS_ANALYSIS.md** - Review common error patterns
+   - 60% failures: Missing required properties in objects
+   - 25% failures: Status enum mismatches
+   - 15% failures: Stale/wrong imports
+
+2. **Run `pnpm type-check`** - Ensure baseline passes
+   ```bash
+   # Full project
+   pnpm type-check
+   
+   # Just frontend (where most errors occur)
+   cd apps/frontend && pnpm type-check
+   ```
+
+3. **Verify all interfaces have required properties**
+   - Check `packages/shared/types.ts` for type definitions
+   - Use `Omit<T, 'id' | 'created_at' | 'updated_at'>` for CREATE operations
+   - Use `Partial<T>` for UPDATE operations
+
+### Step 2: Reference Existing Patterns
+
+**From DEPLOYMENT_ERRORS_ANALYSIS.md**:
+
+#### ✅ Correct Pattern - CREATE Operation
+```typescript
+// Creating new routing operations (from RoutingBuilder.tsx fix)
+type NewRoutingOperation = Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>;
+
+const operations: NewRoutingOperation[] = localOperations.map((op, index) => ({
+  seq_no: index + 1,
+  name: op.name,
+  code: op.code,
+  description: op.description,
+  requirements: op.requirements,
+}));
+```
+
+#### ✅ Correct Pattern - Status Enums
+```typescript
+// Always use correct enum values (check types.ts)
+const status: POStatus = 'pending'; // NOT 'open'
+const qaStatus: QAStatus = 'passed'; // NOT 'approved'
+const woStatus: WorkOrderStatus = 'planned'; // NOT 'pending'
+```
+
+#### ✅ Correct Pattern - Form Data Conversion
+```typescript
+// Parse form strings to numbers
+const quantity: number = parseFloat(formData.quantity) || 0;
+const price: number = parseFloat(formData.price) || 0;
+
+// Validate before using
+if (isNaN(quantity) || quantity <= 0) {
+  throw new Error('Invalid quantity');
+}
+```
+
+#### ❌ Common Mistakes to Avoid
+```typescript
+// DON'T: Pass objects with missing properties
+const operations = data.map(op => ({
+  name: op.name,
+  code: op.code
+  // Missing: id, routing_id, created_at, updated_at
+}));
+
+// DON'T: Use wrong status literals
+const status: POStatus = 'open'; // Wrong! Should be 'pending'
+
+// DON'T: Import non-existent components
+import { LazyAddItemModal } from '@/components/modals/LazyAddItemModal'; // Wrong!
+import { GRNsAPI } from '@/lib/api'; // Doesn't exist!
+```
+
+### Step 3: Implementation Checklist
+
+**While coding**:
+- [ ] Use TypeScript utility types (`Omit<>`, `Partial<>`, `Pick<>`)
+- [ ] Check enum values in `packages/shared/types.ts`
+- [ ] Parse form strings to proper types
+- [ ] Verify all imports exist (check API_REFERENCE.md)
+- [ ] Add proper error handling
+- [ ] Test locally before committing
+
+**Before committing** (automated via pre-commit hooks):
+- [ ] `pnpm type-check` passes (automated)
+- [ ] `pnpm lint` passes (automated)
+- [ ] `pnpm format` applied (automated)
+- [ ] All imports validated (automated)
+
+**After committing**:
+- [ ] Vercel preview build successful
+- [ ] No TypeScript errors in deployment logs
+- [ ] Manual testing of changed features
+
+### Step 4: Testing & Validation
+
+**Type Safety Tests** (see TODO.md section 9.5):
+```typescript
+// Test that types are correctly defined
+describe('Type Safety', () => {
+  it('should accept valid CREATE operation types', () => {
+    type NewWO = Omit<WorkOrder, 'id' | 'created_at' | 'updated_at'>;
+    const wo: NewWO = {
+      wo_number: 'WO-001',
+      product_id: 1,
+      quantity_ordered: 100,
+      // ... all other required fields
+    };
+    expect(wo).toBeDefined();
+  });
+  
+  it('should reject invalid status enums', () => {
+    // This should not compile
+    // const status: POStatus = 'open'; // TS Error!
+  });
+});
+```
+
+### Step 5: Documentation References
+
+When implementing features, always consult:
+
+| Document | Purpose | When to Use |
+|----------|---------|-------------|
+| **DEPLOYMENT_ERRORS_ANALYSIS.md** | Common error patterns | Before starting implementation |
+| **API_REFERENCE.md** | Type Safety Best Practices section | When calling APIs |
+| **SYSTEM_OVERVIEW.md** | Section 9: Type Safety | For workflow understanding |
+| **AI_QUICK_REFERENCE.md** | TypeScript Error Quick Reference | For quick lookup |
+| **TODO.md** | Section 9.5: Deployment checklist | Before committing |
+
+---
 
 ## Common Patterns and Anti-patterns
 

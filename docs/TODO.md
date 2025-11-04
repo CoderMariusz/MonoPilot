@@ -1,8 +1,9 @@
 # MonoPilot MES - Implementation Status & TODO
 
-> 📅 **Last Updated**: 2025-11-03  
+> 📅 **Last Updated**: 2025-11-04  
 > 🎯 **Purpose**: Complete checklist of what's been implemented and what's pending  
-> 📊 **Progress**: Based on code audit and documentation review
+> 📊 **Progress**: Based on code audit and documentation review  
+> 🔒 **Type Safety**: 100% deployment failures were TypeScript errors (see DEPLOYMENT_ERRORS_ANALYSIS.md)
 
 ---
 
@@ -461,6 +462,92 @@
 
 **Status**: ⬜ Not started
 
+### 9.5 Type Safety & Deployment Prevention 🟢 P0
+
+> 📋 **Context**: Analysis of 20 consecutive deployment failures revealed 100% were TypeScript errors  
+> 📄 **Reference**: See `DEPLOYMENT_ERRORS_ANALYSIS.md` for detailed patterns and solutions  
+> ✅ **Setup Complete**: Pre-commit hooks configured via `SETUP_TYPE_CHECKING.md`
+
+#### 9.5.1 Pre-commit Type Checking
+- [x] 9.5.1.1 Husky pre-commit hooks setup ✅ (see SETUP_TYPE_CHECKING.md)
+- [x] 9.5.1.2 Type-check command integration (`pnpm type-check`)
+- [x] 9.5.1.3 ESLint integration in pre-commit
+- [x] 9.5.1.4 Prettier auto-formatting in pre-commit
+- [x] 9.5.1.5 Import validation in pre-commit
+- [ ] 9.5.1.6 Pre-push test execution 🟢 P0
+
+**Status**: ✅ Pre-commit hooks operational, pre-push tests pending
+
+#### 9.5.2 TypeScript Configuration
+- [x] 9.5.2.1 Strict mode enabled in tsconfig.json
+- [x] 9.5.2.2 noImplicitAny enabled
+- [x] 9.5.2.3 strictNullChecks enabled
+- [x] 9.5.2.4 Incremental compilation for performance
+- [ ] 9.5.2.5 noUnusedLocals enforcement 🟡 P1
+- [ ] 9.5.2.6 noUnusedParameters enforcement 🟡 P1
+
+**Status**: ✅ Core strict mode configured
+
+#### 9.5.3 Common Deployment Error Prevention
+
+**Reference**: `DEPLOYMENT_ERRORS_ANALYSIS.md` - Kategorie Błędów
+
+- [ ] 9.5.3.1 Audit all component props for incomplete types 🟢 P0
+  - **Issue**: Missing required properties (60% of failures)
+  - **Example**: `RoutingBuilder.tsx:113` - Missing id, routing_id, timestamps
+  - **Fix**: Use `Omit<T, 'id' | 'created_at' | 'updated_at'>`
+  
+- [ ] 9.5.3.2 Verify all status enum usages 🟢 P0
+  - **Issue**: Type literal incompatibility (25% of failures)
+  - **Example**: Status 'open' when POStatus = 'pending' | 'approved'
+  - **Fix**: Use correct enum values from generated types
+  
+- [ ] 9.5.3.3 Fix stale import references 🟢 P0
+  - **Issue**: Imports of removed/moved components (15% of failures)
+  - **Example**: `LazyAddItemModal` should be `AddItemModal`
+  - **Fix**: Verify all imports exist before commit
+
+**Status**: ⬜ Audit needed - Use DEPLOYMENT_ERRORS_ANALYSIS.md as checklist
+
+#### 9.5.4 Type Check Commands
+```bash
+# Full project type check
+pnpm type-check
+
+# Frontend only
+cd apps/frontend && pnpm type-check
+
+# Backend only  
+cd apps/backend && pnpm type-check
+
+# Pre-commit simulation (all checks)
+pnpm pre-commit
+```
+
+#### 9.5.5 Deployment Checklist 🟢 P0
+
+**Before Every Commit**:
+- [ ] Run `pnpm type-check` - MUST pass (automated via pre-commit)
+- [ ] Verify all imports exist and are correct
+- [ ] Check for incomplete type definitions
+- [ ] Validate enum/status values against generated types
+- [ ] Test changed components locally
+
+**Before Every Deploy**:
+- [ ] All pre-commit hooks passed
+- [ ] No TypeScript errors in build log
+- [ ] Verify Vercel deployment preview builds successfully
+- [ ] Check for console errors in deployment preview
+
+**Common Pitfalls** (from DEPLOYMENT_ERRORS_ANALYSIS.md):
+1. ❌ Mapping objects without all required properties → Use `Omit<>` or `Partial<>`
+2. ❌ Using wrong status literals → Check enum definitions
+3. ❌ Importing non-existent components → Verify paths
+4. ❌ Number vs String in forms → Use `parseFloat()` or validation
+5. ❌ Optional vs Required properties → Match interface definitions
+
+**Status**: 🔄 Checklist defined, enforcement via automation (pre-commit hooks ✅)
+
 ---
 
 ## 10.0 Documentation & Deployment
@@ -595,7 +682,8 @@
 | 7.0 Quality | ~45% | 🔄 QA basics, NO trace visualization |
 | 8.0 Exports | ~70% | 🔄 Core exports done |
 | 9.0 Testing | ~10% | ⬜ Only auth tests exist |
-| 10.0 Documentation | ~80% | 🔄 Core docs updated |
+| 9.5 Type Safety | ~80% | ✅ Pre-commit hooks active, audit pending |
+| 10.0 Documentation | ~85% | 🔄 Core docs updated + type safety |
 | 11.0 Future | ~0% | ⬜ Post-MVP |
 
 ### Priority Breakdown
@@ -607,17 +695,22 @@
 ### Key Findings from Code Audit
 
 1. **Foundation & Technical solid** - ~95% complete
-2. **🟡 Planning module** - ~77% (Schema→UI gap: actual dates, currency, ship/receive dates)
+2. **✅ Type Safety implemented** - ~80% complete
+   - Pre-commit hooks operational (SETUP_TYPE_CHECKING.md)
+   - 100% deployment failures were TypeScript errors (DEPLOYMENT_ERRORS_ANALYSIS.md)
+   - Automated type-check, ESLint, Prettier in pre-commit
+   - Audit of existing code for type issues pending
+3. **🟡 Planning module** - ~77% (Schema→UI gap: actual dates, currency, ship/receive dates)
    - WO ~85%: Brakuje actual_start/end, source_demand, BOM tracking w UI
    - PO ~80%: Brakuje due_date, currency, exchange_rate, total_amount w UI  
    - TO ~65%: Brakuje 4 daty (planned/actual ship/receive), location fix, line items details
-3. **🔴 Production module** - ~50% (ONLY basic tables, NO dashboard/analytics)
-4. **🔴 Traceability** - ~40% (API exists, NO visualization/tables)
-5. **Testing is minimal** - Only auth tests exist; need comprehensive test suite
-6. **Mobile UX pending** - Scanner module needs mobile optimization
-7. **ASN → GRN → LP flow** - Core logic exists but full integration pending
-8. **Label printing** - Not started, critical for MVP
-9. **Documentation** - Core docs updated 2025-11-03, Planning & Production analysis complete
+4. **🔴 Production module** - ~50% (ONLY basic tables, NO dashboard/analytics)
+5. **🔴 Traceability** - ~40% (API exists, NO visualization/tables)
+6. **Testing is minimal** - Only auth tests exist; need comprehensive test suite
+7. **Mobile UX pending** - Scanner module needs mobile optimization
+8. **ASN → GRN → LP flow** - Core logic exists but full integration pending
+9. **Label printing** - Not started, critical for MVP
+10. **Documentation** - Core docs updated 2025-11-04, Type safety integration in progress
 
 ### Next Steps (Priority Order)
 
@@ -657,6 +750,7 @@
 
 ---
 
-**Last audit**: 2025-11-03  
+**Last audit**: 2025-11-04  
 **Audited by**: Documentation Team  
-**Verified against**: Code, migrations, components, API classes, documentation
+**Verified against**: Code, migrations, components, API classes, documentation  
+**Type Safety**: Pre-commit hooks active, deployment error prevention implemented (see DEPLOYMENT_ERRORS_ANALYSIS.md)

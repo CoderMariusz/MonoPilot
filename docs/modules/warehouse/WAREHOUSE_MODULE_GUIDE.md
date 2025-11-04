@@ -1,10 +1,35 @@
 # Warehouse Module Guide
 
-**Last Updated**: 2025-01-XX  
-**Version**: 2.0 - Documentation Audit Update
+**Last Updated**: 2025-11-04  
+**Version**: 2.1 - Type Safety Update  
+**Type Safety Risk**: 🟡 MEDIUM - See DEPLOYMENT_ERRORS_ANALYSIS.md  
+**Completion**: ~70% - Core done, ASN flow pending
 
 ## Overview
 The Warehouse Module manages inventory operations including goods receipt processing, stock movements, license plate management, and location tracking. It provides real-time visibility into inventory levels and material locations.
+
+### ⚠️ Type Safety Patterns
+
+**Common Type Patterns**:
+```typescript
+// GRN Creation
+type NewGRN = Omit<GRN, 'id' | 'created_at' | 'updated_at'>;
+
+// License Plate Creation
+type NewLP = Omit<LicensePlate, 'id' | 'created_at' | 'updated_at'>;
+
+// Stock Move Creation
+type NewStockMove = Omit<StockMove, 'id' | 'created_at' | 'updated_at'>;
+```
+
+**Status Enums**:
+- **QAStatus**: `'pending' | 'passed' | 'failed' | 'quarantine'` (NOT 'approved')
+- **LPStatus**: Use correct values from database schema
+
+**Before Implementing**:
+1. Check DEPLOYMENT_ERRORS_ANALYSIS.md
+2. Run `pnpm type-check`
+3. Parse quantity strings: `parseFloat(formData.quantity) || 0`
 
 ## Module Architecture
 
