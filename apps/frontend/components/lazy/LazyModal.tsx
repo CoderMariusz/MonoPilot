@@ -3,7 +3,7 @@
 import { lazy, Suspense } from 'react';
 
 // Lazy load heavy modals
-export const LazyAddItemModal = lazy(() => import('../AddItemModal'));
+// Note: AddItemModal removed - file does not exist
 export const LazyWorkOrderDetailsModal = lazy(() => import('../WorkOrderDetailsModal').then(module => ({ default: module.WorkOrderDetailsModal })));
 export const LazyPurchaseOrderDetailsModal = lazy(() => import('../PurchaseOrderDetailsModal').then(module => ({ default: module.PurchaseOrderDetailsModal })));
 export const LazyTransferOrderDetailsModal = lazy(() => import('../TransferOrderDetailsModal').then(module => ({ default: module.TransferOrderDetailsModal })));
