@@ -6,7 +6,7 @@ import { LocationsAPI } from '@/lib/api/locations';
 import { ProductsAPI } from '@/lib/api/products';
 import { PurchaseOrdersAPI } from '@/lib/api/purchaseOrders';
 import { useSuppliers, resolveDefaultUnitPrice } from '@/lib/clientState';
-import type { Product, PurchaseOrderItem, Location } from '@/lib/types';
+import type { Product, PurchaseOrderItem, Location, POStatus } from '@/lib/types';
 
 interface EditPurchaseOrderModalProps {
   isOpen: boolean;
@@ -167,9 +167,23 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
         };
       });
       
+      // Map status to POStatus if needed
+      const statusMap: Record<string, POStatus> = {
+        'draft': 'draft',
+        'approved': 'approved',
+        'closed': 'closed',
+        'cancelled': 'cancelled',
+        'sent': 'approved', // Map sent to approved
+        'submitted': 'approved', // Map submitted to approved
+        'confirmed': 'approved', // Map confirmed to approved
+        'partially_received': 'approved', // Map partially_received to approved
+        'received': 'approved', // Map received to approved
+      };
+      const mappedStatus: POStatus = statusMap[formData.status] || formData.status as POStatus;
+      
       updatePurchaseOrder(purchaseOrderId, {
         supplier_id: Number(formData.supplier_id),
-        status: formData.status,
+        status: mappedStatus,
         due_date: formData.due_date || null,
         payment_due_date: formData.payment_due_date || undefined,
         currency: formData.currency || 'USD',
