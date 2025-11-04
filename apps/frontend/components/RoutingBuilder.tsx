@@ -6,7 +6,9 @@ import type { Routing, RoutingOperation } from '@/lib/types';
 
 interface RoutingBuilderProps {
   routing?: Routing;
-  onSave: (routing: Omit<Routing, 'id' | 'created_at' | 'updated_at'>) => void;
+  onSave: (routing: Omit<Routing, 'id' | 'created_at' | 'updated_at'> & { 
+    operations?: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>[] 
+  }) => void;
   onCancel: () => void;
 }
 
