@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, Route } from 'lucide-react';
 import { RoutingsAPI } from '@/lib/api/routings';
-import type { Routing } from '@/lib/types';
+import type { Routing, RoutingOperation } from '@/lib/types';
 import { useToast } from '@/lib/toast';
 import { RoutingBuilder } from './RoutingBuilder';
 
