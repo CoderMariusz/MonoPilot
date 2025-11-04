@@ -73,7 +73,7 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
           setTransferItems(to.transfer_order_items.map(item => ({
             id: item.id.toString(),
             product_id: item.product_id.toString(),
-            quantity: item.quantity,
+            quantity: item.quantity.toString(),
           })));
         }
       }
