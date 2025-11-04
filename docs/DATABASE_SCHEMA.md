@@ -39,12 +39,8 @@ This document describes the complete database schema for the MonoPilot MES syste
 | allergen_ids | INTEGER | - |
 | created_by | UUID | REFERENCES users(id) |
 | updated_by | UUID | REFERENCES users(id) |
-| group | product_group | NOT NULL, DEFAULT 'COMPOSITE' |
 | product_type | product_type | NOT NULL, DEFAULT 'FG' |
-| product_group | product_group | NOT NULL, DEFAULT 'COMPOSITE' |
-| boxes_per_pallet | INTEGER | - |
 | packs_per_box | INTEGER | - |
-| supplier_id | INTEGER | - |
 
 **Foreign Keys**:
 
@@ -167,7 +163,6 @@ CREATE TABLE IF NOT EXISTS boms (
 | lead_time_days | INTEGER | - |
 | moq | NUMERIC(12,4) | - |
 | packages_per_box | NUMERIC(12,4) | NOT NULL, DEFAULT 1 |
-| one_to_one | BOOLEAN | DEFAULT false |
 
 **Foreign Keys**:
 
@@ -230,13 +225,8 @@ CREATE TABLE IF NOT EXISTS bom_items (
 | approved_by | INTEGER | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
-| routing_id | INTEGER | REFERENCES routings(id) |
-| kpi_scope | kpi_scope_enum | NOT NULL, DEFAULT 'PR' |
-| planned_boxes | INTEGER | - |
 | actual_boxes | INTEGER | - |
 | box_weight_kg | NUMERIC(10,4) | - |
-| current_operation_seq | INTEGER | - |
-| closed_by | UUID | REFERENCES users(id) |
 | closed_at | TIMESTAMPTZ | - |
 | closed_source | move_source_enum | - |
 | actual_output_qty | NUMERIC(10,4) | - |
@@ -246,8 +236,6 @@ CREATE TABLE IF NOT EXISTS bom_items (
 - `product_id` → `products.id`
 - `bom_id` → `boms.id`
 - `machine_id` → `machines.id`
-- `routing_id` → `routings.id`
-- `closed_by` → `users.id`
 
 **Indexes**:
 
@@ -917,7 +905,6 @@ CREATE TABLE IF NOT EXISTS warehouses (
 | boxes | INTEGER | - |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_by | UUID | REFERENCES users(id) |
-| source | TEXT | DEFAULT 'scanner' CHECK (source IN ('scanner' |
 
 **Foreign Keys**:
 
@@ -1159,7 +1146,6 @@ CREATE TABLE routings (
 | estimated_duration_minutes | INTEGER | - |
 | setup_time_minutes | INTEGER | DEFAULT 0 |
 | is_active | BOOLEAN | DEFAULT true |
-| requirements | TEXT | - |
 
 **Foreign Keys**:
 
@@ -1210,14 +1196,10 @@ CREATE TABLE routing_operations (
 | started_at | TIMESTAMPTZ | - |
 | finished_at | TIMESTAMPTZ | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
-| planned_input_weight | NUMERIC(10,4) | - |
 | planned_output_weight | NUMERIC(10,4) | - |
-| actual_input_weight | NUMERIC(10,4) | - |
 | actual_output_weight | NUMERIC(10,4) | - |
-| cooking_loss_weight | NUMERIC(10,4) | - |
 | trim_loss_weight | NUMERIC(10,4) | - |
 | marinade_gain_weight | NUMERIC(10,4) | - |
-| scrap_breakdown | JSONB | - |
 
 **Foreign Keys**:
 
@@ -1732,7 +1714,6 @@ CREATE TABLE qa_override_log (
 | approved_by | UUID | REFERENCES users(id) |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
-| payment_due_date | TIMESTAMPTZ | - |
 
 **Foreign Keys**:
 
@@ -1905,7 +1886,6 @@ CREATE TABLE IF NOT EXISTS po_correction (
 | approved_by | UUID | REFERENCES users(id) |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
-| planned_ship_date | TIMESTAMPTZ | - |
 | actual_ship_date | TIMESTAMPTZ | - |
 | planned_receive_date | TIMESTAMPTZ | - |
 | actual_receive_date | TIMESTAMPTZ | - |
@@ -1969,7 +1949,6 @@ CREATE TABLE IF NOT EXISTS to_header (
 | approved_line | BOOLEAN | DEFAULT false |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
-| lp_id | INTEGER | REFERENCES license_plates(id) |
 | batch | VARCHAR(100) | - |
 
 **Foreign Keys**:
@@ -1978,7 +1957,6 @@ CREATE TABLE IF NOT EXISTS to_header (
 - `item_id` → `products.id`
 - `from_location_id` → `locations.id`
 - `to_location_id` → `locations.id`
-- `lp_id` → `license_plates.id`
 
 **Indexes**:
 
@@ -2402,17 +2380,12 @@ CREATE TABLE lp_genealogy (
 | reference_id | INTEGER | - |
 | created_by | VARCHAR(50) | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
-| status | move_status_enum | NOT NULL, DEFAULT 'draft' |
-| wo_id | INTEGER | REFERENCES work_orders(id) |
-| meta | JSONB | - |
-| source | move_source_enum | NOT NULL, DEFAULT 'portal' |
 
 **Foreign Keys**:
 
 - `product_id` → `products.id`
 - `from_location_id` → `locations.id`
 - `to_location_id` → `locations.id`
-- `wo_id` → `work_orders.id`
 
 **Indexes**:
 

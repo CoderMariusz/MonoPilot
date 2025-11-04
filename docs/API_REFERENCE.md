@@ -767,6 +767,21 @@ static async getById(id: number): Promise<Product | null>
 
 ---
 
+#### `update()`
+
+**Signature**:
+```typescript
+static async update(id: number, data: UpdateProductData): Promise<Product>
+```
+
+**Parameters**:
+- `id: number`
+- `data: UpdateProductData`
+
+**Returns**: `Promise<Product>`
+
+---
+
 ### PurchaseOrdersAPI
 
 **Source**: `apps/frontend/lib/api/purchaseOrders.ts`
@@ -891,13 +906,14 @@ static async create(data: CreateRoutingDTO): Promise<Routing>
 
 **Signature**:
 ```typescript
-static async update(id: number, data: Partial<Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'>>): Promise<Routing>
+static async update(id: number, data: Partial<Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'>> & { operations?: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>[] }): Promise<Routing>
 ```
 
 **Parameters**:
 - `id: number`
 - `data: Partial<Omit<Routing`
-- `'id' | 'created_at' | 'updated_at' | 'operations'>>`
+- `'id' | 'created_at' | 'updated_at' | 'operations'>> & { operations?: Omit<RoutingOperation`
+- `'id' | 'routing_id' | 'created_at' | 'updated_at'>[] }`
 
 **Returns**: `Promise<Routing>`
 
