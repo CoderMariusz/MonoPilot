@@ -741,6 +741,22 @@ export interface BomHistory {
     };
   };
   description?: string;
+  // Enhanced relationships from API
+  changed_by_user?: {
+    id: string;
+    email: string;
+  };
+  bom?: {
+    id: number;
+    product_id: number;
+    version: string;
+    status: string;
+    products?: {
+      id: number;
+      part_number: string;
+      description: string;
+    };
+  };
 }
 
 // WO Materials interface for BOM snapshot functionality
