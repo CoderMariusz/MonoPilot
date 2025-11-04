@@ -155,13 +155,28 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
         const product = products.find(p => p.id === Number(item.product_id));
         const quantity = parseFloat(item.quantity);
         const unitPrice = parseFloat(item.unit_price);
+        const itemId = Number(item.id) || (Date.now() + index);
         return {
-          id: Number(item.id) || (Date.now() + index),
+          // POLine properties
+          id: itemId,
           po_id: purchaseOrderId,
+          line_no: index + 1,
+          item_id: itemId,
+          uom: product?.uom || 'EA',
+          qty_ordered: quantity,
+          qty_received: 0,
+          unit_price: unitPrice,
+          vat_rate: 0,
+          requested_delivery_date: undefined,
+          promised_delivery_date: undefined,
+          default_location_id: undefined,
+          note: undefined,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          // PurchaseOrderItem properties
           product_id: Number(item.product_id),
           quantity_ordered: quantity,
           quantity_received: 0,
-          unit_price: unitPrice,
           total_price: quantity * unitPrice,
           product,
         };
