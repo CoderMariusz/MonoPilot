@@ -34,7 +34,7 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
     supplier_id: string;
     due_date: string;
     payment_due_date: string;
-    status: 'draft' | 'sent' | 'submitted' | 'confirmed' | 'partially_received' | 'received' | 'cancelled' | 'closed';
+    status: 'draft' | 'sent' | 'submitted' | 'confirmed' | 'approved' | 'partially_received' | 'received' | 'cancelled' | 'closed';
     warehouse_id: string;
     request_delivery_date: string;
     expected_delivery_date: string;
