@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase/client-browser';
 import SingleProductModal from '@/components/SingleProductModal';
 import CompositeProductModal from '@/components/CompositeProductModal';
 import { BomHistoryModal } from '@/components/BomHistoryModal';
+import { ProductHistoryModal } from '@/components/ProductHistoryModal';
 
 type CategoryType = 'MEAT' | 'DRYGOODS' | 'FINISHED_GOODS' | 'PROCESS' | 'ARCHIVE';
 
@@ -248,6 +249,8 @@ function ProductsTable({
   const [bomActionLoading, setBomActionLoading] = useState<number | null>(null);
   const [historyBomId, setHistoryBomId] = useState<number | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyProductId, setHistoryProductId] = useState<number | null>(null);
+  const [isProductHistoryOpen, setIsProductHistoryOpen] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -422,6 +425,9 @@ function ProductsTable({
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">UoM</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Type</th>
+                  {(category === 'MEAT' || category === 'DRYGOODS') && (
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Version</th>
+                  )}
                   <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Expiry Policy</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Shelf Life</th>
                   <th 
@@ -463,6 +469,13 @@ function ProductsTable({
                         {product.product_type}
                       </span>
                     </td>
+                    {(category === 'MEAT' || category === 'DRYGOODS') && (
+                      <td className="py-3 px-4 text-sm text-slate-600">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium font-mono">
+                          v{(product as any).product_version || '1.0'}
+                        </span>
+                      </td>
+                    )}
                     <td className="py-3 px-4 text-sm text-slate-600">
                       {formatExpiryPolicy(product.expiry_policy)}
                     </td>
@@ -567,6 +580,21 @@ function ProductsTable({
                             <History className="w-4 h-4 text-purple-600" />
                           </button>
                         )}
+                        
+                        {/* Product History button for MEAT/DRYGOODS */}
+                        {(category === 'MEAT' || category === 'DRYGOODS') && (
+                          <button 
+                            onClick={() => {
+                              setHistoryProductId(product.id);
+                              setIsProductHistoryOpen(true);
+                            }}
+                            className="p-1 hover:bg-green-100 rounded transition-colors"
+                            title="View Product History"
+                            type="button"
+                          >
+                            <History className="w-4 h-4 text-green-600" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -608,6 +636,16 @@ function ProductsTable({
             setHistoryBomId(null);
           }}
           bomId={historyBomId}
+        />
+      )}
+      {historyProductId && (
+        <ProductHistoryModal
+          isOpen={isProductHistoryOpen}
+          onClose={() => {
+            setIsProductHistoryOpen(false);
+            setHistoryProductId(null);
+          }}
+          productId={historyProductId}
         />
       )}
     </div>

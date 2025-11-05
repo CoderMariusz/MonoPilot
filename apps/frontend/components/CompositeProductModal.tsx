@@ -238,7 +238,6 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               is_phantom,
               consume_whole_lp,
               unit_cost_std,
-              tax_code_id,
               lead_time_days,
               moq,
               line_id,
@@ -274,7 +273,6 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               is_phantom: item.is_phantom,
               consume_whole_lp: item.consume_whole_lp,
               unit_cost_std: item.unit_cost_std,
-              tax_code_id: item.tax_code_id,
               lead_time_days: item.lead_time_days,
               moq: item.moq,
               line_id: item.line_id || null
@@ -378,7 +376,8 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
     items.forEach(newItem => {
       const oldItem = oldItemsMap.get(newItem.material_id!);
       if (oldItem) {
-        const fieldsToCompare = ['quantity', 'uom', 'sequence', 'priority', 'scrap_std_pct', 'is_optional', 'is_phantom', 'consume_whole_lp', 'unit_cost_std', 'line_id', 'tax_code_id', 'lead_time_days', 'moq'];
+        // Tax code is managed at PO/Supplier level, not in BOM
+        const fieldsToCompare = ['quantity', 'uom', 'sequence', 'priority', 'scrap_std_pct', 'is_optional', 'is_phantom', 'consume_whole_lp', 'unit_cost_std', 'line_id', 'lead_time_days', 'moq'];
         const itemChanges: any = {};
         
         fieldsToCompare.forEach(field => {
@@ -609,7 +608,6 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           is_phantom: item.is_phantom,
           consume_whole_lp: item.consume_whole_lp,
           unit_cost_std: item.unit_cost_std,
-          tax_code_id: item.tax_code_id,
           lead_time_days: item.lead_time_days,
           moq: item.moq,
           line_id: item.line_id ?? null,
@@ -903,7 +901,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
                       else if (field === 'is_optional') fieldDisplay = 'optional';
                       else if (field === 'is_phantom') fieldDisplay = 'phantom';
                       else if (field === 'consume_whole_lp') fieldDisplay = 'consume whole LP';
-                      else if (field === 'tax_code_id') fieldDisplay = 'tax code';
+                      // Tax code removed - managed at PO/Supplier level
                       else if (field === 'lead_time_days') fieldDisplay = 'lead time';
                       else if (field === 'moq') fieldDisplay = 'moq';
                       let oldValDisplay = Array.isArray(oldVal) ? oldVal.join(',') : oldVal;
@@ -977,6 +975,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           // It's only relevant for single products
           
           // Update existing BOM items
+          // Tax code is managed at PO/Supplier level, not in BOM
           await supabase.from('bom_items').delete().eq('bom_id', bomId);
           if (items.length > 0) {
             const bomItems = items.map(item => ({
@@ -993,7 +992,6 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               is_phantom: item.is_phantom,
               consume_whole_lp: item.consume_whole_lp,
               unit_cost_std: item.unit_cost_std,
-              tax_code_id: item.tax_code_id,
               lead_time_days: item.lead_time_days,
               moq: item.moq,
               line_id: item.line_id,

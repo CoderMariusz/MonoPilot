@@ -5,6 +5,8 @@ import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase/client-browser';
 import type { ProductInsert, ProductGroup, ProductType, DbType, ExpiryPolicy, Product } from '@/lib/types';
 import AllergenChips from '@/components/AllergenChips';
+import { ProductHistoryModal } from '@/components/ProductHistoryModal';
+import { History } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -27,6 +29,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
   const [selectedAllergens, setSelectedAllergens] = useState<number[]>([]);
   const [isActive, setIsActive] = useState<boolean>(true);
   const [productVersion, setProductVersion] = useState<string>('1.0');  // NEW: Product version
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   
   // Normalize UoM to match dropdown values (KG, EACH, METER, LITER)
   const normalizeUomForSelect = (uom: string): 'KG' | 'EACH' | 'METER' | 'LITER' => {
@@ -130,6 +133,43 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
         setSubmitting(false);
         return;
       }
+      
+      // Auto-bump product version if editing and fields changed
+      let finalProductVersion = productVersion;
+      if (product) {
+        const fieldsToCheck = [
+          'description', 'std_price', 'uom', 'expiry_policy', 'shelf_life_days',
+          'supplier_id', 'tax_code_id', 'lead_time_days', 'moq'
+        ];
+        
+        let hasChanges = false;
+        for (const field of fieldsToCheck) {
+          const oldValue = (product as any)[field];
+          const newValue = (form as any)[field];
+          if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+            hasChanges = true;
+            break;
+          }
+        }
+        
+        // Check production_lines separately (array)
+        if (!hasChanges && JSON.stringify(product.production_lines) !== JSON.stringify(form.production_lines)) {
+          hasChanges = true;
+        }
+        
+        // If there are changes, auto-bump version
+        if (hasChanges) {
+          const [major, minor] = finalProductVersion.split('.').map(Number);
+          // Auto-bump to major if minor >= 9
+          if (minor >= 9) {
+            finalProductVersion = `${major + 1}.0`;
+          } else {
+            finalProductVersion = `${major}.${minor + 1}`;
+          }
+          setProductVersion(finalProductVersion);
+        }
+      }
+      
       const productPayload: ProductInsert = {
         type: mappedType,
         part_number: form.part_number!,
@@ -137,7 +177,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
         uom: form.uom!,
         product_group: group,
         product_type: form.product_type,
-        product_version: productVersion,  // NEW: Product version
+        product_version: finalProductVersion,  // Use auto-bumped version
         supplier_id: form.supplier_id || null,
         tax_code_id: form.tax_code_id || null,
         lead_time_days: form.lead_time_days || null,
@@ -148,10 +188,10 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
         production_lines: form.production_lines ?? [],
       };
       if (product) {
-        // Update existing product
+        // Update existing product - combine all updates into one query to avoid duplicate audit entries
         const { error: updateError } = await supabase
           .from('products')
-          .update(productPayload)
+          .update({ ...productPayload, is_active: isActive })
           .eq('id', product.id);
         
         if (updateError) throw updateError;
@@ -163,12 +203,6 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
           const { error: paErr } = await supabase.from('product_allergens').insert(rows);
           if (paErr) console.warn('Failed to save allergens', paErr);
         }
-        
-        // Update product is_active
-        await supabase
-          .from('products')
-          .update({ is_active: isActive })
-          .eq('id', product.id);
         
         toast.success('Product updated successfully');
       } else {
@@ -205,9 +239,21 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
-          <h2 className="text-xl font-semibold text-slate-900">
-            {product ? 'Edit Product' : 'Add Single Product'}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold text-slate-900">
+              {product ? 'Edit Product' : 'Add Single Product'}
+            </h2>
+            {product && (
+              <button
+                onClick={() => setIsHistoryOpen(true)}
+                className="p-2 hover:bg-purple-100 rounded transition-colors"
+                title="View Product History"
+                type="button"
+              >
+                <History className="w-4 h-4 text-purple-600" />
+              </button>
+            )}
+          </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -391,11 +437,19 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
               <button
                 onClick={() => {
                   const [major, minor] = productVersion.split('.').map(Number);
-                  setProductVersion(`${major}.${minor + 1}`);
+                  // Auto-bump to major if minor reaches 9
+                  if (minor >= 9) {
+                    setProductVersion(`${major + 1}.0`);
+                  } else {
+                    setProductVersion(`${major}.${minor + 1}`);
+                  }
                 }}
                 className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded text-xs font-medium hover:bg-blue-200"
               >
-                Bump Minor (→ {productVersion.split('.')[0]}.{parseInt(productVersion.split('.')[1]) + 1})
+                Bump Minor (→ {(() => {
+                  const [major, minor] = productVersion.split('.').map(Number);
+                  return minor >= 9 ? `${major + 1}.0` : `${major}.${minor + 1}`;
+                })()})
               </button>
               <button
                 onClick={() => {
@@ -408,7 +462,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
               </button>
             </div>
             <p className="text-xs text-slate-500 mt-2">
-              Minor: metadata changes. Major: manual bump for significant changes.
+              Minor: metadata changes. Major: manual bump or auto after 0.9.
             </p>
           </div>
         </div>
@@ -420,6 +474,13 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
           </button>
         </div>
       </div>
+      {product && (
+        <ProductHistoryModal
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
+          productId={product.id}
+        />
+      )}
     </div>
   );
 }
