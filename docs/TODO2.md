@@ -1293,229 +1293,604 @@ Interfejs planowania produkcji: W Dashboardzie Produkcji wystarczy link do modu�
 
 Priorytety KPI: Które KPI są najważniejsze na start (yield, waste, on-time, wykorzystanie maszyn…)? Proszę o ranking – ułatwi to priorytetyzację elementów Dashboardu.
 
-5.0 Warehouse Module - Inventory
-5.1 Goods Receipt Notes (GRN)
+5.0 Moduł Warehouse – Gospodarka Magazynowa
 
-5.1.1 GRN table (grn_number, po_id, status)
+Moduł Warehouse (magazyn) odpowiada za pełne zarządzanie ruchem towarów: przyjęcia (GRN), wydania i przesunięcia (Stock Moves, Transfer Orders), śledzenie stanów magazynowych przy pomocy License Plates (LP), obsługę lokalizacji, oraz integrację z terminalami skanującymi.
+Poniżej znajduje się kompletny plan implementacyjny, opracowany w oparciu o Twoje odpowiedzi, z priorytetami i zakresem prac dla każdej funkcji.
 
-5.1.2 GRN items (product, quantities ordered/received)
+5.1 Goods Receipt Notes (GRN) — Przyjęcia Towaru
 
-[?] 5.1.3 GRNTable component
+ 5.1.1 Tabela GRN — utworzyć tabelę w bazie danych do przechowywania nagłówków przyjęć:
+Kolumny: grn_number, po_id, status, created_by, created_at.
 
-[?] 5.1.4 GRNDetailsModal component
+ 5.1.2 Tabela pozycji GRN (GRN items) — przechowuje szczegóły każdej pozycji dokumentu przyjęcia:
+Kolumny: grn_id, product_id, qty_ordered, qty_received, uom, batch_number.
 
-[?] 5.1.5 CreateGRNModal component
+ 5.1.3 Komponent GRNTable — tabela w UI listująca wszystkie GRN, z informacjami o numerze, powiązanym PO, statusie i dacie utworzenia.
+Wymaga dopracowania (🟢 P0 — 0.5 dnia).
 
-5.1.6 ASN → GRN flow integration 🟢 P0
+ 5.1.4 Komponent GRNDetailsModal — okno z detalami GRN (linie, ilości, statusy, użytkownik).
+Należy sprawdzić i uzupełnić brakujące dane (🟢 P0 — 0.5 dnia).
 
-5.1.7 Auto-generate LP on GRN 🟢 P0
+ 5.1.5 Komponent CreateGRNModal — formularz do tworzenia GRN powiązanego z PO lub TO, z listą produktów i ilościami.
+Weryfikacja pól, walidacja ilości i zapisu (🟢 P0 — 0.5 dnia).
 
-5.1.8 Location assignment on GRN 🟢 P0
+ 5.1.6 Integracja przepływu ASN → GRN — umożliwić automatyczne tworzenie GRN na podstawie przychodzącego ASN (Advanced Shipping Notice) zarówno od dostawcy (PO), jak i z innego magazynu (TO).
+Przyjęcie ASN powinno generować GRN z wszystkimi oczekiwanymi pozycjami i ilościami.
+(🟢 P0 — kluczowe dla MVP).
 
-Status: 🔄 ~60% complete - Components done, ASN flow pending
+ 5.1.7 Automatyczne generowanie LP przy GRN — w momencie przyjęcia (zatwierdzenia GRN) system automatycznie tworzy License Plate (LP) dla każdej unikalnej partii lub palety.
+Każda pozycja GRN powinna otrzymać unikalny numer LP zgodny z przyjętym formatem (np. WOnnnnSS) (🟢 P0).
 
-5.1 GRN — P0 doprecyzowania (NOWE)
+ 5.1.8 Przypisanie lokacji podczas GRN — po utworzeniu LP, system automatycznie przypisuje im lokację magazynową na podstawie reguł z 5.4.4.
+Operator ma możliwość potwierdzenia lub zmiany lokacji w terminalu (🟢 P0).
 
-5.1.3 GRNTable — weryfikacja/uzupełnienie 🟢 P0 — 0.5 dnia
+📍 Status: 🔄 ~60% ukończone — podstawowe tabele i komponenty istnieją, brakuje pełnego przepływu ASN/TO → GRN oraz automatycznego przypisania LP i lokacji.
 
-5.1.4 GRNDetailsModal — weryfikacja/uzupełnienie 🟢 P0 — 0.5 dnia
+5.2 License Plates (LP) — Jednostki Magazynowe
 
-5.1.5 CreateGRNModal — weryfikacja/uzupełnienie 🟢 P0 — 0.5 dnia
+ 5.2.1 Tabela License Plates — zawiera informacje o każdej jednostce magazynowej:
+lp_number, product_id, quantity, uom, qa_status, location_id, parent_lp_id, created_from (GRN, TO, WO itp.).
 
-5.2 License Plates (LP) (Stock)
+ 5.2.2 Numeracja 8-cyfrowa LP (format WOnnnnSS) — każda jednostka ma unikalny numer LP z możliwością zeskanowania (barcode).
 
-5.2.1 License plates table (lp_number, product, quantity, qa_status)
+ 5.2.3 Relacje parent–child LP — system przechowuje relację między LP nadrzędnym (np. paletą) a podrzędnymi (np. kartonami).
 
-5.2.2 8-digit LP numbering (WOnnnnSS format)
+ 5.2.4 Śledzenie składów LP (lp_compositions) — tabela do rejestrowania łączenia i rozdzielania LP (np. scalanie palet lub rozdział paczek).
 
-5.2.3 LP parent-child relationships
+ 5.2.5 Genealogia LP (lp_genealogy) — pełna historia pochodzenia LP: z jakiego GRN lub LP nadrzędnego powstało, jak było dzielone, łączone, przesuwane.
 
-5.2.4 LP composition tracking (lp_compositions table)
+ 5.2.6 LPOperationsTable — komponent UI listujący operacje i historię LP.
 
-5.2.5 LP genealogy (lp_genealogy table)
+ 5.2.7 AmendLPModal — okno do edycji LP (korekta ilości, zmiana QA statusu).
 
-[?] 5.2.6 LPOperationsTable component
+ 5.2.8 SplitLPModal — interfejs do podziału LP:
 
-[?] 5.2.7 AmendLPModal component
+operator skanuje LP,
 
-[?] 5.2.8 SplitLPModal component
+wpisuje ilość do przeniesienia,
 
-[?] 5.2.9 TraceLPModal component
+skanuje nową lokalizację,
 
-Status: ✅ Complete
+system tworzy nowe LP (dziecko) z wprowadzoną ilością,
 
-5.2 LP — P0 doprecyzowania (NOWE)
+drukuje etykietę dla nowego LP (🟢 P0).
 
-5.2.6–5.2.9 LP UI completeness pass 🟢 P0 — 1.0 dnia
-LPOperationsTable / AmendLPModal / SplitLPModal / TraceLPModal — potwierdź i uzupełnij brakujące pola/akcje.
+ 5.2.9 TraceLPModal — interfejs do wyświetlania drzewa genealogicznego LP:
+pokazuje powiązania parent–child, lokalizacje, źródło (GRN, TO, WO) oraz daty zmian.
 
-5.3 Stock Moves
+ 5.2.6–5.2.9 Przegląd UI LP (completeness pass) — dopracować szczegóły wszystkich komponentów LP, zwłaszcza Split i Trace:
 
-5.3.1 Stock moves table (lp_id, from/to location, status)
+potwierdzić pełny zapis parent–child,
 
-5.3.2 StockMoveTable component
+automatyczny druk etykiety po split,
 
-5.3.3 StockMoveDetailsModal component
+dopasować layout pod terminal (mobile view).
+(🟢 P0 — 1.0 dnia).
 
-5.3.4 CreateStockMoveModal component
+📍 Status: ✅ ukończona logika bazowa, wymaga dopracowania UI i testów trace oraz split.
 
-5.3.5 Mobile-friendly Pick/Putaway UI 🟢 P0
+Dodatkowe uwagi:
+Etykieta LP powinna zawierać:
 
-Status: 🔄 ~80% complete - Desktop UI done, mobile pending
+nazwę produktu,
 
-5.4 Location Management
+ilość, jednostkę,
 
-5.4.1 Locations table (code, name, warehouse_id)
+numer LP (z kodem kreskowym),
 
-5.4.2 Warehouse hierarchy
+informację o alergenach,
 
-5.4.3 LocationsTable component
+numer LP nadrzędnego lub źródło (np. GRN),
 
-5.4.4 Auto-location assignment rules 🟢 P0
+składniki (jeśli LP dotyczy produktu złożonego).
 
-Status: 🔄 ~70% complete - Basic location mgmt done, rules pending
+5.3 Stock Moves — Przesunięcia Magazynowe
 
-6.0 Scanner Module - Mobile Operations
-6.1 Stage Board
+ 5.3.1 Tabela stock_moves — zapisuje każde przesunięcie LP:
+lp_id, from_location_id, to_location_id, moved_by, status, timestamp.
 
-6.1.1 StageBoard component (real-time operation status)
+ 5.3.2 Komponent StockMoveTable — tabela UI z listą przesunięć (filtry: oczekujące, zakończone, użytkownik, data).
 
-[?] 6.1.2 Color coding (red/amber/green)
+ 5.3.3 StockMoveDetailsModal — szczegóły przesunięcia: kto, kiedy, z/do jakiej lokacji, powiązane LP.
 
-6.1.3 Stage metrics display
+ 5.3.4 CreateStockMoveModal — formularz do utworzenia ręcznego przesunięcia LP.
 
-6.1.4 LP staging validation
+ 5.3.5 Interfejs mobilny Pick/Putaway (terminal) — zoptymalizowany pod skaner:
 
-6.1.5 QA gate enforcement
+Pick: operator skanuje LP do pobrania,
 
-Status: ✅ Complete (desktop)
+Putaway: operator skanuje lokalizację docelową,
 
-6.1 Stage Board — P0 doprecyzowania (NOWE)
+system aktualizuje location_id LP i zapisuje przesunięcie,
 
-6.1.2 Color coding (R/A/G) — finalize & document 🟢 P0 — 0.5 dnia
-Legendy, progi, testy.
+komunikaty w czasie rzeczywistym („Przeniesiono pomyślnie”, „Błąd: lokalizacja nieznana”).
+(🟢 P0 — kluczowy element).
 
-6.2 Process Terminal
+📍 Status: 🔄 ~80% ukończone — backend gotowy, interfejs mobilny w trakcie.
 
-6.2.1 Staging operations
+Uwagi:
 
-6.2.2 Weight recording
+Stock Move ≠ Transfer Order (TO):
 
-6.2.3 Operation completion
+Stock Move = przesunięcie wewnętrzne w jednym magazynie.
 
-6.2.4 1:1 validation enforcement
+Transfer Order (TO) = przesunięcie między magazynami.
+Przy wysyłce do innego magazynu system tworzy TO, a magazyn docelowy tworzy GRN na podstawie tego TO.
 
-6.2.5 Error handling & retry logic 🟢 P0
+Jeśli przesuwamy tylko część ilości LP → wywołujemy proces Split LP (tworzenie nowego dziecka LP dla przesuwanej ilości).
 
-6.2.6 Barcode scanning integration 🟢 P0
+5.4 Location Management — Zarządzanie Lokacjami
 
-6.2.7 Mobile UX optimization 🟢 P0
+ 5.4.1 Tabela locations — kolumny: id, code, name, warehouse_id, type, parent_id, is_active.
 
-6.2.8 🟢 P0
+ 5.4.2 Hierarchia magazynu — struktura stref → regałów → półek → pozycji.
+Relacja self-join (parent_id → locations.id).
 
-Status: 🔄 ~60% complete - Core logic done, UX needs work
+ 5.4.3 LocationsTable (UI) — zarządzanie lokacjami (lista, edycja, hierarchia).
 
-6.2 Process Terminal — P0 doprecyzowania (NOWE)
+ 5.4.4 Reguły automatycznego przypisywania lokacji — logika systemowa (🟢 P0):
 
-6.2.8 Błąd/Recovery UX (toast + retry flow) 🟢 P0 — 0.5 dnia
-Jednolity banner błędu, retry, logowanie przyczyn (front).
+reguły przypisywania domyślnych lokacji wg typu produktu (np. mięso → Chiller, FG → FG-Out),
 
-6.3 Pack Terminal
+zapis reguł w tabeli settings,
 
-[?] 6.3.1 Pallet creation -> tworzy lejbe pomysl na poczatek pdf puki nie podlaczymy drukarki.
+przy GRN, TO, Split LP – automatyczne podpowiedzi lokalizacji,
 
-[?] 6.3.2 LP composition management -> musimy to rozpisac
+możliwość nadpisania przez użytkownika,
 
-[?] 6.3.3 Pallet items tracking -> musimy to rozpisac
+walidacja pojemności i zgodności (np. alergenów lub materiałów niekompatybilnych).
 
-6.3.4 Mobile UI optimization 🟢 P0
+📍 Status: 🔄 ~70% ukończone — CRUD gotowy, brakuje auto-reguł przypisania.
 
-6.3.5 Barcode scanning integration 🟢 P0
+Integracja terminalowa (Mobile Scanner Flow)
 
-Status: 🔄 ~60% complete - Core done, mobile UI pending
+Terminal będzie obsługiwał następujące procesy:
 
-6.3 Pack Terminal — P0 doprecyzowania (NOWE)
+Przyjęcie GRN (z PO lub TO) – skan LP, zatwierdzenie ilości, przypisanie lokacji.
 
-6.3.1 Pallet label → PDF (MVP) 🟢 P0 — 0.75 dnia
+Przyjęcie TO (Transfer Order) – odbiór z innego magazynu, tworzenie LP.
 
-6.3.2 LP composition management — spec + minimal UI 🟢 P0 — 0.75 dnia
+Podział palet (Split LP) – skan LP → wprowadzenie ilości → skan lokacji docelowej → druk etykiety nowego LP.
 
-6.3.3 Pallet items tracking — schema+UX 🟢 P0 — 0.75 dnia
+Przesunięcia (Stock Move) – skan LP → skan lokacji → zatwierdzenie → aktualizacja.
 
-6.4 QA Override
+Proces terminalowy QA (w przyszłości) – skan LP, weryfikacja statusu jakości, akceptacja lub blokada.
 
-6.4.1 QAOverrideModal component 🟢 P0
+Pytanie otwarte
 
-6.4.2 Supervisor PIN validation 🟢 P0
+🔸 Integracja QA z magazynem:
+Czy LP o statusie „QA Pending” mają być blokowane do momentu akceptacji?
+Rekomendacja: przy GRN oznaczać nowe LP jako „Pending”, następnie dopuszczać do użytku po pozytywnej kontroli (QA Approved).
+Pozwoli to powiązać przyszły moduł QA z Warehouse.
 
-6.4.3 QA status change (Pending/Passed/Failed/Quarantine)🟢 P0
+Propozycje rozszerzeń (P1–P2)
 
-6.4.4 Audit trail for QA changes 🟢 P0
+🟡 Integracja z drukarkami etykiet (ZPL/PDF) — automatyczne drukowanie LP po GRN i Split LP.
 
-Status: ✅ Complete
+🟡 Raporty traceability (TraceTree) — wizualne drzewo genealogiczne LP: od GRN → Split → Transfer → zużycie.
 
-6.5 Mobile Optimization
+🟡 Moduł QA w magazynie — kontrola jakości i blokady LP do momentu zatwierdzenia.
 
-6.5.1 "Gruba rękawica" mode 🟢 P0
+⚪ Reguły pojemności i stref bezpieczeństwa — ograniczenia ilościowe i przestrzenne dla lokacji (np. „max 20 LP w strefie Chiller”).
 
-6.5.2 Large touch targets 🟢 P0
+⚪ Raport „Inventory Aging” — raport starzenia się zapasów wg LP i dat GRN.
 
-6.5.3 Landscape orientation support 🟢 P0
+Podsumowanie
 
-6.5.4 Offline capability ⚪ P2
+✅ Gotowe: struktury GRN, LP, Stock Moves, Locations, większość komponentów UI.
+🔄 Do wykonania (P0):
 
-Status: ⬜ Not started
+Integracja ASN → GRN,
 
-7.0 Quality & Traceability
+Automatyczne LP + przypisanie lokacji,
+
+Interfejs mobilny terminala (Pick/Putaway/Split),
+
+Reguły auto-lokacji,
+
+Finalizacja UI LP (Split, Trace).
+
+Plan integracji drukarek sieciowych i terminala skanującego w systemie MES
+Integracja drukarek sieciowych (punkt 1)
+
+Architektura druku etykiet: Wszystkie drukarki etykiet będą podłączone sieciowo w kluczowych punktach procesu (np. na stanowisku przyjęcia towaru, produkcji, pakowania). Dzięki temu aplikacja webowa będzie mogła wysyłać zadania drukowania bezpośrednio do drukarek przez sieć (np. adres IP drukarki lub centralny serwer druku). Planujemy wdrożyć system kolejkowania wydruków z mechanizmem ponawiania nieudanych prób, aby zapewnić niezawodność (jeśli drukarka jest chwilowo niedostępna, zadanie będzie ponawiane). Dodatkowo przewidziana jest integracja z drukarkami etykiet na poziomie aplikacji – np. wykorzystanie sterowników/SDK lub wysyłanie poleceń w języku ZPL/ESC do drukarek termicznych.
+
+Szablony etykiet: Stworzymy uniwersalne szablony etykiet zawierające wszystkie wymagane informacje. Etykieta dla License Plate (LP) będzie zawierać m.in. numer LP, nazwę produktu, ilość, jednostkę oraz ewentualnie datę ważności partii. Na etykiecie znajdzie się kod kreskowy 1D (np. Code 128) reprezentujący kluczowy identyfikator – typowo numer LP lub numer partii. Szablony będą projektowane z myślą o spójności i czytelności. W przyszłości, jeśli zajdzie potrzeba, szablon może zostać rozszerzony o kod 2D (QR/DataMatrix) zawierający więcej danych (szczegóły w pkt 5).
+
+Scenariusze drukowania:
+
+Przyjęcie dostawy (GRN): Po zarejestrowaniu Goods Receipt Note i automatycznym wygenerowaniu nowych LP dla otrzymanych partii, system od razu wydrukuje etykiety dla tych LP. Każda paleta/partia otrzyma fizyczną etykietę z kodem.
+
+Zakończenie operacji produkcyjnej: Gdy na terminalu produkcyjnym operator utworzy nowy LP (np. po ukończeniu etapu produkcji lub zapełnieniu pojemnika półproduktu), aplikacja umożliwi wydruk etykiety dla tego nowo powstałego LP.
+
+Paletyzacja i wysyłka: Na stanowisku pakowania, po skompletowaniu palety (zebraniu wielu LP w paletę), będzie opcja wydruku etykiety paletowej z unikalnym numerem palety i kodem kreskowym/QR.
+
+Każdy z tych punktów będzie miał przypisaną domyślną drukarkę sieciową. Użytkownik (lub konfiguracja systemu) określi, która drukarka obsługuje dane stanowisko. Aplikacja może oferować wybór drukarki lub automatycznie kierować wydruk na właściwe urządzenie według lokalizacji/stanowiska.
+
+Automatyczne sugestie FIFO/FEFO (punkt 2)
+
+Zasada FIFO/FEFO: W systemie zostanie zaimplementowana funkcja automatycznego sugerowania, które partie/LP użyć w pierwszej kolejności na podstawie zasady FIFO lub FEFO. FIFO (First In, First Out) oznacza rotację wg kolejności przyjęcia – najstarsze zapasy schodzą pierwsze. FEFO (First Expire, First Out) uwzględnia daty ważności – system sugeruje zużycie partii z najbliższym terminem przydatności do spożycia jako pierwszych. Możliwość wyboru strategii (FIFO vs FEFO) będzie konfigurowalna w ustawieniach systemu lub nawet per produkt, zależnie od wymagań.
+
+Śledzenie dat i partii: Każdy License Plate (lub partia) w systemie powinien mieć przypisaną datę przyjęcia oraz (opcjonalnie) datę ważności przydatności. Jeśli te dane nie są obecnie przechowywane, rozszerzymy schemat bazy o pole daty ważności dla partii. Dzięki temu system może sortować dostępne zapasy według najstarszej daty przyjęcia lub najbliższej daty ważności.
+
+Sugestie w procesach:
+
+Pobieranie surowców do produkcji: Gdy operator na terminalu produkcyjnym wybiera surowiec do pobrania, interfejs może automatycznie podpowiedzieć konkretny LP (partię) – np. wyświetlając listę dostępnych partii danego surowca posortowaną rosnąco wg daty przyjęcia/ważności i oznaczając sugerowaną pozycję.
+
+Kompletacja zamówienia/transferu: Analogicznie, przy realizacji zamówienia magazynowego lub transferu między magazynami, system wskaże które jednostki magazynowe (LP) należy wydać najpierw. Pracownik otrzyma informację, że np. LP1234 (przyjęty 01.09, ważny do 01.12) powinien zostać pobrany przed LP5678 (przyjęty później lub z dłuższą datą).
+
+Alerty o dacie ważności: System może generować ostrzeżenia, jeśli jakaś partia zbliża się do upływu terminu – np. podświetlać ją na liście na czerwono lub wysyłać notyfikacje, aby zachęcić do jej wykorzystania (to rozszerzenie, które można wprowadzić).
+
+Wdrożenie tej funkcjonalności wymaga, by aplikacja znała ilości dostępne w poszczególnych LP oraz ich parametry (daty). Moduł magazynowy już teraz śledzi stany poprzez obiekty LP i ruchy stockowe – dodanie logiki FEFO to głównie warstwa rekomendacji w interfejsie. Funkcja będzie podpowiedzią, a nie wymuszeniem – operator nadal będzie mógł wybrać inną partię w razie potrzeby (np. gdy sugerowana partia jest trudno dostępna fizycznie), jednak system może wymagać potwierdzenia odstępstwa. Dzięki temu zachowamy balans między automatyzacją a elastycznością.
+
+Pełny zakres funkcjonalności systemu (punkt 3)
+
+Projekt zakłada implementację wszystkich kluczowych funkcji związanych z obsługą drukowania etykiet, skanowania i zarządzania magazynowo-produkcyjnego – żadna istotna funkcja nie zostanie pominięta. Poniżej lista najważniejszych elementów, które obejmuje plan:
+
+Przyjęcia towarów (GRN) z automatycznym nadawaniem LP: Umożliwimy tworzenie Goods Receipt Notes powiązanych z zamówieniami (PO/ASN) oraz automatyczne generowanie unikalnych numerów License Plate dla odebranych partii materiałów. Każdy LP utworzony przy przyjęciu zostanie przypisany do lokalizacji magazynowej (docelowo z auto-sugestią lokalizacji wg ustalonych reguł). Bezpośrednio po utworzeniu LP nastąpi wydruk etykiety (jak opisano w sekcji druku).
+
+Zarządzanie etykietami LP: System umożliwi edycję i podział etykiet LP. Dostępne będą funkcje edycyjne (zmiana atrybutów LP, np. korekta ilości przez Amend LP), dzielenie partii na mniejsze jednostki (Split LP), łączenie/komponowanie (kompozycja LP) oraz śledzenie powiązań partii (genealogia). Te funkcje są w dużej mierze zaimplementowane w module magazynowym (status LP jest kompletny według aktualnej dokumentacji).
+
+Lokalizacje magazynowe i przemieszczenia: Każdy LP jest przypisany do lokalizacji w magazynie. System posiada zarządzanie lokalizacjami i hierarchią magazynów (regały, strefy itp.). Planujemy wdrożyć ruchy magazynowe (Stock Moves) z pełną obsługą na urządzeniach mobilnych – np. pracownik skanuje LP i wskazuje docelową lokalizację przy odkładaniu towaru lub kompletacji zamówienia. Istnieje już tabela i podstawowy interfejs do ruchów magazynowych, a do zrobienia pozostaje przyjazny interfejs mobilny typu „Pick/Putaway” usprawniający pobieranie i odkładanie towarów. Funkcje automatycznego przypisywania lokalizacji (np. sugerowanie miejsca składowania według reguł ABC czy typu produktu) również są przewidziane.
+
+Terminal produkcyjny (Process Terminal): To dedykowany interfejs (część modułu Scanner) dla operatora na hali produkcyjnej. Umożliwia on realizację operacji produkcyjnych w oparciu o zlecenie produkcyjne (Work Order). W ramach terminala produkcyjnego operator może:
+
+Staging (pobranie materiałów): Skanować kody LP surowców, aby zarejestrować ich pobranie z magazynu na stanowisko produkcyjne (system sprawdza przy tym m.in. czy materiały są poprawnie przypisane do zlecenia i czy nie przekroczono dostępnych ilości).
+
+Rejestracja wag i wyników: Po wykonaniu operacji, operator wprowadza lub skanuje wagę zużytego surowca i uzyskanego produktu. Terminal umożliwi wpisanie tych danych, a system może automatycznie obliczyć wydajność, straty itp. na podstawie różnicy wag.
+
+Zakończenie operacji: Operator zatwierdza zakończenie etapu (co zmienia status operacji w systemie). System wymusi, by wszystkie wymagane czynności były wykonane – np. odczytana waga, spełnione reguły 1:1 dla komponentów (czyli jeśli operacja wymaga dokładnie jednego LP surowca na jeden LP produktu, system sprawdzi czy nie zużyto częściowo LP – ta walidacja jest zaimplementowana). Po zamknięciu operacji może nastąpić utworzenie nowego LP dla półproduktu/produktu powstałego na danym etapie (jeśli operacja coś wytwarza) – operator otrzyma wtedy nowy numer LP, który można wydrukować i oznaczyć fizycznie pojemnik.
+
+Terminal produkcyjny będzie obsługiwał skanowanie kodów kreskowych dla usprawnienia pracy – planowana jest integracja odczytu kodów, tak aby zeskanowanie kodu LP automatycznie wybierało dany surowiec lub potwierdzało operację (implementacja obsługi skanera jest priorytetem P0). Obecnie rdzeń logiki terminala procesowego jest gotowy (~60%), pozostało dopracowanie obsługi błędów i interfejsu użytkownika.
+
+Terminal pakowania (Pack Terminal): Drugi tryb modułu Scanner, przeznaczony do obsługi pakowania i paletyzacji na końcu procesu. Pozwala on operatorowi na:
+
+Tworzenie palety: Gdy zebrana zostanie określona liczba opakowań lub pojemników (każdy z własnym LP) gotowych produktów, operator może utworzyć nową paletę i przypisać do niej te jednostki. Terminal poprosi o nadanie numeru palety (lub zrobi to automatycznie) oraz o zeskanowanie kolejno wszystkich LP, które mają trafić na paletę.
+
+Zarządzanie składnikami palety: Każde zeskanowane LP zostanie dodane do składu palety (relacja wiele-do-wielu w tabeli pallet_items). Jeśli zajdzie potrzeba, można usunąć LP z palety lub dodać dodatkowe przed zamknięciem. System śledzi powiązania LP z paletą w celu zapewnienia traceability (genealogia).
+
+Finalizacja i etykieta palety: Po skompletowaniu, paleta zostaje zamknięta w systemie – otrzymuje swój identyfikator i etykietę do wydruku. Etykieta palety będzie zawierać kod (prawdopodobnie 1D lub QR) pozwalający zidentyfikować całą paletę przy wysyłce lub składowaniu.
+
+Terminal pakowania również wykorzysta skanowanie kodów dla sprawnej pracy (skan LP aby dodać go do palety, skan palety aby wywołać jej szczegóły itp.). Podobnie jak w przypadku terminala procesowego, interfejs jest w fazie dostosowywania do urządzeń mobilnych (rdzeń jest zrealizowany w ~60%).
+
+Kontrola jakości i identyfikowalność: System będzie egzekwował zasady QA podczas operacji. Przykładowo, jeśli dana partia (LP) ma status Failed lub Quarantine w systemie jakości, terminal zablokuje możliwość jej użycia w produkcji. Jest to tzw. QA gate enforcement – zostało to już zaimplementowane w module skanera dla procesu produkcji (StageBoard i terminal). Dodatkowo istnieje możliwość wykonania override QA przez uprawnionego nadzorcę (PIN Supervisora), co również uwzględniono w systemie. Wszystkie działania (pobrania, zużycia, paletyzacja) są zapisywane, co zapewnia pełną traceability – na poziomie bazy danym mamy tabele śledzące genealogie LP i ich kompozycje, a planujemy także rozbudować interfejs do prezentacji tych powiązań (drzewa genealogii partii itp.).
+
+Eksporty i raporty: Choć nie jest to bezpośrednio część obsługi skanera czy druku, warto zaznaczyć, że system posiada mechanizmy eksportu danych (np. do Excela) dla różnych modułów – w tym raporty z produkcji, ruchów magazynowych, list LP, itp. Na liście mamy także eksporty związane z traceability oraz dokumenty wysyłkowe. W kontekście naszego projektu, możemy rozważyć dodanie raportu np. „Lista partii z datami ważności” by łatwo monitorować FIFO/FEFO, lub raport wydajności produkcji zebrany z terminala.
+
+(Powyższa lista nie pomija żadnej kluczowej funkcjonalności zaplanowanej w ramach systemu – zgodnie z prośbą ujęto wszystkie istotne elementy.)
+
+Terminal skanujący – aplikacja webowa dostosowana do urządzeń mobilnych (punkt 4)
+
+Terminal skanujący (obejmujący tryb Process i Pack) będzie zrealizowany jako część aplikacji webowej, ale zoptymalizowana pod urządzenia mobilne (tablety przemysłowe, kolektory danych). Oznacza to, że interfejs w przeglądarce na urządzeniu skanującym będzie uproszczony i dostosowany do pracy dotykowej oraz przy użyciu skanera kodów. Kilka aspektów tego dostosowania:
+
+Responsywny design: Strona /scanner będzie przełączac się w tryb mobilny z prostym układem, dużymi przyciskami i czytelną czcionką. Elementy interaktywne (przyciski, listy) zostaną zaprojektowane jako „duże cele dotykowe” – tak, aby osoba w rękawicach roboczych mogła łatwo obsługiwać ekran. Planowany jest nawet specjalny tryb „grubej rękawicy” zwiększający rozmiar elementów interfejsu. Bierzemy też pod uwagę używanie urządzeń w orientacji poziomej (landscape), więc interfejs będzie to wspierał.
+
+Obsługa skanera kodów: Urządzenia typu kolektor zazwyczaj mają wbudowany skaner kodów kreskowych działający jak klawiatura (wprowadzający odczytany ciąg znaków). Nasza aplikacja to wykorzysta – w polach wprowadzania będzie możliwość skanowania zamiast pisania. Dodatkowo, zaimplementujemy mechanizmy nasłuchujące zdarzeń skanera: np. focus automatycznie ustawi się na właściwym polu gdy oczekiwany jest skan; po zeskanowaniu kodu aplikacja może od razu wywołać odpowiednią akcję (np. dodanie surowca do operacji). Ta integracja skanera jest traktowana priorytetowo. Rozważamy także użycie kamery urządzenia jako skanera (przez API getUserMedia) dla ewentualnych urządzeń bez dedykowanego skanera – to może być funkcja opcjonalna.
+
+Tryb offline: Jako że to web-aplikacja, domyślnie wymaga połączenia sieciowego (do komunikacji z backendem w Supabase). Zdajemy sobie sprawę, że na halach produkcyjnych zasięg WiFi bywa zawodny, dlatego planujemy w przyszłości tryb offline (PWA) pozwalający na buforowanie operacji w razie utraty łączności. Na ten moment jest to funkcja oznaczona jako przyszłe usprawnienie (priorytet P2), więc nie wchodzi do bieżącego scope – jednak struktura aplikacji (Next.js + Supabase) pozwoli w przyszłości na implementację mechanizmów offline (ServiceWorker, cache lokalny danych).
+
+Bezpieczeństwo i dostęp: Terminal będzie częścią aplikacji, więc obowiązują te same mechanizmy autentykacji. Pracownik loguje się swoim kontem (możemy rozważyć logowanie PIN-em lub kartą RFID, aby uprościć na terminalu – to ewentualne usprawnienie). System uprawnień (Role-Based Access Control) jest w trakcie rozbudowy, docelowo pozwoli ograniczyć dostęp np. tylko do modułu Scanner dla operatorów produkcji. Interfejs terminala może po zalogowaniu od razu przełączać na ekran skanera (bez pokazywania całego menu modułów), co ułatwi obsługę.
+
+Podsumowując, terminal = web-aplikacja dostosowana do użycia na mobilnym skanerze. Zachowujemy wszelkie zalety centralnej aplikacji (jednolita baza danych, brak konieczności synchronizacji, łatwa aktualizacja oprogramowania), jednocześnie czyniąc UI wygodnym w warunkach produkcyjnych. Implementacja wymaga dopracowania UX (co jest w toku) oraz testów na docelowych urządzeniach, by upewnić się że dotyk i skanowanie działają płynnie (to uwzględnimy w harmonogramie prac).
+
+Wykorzystanie kodów kreskowych 1D vs kodów 2D (punkt 5)
+
+Na start skupimy się na standardowych kodach kreskowych 1D (jednowymiarowych) do identyfikacji obiektów, z możliwością rozszerzenia o kody 2D (dwuwymiarowe, np. QR) w przyszłości dla bardziej złożonych zastosowań.
+
+Kody kreskowe 1D (np. Code 128): Będą głównym nośnikiem identyfikatorów w systemie – proste, niezawodne i powszechnie obsługiwane przez skanery. Code 128 pozwala zakodować zarówno cyfry, jak i litery, więc bez problemu zmieścimy np. alfanumeryczny numer LP lub numer palety. Każda wygenerowana etykieta LP będzie zawierała taki kod 1D, co umożliwi szybkie skanowanie i odnalezienie rekordu w systemie. Generowanie tych kodów zostanie zaimplementowane po stronie aplikacji (np. biblioteka do generowania kodów lub renderowanie w canvas/svg) – ten element jest przewidziany w planie prac.
+
+Kody 2D (QR/DataMatrix): Kody dwuwymiarowe mają tę zaletę, że mogą pomieścić dużo więcej informacji na mniejszej etykiecie. Rozważamy ich użycie w przyszłości do bardziej złożonych operacji. Przykładowy scenariusz: kod QR zawierający zakodowane szczegóły partii, np. numer produktu, numer partii, ilość, datę produkcji i datę ważności – wszystko w jednym skanie. To mogłoby przyspieszyć np. przyjęcie dostawy od dostawcy, który umieszcza QR na palecie: skanując taki kod, system mógłby automatycznie odczytać wszystkie potrzebne dane i utworzyć odpowiedni rekord (zamiast skanować kilka różnych kodów lub wpisywać dane ręcznie). Innym zastosowaniem może być przypisanie linku lub identyfikatora do dokumentacji jakościowej – skan QR mógłby np. otworzyć od razu kartę produktu z atestami.
+
+W pierwszej fazie nie planujemy jeszcze masowego użycia kodów 2D, ponieważ wymaga to szerszego przygotowania (standaryzacji zawartości kodu, doposażenia drukarek w tę funkcję, zapewnienia, że wszyscy użytkownicy mają skanery 2D). Jednak już na etapie projektowania uwzględniamy tę możliwość. Funkcja generowania kodów QR również jest na liście rzeczy do zrobienia (priorytet P0) obok generowania kodów 1D, co oznacza że w ramach prac nad drukowaniem etykiet stworzymy moduł pozwalający na wygenerowanie i umieszczenie na etykiecie także kodu 2D. Być może początkowo nie będzie on wykorzystywany na wszystkich etykietach, ale podstawa technologiczna będzie gotowa. W ten sposób przyszłe rozszerzenia (np. wprowadzenie QR dla wybranych procesów) będą łatwe do wdrożenia.
+
+Podsumowanie 1D vs 2D: Na dzień dzisiejszy priorytetem jest niezawodność i prostota – dlatego 1D. Kody 1D w zupełności wystarczają do identyfikacji jednostek (LP, produkty, lokalizacje itp.), zwłaszcza że system przechowuje szczegóły w bazie, a kod służy jako klucz. Natomiast kody 2D traktujemy jako pole do innowacji w przyszłości – otwierają one możliwość przekazywania większej ilości danych w terenie (poza bazą danych). Będziemy obserwować potrzeby procesu: jeśli pojawi się sytuacja, gdzie QR zdecydowanie usprawni pracę (np. zmniejszy liczbę skanów z kilku do jednego), wdrożymy go pilotażowo w danym obszarze.
+
+Otwarte pytania do wyjaśnienia
+
+Model drukarek i protokół komunikacji: Jakie dokładnie drukarki etykiet będą używane (marka/model)? Czy obsługują one druk po IP (protokoły typu LPR/IPP lub API producenta)? To wpłynie na sposób integracji – czy możemy drukować wysyłając strumień ZPL, czy potrzebujemy dodatkowego serwera wydruku.
+
+Format etykiet i informacje: Czy są określone standardy co do informacji na etykiecie? Np. czy na etykiecie surowca musi być kod produktu, nazwa dostawcy, numer partii dostawcy itp. poza naszym numerem LP? Ustalenie tego wpłynie na projekt szablonu.
+
+Dane o dacie ważności: Czy dla wszystkich surowców/produktów są znane daty ważności lub przydatności? Jeśli tak, czy będą wprowadzane ręcznie przy przyjęciu, czy importowane z ASN/dokumentów dostawcy? Upewnienie się, że posiadamy te dane, jest krytyczne dla poprawnego działania FEFO. Jeśli nie, czy będziemy wymagać od użytkownika wprowadzania daty przy tworzeniu LP?
+
+Strategia FIFO/FEFO – globalnie czy per produkt: Czy zasada rotacji ma być globalna (jedna ustawiona w systemie dla wszystkiego), czy zależna od klasy produktu? Np. żywność wg FEFO (data ważności), a komponenty techniczne wg FIFO. Możliwość konfiguracji per kategoria produktu może być potrzebna – warto to potwierdzić.
+
+Sposób prezentacji sugestii FIFO/FEFO: Jak użytkownik ma otrzymywać te sugestie? Czy wystarczy posortowana lista z wyróżnieniem pierwszej pozycji, czy potrzebny jest osobny komunikat „Użyj najpierw LP XYZ”? Czy w razie pomyłki (użycia niewłaściwej partii) system ma ostrzegać lub blokować? Te szczegóły UX wpłyną na implementację.
+
+Urządzenia mobilne do terminala: Jakie konkretnie urządzenia będą używane przez operatorów (np. Zebra TC21/TC26 z Androidem, Honeywell, czy może tablety + skanery Bluetooth)? Ważne dla testów – musimy sprawdzić kompatybilność przeglądarki, rozdzielczości ekranu, ewentualnie czy urządzenia mają tryb kiosk (żeby przeglądarka była jedyną aplikacją).
+
+Integracja z wagami przemysłowymi: Czy planujemy podłączenie wag elektronicznych do systemu, aby automatycznie zaczytywać masę (np. surowca przed i po, produktu) zamiast wpisywać ręcznie? Wspomniano ręczne wprowadzanie wagi, ale integracja wag poprzez porty COM/USB lub protokół sieciowy mogłaby wyeliminować błąd ludzki. Jeśli to pożądane, trzeba uwzględnić dodatkowy interfejs do odczytu wag.
+
+Tryb offline vs ciągła łączność: Na ile krytyczne jest działanie terminala w trybie offline? Mamy to w planach P2, ale jeżeli zakład produkcyjny ma słaby internet lub WiFi, może warto priorytetyzować przynajmniej podstawowy bufor offline wcześniej. To pytanie do ustalenia z zespołem IT na miejscu.
+
+Szkolenie i interfejs użytkownika: Czy docelowi użytkownicy (magazynierzy, operatorzy) mieli już doświadczenie z podobnymi systemami? To może wpłynąć na projekt UI (np. użycie ikon i terminologii zrozumiałej dla nich). Czy przewidujemy tryb „demo” lub testowy do szkolenia? Warto zaplanować.
+
+(Odpowiedzi na powyższe pytania pozwolą doprecyzować wymagania i uniknąć błędnych założeń przed finalizacją implementacji.)
+
+Dodatkowe sugestie i pomysły do rozważenia
+
+Integracja z systemem ERP/WMS: Jeśli istnieje nadrzędny system (np. ERP) zarządzający zamówieniami lub stanami, warto rozważyć dwukierunkową integrację. Np. wysyłanie informacji o zużyciu materiałów, o wyprodukowaniu partii czy o wysyłce do ERP. MES MonoPilot może działać autonomicznie, ale synchronizacja z innymi systemami zapewni spójność danych w całej firmie.
+
+Wykorzystanie RFID w przyszłości: Kody kreskowe/QR to jedno rozwiązanie, ale warto pamiętać o technologii RFID. Etykiety z chipem RFID pozwalają skanować (odczytywać) wiele naraz i na odległość. Może w przyszłości pojawić się potrzeba, by niektóre palety czy pojemniki miały tag RFID dla automatycznej identyfikacji np. przy wyjeździe przez bramę. Nasz system mógłby zostać rozbudowany o moduł odczytu RFID (czytniki bramowe lub handheld), jeśli zajdzie taka potrzeba.
+
+Automatyzacja wydruków etykiet QA/raportów: Skoro przewidujemy generowanie PDF (np. Certificate of Analysis, raporty jakości), można pomyśleć o automatycznym dołączaniu ich do partii. Np. po zakończeniu produkcji partii system generuje PDF z podsumowaniem (ilość, jakość, wyniki testów) i umożliwia wydruk wraz z etykietą lub wpięcie do bazy danych. To zwiększa kompletność dokumentacji.
+
+Monitorowanie i alerty w czasie rzeczywistym: Warto dodać mechanizmy alertujące na bieżąco o ewentualnych odchyleniach. Przykłady: jeśli operator zeskanuje nieodpowiedni LP (niezgodny z WO), aplikacja natychmiast sygnalizuje błąd (dźwiękowo i komunikatem). Albo – jeśli jakaś partia jest już po terminie ważności, przy próbie skanowania jej pojawi się ostrzeżenie i wymóg potwierdzenia przez kierownika. Takie funkcje usprawnią bezpieczeństwo i zgodność procesów.
+
+Ulepszona ergonomia interfejsu skanera: Poza „dużymi przyciskami” można wdrożyć funkcje typu skróty klawiszowe lub przyciski sprzętowe urządzenia. Wiele kolektorów ma boczne przyciski, którym można przypisać akcje – np. jeden przycisk mógłby zatwierdzać operację (odpowiadać „Enter”), inny usuwać ostatni skan. Jeśli oprogramowanie urządzenia pozwala, można to wykorzystać by przyspieszyć obsługę bez dotykania ekranu.
+
+Progressive Web App (PWA): Wspomniany tryb offline można połączyć z ideą PWA – aplikacja mogłaby działać jak zainstalowana na urządzeniu, z własną ikonką, pełnym ekranem bez adresu URL, a nawet z pewnymi danymi offline. Rozważamy przygotowanie MonoPilot Scanner jako PWA, co użytkownikom uprości dostęp (klikają ikonę zamiast wpisywać adres) i pozwoli wykorzystać pewne API przeglądarki (cache, powiadomienia push w przyszłości).
+
+Analiza danych i optymalizacje: Gdy już system będzie zbierał dane o wszystkich operacjach (czasy operacji, zużycia, ruchy magazynowe), można pomyśleć o ich analizie. Np. które etapy produkcji najczęściej się opóźniają – może da się je usprawnić; które produkty najczęściej mają braki (shortages) – może warto zwiększyć zapasy bezpieczeństwa. Takie analizy można robić w modułach raportowych lub eksportując dane do narzędzi BI. Chociaż to poza bezpośrednim zakresem bieżącej implementacji, jest to potencjalna wartość dodana z zebranych danych.
+
+Wszystkie powyższe sugestie mogą zostać zrealizowane etapowo, po wdrożeniu podstawowych funkcji. Najpierw koncentrujemy się na stabilnym uruchomieniu pełnej zaplanowanej funkcjonalności (drukarki, FIFO/FEFO, terminal) zgodnie z powyższym planem, aby użytkownicy końcowi otrzymali działające narzędzie spełniające ich wymagania. Następnie, wraz z ich feedbackiem, możemy iteracyjnie wprowadzać kolejne usprawnienia i innowacje.
+
+7.0 Quality & Traceability — plan wdrożenia (kompletny, gotowy do TODO2.md)
+
+Poniżej masz pełny, rozbity plan dla modułu Quality & Traceability, zgodny z Twoją listą 7.1–7.2. Trzymam się istniejących założeń technicznych (QA gate, TraceabilityAPI, LP genealogy/compositions, eksporty), wskazuję migracje DB, endpointy API, komponenty UI, testy E2E oraz doprecyzowania UX. W miejscach, gdzie w dokumentach mamy już logikę/warstwy API, cytuję je, aby było jasne, na czym się opieramy.
+Statusy bazowe: QA ~50% (COA pending), Traceability ~40% (API jest, brak UI).
+
 7.1 QA Status Management
 
-7.1.1 QA status enum (Pending/Passed/Failed/Quarantine)
+Cel: kompletna kontrola jakości na poziomie LP: statusy, bramki QA (gate), override z PIN, wyniki testów, załączniki oraz COA PDF.
 
-7.1.2 QA gate enforcement (blocks failed LPs)
+Stan źródłowy / kontekst:
 
-7.1.3 Supervisor override capability
+W regułach biznesowych istnieje QA gate enforcement (blokada operacji przy failed QA + override z PIN + audyt), już używane w produkcji/skanerze.
 
-7.1.4 ChangeQAStatusModal component
+Szybka referencja modułów/warstw potwierdza QA status enum i QA gate jako reguły systemu.
 
-7.1.5 COA PDF generation 🟢 P0
+7.1.1 QA status enum (Pending/Passed/Failed/Quarantine) — 🟢 P0
 
-7.1.6 QA results table per LP 🟢 P0
+DB / migracje:
 
-7.1.7 QA test results storage 🟢 P0
+Potwierdź pole license_plates.qa_status (enum/constraint) + indeks do filtrowania.
 
-7.1.8 Attachments (photos, docs) 🟢 P0
+Dodać: license_plates.qa_comment, qa_changed_by, qa_changed_at (audyt ostatniej zmiany).
+API: PATCH /api/quality/lp/[lpId]/status (walidacja ról, audyt).
+UI: w szczegółach LP (oraz Trace/LP modals) wyświetl status i historię zmian.
+Reguły: status domyślny Pending przy GRN/utworzeniu LP; Quarantine dostępny dla QA.
+Powiązanie ze Scannerem: blokady w Process/Pack/Stage (istnieją).
 
-Status: 🔄 ~50% complete - Basic QA done, COA pending
+7.1.2 QA gate enforcement (blocks failed LPs) — 🟢 P0
+
+Logika (już jest): blokada użycia LP w operacjach przy statusie Failed; opcja override.
+Wzmocnienia: wspólna usługa walidacji QA (importowana w API/Scanner/Warehouse), ujednolicone kody błędów (BUSINESS_RULE_ERROR).
+
+7.1.3 Supervisor override capability — 🟢 P0
+
+DB: tabela qa_audit_trail (lp_id, old_status, new_status, reason, supervisor_id, pin_hash, changed_at).
+API: POST /api/quality/lp/[lpId]/override (PIN + reason).
+UI: QAOverrideModal (istnieje), poprawki: czytelny opis ryzyka, obowiązkowy reason.
+
+7.1.4 ChangeQAStatusModal component — 🟢 P0
+
+UI: modal dla QA (bez PIN) do zwykłych zmian (Pending→Passed).
+Walidacje: blokada downgrade bez powodu; log w qa_audit_trail.
+
+7.1.5 COA PDF generation — 🟢 P0
+
+Cel: Certyfikat Analizy dla LP/partii. Status w TODO: pending → robimy.
+Zawartość COA: produkt (part_number/nazwa), LP/batch, daty, wyniki testów (tabela), spec min/max, wynik PASS/FAIL, podpis QA, QR (opcjonalnie).
+API: GET /api/quality/coa/[lpId].pdf (+ pakiety zbiorcze: paleta/TO).
+Generator: wspólna infrastruktura eksportów (PDF/Excel jest gotowa; dodajemy szablon COA).
+
+7.1.6 QA results table per LP — 🟢 P0
+
+DB: qa_results (lp_id, test_code, name, unit, spec_min, spec_max, measured, result, tester_id, tested_at).
+UI: QAResultsTable w szczegółach LP, filtr wg zakresu czasu/partii; kolory PASS/FAIL.
+
+7.1.7 QA test results storage — 🟢 P0
+
+Wejście danych: ręcznie (formularz), upload CSV/XLSX (mapowanie kolumn), API integracyjne.
+Walidacje: kompletność spec, typy, zakresy; audyt importu (plik, kto, kiedy).
+
+7.1.8 Attachments (photos, docs) — 🟢 P0
+
+DB: qa_attachments (lp_id, file_url, kind: photo/doc, notes, uploaded_by, uploaded_at).
+Storage: S3 (zgodnie z polityką exportów/plików).
+UI: galeria/sekcja plików; miniatury zdjęć; podgląd PDF.
+
+Testy / E2E (QA):
+
+Blokada na QA gate w Process/Pack/Stage; override z PIN i audytem.
+
+COA PDF zawiera kompletną tabelę wyników; numerowane strony; watermark Quarantine dla statusów ≠ Passed.
+
+Import wyników z CSV (walidacja spec, błędne linie → raport).
+
+Uprawnienia ról (QA, Supervisor, Operator).
 
 7.2 Traceability
 
-⚠️ CRITICAL: Traceability ma tylko API - NIE MA tabelek ani wizualizacji!
+Cel: od pełnego API forward/backward do używalnego UI: tabela, widok drzewa, genealogia, matrix kompozycji, eksporty i raporty.
 
-7.2.1 Forward trace API (backend only)
+Stan źródłowy / kontekst:
 
-7.2.2 Backward trace API (backend only)
+TraceabilityAPI (forward/backward) istnieje; LP genealogy/compositions w schemacie; view’y do trace są w planie/enhancements. UI jest w formie skromnej listy (TraceTab text).
 
-7.2.3 LP composition chains (database level)
+7.2.1 Forward trace API (backend only) — ✅
 
-7.2.4 Multi-level traceability (API level)
+Już istnieje; potwierdzić zwracany model (LP → children).
 
-[~] 7.2.5 TraceTab component (only text list, NO table/tree) 🟢 P0
+7.2.2 Backward trace API (backend only) — ✅
 
-7.2.6 Trace to GRN/PO (API level)
+Już istnieje; LP → parent chain.
 
-7.2.7 Visual table/grid for trace results 🟢 P0
+7.2.3 LP composition chains (database level) — ✅
 
-7.2.8 Tree diagram visualization 🟢 P0
+lp_compositions, lp_genealogy są w schemacie; indeksy do zapytań rekursywnych.
 
-7.2.9 Trace export to Excel 🟢 P0
+7.2.4 Multi-level traceability (API level) — ✅
 
-7.2.10 Traceability reports 🟢 P0
+Rekursywne przejście drzewa, budowa struktury wynikowej.
 
-7.2.11 LP genealogy visualization 🟢 P0
+7.2.5 TraceTab component (only text list, NO table/tree) — 🟢 P0
 
-7.2.12 Composition matrix view 🟢 P0
+Doprecyzowanie: rozszerzamy TraceTab:
 
-Status: 🔄 ~40% complete - API exists, NO proper UI/tables/visualization
+Pole LP number, kierunek (forward/backward), zakres dat, głębokość.
+
+Wynik najpierw jako tabela + akcja „Pokaż drzewo”.
+
+Lazy-load/stronicowanie przy dużych drzewach.
+
+7.2.6 Trace to GRN/PO (API level) — ✅
+
+W API jest powiązanie do GRN/PO; w UI dodajemy linki do dokumentów źródłowych (GRN, PO).
+
+7.2.7 Visual table/grid for trace results — 🟢 P0
+
+Spec tabeli: LP, produkt, ilość, źródło (GRN/TO/WO), lokacja, QA, daty; kolumny z filtrami.
+Akcje: „detale LP”, „przejdź do GRN/PO/WO”, „eksport zaznaczonych”.
+
+7.2.8 Tree diagram visualization — 🟢 P0
+
+UI: wykres drzewa (rozsuwane węzły), wyróżnienie ścieżki do bieżącego LP, ikony źródeł (GRN/WO/Pack/Pallet), kolory QA.
+Dane: z TraceabilityAPI (multi-level). CTE/widoki mogu przyspieszyć odpowiedzi.
+
+7.2.9 Trace export to Excel — 🟢 P0
+
+API: /api/exports/trace.xlsx (w planie/istnieje), uzupełniamy kolumny (ścieżka, poziom, QA).
+
+7.2.10 Traceability reports — 🟢 P0
+
+Szablony raportów:
+
+Backward Recall Report (co trafiło do FG z danego RM),
+
+Forward Impact Report (które FG/palety zawierają dany LP),
+
+LP Movement Story (czasowa sekwencja: GRN→…→FG/paleta).
+Eksport PDF/XLSX (reuse infra).
+
+7.2.11 LP genealogy visualization — 🟢 P0
+
+UI: zakładka Genealogy w szczegółach LP: drzewo parent↔child, ze skokiem do TraceTab.
+Dane: lp_genealogy + lp_compositions.
+
+7.2.12 Composition matrix view — 🟢 P0
+
+UI: macierz input LP (wiersze) vs output LP/palety (kolumny); w komórce: ilość/udział, QA.
+Zastosowanie: szybki audyt kompozycji dla audytora jakości/klienta.
+Źródło: lp_compositions (join z produktami/LP).
+
+Testy / E2E (Trace):
+
+Głębokie drzewo (GRN→PR→FG→Paleta) — poprawny forward/backward i UI drzewa.
+
+Eksport trace.xlsx — komplet danych; duże wolumeny (wydajność).
+
+Linki do GRN/PO/WO — poprawnie nawigują do dokumentów.
+
+Integralność łańcucha (brak cykli; walidacja podczas insert do lp_genealogy).
+
+Architektura / migracje / wydajność
+
+Migracje (QA/Trace uzupełnienia):
+
+026_qa_results.sql — tabela wyników.
+
+027_qa_attachments.sql — załączniki QA (LP-level).
+
+028_qa_audit_trail.sql — audyt zmian/override.
+
+(opcjonalnie) 029_trace_views.sql — materializowane widoki vw_trace_forward/backward dla dużych drzew.
+
+API — konsolidacja:
+
+QualityAPI: /quality/lp/:id/status, /quality/lp/:id/override, /quality/lp/:id/results, /quality/lp/:id/attachments, /quality/coa/:id.pdf.
+
+TraceabilityAPI: istnieje (forward/backward), rozszerzamy parametry (depth, time window).
+
+Wydajność:
+
+Indeksy: idx_lp_genealogy_parent, idx_lp_genealogy_child, idx_lp_compositions_lp, idx_lp_status, idx_qa_results_lp_time.
+
+CTE/materialized views dla drzewa; lazy expansion po stronie UI.
+
+Integracje (powiązania z innymi modułami):
+
+Scanner/Production: QA gate przy staging/weights/complete-op (już enforced).
+
+Warehouse: GRN→LP ustawia qa_status=Pending; Trace łączy do GRN/PO.
+
+Exports: korzystamy z istniejącej infrastruktury XLSX (SheetJS + endpoints).
+
+Testy i jakość
+
+Unit / Integration:
+
+Walidacje QA (gate, override, role-based access).
+
+API Trace (forward/backward) — głębokość, kierunek, zakres czasu.
+
+COA generator (pełne pokrycie szablonu).
+E2E (Playwright):
+
+GRN→LP(Pending)→QA Passed→Process→COA PDF,
+
+Failed + Override z PIN + audyt,
+
+Forward trace od GRN do palety FG (drzewo + eksport),
+
+Backward trace od palety do RM (tabela + linki do GRN/PO).
+
+Harmonogram P0 (szacunki)
+
+7.1.1–7.1.4 statusy/override/modale: 1.5 dnia
+
+7.1.5 COA PDF: 2.0 dni
+
+7.1.6–7.1.8 wyniki/załączniki: 1.5 dnia
+
+7.2.5–7.2.12 UI Trace (tabela, drzewo, matrix, eksporty, raporty): 5–7 dni
+(API i DB bazowe dla trace już są — skupiamy się na UI i wydajności).
+
+Pytania (żeby domknąć szczegóły i uniknąć reworku)
+
+COA format: czy mamy wzór firmowy (logo, układ, podpisy) i minimalny zestaw testów/spec? Czy COA generujemy per LP czy zbiorczo per paleta/TO?
+
+Katalog testów QA: czy testy i specyfikacje są per produkt (np. tłuszcz, białko, wilgotność), czy globalne? Potrzebny master qa_test_catalog?
+
+Quarantine workflow: czy Quarantine blokuje wydania i wymaga dwustopniowej akceptacji? Czy COA ma watermark „Quarantine”?
+
+Retencja załączników: jak długo trzymamy zdjęcia/dokumenty? Jakie limity (rozmiar/typ)?
+
+Trace głębokość: czy UI ma limit domyślny (np. 6 poziomów)? Czy pozwalamy użytkownikowi pogłębiać ad hoc?
+
+Wydajność trace: expected scale — rzędu setek tysięcy LP? Jeśli tak, priorytet dla materialized views i paginacji.
+
+Uprawnienia: kto może zmieniać status QA, dodawać wyniki, wykonywać override? Role: QA, QA Supervisor, Operator — potwierdzić.
+
+Eksporty trace: Excel tylko, czy także PDF raportów dla audytora/klienta (brandowane)?
+
+Integracja z klientem/audytorem: czy przewidujemy nadanie linku (read-only) do widoku Trace/COA dla reklamacji/inspekcji?
+
+Propozycje rozbudowy (po P0)
+
+SPC / statystyka jakości: karty kontrolne, out-of-trend (OOT/OOC), alarmy.
+
+Recall workflow: kreator akcji wycofania (Backward trace → lista odbiorców/FG → dokumentacja).
+
+QA sampling plans: AQL, auto-losowanie próbek; checklisty na terminalu.
+
+COA + QR: QR na COA z deep-linkiem do LP/Trace (read-only).
+
+Automatyzacja spec: dziedziczenie spec z produktu/BOM i wersjonowanie spec QA.
+
+Data Lake / BI: dzienne snapshoty genealogii i jakości do analityki.
+
+Guardy anty-cykl: funkcje DB wykrywające cykle w lp_genealogy przed insertem.
+
+Podsumowanie
+
+QA (7.1): domykamy statusy, override z audytem, COA PDF, wyniki testów i załączniki — spójne z bramkami QA w produkcji/skanerze.
+
+Traceability (7.2): API już jest; dostarczamy pełny UI (tabela, drzewo, genealogia, matrix), eksporty i raporty + poprawki wydajności.
+
+Wszystkie punkty 7.1.1–7.1.8 oraz 7.2.1–7.2.12 zostały uwzględnione, z planem migracji, API, UI, testami oraz rozbudową. Jeśli zatwierdzisz pytania / wybory UX (COA, role, głębokość trace), wprowadzę to od razu do harmonogramu P0 i checklisty wdrożeniowej.
 
 8.0 Exports & Reporting
 8.1 Excel Exports Infrastructure

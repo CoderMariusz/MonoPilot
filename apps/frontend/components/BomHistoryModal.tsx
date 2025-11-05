@@ -102,16 +102,80 @@ export function BomHistoryModal({ isOpen, onClose, bomId }: BomHistoryModalProps
                       <div className="space-y-3">
                         {Object.keys(entry.changes.bom || {}).length > 0 && (
                           <div>
-                            <h4 className="text-sm font-medium text-slate-900 mb-2">BOM Changes:</h4>
-                            <div className="bg-slate-50 rounded p-3 space-y-1">
-                              {Object.entries(entry.changes.bom || {}).map(([field, change]: [string, any]) => (
-                                <div key={field} className="text-sm">
-                                  <span className="font-medium">{field}:</span>{' '}
-                                  <span className="text-red-600">{change.old ?? 'null'}</span>
-                                  {' → '}
-                                  <span className="text-green-600">{change.new ?? 'null'}</span>
-                                </div>
-                              ))}
+                            <h4 className="text-sm font-medium text-slate-900 mb-2">BOM Header Changes:</h4>
+                            <div className="bg-slate-50 rounded p-3 space-y-2">
+                              {Object.entries(entry.changes.bom || {}).map(([field, change]: [string, any]) => {
+                                // Format field name for display
+                                let fieldDisplay = field;
+                                if (field === 'status') fieldDisplay = 'Status';
+                                else if (field === 'version') fieldDisplay = 'Version';
+                                else if (field === 'default_routing_id') fieldDisplay = 'Default Routing';
+                                else if (field === 'line_id') fieldDisplay = 'Production Lines';
+                                else if (field === 'notes') fieldDisplay = 'Notes';
+                                else if (field === 'effective_from') fieldDisplay = 'Effective From';
+                                else if (field === 'effective_to') fieldDisplay = 'Effective To';
+                                
+                                // Format values for display
+                                let oldValDisplay = change.old;
+                                let newValDisplay = change.new;
+                                
+                                // Handle arrays (like line_id)
+                                if (Array.isArray(oldValDisplay)) {
+                                  oldValDisplay = oldValDisplay.length > 0 ? oldValDisplay.join(', ') : 'none';
+                                }
+                                if (Array.isArray(newValDisplay)) {
+                                  newValDisplay = newValDisplay.length > 0 ? newValDisplay.join(', ') : 'none';
+                                }
+                                
+                                // Handle null/undefined
+                                if (oldValDisplay === null || oldValDisplay === undefined) oldValDisplay = 'none';
+                                if (newValDisplay === null || newValDisplay === undefined) newValDisplay = 'none';
+                                
+                                return (
+                                  <div key={field} className="text-sm">
+                                    <span className="font-medium text-slate-900">{fieldDisplay}:</span>{' '}
+                                    <span className="text-red-600">{String(oldValDisplay)}</span>
+                                    {' → '}
+                                    <span className="text-green-600">{String(newValDisplay)}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {Object.keys(entry.changes.product || {}).length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-slate-900 mb-2">Product Changes:</h4>
+                            <div className="bg-slate-50 rounded p-3 space-y-2">
+                              {Object.entries(entry.changes.product || {}).map(([field, change]: [string, any]) => {
+                                let fieldDisplay = field;
+                                if (field === 'description') fieldDisplay = 'Description';
+                                else if (field === 'std_price') fieldDisplay = 'Std Price';
+                                else if (field === 'expiry_policy') fieldDisplay = 'Expiry Policy';
+                                else if (field === 'shelf_life_days') fieldDisplay = 'Shelf Life (days)';
+                                else if (field === 'packs_per_box') fieldDisplay = 'Packs per Box';
+                                else if (field === 'boxes_per_pallet') fieldDisplay = 'Boxes per Pallet';
+                                else if (field === 'default_routing_id') fieldDisplay = 'Default Routing';
+                                else if (field === 'uom') fieldDisplay = 'UoM';
+                                else if (field === 'lead_time_days') fieldDisplay = 'Lead Time (days)';
+                                else if (field === 'moq') fieldDisplay = 'MOQ';
+
+                                let oldValDisplay = change.old;
+                                let newValDisplay = change.new;
+
+                                if (oldValDisplay === null || oldValDisplay === undefined || oldValDisplay === '') oldValDisplay = 'none';
+                                if (newValDisplay === null || newValDisplay === undefined || newValDisplay === '') newValDisplay = 'none';
+
+                                return (
+                                  <div key={field} className="text-sm">
+                                    <span className="font-medium text-slate-900">{fieldDisplay}:</span>{' '}
+                                    <span className="text-red-600">{String(oldValDisplay)}</span>
+                                    {' → '}
+                                    <span className="text-green-600">{String(newValDisplay)}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}

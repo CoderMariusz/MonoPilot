@@ -317,7 +317,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
     }
   };
 
-  const detectChanges = (oldBomData?: any): { 
+  const detectChanges = (oldBomData?: any, oldBomItems?: any[]): { 
     itemsAdded: number; 
     itemsRemoved: number; 
     itemsModified: number;
@@ -340,8 +340,11 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
       };
     }
     
+    // Use oldBomItems from database if provided, otherwise use initialItems
+    const oldItems = oldBomItems || initialItems || [];
+    
     // Detect BOM items changes
-    const oldItemsMap = new Map((initialItems || []).map((item: any) => [item.material_id, item]));
+    const oldItemsMap = new Map(oldItems.map((item: any) => [item.material_id, item]));
     const newItemsMap = new Map(items.map(item => [item.material_id!, item]));
     
     const addedItems: any[] = [];
@@ -361,7 +364,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
     });
     
     // Count removed items
-    (initialItems || []).forEach((oldItem: any) => {
+    oldItems.forEach((oldItem: any) => {
       if (!newItemsMap.has(oldItem.material_id)) {
         removedItems.push({
           material_id: oldItem.material_id,
@@ -409,6 +412,14 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
         else if (field === 'default_routing_id') newValue = (product as any).default_routing_id || null;
         else newValue = null; // notes, effective_from, effective_to not yet in UI
         
+        console.log(`Comparing BOM field "${field}":`, { 
+          oldValue, 
+          newValue, 
+          stringOld: JSON.stringify(oldValue), 
+          stringNew: JSON.stringify(newValue),
+          areEqual: JSON.stringify(oldValue) === JSON.stringify(newValue)
+        });
+        
         if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
           bomFieldsChanged.push(field);
         }
@@ -423,8 +434,12 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
       itemsModified: modifiedItems.length,
       bomFieldsChanged,
       hasAnyChanges,
-      initialItems,
-      currentItems: items
+      oldItems: oldItems.length,
+      currentItems: items.length,
+      oldBomData,
+      currentBomStatus: bomStatus,
+      currentBomLineIds: bomLineIds,
+      currentRoutingId: (product as any).default_routing_id
     });
     
     return { 
@@ -604,12 +619,30 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
       console.log('CompositeProductModal payload:', JSON.stringify(payload, null, 2));
       if (editingProduct) {
         // Update existing product (including packaging fields)
+        // Note: is_active is not updated for composite products
         const productUpdate: any = {
           ...payload.product,
           default_routing_id: (product as any).default_routing_id ?? null,
           packs_per_box: (product as any).packs_per_box ?? null,
           boxes_per_pallet: (product as any).boxes_per_pallet ?? null,
         };
+        // Remove is_active from update (it's only for single products)
+        delete productUpdate.is_active;
+        
+        // Store old product values for comparison
+        const oldProductData = {
+          description: editingProduct.description,
+          std_price: editingProduct.std_price,
+          expiry_policy: editingProduct.expiry_policy,
+          shelf_life_days: editingProduct.shelf_life_days,
+          packs_per_box: (editingProduct as any).packs_per_box,
+          boxes_per_pallet: (editingProduct as any).boxes_per_pallet,
+          default_routing_id: (editingProduct as any).default_routing_id,
+          uom: editingProduct.uom,
+          lead_time_days: editingProduct.lead_time_days,
+          moq: editingProduct.moq,
+        };
+        
         const { error: updateError } = await supabase
           .from('products')
           .update(productUpdate)
@@ -650,8 +683,8 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
             .eq('bom_id', bomId)
             .order('sequence');
           
-          // Detect ALL changes (items + BOM fields)
-          const changesInfo = detectChanges(oldBomData);
+          // Detect ALL changes (items + BOM fields) - use oldBomItems from database for accurate comparison
+          const changesInfo = detectChanges(oldBomData, oldBomItems);
           
           // Check if only status changed (no items or BOM field changes except status)
           const statusOnlyChange = 
@@ -665,94 +698,267 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           // Calculate new version
           const newVersion = getNewVersion(changesInfo, statusOnlyChange);
           
+          // Check if there are ANY changes (items OR BOM header fields)
+          const hasBomHeaderChanges = oldBomData && (
+            oldBomData.status !== bomStatus ||
+            oldBomData.version !== newVersion ||
+            JSON.stringify(oldBomData.default_routing_id) !== JSON.stringify((product as any).default_routing_id || null) ||
+            JSON.stringify(oldBomData.line_id) !== JSON.stringify(bomLineIds.length > 0 ? bomLineIds : null)
+          );
+          
+          const hasAnyChanges = changesInfo.hasAnyChanges || hasBomHeaderChanges;
+          
           console.log('Version check:', { 
             currentVersion: bomVersion, 
             newVersion, 
             statusOnlyChange,
-            changesInfo
+            changesInfo,
+            hasBomHeaderChanges,
+            hasAnyChanges
           });
           
           // Update BOM with new version, status, and other fields
-          await supabase
+          const bomUpdate: any = {
+            version: newVersion,
+            default_routing_id: (product as any).default_routing_id || null,
+          };
+          
+          // Format line_id as PostgreSQL array if needed
+          if (bomLineIds.length > 0) {
+            bomUpdate.line_id = bomLineIds;
+          } else {
+            bomUpdate.line_id = null;
+          }
+          
+          // Only update status if it's different
+          if (oldBomData?.status !== bomStatus) {
+            bomUpdate.status = bomStatus;
+          }
+          
+          const { error: bomUpdateError } = await supabase
             .from('boms')
-            .update({ 
-              status: bomStatus,
-              version: newVersion,
-              default_routing_id: (product as any).default_routing_id || null,
-              line_id: bomLineIds.length > 0 ? bomLineIds : null
-            })
+            .update(bomUpdate)
             .eq('id', bomId);
           
-          // Track changes - save history if there are any changes
-          if (changesInfo.hasAnyChanges) {
-            try {
-              const changes: any = {
-                bom: {},
-                items: {
-                  added: changesInfo.itemChangesDetail.added,
-                  removed: changesInfo.itemChangesDetail.removed,
-                  modified: changesInfo.itemChangesDetail.modified
-                }
+          if (bomUpdateError) {
+            console.error('BOM update error:', bomUpdateError);
+            throw new Error(`Failed to update BOM: ${bomUpdateError.message}`);
+          }
+          
+          // Track changes across BOM header, items, and product fields
+          const changes: any = {
+            bom: {},
+            product: {},
+            items: {
+              added: changesInfo.itemChangesDetail.added || [],
+              removed: changesInfo.itemChangesDetail.removed || [],
+              modified: changesInfo.itemChangesDetail.modified || []
+            }
+          };
+
+          if (oldProductData) {
+            if (oldProductData.description !== product.description) {
+              changes.product.description = {
+                old: oldProductData.description,
+                new: product.description
               };
-              
-              // Compare BOM header fields and build changes object
-              if (oldBomData) {
-                const bomFieldsToCompare = [
-                  { field: 'status', newValue: bomStatus },
-                  { field: 'version', newValue: newVersion },
-                  { field: 'default_routing_id', newValue: (product as any).default_routing_id || null },
-                  { field: 'line_id', newValue: bomLineIds.length > 0 ? bomLineIds : null }
-                ];
-                
-                bomFieldsToCompare.forEach(({ field, newValue }) => {
-                  if (JSON.stringify(oldBomData[field]) !== JSON.stringify(newValue)) {
-                    changes.bom[field] = {
-                      old: oldBomData[field],
-                      new: newValue
-                    };
-                  }
-                });
-              }
-              
-              // Generate description based on changes
-              let description = '';
-              if (statusOnlyChange) {
-                description = `Status changed from ${oldBomData?.status || 'draft'} to ${bomStatus}`;
-              } else {
+            }
+            if (oldProductData.std_price !== product.std_price) {
+              changes.product.std_price = {
+                old: oldProductData.std_price,
+                new: product.std_price
+              };
+            }
+            if (oldProductData.expiry_policy !== product.expiry_policy) {
+              changes.product.expiry_policy = {
+                old: oldProductData.expiry_policy,
+                new: product.expiry_policy
+              };
+            }
+            if (oldProductData.shelf_life_days !== product.shelf_life_days) {
+              changes.product.shelf_life_days = {
+                old: oldProductData.shelf_life_days,
+                new: product.shelf_life_days
+              };
+            }
+            if (oldProductData.packs_per_box !== (product as any).packs_per_box) {
+              changes.product.packs_per_box = {
+                old: oldProductData.packs_per_box,
+                new: (product as any).packs_per_box
+              };
+            }
+            if (oldProductData.boxes_per_pallet !== (product as any).boxes_per_pallet) {
+              changes.product.boxes_per_pallet = {
+                old: oldProductData.boxes_per_pallet,
+                new: (product as any).boxes_per_pallet
+              };
+            }
+            if (oldProductData.uom !== product.uom) {
+              changes.product.uom = {
+                old: oldProductData.uom,
+                new: product.uom
+              };
+            }
+            if (oldProductData.lead_time_days !== product.lead_time_days) {
+              changes.product.lead_time_days = {
+                old: oldProductData.lead_time_days,
+                new: product.lead_time_days
+              };
+            }
+            if (oldProductData.moq !== product.moq) {
+              changes.product.moq = {
+                old: oldProductData.moq,
+                new: product.moq
+              };
+            }
+            if (JSON.stringify(oldProductData.default_routing_id) !== JSON.stringify((product as any).default_routing_id)) {
+              changes.product.default_routing_id = {
+                old: oldProductData.default_routing_id,
+                new: (product as any).default_routing_id
+              };
+            }
+          }
+
+          if (oldBomData) {
+            if (oldBomData.status !== bomStatus) {
+              changes.bom.status = {
+                old: oldBomData.status,
+                new: bomStatus
+              };
+            }
+            if (oldBomData.version !== newVersion) {
+              changes.bom.version = {
+                old: oldBomData.version,
+                new: newVersion
+              };
+            }
+            const newRoutingId = (product as any).default_routing_id || null;
+            if (JSON.stringify(oldBomData.default_routing_id) !== JSON.stringify(newRoutingId)) {
+              changes.bom.default_routing_id = {
+                old: oldBomData.default_routing_id,
+                new: newRoutingId
+              };
+            }
+            const newLineId = bomLineIds.length > 0 ? bomLineIds : null;
+            if (JSON.stringify(oldBomData.line_id) !== JSON.stringify(newLineId)) {
+              changes.bom.line_id = {
+                old: oldBomData.line_id,
+                new: newLineId
+              };
+            }
+          }
+
+          const productChangeCount = Object.keys(changes.product).length;
+          const bomChangeCount = Object.keys(changes.bom).length;
+          const hasItemChanges = (changes.items.added?.length || 0) > 0 || (changes.items.removed?.length || 0) > 0 || (changes.items.modified?.length || 0) > 0;
+          const shouldSaveHistory = hasAnyChanges || productChangeCount > 0 || bomChangeCount > 0 || hasItemChanges;
+
+          if (shouldSaveHistory) {
+            try {
+              console.log('BOM & Product changes to save to history:', changes);
+
+              const getRoutingName = (routingId: number | null): string => {
+                if (!routingId) return 'none';
+                const routing = routings.find(r => r.id === routingId);
+                return routing?.name || `routing ${routingId}`;
+              };
+
+              const generateDescription = async (): Promise<string> => {
+                if (statusOnlyChange) {
+                  return `Status changed from ${oldBomData?.status || 'draft'} to ${bomStatus}`;
+                }
+
                 const parts: string[] = [];
-                
-                if (changes.bom.status) {
+
+                if (changes.bom?.status) {
                   parts.push(`status ${changes.bom.status.old}→${changes.bom.status.new}`);
                 }
-                
-                if (changes.bom.version && changes.bom.version.old !== changes.bom.version.new) {
+                if (changes.bom?.version && changes.bom.version.old !== changes.bom.version.new) {
                   const versionType = changesInfo.itemsAdded > 0 || changesInfo.itemsRemoved > 0 ? 'major' : 'minor';
                   parts.push(`version ${changes.bom.version.old}→${changes.bom.version.new} (${versionType} bump)`);
                 }
-                
+
                 const itemChangeParts: string[] = [];
-                if (changesInfo.itemsAdded > 0) itemChangeParts.push(`${changesInfo.itemsAdded} added`);
-                if (changesInfo.itemsRemoved > 0) itemChangeParts.push(`${changesInfo.itemsRemoved} removed`);
-                if (changesInfo.itemsModified > 0) itemChangeParts.push(`${changesInfo.itemsModified} modified`);
-                
+                if (changesInfo.itemChangesDetail.added.length > 0) {
+                  itemChangeParts.push(`${changesInfo.itemChangesDetail.added.length} added`);
+                }
+                if (changesInfo.itemChangesDetail.removed.length > 0) {
+                  itemChangeParts.push(`${changesInfo.itemChangesDetail.removed.length} removed`);
+                }
+                if (changesInfo.itemChangesDetail.modified.length > 0) {
+                  const modifiedDetails: string[] = [];
+                  for (const modifiedItem of changesInfo.itemChangesDetail.modified) {
+                    const fieldChanges: string[] = [];
+                    Object.entries(modifiedItem.changes || {}).forEach(([field, change]: [string, any]) => {
+                      const oldVal = change.old ?? 'none';
+                      const newVal = change.new ?? 'none';
+                      let fieldDisplay = field;
+                      if (field === 'quantity') fieldDisplay = 'quantity';
+                      else if (field === 'uom') fieldDisplay = 'uom';
+                      else if (field === 'line_id') fieldDisplay = 'line';
+                      else if (field === 'unit_cost_std') fieldDisplay = 'cost';
+                      else if (field === 'scrap_std_pct') fieldDisplay = 'scrap';
+                      else if (field === 'sequence') fieldDisplay = 'sequence';
+                      else if (field === 'priority') fieldDisplay = 'priority';
+                      else if (field === 'is_optional') fieldDisplay = 'optional';
+                      else if (field === 'is_phantom') fieldDisplay = 'phantom';
+                      else if (field === 'consume_whole_lp') fieldDisplay = 'consume whole LP';
+                      else if (field === 'tax_code_id') fieldDisplay = 'tax code';
+                      else if (field === 'lead_time_days') fieldDisplay = 'lead time';
+                      else if (field === 'moq') fieldDisplay = 'moq';
+                      let oldValDisplay = Array.isArray(oldVal) ? oldVal.join(',') : oldVal;
+                      let newValDisplay = Array.isArray(newVal) ? newVal.join(',') : newVal;
+                      if (oldValDisplay === null || oldValDisplay === undefined) oldValDisplay = 'none';
+                      if (newValDisplay === null || newValDisplay === undefined) newValDisplay = 'none';
+                      fieldChanges.push(`${fieldDisplay} ${oldValDisplay}→${newValDisplay}`);
+                    });
+                    if (fieldChanges.length > 0) {
+                      modifiedDetails.push(fieldChanges.join(', '));
+                    }
+                  }
+                  if (modifiedDetails.length > 0) {
+                    itemChangeParts.push(`${changesInfo.itemChangesDetail.modified.length} item${changesInfo.itemChangesDetail.modified.length > 1 ? 's' : ''} modified (${modifiedDetails.join('; ')})`);
+                  } else {
+                    itemChangeParts.push(`${changesInfo.itemChangesDetail.modified.length} modified`);
+                  }
+                }
                 if (itemChangeParts.length > 0) {
                   parts.push(`items: ${itemChangeParts.join(', ')}`);
                 }
-                
-                if (changes.bom.line_id) {
-                  parts.push('production lines updated');
+
+                if (changes.bom?.line_id) {
+                  const oldLines = Array.isArray(changes.bom.line_id.old) ? changes.bom.line_id.old.join(',') : (changes.bom.line_id.old || 'none');
+                  const newLines = Array.isArray(changes.bom.line_id.new) ? changes.bom.line_id.new.join(',') : (changes.bom.line_id.new || 'none');
+                  parts.push(`production lines ${oldLines}→${newLines}`);
                 }
-                
-                if (changes.bom.default_routing_id) {
-                  parts.push('routing updated');
+
+                if (changes.bom?.default_routing_id) {
+                  const oldRoutingName = getRoutingName(changes.bom.default_routing_id.old);
+                  const newRoutingName = getRoutingName(changes.bom.default_routing_id.new);
+                  parts.push(`routing ${oldRoutingName}→${newRoutingName}`);
                 }
-                
-                description = parts.length > 0 
+
+                if (productChangeCount > 0) {
+                  parts.push(`product: ${productChangeCount} change${productChangeCount > 1 ? 's' : ''}`);
+                }
+
+                return parts.length > 0
                   ? `BOM updated: ${parts.join(', ')}`
                   : 'BOM updated';
+              };
+
+              const description = await generateDescription();
+
+              if (!bomChangeCount) {
+                delete changes.bom;
               }
-              
-              // Create history entry
+              if (!productChangeCount) {
+                delete changes.product;
+              }
+              if (!hasItemChanges) {
+                delete changes.items;
+              }
+
               await BomHistoryAPI.create({
                 bom_id: bomId,
                 version: newVersion,
@@ -767,12 +973,8 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
             }
           }
           
-          // Update product is_active based on BOM status
-          const isActive = bomStatus === 'active';
-          await supabase
-            .from('products')
-            .update({ is_active: isActive })
-            .eq('id', editingProduct.id);
+          // Note: is_active is not updated for composite products
+          // It's only relevant for single products
           
           // Update existing BOM items
           await supabase.from('bom_items').delete().eq('bom_id', bomId);
@@ -805,14 +1007,8 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
         // Create new product
         const result = await createComposite(payload);
         
-        // Update product is_active based on BOM status
-        if (result?.product_id) {
-          const isActive = bomStatus === 'active';
-          await supabase
-            .from('products')
-            .update({ is_active: isActive })
-            .eq('id', result.product_id);
-        }
+        // Note: is_active is not set for composite products
+        // It's only relevant for single products
         
         // Combine inherited and selected allergens
         const allAllergens = [...new Set([...inheritedAllergens, ...selectedAllergens])];
@@ -873,17 +1069,6 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
             {editingProduct && (
               <p className="text-xs text-slate-500 mt-1">Product type cannot be changed after creation</p>
             )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Product Status (is_active)</label>
-            <select
-              value={product.is_active ? 'active' : 'inactive'}
-              onChange={e => setProduct(p => ({ ...p, is_active: e.target.value === 'active' }))}
-              className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Part Number</label>

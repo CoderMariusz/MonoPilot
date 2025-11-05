@@ -430,7 +430,6 @@ function ProductsTable({
                   >
                     Std. Price {sortColumn === 'std_price' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Is Active</th>
                   {(category === 'FINISHED_GOODS' || category === 'PROCESS') && (
                     <>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Active BOM</th>
@@ -476,15 +475,6 @@ function ProductsTable({
                           ? product.std_price.toString()
                           : product.std_price ?? undefined
                       )}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-slate-600">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        product.is_active 
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {product.is_active ? 'Active' : 'Inactive'}
-                      </span>
                     </td>
                     {(category === 'FINISHED_GOODS' || category === 'PROCESS') && (
                       <>

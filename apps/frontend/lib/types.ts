@@ -474,6 +474,7 @@ export interface Product {
   expiry_policy?: string;
   rate?: number;
   production_lines?: string[];
+  default_routing_id?: number | null;
   created_at: string;
   updated_at: string;
   created_by?: string;
@@ -510,6 +511,9 @@ export interface ProductInsert {
   shelf_life_days?: number | null;
   std_price?: number | null;
   production_lines?: string[];
+  default_routing_id?: number | null;
+  packs_per_box?: number | null;
+  boxes_per_pallet?: number | null;
 }
 
 export interface BomItemInput {
@@ -768,6 +772,7 @@ export interface BomHistory {
   status_to?: string;
   changes: {
     bom?: Record<string, { old: any; new: any }>;
+    product?: Record<string, { old: any; new: any }>;
     items?: {
       added?: any[];
       removed?: any[];
