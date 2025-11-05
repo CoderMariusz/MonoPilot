@@ -4,7 +4,7 @@
 
 The MonoPilot MES system uses a dual-mode API layer that seamlessly switches between mock data (development) and real Supabase data (production).
 
-**Last Updated**: 2025-11-04 (auto-generated)
+**Last Updated**: 2025-11-05 (auto-generated)
 
 ## API Classes
 

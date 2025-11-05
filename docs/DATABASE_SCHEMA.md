@@ -4,7 +4,7 @@
 
 This document describes the complete database schema for the MonoPilot MES system, including all tables, relationships, constraints, and business rules.
 
-**Last Updated**: 2025-11-04 (auto-generated)
+**Last Updated**: 2025-11-05 (auto-generated)
 **Version**: Auto-generated from migrations
 
 ## Tables
