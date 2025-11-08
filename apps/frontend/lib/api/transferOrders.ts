@@ -10,7 +10,7 @@ export class TransferOrdersAPI {
           *,
           from_warehouse:warehouses!to_header_from_wh_id_fkey(*),
           to_warehouse:warehouses!to_header_to_wh_id_fkey(*),
-          to_lines:to_line(*, item:products(*), from_location:locations!to_line_from_location_id_fkey(*), to_location:locations!to_line_to_location_id_fkey(*))
+          to_lines:to_line(*, item:products(*), from_location:locations!to_line_from_location_id_fkey(*, warehouse:warehouses(*)), to_location:locations!to_line_to_location_id_fkey(*, warehouse:warehouses(*)))
         `)
         .order('created_at', { ascending: false });
 
@@ -44,13 +44,13 @@ export class TransferOrdersAPI {
 
   static async getById(id: number): Promise<TransferOrder | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('to_header')
         .select(`
           *,
           from_warehouse:warehouses!to_header_from_wh_id_fkey(*),
           to_warehouse:warehouses!to_header_to_wh_id_fkey(*),
-          to_lines:to_line(*, item:products(*), from_location:locations!to_line_from_location_id_fkey(*), to_location:locations!to_line_to_location_id_fkey(*))
+          to_lines:to_line(*, item:products(*), from_location:locations!to_line_from_location_id_fkey(*, warehouse:warehouses(*)), to_location:locations!to_line_to_location_id_fkey(*, warehouse:warehouses(*)))
         `)
         .eq('id', id)
         .single();
@@ -118,60 +118,86 @@ export class TransferOrdersAPI {
    * Sets actual_ship_date and updates status to 'in_transit'
    * Only works if current status is 'submitted'
    */
-  static async markShipped(id: number, actualShipDate?: Date): Promise<{ success: boolean; message: string }> {
+  static async markShipped(toId: number, actualShipDate: string): Promise<TOHeader> {
     try {
-      const date = actualShipDate || new Date();
-      const { error } = await supabase
-        .from('to_header')
-        .update({ 
-          actual_ship_date: date.toISOString(),
-          status: 'in_transit'
-        })
-        .eq('id', id)
-        .eq('status', 'submitted'); // Only if currently submitted
-      
-      if (error) {
-        // Check if it's because status is not 'submitted'
-        if (error.code === 'PGRST116') {
-          return { success: false, message: 'Transfer order must be in "submitted" status to mark as shipped' };
-        }
-        return { success: false, message: error.message };
+      // Get current user from Supabase auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
       }
       
-      return { success: true, message: 'Transfer marked as shipped' };
+      const { data, error } = await supabase.rpc('mark_transfer_shipped', {
+        p_to_id: toId,
+        p_actual_ship_date: actualShipDate,
+        p_user_id: user.id
+      });
+      
+      if (error) throw error;
+      if (!data) throw new Error('No data returned from mark_transfer_shipped');
+      
+      return data as TOHeader;
     } catch (error: any) {
-      return { success: false, message: error.message || 'Failed to mark transfer as shipped' };
+      console.error('Error marking transfer as shipped:', error);
+      throw new Error(error.message || 'Failed to mark transfer as shipped');
     }
   }
 
   /**
    * Mark a transfer order as received
    * Sets actual_receive_date and updates status to 'received'
+   * Updates line items with qty_moved, lp_id, and batch
    * Only works if current status is 'in_transit'
    */
-  static async markReceived(id: number, actualReceiveDate?: Date): Promise<{ success: boolean; message: string }> {
+  static async markReceived(
+    toId: number,
+    actualReceiveDate: string,
+    lineUpdates: MarkReceivedLineUpdate[]
+  ): Promise<TOHeader> {
     try {
-      const date = actualReceiveDate || new Date();
-      const { error } = await supabase
-        .from('to_header')
-        .update({ 
-          actual_receive_date: date.toISOString(),
-          status: 'received'
-        })
-        .eq('id', id)
-        .eq('status', 'in_transit'); // Only if currently in transit
-      
-      if (error) {
-        // Check if it's because status is not 'in_transit'
-        if (error.code === 'PGRST116') {
-          return { success: false, message: 'Transfer order must be in "in_transit" status to mark as received' };
-        }
-        return { success: false, message: error.message };
+      // Get current user from Supabase auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
       }
       
-      return { success: true, message: 'Transfer marked as received' };
+      const { data, error } = await supabase.rpc('mark_transfer_received', {
+        p_to_id: toId,
+        p_actual_receive_date: actualReceiveDate,
+        p_line_updates: lineUpdates,
+        p_user_id: user.id
+      });
+      
+      if (error) throw error;
+      if (!data) throw new Error('No data returned from mark_transfer_received');
+      
+      return data as TOHeader;
     } catch (error: any) {
-      return { success: false, message: error.message || 'Failed to mark transfer as received' };
+      console.error('Error marking transfer as received:', error);
+      throw new Error(error.message || 'Failed to mark transfer as received');
     }
   }
+
+  /**
+   * Validate that planned receive date is after or equal to planned ship date
+   */
+  static validateDateOrder(
+    plannedShip?: string,
+    plannedReceive?: string
+  ): void {
+    if (plannedShip && plannedReceive) {
+      const shipDate = new Date(plannedShip);
+      const receiveDate = new Date(plannedReceive);
+      if (receiveDate < shipDate) {
+        throw new Error('Planned receive date must be >= planned ship date');
+      }
+    }
+  }
+}
+
+// DTO for markReceived line updates
+export interface MarkReceivedLineUpdate {
+  line_id: number;
+  qty_moved: number;
+  lp_id?: number;
+  batch?: string;
 }

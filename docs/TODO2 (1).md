@@ -331,33 +331,39 @@ Walidacje UoM działają (mixed units ok).
 
 ### 2.3 Routing Management
 
-  - ⬜ 2.3.1 Routing definition (operations sequence)
-  - ⬜ 2.3.2 Routing operations (operation_id, sequence, machine_id) add field machine?
-  - ⬜ 2.3.3 Multi-choice routing requirements (Smoke, Roast, Dice, Mix) (possible o change that names)?
-  - ⬜ 2.3.4 Yield per phase tracking
+  - ✅ 2.3.1 Routing definition (operations sequence)
+  - ✅ 2.3.2 Routing operations (operation_id, sequence, machine_id) - COMPLETED: machine_id field added, UI implemented
+  - ✅ 2.3.3 Multi-choice routing requirements (Smoke, Roast, Dice, Mix) - COMPLETED: Dictionary-based, configurable via Settings
+  - ✅ 2.3.4 Yield per phase tracking - COMPLETED: expected_yield_pct field added (storage-only)
   - ⬜ 2.3.5 Per-phase expiry adjustments ⚪ P2
 
-**Status: ✅ Core routing done, advanced features pending**
+**Status: ✅ Core routing complete with P0 features (machine_id, dictionary, yield tracking)**
 
 ### 2.3 Routing — P0 doprecyzowania (NOWE)
 
-  - ⬜ 2.3.2 routing_operations.machine_id — migracja + UI 🟢 P0 — 1.0 dnia
+  - ✅ 2.3.2 routing_operations.machine_id — migracja + UI 🟢 P0 — 1.0 dnia ✅ COMPLETED
 
-Dodaj machine_id (FK) i selektor w wierszu operacji.
+**Zrobione:**
+- Dodano machine_id (FK → machines) do routing_operations (migracja 057)
+- Selektor maszyny w RoutingBuilder UI
+- Walidacja sekwencji (unikalna per routing) w API
+- TypeScript interfaces zaktualizowane
 
-Walidacja sekwencji (rosnąca, unikalna).
+  - ✅ 2.3.3 Słownik nazw operacji w Settings (Decyzja #4) 🟢 P0 — 0.5 dnia ✅ COMPLETED
 
-  - ⬜ 2.3.3 Słownik nazw operacji w Settings (Decyzja #4) 🟢 P0 — 0.5 dnia
+**Zrobione:**
+- Utworzono tabelę routing_operation_names (migracja 057)
+- Settings → Operation Names tab z pełnym CRUD
+- RoutingBuilder używa słownika dynamicznie
+- Seed data: Smoke, Roast, Dice, Mix, Cool, Package, Prep, QC
+- API: RoutingOperationNamesAPI z soft delete
 
-Dodaj Settings → Routing Operations Dictionary (lista nazw i aliasów).
+  - ✅ 2.3.S1 Expected yield % per operacja (storage-only) 🟢 P0 — 0.25 dnia ✅ COMPLETED
 
-RoutingBuilder używa słownika; można ręcznie dodawać/korygować.
-
-Startowy zestaw: Smoke, Roast, Dice, Mix.
-
-2.3.S1 Expected yield % per operacja (storage-only) 🟢 P0 — 0.25 dnia
-
-Przechowywanie expected_yield% per operacja; raportowanie w Production.
+**Zrobione:**
+- Pole expected_yield_pct (0-100) w routing_operations (migracja 057)
+- UI input w RoutingBuilder z walidacją
+- Storage-only (gotowe do przyszłego raportowania)
 
 ### 2.4 UI Components
 

@@ -159,6 +159,8 @@ export interface Location {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Relationships
+  warehouse?: Warehouse;
 }
 
 export type CreateLocationData = Omit<Location, 'id' | 'created_at' | 'updated_at'>;

@@ -9,6 +9,7 @@ Skopiuj poniższy prompt i dostosuj sekcję INPUT, a następnie uruchom w Cursor
 Jesteś Plan Composer dla repo MonoPilot (Next.js 15 + Supabase, RLS ON, Filament-style UI). 
 
 Twoim zadaniem jest wygenerować gotowy plan (Markdown) według szablonu `docs/plan/_template-plan-standard.md` i zapisać go w `docs/plan/`.
+W planie nie uwzgledniasz kodu! cod produkujesz w momecie budowania planu.
 
 ## CONSTRAINTS (domyślne, dodaj do planu)
 
@@ -129,31 +130,24 @@ notes: # opcjonalne
 ## PRZYKŁAD UŻYCIA
 
 ```yaml
-plan_number: 003
-title_one_liner: Work Orders — kolumny Made/Progress + agregacja z production_outputs
+plan_number: 001
+title_one_liner: check what from it is done. 
 task_5_sentences: |
-  Dodaj widoczne w liście WO kolumny Made i Progress.
-  Progress licz jako procent wykonania względem planned_qty.
-  Agreguj dane z production_outputs po wo_id z uwzględnieniem RLS.
-  Nie zmieniaj schematu DB w tej iteracji.
-  Zapewnij testy i DoD zgodnie ze standardem.
+from that what i see most of task to point 3 is done confir what is done and check it. update todo2(1).md file
 
-module: PROD
+module: PLAN
 priority: P0
 
 ui_inputs:
-  - "woId:string:required"
-  - "plannedQty:number:required"
-  - "madeQty:number:readonly"
-  - "progressPct:number:readonly"
+
 
 constraints:
   - "RLS ON"
   - "bez migracji schematu"
 
 notes:
-  - "pasek procentowy w kolumnie Table"
-  - "edge case: plannedQty=0 → progress=0"
+
+
 ```
 
 **Wynikowy plik:** `docs/plan/003--PROD--wo-made-progress-columns--p0.md`

@@ -3,8 +3,10 @@
 import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ProductsAPI } from '@/lib/api/products';
+import { TransferOrdersAPI } from '@/lib/api/transferOrders';
 import { useWarehouses } from '@/lib/clientState';
 import type { Product, Warehouse } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 interface CreateTransferOrderModalProps {
   isOpen: boolean;
@@ -80,6 +82,19 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
     setError(null);
 
     try {
+      // Validate date order
+      try {
+        TransferOrdersAPI.validateDateOrder(
+          formData.planned_ship_date || undefined,
+          formData.planned_receive_date || undefined
+        );
+      } catch (validationError: any) {
+        toast.error(validationError.message);
+        setError(validationError.message);
+        setLoading(false);
+        return;
+      }
+
       const { addTransferOrder } = await import('@/lib/clientState');
       const nextToNumber = `TO-2024-${String(Date.now()).slice(-3).padStart(3, '0')}`;
       const from_warehouse = warehouses.find(w => w.id === Number(formData.from_warehouse_id));

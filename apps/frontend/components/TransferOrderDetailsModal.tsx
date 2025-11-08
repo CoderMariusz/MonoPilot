@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useTransferOrders, useWarehouses } from '@/lib/clientState';
-import { TransferOrdersAPI } from '@/lib/api/transferOrders';
+import { TransferOrdersAPI, type MarkReceivedLineUpdate } from '@/lib/api/transferOrders';
 import type { TransferOrder } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
@@ -19,6 +19,11 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
   const [transferOrder, setTransferOrder] = useState<TransferOrder | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showShipModal, setShowShipModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [shipDate, setShipDate] = useState('');
+  const [receiveDate, setReceiveDate] = useState('');
+  const [lineUpdates, setLineUpdates] = useState<Record<number, { qty_moved: string; lp_id?: string; batch?: string }>>({});
 
   useEffect(() => {
     if (isOpen && transferOrderId) {
@@ -81,30 +86,81 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
     }
   };
 
+  const handleMarkShippedClick = () => {
+    // Set default ship date to today
+    const today = new Date().toISOString().split('T')[0];
+    setShipDate(today);
+    setShowShipModal(true);
+  };
+
   const handleMarkShipped = async () => {
-    if (!transferOrder) return;
+    if (!transferOrder || !shipDate) return;
     
-    const result = await TransferOrdersAPI.markShipped(transferOrder.id);
-    
-    if (result.success) {
-      toast.success(result.message);
-      loadDetails(); // Reload to refresh dates and status
-    } else {
-      toast.error(result.message);
+    setLoading(true);
+    try {
+      const shipDateTime = new Date(shipDate).toISOString();
+      await TransferOrdersAPI.markShipped(transferOrder.id, shipDateTime);
+      toast.success('Transfer order marked as shipped');
+      setShowShipModal(false);
+      await loadDetails(); // Reload to refresh dates and status
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to mark as shipped');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleMarkReceivedClick = () => {
+    // Set default receive date to today
+    const today = new Date().toISOString().split('T')[0];
+    setReceiveDate(today);
+    // Initialize line updates with planned quantities
+    const updates: Record<number, { qty_moved: string; lp_id?: string; batch?: string }> = {};
+    transferOrder?.transfer_order_items?.forEach(item => {
+      updates[item.id] = {
+        qty_moved: String(item.quantity || 0),
+        lp_id: '',
+        batch: item.batch || ''
+      };
+    });
+    setLineUpdates(updates);
+    setShowReceiveModal(true);
+  };
+
   const handleMarkReceived = async () => {
-    if (!transferOrder) return;
+    if (!transferOrder || !receiveDate) return;
     
-    const result = await TransferOrdersAPI.markReceived(transferOrder.id);
-    
-    if (result.success) {
-      toast.success(result.message);
-      loadDetails(); // Reload to refresh dates and status
-    } else {
-      toast.error(result.message);
+    setLoading(true);
+    try {
+      const receiveDateTime = new Date(receiveDate).toISOString();
+      
+      // Build line updates array
+      const updates: MarkReceivedLineUpdate[] = Object.entries(lineUpdates).map(([id, data]) => ({
+        line_id: Number(id),
+        qty_moved: Number(data.qty_moved),
+        lp_id: data.lp_id ? Number(data.lp_id) : undefined,
+        batch: data.batch || undefined
+      }));
+      
+      await TransferOrdersAPI.markReceived(transferOrder.id, receiveDateTime, updates);
+      toast.success('Transfer order marked as received');
+      setShowReceiveModal(false);
+      await loadDetails(); // Reload to refresh dates and status
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to mark as received');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const updateLineField = (lineId: number, field: string, value: string) => {
+    setLineUpdates(prev => ({
+      ...prev,
+      [lineId]: {
+        ...prev[lineId],
+        [field]: value
+      }
+    }));
   };
 
   if (!isOpen) return null;
@@ -270,16 +326,18 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
             <div className="flex items-center gap-3">
               {transferOrder?.status === 'submitted' && (
                 <button
-                  onClick={handleMarkShipped}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  onClick={handleMarkShippedClick}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Mark as Shipped
                 </button>
               )}
               {transferOrder?.status === 'in_transit' && (
                 <button
-                  onClick={handleMarkReceived}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                  onClick={handleMarkReceivedClick}
+                  disabled={loading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Mark as Received
                 </button>
@@ -304,6 +362,136 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
           </div>
         </div>
       </div>
+
+      {/* Ship Date Modal */}
+      {showShipModal && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Mark as Shipped</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Actual Ship Date
+              </label>
+              <input
+                type="date"
+                value={shipDate}
+                onChange={(e) => setShipDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setShowShipModal(false)}
+                disabled={loading}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMarkShipped}
+                disabled={loading || !shipDate}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Processing...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receive Date Modal */}
+      {showReceiveModal && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 m-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Mark as Received</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Actual Receive Date
+              </label>
+              <input
+                type="date"
+                value={receiveDate}
+                onChange={(e) => setReceiveDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-slate-900 mb-2">Line Items</h4>
+              <div className="border border-slate-200 rounded-md overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="text-left py-2 px-3 text-xs font-semibold text-slate-700">Product</th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-slate-700">Planned</th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-slate-700">Qty Moved</th>
+                      <th className="text-left py-2 px-3 text-xs font-semibold text-slate-700">LP ID</th>
+                      <th className="text-left py-2 px-3 text-xs font-semibold text-slate-700">Batch</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transferOrder?.transfer_order_items?.map((item) => (
+                      <tr key={item.id} className="border-t border-slate-100">
+                        <td className="py-2 px-3 text-xs">
+                          <div className="font-medium text-slate-900">{item.product?.part_number || '-'}</div>
+                        </td>
+                        <td className="py-2 px-3 text-xs text-right text-slate-600">{item.quantity}</td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="number"
+                            value={lineUpdates[item.id]?.qty_moved || ''}
+                            onChange={(e) => updateLineField(item.id, 'qty_moved', e.target.value)}
+                            step="0.01"
+                            min="0"
+                            max={item.quantity}
+                            className="w-20 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={lineUpdates[item.id]?.lp_id || ''}
+                            onChange={(e) => updateLineField(item.id, 'lp_id', e.target.value)}
+                            placeholder="Optional"
+                            className="w-24 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="text"
+                            value={lineUpdates[item.id]?.batch || ''}
+                            onChange={(e) => updateLineField(item.id, 'batch', e.target.value)}
+                            placeholder="Optional"
+                            className="w-32 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setShowReceiveModal(false)}
+                disabled={loading}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMarkReceived}
+                disabled={loading || !receiveDate}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Processing...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
