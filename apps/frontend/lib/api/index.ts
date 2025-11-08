@@ -9,6 +9,7 @@ export { TransferOrdersAPI } from './transferOrders';
 export { ASNsAPI } from './asns';
 export { TaxCodesAPI } from './taxCodes';
 export { RoutingsAPI } from './routings';
+export { RoutingOperationNamesAPI } from './routingOperationNames';
 
 // Re-export all API classes for easy importing
 export * from './workOrders';
@@ -18,6 +19,7 @@ export * from './transferOrders';
 export * from './asns';
 export * from './taxCodes';
 export * from './routings';
+export * from './routingOperationNames';
 
 // TODO: Add other API classes as needed:
 // export { PurchaseOrdersAPI } from './purchaseOrders';

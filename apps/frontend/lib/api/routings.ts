@@ -53,6 +53,8 @@ export class RoutingsAPI {
           code: op.code || undefined,
           description: op.description || undefined,
           requirements: op.requirements || [],
+          machine_id: op.machine_id || undefined,
+          expected_yield_pct: op.expected_yield_pct || undefined,
           created_at: op.created_at,
           updated_at: op.updated_at,
         }))
@@ -98,6 +100,8 @@ export class RoutingsAPI {
         code: op.code || undefined,
         description: op.description || undefined,
         requirements: op.requirements || [],
+        machine_id: op.machine_id || undefined,
+        expected_yield_pct: op.expected_yield_pct || undefined,
         created_at: op.created_at,
         updated_at: op.updated_at,
       }))
@@ -123,13 +127,22 @@ export class RoutingsAPI {
 
     // Create routing operations if provided
     if (data.operations && data.operations.length > 0) {
+      // Validate sequence numbers are unique and ascending
+      const seqNumbers = data.operations.map(op => op.seq_no);
+      const uniqueSeqNumbers = new Set(seqNumbers);
+      if (seqNumbers.length !== uniqueSeqNumbers.size) {
+        throw new Error('Sequence numbers must be unique');
+      }
+      
       const operations = data.operations.map(op => ({
         routing_id: routing.id,
         sequence_number: op.seq_no,
         operation_name: op.name,
         code: op.code || null,
         description: op.description || null,
-        requirements: op.requirements && op.requirements.length > 0 ? op.requirements : []
+        requirements: op.requirements && op.requirements.length > 0 ? op.requirements : [],
+        machine_id: op.machine_id || null,
+        expected_yield_pct: op.expected_yield_pct || null
       }));
 
       const { error: operationsError, data: insertedOperations } = await supabase
@@ -151,6 +164,8 @@ export class RoutingsAPI {
         code: op.code || undefined,
         description: op.description || undefined,
         requirements: op.requirements || [],
+        machine_id: op.machine_id || undefined,
+        expected_yield_pct: op.expected_yield_pct || undefined,
         created_at: op.created_at,
         updated_at: op.updated_at,
       }));
@@ -200,13 +215,22 @@ export class RoutingsAPI {
 
       // Insert new operations if any
       if (operations.length > 0) {
+        // Validate sequence numbers are unique and ascending
+        const seqNumbers = operations.map(op => op.seq_no);
+        const uniqueSeqNumbers = new Set(seqNumbers);
+        if (seqNumbers.length !== uniqueSeqNumbers.size) {
+          throw new Error('Sequence numbers must be unique');
+        }
+        
         const operationsToInsert = operations.map(op => ({
           routing_id: id,
           sequence_number: op.seq_no,
           operation_name: op.name,
           code: op.code || null,
           description: op.description || null,
-          requirements: op.requirements && op.requirements.length > 0 ? op.requirements : []
+          requirements: op.requirements && op.requirements.length > 0 ? op.requirements : [],
+          machine_id: op.machine_id || null,
+          expected_yield_pct: op.expected_yield_pct || null
         }));
 
         const { error: insertError, data: insertedOperations } = await supabase
@@ -228,6 +252,8 @@ export class RoutingsAPI {
           code: op.code || undefined,
           description: op.description || undefined,
           requirements: op.requirements || [],
+          machine_id: op.machine_id || undefined,
+          expected_yield_pct: op.expected_yield_pct || undefined,
           created_at: op.created_at,
           updated_at: op.updated_at,
         }));
@@ -261,6 +287,8 @@ export class RoutingsAPI {
         code: op.code || undefined,
         description: op.description || undefined,
         requirements: op.requirements || [],
+        machine_id: op.machine_id || undefined,
+        expected_yield_pct: op.expected_yield_pct || undefined,
         created_at: op.created_at,
         updated_at: op.updated_at,
       }))

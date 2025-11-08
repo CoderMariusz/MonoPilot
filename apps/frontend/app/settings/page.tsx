@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, Cog, AlertTriangle, Truck, Warehouse, Receipt, Route } from 'lucide-react';
+import { MapPin, Cog, AlertTriangle, Truck, Warehouse, Receipt, Route, ListOrdered } from 'lucide-react';
 import { LocationsTable } from '@/components/LocationsTable';
 import { MachinesTable } from '@/components/MachinesTable';
 import { AllergensTable } from '@/components/AllergensTable';
@@ -9,8 +9,9 @@ import { SuppliersTable } from '@/components/SuppliersTable';
 import { WarehousesTable } from '@/components/WarehousesTable';
 import { TaxCodesTable } from '@/components/TaxCodesTable';
 import { RoutingsTable } from '@/components/RoutingsTable';
+import { RoutingOperationNamesTable } from '@/components/RoutingOperationNamesTable';
 
-type TabType = 'locations' | 'machines' | 'allergens' | 'suppliers' | 'warehouses' | 'tax-codes' | 'routings';
+type TabType = 'locations' | 'machines' | 'allergens' | 'suppliers' | 'warehouses' | 'tax-codes' | 'routings' | 'routing-operations';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('locations');
@@ -23,6 +24,7 @@ export default function SettingsPage() {
     { id: 'warehouses' as TabType, label: 'Warehouses', icon: Warehouse },
     { id: 'tax-codes' as TabType, label: 'Tax Codes', icon: Receipt },
     { id: 'routings' as TabType, label: 'Routings', icon: Route },
+    { id: 'routing-operations' as TabType, label: 'Operation Names', icon: ListOrdered },
   ];
 
   return (
@@ -64,6 +66,7 @@ export default function SettingsPage() {
           {activeTab === 'warehouses' && <WarehousesTab />}
           {activeTab === 'tax-codes' && <TaxCodesTab />}
           {activeTab === 'routings' && <RoutingsTab />}
+          {activeTab === 'routing-operations' && <RoutingOperationsTab />}
         </div>
       </div>
     </div>
@@ -143,6 +146,14 @@ function RoutingsTab() {
         <h2 className="text-xl font-semibold text-slate-900">Routings</h2>
       </div>
       <RoutingsTable />
+    </div>
+  );
+}
+
+function RoutingOperationsTab() {
+  return (
+    <div>
+      <RoutingOperationNamesTable />
     </div>
   );
 }

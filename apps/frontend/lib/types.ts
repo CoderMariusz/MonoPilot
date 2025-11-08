@@ -616,8 +616,22 @@ export interface RoutingOperation {
   code?: string;
   description?: string;
   requirements?: string[];
+  machine_id?: number;
+  expected_yield_pct?: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface RoutingOperationName {
+  id: number;
+  name: string;
+  alias?: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
 }
 
 export interface WoOperation {

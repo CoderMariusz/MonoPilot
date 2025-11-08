@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, GripVertical, Save, X } from 'lucide-react';
-import type { Routing, RoutingOperation } from '@/lib/types';
+import type { Routing, RoutingOperation, Machine, RoutingOperationName } from '@/lib/types';
+import { MachinesAPI } from '@/lib/api/machines';
+import { RoutingOperationNamesAPI } from '@/lib/api/routingOperationNames';
 
 interface RoutingBuilderProps {
   routing?: Routing;
@@ -11,8 +13,6 @@ interface RoutingBuilderProps {
   }) => void;
   onCancel: () => void;
 }
-
-const AVAILABLE_REQUIREMENTS = ['Smoke', 'Roast', 'Dice', 'Mix'];
 
 export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProps) {
   const [formData, setFormData] = useState({
@@ -29,6 +29,8 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
       code: op.code || undefined,
       description: op.description || undefined,
       requirements: op.requirements || [],
+      machine_id: op.machine_id || undefined,
+      expected_yield_pct: op.expected_yield_pct || undefined,
     })) || [
       {
         seq_no: 1,
@@ -36,9 +38,36 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
         code: undefined,
         description: undefined,
         requirements: [],
+        machine_id: undefined,
+        expected_yield_pct: undefined,
       }
     ]
   );
+
+  const [machines, setMachines] = useState<Machine[]>([]);
+  const [availableRequirements, setAvailableRequirements] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const [machinesData, operationNamesData] = await Promise.all([
+          MachinesAPI.getAll(),
+          RoutingOperationNamesAPI.getAll()
+        ]);
+        setMachines(machinesData);
+        setAvailableRequirements(operationNamesData.map(on => on.name));
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Fallback to default requirements if API fails
+        setAvailableRequirements(['Smoke', 'Roast', 'Dice', 'Mix']);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const handleOperationChange = (index: number, field: keyof typeof operations[0], value: any) => {
     setOperations(prev => prev.map((op, i) => 
@@ -67,6 +96,8 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
       code: undefined,
       description: undefined,
       requirements: [],
+      machine_id: undefined,
+      expected_yield_pct: undefined,
     }]);
   };
 
@@ -108,6 +139,12 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
       return;
     }
 
+    // Validate expected_yield_pct
+    if (operations.some(op => op.expected_yield_pct !== undefined && (op.expected_yield_pct < 0 || op.expected_yield_pct > 100))) {
+      alert('Expected yield percentage must be between 0 and 100');
+      return;
+    }
+
     onSave({
       ...formData,
       operations: operations.map((op, index) => ({
@@ -116,6 +153,8 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
         code: op.code || undefined,
         description: op.description || undefined,
         requirements: op.requirements || [],
+        machine_id: op.machine_id || undefined,
+        expected_yield_pct: op.expected_yield_pct || undefined,
       })),
     });
   };
@@ -270,10 +309,44 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
                     </label>
                     <input
                       type="text"
-                      value={operation.code}
+                      value={operation.code || ''}
                       onChange={(e) => handleOperationChange(index, 'code', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                       placeholder="e.g., PREP"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Machine
+                    </label>
+                    <select
+                      value={operation.machine_id || ''}
+                      onChange={(e) => handleOperationChange(index, 'machine_id', e.target.value ? parseInt(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    >
+                      <option value="">None</option>
+                      {machines.map(machine => (
+                        <option key={machine.id} value={machine.id}>
+                          {machine.code} - {machine.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Expected Yield %
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={operation.expected_yield_pct || ''}
+                      onChange={(e) => handleOperationChange(index, 'expected_yield_pct', e.target.value ? parseFloat(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      placeholder="e.g., 95.5"
                     />
                   </div>
 
@@ -282,7 +355,7 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
                       Description
                     </label>
                     <textarea
-                      value={operation.description}
+                      value={operation.description || ''}
                       onChange={(e) => handleOperationChange(index, 'description', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                       rows={2}
@@ -296,25 +369,31 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Requirements
                   </label>
-                  <div className="flex flex-wrap gap-2">
-                    {AVAILABLE_REQUIREMENTS.map(requirement => (
-                      <button
-                        key={requirement}
-                        type="button"
-                        onClick={() => handleRequirementToggle(index, requirement)}
-                        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                          operation.requirements?.includes(requirement)
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        {requirement}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Select the requirements for this operation (Smoke, Roast, Dice, Mix)
-                  </p>
+                  {loading ? (
+                    <p className="text-sm text-slate-500">Loading requirements...</p>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        {availableRequirements.map(requirement => (
+                          <button
+                            key={requirement}
+                            type="button"
+                            onClick={() => handleRequirementToggle(index, requirement)}
+                            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                              operation.requirements?.includes(requirement)
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            {requirement}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Select the requirements for this operation
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
