@@ -1,17 +1,17 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Loader2, Eye, Edit, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useSupabaseTransferOrders } from '@/lib/hooks/useSupabaseData';
-import { deleteTransferOrder } from '@/lib/clientState';
+import { TransferOrdersAPI } from '@/lib/api/transferOrders';
+import { WarehousesAPI } from '@/lib/api/warehouses';
 import { TransferOrderDetailsModal } from '@/components/TransferOrderDetailsModal';
 import { EditTransferOrderModal } from '@/components/EditTransferOrderModal';
-import type { TransferOrder } from '@/lib/types';
+import type { TransferOrder, Warehouse } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 export function TransferOrdersTable() {
-  const { data: transferOrders, loading: loadingData, error: loadError } = useSupabaseTransferOrders();
-  const [loading] = useState(false);
-  const [error] = useState<string | null>(null);
+  const { data: transferOrders, loading: loadingData, error: loadError, refetch } = useSupabaseTransferOrders();
   const [selectedTOId, setSelectedTOId] = useState<number | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -19,6 +19,28 @@ export function TransferOrdersTable() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [warehousesLoading, setWarehousesLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadWarehouses() {
+      try {
+        setWarehousesLoading(true);
+        const data = await WarehousesAPI.getAll();
+        
+        setWarehouses(data);
+      } catch (error) {
+        console.error('Failed to load warehouses for table', error);
+      } finally {
+        setWarehousesLoading(false);
+      }
+    }
+    loadWarehouses();
+  }, []);
+
+  useEffect(() => {
+    console.log('[TransferOrdersTable] raw transferOrders', transferOrders);
+  }, [transferOrders]);
 
   const filteredTransferOrders = useMemo(() => {
     if (!searchQuery.trim()) return transferOrders;
@@ -26,22 +48,34 @@ export function TransferOrdersTable() {
     const query = searchQuery.toLowerCase();
     return transferOrders.filter(to => {
       const toNumber = to.to_number?.toLowerCase() || '';
-      const fromWarehouse = to.from_warehouse?.name?.toLowerCase() || '';
-      const toWarehouse = to.to_warehouse?.name?.toLowerCase() || '';
+      const fromWarehouseName = to.from_warehouse?.name?.toLowerCase() || '';
+      const fromWarehouseCode = to.from_warehouse?.code?.toLowerCase() || '';
+      const toWarehouseName = to.to_warehouse?.name?.toLowerCase() || '';
+      const toWarehouseCode = to.to_warehouse?.code?.toLowerCase() || '';
       const itemCodes = to.transfer_order_items?.map(item => 
         item.product?.part_number?.toLowerCase() || ''
       ).join(' ') || '';
       
-      return toNumber.includes(query) || 
-             fromWarehouse.includes(query) || 
-             toWarehouse.includes(query) || 
-             itemCodes.includes(query);
+      return (
+        toNumber.includes(query) ||
+        fromWarehouseName.includes(query) ||
+        fromWarehouseCode.includes(query) ||
+        toWarehouseName.includes(query) ||
+        toWarehouseCode.includes(query) ||
+        itemCodes.includes(query)
+      );
     });
   }, [transferOrders, searchQuery]);
+
+  useEffect(() => {
+    console.log('[TransferOrdersTable] filteredTransferOrders', filteredTransferOrders);
+  }, [filteredTransferOrders]);
 
   const sortedTransferOrders = useMemo(() => {
     if (!sortColumn) return filteredTransferOrders;
     
+
+
     return [...filteredTransferOrders].sort((a, b) => {
       let aVal, bVal;
       
@@ -106,6 +140,10 @@ export function TransferOrdersTable() {
     });
   }, [filteredTransferOrders, sortColumn, sortDirection]);
 
+  useEffect(() => {
+    console.log('[TransferOrdersTable] sortedTransferOrders', sortedTransferOrders);
+  }, [sortedTransferOrders]);
+
   const handleSort = (column: string) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -125,15 +163,22 @@ export function TransferOrdersTable() {
     setIsEditModalOpen(true);
   };
 
-  const handleDelete = (toId: number) => {
-    deleteTransferOrder(toId);
-    setDeleteConfirmId(null);
+  const handleDelete = async (toId: number) => {
+    try {
+      await TransferOrdersAPI.delete(toId);
+      toast.success('Transfer order deleted');
+      setDeleteConfirmId(null);
+      await refetch();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete transfer order');
+    }
   };
 
   const handleEditSuccess = () => {
+    refetch();
   };
 
-  if (loading) {
+  if (loadingData || warehousesLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
@@ -141,10 +186,10 @@ export function TransferOrdersTable() {
     );
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <div className="py-4 px-6 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
-        Error loading transfer orders: {error}
+        Error loading transfer orders: {loadError}
       </div>
     );
   }
@@ -156,7 +201,7 @@ export function TransferOrdersTable() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input
             type="text"
-            placeholder="Search by TO number, locations, or item codes..."
+            placeholder="Search by TO number, warehouses, or item codes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -284,11 +329,36 @@ export function TransferOrdersTable() {
                   return new Date(dateString).toLocaleDateString();
                 };
                 
+                const formatWarehouse = (
+                  warehouse?: { code?: string; name?: string },
+                  fallbackId?: number
+                ) => {
+                  if (warehouse?.code || warehouse?.name) {
+                    return [warehouse.code, warehouse.name].filter(Boolean).join(' / ') || '-';
+                  }
+                  if (fallbackId) {
+                    const fallbackWarehouse = warehouses.find(w => w.id === fallbackId);
+                    if (fallbackWarehouse) {
+                      return [fallbackWarehouse.code, fallbackWarehouse.name].filter(Boolean).join(' / ') || '-';
+                    }
+                    return `ID ${fallbackId}`;
+                  }
+                  return '-';
+                };
+                console.log('[TransferOrdersTable] to', to);
+                
+
                 return (
                 <tr key={to.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="py-3 px-4 text-sm">{to.to_number}</td>
-                  <td className="py-3 px-4 text-sm">{to.from_warehouse?.name || '-'}</td>
-                  <td className="py-3 px-4 text-sm">{to.to_warehouse?.name || '-'}</td>
+                  <td className="py-3 px-4 text-sm">
+                    {to.to_number}
+                  </td>
+                  <td className="py-3 px-4 text-sm">
+                    {formatWarehouse(to.from_warehouse as any, to.from_wh_id || to.from_warehouse_id)}
+                  </td>
+                  <td className="py-3 px-4 text-sm">
+                    {formatWarehouse(to.to_warehouse as any, to.to_wh_id || to.to_warehouse_id)}
+                  </td>
                   <td className="py-3 px-4 text-sm">{formatDate(to.planned_ship_date)}</td>
                   <td className={`py-3 px-4 text-sm ${to.actual_ship_date ? 'font-bold text-green-700' : ''}`}>
                     {formatDate(to.actual_ship_date)}

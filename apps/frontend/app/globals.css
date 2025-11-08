@@ -22,6 +22,7 @@ html {
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   font-size: 1.4rem;
+  color: #9ca3af; /* Tailwind gray-400 */
 }
 
 @media (max-width: 640px) {

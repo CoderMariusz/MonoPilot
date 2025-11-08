@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { useTransferOrders, useWarehouses } from '@/lib/clientState';
 import { TransferOrdersAPI, type MarkReceivedLineUpdate } from '@/lib/api/transferOrders';
-import type { TransferOrder } from '@/lib/types';
+import { WarehousesAPI } from '@/lib/api/warehouses';
+import type { TransferOrder, Warehouse } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
 interface TransferOrderDetailsModalProps {
@@ -14,9 +14,8 @@ interface TransferOrderDetailsModalProps {
 }
 
 export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: TransferOrderDetailsModalProps) {
-  const transferOrders = useTransferOrders();
-  const warehouses = useWarehouses();
   const [transferOrder, setTransferOrder] = useState<TransferOrder | null>(null);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showShipModal, setShowShipModal] = useState(false);
@@ -24,6 +23,18 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
   const [shipDate, setShipDate] = useState('');
   const [receiveDate, setReceiveDate] = useState('');
   const [lineUpdates, setLineUpdates] = useState<Record<number, { qty_moved: string; lp_id?: string; batch?: string }>>({});
+
+  useEffect(() => {
+    async function loadWarehouses() {
+      try {
+        const data = await WarehousesAPI.getAll();
+        setWarehouses(data);
+      } catch (err) {
+        console.error('Failed to load warehouses for details modal', err);
+      }
+    }
+    loadWarehouses();
+  }, []);
 
   useEffect(() => {
     if (isOpen && transferOrderId) {
@@ -37,7 +48,7 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
     setLoading(true);
     setError(null);
     try {
-      const to = transferOrders.find(t => t.id === transferOrderId);
+      const to = await TransferOrdersAPI.getById(transferOrderId);
       if (!to) {
         throw new Error('Transfer order not found');
       }
@@ -206,8 +217,12 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                   <div className="text-sm text-slate-600 mb-1">From Warehouse</div>
                   <div className="text-base font-medium text-slate-900">
                     {(() => {
-                      const fromWarehouse = warehouses.find(w => w.id === transferOrder.from_warehouse_id);
-                      return fromWarehouse ? `${fromWarehouse.code} - ${fromWarehouse.name}` : 'Unknown';
+                      const fromWarehouse =
+                        (transferOrder.from_warehouse as Warehouse | undefined) ||
+                        warehouses.find(w => w.id === transferOrder.from_warehouse_id);
+                      return fromWarehouse
+                        ? `${fromWarehouse.code} - ${fromWarehouse.name}`
+                        : 'Unknown';
                     })()}
                   </div>
                 </div>
@@ -215,8 +230,12 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                   <div className="text-sm text-slate-600 mb-1">To Warehouse</div>
                   <div className="text-base font-medium text-slate-900">
                     {(() => {
-                      const toWarehouse = warehouses.find(w => w.id === transferOrder.to_warehouse_id);
-                      return toWarehouse ? `${toWarehouse.code} - ${toWarehouse.name}` : 'Unknown';
+                      const toWarehouse =
+                        (transferOrder.to_warehouse as Warehouse | undefined) ||
+                        warehouses.find(w => w.id === transferOrder.to_warehouse_id);
+                      return toWarehouse
+                        ? `${toWarehouse.code} - ${toWarehouse.name}`
+                        : 'Unknown';
                     })()}
                   </div>
                 </div>
@@ -286,7 +305,8 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                     <thead>
                       <tr className="border-b border-slate-200">
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Product</th>
-                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Quantity</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty Ordered</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty Sent</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">License Plate</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Batch</th>
                       </tr>
@@ -303,7 +323,10 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                             </div>
                           </td>
                           <td className="py-3 px-4 text-sm text-right text-slate-700">
-                            {item.quantity} {item.product?.uom || ''}
+                            {(item.quantity_planned ?? item.quantity) ?? 0} {item.product?.uom || ''}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-right text-slate-700">
+                            {(item.quantity_actual ?? 0)} {item.product?.uom || ''}
                           </td>
                           <td className="py-3 px-4 text-sm text-slate-600">
                             {item.lp_id ? `LP-${item.lp_id}` : '–'}

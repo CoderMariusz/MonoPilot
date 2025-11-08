@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../supabase/client-browser';
 import type { WorkOrder, PurchaseOrder, TransferOrder, Product, GRN, LicensePlate } from '../types';
 import { useAuth } from '../auth/AuthContext';
@@ -180,71 +180,77 @@ export function useSupabaseTransferOrders() {
   const [error, setError] = useState<string | null>(null);
   const { loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    // Wait for auth to be ready before fetching
-    if (authLoading) {
-      console.log('[useSupabaseTransferOrders] Auth still loading, waiting...');
-      return;
-    }
-
-    async function loadData() {
-      try {
-        console.log('[useSupabaseTransferOrders] Auth ready, fetching transfer orders...');
-        // Use new to_header table
-        const { data: tos, error } = await supabase
-          .from('to_header')
-          .select(`
+  const loadData = useCallback(async () => {
+    if (authLoading) return;
+    setLoading(true);
+    try {
+      const { data: tos, error } = await supabase
+        .from('to_header')
+        .select(`
+          *,
+          from_warehouse:warehouses!to_header_from_wh_id_fkey(id, code, name),
+          to_warehouse:warehouses!to_header_to_wh_id_fkey(id, code, name),
+          to_lines:to_line(
             *,
-            from_warehouse:warehouses!to_header_from_wh_id_fkey(code, name),
-            to_warehouse:warehouses!to_header_to_wh_id_fkey(code, name),
-            to_lines:to_line(*, item:products(*))
-          `)
-          .order('created_at', { ascending: false });
+            item:products(*)
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        // Map to TransferOrder for backward compatibility
-        const mapped: TransferOrder[] = (tos || []).map(to => ({
-          id: to.id,
-          number: to.number,
-          to_number: to.number,
-          from_wh_id: to.from_wh_id,
-          to_wh_id: to.to_wh_id,
-          from_warehouse_id: to.from_wh_id,
-          to_warehouse_id: to.to_wh_id,
-          status: to.status,
-          requested_date: to.requested_date,
-          planned_ship_date: to.requested_date,
-          transfer_date: to.requested_date,
-          created_at: to.created_at,
-          updated_at: to.updated_at,
-          from_warehouse: to.from_warehouse,
-          to_warehouse: to.to_warehouse,
-          transfer_order_items: (to.to_lines || []).map((line: any) => ({
-            id: line.id,
-            to_id: line.to_id,
-            product_id: line.item_id,
-            item_id: line.item_id,
-            uom: line.uom,
-            quantity: parseFloat(line.qty_planned),
-            quantity_planned: parseFloat(line.qty_planned),
-            quantity_actual: parseFloat(line.qty_moved || 0)
-          }))
-        }));
+      const mapped: TransferOrder[] = (tos || []).map(to => ({
+        id: to.id,
+        number: to.number,
+        to_number: to.number,
+        from_wh_id: to.from_wh_id,
+        to_wh_id: to.to_wh_id,
+        from_warehouse_id: to.from_wh_id,
+        to_warehouse_id: to.to_wh_id,
+        status: to.status,
+        requested_date: to.requested_date,
+        planned_ship_date: to.planned_ship_date,
+        planned_receive_date: to.planned_receive_date,
+        actual_ship_date: to.actual_ship_date,
+        actual_receive_date: to.actual_receive_date,
+        transfer_date: to.planned_ship_date || to.requested_date,
+        created_at: to.created_at,
+        updated_at: to.updated_at,
+        created_by: to.created_by,
+        updated_by: to.updated_by,
+        from_warehouse: to.from_warehouse || undefined,
+        to_warehouse: to.to_warehouse || undefined,
+        transfer_order_items: (to.to_lines || []).map((line: any) => ({
+          id: line.id,
+          to_id: line.to_id,
+          product_id: line.item_id,
+          item_id: line.item_id,
+          uom: line.uom,
+          quantity: parseFloat(line.qty_planned),
+          quantity_planned: parseFloat(line.qty_planned),
+          quantity_actual: parseFloat(line.qty_moved || 0),
+          lp_id: line.lp_id ?? undefined,
+          batch: line.batch ?? undefined,
+          product: line.item || undefined,
+        }))
+      }));
 
-        setData(mapped);
-        setError(null);
-      } catch (err: any) {
-        console.error('Error loading transfer orders:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
+      setData(mapped);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error loading transfer orders:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-
-    loadData();
   }, [authLoading]);
 
-  return { data, loading, error };
+  useEffect(() => {
+    if (!authLoading) {
+      loadData();
+    }
+  }, [authLoading, loadData]);
+
+  return { data, loading, error, refetch: loadData };
 }
 

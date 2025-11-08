@@ -413,15 +413,20 @@ export type TransferOrderStatus = TOStatus;
 export interface TransferOrder {
   id: number;
   to_number: string;
+  from_wh_id?: number;
+  to_wh_id?: number;
   from_warehouse_id: number;
   to_warehouse_id: number;
   status: TransferOrderStatus;
   transfer_date: string;
+  requested_date?: string;
   planned_ship_date?: string;
   actual_ship_date?: string;
   planned_receive_date?: string;
   actual_receive_date?: string;
   notes?: string;
+  created_by?: string;
+  updated_by?: string;
   from_warehouse?: Warehouse;
   to_warehouse?: Warehouse;
   transfer_order_items?: Array<{

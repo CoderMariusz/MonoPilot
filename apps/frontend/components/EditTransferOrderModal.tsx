@@ -4,8 +4,9 @@ import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ProductsAPI } from '@/lib/api/products';
 import { TransferOrdersAPI } from '@/lib/api/transferOrders';
-import { useWarehouses } from '@/lib/clientState';
+import { WarehousesAPI } from '@/lib/api/warehouses';
 import type { Product, Warehouse, TOStatus } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 interface EditTransferOrderModalProps {
   isOpen: boolean;
@@ -22,7 +23,7 @@ interface TransferItem {
 
 export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuccess }: EditTransferOrderModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
-  const warehouses = useWarehouses();
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,12 +55,15 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
   const loadData = async () => {
     setLoadingData(true);
     try {
-      // Load products
-      const productsData = await ProductsAPI.getAll();
-      setProducts(productsData);
+      const [productsData, warehousesData, to] = await Promise.all([
+        ProductsAPI.getAll(),
+        WarehousesAPI.getAll(),
+        transferOrderId ? TransferOrdersAPI.getById(transferOrderId) : Promise.resolve(null),
+      ]);
 
-      // Load transfer order
-      const to = await TransferOrdersAPI.getById(transferOrderId);
+      setProducts(productsData);
+      setWarehouses(warehousesData);
+
       if (to) {
         setFormData({
           from_warehouse_id: to.from_warehouse_id?.toString() || '',
@@ -111,41 +115,40 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
     try {
       if (!transferOrderId) return;
       
-      const { updateTransferOrder } = await import('@/lib/clientState');
-      const from_warehouse = warehouses.find(w => w.id === Number(formData.from_warehouse_id));
-      const to_warehouse = warehouses.find(w => w.id === Number(formData.to_warehouse_id));
-      
-      const transfer_order_items = transferItems.map((item, index) => {
+      const lines = transferItems.map((item, index) => {
         const product = products.find(p => p.id === Number(item.product_id));
-        const quantityNum = typeof item.quantity === 'string' ? Number(item.quantity) || 0 : item.quantity || 0;
+        if (!product) {
+          throw new Error(`Line ${index + 1}: product not found`);
+        }
+        const quantityNum = Number(item.quantity);
+        if (!quantityNum || quantityNum <= 0) {
+          throw new Error(`Line ${index + 1}: quantity must be greater than zero`);
+        }
         return {
-          id: Number(item.id) || (Date.now() + index),
-          transfer_order_id: transferOrderId,
-          product_id: Number(item.product_id),
-          product,
-          quantity: quantityNum,
-          quantity_planned: quantityNum,
-          quantity_actual: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          item_id: Number(item.product_id),
+          uom: product.uom || 'EA',
+          qty_planned: quantityNum,
+          qty_moved: 0,
         };
       });
       
-      updateTransferOrder(transferOrderId, {
-        from_warehouse_id: Number(formData.from_warehouse_id),
-        from_warehouse,
-        to_warehouse_id: Number(formData.to_warehouse_id),
-        to_warehouse,
+      await TransferOrdersAPI.update(transferOrderId, {
+        from_wh_id: Number(formData.from_warehouse_id),
+        to_wh_id: Number(formData.to_warehouse_id),
         status: formData.status,
-        planned_ship_date: formData.planned_ship_date || undefined,
-        planned_receive_date: formData.planned_receive_date || undefined,
-        transfer_order_items,
+        planned_ship_date: formData.planned_ship_date || null,
+        planned_receive_date: formData.planned_receive_date || null,
+        requested_date: formData.planned_ship_date || null,
+        lines,
       });
       
+      toast.success('Transfer order updated successfully');
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to update transfer order');
+      const message = err.message || 'Failed to update transfer order';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
