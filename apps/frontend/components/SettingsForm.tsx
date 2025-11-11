@@ -1,37 +1,77 @@
 'use client';
 
 import { useState, useEffect  } from 'react';
-import { Save } from 'lucide-react';
-import { useSettings, updateSettings } from '@/lib/clientState';
+import { Save, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { LocationsAPI } from '@/lib/api/locations';
-import type { Location } from '@/lib/types';
+import type { Location, Settings } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
 export function SettingsForm() {
-  const settings = useSettings();
-  const [formData, setFormData] = useState(settings);
+  const { user } = useAuth();
+  const [formData, setFormData] = useState<Settings>({} as Settings);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setFormData(settings);
-  }, [settings]);
+    if (user) {
+      loadSettings();
+      loadLocations();
+    }
+  }, [user]);
 
-  useEffect(() => {
-    const loadLocations = async () => {
-      try {
-        const data = await LocationsAPI.getAll();
-        setLocations(data);
-      } catch (error) {
-        console.error('Failed to load locations:', error);
+  const loadSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
+      
+      if (data) {
+        setFormData(data);
       }
-    };
-    loadLocations();
-  }, []);
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      toast.error('Failed to load settings');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loadLocations = async () => {
+    try {
+      const data = await LocationsAPI.getAll();
+      setLocations(data);
+    } catch (error) {
+      console.error('Failed to load locations:', error);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings(formData);
-    toast.success('Settings saved successfully');
+    setSaving(true);
+    
+    try {
+      const { error } = await supabase
+        .from('settings')
+        .upsert({
+          ...formData,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+      
+      toast.success('Settings saved successfully');
+    } catch (error: any) {
+      console.error('Failed to save settings:', error);
+      toast.error('Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -268,10 +308,20 @@ export function SettingsForm() {
       <div className="flex justify-end pt-4">
         <button
           type="submit"
-          className="px-6 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors text-sm font-medium flex items-center gap-2"
+          disabled={saving}
+          className="px-6 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Save className="w-4 h-4" />
-          Save Settings
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              Save Settings
+            </>
+          )}
         </button>
       </div>
     </form>

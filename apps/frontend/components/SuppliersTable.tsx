@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, Package } from 'lucide-react';
 import { SuppliersAPI } from '@/lib/api/suppliers';
+import { supabase } from '@/lib/supabase';
 import type { Supplier, Product, TaxCode } from '@/lib/types';
 import { SupplierProductsModal } from './SupplierProductsModal';
 import { ProductsAPI } from '@/lib/api/products';
 import { SupplierModal } from './SupplierModal';
 import { useToast } from '@/lib/toast';
-import { useProducts, useTaxCodes } from '@/lib/clientState';
 import { useAuthAwareEffect } from '@/lib/hooks/useAuthAwareEffect';
 
 export function SuppliersTable() {
@@ -20,24 +20,40 @@ export function SuppliersTable() {
   const [showProductsModal, setShowProductsModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierProducts, setSupplierProducts] = useState<Product[]>([]);
-  const { products } = useProducts();
-  const taxCodes = useTaxCodes();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
 
   useAuthAwareEffect(() => {
-    const loadSuppliers = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const data = await SuppliersAPI.getAll();
-        setSuppliers(data);
+        
+        // Load suppliers
+        const suppliersData = await SuppliersAPI.getAll();
+        setSuppliers(suppliersData);
+        
+        // Load products
+        const productsData = await ProductsAPI.getAll();
+        setProducts(productsData);
+        
+        // Load tax codes
+        const { data: taxCodesData } = await supabase
+          .from('settings_tax_codes')
+          .select('*')
+          .order('code');
+        
+        if (taxCodesData) {
+          setTaxCodes(taxCodesData);
+        }
       } catch (error) {
-        console.error('Error loading suppliers:', error);
-        showToast('Failed to load suppliers', 'error');
+        console.error('Error loading data:', error);
+        showToast('Failed to load data', 'error');
       } finally {
         setLoading(false);
       }
     };
 
-    loadSuppliers();
+    loadData();
   }, [showToast]);
 
   const handleToggleActive = async (supplier: Supplier) => {

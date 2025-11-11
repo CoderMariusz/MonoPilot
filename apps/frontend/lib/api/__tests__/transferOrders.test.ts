@@ -16,6 +16,9 @@ vi.mock('../../supabase/client-browser', () => ({
   supabase: {
     from: vi.fn(),
     rpc: vi.fn(),
+    auth: {
+      getUser: vi.fn(),
+    },
   },
 }));
 
@@ -28,167 +31,135 @@ describe('TransferOrdersAPI', () => {
 
   describe('markShipped', () => {
     it('should mark transfer order as shipped and update status to in_transit', async () => {
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        }),
-      });
+      const mockUser = { id: 'user-123' };
+      const mockResponse = { 
+        id: 1, 
+        status: 'in_transit', 
+        actual_ship_date: expect.any(String)
+      };
 
-      (supabase.from as any).mockReturnValue({
-        update: mockUpdate,
-      });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: mockResponse, error: null });
 
-      const result = await TransferOrdersAPI.markShipped(1);
+      const result = await TransferOrdersAPI.markShipped(1, '2024-01-15T10:00:00Z');
 
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('Transfer marked as shipped');
-      expect(mockUpdate).toHaveBeenCalledWith({
-        actual_ship_date: expect.any(String),
-        status: 'in_transit',
+      expect(result.status).toBe('in_transit');
+      expect(supabase.rpc).toHaveBeenCalledWith('mark_transfer_shipped', {
+        p_to_id: 1,
+        p_actual_ship_date: '2024-01-15T10:00:00Z',
+        p_user_id: mockUser.id
       });
-      expect(mockUpdate().eq).toHaveBeenCalledWith('id', 1);
-      expect(mockUpdate().eq().eq).toHaveBeenCalledWith('status', 'submitted');
     });
 
     it('should use provided actualShipDate when provided', async () => {
-      const testDate = new Date('2024-01-15T10:00:00Z');
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        }),
-      });
+      const testDate = '2024-01-15T10:00:00Z';
+      const mockUser = { id: 'user-123' };
+      const mockResponse = { 
+        id: 1, 
+        status: 'in_transit', 
+        actual_ship_date: testDate
+      };
 
-      (supabase.from as any).mockReturnValue({
-        update: mockUpdate,
-      });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: mockResponse, error: null });
 
       await TransferOrdersAPI.markShipped(1, testDate);
 
-      expect(mockUpdate).toHaveBeenCalledWith({
-        actual_ship_date: testDate.toISOString(),
-        status: 'in_transit',
+      expect(supabase.rpc).toHaveBeenCalledWith('mark_transfer_shipped', {
+        p_to_id: 1,
+        p_actual_ship_date: testDate,
+        p_user_id: mockUser.id
       });
     });
 
-    it('should return error if transfer order is not in submitted status', async () => {
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ 
-            error: { code: 'PGRST116', message: 'No rows updated' } 
-          }),
-        }),
-      });
+    it('should throw error if transfer order is not in submitted status', async () => {
+      const mockUser = { id: 'user-123' };
+      const mockError = { message: 'Can only mark as shipped from submitted status' };
 
-      (supabase.from as any).mockReturnValue({
-        update: mockUpdate,
-      });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: null, error: mockError });
 
-      const result = await TransferOrdersAPI.markShipped(1);
-
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('Transfer order must be in "submitted" status to mark as shipped');
+      await expect(TransferOrdersAPI.markShipped(1, '2024-01-15T10:00:00Z')).rejects.toThrow();
     });
 
     it('should handle database errors gracefully', async () => {
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ 
-            error: { message: 'Database connection failed' } 
-          }),
-        }),
-      });
+      const mockUser = { id: 'user-123' };
+      const mockError = { message: 'Database connection failed' };
 
-      (supabase.from as any).mockReturnValue({
-        update: mockUpdate,
-      });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: null, error: mockError });
 
-      const result = await TransferOrdersAPI.markShipped(1);
-
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('Database connection failed');
+      await expect(TransferOrdersAPI.markShipped(1, '2024-01-15T10:00:00Z')).rejects.toThrow('Database connection failed');
     });
   });
 
   describe('markReceived', () => {
     it('should mark transfer order as received and update status to received', async () => {
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        }),
-      });
+      const mockUser = { id: 'user-123' };
+      const mockResponse = { 
+        id: 1, 
+        status: 'received', 
+        actual_receive_date: expect.any(String)
+      };
+      const lineUpdates: any[] = [];
 
-      (supabase.from as any).mockReturnValue({
-        update: mockUpdate,
-      });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: mockResponse, error: null });
 
-      const result = await TransferOrdersAPI.markReceived(1);
+      const result = await TransferOrdersAPI.markReceived(1, '2024-01-20T14:00:00Z', lineUpdates);
 
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('Transfer marked as received');
-      expect(mockUpdate).toHaveBeenCalledWith({
-        actual_receive_date: expect.any(String),
-        status: 'received',
+      expect(result.status).toBe('received');
+      expect(supabase.rpc).toHaveBeenCalledWith('mark_transfer_received', {
+        p_to_id: 1,
+        p_actual_receive_date: '2024-01-20T14:00:00Z',
+        p_line_updates: lineUpdates,
+        p_user_id: mockUser.id
       });
-      expect(mockUpdate().eq).toHaveBeenCalledWith('id', 1);
-      expect(mockUpdate().eq().eq).toHaveBeenCalledWith('status', 'in_transit');
     });
 
     it('should use provided actualReceiveDate when provided', async () => {
-      const testDate = new Date('2024-01-20T14:00:00Z');
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        }),
-      });
+      const testDate = '2024-01-20T14:00:00Z';
+      const mockUser = { id: 'user-123' };
+      const mockResponse = { 
+        id: 1, 
+        status: 'received', 
+        actual_receive_date: testDate
+      };
+      const lineUpdates: any[] = [];
 
-      (supabase.from as any).mockReturnValue({
-        update: mockUpdate,
-      });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: mockResponse, error: null });
 
-      await TransferOrdersAPI.markReceived(1, testDate);
+      await TransferOrdersAPI.markReceived(1, testDate, lineUpdates);
 
-      expect(mockUpdate).toHaveBeenCalledWith({
-        actual_receive_date: testDate.toISOString(),
-        status: 'received',
+      expect(supabase.rpc).toHaveBeenCalledWith('mark_transfer_received', {
+        p_to_id: 1,
+        p_actual_receive_date: testDate,
+        p_line_updates: lineUpdates,
+        p_user_id: mockUser.id
       });
     });
 
-    it('should return error if transfer order is not in in_transit status', async () => {
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ 
-            error: { code: 'PGRST116', message: 'No rows updated' } 
-          }),
-        }),
-      });
+    it('should throw error if transfer order is not in in_transit status', async () => {
+      const mockUser = { id: 'user-123' };
+      const mockError = { message: 'Can only mark as received from in_transit status' };
+      const lineUpdates: any[] = [];
 
-      (supabase.from as any).mockReturnValue({
-        update: mockUpdate,
-      });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: null, error: mockError });
 
-      const result = await TransferOrdersAPI.markReceived(1);
-
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('Transfer order must be in "in_transit" status to mark as received');
+      await expect(TransferOrdersAPI.markReceived(1, '2024-01-20T14:00:00Z', lineUpdates)).rejects.toThrow();
     });
 
     it('should handle database errors gracefully', async () => {
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ 
-            error: { message: 'Network error' } 
-          }),
-        }),
-      });
+      const mockUser = { id: 'user-123' };
+      const mockError = { message: 'Network error' };
+      const lineUpdates: any[] = [];
 
-      (supabase.from as any).mockReturnValue({
-        update: mockUpdate,
-      });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: null, error: mockError });
 
-      const result = await TransferOrdersAPI.markReceived(1);
-
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('Network error');
+      await expect(TransferOrdersAPI.markReceived(1, '2024-01-20T14:00:00Z', lineUpdates)).rejects.toThrow('Network error');
     });
   });
 
@@ -234,44 +205,27 @@ describe('TransferOrdersAPI', () => {
     });
 
     it('should not allow marking as shipped from draft status', async () => {
-      // This is enforced by the .eq('status', 'submitted') check
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ 
-            error: { code: 'PGRST116', message: 'No rows updated' } 
-          }),
-        }),
-      });
+      const mockUser = { id: 'user-123' };
+      const mockError = { message: 'Can only mark as shipped from submitted status' };
 
-      (supabase.from as any).mockReturnValue({
-        update: mockUpdate,
-      });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: null, error: mockError });
 
-      const result = await TransferOrdersAPI.markShipped(1);
-
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('submitted');
+      await expect(TransferOrdersAPI.markShipped(1, '2024-01-15T10:00:00Z')).rejects.toThrow();
     });
 
     it('should not allow marking as received from submitted status', async () => {
-      // This is enforced by the .eq('status', 'in_transit') check
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ 
-            error: { code: 'PGRST116', message: 'No rows updated' } 
-          }),
-        }),
-      });
+      const mockUser = { id: 'user-123' };
+      const mockError = { message: 'Can only mark as received from in_transit status' };
+      const lineUpdates: any[] = [];
 
-      (supabase.from as any).mockReturnValue({
-        update: mockUpdate,
-      });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: null, error: mockError });
 
-      const result = await TransferOrdersAPI.markReceived(1);
-
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('in_transit');
+      await expect(TransferOrdersAPI.markReceived(1, '2024-01-20T14:00:00Z', lineUpdates)).rejects.toThrow();
     });
   });
 });
+
+
 

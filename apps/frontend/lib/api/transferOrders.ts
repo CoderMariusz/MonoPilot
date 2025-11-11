@@ -1,5 +1,5 @@
 import { supabase } from '../supabase/client-browser';
-import type { TransferOrder, TOHeader, TOStatus } from '../types';
+import type { TransferOrder, TOHeader, TOStatus, TOLine } from '../types';
 
 export class TransferOrdersAPI {
   static async update(toId: number, payload: UpdateTransferOrderRequest): Promise<TOHeader> {
@@ -141,16 +141,20 @@ export class TransferOrdersAPI {
         actual_ship_date: to.actual_ship_date,
         planned_receive_date: to.planned_receive_date,
         actual_receive_date: to.actual_receive_date,
-        transfer_order_items: to.to_lines?.map(line => ({
-          ...line,
-          product_id: line.item_id,
-          quantity: line.qty_planned,
-          quantity_planned: line.qty_planned,
-          quantity_shipped: line.qty_shipped || 0,
-          quantity_received: line.qty_received || 0,
-          lp_id: line.lp_id,
-          batch: line.batch
-        })) || []
+        transfer_order_items: to.to_lines?.map(line => {
+          const lineWithQty = line as TOLine & { qty_shipped?: number; qty_received?: number };
+          return {
+            ...line,
+            product_id: line.item_id,
+            quantity: line.qty_planned,
+            quantity_planned: line.qty_planned,
+            quantity_actual: lineWithQty.qty_received || line.qty_moved || 0,
+            quantity_shipped: lineWithQty.qty_shipped || 0,
+            quantity_received: lineWithQty.qty_received || 0,
+            lp_id: line.lp_id,
+            batch: line.batch
+          };
+        }) || []
       })) as TransferOrder[];
     } catch (error) {
       console.error('Error fetching transfer orders:', error);
@@ -313,16 +317,20 @@ export class TransferOrdersAPI {
         actual_ship_date: data.actual_ship_date,
         planned_receive_date: data.planned_receive_date,
         actual_receive_date: data.actual_receive_date,
-        transfer_order_items: data.to_lines?.map(line => ({
-          ...line,
-          product_id: line.item_id,
-          quantity: line.qty_planned,
-          quantity_planned: line.qty_planned,
-          quantity_shipped: line.qty_shipped || 0,
-          quantity_received: line.qty_received || 0,
-          lp_id: line.lp_id,
-          batch: line.batch
-        })) || []
+        transfer_order_items: data.to_lines?.map(line => {
+          const lineWithQty = line as TOLine & { qty_shipped?: number; qty_received?: number };
+          return {
+            ...line,
+            product_id: line.item_id,
+            quantity: line.qty_planned,
+            quantity_planned: line.qty_planned,
+            quantity_actual: lineWithQty.qty_received || line.qty_moved || 0,
+            quantity_shipped: lineWithQty.qty_shipped || 0,
+            quantity_received: lineWithQty.qty_received || 0,
+            lp_id: line.lp_id,
+            batch: line.batch
+          };
+        }) || []
       } as TransferOrder;
     } catch (error) {
       console.error('Error fetching transfer order:', error);

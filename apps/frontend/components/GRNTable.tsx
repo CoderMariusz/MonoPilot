@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Eye, CheckCircle, Search } from 'lucide-react';
-import { useGRNs, updateGRN } from '@/lib/clientState';
+import { useState, useMemo, useEffect } from 'react';
+import { Eye, CheckCircle, Search, Loader2 } from 'lucide-react';
+import type { GRN } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { GRNDetailsModal } from './GRNDetailsModal';
 import { toast } from '@/lib/toast';
 
@@ -19,17 +21,71 @@ const formatDateTime = (dateString: string | null): string => {
 };
 
 export function GRNTable() {
-  const grns = useGRNs();
+  const [grns, setGrns] = useState<GRN[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
   const [selectedGRN, setSelectedGRN] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleComplete = (id: number) => {
-    const result = updateGRN(id, { 
-      status: 'completed',
-      received_date: new Date().toISOString()
-    });
-    if (result) {
+  useEffect(() => {
+    if (user) {
+      loadGRNs();
+    }
+  }, [user]);
+
+  const loadGRNs = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('grns')
+        .select(`
+          *,
+          po_header:po_id (
+            po_number:number,
+            supplier:suppliers (
+              name
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Transform data to match expected structure
+      const transformedGRNs = (data || []).map(grn => ({
+        ...grn,
+        po: grn.po_header ? {
+          po_number: grn.po_header.po_number,
+          supplier: grn.po_header.supplier
+        } : undefined
+      }));
+      
+      setGrns(transformedGRNs);
+    } catch (error) {
+      console.error('Error loading GRNs:', error);
+      toast.error('Failed to load goods receipts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleComplete = async (id: number) => {
+    try {
+      const { error } = await supabase
+        .from('grns')
+        .update({ 
+          status: 'completed',
+          received_date: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      
       toast.success('GRN completed successfully');
+      loadGRNs(); // Refresh list
+    } catch (error) {
+      console.error('Error completing GRN:', error);
+      toast.error('Failed to complete GRN');
     }
   };
 
@@ -43,6 +99,15 @@ export function GRNTable() {
       grn.po?.supplier?.name?.toLowerCase().includes(query)
     );
   }, [grns, searchQuery]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
+        <span className="ml-3 text-sm text-slate-600">Loading goods receipts...</span>
+      </div>
+    );
+  }
 
   return (
     <>

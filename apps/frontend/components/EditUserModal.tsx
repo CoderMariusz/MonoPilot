@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { updateUser } from '@/lib/clientState';
+import { supabase } from '@/lib/supabase';
 import type { User, UserRole, UserStatus } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
@@ -48,18 +48,25 @@ export function EditUserModal({ isOpen, onClose, onSuccess, user }: EditUserModa
         throw new Error('Please fill all required fields');
       }
 
-      updateUser(parseInt(user.id), {
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        status: formData.status,
-      });
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          status: formData.status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
       
       toast.success(`User ${formData.name} updated successfully`);
       onSuccess();
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to update user');
+      toast.error(err.message || 'Failed to update user');
     } finally {
       setLoading(false);
     }

@@ -6,8 +6,8 @@ import { supabase } from '@/lib/supabase/client-browser';
 import { WarehousesAPI } from '@/lib/api/warehouses';
 import { ProductsAPI } from '@/lib/api/products';
 import { PurchaseOrdersAPI } from '@/lib/api/purchaseOrders';
-import { useSuppliers, resolveDefaultUnitPrice } from '@/lib/clientState';
-import type { Product, PurchaseOrderItem, Warehouse, POStatus } from '@/lib/types';
+import { SuppliersAPI } from '@/lib/api/suppliers';
+import type { Product, PurchaseOrderItem, Warehouse, POStatus, Supplier } from '@/lib/types';
 
 interface EditPurchaseOrderModalProps {
   isOpen: boolean;
@@ -26,10 +26,16 @@ interface LineItem {
 export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuccess }: EditPurchaseOrderModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const suppliers = useSuppliers();
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Helper function to resolve default unit price
+  const resolveDefaultUnitPrice = (productId: number): number => {
+    const product = products.find(p => p.id === productId);
+    return product?.std_price || 0;
+  };
   
   const [formData, setFormData] = useState<{
     supplier_id: string;
@@ -78,6 +84,10 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
       // Load warehouses
       const warehousesData = await WarehousesAPI.getAll();
       setWarehouses(warehousesData);
+      
+      // Load suppliers
+      const suppliersData = await SuppliersAPI.getAll();
+      setSuppliers(suppliersData);
 
       // Load purchase order
       const po = await PurchaseOrdersAPI.getById(purchaseOrderId);
@@ -141,7 +151,7 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
         
         // Auto-fill unit price when product changes
         if (field === 'product_id' && value) {
-          const defaultPrice = resolveDefaultUnitPrice(Number(value), Number(formData.supplier_id));
+          const defaultPrice = resolveDefaultUnitPrice(Number(value));
           updatedItem.unit_price = defaultPrice.toString();
         }
         

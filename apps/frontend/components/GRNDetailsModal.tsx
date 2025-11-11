@@ -1,7 +1,10 @@
 'use client';
 
-import { X } from 'lucide-react';
-import { useGRNs } from '@/lib/clientState';
+import { useState, useEffect } from 'react';
+import { X, Loader2 } from 'lucide-react';
+import type { GRN } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
 
 interface GRNDetailsModalProps {
   grnId: number;
@@ -10,10 +13,93 @@ interface GRNDetailsModalProps {
 }
 
 export function GRNDetailsModal({ grnId, isOpen, onClose }: GRNDetailsModalProps) {
-  const grns = useGRNs();
-  const grn = grns.find(g => g.id === grnId);
+  const [grn, setGrn] = useState<GRN | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!isOpen || !grn) return null;
+  useEffect(() => {
+    if (isOpen && grnId) {
+      loadGRNDetails();
+    }
+  }, [isOpen, grnId]);
+
+  const loadGRNDetails = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('grns')
+        .select(`
+          *,
+          po_header:po_id (
+            po_number:number,
+            supplier:suppliers (
+              name
+            )
+          ),
+          grn_items (
+            *,
+            product:products (
+              description
+            ),
+            location:locations (
+              name
+            )
+          )
+        `)
+        .eq('id', grnId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      
+      // Transform data to match expected structure
+      const transformedGRN: GRN = {
+        ...data,
+        po: data.po_header ? {
+          po_number: data.po_header.po_number,
+          supplier: data.po_header.supplier
+        } : undefined
+      };
+      
+      setGrn(transformedGRN);
+    } catch (err: any) {
+      console.error('Error loading GRN details:', err);
+      setError(err.message || 'Failed to load GRN details');
+      toast.error('Failed to load GRN details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl p-8">
+          <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
+          <p className="mt-2 text-sm text-slate-600">Loading GRN details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !grn) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <h2 className="text-lg font-semibold text-red-600 mb-2">Error</h2>
+          <p className="text-sm text-slate-600 mb-4">{error || 'GRN not found'}</p>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

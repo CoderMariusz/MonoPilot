@@ -1,18 +1,55 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Split, Edit, RotateCcw, Search } from 'lucide-react';
-import { useLicensePlates } from '@/lib/clientState';
+import { useState, useMemo, useEffect } from 'react';
+import { Split, Edit, RotateCcw, Search, Loader2 } from 'lucide-react';
+import type { LicensePlate } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { SplitLPModal } from './SplitLPModal';
 import { AmendLPModal } from './AmendLPModal';
 import { ChangeQAStatusModal } from './ChangeQAStatusModal';
 
 export function LPOperationsTable() {
-  const licensePlates = useLicensePlates();
+  const [licensePlates, setLicensePlates] = useState<LicensePlate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
   const [splitLPId, setSplitLPId] = useState<number | null>(null);
   const [amendLPId, setAmendLPId] = useState<number | null>(null);
   const [qaLPId, setQALPId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      loadLicensePlates();
+    }
+  }, [user]);
+
+  const loadLicensePlates = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('license_plates')
+        .select(`
+          *,
+          product:products (
+            part_number,
+            description,
+            uom
+          ),
+          location:locations (
+            name
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setLicensePlates(data || []);
+    } catch (error) {
+      console.error('Error loading license plates:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredLPs = useMemo(() => {
     if (!searchQuery) return licensePlates;
@@ -26,6 +63,15 @@ export function LPOperationsTable() {
       lp.qa_status?.toLowerCase().includes(query)
     );
   }, [licensePlates, searchQuery]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
+        <span className="ml-3 text-sm text-slate-600">Loading license plates...</span>
+      </div>
+    );
+  }
 
   return (
     <>

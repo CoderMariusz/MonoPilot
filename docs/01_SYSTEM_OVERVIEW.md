@@ -1,7 +1,17 @@
 # System Overview
 
+**Last Updated**: 2025-01-11  
+**Status**: Active Development (Brownfield MES)  
+**Technical Debt Register**: See [Tech-Spec](bmm/artifacts/tech-spec.md#-technical-debt-register)
+
 ## 1. Cel dokumentu
 Przegląd architektury, modułów i przepływów danych MonoPilot. Dokument pomaga szybko zrozumieć granice domen, zależności i kontrakty między modułami: **Planning**, **Production**, **Technical**, **Warehouse & Scanner**, **Settings & Config**, **App Guide**, **AI Helper**.
+
+**Related Documentation**:
+- [Project Structure](11_PROJECT_STRUCTURE.md) - Directory & file organization
+- [Database Tables](12_DATABASE_TABLES.md) - Complete schema reference
+- [Technical Debt](14_NIESPOJNOSCI_FIX_CHECKLIST.md) - Known issues & fixes
+- [BMM Tech-Spec](bmm/artifacts/tech-spec.md) - Comprehensive technical specification
 
 ---
 

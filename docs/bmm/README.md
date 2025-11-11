@@ -8,6 +8,45 @@ This directory contains all BMad Method (BMM) artifacts and documentation for th
 
 ---
 
+## 🗂️ Documentation Map
+
+**Quick Links** to all project documentation:
+
+### 🏗️ Architecture & Technical
+- **[Tech-Spec](artifacts/tech-spec.md)** ⭐ - Comprehensive brownfield spec (1545 lines)
+  - Architecture overview
+  - Database schema (34 tables)
+  - API patterns (20+ modules)
+  - **[Technical Debt Register](artifacts/tech-spec.md#-technical-debt-register)** - 8 tracked items (TD-001 to TD-008)
+- **[System Overview](../01_SYSTEM_OVERVIEW.md)** - High-level architecture
+- **[Project Structure](../11_PROJECT_STRUCTURE.md)** - Directory & file organization
+- **[Database Tables](../12_DATABASE_TABLES.md)** - Complete schema reference (34 tables)
+- **[Database Migrations](../13_DATABASE_MIGRATIONS.md)** - Migration history (44 files)
+
+### 🐛 Issues & Fixes
+- **[Technical Debt Checklist](../14_NIESPOJNOSCI_FIX_CHECKLIST.md)** ⭐ - Known issues & fixes
+  - TD-001: Client State Migration (43% done - 10/23 components)
+  - TD-002: E2E Tests (planned)
+  - TD-003: API Documentation (planned)
+  - And more...
+
+### 📚 User Guides & Modules
+- **[Business Process Flows](../02_BUSINESS_PROCESS_FLOWS.md)** - Process diagrams
+- **[App Guide](../03_APP_GUIDE.md)** - User documentation
+- **[Planning Module](../04_PLANNING_MODULE.md)** - TO/PO/WO documentation
+- **[Production Module](../05_PRODUCTION_MODULE.md)** - Production workflows
+- **[Technical Module](../06_TECHNICAL_MODULE.md)** - BOM, Routing, Products
+- **[Warehouse & Scanner](../07_WAREHOUSE_AND_SCANNER.md)** - Warehouse operations
+- **[Settings & Config](../08_SETTINGS_AND_CONFIG.md)** - System configuration
+- **[AI Helper Guide](../10_AI_HELPER_GUIDE.md)** - AI assistant documentation
+
+### 📊 Project Management
+- **[Documentation Audit](../15_DOCUMENTATION_AUDIT.md)** - Doc quality & status
+- **[Status Tracking](.bmad-status.yaml)** - Project metrics (machine-readable)
+- **[Brainstorm Session](sessions/2025-01-11-brainstorm-init.md)** - Strategic planning
+
+---
+
 ## 📁 Directory Structure
 
 ```
@@ -38,7 +77,8 @@ docs/bmm/
 
 1. ⏳ **plan-epic** - "BOM Complexity v2" (Priority 1)
 2. ⏳ **plan-epic** - "Traceability & Compliance" (Priority 2)
-3. ⏳ **implement** - Feature development
+3. ⏳ **plan-epic** - "Modules Production & warehouse and Scanner"
+4. ⏳ **implement** - Feature development
 
 ---
 

@@ -1,14 +1,52 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Eye, Search } from 'lucide-react';
-import { useStockMoves } from '@/lib/clientState';
+import { useState, useMemo, useEffect } from 'react';
+import { Eye, Search, Loader2 } from 'lucide-react';
+import type { StockMove } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { StockMoveDetailsModal } from './StockMoveDetailsModal';
+import { toast } from '@/lib/toast';
 
 export function StockMoveTable() {
-  const stockMoves = useStockMoves();
+  const [stockMoves, setStockMoves] = useState<StockMove[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
   const [selectedMove, setSelectedMove] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      loadStockMoves();
+    }
+  }, [user]);
+
+  const loadStockMoves = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('stock_moves')
+        .select(`
+          *,
+          from_location:locations!from_location_id (name),
+          to_location:locations!to_location_id (name),
+          product:products (
+            part_number,
+            description,
+            uom
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setStockMoves(data || []);
+    } catch (error) {
+      console.error('Error loading stock moves:', error);
+      toast.error('Failed to load stock moves');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredStockMoves = useMemo(() => {
     if (!searchQuery) return stockMoves;
@@ -32,6 +70,15 @@ export function StockMoveTable() {
       );
     });
   }, [stockMoves, searchQuery]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
+        <span className="ml-3 text-sm text-slate-600">Loading stock moves...</span>
+      </div>
+    );
+  }
 
   return (
     <>

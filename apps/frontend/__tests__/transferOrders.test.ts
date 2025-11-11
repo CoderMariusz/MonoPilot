@@ -1,23 +1,25 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TransferOrdersAPI, type MarkReceivedLineUpdate } from '@/lib/api/transferOrders';
-import { supabase } from '@/lib/supabase/client-browser';
 
 // Mock Supabase client
-jest.mock('@/lib/supabase/client-browser', () => ({
+vi.mock('@/lib/supabase/client-browser', () => ({
   supabase: {
-    rpc: jest.fn(),
+    rpc: vi.fn(),
     auth: {
-      getUser: jest.fn()
+      getUser: vi.fn()
     }
   }
 }));
 
+import { supabase } from '@/lib/supabase/client-browser';
+
 describe('TransferOrdersAPI - Ship/Receive', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('markShipped', () => {
-    test('should mark TO as shipped when status is submitted', async () => {
+    it('should mark TO as shipped when status is submitted', async () => {
       // Arrange
       const toId = 1;
       const shipDate = '2025-11-10T10:00:00Z';
@@ -28,8 +30,8 @@ describe('TransferOrdersAPI - Ship/Receive', () => {
         actual_ship_date: shipDate 
       };
       
-      (supabase.auth.getUser as jest.Mock).mockResolvedValue({ data: { user: mockUser } });
-      (supabase.rpc as jest.Mock).mockResolvedValue({ data: mockResponse, error: null });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: mockResponse, error: null });
 
       // Act
       const result = await TransferOrdersAPI.markShipped(toId, shipDate);
@@ -44,18 +46,18 @@ describe('TransferOrdersAPI - Ship/Receive', () => {
       });
     });
 
-    test('should throw error when user is not authenticated', async () => {
+    it('should throw error when user is not authenticated', async () => {
       // Arrange
       const toId = 1;
       const shipDate = '2025-11-10T10:00:00Z';
       
-      (supabase.auth.getUser as jest.Mock).mockResolvedValue({ data: { user: null } });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: null } });
 
       // Act & Assert
       await expect(TransferOrdersAPI.markShipped(toId, shipDate)).rejects.toThrow('User not authenticated');
     });
 
-    test('should throw error when status is not submitted', async () => {
+    it('should throw error when status is not submitted', async () => {
       // Arrange
       const toId = 1;
       const shipDate = '2025-11-10T10:00:00Z';
@@ -63,13 +65,13 @@ describe('TransferOrdersAPI - Ship/Receive', () => {
       const mockError = new Error('Can only mark as shipped from submitted status');
       
       (supabase.auth.getUser as jest.Mock).mockResolvedValue({ data: { user: mockUser } });
-      (supabase.rpc as jest.Mock).mockResolvedValue({ data: null, error: mockError });
+      (supabase.rpc as any).mockResolvedValue({ data: null, error: mockError });
 
       // Act & Assert
       await expect(TransferOrdersAPI.markShipped(toId, shipDate)).rejects.toThrow();
     });
 
-    test('should throw error when no data is returned', async () => {
+    it('should throw error when no data is returned', async () => {
       // Arrange
       const toId = 1;
       const shipDate = '2025-11-10T10:00:00Z';
@@ -84,7 +86,7 @@ describe('TransferOrdersAPI - Ship/Receive', () => {
   });
 
   describe('markReceived', () => {
-    test('should mark TO as received with line updates', async () => {
+    it('should mark TO as received with line updates', async () => {
       // Arrange
       const toId = 1;
       const receiveDate = '2025-11-12T14:00:00Z';
@@ -99,8 +101,8 @@ describe('TransferOrdersAPI - Ship/Receive', () => {
         actual_receive_date: receiveDate 
       };
       
-      (supabase.auth.getUser as jest.Mock).mockResolvedValue({ data: { user: mockUser } });
-      (supabase.rpc as jest.Mock).mockResolvedValue({ data: mockResponse, error: null });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: mockResponse, error: null });
 
       // Act
       const result = await TransferOrdersAPI.markReceived(toId, receiveDate, lineUpdates);
@@ -116,13 +118,13 @@ describe('TransferOrdersAPI - Ship/Receive', () => {
       });
     });
 
-    test('should throw error when user is not authenticated', async () => {
+    it('should throw error when user is not authenticated', async () => {
       // Arrange
       const toId = 1;
       const receiveDate = '2025-11-12T14:00:00Z';
       const lineUpdates: MarkReceivedLineUpdate[] = [];
       
-      (supabase.auth.getUser as jest.Mock).mockResolvedValue({ data: { user: null } });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: null } });
 
       // Act & Assert
       await expect(TransferOrdersAPI.markReceived(toId, receiveDate, lineUpdates)).rejects.toThrow('User not authenticated');
@@ -137,13 +139,13 @@ describe('TransferOrdersAPI - Ship/Receive', () => {
       const mockError = new Error('Can only mark as received from in_transit status');
       
       (supabase.auth.getUser as jest.Mock).mockResolvedValue({ data: { user: mockUser } });
-      (supabase.rpc as jest.Mock).mockResolvedValue({ data: null, error: mockError });
+      (supabase.rpc as any).mockResolvedValue({ data: null, error: mockError });
 
       // Act & Assert
       await expect(TransferOrdersAPI.markReceived(toId, receiveDate, lineUpdates)).rejects.toThrow();
     });
 
-    test('should handle line updates with optional fields', async () => {
+    it('should handle line updates with optional fields', async () => {
       // Arrange
       const toId = 1;
       const receiveDate = '2025-11-12T14:00:00Z';
@@ -158,8 +160,8 @@ describe('TransferOrdersAPI - Ship/Receive', () => {
         actual_receive_date: receiveDate 
       };
       
-      (supabase.auth.getUser as jest.Mock).mockResolvedValue({ data: { user: mockUser } });
-      (supabase.rpc as jest.Mock).mockResolvedValue({ data: mockResponse, error: null });
+      (supabase.auth.getUser as any).mockResolvedValue({ data: { user: mockUser } });
+      (supabase.rpc as any).mockResolvedValue({ data: mockResponse, error: null });
 
       // Act
       const result = await TransferOrdersAPI.markReceived(toId, receiveDate, lineUpdates);
@@ -176,49 +178,49 @@ describe('TransferOrdersAPI - Ship/Receive', () => {
   });
 
   describe('validateDateOrder', () => {
-    test('should pass when receive date >= ship date', () => {
+    it('should pass when receive date >= ship date', () => {
       expect(() => {
         TransferOrdersAPI.validateDateOrder('2025-11-10', '2025-11-12');
       }).not.toThrow();
     });
 
-    test('should pass when receive date equals ship date', () => {
+    it('should pass when receive date equals ship date', () => {
       expect(() => {
         TransferOrdersAPI.validateDateOrder('2025-11-10', '2025-11-10');
       }).not.toThrow();
     });
 
-    test('should throw error when receive date < ship date', () => {
+    it('should throw error when receive date < ship date', () => {
       expect(() => {
         TransferOrdersAPI.validateDateOrder('2025-11-10', '2025-11-08');
       }).toThrow('Planned receive date must be >= planned ship date');
     });
 
-    test('should pass when only ship date is provided', () => {
+    it('should pass when only ship date is provided', () => {
       expect(() => {
         TransferOrdersAPI.validateDateOrder('2025-11-10', undefined);
       }).not.toThrow();
     });
 
-    test('should pass when only receive date is provided', () => {
+    it('should pass when only receive date is provided', () => {
       expect(() => {
         TransferOrdersAPI.validateDateOrder(undefined, '2025-11-12');
       }).not.toThrow();
     });
 
-    test('should pass when both dates are missing', () => {
+    it('should pass when both dates are missing', () => {
       expect(() => {
         TransferOrdersAPI.validateDateOrder(undefined, undefined);
       }).not.toThrow();
     });
 
-    test('should handle different date formats', () => {
+    it('should handle different date formats', () => {
       expect(() => {
         TransferOrdersAPI.validateDateOrder('2025-11-10T08:00:00Z', '2025-11-12T14:00:00Z');
       }).not.toThrow();
     });
 
-    test('should throw error with ISO timestamps when receive < ship', () => {
+    it('should throw error with ISO timestamps when receive < ship', () => {
       expect(() => {
         TransferOrdersAPI.validateDateOrder('2025-11-10T08:00:00Z', '2025-11-09T14:00:00Z');
       }).toThrow('Planned receive date must be >= planned ship date');
@@ -231,7 +233,7 @@ describe('TransferOrders Integration - Workflow', () => {
   // Note: These are placeholder tests showing the structure
   // In a real environment, you'd use a test database or more sophisticated mocking
   
-  test.skip('should complete full TO lifecycle: create → submit → ship → receive', async () => {
+  it.skip('should complete full TO lifecycle: create → submit → ship → receive', async () => {
     // This test is skipped as it requires actual database/API integration
     // In a real test environment:
     // 1. Create TO (draft)
@@ -241,7 +243,7 @@ describe('TransferOrders Integration - Workflow', () => {
     // Each step would verify the status transitions and data updates
   });
 
-  test.skip('should respect RLS policies for Warehouse role', async () => {
+  it.skip('should respect RLS policies for Warehouse role', async () => {
     // This test is skipped as it requires actual RLS testing
     // In a real test environment, you'd:
     // 1. Mock different user roles
@@ -249,7 +251,7 @@ describe('TransferOrders Integration - Workflow', () => {
     // 3. Verify that only authorized users can perform ship/receive operations
   });
 
-  test.skip('should validate qty_moved does not exceed qty_planned', async () => {
+  it.skip('should validate qty_moved does not exceed qty_planned', async () => {
     // This test is skipped as it requires actual database constraints
     // In a real test environment, you'd:
     // 1. Create a TO with qty_planned = 100

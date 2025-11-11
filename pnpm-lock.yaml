@@ -65,6 +65,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.0
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
       eslint:
         specifier: ^8.57.0
         version: 8.57.1
@@ -1979,6 +1982,11 @@ packages:
     engines: {node: '>=6.0.0'}
     dependencies:
       esutils: 2.0.3
+    dev: true
+
+  /dotenv@17.2.3:
+    resolution: {integrity: sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==}
+    engines: {node: '>=12'}
     dev: true
 
   /dunder-proto@1.0.1:

@@ -3,9 +3,9 @@
 import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client-browser';
-import { useSuppliers } from '@/lib/clientState';
+import { SuppliersAPI } from '@/lib/api/suppliers';
 import { useAuth } from '@/lib/auth/AuthContext';
-import type { Product, Warehouse } from '@/lib/types';
+import type { Product, Warehouse, Supplier } from '@/lib/types';
 
 interface CreatePurchaseOrderModalProps {
   isOpen: boolean;
@@ -23,7 +23,7 @@ interface LineItem {
 export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreatePurchaseOrderModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const suppliers = useSuppliers();
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -76,8 +76,12 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
 
       if (warehousesError) throw warehousesError;
 
+      // Load suppliers
+      const suppliersData = await SuppliersAPI.getAll();
+
       setProducts(productsData || []);
       setWarehouses(warehousesData || []);
+      setSuppliers(suppliersData);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {

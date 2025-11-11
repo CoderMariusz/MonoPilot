@@ -1,40 +1,113 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { useLicensePlates, updateLicensePlate } from '@/lib/clientState';
-import type { QAStatus } from '@/lib/types';
+import { X, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import type { QAStatus, LicensePlate } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
 interface ChangeQAStatusModalProps {
   lpId: number;
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 const QA_STATUSES: QAStatus[] = ['Pending', 'Passed', 'Failed', 'Quarantine'];
 
-export function ChangeQAStatusModal({ lpId, isOpen, onClose }: ChangeQAStatusModalProps) {
-  const licensePlates = useLicensePlates();
-  const lp = licensePlates.find(l => l.id === lpId.toString());
+export function ChangeQAStatusModal({ lpId, isOpen, onClose, onSuccess }: ChangeQAStatusModalProps) {
+  const [lp, setLp] = useState<LicensePlate | null>(null);
   const [qaStatus, setQAStatus] = useState<QAStatus>('Pending');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (lp) {
-      setQAStatus(lp.qa_status as QAStatus || 'Pending');
+    if (isOpen && lpId) {
+      loadLP();
     }
-  }, [lp]);
+  }, [isOpen, lpId]);
 
-  if (!isOpen || !lp) return null;
+  const loadLP = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('license_plates')
+        .select(`
+          *,
+          product:products (
+            part_number,
+            description,
+            uom
+          )
+        `)
+        .eq('id', lpId)
+        .single();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    updateLicensePlate(parseInt(lp.id), { qa_status: qaStatus });
-
-    toast.success('QA Status updated successfully');
-    onClose();
+      if (error) throw error;
+      
+      setLp(data);
+      setQAStatus((data.qa_status as QAStatus) || 'Pending');
+    } catch (error) {
+      console.error('Error loading license plate:', error);
+      toast.error('Failed to load license plate');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    
+    try {
+      const { error } = await supabase
+        .from('license_plates')
+        .update({
+          qa_status: qaStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', lpId);
+
+      if (error) throw error;
+
+      toast.success('QA Status updated successfully');
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (error: any) {
+      console.error('Error updating QA status:', error);
+      toast.error('Failed to update QA status');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
+          <div className="flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
+            <span className="ml-3 text-sm text-slate-600">Loading...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!lp) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
+          <p className="text-center text-slate-600">License plate not found</p>
+          <button onClick={onClose} className="mt-4 w-full px-4 py-2 bg-slate-900 text-white rounded-md">
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -109,15 +182,24 @@ export function ChangeQAStatusModal({ lpId, isOpen, onClose }: ChangeQAStatusMod
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50"
+              disabled={saving}
+              className="px-4 py-2 text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800"
+              disabled={saving}
+              className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2"
             >
-              Update Status
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Status'
+              )}
             </button>
           </div>
         </form>

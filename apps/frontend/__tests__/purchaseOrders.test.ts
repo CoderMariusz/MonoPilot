@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockRpc = vi.fn();
-const mockGetUser = vi.fn();
-
 vi.mock('../lib/supabase/client-browser', () => ({
   supabase: {
-    rpc: mockRpc,
+    rpc: vi.fn(),
     auth: {
-      getUser: mockGetUser
+      getUser: vi.fn()
     }
   }
 }));
 
 import { PurchaseOrdersAPI, type QuickPOEntryLine } from '../lib/api/purchaseOrders';
+import { supabase } from '../lib/supabase/client-browser';
+
+const mockRpc = supabase.rpc as any;
+const mockGetUser = supabase.auth.getUser as any;
 
 /**
  * Unit tests for Purchase Orders API
@@ -69,7 +70,8 @@ describe('PurchaseOrdersAPI', () => {
       // Assert
       expect(mockRpc).toHaveBeenCalledWith('quick_create_pos', {
         p_product_entries: lines,
-        p_user_id: 'test-user-id'
+        p_user_id: 'test-user-id',
+        p_warehouse_id: null
       });
       expect(result.purchase_orders).toHaveLength(1);
     });

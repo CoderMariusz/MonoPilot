@@ -1,253 +1,317 @@
-# E2E Testing with Playwright
+# E2E Tests - MonoPilot
+
+## 📋 Overview
 
 This directory contains end-to-end tests for the MonoPilot application using Playwright.
 
-## Test Structure
+## 🚀 Quick Start
+
+### 1. Install Playwright Browsers
+
+```bash
+pnpm playwright:install
+```
+
+### 2. Configure Environment Variables
+
+Create `.env.local` file in `apps/frontend/` with your Supabase credentials:
+
+```bash
+# apps/frontend/.env.local
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+```
+
+**Note:** The service role key is required for the seeding script to create test data.
+
+### 3. Seed Test Data (First Time Setup)
+
+Before running E2E tests, seed the database with test data:
+
+```bash
+# From apps/frontend directory
+pnpm test:e2e:seed
+```
+
+**What gets seeded:**
+- ✅ 3 Test Suppliers (SUP-001, SUP-002, SUP-003) with different currencies
+- ✅ 5 Test Products (BXS-001, PKC-001, CHB-001, LBS-001, VCS-001)
+- ✅ 3 Test Warehouses (WH-TEST-01, WH-TEST-02, WH-TEST-03)
+- ✅ Multiple Locations per warehouse (RECEIVING, SHIPPING, storage)
+- ✅ Product-Supplier links for PO creation
+
+**Note:** Re-run this command anytime test data needs to be reset or corrupted.
+
+### 4. Run Tests
+
+```bash
+# Run all tests
+pnpm test:e2e
+
+# Run with UI (recommended for development)
+pnpm test:e2e:ui
+
+# Run in headed mode (watch browser)
+pnpm test:e2e:headed
+
+# Run specific test suites
+pnpm test:e2e:auth          # Authentication tests
+pnpm test:e2e:po            # Purchase Order tests
+pnpm test:e2e:to            # Transfer Order tests
+pnpm test:e2e:lp            # License Plate tests
+pnpm test:e2e:settings      # Settings tests
+pnpm test:e2e:grn           # GRN/Receiving tests
+
+# Run only critical tests (CI/CD)
+pnpm test:e2e:critical
+```
+
+## 📁 Test Structure
 
 ```
 e2e/
-├── utils/           # Test utilities and helpers
-├── fixtures/        # Test data fixtures
-├── auth/            # Authentication tests
-├── bom/             # BOM module tests
-├── planning/        # Planning module tests
-├── production/      # Production module tests
-├── warehouse/       # Warehouse module tests
-├── scanner/         # Scanner module tests
-├── settings/        # Settings module tests
-├── admin/           # Admin module tests
-├── integration/     # Cross-module integration tests
-├── components/      # UI component tests
-├── error-handling/  # Error handling tests
-├── performance/     # Performance tests
-└── accessibility/   # Accessibility tests
+├── helpers.ts                    # Shared helper functions
+├── 01-auth.spec.ts               # Authentication flow tests
+├── 02-purchase-orders.spec.ts    # PO creation, editing, deletion
+├── 03-transfer-orders.spec.ts    # TO creation, shipping, receiving
+├── 04-license-plates.spec.ts     # LP split, amend, QA status
+├── 05-settings.spec.ts           # System settings updates
+├── 06-grn-receiving.spec.ts      # GRN/receiving workflow
+└── README.md                     # This file
 ```
 
-## Running Tests
+## 🧪 Test Coverage
 
-### Local Development
+| Module | Tests | Coverage |
+|--------|-------|----------|
+| Authentication | 3 | ✅ Login, Logout, Validation |
+| Purchase Orders | 5 | ✅ CRUD, Quick Entry, Filtering |
+| Transfer Orders | 5 | ✅ Create, Ship, Receive, Validation |
+| License Plates | 5 | ✅ Split, QA Status, Amend, Search |
+| Settings | 5 | ✅ Update, Persistence, Loading |
+| GRN/Receiving | 4 | ✅ View, Complete, Filter, Search |
+
+**Total**: 27 E2E tests covering 6 major workflows
+
+## ⚙️ Configuration
+
+### Test User Setup
+
+Tests require a test user in your Supabase database. You can:
+
+1. **Manually create** a test user via Supabase Dashboard
+2. **Use seed script** (if available):
+   ```bash
+   pnpm seed:test-users
+   ```
+
+### Environment Variables
+
+Set these in your environment or use `.env.test` (create from `.env.test.example`):
 
 ```bash
-# Install Playwright browsers
-pnpm playwright:install
+TEST_USER_EMAIL=test@monopilot.com
+TEST_USER_PASSWORD=testpassword123
+```
 
-# Run all E2E tests
-pnpm test:e2e
+### Playwright Config
 
-# Run tests with UI mode
+See `playwright.config.ts` for full configuration:
+- Base URL: `http://localhost:5000`
+- Browser: Chromium (fastest)
+- Retry: 2x on CI, 0x locally
+- Screenshots/Videos: On failure only
+
+## 📝 Writing New Tests
+
+### 1. Use Helper Functions
+
+```typescript
+import { login, navigateTo, waitForModal, waitForToast } from './helpers';
+
+test('should do something', async ({ page }) => {
+  await login(page);
+  await navigateTo(page, 'planning');
+  // ... your test
+});
+```
+
+### 2. Follow Naming Convention
+
+- File: `XX-module-name.spec.ts` (numbered for execution order)
+- Test suite: `test.describe('Module Name', () => { ... })`
+- Test case: `test('should do something specific', async ({ page }) => { ... })`
+
+### 3. Use Assertions
+
+```typescript
+import { expect } from '@playwright/test';
+
+// Visibility
+await expect(page.locator('.modal')).toBeVisible();
+
+// Text content
+await expect(page.locator('.message')).toContainText('success');
+
+// URL
+await expect(page).toHaveURL('/dashboard');
+```
+
+### 4. Handle Async Operations
+
+```typescript
+// Wait for toast
+await waitForToast(page, 'Successfully created');
+
+// Wait for modal
+await waitForModal(page, 'Create Purchase Order');
+
+// Wait for table data
+await page.waitForSelector('table tbody tr');
+```
+
+## 🐛 Debugging
+
+### 1. Run in UI Mode
+
+```bash
 pnpm test:e2e:ui
+```
 
-# Run tests in headed mode
+This opens Playwright's interactive UI where you can:
+- Step through tests
+- Inspect locators
+- View screenshots/videos
+- See network requests
+
+### 2. Run in Headed Mode
+
+```bash
 pnpm test:e2e:headed
-
-# Run tests in debug mode
-pnpm test:e2e:debug
-
-# Run specific test file
-pnpm test:e2e --grep "BOM - Create MEAT Product"
-
-# Run tests for specific module
-pnpm test:e2e --grep "BOM"
 ```
 
-### CI/CD
+Watch the browser execute tests in real-time.
 
-Tests run automatically on:
-- Push to main/develop branches
-- Pull requests to main/develop branches
-
-## Test Utilities
-
-### TestHelpers
-
-Core utility class with methods for:
-- Authentication (`login`, `logout`)
-- Navigation (`navigateToBOM`, `navigateToPlanning`, etc.)
-- Form interactions (`fillFormField`, `selectDropdownOption`)
-- Assertions (`verifyToast`, `verifyTableContainsRow`)
-- UI interactions (`clickButton`, `waitForLoadingComplete`)
-
-### NavigationHelpers
-
-Navigation-specific utilities for:
-- Module navigation
-- Tab switching
-- Breadcrumb verification
-- User menu interactions
-
-### DataHelpers
-
-Data management utilities for:
-- Creating test data
-- Cleaning up test data
-- Generating unique IDs
-- Data validation
-
-### AssertionHelpers
-
-Assertion utilities for:
-- Field validation
-- Table operations
-- Modal interactions
-- Error handling
-
-### CleanupHelpers
-
-Cleanup utilities for:
-- Removing test data
-- Cleaning up by prefix
-- Handling cascading deletes
-
-## Test Data
-
-Test fixtures are located in `fixtures/test-data.ts` and include:
-- Test users with different roles
-- Test products for different categories
-- Test work orders, purchase orders, transfer orders
-- Test suppliers, warehouses, locations
-- Test system settings and configurations
-
-## Writing New Tests
-
-### Basic Test Structure
+### 3. Use Console Logs
 
 ```typescript
-import { test, expect } from '@playwright/test';
-import { TestHelpers } from '../utils/test-helpers';
-import { testUsers } from '../fixtures/test-data';
-
-test.describe('Module - Feature', () => {
-  let helpers: TestHelpers;
-
-  test.beforeEach(async ({ page }) => {
-    helpers = new TestHelpers(page);
-    await helpers.login(testUsers.admin.email, testUsers.admin.password);
-  });
-
-  test.afterEach(async () => {
-    // Cleanup test data
-  });
-
-  test('should perform specific action', async ({ page }) => {
-    // Test implementation
-  });
-});
+console.log(await page.locator('.element').textContent());
 ```
 
-### Best Practices
+### 4. Take Screenshots
 
-1. **Use TestHelpers**: Leverage the utility methods for common operations
-2. **Clean up data**: Always clean up test data in `afterEach` hooks
-3. **Use fixtures**: Use test data from fixtures for consistency
-4. **Test error cases**: Include tests for validation errors and network failures
-5. **Test loading states**: Verify loading states and user feedback
-6. **Test accessibility**: Include keyboard navigation and screen reader tests
-
-### Common Patterns
-
-#### Creating Test Data
 ```typescript
-const testProduct = await helpers.createTestProduct({
-  partNumber: `TEST-${Date.now()}`,
-  description: 'Test Product',
-  category: 'DRYGOODS'
-});
+await page.screenshot({ path: 'debug.png' });
 ```
 
-#### Verifying Success
-```typescript
-await helpers.verifyToast('Product created successfully');
-await expect(page.locator(`tr:has-text("${testProduct.partNumber}")`)).toBeVisible();
+## 🚦 CI/CD Integration
+
+### GitHub Actions Example
+
+```yaml
+- name: Install Playwright
+  run: pnpm playwright:install
+
+- name: Run E2E Tests
+  run: pnpm test:e2e:critical
+  env:
+    TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+    TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 ```
 
-#### Testing Error Cases
-```typescript
-await page.route('**/api/products/**', route => route.abort());
-await page.click('button:has-text("Save")');
-await helpers.verifyToast('Network error');
+### Critical Tests Only
+
+For faster CI builds, run only critical tests:
+
+```bash
+pnpm test:e2e:critical
 ```
 
-## Test Categories
+This runs:
+- Authentication (login/logout)
+- Purchase Orders (create, edit, delete)
+- Transfer Orders (create, ship, receive)
 
-### Authentication Tests
-- Login/logout flows
-- Signup process
-- Session management
-- Role-based access control
-
-### Module Tests
-- BOM: Product creation, editing, deletion, BOM components
-- Planning: Work orders, purchase orders, transfer orders
-- Production: Yield reports, consumption, operations, traceability
-- Warehouse: GRN, stock moves, license plate operations
-- Scanner: Pack/process terminals, material staging
-- Settings: Locations, machines, suppliers, warehouses
-- Admin: User management, sessions, system settings
-
-### Integration Tests
-- Cross-module workflows
-- End-to-end production flows
-- Data consistency across modules
-
-### Component Tests
-- Modal behaviors
-- Table operations
-- Form validations
-- Navigation
-
-### Error Handling Tests
-- API errors
-- Validation errors
-- Permission errors
-- Network failures
-
-### Performance Tests
-- Load times
-- Search performance
-- Large dataset handling
-
-### Accessibility Tests
-- Keyboard navigation
-- Screen reader support
-- ARIA labels
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Test timeouts**: Increase timeout in test configuration
-2. **Element not found**: Use proper selectors and wait strategies
-3. **Data conflicts**: Use unique test data and proper cleanup
-4. **Network issues**: Mock API responses for consistent testing
-
-### Debug Mode
-
-Use `pnpm test:e2e:debug` to run tests in debug mode with:
-- Step-by-step execution
-- Element inspection
-- Network monitoring
-- Console logs
-
-### Test Reports
+## 📊 Test Reports
 
 After running tests, view the HTML report:
+
 ```bash
-pnpm playwright show-report
+npx playwright show-report
 ```
 
-## CI/CD Integration
+Reports include:
+- Test results (pass/fail)
+- Screenshots on failure
+- Videos on failure
+- Execution times
+- Trace files for debugging
 
-Tests run automatically in GitHub Actions with:
-- Automatic browser installation
-- Test result artifacts
-- Failure notifications
-- Performance monitoring
+## 🔧 Common Issues
 
-## Contributing
+### Issue: "Test user not found"
 
-When adding new tests:
-1. Follow the existing test structure
-2. Use descriptive test names
-3. Include both positive and negative test cases
-4. Add proper cleanup
-5. Update documentation as needed
+**Solution**: Create a test user in Supabase with the credentials in `TEST_USER_EMAIL` and `TEST_USER_PASSWORD`.
+
+### Issue: "Cannot connect to http://localhost:5000"
+
+**Solution**: Ensure the dev server is running. Playwright config includes `webServer` that should auto-start it, but you can also start it manually:
+
+```bash
+pnpm dev
+```
+
+### Issue: "Element not found"
+
+**Solution**: Use more flexible selectors:
+
+```typescript
+// ❌ Too specific
+await page.click('div.modal button.primary');
+
+// ✅ More flexible
+await page.click('button:has-text("Create")');
+```
+
+### Issue: "Test timeout"
+
+**Solution**: Increase timeout for slow operations:
+
+```typescript
+await expect(element).toBeVisible({ timeout: 10000 }); // 10 seconds
+```
+
+## 📚 Resources
+
+- [Playwright Documentation](https://playwright.dev/docs/intro)
+- [Playwright Best Practices](https://playwright.dev/docs/best-practices)
+- [Playwright Selectors](https://playwright.dev/docs/selectors)
+- [Playwright API](https://playwright.dev/docs/api/class-playwright)
+
+## 🎯 Next Steps
+
+### Missing Test Coverage (Future)
+
+1. **Work Orders** - Create, start, complete, cancel
+2. **BOM Management** - Create, edit, activate BOMs
+3. **Production Outputs** - Record production, scrap, downtime
+4. **Stock Moves** - Create and execute stock movements
+5. **User Management** - Create users, assign roles, permissions
+6. **Supplier Management** - CRUD suppliers, contacts
+7. **Product Catalog** - CRUD products, allergens, variants
+
+### Test Improvements
+
+1. **Data Fixtures** - Create reusable test data
+2. **Page Objects** - Encapsulate page interactions
+3. **Visual Regression** - Screenshot comparisons
+4. **Performance Tests** - Measure load times
+5. **Accessibility Tests** - ARIA, keyboard navigation
+
+---
+
+**Last Updated**: 2025-01-11  
+**Test Count**: 27  
+**Coverage**: ~30% of critical workflows  
+**Status**: ✅ Initial E2E test suite complete

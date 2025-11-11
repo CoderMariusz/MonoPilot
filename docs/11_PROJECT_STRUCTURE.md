@@ -2,6 +2,14 @@
 
 Ten dokument opisuje strukturę katalogów i plików projektu MonoPilot.
 
+**Last Updated**: 2025-01-11
+
+**Related Documentation**:
+- [System Overview](01_SYSTEM_OVERVIEW.md) - Architecture & modules
+- [Database Tables](12_DATABASE_TABLES.md) - Complete schema
+- [Technical Debt](14_NIESPOJNOSCI_FIX_CHECKLIST.md) - Known issues & fixes
+- [BMM Tech-Spec](bmm/artifacts/tech-spec.md) - Brownfield documentation
+
 ## 📁 Struktura Główna
 
 ```
