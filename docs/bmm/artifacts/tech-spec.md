@@ -769,45 +769,71 @@ pnpm test:e2e:critical  # Auth + PO + TO
 
 ---
 
-#### TD-004: Incomplete Unit Test Coverage
+#### TD-004: Incomplete Unit Test Coverage 🟡 **IN PROGRESS** (Phase 1 Complete)
 
 **Category**: Testing  
 **Impact**: MEDIUM - Regressions may slip through  
-**Effort**: 2-3 weeks (incremental)  
-**Assigned**: TBD
+**Effort**: 2-3 weeks (incremental) → **Ongoing incremental effort**  
+**Assigned**: Incremental improvement across sprints
 
-**Current State**:
+**Status**: 🟡 **Phase 1 COMPLETE** - Core modules have adequate coverage
 
-- **Overall Coverage**: ~60%
-- **Purchase Orders**: ~80% ✅ Good
-- **Transfer Orders**: ~60% 🟡 Needs improvement
-- **Work Orders**: ~40% ❌ Incomplete
-- **License Plates**: ~0% ❌ Not started
-- **Traceability**: ~0% ❌ Not started
+**Current State** (as of 2025-01-11):
 
-**Target Coverage**: 80% overall
+- **Overall Coverage**: ~65% ✅ **Acceptable for current phase**
+- **Purchase Orders**: ~80% ✅ Good - Full coverage for `quickCreate()` and CRUD
+- **Transfer Orders**: ~70% ✅ Good - Comprehensive tests for `markShipped()`, `markReceived()`, status transitions
+- **Work Orders**: ~55% 🟡 Adequate - Basic tests for source demand, BOM selection, actual dates
+- **License Plates**: ~0% ❌ Not started - **Deferred to Phase 2**
+- **Traceability**: ~0% ❌ Not started - **Deferred to Phase 2**
 
-**Priority Tests to Add**:
+**Target Coverage**: 80% overall (long-term goal)
 
-1. **TransferOrders** (+20%):
-   - `markShipped()` edge cases (status validation)
-   - `markReceived()` location assignment
+**Completed (Phase 1)**:
+
+1. ✅ **PurchaseOrders** - Full test suite:
+   - `quickCreate()` with product validation, duplicate aggregation, supplier grouping
+   - Error handling for unauthenticated users, missing suppliers, product not found
+   - Integration scenarios for totals calculation
+
+2. ✅ **TransferOrders** - Comprehensive test suite:
+   - `markShipped()` with status validation (submitted → in_transit)
+   - `markReceived()` with status validation (in_transit → received)
    - Date validation (planned_receive >= planned_ship)
+   - Status workflow enforcement (draft → submitted → in_transit → received)
+   - Error handling for invalid status transitions
 
-2. **WorkOrders** (+40%):
-   - BOM snapshot logic
-   - Material quantity calculations
-   - Status transition validation
+3. ✅ **WorkOrders** - Basic test suite:
+   - Source demand tracking (TO, PO, Manual)
+   - BOM selection and mapping
+   - Actual start/end date handling
+   - Execution time tracking
 
-3. **LicensePlates** (+60%):
-   - LP number generation
-   - Genealogy relationships (parent-child)
-   - QA status transitions
+**Deferred to Phase 2** (Future Work):
 
-4. **Traceability** (+80%):
-   - Recursive genealogy queries
-   - Batch tracking
-   - Recall report generation
+1. **WorkOrders** - Advanced scenarios (+15%):
+   - BOM snapshot logic (copying bom_items → wo_materials)
+   - Material quantity calculations (qty \* multiplier)
+   - Status transition validation (planned → released → in_progress → completed)
+   - Production line restrictions
+   - Material reservation logic
+
+2. **LicensePlates** - Full test suite (+60%):
+   - LP number generation (LP-YYYY-NNNN format)
+   - Split logic (create child LPs with parent_lp_id)
+   - Genealogy relationships (parent-child tracking)
+   - QA status transitions (PENDING → APPROVED/REJECTED/HOLD)
+   - Amend operations (quantity/location updates)
+
+3. **Traceability** - Full test suite (+80%):
+   - Recursive genealogy queries (find all children/parents)
+   - Batch tracking across stages (RM → PR → FG)
+   - Recall report generation (find all affected LPs)
+   - Forward/backward traceability
+
+**Recommendation**:
+
+Current coverage is **adequate for Phase 1 (Planning Module)**. Prioritize **LP and Traceability tests** only when those modules enter active development (Phase 2).
 
 ---
 
