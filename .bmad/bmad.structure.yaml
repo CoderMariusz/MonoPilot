@@ -1,0 +1,291 @@
+bmad_version: 1
+
+master:
+  primary: docs/master.bmad.md
+  fallback: docs/master_bmad.md
+
+aliases:
+  master_dot: docs/master.bmad.md
+  master_underscore: docs/master_bmad.md
+  architecture_dot: docs/architecture.agent.md
+  architecture_underscore: docs/architecture_agent.md
+  qa_dot: docs/qa.agent.md
+  qa_underscore: docs/qa_agent.md
+
+policies:
+  transfer_orders:
+    mode: warehouse_based                    # TO: między magazynami (bez lokacji w nagłówku)
+    transit_policy: warehouse_transit_location
+  defaults:
+    location_for_PO: required                # domyślna lokacja per warehouse (Settings)
+    location_for_TO: required
+
+docs:
+  - id: overview
+    path: docs/01_SYSTEM_OVERVIEW.md
+    gates: [QG-PROC, QG-DB]
+  - id: flows
+    path: docs/02_BUSINESS_PROCESS_FLOWS.md
+    gates: [QG-PROC]
+  - id: app-guide
+    path: docs/03_APP_GUIDE.md
+    gates: [QG-UI]
+  - id: planning
+    path: docs/04_PLANNING_MODULE.md
+    gates: [QG-UI, QG-DB]
+  - id: production
+    path: docs/05_PRODUCTION_MODULE.md
+    gates: [QG-PROC]
+  - id: technical
+    path: docs/06_TECHNICAL_MODULE.md
+    gates: [QG-TECH]
+  - id: warehouse
+    path: docs/07_WAREHOUSE_AND_SCANNER.md
+    gates: [QG-WH]
+  - id: settings
+    path: docs/08_SETTINGS_AND_CONFIG.md
+  - id: db
+    path: docs/09_DATABASE_SCHEMA.md
+    gates: [QG-DB]
+  - id: ai-helper
+    path: docs/10_AI_HELPER_GUIDE.md
+  - id: database-tables
+    path: docs/12_DATABASE_TABLES.md
+    fallback: docs/14_DATABASE_TABLES.md
+  - id: database-migrations
+    path: docs/13_DATABASE_MIGRATIONS.md
+    fallback: docs/13_DOCUMENTATION_AUDIT.md
+  - id: fix
+    path: docs/14_NIESPOJNOSCI_FIX_CHECKLIST.md
+  - id: audit
+    path: docs/15_DOCUMENTATION_AUDIT.md
+    fallback: docs/15_DOCUMENTATION_AUDIT.md
+
+agents:
+  - id: architecture
+    path: docs/architecture.agent.md
+    fallback: docs/architecture_agent.md
+  - id: qa
+    path: docs/qa.agent.md
+    fallback: docs/qa_agent.md
+
+workflow:
+  - step: "Audit Sync"
+    gate: QG-AUDIT
+    requires:
+      - doc: fix
+        section: "1) Priorytety P0 (blokujące)"
+  - step: "Migrations"
+    tasks: [T-MIG]
+    requires:
+      - doc: database-migrations
+        section: "Backlog migracji (P0)"
+  - step: "Refactor UI/API"
+    gate: QG-UI
+    requires:
+      - doc: app-guide
+        section: "8. Checklisty (QA & Akceptacja)"
+  - step: "Features"
+    tasks: [T8, T9, T10, T11]
+  - step: "Docs Sync"
+    checklist:
+      - doc: audit
+        section: "5. Checklisty akceptacyjne"
+
+quality_gates:
+  QG-AUDIT:
+    checks:
+      - doc: fix
+        section: "1) Priorytety P0 (blokujące)"
+  QG-DB:
+    checks:
+      - doc: db
+        section: "4. Klucze, indeksy, ograniczenia"
+      - doc: db
+        section: "5. RLS & Multi-tenant"
+      - doc: database-migrations
+        section: "Backlog migracji (P0)"
+      - doc: database-tables
+        section: "Spis tabel / aktualny stan"
+  QG-UI:
+    checks:
+      - doc: app-guide
+        section: "8. Checklisty (QA & Akceptacja)"
+  QG-PROC:
+    checks:
+      - doc: flows
+        section: "3. Transfer Order (TO) – Ship → Transit → Receive"   # warehouse-based
+      - doc: flows
+        section: "2. Purchase Order → ASN → GRN → LP"
+      - doc: flows
+        section: "4. Work Order – Snapshot → Operations → Outputs → Yield"
+  QG-TECH:
+    checks:
+      - doc: technical
+        section: "7. Checklisty (QA & Akceptacja)"
+  QG-WH:
+    checks:
+      - doc: warehouse
+        section: "5. Checklisty (QA & Akceptacja)"
+
+tasks:
+  source: docs/TODO.md
+  ids: [T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13]
+
+archive:
+  index: docs/archive/ARCHIVE_INDEX.md
+  include_globs:
+    - "docs/archive/**/*.md"
+    - "docs/archive/**/*.pdf"
+    - "docs/archive/**/*.docx"
+  pin_as_source_of_truth: []   # archiwum = referencja historyczna
+
+rules:
+  naming:
+    docs_prefix_numeric: true
+    module_files_required: true
+  consistency:
+    enforce_warehouse_based_TO: true
+    bom_table_name: "bom"
+
+code:
+  # Obsługa obu układów katalogów (web/ i frontend/)
+  - id: app-planning-web
+    root: apps/web/app/planning
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: planning
+  - id: app-planning-frontend
+    root: apps/frontend/app/planning
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: planning
+
+  - id: app-production-web
+    root: apps/web/app/production
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: production
+  - id: app-production-frontend
+    root: apps/frontend/app/production
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: production
+
+  - id: app-technical-web
+    root: apps/web/app/technical
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: technical
+  - id: app-technical-frontend
+    root: apps/frontend/app/technical
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: technical
+
+  - id: app-warehouse-web
+    root: apps/web/app/warehouse
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: warehouse
+  - id: app-warehouse-frontend
+    root: apps/frontend/app/warehouse
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: warehouse
+
+  - id: app-scanner-web
+    root: apps/web/app/scanner
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: warehouse
+  - id: app-scanner-frontend
+    root: apps/frontend/app/scanner
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: warehouse
+
+  - id: app-settings-web
+    root: apps/web/app/settings
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: settings
+  - id: app-settings-frontend
+    root: apps/frontend/app/settings
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: settings
+
+  - id: api-core
+    root: packages/api
+    globs: ["**/*.ts"]
+    maps_to_doc: app-guide
+
+  - id: ts-schemas
+    root: packages/schemas
+    globs: ["**/*.ts"]
+    maps_to_doc: db
+
+  - id: ui-shared
+    root: packages/ui
+    globs: ["**/*.tsx", "**/*.ts"]
+    maps_to_doc: app-guide
+
+  exclude:
+    - "**/node_modules/**"
+    - "**/.next/**"
+    - "**/dist/**"
+    - "**/build/**"
+
+# Automatyczne wstrzykiwanie treści do istniejących sekcji (idempotentne, bez duplikatów)
+ingest:
+
+  # Quick PO Enter → Planning/PO (upsert, bez duplikacji)
+  - id: quick-po-into-planning
+    source: docs/11_QUICK_PO_ENTER.md
+    target:
+      doc: planning
+      block_id: "planning.po.quick-entry"     # docelowy blok w 04_PLANNING_MODULE.md
+      mode: upsert_block
+      heading: "PO — Quick Entry"
+    dedupe:
+      by: [block_id, heading_slug, content_hash]
+      update_if_changed: true
+    normalize:
+      strip_title_from_source: true
+      keep_source_file: true
+      collapse_whitespace: true
+      lowercase_headings: true
+      order: 20
+
+  # Inbox z Twojego skryptu (frontmatter): auto-merge do wskazanych bloków
+  - id: inbox-frontmatter
+    glob: "docs/inbox/**/*.md"
+    frontmatter: true
+    map:
+      fragment_id_key: "bmad.fragment_id"     # stabilny ID fragmentu (unikamy duplikatów)
+      target_doc_key: "bmad.target_doc"       # planning / production / warehouse / technical / settings
+      target_anchor_key: "bmad.target_anchor" # opcjonalnie, gdy chcesz użyć anchor zamiast block_id
+      target_block_id_key: "bmad.target_block_id"
+      heading_key: "bmad.heading"
+      mode_key: "bmad.mode"                   # upsert_block | append_subsection | replace_block
+      order_key: "bmad.order"
+    default:
+      mode: upsert_block
+      strip_title_from_source: true
+      keep_source_file: true
+    dedupe:
+      by: [fragment_id, target_block_id, heading_slug, content_hash]
+      update_if_changed: true
+
+  # Fallback bez frontmatter (po folderach) — też jako upsert do konkretnego bloku
+  - id: inbox-by-folder
+    glob: "docs/inbox/**/planning/po/**/*.md"
+    target:
+      doc: planning
+      block_id: "planning.po.modal"
+      mode: upsert_block
+    normalize:
+      strip_title_from_source: true
+      keep_source_file: true
+      order: 50
+    dedupe:
+      by: [block_id, content_hash]
+      update_if_changed: true
+
+safety:
+  dry_run: false              # ustaw na true, jeśli chcesz najpierw obejrzeć diff
+  conflict_on_heading_collision: true
+  write_backup: true
+
+logs:
+  level: info
+  emit_summary_table: true

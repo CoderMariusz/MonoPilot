@@ -2,11 +2,12 @@
 
 import { useState, useEffect  } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { LocationsAPI } from '@/lib/api/locations';
+import { supabase } from '@/lib/supabase/client-browser';
+import { WarehousesAPI } from '@/lib/api/warehouses';
 import { ProductsAPI } from '@/lib/api/products';
 import { PurchaseOrdersAPI } from '@/lib/api/purchaseOrders';
 import { useSuppliers, resolveDefaultUnitPrice } from '@/lib/clientState';
-import type { Product, PurchaseOrderItem, Location, POStatus } from '@/lib/types';
+import type { Product, PurchaseOrderItem, Warehouse, POStatus } from '@/lib/types';
 
 interface EditPurchaseOrderModalProps {
   isOpen: boolean;
@@ -24,7 +25,7 @@ interface LineItem {
 
 export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuccess }: EditPurchaseOrderModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const suppliers = useSuppliers();
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -69,18 +70,27 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
   const loadData = async () => {
     setLoadingData(true);
     try {
-      // Load products
+      // Load products - show all active products
       const allProducts = await ProductsAPI.getAll();
-      const rmProducts = allProducts.filter(p => p.product_type === 'RM_MEAT');
-      setProducts(rmProducts);
+      const activeProducts = allProducts.filter(p => p.is_active);
+      setProducts(activeProducts);
       
-      // Load locations
-      const locationsData = await LocationsAPI.getAll();
-      setLocations(locationsData);
+      // Load warehouses
+      const warehousesData = await WarehousesAPI.getAll();
+      setWarehouses(warehousesData);
 
       // Load purchase order
       const po = await PurchaseOrdersAPI.getById(purchaseOrderId);
       if (po) {
+        // Get the buyer name from the user who created the PO
+        const { data: userData } = await supabase
+          .from('users')
+          .select('full_name, email')
+          .eq('id', po.created_by)
+          .single();
+        
+        const buyerName = userData?.full_name || userData?.email || 'Unknown';
+        
         setFormData({
           supplier_id: po.supplier_id?.toString() || '',
           due_date: po.due_date || '',
@@ -92,7 +102,7 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
           currency: po.currency || 'USD',
           exchange_rate: (po.exchange_rate || 1.0).toString(),
           notes: po.notes || '',
-          buyer: po.buyer_name || '',
+          buyer: buyerName,
         });
 
         if (po.purchase_order_items && po.purchase_order_items.length > 0) {
@@ -242,14 +252,16 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
                   <select
                     value={formData.supplier_id}
                     onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent bg-slate-100"
+                    disabled
                     required
                   >
                     <option value="">Select Supplier</option>
-                    {suppliers.filter(s => s.is_active).map(s => (
+                    {suppliers.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
+                  <p className="text-xs text-slate-500 mt-1">Supplier cannot be changed</p>
                 </div>
 
                 <div>
@@ -259,15 +271,21 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
                   <select
                     value={formData.warehouse_id}
                     onChange={(e) => setFormData({ ...formData, warehouse_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    className={`w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent ${
+                      formData.status === 'confirmed' ? 'bg-slate-100' : ''
+                    }`}
+                    disabled={formData.status === 'confirmed'}
                   >
                     <option value="">Select warehouse...</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name}
+                    {warehouses.map((warehouse) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.code} - {warehouse.name}
                       </option>
                     ))}
                   </select>
+                  {formData.status === 'confirmed' && (
+                    <p className="text-xs text-slate-500 mt-1">Warehouse cannot be changed after confirmation</p>
+                  )}
                 </div>
               </div>
 
@@ -297,39 +315,20 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Currency
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={formData.currency}
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value, exchange_rate: e.target.value === 'USD' ? '1.0' : formData.exchange_rate })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                    <option value="PLN">PLN</option>
-                  </select>
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md bg-slate-100 text-slate-700"
+                    disabled
+                    readOnly
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Currency cannot be changed</p>
                 </div>
-
-                {formData.currency !== 'USD' && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Exchange Rate
-                    </label>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      min="0"
-                      value={formData.exchange_rate}
-                      onChange={(e) => setFormData({ ...formData, exchange_rate: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                      placeholder="1.0000"
-                    />
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -353,10 +352,11 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
                   <input
                     type="text"
                     value={formData.buyer}
-                    onChange={(e) => setFormData({ ...formData, buyer: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                    placeholder="Enter buyer name"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md bg-slate-100 text-slate-700"
+                    disabled
+                    readOnly
                   />
+                  <p className="text-xs text-slate-500 mt-1">User who created the PO</p>
                 </div>
 
                 <div>

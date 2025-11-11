@@ -1,6 +1,32 @@
 import { supabase } from '../supabase/client-browser';
 import type { PurchaseOrder, POHeader } from '../types';
 
+export interface QuickPOEntryLine {
+  product_code: string;
+  quantity: number;
+}
+
+export interface QuickPOCreateRequest {
+  lines: QuickPOEntryLine[];
+  warehouse_id?: number;
+}
+
+export interface QuickPOCreatedPO {
+  id: number;
+  number: string;
+  supplier_id: number;
+  supplier_name: string;
+  currency: string;
+  total_lines: number;
+  net_total: number;
+  vat_total: number;
+  gross_total: number;
+}
+
+export interface QuickPOCreateResponse {
+  purchase_orders: QuickPOCreatedPO[];
+}
+
 export class PurchaseOrdersAPI {
   static async getAll(): Promise<PurchaseOrder[]> {
     try {
@@ -256,6 +282,78 @@ export class PurchaseOrdersAPI {
       };
     } catch (error: any) {
       return { success: false, message: error.message || 'Failed to close PO' };
+    }
+  }
+
+  static async quickCreate(request: QuickPOCreateRequest): Promise<QuickPOCreateResponse> {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Call RPC function
+      const { data, error } = await supabase.rpc('quick_create_pos', {
+        p_product_entries: request.lines,
+        p_user_id: user.id,
+        p_warehouse_id: request.warehouse_id || null
+      });
+
+      if (error) {
+        console.error('Error in quick_create_pos:', error);
+        throw new Error(error.message || 'Failed to create purchase orders');
+      }
+
+      if (!data || !data.purchase_orders) {
+        throw new Error('No data returned from quick create');
+      }
+
+      return data as QuickPOCreateResponse;
+    } catch (error: any) {
+      console.error('Error creating quick POs:', error);
+      throw new Error(error.message || 'Failed to create purchase orders');
+    }
+  }
+
+  static async delete(id: number): Promise<{ success: boolean; message: string }> {
+    try {
+      // First check if PO is in draft status
+      const po = await this.getById(id);
+      if (!po) {
+        return { success: false, message: 'Purchase order not found' };
+      }
+
+      if (po.status !== 'draft') {
+        return { success: false, message: 'Only draft purchase orders can be deleted' };
+      }
+
+      // Delete PO lines first
+      const { error: linesError } = await supabase
+        .from('po_line')
+        .delete()
+        .eq('po_id', id);
+
+      if (linesError) {
+        console.error('Error deleting PO lines:', linesError);
+        throw new Error('Failed to delete purchase order lines');
+      }
+
+      // Delete PO header
+      const { error: headerError } = await supabase
+        .from('po_header')
+        .delete()
+        .eq('id', id);
+
+      if (headerError) {
+        console.error('Error deleting PO header:', headerError);
+        throw new Error('Failed to delete purchase order');
+      }
+
+      return { success: true, message: 'Purchase order deleted successfully' };
+    } catch (error: any) {
+      console.error('Error deleting PO:', error);
+      return { success: false, message: error.message || 'Failed to delete purchase order' };
     }
   }
 }

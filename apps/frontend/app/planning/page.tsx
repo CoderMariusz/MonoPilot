@@ -6,6 +6,7 @@ import { WorkOrdersTable } from '@/components/WorkOrdersTable';
 import { CreateWorkOrderModal } from '@/components/CreateWorkOrderModal';
 import { PurchaseOrdersTable } from '@/components/PurchaseOrdersTable';
 import { CreatePurchaseOrderModal } from '@/components/CreatePurchaseOrderModal';
+import { QuickPOEntryModal } from '@/components/QuickPOEntryModal';
 import { TransferOrdersTable } from '@/components/TransferOrdersTable';
 import { CreateTransferOrderModal } from '@/components/CreateTransferOrderModal';
 
@@ -93,6 +94,7 @@ function WorkOrdersTab() {
 
 function PurchaseOrdersTab() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isQuickEntryOpen, setIsQuickEntryOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleCreateSuccess = () => {
@@ -103,17 +105,30 @@ function PurchaseOrdersTab() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-slate-900">Purchase Orders</h2>
-        <button 
-          onClick={() => setIsCreateModalOpen(true)}
-          className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors text-sm"
-        >
-          Create Purchase Order
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setIsQuickEntryOpen(true)}
+            className="px-4 py-2 bg-slate-100 text-slate-900 rounded-md hover:bg-slate-200 transition-colors text-sm font-medium"
+          >
+            Quick Entry
+          </button>
+          <button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors text-sm"
+          >
+            Create Purchase Order
+          </button>
+        </div>
       </div>
       <PurchaseOrdersTable key={refreshKey} />
       <CreatePurchaseOrderModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+      />
+      <QuickPOEntryModal
+        isOpen={isQuickEntryOpen}
+        onClose={() => setIsQuickEntryOpen(false)}
         onSuccess={handleCreateSuccess}
       />
     </div>

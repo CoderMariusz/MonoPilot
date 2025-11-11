@@ -3,9 +3,10 @@
 import { useState, useMemo } from 'react';
 import { Loader2, Eye, Edit, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useSupabasePurchaseOrders } from '@/lib/hooks/useSupabaseData';
-import { deletePurchaseOrder } from '@/lib/clientState';
+import { PurchaseOrdersAPI } from '@/lib/api/purchaseOrders';
 import { PurchaseOrderDetailsModal } from '@/components/PurchaseOrderDetailsModal';
 import { EditPurchaseOrderModal } from '@/components/EditPurchaseOrderModal';
+import { toast } from '@/lib/toast';
 import type { PurchaseOrder } from '@/lib/types';
 
 export function PurchaseOrdersTable() {
@@ -125,9 +126,20 @@ export function PurchaseOrdersTable() {
     setIsEditModalOpen(true);
   };
 
-  const handleDelete = (poId: number) => {
-    deletePurchaseOrder(poId);
-    setDeleteConfirmId(null);
+  const handleDelete = async (poId: number) => {
+    try {
+      const result = await PurchaseOrdersAPI.delete(poId);
+      if (result.success) {
+        toast.success(result.message);
+        // The hook will automatically refetch the data
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete purchase order');
+    } finally {
+      setDeleteConfirmId(null);
+    }
   };
 
   const handleEditSuccess = () => {
@@ -353,29 +365,31 @@ export function PurchaseOrdersTable() {
                       >
                         <Edit className="w-4 h-4" />
                       </button>
-                      {deleteConfirmId === po.id ? (
-                        <div className="flex items-center gap-1">
+                      {po.status === 'draft' && (
+                        deleteConfirmId === po.id ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleDelete(po.id)}
+                              className="text-red-600 hover:text-red-800 text-xs px-2 py-1 border border-red-300 rounded"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              className="text-slate-600 hover:text-slate-800 text-xs px-2 py-1 border border-slate-300 rounded"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
                           <button
-                            onClick={() => handleDelete(po.id)}
-                            className="text-red-600 hover:text-red-800 text-xs px-2 py-1 border border-red-300 rounded"
+                            onClick={() => setDeleteConfirmId(po.id)}
+                            className="text-slate-600 hover:text-red-600 transition-colors"
+                            title="Delete"
                           >
-                            Confirm
+                            <Trash2 className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => setDeleteConfirmId(null)}
-                            className="text-slate-600 hover:text-slate-800 text-xs px-2 py-1 border border-slate-300 rounded"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setDeleteConfirmId(po.id)}
-                          className="text-slate-600 hover:text-red-600 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        )
                       )}
                     </div>
                   </td>

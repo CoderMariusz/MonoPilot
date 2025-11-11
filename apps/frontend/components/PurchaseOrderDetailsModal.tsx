@@ -28,15 +28,16 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
     if (isOpen && purchaseOrderId) {
       loadDetails();
     }
-  }, [isOpen, purchaseOrderId, allPurchaseOrders, allGrns]);
+  }, [isOpen, purchaseOrderId]);
 
-  const loadDetails = () => {
+  const loadDetails = async () => {
     if (!purchaseOrderId) return;
     
     setLoading(true);
     setError(null);
     try {
-      const po = allPurchaseOrders.find(p => p.id === purchaseOrderId);
+      // Fetch from API instead of clientState
+      const po = await PurchaseOrdersAPI.getById(purchaseOrderId);
       if (!po) {
         throw new Error('Purchase order not found');
       }

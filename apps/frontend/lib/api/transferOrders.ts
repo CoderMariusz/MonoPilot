@@ -70,13 +70,11 @@ export class TransferOrdersAPI {
         item_id: line.item_id,
         uom: line.uom,
         qty_planned: line.qty_planned,
-        qty_moved: line.qty_moved || 0,
-        from_location_id: line.from_location_id || null,
-        to_location_id: line.to_location_id || null,
+        qty_shipped: line.qty_shipped || 0,
+        qty_received: line.qty_received || 0,
         lp_id: line.lp_id || null,
         batch: line.batch || null,
-        scan_required: line.scan_required || false,
-        approved_line: line.approved_line || false,
+        notes: line.notes || null,
       }));
 
       if (lineRecords.length > 0) {
@@ -98,9 +96,7 @@ export class TransferOrdersAPI {
           to_warehouse:warehouses!to_header_to_wh_id_fkey(*),
           to_lines:to_line(
             *,
-            item:products(*),
-            from_location:locations!to_line_from_location_id_fkey(*),
-            to_location:locations!to_line_to_location_id_fkey(*)
+            item:products(*)
           )
         `)
         .eq('id', toId)
@@ -126,7 +122,10 @@ export class TransferOrdersAPI {
           *,
           from_warehouse:warehouses!to_header_from_wh_id_fkey(*),
           to_warehouse:warehouses!to_header_to_wh_id_fkey(*),
-          to_lines:to_line(*, item:products(*), from_location:locations!to_line_from_location_id_fkey(*, warehouse:warehouses(*)), to_location:locations!to_line_to_location_id_fkey(*, warehouse:warehouses(*)))
+          to_lines:to_line(
+            *,
+            item:products(*)
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -147,7 +146,8 @@ export class TransferOrdersAPI {
           product_id: line.item_id,
           quantity: line.qty_planned,
           quantity_planned: line.qty_planned,
-          quantity_actual: line.qty_moved,
+          quantity_shipped: line.qty_shipped || 0,
+          quantity_received: line.qty_received || 0,
           lp_id: line.lp_id,
           batch: line.batch
         })) || []
@@ -238,13 +238,11 @@ export class TransferOrdersAPI {
         item_id: line.item_id,
         uom: line.uom,
         qty_planned: line.qty_planned,
-        qty_moved: line.qty_moved || 0,
-        from_location_id: line.from_location_id || null,
-        to_location_id: line.to_location_id || null,
+        qty_shipped: line.qty_shipped || 0,
+        qty_received: line.qty_received || 0,
         lp_id: line.lp_id || null,
         batch: line.batch || null,
-        scan_required: line.scan_required || false,
-        approved_line: line.approved_line || false,
+        notes: line.notes || null,
       }));
 
       const { error: lineError } = await supabase
@@ -267,9 +265,7 @@ export class TransferOrdersAPI {
           to_warehouse:warehouses!to_header_to_wh_id_fkey(*),
           to_lines:to_line(
             *,
-            item:products(*),
-            from_location:locations!to_line_from_location_id_fkey(*),
-            to_location:locations!to_line_to_location_id_fkey(*)
+            item:products(*)
           )
         `)
         .eq('id', header.id)
@@ -295,7 +291,10 @@ export class TransferOrdersAPI {
           *,
           from_warehouse:warehouses!to_header_from_wh_id_fkey(*),
           to_warehouse:warehouses!to_header_to_wh_id_fkey(*),
-          to_lines:to_line(*, item:products(*), from_location:locations!to_line_from_location_id_fkey(*, warehouse:warehouses(*)), to_location:locations!to_line_to_location_id_fkey(*, warehouse:warehouses(*)))
+          to_lines:to_line(
+            *,
+            item:products(*)
+          )
         `)
         .eq('id', id)
         .single();
@@ -319,7 +318,8 @@ export class TransferOrdersAPI {
           product_id: line.item_id,
           quantity: line.qty_planned,
           quantity_planned: line.qty_planned,
-          quantity_actual: line.qty_moved,
+          quantity_shipped: line.qty_shipped || 0,
+          quantity_received: line.qty_received || 0,
           lp_id: line.lp_id,
           batch: line.batch
         })) || []
@@ -478,13 +478,11 @@ export interface CreateTransferOrderLineRequest {
   item_id: number;
   uom: string;
   qty_planned: number;
-  qty_moved?: number;
-  from_location_id?: number;
-  to_location_id?: number;
+  qty_shipped?: number;
+  qty_received?: number;
   lp_id?: number;
   batch?: string;
-  scan_required?: boolean;
-  approved_line?: boolean;
+  notes?: string;
 }
 
 export interface UpdateTransferOrderRequest extends CreateTransferOrderRequest {

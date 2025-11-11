@@ -26,7 +26,11 @@
     "test:unit": "pnpm --recursive test:unit",
     "test:e2e:critical": "node scripts/run-e2e-critical.mjs",
     "pre-commit": "pnpm type-check && pnpm docs:update && (pnpm gen-types || echo '⚠️ Supabase CLI not available - skipping type generation') && (npx lint-staged || echo '⚠️ Lint-staged skipped - format code manually if needed')",
-    "pre-push": "pnpm test"
+    "pre-push": "pnpm test",
+    "bmad": "npx bmad-method@alpha",
+    "bmad:status": "npx bmad-method@alpha status",
+    "bmad:list": "npx bmad-method@alpha list",
+    "bmad:update": "npx bmad-method@alpha update"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
