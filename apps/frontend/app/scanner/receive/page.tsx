@@ -1,14 +1,14 @@
 /**
  * Scanner Receive Terminal
  * EPIC-002 Scanner & Warehouse v2 - Phase 1
- * 
+ *
  * Mobile-friendly terminal for receiving ASN:
  * - Step 1: Select ASN from submitted list
  * - Step 2: Scan items one-by-one (LP, quantity, batch, expiry)
  * - Step 3: Confirm and create GRN with LPs
- * 
+ *
  * Optimized for handheld scanners (Android/Windows CE)
- * 
+ *
  * @page /scanner/receive
  */
 
@@ -16,11 +16,17 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle, Package, Scan, AlertTriangle } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle,
+  Package,
+  Scan,
+  AlertTriangle,
+} from 'lucide-react';
 import { ASNsAPI } from '../../../lib/api/asns';
 import { supabase } from '../../../lib/supabase/client';
 import { useAuth } from '../../../lib/auth/AuthContext';
-import type { ASN, ASNItem, ASNForReceiving } from '../../../lib/types';
+import type { ASN, ASNForReceiving } from '../../../lib/types';
 import { toast } from '../../../lib/toast';
 
 interface ScannedItem {
@@ -41,24 +47,24 @@ type Step = 'select' | 'scan' | 'confirm';
 export default function ScannerReceivePage() {
   const router = useRouter();
   const { user } = useAuth();
-  
+
   // State
   const [step, setStep] = useState<Step>('select');
   const [asnList, setAsnList] = useState<ASNForReceiving[]>([]);
   const [selectedASN, setSelectedASN] = useState<ASN | null>(null);
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
-  
+
   // Form inputs
   const [lpNumber, setLpNumber] = useState('');
   const [receivedQty, setReceivedQty] = useState('');
   const [batch, setBatch] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
-  
+
   // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Refs for scanner input
   const lpInputRef = useRef<HTMLInputElement>(null);
 
@@ -96,12 +102,12 @@ export default function ScannerReceivePage() {
         return;
       }
       setSelectedASN(asn);
-      
+
       // Pre-fill batch and expiry from first item if available
       const firstItem = asn.asn_items[0];
       if (firstItem.batch) setBatch(firstItem.batch);
       if (firstItem.expiry_date) setExpiryDate(firstItem.expiry_date);
-      
+
       setStep('scan');
       setCurrentItemIndex(0);
     } catch (err) {
@@ -114,7 +120,7 @@ export default function ScannerReceivePage() {
 
   const handleScanItem = () => {
     if (!selectedASN || !selectedASN.asn_items) return;
-    
+
     const currentItem = selectedASN.asn_items[currentItemIndex];
     if (!currentItem) return;
 
@@ -146,19 +152,21 @@ export default function ScannerReceivePage() {
     };
 
     setScannedItems([...scannedItems, scannedItem]);
-    
+
     // Move to next item
     if (currentItemIndex < selectedASN.asn_items.length - 1) {
       setCurrentItemIndex(currentItemIndex + 1);
-      
+
       // Pre-fill next item's batch/expiry if available
       const nextItem = selectedASN.asn_items[currentItemIndex + 1];
       setLpNumber('');
       setReceivedQty('');
       if (nextItem.batch) setBatch(nextItem.batch);
       if (nextItem.expiry_date) setExpiryDate(nextItem.expiry_date);
-      
-      toast.success(`Item ${currentItemIndex + 1}/${selectedASN.asn_items.length} scanned`);
+
+      toast.success(
+        `Item ${currentItemIndex + 1}/${selectedASN.asn_items.length} scanned`
+      );
     } else {
       // All items scanned
       toast.success('All items scanned!');
@@ -176,11 +184,14 @@ export default function ScannerReceivePage() {
       setLoading(true);
 
       // Call RPC to create GRN from ASN
-      const { data, error: rpcError } = await supabase.rpc('create_grn_from_asn', {
-        p_asn_id: selectedASN.id,
-        p_received_by: parseInt(user.id, 10),
-        p_notes: 'Received via scanner terminal',
-      });
+      const { data, error: rpcError } = await supabase.rpc(
+        'create_grn_from_asn',
+        {
+          p_asn_id: selectedASN.id,
+          p_received_by: parseInt(user.id, 10),
+          p_notes: 'Received via scanner terminal',
+        }
+      );
 
       if (rpcError) throw new Error(rpcError.message);
       if (!data || data.length === 0) throw new Error('No data returned');
@@ -198,7 +209,9 @@ export default function ScannerReceivePage() {
           .single();
 
         if (settingsError) {
-          console.warn('No default receiving location found, using location ID 1');
+          console.warn(
+            'No default receiving location found, using location ID 1'
+          );
         }
 
         const locationId = settingsData?.default_receiving_location_id || 1;
@@ -226,7 +239,7 @@ export default function ScannerReceivePage() {
       }
 
       toast.success(`GRN ${grnNumber} created with ${scannedItems.length} LPs`);
-      
+
       // Reset and go back to selection
       resetForm();
       setStep('select');
@@ -265,14 +278,16 @@ export default function ScannerReceivePage() {
       }
     } else if (step === 'confirm') {
       setStep('scan');
-      setCurrentItemIndex(selectedASN?.asn_items?.length ? selectedASN.asn_items.length - 1 : 0);
+      setCurrentItemIndex(
+        selectedASN?.asn_items?.length ? selectedASN.asn_items.length - 1 : 0
+      );
     } else {
       router.push('/scanner');
     }
   };
 
   const currentItem = selectedASN?.asn_items?.[currentItemIndex];
-  const progress = selectedASN?.asn_items?.length 
+  const progress = selectedASN?.asn_items?.length
     ? ((currentItemIndex / selectedASN.asn_items.length) * 100).toFixed(0)
     : 0;
 
@@ -308,7 +323,9 @@ export default function ScannerReceivePage() {
         {step === 'select' && (
           <div className="space-y-3">
             {loading ? (
-              <div className="text-center py-12 text-slate-600">Loading ASNs...</div>
+              <div className="text-center py-12 text-slate-600">
+                Loading ASNs...
+              </div>
             ) : asnList.length === 0 ? (
               <div className="bg-white rounded-lg border border-slate-200 p-8 text-center">
                 <Package className="w-12 h-12 text-slate-400 mx-auto mb-3" />
@@ -318,19 +335,26 @@ export default function ScannerReceivePage() {
                 </p>
               </div>
             ) : (
-              asnList.map((asn) => (
+              asnList.map(asn => (
                 <button
                   key={asn.asn_id}
                   onClick={() => handleSelectASN(asn.asn_id)}
                   className="w-full bg-white rounded-lg border border-slate-200 p-4 text-left hover:border-purple-300 hover:bg-purple-50 transition-colors"
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <div className="font-semibold text-slate-900 text-lg">{asn.asn_number}</div>
-                    <div className="text-sm text-slate-600">{asn.items_count} items</div>
+                    <div className="font-semibold text-slate-900 text-lg">
+                      {asn.asn_number}
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      {asn.items_count} items
+                    </div>
                   </div>
-                  <div className="text-sm text-slate-600">{asn.supplier_name}</div>
+                  <div className="text-sm text-slate-600">
+                    {asn.supplier_name}
+                  </div>
                   <div className="text-xs text-slate-500 mt-1">
-                    Expected: {new Date(asn.expected_arrival).toLocaleDateString()}
+                    Expected:{' '}
+                    {new Date(asn.expected_arrival).toLocaleDateString()}
                   </div>
                 </button>
               ))
@@ -347,7 +371,9 @@ export default function ScannerReceivePage() {
                 <span className="text-sm font-medium text-slate-700">
                   Item {currentItemIndex + 1} of {selectedASN.asn_items.length}
                 </span>
-                <span className="text-sm font-medium text-purple-600">{progress}%</span>
+                <span className="text-sm font-medium text-purple-600">
+                  {progress}%
+                </span>
               </div>
               <div className="w-full bg-slate-200 rounded-full h-2">
                 <div
@@ -376,7 +402,9 @@ export default function ScannerReceivePage() {
                 {currentItem.batch && (
                   <div>
                     <span className="text-slate-500">Batch:</span>{' '}
-                    <span className="font-medium text-slate-900">{currentItem.batch}</span>
+                    <span className="font-medium text-slate-900">
+                      {currentItem.batch}
+                    </span>
                   </div>
                 )}
               </div>
@@ -392,8 +420,8 @@ export default function ScannerReceivePage() {
                   ref={lpInputRef}
                   type="text"
                   value={lpNumber}
-                  onChange={(e) => setLpNumber(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleScanItem()}
+                  onChange={e => setLpNumber(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleScanItem()}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-lg"
                   placeholder="Scan or enter LP"
                 />
@@ -407,8 +435,8 @@ export default function ScannerReceivePage() {
                   type="number"
                   step="0.01"
                   value={receivedQty}
-                  onChange={(e) => setReceivedQty(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleScanItem()}
+                  onChange={e => setReceivedQty(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleScanItem()}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-lg"
                   placeholder={`Enter qty (${currentItem.uom})`}
                 />
@@ -421,8 +449,8 @@ export default function ScannerReceivePage() {
                 <input
                   type="text"
                   value={batch}
-                  onChange={(e) => setBatch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleScanItem()}
+                  onChange={e => setBatch(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleScanItem()}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                   placeholder="Enter batch"
                 />
@@ -435,7 +463,7 @@ export default function ScannerReceivePage() {
                 <input
                   type="date"
                   value={expiryDate}
-                  onChange={(e) => setExpiryDate(e.target.value)}
+                  onChange={e => setExpiryDate(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                 />
               </div>
@@ -445,7 +473,9 @@ export default function ScannerReceivePage() {
                 className="w-full bg-purple-600 text-white py-3 rounded-lg font-medium hover:bg-purple-700 flex items-center justify-center gap-2"
               >
                 <Scan className="w-5 h-5" />
-                {currentItemIndex < (selectedASN.asn_items.length - 1) ? 'Next Item' : 'Finish Scanning'}
+                {currentItemIndex < selectedASN.asn_items.length - 1
+                  ? 'Next Item'
+                  : 'Finish Scanning'}
               </button>
             </div>
 
@@ -457,12 +487,18 @@ export default function ScannerReceivePage() {
                 </div>
                 <div className="space-y-2">
                   {scannedItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm pb-2 border-b border-slate-100 last:border-0">
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 text-sm pb-2 border-b border-slate-100 last:border-0"
+                    >
                       <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
                       <div className="flex-1">
-                        <div className="font-medium text-slate-900">{item.product_code}</div>
+                        <div className="font-medium text-slate-900">
+                          {item.product_code}
+                        </div>
                         <div className="text-xs text-slate-500">
-                          {item.received_quantity} {item.uom} • LP: {item.lp_number}
+                          {item.received_quantity} {item.uom} • LP:{' '}
+                          {item.lp_number}
                         </div>
                       </div>
                     </div>
@@ -479,29 +515,43 @@ export default function ScannerReceivePage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
               <CheckCircle className="w-6 h-6 text-green-600" />
               <div>
-                <div className="font-medium text-green-900">All items scanned!</div>
-                <div className="text-sm text-green-700">Ready to create GRN</div>
+                <div className="font-medium text-green-900">
+                  All items scanned!
+                </div>
+                <div className="text-sm text-green-700">
+                  Ready to create GRN
+                </div>
               </div>
             </div>
 
             <div className="bg-white rounded-lg border border-slate-200 p-4">
-              <div className="text-sm font-medium text-slate-700 mb-3">Summary</div>
+              <div className="text-sm font-medium text-slate-700 mb-3">
+                Summary
+              </div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-600">ASN:</span>
-                  <span className="font-medium text-slate-900">{selectedASN.asn_number}</span>
+                  <span className="font-medium text-slate-900">
+                    {selectedASN.asn_number}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Supplier:</span>
-                  <span className="font-medium text-slate-900">{selectedASN.supplier?.name}</span>
+                  <span className="font-medium text-slate-900">
+                    {selectedASN.supplier?.name}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Items:</span>
-                  <span className="font-medium text-slate-900">{scannedItems.length}</span>
+                  <span className="font-medium text-slate-900">
+                    {scannedItems.length}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">LPs Created:</span>
-                  <span className="font-medium text-slate-900">{scannedItems.length}</span>
+                  <span className="font-medium text-slate-900">
+                    {scannedItems.length}
+                  </span>
                 </div>
               </div>
             </div>
@@ -520,4 +570,3 @@ export default function ScannerReceivePage() {
     </div>
   );
 }
-
