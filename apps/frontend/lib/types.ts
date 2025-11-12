@@ -699,6 +699,8 @@ export interface BomItemInput {
   is_by_product?: boolean;  // True if OUTPUT (by-product), false if INPUT (material)
   yield_percentage?: number | null;  // Expected yield % for by-products (e.g., 15.00 = 15%)
   line_id?: number[] | null;  // Array of production line IDs for line-specific materials
+  // EPIC-001 Phase 3: Conditional Components
+  condition?: BomItemCondition | null;
 }
 
 export interface CreateSinglePayload {
@@ -918,6 +920,27 @@ export interface Bom {
   defaultRouting?: Routing;
 }
 
+// EPIC-001 Phase 3: Conditional BOM Item types
+export type ConditionOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'contains'
+  | 'not_contains'
+  | 'greater_than'
+  | 'less_than'
+  | 'in';
+
+export interface ConditionRule {
+  field: string;  // e.g., 'order_flags', 'customer_id', 'order_type'
+  operator: ConditionOperator;
+  value: string | number | any;
+}
+
+export interface BomItemCondition {
+  type: 'AND' | 'OR';
+  rules: ConditionRule[];
+}
+
 export interface BomItem {
   id: number;
   bom_id: number;
@@ -936,6 +959,10 @@ export interface BomItem {
   tax_code_id?: number | null;
   lead_time_days?: number | null;
   moq?: number | null;
+  // EPIC-001 Phase 1: By-Products Support
+  is_by_product?: boolean;
+  // EPIC-001 Phase 3: Conditional Components
+  condition?: BomItemCondition | null;
   created_at: string;
   updated_at: string;
   // Enhanced relationships
