@@ -29,7 +29,7 @@ export function AddLPToPalletModal({
   palletId,
   isOpen,
   onClose,
-  onSuccess
+  onSuccess,
 }: AddLPToPalletModalProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -61,7 +61,8 @@ export function AddLPToPalletModal({
       // Get all available LPs (QA Passed, not consumed)
       const { data, error } = await supabase
         .from('license_plates')
-        .select(`
+        .select(
+          `
           id,
           lp_number,
           quantity,
@@ -72,7 +73,8 @@ export function AddLPToPalletModal({
           is_consumed,
           product:products(description),
           location:locations(name)
-        `)
+        `
+        )
         .eq('qa_status', 'Passed')
         .eq('is_consumed', false)
         .order('lp_number', { ascending: false })
@@ -80,17 +82,30 @@ export function AddLPToPalletModal({
 
       if (error) throw error;
 
-      const lps: LicensePlate[] = (data || []).map(lp => ({
-        id: lp.id,
-        lp_number: lp.lp_number,
-        product_description: lp.product?.description || '',
-        quantity: parseFloat(lp.quantity),
-        uom: lp.uom,
-        batch: lp.batch,
-        expiry_date: lp.expiry_date,
-        location_name: lp.location?.name || '',
-        qa_status: lp.qa_status
-      }));
+      const lps: LicensePlate[] = (data || []).map((lp: any) => {
+        const rawProduct = lp.product;
+        const rawLocation = lp.location;
+
+        const productDescription = Array.isArray(rawProduct)
+          ? (rawProduct[0]?.description ?? '')
+          : (rawProduct?.description ?? '');
+
+        const locationName = Array.isArray(rawLocation)
+          ? (rawLocation[0]?.name ?? '')
+          : (rawLocation?.name ?? '');
+
+        return {
+          id: lp.id,
+          lp_number: lp.lp_number,
+          product_description: productDescription,
+          quantity: parseFloat(lp.quantity),
+          uom: lp.uom,
+          batch: lp.batch,
+          expiry_date: lp.expiry_date,
+          location_name: locationName,
+          qa_status: lp.qa_status,
+        };
+      });
 
       setAvailableLPs(lps);
     } catch (error) {
@@ -116,20 +131,24 @@ export function AddLPToPalletModal({
     }
 
     if (qtyToAdd > selectedLP.quantity) {
-      toast.error(`Quantity cannot exceed LP quantity (${selectedLP.quantity})`);
+      toast.error(
+        `Quantity cannot exceed LP quantity (${selectedLP.quantity})`
+      );
       return;
     }
 
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       await PalletsAPI.addLP({
         pallet_id: palletId,
         lp_id: selectedLP.id,
         quantity: qtyToAdd,
-        userId: user.id
+        userId: user.id,
       });
 
       toast.success(`LP ${selectedLP.lp_number} added to pallet`);
@@ -143,10 +162,11 @@ export function AddLPToPalletModal({
     }
   };
 
-  const filteredLPs = availableLPs.filter(lp =>
-    lp.lp_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lp.product_description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (lp.batch && lp.batch.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredLPs = availableLPs.filter(
+    lp =>
+      lp.lp_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lp.product_description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lp.batch && lp.batch.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (!isOpen) return null;
@@ -158,7 +178,9 @@ export function AddLPToPalletModal({
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-slate-700" />
-            <h2 className="text-xl font-semibold text-slate-900">Add LP to Pallet</h2>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Add LP to Pallet
+            </h2>
           </div>
           <button
             onClick={onClose}
@@ -182,7 +204,7 @@ export function AddLPToPalletModal({
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Scan barcode or type LP number, product, batch..."
                 className="w-full pl-10 pr-10 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
                 autoFocus
@@ -205,13 +227,17 @@ export function AddLPToPalletModal({
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                <span className="ml-2 text-sm text-slate-500">Loading LPs...</span>
+                <span className="ml-2 text-sm text-slate-500">
+                  Loading LPs...
+                </span>
               </div>
             ) : filteredLPs.length === 0 ? (
               <div className="text-center py-8 bg-slate-50 rounded-lg">
                 <Package className="w-12 h-12 mx-auto text-slate-300 mb-2" />
                 <p className="text-slate-500 text-sm">
-                  {searchTerm ? 'No matching license plates found' : 'No available license plates'}
+                  {searchTerm
+                    ? 'No matching license plates found'
+                    : 'No available license plates'}
                 </p>
               </div>
             ) : (
@@ -219,17 +245,31 @@ export function AddLPToPalletModal({
                 <table className="w-full">
                   <thead className="bg-slate-50 sticky top-0">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Select</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">LP Number</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Product</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Quantity</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Batch</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Expiry</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Location</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                        Select
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                        LP Number
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                        Product
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                        Quantity
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                        Batch
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                        Expiry
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                        Location
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {filteredLPs.map((lp) => (
+                    {filteredLPs.map(lp => (
                       <tr
                         key={lp.id}
                         onClick={() => setSelectedLP(lp)}
@@ -246,16 +286,26 @@ export function AddLPToPalletModal({
                             className="w-4 h-4 text-blue-600"
                           />
                         </td>
-                        <td className="px-4 py-2 text-sm font-mono text-slate-900">{lp.lp_number}</td>
-                        <td className="px-4 py-2 text-sm text-slate-600">{lp.product_description}</td>
+                        <td className="px-4 py-2 text-sm font-mono text-slate-900">
+                          {lp.lp_number}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-slate-600">
+                          {lp.product_description}
+                        </td>
                         <td className="px-4 py-2 text-sm text-slate-900">
                           {lp.quantity.toFixed(2)} {lp.uom}
                         </td>
-                        <td className="px-4 py-2 text-sm font-mono text-slate-600">{lp.batch || '-'}</td>
-                        <td className="px-4 py-2 text-sm text-slate-600">
-                          {lp.expiry_date ? new Date(lp.expiry_date).toLocaleDateString() : '-'}
+                        <td className="px-4 py-2 text-sm font-mono text-slate-600">
+                          {lp.batch || '-'}
                         </td>
-                        <td className="px-4 py-2 text-sm text-slate-500">{lp.location_name}</td>
+                        <td className="px-4 py-2 text-sm text-slate-600">
+                          {lp.expiry_date
+                            ? new Date(lp.expiry_date).toLocaleDateString()
+                            : '-'}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-slate-500">
+                          {lp.location_name}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -267,23 +317,33 @@ export function AddLPToPalletModal({
           {/* Selected LP Details */}
           {selectedLP && (
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="text-sm font-semibold text-blue-900 mb-3">Selected License Plate</h4>
+              <h4 className="text-sm font-semibold text-blue-900 mb-3">
+                Selected License Plate
+              </h4>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="font-medium text-blue-700">LP:</span>{' '}
-                  <span className="font-mono text-blue-900">{selectedLP.lp_number}</span>
+                  <span className="font-mono text-blue-900">
+                    {selectedLP.lp_number}
+                  </span>
                 </div>
                 <div>
                   <span className="font-medium text-blue-700">Product:</span>{' '}
-                  <span className="text-blue-900">{selectedLP.product_description}</span>
+                  <span className="text-blue-900">
+                    {selectedLP.product_description}
+                  </span>
                 </div>
                 <div>
                   <span className="font-medium text-blue-700">Available:</span>{' '}
-                  <span className="text-blue-900">{selectedLP.quantity.toFixed(2)} {selectedLP.uom}</span>
+                  <span className="text-blue-900">
+                    {selectedLP.quantity.toFixed(2)} {selectedLP.uom}
+                  </span>
                 </div>
                 <div>
                   <span className="font-medium text-blue-700">Batch:</span>{' '}
-                  <span className="font-mono text-blue-900">{selectedLP.batch || 'N/A'}</span>
+                  <span className="font-mono text-blue-900">
+                    {selectedLP.batch || 'N/A'}
+                  </span>
                 </div>
               </div>
 
@@ -296,7 +356,7 @@ export function AddLPToPalletModal({
                   <input
                     type="number"
                     value={quantity}
-                    onChange={(e) => {
+                    onChange={e => {
                       setQuantity(e.target.value);
                       setUseFullQty(false);
                     }}
@@ -325,7 +385,8 @@ export function AddLPToPalletModal({
                 </div>
                 {!useFullQty && parseFloat(quantity) < selectedLP.quantity && (
                   <p className="mt-1 text-xs text-blue-700">
-                    Partial quantity: {quantity} / {selectedLP.quantity} {selectedLP.uom}
+                    Partial quantity: {quantity} / {selectedLP.quantity}{' '}
+                    {selectedLP.uom}
                   </p>
                 )}
               </div>
