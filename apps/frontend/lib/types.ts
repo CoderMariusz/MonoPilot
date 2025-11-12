@@ -240,6 +240,117 @@ export interface Supplier {
 export type CreateSupplierData = Omit<Supplier, 'id' | 'created_at' | 'updated_at'>;
 export type UpdateSupplierData = Partial<CreateSupplierData>;
 
+// ============================================================================
+// EPIC-002: Scanner & Warehouse v2 - ASN (Advanced Shipping Notice)
+// ============================================================================
+
+export type ASNStatus = 'draft' | 'submitted' | 'received' | 'cancelled';
+
+export interface ASN {
+  id: number;
+  asn_number: string;
+  po_id?: number | null;
+  supplier_id: number;
+  expected_arrival: string; // TIMESTAMPTZ
+  actual_arrival?: string | null; // TIMESTAMPTZ
+  status: ASNStatus;
+  notes?: string | null;
+  attachments?: Array<{ name: string; url: string }> | null; // JSONB
+  created_at: string;
+  updated_at: string;
+  created_by?: string | null;
+  updated_by?: string | null;
+  // Relationships
+  supplier?: Supplier;
+  purchase_order?: POHeader;
+  asn_items?: ASNItem[];
+}
+
+export interface ASNItem {
+  id: number;
+  asn_id: number;
+  product_id: number;
+  quantity: number;
+  uom: string;
+  batch?: string | null; // Pre-assigned batch from supplier
+  expiry_date?: string | null; // DATE
+  lp_number?: string | null; // Pre-assigned LP number
+  notes?: string | null;
+  created_at: string;
+  // Relationships
+  product?: Product;
+}
+
+export interface CreateASNData {
+  asn_number: string;
+  po_id?: number | null;
+  supplier_id: number;
+  expected_arrival: string;
+  status?: ASNStatus;
+  notes?: string | null;
+  attachments?: Array<{ name: string; url: string }> | null;
+  asn_items?: CreateASNItemData[];
+}
+
+export interface CreateASNItemData {
+  product_id: number;
+  quantity: number;
+  uom: string;
+  batch?: string | null;
+  expiry_date?: string | null;
+  lp_number?: string | null;
+  notes?: string | null;
+}
+
+export interface UpdateASNData extends Partial<CreateASNData> {
+  id: number;
+}
+
+export interface ASNForReceiving {
+  asn_id: number;
+  asn_number: string;
+  supplier_name: string;
+  expected_arrival: string;
+  items_count: number;
+  total_quantity: number;
+}
+
+// Enhanced License Plate with genealogy and batch tracking
+export interface LicensePlateEnhanced extends LicensePlate {
+  batch?: string | null;
+  expiry_date?: string | null; // DATE
+  uom: string;
+  parent_lp_id?: number | null;
+  is_consumed: boolean;
+  consumed_at?: string | null;
+  consumed_by?: string | null;
+  asn_id?: number | null;
+  // Relationships
+  parent_lp?: LicensePlate;
+  asn?: ASN;
+}
+
+export interface LPForFIFO {
+  lp_id: number;
+  lp_number: string;
+  quantity: number;
+  uom: string;
+  batch?: string | null;
+  expiry_date?: string | null;
+  created_at: string;
+  location_name: string;
+}
+
+export interface LPGenealogyChain {
+  lp_id: number;
+  lp_number: string;
+  parent_lp_id?: number | null;
+  parent_lp_number?: string | null;
+  level: number; // 0 = target, negative = parents, positive = children
+  quantity: number;
+  batch?: string | null;
+}
+
 // Phase 1 Planning Types - Updated for new schema
 
 // PO status values must match database schema constraint
