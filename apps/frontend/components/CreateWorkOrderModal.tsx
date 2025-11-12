@@ -120,9 +120,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
   useEffect(() => {
     if (selectedTO && selectedTO.transfer_order_items && selectedTO.transfer_order_items.length > 0) {
       // Pre-fill quantity from first TO item (could be enhanced to match product)
-      const firstItem = selectedTO.transfer_order_items[0];
-      if (firstItem.quantity && !formData.quantity) {
-        setFormData(prev => ({ ...prev, quantity: firstItem.quantity.toString() }));
+      const firstItem = selectedTO.items?.[0];
+      if (firstItem?.qty_planned && !formData.quantity) {
+        setFormData(prev => ({ ...prev, quantity: firstItem.qty_planned.toString() }));
       }
     }
   }, [selectedTO]);

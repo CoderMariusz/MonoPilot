@@ -22,7 +22,7 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [shipDate, setShipDate] = useState('');
   const [receiveDate, setReceiveDate] = useState('');
-  const [lineUpdates, setLineUpdates] = useState<Record<number, { qty_moved: string; lp_id?: string; batch?: string }>>({});
+  const [lineUpdates, setLineUpdates] = useState<Record<number, { qty_received: string; lp_id?: string; batch?: string }>>({});
 
   useEffect(() => {
     async function loadWarehouses() {
@@ -126,10 +126,10 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
     const today = new Date().toISOString().split('T')[0];
     setReceiveDate(today);
     // Initialize line updates with planned quantities
-    const updates: Record<number, { qty_moved: string; lp_id?: string; batch?: string }> = {};
-    transferOrder?.transfer_order_items?.forEach(item => {
+    const updates: Record<number, { qty_received: string; lp_id?: string; batch?: string }> = {};
+    transferOrder?.items?.forEach(item => {
       updates[item.id] = {
-        qty_moved: String(item.quantity || 0),
+        qty_received: String(item.qty_planned || 0),
         lp_id: '',
         batch: item.batch || ''
       };
@@ -148,7 +148,7 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
       // Build line updates array
       const updates: MarkReceivedLineUpdate[] = Object.entries(lineUpdates).map(([id, data]) => ({
         line_id: Number(id),
-        qty_moved: Number(data.qty_moved),
+        qty_received: Number(data.qty_received),
         lp_id: data.lp_id ? Number(data.lp_id) : undefined,
         batch: data.batch || undefined
       }));
@@ -248,7 +248,7 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                 <div>
                   <div className="text-sm text-slate-600 mb-1">Total Items</div>
                   <div className="text-base font-medium text-slate-900">
-                    {transferOrder.transfer_order_items?.length || 0}
+                    {transferOrder.items?.length || 0}
                   </div>
                 </div>
               </div>
@@ -295,7 +295,7 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
             <div className="p-6">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Transfer Items</h3>
               
-              {!transferOrder.transfer_order_items || transferOrder.transfer_order_items.length === 0 ? (
+              {!transferOrder.items || transferOrder.items.length === 0 ? (
                 <div className="text-center py-8 text-slate-500 text-sm">
                   No transfer items found
                 </div>
@@ -305,14 +305,15 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                     <thead>
                       <tr className="border-b border-slate-200">
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Product</th>
-                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty Ordered</th>
-                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty Sent</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty Planned</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty Shipped</th>
+                        <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Qty Received</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">License Plate</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Batch</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {transferOrder.transfer_order_items.map((item) => (
+                      {transferOrder.items.map((item) => (
                         <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-3 px-4 text-sm">
                             <div className="font-medium text-slate-900">
@@ -323,10 +324,13 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                             </div>
                           </td>
                           <td className="py-3 px-4 text-sm text-right text-slate-700">
-                            {(item.quantity_planned ?? item.quantity) ?? 0} {item.product?.uom || ''}
+                            {item.qty_planned || 0} {item.uom || ''}
                           </td>
                           <td className="py-3 px-4 text-sm text-right text-slate-700">
-                            {(item.quantity_actual ?? 0)} {item.product?.uom || ''}
+                            {item.qty_shipped || 0} {item.uom || ''}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-right text-slate-700">
+                            {item.qty_received || 0} {item.uom || ''}
                           </td>
                           <td className="py-3 px-4 text-sm text-slate-600">
                             {item.lp_id ? `LP-${item.lp_id}` : '–'}
@@ -448,26 +452,26 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                     <tr>
                       <th className="text-left py-2 px-3 text-xs font-semibold text-slate-700">Product</th>
                       <th className="text-right py-2 px-3 text-xs font-semibold text-slate-700">Planned</th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-slate-700">Qty Moved</th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-slate-700">Qty Received</th>
                       <th className="text-left py-2 px-3 text-xs font-semibold text-slate-700">LP ID</th>
                       <th className="text-left py-2 px-3 text-xs font-semibold text-slate-700">Batch</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {transferOrder?.transfer_order_items?.map((item) => (
+                    {transferOrder?.items?.map((item) => (
                       <tr key={item.id} className="border-t border-slate-100">
                         <td className="py-2 px-3 text-xs">
                           <div className="font-medium text-slate-900">{item.product?.part_number || '-'}</div>
                         </td>
-                        <td className="py-2 px-3 text-xs text-right text-slate-600">{item.quantity}</td>
+                        <td className="py-2 px-3 text-xs text-right text-slate-600">{item.qty_planned}</td>
                         <td className="py-2 px-3">
                           <input
                             type="number"
-                            value={lineUpdates[item.id]?.qty_moved || ''}
-                            onChange={(e) => updateLineField(item.id, 'qty_moved', e.target.value)}
+                            value={lineUpdates[item.id]?.qty_received || ''}
+                            onChange={(e) => updateLineField(item.id, 'qty_received', e.target.value)}
                             step="0.01"
                             min="0"
-                            max={item.quantity}
+                            max={item.qty_planned}
                             className="w-20 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
                           />
                         </td>

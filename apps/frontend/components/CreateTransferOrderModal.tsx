@@ -121,7 +121,8 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
           item_id: Number(item.product_id),
           uom: product.uom || 'EA',
           qty_planned: quantityNum,
-          qty_moved: 0,
+          qty_shipped: 0,
+          qty_received: 0,
         };
       });
 

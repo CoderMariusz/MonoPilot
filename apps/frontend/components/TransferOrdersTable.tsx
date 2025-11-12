@@ -52,7 +52,7 @@ export function TransferOrdersTable() {
       const fromWarehouseCode = to.from_warehouse?.code?.toLowerCase() || '';
       const toWarehouseName = to.to_warehouse?.name?.toLowerCase() || '';
       const toWarehouseCode = to.to_warehouse?.code?.toLowerCase() || '';
-      const itemCodes = to.transfer_order_items?.map(item => 
+      const itemCodes = to.items?.map(item =>
         item.product?.part_number?.toLowerCase() || ''
       ).join(' ') || '';
       
@@ -119,8 +119,8 @@ export function TransferOrdersTable() {
           bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
           break;
         case 'items_count':
-          aVal = a.transfer_order_items?.length || 0;
-          bVal = b.transfer_order_items?.length || 0;
+          aVal = a.items?.length || 0;
+          bVal = b.items?.length || 0;
           break;
         default:
           return 0;
@@ -378,7 +378,7 @@ export function TransferOrdersTable() {
                       {to.status.replace('_', ' ')}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-sm">{to.transfer_order_items?.length || 0}</td>
+                  <td className="py-3 px-4 text-sm">{to.items?.length || 0}</td>
                   <td className="py-3 px-4 text-sm">
                     <div className="flex items-center gap-2">
                       <button

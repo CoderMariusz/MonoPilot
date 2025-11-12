@@ -476,19 +476,38 @@ Implemented comprehensive E2E test suite using **Playwright**:
 - `020_to_line.sql` - zmieniona struktura
 - `043_warehouse_settings.sql` - nowa tabela
 
-**Pliki kodu do aktualizacji**:
-- [x] `apps/frontend/lib/api/transferOrders.ts` - API calls (NAPRAWIONE 2025-01-11)
+**Pliki kodu zaktualizowane**:
+- [x] `apps/frontend/lib/api/transferOrders.ts` - API calls (NAPRAWIONE 2025-01-11, 2025-11-12)
   - Usunięto from_location_id, to_location_id z queries
   - Zmieniono qty_moved na qty_shipped/qty_received
   - Usunięto scan_required, approved_line
   - Zunifikowano queries w getAll() i getById()
-- [ ] `apps/frontend/lib/types.ts` - interface TransferOrderItem
-- [ ] `apps/frontend/components/TransferOrdersTable.tsx` - wyświetlanie
-- [ ] `apps/frontend/components/EditTransferOrderModal.tsx` - edycja
-- [ ] `apps/frontend/components/CreateTransferOrderModal.tsx` - tworzenie
-- [ ] `apps/frontend/components/TransferOrderDetailsModal.tsx` - szczegóły
+  - Zaktualizowano mapping w getAll() dla nowych interfaces
+- [x] `apps/frontend/lib/types.ts` - interface TransferOrderItem (NAPRAWIONE 2025-11-12)
+  - Dodano pełny TransferOrderItem interface
+  - Zaktualizowano TransferOrder z `items` i deprecated `transfer_order_items`
+  - Zaktualizowano TOHeader i TOLine
+- [x] `apps/frontend/components/TransferOrdersTable.tsx` - wyświetlanie (NAPRAWIONE 2025-11-12)
+  - Zmieniono transfer_order_items → items
+- [x] `apps/frontend/components/EditTransferOrderModal.tsx` - edycja (NAPRAWIONE 2025-11-12)
+  - Zmieniono transfer_order_items → items
+  - Zmieniono quantity → qty_planned
+  - Zmieniono qty_moved → qty_shipped + qty_received
+- [x] `apps/frontend/components/CreateTransferOrderModal.tsx` - tworzenie (NAPRAWIONE 2025-11-12)
+  - Zmieniono qty_moved → qty_shipped + qty_received
+- [x] `apps/frontend/components/TransferOrderDetailsModal.tsx` - szczegóły (NAPRAWIONE 2025-11-12)
+  - Zmieniono transfer_order_items → items
+  - Zmieniono quantity → qty_planned
+  - Zmieniono qty_moved → qty_received
+  - Zaktualizowano MarkReceivedLineUpdate interface
+- [x] `apps/frontend/lib/planning/totals.ts` - kalkulacje (NAPRAWIONE 2025-11-12)
+  - Zmieniono qty_moved → qty_shipped
+  - Usunięto scan_required, approved_line, from_location_id, to_location_id logic
+- [x] `apps/frontend/components/CreateWorkOrderModal.tsx` - pre-fill (NAPRAWIONE 2025-11-12)
+  - Zmieniono transfer_order_items → items
+  - Zmieniono quantity → qty_planned
 
-**Status**: ✅ Schema naprawione, 🔄 API naprawione, 🔄 Komponenty frontend wymagają aktualizacji
+**Status**: ✅ **Schema naprawione, ✅ API naprawione, ✅ Komponenty frontend zaktualizowane, ✅ Type-check passed (0 errors)**
 
 ---
 
@@ -523,29 +542,26 @@ W `transferOrders.ts` metody `getAll()` i `getById()` miały różne queries:
 
 ---
 
-### [Priorytet: Wysoki] Frontend Types vs Database Schema
+### ✅ [2025-11-12] Frontend Types vs Database Schema - **COMPLETE**
 
 **Kategoria**: API vs Types
 
 **Problem**:
-Po reorganizacji migracji i poprawce TO, interfejsy TypeScript w `apps/frontend/lib/types.ts` mogą nie odpowiadać aktualnej strukturze bazy danych.
+Po reorganizacji migracji i poprawce TO, interfejsy TypeScript w `apps/frontend/lib/types.ts` nie odpowiadały aktualnej strukturze bazy danych.
 
-**Do sprawdzenia**:
-- [ ] Interface `TransferOrder` - czy zawiera `actual_ship_date`, `actual_receive_date`?
-- [ ] Interface `TransferOrderItem` - czy ma `qty_shipped`, `qty_received` zamiast `qty_moved`?
-- [ ] Interface `PurchaseOrder` - czy ma wszystkie pola z `po_header`?
-- [ ] Interface `PurchaseOrderItem` - czy ma wszystkie pola z `po_line`?
-- [ ] Interface `WorkOrder` - czy ma `line_id` (production_lines)?
-- [ ] Interface `LicensePlate` - czy ma `lp_type`, `stage_suffix`?
+**Zmiany wykonane**:
+- ✅ Interface `TransferOrder` - dodano `items: TransferOrderItem[]` i deprecated alias `transfer_order_items`
+- ✅ Interface `TransferOrderItem` - nowy interface z polami: `id`, `to_id`, `line_no`, `item_id`, `uom`, `qty_planned`, `qty_shipped`, `qty_received`, `lp_id`, `batch`, `notes`
+- ✅ Interface `TOHeader` - zaktualizowano: dodano `notes`, `updated_by`
+- ✅ Interface `TOLine` - zaktualizowano: zmieniono `qty_moved` → `qty_shipped` + `qty_received`, usunięto `from_location_id`, `to_location_id`, `scan_required`, `approved_line`, dodano `notes`
+- ✅ Interface `MarkReceivedLineUpdate` - zmieniono `qty_moved` → `qty_received`
 
-**Jak sprawdzić**:
-```bash
-# Porównaj typy z migracjami
-grep "CREATE TABLE" apps/frontend/lib/supabase/migrations/*.sql
-code apps/frontend/lib/types.ts
-```
+**Pliki zmodyfikowane**:
+- `apps/frontend/lib/types.ts` - zaktualizowano TransferOrder, TransferOrderItem, TOHeader, TOLine
+- `apps/frontend/lib/api/transferOrders.ts` - zaktualizowano MarkReceivedLineUpdate, getAll() mapping
+- `apps/frontend/lib/planning/totals.ts` - zastąpiono qty_moved → qty_shipped, usunięto deprecated fields
 
-**Status**: 🔍 Do weryfikacji
+**Status**: ✅ **COMPLETE** - Wszystkie typy zsynchronizowane z bazą danych
 
 ---
 

@@ -103,7 +103,7 @@ export interface TOLineTotals {
 
 export function calculateTOLineTotals(line: TOLine): TOLineTotals {
   const plannedQuantity = line.qty_planned;
-  const movedQuantity = line.qty_moved;
+  const movedQuantity = line.qty_shipped; // Use qty_shipped as moved quantity
   const remainingQuantity = Math.max(0, plannedQuantity - movedQuantity);
   const completionPercentage = plannedQuantity > 0 
     ? Math.round((movedQuantity / plannedQuantity) * 100) 
@@ -137,15 +137,10 @@ export function calculateTOTotals(to: TOHeader, lines: TOLine[]): TOTotals {
 
   for (const line of lines) {
     totalPlanned += line.qty_planned;
-    totalMoved += line.qty_moved;
-    
-    if (line.scan_required) {
-      scanRequiredCount++;
-    }
-    
-    if (line.approved_line) {
-      approvedLineCount++;
-    }
+    totalMoved += line.qty_shipped; // Use qty_shipped as moved quantity
+
+    // scan_required and approved_line fields deprecated
+    // All lines now use header-level approval
   }
 
   const completionPercentage = totalPlanned > 0 
@@ -266,7 +261,7 @@ export function calculateTOProgress(to: TOHeader, lines: TOLine[]): ProgressSumm
 
   for (const line of lines) {
     totalPlanned += line.qty_planned;
-    totalMoved += line.qty_moved;
+    totalMoved += line.qty_shipped; // Use qty_shipped as moved quantity
   }
 
   const progressPercentage = totalPlanned > 0 
@@ -282,7 +277,7 @@ export function calculateTOProgress(to: TOHeader, lines: TOLine[]): ProgressSumm
 
   return {
     totalItems: lines.length,
-    completedItems: lines.filter(l => l.qty_moved >= l.qty_planned).length,
+    completedItems: lines.filter(l => l.qty_shipped >= l.qty_planned).length,
     progressPercentage,
     status
   };
@@ -376,20 +371,13 @@ export function detectTOWarnings(to: TOHeader, lines: TOLine[]): TOWarnings {
   let hasUnapprovedLines = false;
 
   for (const line of lines) {
-    // Check for incomplete scans
-    if (line.scan_required && line.qty_moved < line.qty_planned) {
+    // Check for incomplete shipments
+    if (line.qty_shipped < line.qty_planned) {
       hasIncompleteScans = true;
     }
 
-    // Check for missing locations
-    if (!line.from_location_id || !line.to_location_id) {
-      hasMissingLocations = true;
-    }
-
-    // Check for unapproved lines
-    if (!line.approved_line) {
-      hasUnapprovedLines = true;
-    }
+    // Location validation deprecated (TO is warehouse-to-warehouse, not location-to-location)
+    // Approval validation deprecated (TO approval now at header level)
   }
 
   if (hasIncompleteScans) {
