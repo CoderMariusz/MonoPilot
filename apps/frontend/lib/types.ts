@@ -513,6 +513,7 @@ export interface PurchaseOrderItem extends POLine {
 export interface GRN {
   id: number;
   po_id: number;
+  asn_id?: number | null; // EPIC-002: Link to source ASN
   grn_number: string;
   received_date: string;
   status: string;
@@ -520,6 +521,10 @@ export interface GRN {
   created_by: string;
   grn_items?: any[];
   po?: PurchaseOrder;
+  asn?: { // EPIC-002: ASN relationship
+    asn_number: string;
+    status: string;
+  };
   created_at: string;
   updated_at: string;
 }

@@ -82,6 +82,65 @@ static async delete(id: number): Promise<void>
 
 ---
 
+### ASNsAPI
+
+**Source**: `apps/frontend/lib/api/asns.ts`
+
+**Methods**:
+
+#### `create()`
+
+**Signature**:
+```typescript
+static async create(data: {
+    asn_number: string;
+    supplier_id: number;
+    po_id?: number;
+    expected_arrival: string;
+    items: any[];
+    attachments?: any[];
+  }): Promise<{ success: boolean; asn_id?: string; message?: string }>
+```
+
+**Parameters**:
+- `data: {
+    asn_number: string;
+    supplier_id: number;
+    po_id?: number;
+    expected_arrival: string;
+    items: any[];
+    attachments?: any[];
+  }`
+
+**Returns**: `Promise<{ success: boolean; asn_id?: string; message?: string }>`
+
+---
+
+#### `getAll()`
+
+**Signature**:
+```typescript
+static async getAll(): Promise<any[]>
+```
+
+**Returns**: `Promise<any[]>`
+
+---
+
+#### `getById()`
+
+**Signature**:
+```typescript
+static async getById(id: number): Promise<any | null>
+```
+
+**Parameters**:
+- `id: number`
+
+**Returns**: `Promise<any | null>`
+
+---
+
 ### BomHistoryAPI
 
 **Source**: `apps/frontend/lib/api/bomHistory.ts`
@@ -1704,130 +1763,6 @@ static async recordByProductOutput(woId: number, byProductId: number, actualQuan
 - `notes?: string`
 
 **Returns**: `Promise<{ lp_id: number; lp_number: string }>`
-
----
-
-#### `evaluateConditionalMaterials()`
-
-**Signature**:
-```typescript
-static async evaluateConditionalMaterials(bomId: number, woContext: {
-      order_flags?: string[];
-      customer_id?: number;
-      order_type?: string;
-    }): Promise<Array<{
-    bom_item_id: number;
-    material_id: number;
-    quantity: number;
-    uom: string;
-    sequence: number;
-    is_conditional: boolean;
-    condition_met: boolean;
-    condition: any;
-  }>
-```
-
-**Parameters**:
-- `bomId: number`
-- `woContext: {
-      order_flags?: string[];
-      customer_id?: number;
-      order_type?: string;
-    }`
-
-**Returns**: `Promise<Array<{
-    bom_item_id: number;
-    material_id: number;
-    quantity: number;
-    uom: string;
-    sequence: number;
-    is_conditional: boolean;
-    condition_met: boolean;
-    condition: any;
-  }>`
-
----
-
-#### `getAllMaterialsWithEvaluation()`
-
-**Signature**:
-```typescript
-static async getAllMaterialsWithEvaluation(bomId: number, woContext: {
-      order_flags?: string[];
-      customer_id?: number;
-      order_type?: string;
-    }): Promise<Array<{
-    bom_item_id: number;
-    material_id: number;
-    quantity: number;
-    uom: string;
-    sequence: number;
-    is_conditional: boolean;
-    condition_met: boolean;
-    condition: any;
-    is_by_product: boolean;
-  }>
-```
-
-**Parameters**:
-- `bomId: number`
-- `woContext: {
-      order_flags?: string[];
-      customer_id?: number;
-      order_type?: string;
-    }`
-
-**Returns**: `Promise<Array<{
-    bom_item_id: number;
-    material_id: number;
-    quantity: number;
-    uom: string;
-    sequence: number;
-    is_conditional: boolean;
-    condition_met: boolean;
-    condition: any;
-    is_by_product: boolean;
-  }>`
-
----
-
-#### `createWithConditionalMaterials()`
-
-**Signature**:
-```typescript
-static async createWithConditionalMaterials(data: CreateWorkOrderData & {
-      order_flags?: string[];
-      customer_id?: number;
-      order_type?: string;
-    }): Promise<{
-    workOrder: WorkOrder;
-    evaluatedMaterials: Array<{
-      bom_item_id: number;
-      material_id: number;
-      quantity: number;
-      uom: string;
-      is_conditional: boolean;
-      condition_met: boolean;
-    }>
-```
-
-**Parameters**:
-- `data: CreateWorkOrderData & {
-      order_flags?: string[];
-      customer_id?: number;
-      order_type?: string;
-    }`
-
-**Returns**: `Promise<{
-    workOrder: WorkOrder;
-    evaluatedMaterials: Array<{
-      bom_item_id: number;
-      material_id: number;
-      quantity: number;
-      uom: string;
-      is_conditional: boolean;
-      condition_met: boolean;
-    }>`
 
 ---
 

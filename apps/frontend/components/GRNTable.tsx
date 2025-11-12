@@ -45,6 +45,10 @@ export function GRNTable() {
             supplier:suppliers (
               name
             )
+          ),
+          asn:asn_id (
+            asn_number,
+            status
           )
         `)
         .order('created_at', { ascending: false });
@@ -146,7 +150,16 @@ export function GRNTable() {
             ) : (
               filteredGRNs.map((grn) => (
                 <tr key={grn.id} className="hover:bg-slate-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{grn.grn_number}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-slate-900">{grn.grn_number}</div>
+                    {grn.asn && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                          From ASN: {grn.asn.asn_number}
+                        </span>
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{grn.po?.po_number || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{grn.po?.supplier?.name || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{formatDateTime(grn.received_date)}</td>

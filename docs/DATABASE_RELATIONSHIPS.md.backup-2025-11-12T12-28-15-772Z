@@ -29,8 +29,6 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `to_header.created_by` → `users.id`
 - `to_header.approved_by` → `users.id`
 - `wo_operations.operator_id` → `users.id`
-- `asns.created_by` → `users.id`
-- `asns.updated_by` → `users.id`
 - `audit_log.actor_id` → `users.id`
 
 ### warehouses

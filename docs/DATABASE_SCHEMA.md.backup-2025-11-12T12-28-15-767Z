@@ -559,8 +559,6 @@ CREATE TABLE products (
 - idx_boms_product_status ON (product_id, status)
 - idx_boms_status ON (status)
 - idx_boms_routing ON (default_routing_id)
-- idx_boms_product_date_range ON (product_id, effective_from, effective_to)
-- idx_boms_current ON (product_id, effective_from)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1236,8 +1234,6 @@ CREATE TABLE to_line (
 - idx_wo_product_status ON (product_id, status)
 - idx_wo_bom ON (bom_id)
 - idx_wo_line ON (line_id)
-- idx_work_orders_customer_id ON (customer_id)
-- idx_work_orders_order_type ON (order_type)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1459,12 +1455,6 @@ CREATE TABLE production_outputs (
 - idx_license_plates_parent_lp ON (parent_lp_id)
 - idx_license_plates_consumed_by_wo ON (consumed_by_wo_id)
 - idx_license_plates_lp_type ON (lp_type)
-- idx_license_plates_batch ON (batch)
-- idx_license_plates_expiry ON (expiry_date)
-- idx_license_plates_parent ON (parent_lp_id)
-- idx_license_plates_consumed ON (is_consumed, consumed_at)
-- idx_license_plates_asn ON (asn_id)
-- idx_license_plates_fifo ON (product_id, location_id, expiry_date, created_at)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1847,17 +1837,11 @@ CREATE TABLE grn_items (
 | attachments | JSONB | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
-| actual_arrival | TIMESTAMPTZ | - |
-| notes | TEXT | - |
-| created_by | UUID | REFERENCES users(id) |
-| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
 - `supplier_id` → `suppliers.id`
 - `po_id` → `po_header.id`
-- `created_by` → `users.id`
-- `updated_by` → `users.id`
 
 **Indexes**:
 
@@ -1865,13 +1849,6 @@ CREATE TABLE grn_items (
 - idx_asns_supplier ON (supplier_id)
 - idx_asns_po ON (po_id)
 - idx_asns_expected_arrival ON (expected_arrival)
-- idx_asns_asn_number ON (asn_number)
-- idx_asns_po_id ON (po_id) WHERE po_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_asns_supplier_id ON asns(supplier_id)
-- idx_asns_status ON (status)
-- idx_asns_status_expected ON (status, expected_arrival)
-- idx_asns_po_id ON (po_id)
-- idx_asns_supplier_id ON (supplier_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1910,8 +1887,6 @@ CREATE TABLE asns (
 | pallet | JSONB | - |
 | notes | TEXT | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
-| expiry_date | DATE | - |
-| lp_number | VARCHAR(50) | - |
 
 **Foreign Keys**:
 
@@ -1922,23 +1897,6 @@ CREATE TABLE asns (
 
 - idx_asn_items_asn ON (asn_id)
 - idx_asn_items_product ON (product_id)
-- idx_asn_items_asn_id ON (asn_id)
-- idx_asn_items_product_id ON (product_id)
-- idx_asn_items_batch ON (batch) WHERE batch IS NOT NULL;
-
--- ============================================================================
--- ROW LEVEL SECURITY (RLS)
--- ============================================================================
-
-ALTER TABLE asns ENABLE ROW LEVEL SECURITY;
-ALTER TABLE asn_items ENABLE ROW LEVEL SECURITY;
-
--- Policy: Allow full access to authenticated users
-CREATE POLICY "Allow full access to asns for authenticated users"
-ON asns TO authenticated
-USING (TRUE)
-WITH CHECK (TRUE)
-- idx_asn_items_batch ON (batch)
 
 <details>
 <summary>SQL Definition</summary>
