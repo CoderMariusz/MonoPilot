@@ -371,4 +371,185 @@ export class WorkOrdersAPI {
       throw error;
     }
   }
+
+  // ============================================================================
+  // EPIC-001: By-Products Support
+  // ============================================================================
+
+  /**
+   * Get by-products for a work order
+   * @param woId Work order ID
+   * @returns Array of by-products with expected and actual quantities
+   */
+  static async getByProducts(woId: number) {
+    try {
+      const { data, error } = await supabase
+        .from('wo_by_products')
+        .select(`
+          *,
+          product:products(
+            id,
+            product_code,
+            description,
+            product_type
+          ),
+          lp:license_plates(
+            id,
+            lp_number,
+            status
+          )
+        `)
+        .eq('wo_id', woId)
+        .order('product_id');
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching WO by-products:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Record actual by-product output and create license plate
+   * @param woId Work order ID
+   * @param byProductId By-product record ID (from wo_by_products table)
+   * @param actualQuantity Actual quantity produced
+   * @param locationId Location where by-product will be stored
+   * @param notes Optional notes from operator
+   * @returns Created license plate details
+   */
+  static async recordByProductOutput(
+    woId: number,
+    byProductId: number,
+    actualQuantity: number,
+    locationId: number,
+    notes?: string
+  ): Promise<{ lp_id: number; lp_number: string }> {
+    try {
+      // 1. Get by-product details
+      const { data: byProduct, error: byProductError } = await supabase
+        .from('wo_by_products')
+        .select('product_id, uom')
+        .eq('id', byProductId)
+        .eq('wo_id', woId)
+        .single();
+
+      if (byProductError || !byProduct) {
+        throw new Error('By-product not found');
+      }
+
+      // 2. Generate LP number
+      const { data: lpData, error: lpError } = await supabase.rpc(
+        'generate_lp_number',
+        {}
+      );
+
+      if (lpError) {
+        console.error('Error generating LP number:', lpError);
+        throw new Error('Failed to generate LP number');
+      }
+
+      const lpNumber = lpData || `LP-${Date.now()}`;
+
+      // 3. Create license plate
+      const { data: lp, error: createLpError } = await supabase
+        .from('license_plates')
+        .insert({
+          lp_number: lpNumber,
+          product_id: byProduct.product_id,
+          quantity: actualQuantity,
+          uom: byProduct.uom,
+          location_id: locationId,
+          status: 'available',
+          qa_status: 'pending',
+          source_type: 'wo_by_product',
+          source_id: woId,
+        })
+        .select()
+        .single();
+
+      if (createLpError || !lp) {
+        console.error('Error creating LP:', createLpError);
+        throw new Error('Failed to create license plate');
+      }
+
+      // 4. Update by-product record with actual quantity and LP
+      const { error: updateError } = await supabase
+        .from('wo_by_products')
+        .update({
+          actual_quantity: actualQuantity,
+          lp_id: lp.id,
+          notes: notes || null,
+        })
+        .eq('id', byProductId);
+
+      if (updateError) {
+        console.error('Error updating by-product:', updateError);
+        throw new Error('Failed to update by-product record');
+      }
+
+      return {
+        lp_id: lp.id,
+        lp_number: lp.lp_number,
+      };
+    } catch (error) {
+      console.error('Error recording by-product output:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Snapshot by-products from BOM to WO during WO creation
+   * This is called internally when creating a WO
+   * @param woId Work order ID
+   * @param bomId BOM ID
+   * @param woQuantity Work order quantity (main output)
+   * @returns Array of created by-product records
+   */
+  static async snapshotByProductsFromBOM(
+    woId: number,
+    bomId: number,
+    woQuantity: number
+  ) {
+    try {
+      // 1. Get by-products from BOM
+      const { data: bomByProducts, error: bomError } = await supabase
+        .from('bom_items')
+        .select('material_id, uom, yield_percentage')
+        .eq('bom_id', bomId)
+        .eq('is_by_product', true);
+
+      if (bomError) throw bomError;
+
+      if (!bomByProducts || bomByProducts.length === 0) {
+        return [];  // No by-products in this BOM
+      }
+
+      // 2. Calculate expected quantities and create wo_by_products records
+      const byProductRecords = bomByProducts.map((bomItem) => ({
+        wo_id: woId,
+        product_id: bomItem.material_id,
+        expected_quantity: (woQuantity * bomItem.yield_percentage!) / 100,
+        actual_quantity: 0,
+        uom: bomItem.uom,
+        lp_id: null,
+        notes: null,
+      }));
+
+      // 3. Insert all by-product records
+      const { data, error: insertError } = await supabase
+        .from('wo_by_products')
+        .insert(byProductRecords)
+        .select();
+
+      if (insertError) throw insertError;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error snapshotting by-products from BOM:', error);
+      throw error;
+    }
+  }
 }

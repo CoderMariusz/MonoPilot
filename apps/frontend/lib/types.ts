@@ -110,6 +110,22 @@ export type UpdateWorkOrderData = Partial<CreateWorkOrderData>;
 // WO status values must match database schema constraint (no 'draft' status in DB)
 export type WorkOrderStatus = 'planned' | 'released' | 'in_progress' | 'completed' | 'cancelled';
 
+// EPIC-001: By-Products Support
+export interface WOByProduct {
+  id: number;
+  wo_id: number;
+  product_id: number;
+  product?: any;  // Populated from products table
+  expected_quantity: number;
+  actual_quantity: number;
+  uom: string;
+  lp_id?: number | null;
+  lp?: any;  // Populated from license_plates table
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LicensePlate {
   id: string;
   lp_code: string;
@@ -539,6 +555,9 @@ export interface BomItemInput {
   tax_code_id?: number | null;
   lead_time_days?: number | null;
   moq?: number | null;
+  // EPIC-001: By-Products Support
+  is_by_product?: boolean;  // True if OUTPUT (by-product), false if INPUT (material)
+  yield_percentage?: number | null;  // Expected yield % for by-products (e.g., 15.00 = 15%)
   line_id?: number[] | null;  // Array of production line IDs for line-specific materials
 }
 
