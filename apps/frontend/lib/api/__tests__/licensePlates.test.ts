@@ -689,4 +689,199 @@ describe('LicensePlatesAPI', () => {
       expect(childLP2).toBe('LP-2025-001-S2');
     });
   });
+
+  // =============================================
+  // EPIC-002 PHASE 2: LP GENEALOGY & TRACEABILITY
+  // =============================================
+
+  describe('split() - Phase 2 Genealogy Tracking', () => {
+    const mockUser = { id: 'user-123' };
+
+    it('should split LP and record genealogy', async () => {
+      const mockLP = {
+        id: 1,
+        lp_number: 'LP-2025-001',
+        product_id: 10,
+        location_id: 5,
+        quantity: 100,
+        uom: 'kg',
+        batch: 'LOT-001',
+        expiry_date: '2025-12-31',
+        qa_status: 'Passed',
+        is_consumed: false
+      };
+
+      // Mock parent LP fetch
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValueOnce({ data: mockLP, error: null })
+      } as any);
+
+      // Mock LP number generation
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        select: vi.fn().mockReturnThis(),
+        like: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValueOnce({ data: [], error: null })
+      } as any);
+
+      // Mock child LPs insert
+      const mockChildren = [
+        { id: 2, lp_number: 'LP-2025-000001', quantity: 50, uom: 'kg', batch: 'LOT-001', expiry_date: '2025-12-31' },
+        { id: 3, lp_number: 'LP-2025-000002', quantity: 50, uom: 'kg', batch: 'LOT-001', expiry_date: '2025-12-31' }
+      ];
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        insert: vi.fn().mockReturnThis(),
+        select: vi.fn().mockResolvedValueOnce({ data: mockChildren, error: null })
+      } as any);
+
+      // Mock genealogy insert
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        insert: vi.fn().mockResolvedValueOnce({ error: null })
+      } as any);
+
+      // Mock parent consumed update
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        update: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValueOnce({ error: null })
+      } as any);
+
+      const result = await LicensePlatesAPI.split(
+        1,
+        [{ quantity: 50 }, { quantity: 50 }],
+        mockUser.id
+      );
+
+      expect(result.child_lps).toHaveLength(2);
+      expect(result.parent_lp.is_consumed).toBe(true);
+    });
+
+    it('should fail if parent LP is consumed', async () => {
+      const consumedLP = {
+        id: 1,
+        is_consumed: true,
+        quantity: 100
+      };
+
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValueOnce({ data: consumedLP, error: null })
+      } as any);
+
+      await expect(
+        LicensePlatesAPI.split(1, [{ quantity: 50 }, { quantity: 50 }], mockUser.id)
+      ).rejects.toThrow('Cannot split consumed LP');
+    });
+  });
+
+  describe('merge() - Phase 2 Composition Tracking', () => {
+    const mockUser = { id: 'user-123' };
+
+    it('should merge LPs and record composition', async () => {
+      const inputLPs = [
+        { id: 1, product_id: 10, batch: 'LOT-001', expiry_date: '2025-12-31', qa_status: 'Passed', is_consumed: false, quantity: 30, uom: 'kg', lp_number: 'LP-001' },
+        { id: 2, product_id: 10, batch: 'LOT-001', expiry_date: '2025-12-31', qa_status: 'Passed', is_consumed: false, quantity: 70, uom: 'kg', lp_number: 'LP-002' }
+      ];
+
+      // Mock input LPs fetch
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        select: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValueOnce({ data: inputLPs, error: null })
+      } as any);
+
+      // Mock LP number generation
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        select: vi.fn().mockReturnThis(),
+        like: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValueOnce({ data: [], error: null })
+      } as any);
+
+      // Mock output LP insert
+      const mockOutput = { id: 3, lp_number: 'LP-2025-000001', quantity: 100, uom: 'kg' };
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        insert: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValueOnce({ data: mockOutput, error: null })
+      } as any);
+
+      // Mock composition insert
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        insert: vi.fn().mockResolvedValueOnce({ error: null })
+      } as any);
+
+      // Mock consume input LPs
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        update: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValueOnce({ error: null })
+      } as any);
+
+      const result = await LicensePlatesAPI.merge(
+        [1, 2],
+        { product_id: 10, location_id: 5, quantity: 100, uom: 'kg' },
+        mockUser.id
+      );
+
+      expect(result.output_lp.quantity).toBe(100);
+      expect(result.input_lps).toHaveLength(2);
+    });
+
+    it('should fail if batches do not match', async () => {
+      const mismatchedLPs = [
+        { id: 1, product_id: 10, batch: 'LOT-001', expiry_date: '2025-12-31', qa_status: 'Passed', is_consumed: false },
+        { id: 2, product_id: 10, batch: 'LOT-002', expiry_date: '2025-12-31', qa_status: 'Passed', is_consumed: false }
+      ];
+
+      vi.mocked(supabase.from).mockReturnValueOnce({
+        select: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValueOnce({ data: mismatchedLPs, error: null })
+      } as any);
+
+      await expect(
+        LicensePlatesAPI.merge(
+          [1, 2],
+          { product_id: 10, location_id: 5, quantity: 100, uom: 'kg' },
+          mockUser.id
+        )
+      ).rejects.toThrow('same product, batch, expiry date, and QA status');
+    });
+  });
+
+  describe('getGenealogy() - Phase 2', () => {
+    it('should retrieve genealogy tree', async () => {
+      const mockTree = [
+        { lp_id: 1, lp_number: 'LP-001', level: 0, quantity: 100, uom: 'kg' },
+        { lp_id: 2, lp_number: 'LP-002', level: 1, quantity: 50, uom: 'kg' },
+        { lp_id: 3, lp_number: 'LP-003', level: 1, quantity: 50, uom: 'kg' }
+      ];
+
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: mockTree, error: null } as any);
+
+      const result = await LicensePlatesAPI.getGenealogy(1);
+
+      expect(result.tree).toHaveLength(3);
+      expect(supabase.rpc).toHaveBeenCalledWith('get_lp_genealogy_tree', { lp_id_param: 1 });
+    });
+  });
+
+  describe('getReverseGenealogy() - Phase 2', () => {
+    it('should retrieve reverse genealogy chain', async () => {
+      const mockChain = [
+        { lp_id: 3, lp_number: 'LP-003', level: 0, quantity: 25, wo_number: 'WO-001' },
+        { lp_id: 2, lp_number: 'LP-002', level: -1, quantity: 50, wo_number: null },
+        { lp_id: 1, lp_number: 'LP-001', level: -2, quantity: 100, wo_number: null }
+      ];
+
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: mockChain, error: null } as any);
+
+      const result = await LicensePlatesAPI.getReverseGenealogy(3);
+
+      expect(result.chain).toHaveLength(3);
+      expect(result.chain[0].level).toBe(0);
+      expect(result.chain[2].level).toBe(-2);
+      expect(supabase.rpc).toHaveBeenCalledWith('get_lp_reverse_genealogy', { lp_id_param: 3 });
+    });
+  });
 });

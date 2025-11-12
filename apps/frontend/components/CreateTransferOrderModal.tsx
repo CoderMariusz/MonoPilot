@@ -189,6 +189,7 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
                     From Warehouse <span className="text-red-500">*</span>
                   </label>
                   <select
+                    data-testid="to-from-warehouse-select"
                     value={formData.from_warehouse_id}
                     onChange={(e) => setFormData({ ...formData, from_warehouse_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -208,6 +209,7 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
                     To Warehouse <span className="text-red-500">*</span>
                   </label>
                   <select
+                    data-testid="to-destination-warehouse-select"
                     value={formData.to_warehouse_id}
                     onChange={(e) => setFormData({ ...formData, to_warehouse_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -229,6 +231,7 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
                     Planned Ship Date
                   </label>
                   <input
+                    data-testid="to-planned-ship-input"
                     type="date"
                     value={formData.planned_ship_date}
                     onChange={(e) => setFormData({ ...formData, planned_ship_date: e.target.value })}
@@ -242,6 +245,7 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
                     Planned Receive Date
                   </label>
                   <input
+                    data-testid="to-planned-receive-input"
                     type="date"
                     value={formData.planned_receive_date}
                     onChange={(e) => {
@@ -265,6 +269,7 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
                   Status
                 </label>
                 <select
+                  data-testid="to-status-select"
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -297,6 +302,7 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
                             Product <span className="text-red-500">*</span>
                           </label>
                           <select
+                            data-testid={`to-line-${item.id}-product-select`}
                             value={item.product_id}
                             onChange={(e) => updateTransferItem(item.id, 'product_id', e.target.value)}
                             className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -315,6 +321,7 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
                             Quantity <span className="text-red-500">*</span>
                           </label>
                           <input
+                            data-testid={`to-line-${item.id}-quantity-input`}
                             type="number"
                             step="0.01"
                             min="0"
@@ -341,7 +348,8 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
             </div>
 
             <div className="p-6 border-t border-slate-200 flex gap-3">
-              <button
+            <button
+              data-testid="to-cancel-button"
                 type="button"
                 onClick={onClose}
                 className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors"
@@ -349,6 +357,7 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
                 Cancel
               </button>
               <button
+              data-testid="to-submit-button"
                 type="submit"
                 disabled={loading}
                 className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"

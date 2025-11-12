@@ -255,6 +255,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                             Product <span className="text-red-500">*</span>
                           </label>
                           <select
+                            data-testid={`po-line-${item.id}-product-select`}
                             value={item.product_id}
                             onChange={(e) => updateLineItem(item.id, 'product_id', e.target.value)}
                             className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -273,6 +274,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                             Quantity <span className="text-red-500">*</span>
                           </label>
                           <input
+                            data-testid={`po-line-${item.id}-quantity-input`}
                             type="number"
                             step="0.01"
                             min="0"
@@ -287,6 +289,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                             Unit Price <span className="text-red-500">*</span>
                           </label>
                           <input
+                            data-testid={`po-line-${item.id}-price-input`}
                             type="number"
                             step="0.01"
                             min="0"
@@ -318,6 +321,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                     Supplier <span className="text-red-500">*</span>
                   </label>
                   <select
+                    data-testid="po-supplier-select"
                     value={formData.supplier_id}
                     onChange={(e) => {
                       const supplierId = e.target.value;
@@ -347,6 +351,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                     Warehouse
                   </label>
                   <select
+                    data-testid="po-warehouse-select"
                     value={formData.warehouse_id}
                     onChange={(e) => setFormData({ ...formData, warehouse_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -467,7 +472,8 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
             </div>
 
             <div className="p-6 border-t border-slate-200 flex gap-3">
-              <button
+            <button
+              data-testid="po-cancel-button"
                 type="button"
                 onClick={onClose}
                 className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors"
@@ -475,6 +481,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                 Cancel
               </button>
               <button
+              data-testid="po-submit-button"
                 type="submit"
                 disabled={loading}
                 className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"

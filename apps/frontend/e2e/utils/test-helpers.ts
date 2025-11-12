@@ -14,32 +14,48 @@ export class TestHelpers {
     // Submit and wait for navigation
     await this.page.click('button[type="submit"]');
     
-    // Wait for either successful navigation OR error toast
-    try {
-      await Promise.race([
-        this.page.waitForURL(/^(?!.*\/login)/, { timeout: 10000 }),
-        this.page.waitForSelector('.toast', { timeout: 10000 })
-      ]);
-    } catch (error) {
-      // If timeout, check current URL and see if we're actually logged in
+    // Give Supabase time to issue the session cookie
+    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+    const start = Date.now();
+    while (Date.now() - start < 15000) {
       const currentUrl = this.page.url();
-      console.log('Login timeout, current URL:', currentUrl);
-      
-      // If we're not on login page, consider it successful
+
       if (!currentUrl.includes('/login')) {
-        console.log('Login successful despite timeout');
-        return;
+        break;
       }
-      
-      // If still on login page, check for error messages
+
+      let returnTo: string | null = null;
+      try {
+        returnTo = new URL(currentUrl).searchParams.get('returnTo');
+      } catch (error) {
+        console.warn('Failed to parse returnTo from URL:', currentUrl, error);
+      }
+
+      if (returnTo) {
+        await this.page.goto(returnTo);
+      } else {
+        await this.page.goto('/');
+      }
+
+      await this.page.waitForLoadState('domcontentloaded').catch(() => {});
+      await this.page.waitForTimeout(250);
+    }
+
+    // Final check - make sure we're not still on the login page
+    const finalUrl = this.page.url();
+    if (finalUrl.includes('/login')) {
       const errorToast = this.page.locator('.toast');
       if (await errorToast.count() > 0) {
         const errorText = await errorToast.textContent();
         throw new Error(`Login failed: ${errorText}`);
       }
-      
-      throw error;
+
+      throw new Error(`Login failed: still on login page (${finalUrl})`);
     }
+
+    // Allow UI to settle
+    await this.page.waitForTimeout(1000);
   }
 
   async logout() {

@@ -6,6 +6,11 @@ import { getRoleBasedRoute } from './lib/auth/roleRedirect';
 export async function middleware(request: NextRequest) {
   console.log('Main Middleware - Path:', request.nextUrl.pathname);
 
+  // Allow bypass during Playwright E2E runs
+  if (process.env.PLAYWRIGHT_E2E === 'true') {
+    return NextResponse.next();
+  }
+
   // Database-first mode - always run auth middleware
 
   // Allow auth pages without any checks

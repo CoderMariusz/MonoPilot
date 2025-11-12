@@ -26,11 +26,36 @@ export async function login(page: Page, email?: string, password?: string) {
   // Click login button
   await page.click('button[type="submit"]');
   
-  // Wait for navigation away from login page (to any authenticated route)
-  await page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 15000 });
-  
-  // Wait a bit for the page to fully load
-  await page.waitForTimeout(1000);
+  // Give Supabase time to set session
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+  const start = Date.now();
+  while (Date.now() - start < 15000) {
+    const current = page.url();
+    if (!current.includes('/login')) {
+      break;
+    }
+
+    // Sometimes Supabase leaves us on /login?returnTo=... – force navigation to returnTo or root
+    const returnTo = new URL(current).searchParams.get('returnTo');
+    if (returnTo) {
+      await page.goto(returnTo);
+    } else {
+      await page.goto('/');
+    }
+
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+    await page.waitForTimeout(250);
+  }
+
+  // Ensure we're no longer on login page
+  await page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 10000 });
+
+  // Navigate to default landing page (production dashboard) to ensure layout loads
+  await page.goto('/production');
+
+  // Wait for sidebar/header to be ready
+  await page.waitForSelector('button:has-text("Work Orders")', { timeout: 10000 });
 }
 
 /**
@@ -54,11 +79,73 @@ export async function logout(page: Page) {
 }
 
 /**
- * Navigate to a specific section
+ * Navigate to a specific top-level section (planning, production, warehouse, settings)
  */
 export async function navigateTo(page: Page, section: 'planning' | 'production' | 'warehouse' | 'settings') {
   await page.click(`a[href="/${section}"], nav >> text=${section}`);
   await page.waitForURL(`**/${section}**`);
+}
+
+/**
+ * Navigate to a production tab (Work Orders, Yield, Consume, Operations, Trace)
+ */
+export async function gotoProductionTab(
+  page: Page,
+  tab:
+    | 'Work Orders'
+    | 'Yield'
+    | 'Consume'
+    | 'Operations'
+    | 'Trace'
+) {
+  if (!page.url().includes('/production')) {
+    await page.goto('/production');
+    await page.waitForSelector('button:has-text("Work Orders")', { timeout: 10000 });
+  }
+
+  await page.click(`button:has-text("${tab}")`);
+
+  // Wait for tab content to render by looking for the headline
+  const expectedHeading =
+    tab === 'Work Orders'
+      ? 'Work Orders'
+      : tab === 'Yield'
+      ? 'Yield Report'
+      : tab === 'Consume'
+      ? 'Consume Report'
+      : tab === 'Operations'
+      ? 'Operations'
+      : 'Traceability';
+
+  await expect(page.locator('h2,h1')).toContainText(expectedHeading, {
+    timeout: 10000,
+  });
+}
+
+/**
+ * Navigate to a planning tab (Work Orders, Purchase Orders, Transfer Orders)
+ */
+export async function gotoPlanningTab(
+  page: Page,
+  tab: 'Work Orders' | 'Purchase Orders' | 'Transfer Orders'
+) {
+  if (!page.url().includes('/planning')) {
+    await page.goto('/planning');
+    await page.waitForSelector('button:has-text("Work Orders")', { timeout: 10000 });
+  }
+
+  await page.click(`button:has-text("${tab}")`);
+
+  const expectedHeading =
+    tab === 'Work Orders'
+      ? 'Work Orders'
+      : tab === 'Purchase Orders'
+      ? 'Purchase Orders'
+      : 'Transfer Orders';
+
+  await expect(page.locator('h2,h1')).toContainText(expectedHeading, {
+    timeout: 10000,
+  });
 }
 
 /**

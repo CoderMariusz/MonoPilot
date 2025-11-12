@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Loader2 } from 'lucide-react';
+import { X, Plus, Trash2, Loader2, GitBranch } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { LicensePlatesAPI } from '@/lib/api/licensePlates';
 import type { LicensePlate } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import LPGenealogyTree from './LPGenealogyTree';
 
 interface SplitLPModalProps {
   lpId: number;
@@ -22,6 +24,7 @@ export function SplitLPModal({ lpId, isOpen, onClose, onSuccess }: SplitLPModalP
   const [lp, setLp] = useState<LicensePlate | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showGenealogy, setShowGenealogy] = useState(false);
   const [splitItems, setSplitItems] = useState<SplitItem[]>([
     { id: '1', quantity: '' },
     { id: '2', quantity: '' }
@@ -79,7 +82,7 @@ export function SplitLPModal({ lpId, isOpen, onClose, onSuccess }: SplitLPModalP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!lp) return;
 
     if (totalSplitQty > lp.quantity) {
@@ -95,57 +98,29 @@ export function SplitLPModal({ lpId, isOpen, onClose, onSuccess }: SplitLPModalP
     setSaving(true);
 
     try {
-      // Generate LP numbers for new LPs
-      const timestamp = Date.now();
-      
-      // Process splits in a transaction-like manner
-      for (let i = 0; i < splitItems.length; i++) {
-        const item = splitItems[i];
-        const quantity = parseFloat(item.quantity);
+      // Use new API method with genealogy tracking
+      const childQuantities = splitItems.map(item => ({
+        quantity: parseFloat(item.quantity),
+        uom: lp.product?.uom
+      }));
 
-        if (i === 0) {
-          // Update original LP with first split quantity
-          const { error } = await supabase
-            .from('license_plates')
-            .update({
-              quantity: quantity,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', lpId);
+      // Get current user ID from Supabase auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
-          if (error) throw error;
-        } else {
-          // Create new LPs for additional splits
-          const newLPNumber = `${lp.lp_number}-S${i}`;
-          
-          const { error } = await supabase
-            .from('license_plates')
-            .insert({
-              lp_number: newLPNumber,
-              lp_code: newLPNumber,
-              product_id: lp.product_id,
-              location_id: lp.location_id,
-              quantity: quantity,
-              qa_status: lp.qa_status,
-              grn_id: lp.grn_id,
-              item_id: lp.item_id,
-              status: lp.status,
-              parent_lp_id: lpId,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
+      const result = await LicensePlatesAPI.split(
+        lpId,
+        childQuantities,
+        user.id
+      );
 
-          if (error) throw error;
-        }
-      }
-
-      toast.success('License Plate split successfully');
+      toast.success(`License Plate split successfully into ${result.child_lps.length} LPs with genealogy tracking`);
       if (onSuccess) onSuccess();
       onClose();
       setSplitItems([{ id: '1', quantity: '' }, { id: '2', quantity: '' }]);
     } catch (error: any) {
       console.error('Error splitting license plate:', error);
-      toast.error('Failed to split license plate');
+      toast.error(error.message || 'Failed to split license plate');
     } finally {
       setSaving(false);
     }
@@ -190,7 +165,22 @@ export function SplitLPModal({ lpId, isOpen, onClose, onSuccess }: SplitLPModalP
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
+          {/* Current LP Info */}
           <div className="mb-6 p-4 bg-slate-50 rounded-md">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-700">Current License Plate</h3>
+              {lp.parent_lp_id && (
+                <button
+                  type="button"
+                  onClick={() => setShowGenealogy(!showGenealogy)}
+                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                >
+                  <GitBranch className="w-4 h-4" />
+                  {showGenealogy ? 'Hide' : 'View'} Genealogy
+                </button>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700">LP Number</label>
@@ -210,8 +200,41 @@ export function SplitLPModal({ lpId, isOpen, onClose, onSuccess }: SplitLPModalP
                   {totalSplitQty.toFixed(2)} {lp.product?.uom}
                 </div>
               </div>
+              {lp.batch && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Batch</label>
+                  <div className="text-base text-slate-900 font-mono">{lp.batch}</div>
+                </div>
+              )}
+              {lp.expiry_date && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Expiry Date</label>
+                  <div className="text-base text-slate-900">
+                    {new Date(lp.expiry_date).toLocaleDateString()}
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Info about inherited fields */}
+            {(lp.batch || lp.expiry_date) && (
+              <div className="mt-3 pt-3 border-t border-slate-200">
+                <p className="text-xs text-slate-600 flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  Child LPs will inherit batch, expiry date, and QA status from this LP
+                </p>
+              </div>
+            )}
           </div>
+
+          {/* Genealogy View */}
+          {showGenealogy && lp.parent_lp_id && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <LPGenealogyTree lpId={lpId} lpNumber={lp.lp_number} maxDepth={3} compact />
+            </div>
+          )}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">

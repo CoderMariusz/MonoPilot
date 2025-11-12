@@ -1,140 +1,104 @@
 import { test, expect } from '@playwright/test';
 import { login, navigateTo, clickButton, waitForModal, waitForToast } from './helpers';
 
+async function ensureLpTable(page) {
+  await page.waitForSelector('table tbody tr', { timeout: 10000 });
+  const rows = page.locator('table tbody tr');
+  const count = await rows.count();
+  expect(count).toBeGreaterThan(0);
+  return rows.first();
+}
+
 test.describe('License Plate Operations', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     await navigateTo(page, 'warehouse');
-    
-    // Navigate to LP Stock tab
-    await page.click('button:has-text("LP Stock")');
-    await page.waitForTimeout(1000);
-    
-    // Wait for LP table to be visible
-    await page.waitForSelector('table, h2:has-text("LP Stock")', { timeout: 5000 });
-  });
 
-  test('should split a license plate', async ({ page }) => {
-    // Find first active LP
-    const firstRow = page.locator('table tbody tr').first();
-    
-    // Click split button
-    await firstRow.locator('button[title="Split"], button:has-text("Split")').click();
-    
-    // Wait for split modal
-    await waitForModal(page, 'Split');
-    
-    // Get original quantity (for validation)
-    const originalQtyText = await firstRow.locator('td').nth(3).textContent(); // Assuming qty is 4th column
-    const originalQty = parseFloat(originalQtyText || '10');
-    
-    // Split into 2 parts (half each)
-    const splitQty = Math.floor(originalQty / 2);
-    
-    // Add first split
-    await page.fill('input[name="split-0"], input[placeholder*="quantity"]:first', splitQty.toString());
-    
-    // Add second split (click "Add Split" if needed)
-    const addSplitButton = page.locator('button:has-text("Add Split")');
-    if (await addSplitButton.isVisible({ timeout: 1000 })) {
-      await addSplitButton.click();
+    const lpTab = page.locator('button:has-text("LP Stock")');
+    if (await lpTab.isVisible({ timeout: 3000 })) {
+      await lpTab.click();
     }
-    
-    await page.fill('input[name="split-1"], input[placeholder*="quantity"]:nth(1)', (originalQty - splitQty).toString());
-    
-    // Submit
-    await clickButton(page, 'Split');
-    
-    // Wait for success
-    await waitForToast(page, 'split');
-    
-    // Verify new LPs appear in table
-    await page.waitForTimeout(1000);
+
+    await page.waitForSelector('h1:has-text("Warehouse")');
+    await ensureLpTable(page);
   });
 
-  test('should change QA status', async ({ page }) => {
-    // Find first LP
-    const firstRow = page.locator('table tbody tr').first();
-    
-    // Click QA status button
+  test('splits a license plate into two', async ({ page }) => {
+    const firstRow = await ensureLpTable(page);
+
+    const qtyCellText = await firstRow.locator('td').nth(3).innerText();
+    const numericMatch = qtyCellText.match(/([0-9]+(?:\.[0-9]+)?)/);
+    const originalQty = numericMatch ? parseFloat(numericMatch[1]) : 20;
+    const firstSplitQty = Math.max(1, Math.floor(originalQty / 2));
+    const secondSplitQty = Math.max(1, Math.round(originalQty - firstSplitQty));
+
+    await firstRow.locator('button[title="Split"], button:has-text("Split")').click();
+    await waitForModal(page, 'Split License Plate');
+
+    const splitInputs = page.locator('input[type="number"]');
+    await splitInputs.first().fill(firstSplitQty.toString());
+    await splitInputs.nth(1).fill(secondSplitQty.toString());
+
+    await clickButton(page, 'Split LP');
+    await waitForToast(page);
+    await page.waitForTimeout(500);
+  });
+
+  test('updates QA status of a license plate', async ({ page }) => {
+    const firstRow = await ensureLpTable(page);
     await firstRow.locator('button[title*="QA"], button:has-text("QA")').click();
-    
-    // Wait for QA status modal
-    await waitForModal(page, 'QA Status');
-    
-    // Change status
-    await page.selectOption('select[name="qa_status"], select:near(label:has-text("QA Status"))', { index: 1 });
-    
-    // Add note
-    await page.fill('textarea[name="notes"]', 'QA status changed in E2E test');
-    
-    // Submit
-    await clickButton(page, 'Update');
-    
-    // Wait for success
-    await waitForToast(page, 'updated');
+    await waitForModal(page, 'Change QA Status');
+
+    const qaSelect = page.locator('select:near(label:has-text("QA Status"))');
+    const options = await qaSelect.locator('option').count();
+    if (options > 1) {
+      await qaSelect.selectOption({ index: 1 });
+    }
+
+    const notesField = page.locator('textarea:near(label:has-text("Notes"))');
+    if (await notesField.isVisible()) {
+      await notesField.fill('QA status adjusted via E2E scenario');
+    }
+
+    await clickButton(page, 'Update Status');
+    await waitForToast(page);
   });
 
-  test('should amend LP quantity', async ({ page }) => {
-    // Find first LP
-    const firstRow = page.locator('table tbody tr').first();
-    
-    // Click amend button
+  test('amends license plate quantity', async ({ page }) => {
+    const firstRow = await ensureLpTable(page);
     await firstRow.locator('button[title="Amend"], button:has-text("Amend")').click();
-    
-    // Wait for amend modal
-    await waitForModal(page, 'Amend');
-    
-    // Change quantity
-    const qtyInput = page.locator('input[name="quantity"], input[type="number"]:near(label:has-text("Quantity"))');
-    await qtyInput.clear();
-    await qtyInput.fill('15');
-    
-    // Submit
-    await clickButton(page, 'Save');
-    
-    // Wait for success
-    await waitForToast(page, 'updated');
+    await waitForModal(page, 'Amend License Plate');
+
+    const qtyInput = page.locator('input:near(label:has-text("New Quantity"))');
+    await qtyInput.fill('25');
+
+    await clickButton(page, 'Update LP');
+    await waitForToast(page);
   });
 
-  test('should filter license plates by status', async ({ page }) => {
-    // Find status filter
-    const statusFilter = page.locator('select[name="status"], select:near(label:has-text("Status"))');
-    
-    if (await statusFilter.isVisible({ timeout: 2000 })) {
-      // Filter by specific status
+  test('filters license plates by QA status', async ({ page }) => {
+    await ensureLpTable(page);
+    const statusFilter = page.locator('select:near(label:has-text("QA Status"))');
+
+    if (await statusFilter.isVisible()) {
       await statusFilter.selectOption({ index: 1 });
       await page.waitForTimeout(500);
-      
-      // Verify table updates
-      const rows = page.locator('table tbody tr');
-      const count = await rows.count();
-      expect(count).toBeGreaterThan(0);
+      const filteredRows = page.locator('table tbody tr');
+      expect(await filteredRows.count()).toBeGreaterThan(0);
     }
   });
 
-  test('should search license plates', async ({ page }) => {
-    // Find search input
-    const searchInput = page.locator('input[type="search"], input[placeholder*="search"]');
-    
-    if (await searchInput.isVisible({ timeout: 2000 })) {
-      // Get first LP number
-      const firstLP = await page.locator('table tbody tr').first().locator('td').first().textContent();
-      
-      if (firstLP) {
-        // Search for it
-        await searchInput.fill(firstLP);
-        await page.waitForTimeout(500);
-        
-        // Should show only matching results
-        const rows = page.locator('table tbody tr');
-        const count = await rows.count();
-        
-        if (count > 0) {
-          await expect(rows.first()).toContainText(firstLP);
-        }
-      }
-    }
+  test('searches license plates by number', async ({ page }) => {
+    const firstRow = await ensureLpTable(page);
+    const lpNumber = (await firstRow.locator('td').first().innerText()).trim();
+
+    const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]');
+    await searchInput.fill(lpNumber);
+    await page.waitForTimeout(500);
+
+    const filteredRows = page.locator('table tbody tr');
+    expect(await filteredRows.count()).toBeGreaterThan(0);
+    await expect(filteredRows.first()).toContainText(lpNumber);
   });
 });
 

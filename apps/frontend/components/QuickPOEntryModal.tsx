@@ -291,6 +291,7 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
                     Destination Warehouse
                   </label>
                   <select
+                    data-testid="quick-po-warehouse-select"
                     value={selectedWarehouse}
                     onChange={(e) => setSelectedWarehouse(e.target.value)}
                     className="w-full max-w-md px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -329,6 +330,7 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
                         <tr key={line.id} className="border-b border-slate-100">
                           <td className="py-3 px-4">
                             <input
+                              data-testid="quick-po-code-input"
                               type="text"
                               value={line.product_code}
                               onChange={(e) => updateLine(line.id, 'product_code', e.target.value)}
@@ -356,6 +358,7 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
                           </td>
                           <td className="py-3 px-4">
                             <input
+                              data-testid="quick-po-qty-input"
                               type="number"
                               step="0.01"
                               min="0.01"

@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, GitBranch } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { LocationsAPI } from '@/lib/api/locations';
 import type { Location, LicensePlate } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import LPGenealogyTree from './LPGenealogyTree';
 
 interface AmendLPModalProps {
   lpId: number;
@@ -18,8 +19,10 @@ export function AmendLPModal({ lpId, isOpen, onClose, onSuccess }: AmendLPModalP
   const [lp, setLp] = useState<LicensePlate | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showGenealogy, setShowGenealogy] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [locationId, setLocationId] = useState<number>(0);
+  const [notes, setNotes] = useState('');
   const [locations, setLocations] = useState<Location[]>([]);
 
   useEffect(() => {
@@ -57,6 +60,7 @@ export function AmendLPModal({ lpId, isOpen, onClose, onSuccess }: AmendLPModalP
       setLp(lpData);
       setQuantity(lpData.quantity.toString());
       setLocationId(lpData.location_id || 0);
+      setNotes('');
 
       // Load locations
       const locationsData = await LocationsAPI.getAll();
@@ -77,6 +81,7 @@ export function AmendLPModal({ lpId, isOpen, onClose, onSuccess }: AmendLPModalP
     setSaving(true);
 
     try {
+      // Update LP
       const { error } = await supabase
         .from('license_plates')
         .update({
@@ -88,9 +93,29 @@ export function AmendLPModal({ lpId, isOpen, onClose, onSuccess }: AmendLPModalP
 
       if (error) throw error;
 
+      // If notes provided, record in genealogy (amendment note)
+      if (notes.trim()) {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const { error: noteError } = await supabase
+          .from('lp_genealogy')
+          .insert({
+            child_lp_id: lpId,
+            parent_lp_id: lp.parent_lp_id || null,
+            quantity_consumed: 0, // Amendment doesn't consume
+            uom: lp.product?.uom || 'kg',
+            wo_id: null,
+            operation_sequence: null,
+            notes: `Amendment: ${notes} | Qty: ${lp.quantity} → ${quantity} | Location: ${lp.location?.name} → ${locations.find(l => l.id === locationId)?.name}`
+          });
+
+        if (noteError) console.error('Failed to record amendment note:', noteError);
+      }
+
       toast.success('License Plate updated successfully');
       if (onSuccess) onSuccess();
       onClose();
+      setNotes('');
     } catch (error: any) {
       console.error('Error updating license plate:', error);
       toast.error('Failed to update license plate');
@@ -138,6 +163,30 @@ export function AmendLPModal({ lpId, isOpen, onClose, onSuccess }: AmendLPModalP
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
+          {/* Parent LP Info & Genealogy */}
+          {lp.parent_lp_id && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-blue-800">
+                  <GitBranch className="w-4 h-4" />
+                  <span className="font-medium">This LP was created from a split operation</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowGenealogy(!showGenealogy)}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  {showGenealogy ? 'Hide' : 'View'} Genealogy
+                </button>
+              </div>
+              {showGenealogy && (
+                <div className="mt-3">
+                  <LPGenealogyTree lpId={lpId} lpNumber={lp.lp_number} maxDepth={3} compact />
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -161,6 +210,35 @@ export function AmendLPModal({ lpId, isOpen, onClose, onSuccess }: AmendLPModalP
                 disabled
                 className="w-full px-3 py-2 border border-slate-300 rounded-md bg-slate-50 text-slate-600"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {lp.batch && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Batch
+                  </label>
+                  <input
+                    type="text"
+                    value={lp.batch}
+                    disabled
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md bg-slate-50 text-slate-600 font-mono"
+                  />
+                </div>
+              )}
+              {lp.expiry_date && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Expiry Date
+                  </label>
+                  <input
+                    type="text"
+                    value={new Date(lp.expiry_date).toLocaleDateString()}
+                    disabled
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md bg-slate-50 text-slate-600"
+                  />
+                </div>
+              )}
             </div>
 
             <div>
@@ -206,6 +284,22 @@ export function AmendLPModal({ lpId, isOpen, onClose, onSuccess }: AmendLPModalP
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Amendment Notes (Optional)
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Reason for amendment (e.g., inventory correction, location change...)"
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Amendment notes will be recorded in genealogy history for traceability
+              </p>
             </div>
           </div>
 

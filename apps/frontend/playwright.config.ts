@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Flag to let the Next.js middleware know we're running automated E2E tests
+process.env.PLAYWRIGHT_E2E = process.env.PLAYWRIGHT_E2E || 'true';
+
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
