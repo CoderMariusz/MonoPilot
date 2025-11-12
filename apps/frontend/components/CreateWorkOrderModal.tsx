@@ -5,6 +5,7 @@ import { X, Loader2 } from 'lucide-react';
 import { useMachines, useProducts, useTransferOrders } from '@/lib/clientState';
 import { supabase } from '@/lib/supabase/client-browser';
 import type { Product, WorkOrder } from '@/lib/types';
+import OrderFlagsSelector from './OrderFlagsSelector';
 
 interface CreateWorkOrderModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
     source_demand_type: 'Manual' as 'Manual' | 'TO' | 'PO' | 'SO',
     source_demand_id: '',
     bom_id: '',
+    order_flags: [] as string[],  // EPIC-001 Phase 4: Conditional Components
   });
 
   const selectedProduct = products.find(p => p.id === Number(formData.product_id));
@@ -155,6 +157,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         source_demand_type: (editingWorkOrder.source_demand_type as 'Manual' | 'TO' | 'PO' | 'SO') || 'Manual',
         source_demand_id: editingWorkOrder.source_demand_id?.toString() || '',
         bom_id: editingWorkOrder.bom_id?.toString() || '',
+        order_flags: editingWorkOrder.order_flags || [],
       });
     } else {
       setFormData({
@@ -169,6 +172,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         source_demand_type: 'Manual',
         source_demand_id: '',
         bom_id: '',
+        order_flags: [],
       });
     }
   }, [editingWorkOrder]);
@@ -239,6 +243,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         source_demand_type: 'Manual',
         source_demand_id: '',
         bom_id: '',
+        order_flags: [],
       });
     } catch (err: any) {
       setError(err.message || `Failed to ${editingWorkOrder ? 'update' : 'create'} work order`);
@@ -512,6 +517,15 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
                   </p>
                 )}
               </div>
+            )}
+
+            {/* EPIC-001 Phase 4: Order Flags Selector */}
+            {formData.bom_id && (
+              <OrderFlagsSelector
+                selectedFlags={formData.order_flags}
+                onChange={(flags) => setFormData({ ...formData, order_flags: flags })}
+                showDescriptions={true}
+              />
             )}
 
             <div>
