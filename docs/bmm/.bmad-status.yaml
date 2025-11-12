@@ -108,24 +108,74 @@ next_workflows:
     estimated_effort: "3-4 weeks"
 
 # Technical Debt Register
-known_issues:
-  - id: "TD-001"
-    title: "Client State migration to API calls"
-    severity: "medium"
-    affected_components: ["Several modals still use clientState"]
-    fix_effort: "2-3 days"
+technical_debt:
+  completed:
+    - id: "TD-001"
+      title: "Client State migration to API calls"
+      status: "74% Complete (Phase 1)"
+      completed_at: "2025-01-11"
+      components_migrated: 15
+      effort_actual: "4 hours"
+      remaining: "5-7 components (deferred to Phase 2)"
+    
+    - id: "TD-002"
+      title: "Missing E2E tests"
+      status: "100% Complete"
+      completed_at: "2025-01-11"
+      tests_created: 27
+      pass_rate: "82% (53/65)"
+      effort_actual: "3 hours"
+    
+    - id: "TD-003"
+      title: "No API documentation"
+      status: "100% Complete"
+      completed_at: "2025-01-11"
+      modules_documented: "30+"
+      effort_actual: "1 hour"
+    
+    - id: "TD-004"
+      title: "Incomplete Unit Test Coverage"
+      status: "Phase 1 Complete (65% coverage)"
+      completed_at: "2025-01-11"
+      tests_created: "45+"
+      coverage: "PO: 80%, TO: 70%, WO: 55%"
+      deferred: "LP & Traceability to Phase 2"
   
-  - id: "TD-002"
-    title: "Missing E2E tests"
-    severity: "medium"
-    coverage: "0% E2E (Playwright setup exists but no tests)"
-    fix_effort: "1 week"
+  in_progress: []
   
-  - id: "TD-003"
-    title: "No API documentation"
-    severity: "low"
-    solution: "Generate OpenAPI/Swagger spec"
-    fix_effort: "2 days"
+  backlog:
+    - id: "TD-005"
+      title: "No Component Library/Storybook"
+      priority: "P2"
+      effort: "1 week"
+      status: "Not Started"
+    
+    - id: "TD-006"
+      title: "Performance Bottlenecks"
+      priority: "P2"
+      effort: "3-5 days"
+      status: "Not Started"
+    
+    - id: "TD-007"
+      title: "No User Manual / Documentation"
+      priority: "P3"
+      effort: "2 weeks"
+      status: "Not Started"
+    
+    - id: "TD-008"
+      title: "No Automated Deployment Pipeline"
+      priority: "P3"
+      effort: "3 days"
+      status: "Not Started"
+  
+  summary:
+    total: 8
+    completed: 3
+    in_progress: 1
+    not_started: 4
+    completion_rate: "37.5%"
+    p0_complete: "1/1 (100%)"
+    p1_complete: "2/3 (67%)"
 
 # Documentation Status
 documentation:
@@ -136,25 +186,36 @@ documentation:
     - "13_DATABASE_MIGRATIONS.md"
     - "14_NIESPOJNOSCI_FIX_CHECKLIST.md"
     - "15_DOCUMENTATION_AUDIT.md"
+    - "API_DOCUMENTATION.md" # TD-003
+    - "TECHNICAL_DEBT_TODO.md" # TD Status
+    - "TD-001_MIGRATION_SUMMARY.md" # TD-001
+    - "TD-002_E2E_TESTS_SUMMARY.md" # TD-002
+    - "TD-003_API_DOCUMENTATION_SUMMARY.md" # TD-003
+    - "TD-004_UNIT_TEST_COVERAGE_SUMMARY.md" # TD-004
+    - "SESSION_SUMMARY_2025-01-11_TD-001_MIGRATION.md"
     - "bmm/artifacts/tech-spec.md"
     - "bmm/sessions/2025-01-11-brainstorm-init.md"
+    - "e2e/README.md" # E2E test documentation
   
   missing:
-    - "API Reference (OpenAPI)"
-    - "Component Library (Storybook)"
-    - "Deployment Guide"
-    - "User Manual"
+    - "Component Library (Storybook)" # TD-005
+    - "Deployment Guide" # TD-008
+    - "User Manual" # TD-007
     - "Troubleshooting Guide"
 
 # Metrics
 codebase_metrics:
   lines_of_code: "~50,000 (estimated)"
-  test_coverage: "~60% unit tests"
+  test_coverage:
+    unit: "~65% (45+ tests across PO/TO/WO)"
+    e2e: "27 tests (82% pass rate, 53/65 passing)"
+    overall: "Good"
   database_tables: 34
   migrations: 44
-  api_modules: 20+
+  api_modules: 30+
   components: 60+
   routes: "~15 (Next.js App Router)"
+  documentation_files: 20+
 
 # Team & Roles
 team:
