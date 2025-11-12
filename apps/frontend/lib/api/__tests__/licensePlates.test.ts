@@ -1,6 +1,6 @@
 /**
  * Unit Tests for LicensePlatesAPI
- * 
+ *
  * Tests cover:
  * - LP number format validation
  * - QA status transitions
@@ -37,11 +37,11 @@ describe('LicensePlatesAPI', () => {
           product_id: 100,
           product: {
             description: 'Beef Ribeye',
-            part_number: 'BEF-001'
+            part_number: 'BEF-001',
           },
           location_id: 10,
           location: {
-            name: 'A-01-01'
+            name: 'A-01-01',
           },
           quantity: '500',
           uom: 'KG',
@@ -52,29 +52,30 @@ describe('LicensePlatesAPI', () => {
           origin_type: 'GRN',
           origin_ref: { grn_id: 5 },
           created_at: '2025-01-15T10:00:00Z',
-          updated_at: '2025-01-15T10:00:00Z'
-        }
+          updated_at: '2025-01-15T10:00:00Z',
+        },
       ];
 
       const mockReservations = {
         data: [{ qty: '50' }],
-        error: null
+        error: null,
       };
 
       const mockSelect = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue(mockReservations)
-        })
+          eq: vi.fn().mockResolvedValue(mockReservations),
+        }),
       });
 
-      const mockFrom = vi.fn()
+      const mockFrom = vi
+        .fn()
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: mockLPs, error: null })
-          })
+            order: vi.fn().mockResolvedValue({ data: mockLPs, error: null }),
+          }),
         })
         .mockReturnValue({
-          select: mockSelect
+          select: mockSelect,
         });
 
       (supabase.from as any) = mockFrom;
@@ -108,28 +109,29 @@ describe('LicensePlatesAPI', () => {
           origin_type: 'GRN',
           origin_ref: {},
           created_at: '2025-01-15T10:00:00Z',
-          updated_at: '2025-01-15T10:00:00Z'
-        }
+          updated_at: '2025-01-15T10:00:00Z',
+        },
       ];
 
       const mockSelect = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null })
-        })
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
       });
 
       const mockEq = vi.fn().mockReturnValue({
-        order: vi.fn().mockResolvedValue({ data: mockLPs, error: null })
+        order: vi.fn().mockResolvedValue({ data: mockLPs, error: null }),
       });
 
-      const mockFrom = vi.fn()
+      const mockFrom = vi
+        .fn()
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
-            eq: mockEq
-          })
+            eq: mockEq,
+          }),
         })
         .mockReturnValue({
-          select: mockSelect
+          select: mockSelect,
         });
 
       (supabase.from as any) = mockFrom;
@@ -159,7 +161,7 @@ describe('LicensePlatesAPI', () => {
           origin_type: 'GRN',
           origin_ref: {},
           created_at: '2025-01-15T10:00:00Z',
-          updated_at: '2025-01-15T10:00:00Z'
+          updated_at: '2025-01-15T10:00:00Z',
         },
         {
           id: 2,
@@ -177,24 +179,25 @@ describe('LicensePlatesAPI', () => {
           origin_type: 'WO',
           origin_ref: {},
           created_at: '2025-01-15T11:00:00Z',
-          updated_at: '2025-01-15T11:00:00Z'
-        }
+          updated_at: '2025-01-15T11:00:00Z',
+        },
       ];
 
       const mockSelect = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null })
-        })
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
       });
 
-      const mockFrom = vi.fn()
+      const mockFrom = vi
+        .fn()
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: mockLPs, error: null })
-          })
+            order: vi.fn().mockResolvedValue({ data: mockLPs, error: null }),
+          }),
         })
         .mockReturnValue({
-          select: mockSelect
+          select: mockSelect,
         });
 
       (supabase.from as any) = mockFrom;
@@ -227,7 +230,7 @@ describe('LicensePlatesAPI', () => {
           origin_type: 'GRN',
           origin_ref: {},
           created_at: '2025-01-15T10:00:00Z',
-          updated_at: '2025-01-15T10:00:00Z'
+          updated_at: '2025-01-15T10:00:00Z',
         },
         {
           id: 2,
@@ -245,29 +248,32 @@ describe('LicensePlatesAPI', () => {
           origin_type: 'GRN',
           origin_ref: {},
           created_at: '2025-01-15T11:00:00Z',
-          updated_at: '2025-01-15T11:00:00Z'
-        }
+          updated_at: '2025-01-15T11:00:00Z',
+        },
       ];
 
-      const mockFrom = vi.fn()
+      const mockFrom = vi
+        .fn()
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: mockLPs, error: null })
-          })
+            order: vi.fn().mockResolvedValue({ data: mockLPs, error: null }),
+          }),
         })
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [{ qty: '50' }], error: null })
-            })
-          })
+              eq: vi
+                .fn()
+                .mockResolvedValue({ data: [{ qty: '50' }], error: null }),
+            }),
+          }),
         })
         .mockReturnValue({
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [], error: null })
-            })
-          })
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
         });
 
       (supabase.from as any) = mockFrom;
@@ -284,7 +290,7 @@ describe('LicensePlatesAPI', () => {
   describe('getLPComposition', () => {
     it('should retrieve forward and backward composition trees', async () => {
       const mockLPData = {
-        lp_number: 'LP-2025-001'
+        lp_number: 'LP-2025-001',
       };
 
       const mockForwardTree = [
@@ -301,8 +307,8 @@ describe('LicensePlatesAPI', () => {
           parent_node: 'LP-2025-001',
           depth: 1,
           composition_qty: 100,
-          pallet_code: null
-        }
+          pallet_code: null,
+        },
       ];
 
       const mockBackwardTree = [
@@ -319,16 +325,18 @@ describe('LicensePlatesAPI', () => {
           parent_node: null,
           depth: 1,
           composition_qty: 150,
-          pallet_code: null
-        }
+          pallet_code: null,
+        },
       ];
 
       (supabase.from as any).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: mockLPData, error: null })
-          })
-        })
+            single: vi
+              .fn()
+              .mockResolvedValue({ data: mockLPData, error: null }),
+          }),
+        }),
       });
 
       (supabase.rpc as any)
@@ -345,33 +353,47 @@ describe('LicensePlatesAPI', () => {
       expect(result.backward[0].lp_number).toBe('LP-2025-000');
       expect(result.backward[0].composition_qty).toBe(150);
 
-      expect(supabase.rpc).toHaveBeenCalledWith('get_lp_composition_tree', { lp_id_param: 1 });
-      expect(supabase.rpc).toHaveBeenCalledWith('get_lp_reverse_composition_tree', { lp_id_param: 1 });
+      expect(supabase.rpc).toHaveBeenCalledWith('get_lp_composition_tree', {
+        lp_id_param: 1,
+      });
+      expect(supabase.rpc).toHaveBeenCalledWith(
+        'get_lp_reverse_composition_tree',
+        { lp_id_param: 1 }
+      );
     });
 
     it('should throw error if LP not found', async () => {
       (supabase.from as any).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: null, error: { message: 'Not found' } })
-          })
-        })
+            single: vi
+              .fn()
+              .mockResolvedValue({
+                data: null,
+                error: { message: 'Not found' },
+              }),
+          }),
+        }),
       });
 
-      await expect(LicensePlatesAPI.getLPComposition(999)).rejects.toThrow('Not found');
+      await expect(LicensePlatesAPI.getLPComposition(999)).rejects.toThrow(
+        'License plate not found'
+      );
     });
 
     it('should handle empty composition trees', async () => {
       const mockLPData = {
-        lp_number: 'LP-2025-001'
+        lp_number: 'LP-2025-001',
       };
 
       (supabase.from as any).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: mockLPData, error: null })
-          })
-        })
+            single: vi
+              .fn()
+              .mockResolvedValue({ data: mockLPData, error: null }),
+          }),
+        }),
       });
 
       (supabase.rpc as any)
@@ -395,22 +417,22 @@ describe('LicensePlatesAPI', () => {
           part_number: 'BEF-001',
           description: 'Beef Ribeye',
           type: 'RM',
-          uom: 'KG'
+          uom: 'KG',
         },
         location: {
           id: 10,
           name: 'A-01-01',
-          code: 'A-01-01'
+          code: 'A-01-01',
         },
         quantity: '500',
         qa_status: 'Passed',
         stage_suffix: 'RM',
         parent_lp: {
           id: 5,
-          lp_number: 'LP-2024-999'
+          lp_number: 'LP-2024-999',
         },
         origin_type: 'GRN',
-        origin_ref: { grn_id: 10 }
+        origin_ref: { grn_id: 10 },
       };
 
       const mockReservations = [
@@ -420,8 +442,8 @@ describe('LicensePlatesAPI', () => {
           work_order: { wo_number: 'WO-2025-001' },
           qty: '50',
           status: 'active',
-          created_at: '2025-01-15T10:00:00Z'
-        }
+          created_at: '2025-01-15T10:00:00Z',
+        },
       ];
 
       const mockCompositions = [
@@ -433,8 +455,8 @@ describe('LicensePlatesAPI', () => {
           output_lp: { lp_number: 'LP-2025-002' },
           qty: '100',
           uom: 'KG',
-          op_seq: 1
-        }
+          op_seq: 1,
+        },
       ];
 
       const mockStockMoves = [
@@ -444,34 +466,42 @@ describe('LicensePlatesAPI', () => {
           move_type: 'putaway',
           status: 'completed',
           quantity: '500',
-          move_date: '2025-01-15T11:00:00Z'
-        }
+          move_date: '2025-01-15T11:00:00Z',
+        },
       ];
 
       (supabase.from as any)
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: mockLPData, error: null })
-            })
-          })
+              single: vi
+                .fn()
+                .mockResolvedValue({ data: mockLPData, error: null }),
+            }),
+          }),
         })
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: mockReservations, error: null })
-          })
+            eq: vi
+              .fn()
+              .mockResolvedValue({ data: mockReservations, error: null }),
+          }),
         })
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
-            or: vi.fn().mockResolvedValue({ data: mockCompositions, error: null })
-          })
+            or: vi
+              .fn()
+              .mockResolvedValue({ data: mockCompositions, error: null }),
+          }),
         })
         .mockReturnValue({
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: mockStockMoves, error: null })
-            })
-          })
+              order: vi
+                .fn()
+                .mockResolvedValue({ data: mockStockMoves, error: null }),
+            }),
+          }),
         });
 
       const result = await LicensePlatesAPI.getLPDetails(1);
@@ -499,45 +529,47 @@ describe('LicensePlatesAPI', () => {
           part_number: 'BEF-001',
           description: 'Beef',
           type: 'RM',
-          uom: 'KG'
+          uom: 'KG',
         },
         location: {
           id: 10,
           name: 'A-01',
-          code: 'A-01'
+          code: 'A-01',
         },
         quantity: '500',
         qa_status: 'Passed',
         stage_suffix: 'RM',
         parent_lp: null,
         origin_type: 'GRN',
-        origin_ref: {}
+        origin_ref: {},
       };
 
       (supabase.from as any)
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: mockLPData, error: null })
-            })
-          })
+              single: vi
+                .fn()
+                .mockResolvedValue({ data: mockLPData, error: null }),
+            }),
+          }),
         })
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null })
-          })
+            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
         })
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
-            or: vi.fn().mockResolvedValue({ data: [], error: null })
-          })
+            or: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
         })
         .mockReturnValue({
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({ data: [], error: null })
-            })
-          })
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
         });
 
       const result = await LicensePlatesAPI.getLPDetails(1);
@@ -551,11 +583,7 @@ describe('LicensePlatesAPI', () => {
 
   describe('LP Number Format', () => {
     it('should validate LP number format (LP-YYYY-NNN)', () => {
-      const validFormats = [
-        'LP-2025-001',
-        'LP-2025-999',
-        'LP-2024-100'
-      ];
+      const validFormats = ['LP-2025-001', 'LP-2025-999', 'LP-2024-100'];
 
       const lpNumberRegex = /^LP-\d{4}-\d{3,}$/;
 
@@ -566,11 +594,11 @@ describe('LicensePlatesAPI', () => {
 
     it('should reject invalid LP number formats', () => {
       const invalidFormats = [
-        'LP-25-001',     // Year too short
-        'LP-2025-1',     // Number too short
-        'LP2025001',     // Missing dashes
-        'LP-2025-ABC',   // Non-numeric
-        'lp-2025-001'    // Lowercase
+        'LP-25-001', // Year too short
+        'LP-2025-1', // Number too short
+        'LP2025001', // Missing dashes
+        'LP-2025-ABC', // Non-numeric
+        'lp-2025-001', // Lowercase
       ];
 
       const lpNumberRegex = /^LP-\d{4}-\d{3,}$/;
@@ -584,7 +612,7 @@ describe('LicensePlatesAPI', () => {
   describe('QA Status Transitions', () => {
     it('should define valid QA statuses', () => {
       const validStatuses = ['Pending', 'Passed', 'Failed', 'Quarantine'];
-      
+
       expect(validStatuses).toContain('Pending');
       expect(validStatuses).toContain('Passed');
       expect(validStatuses).toContain('Failed');
@@ -594,10 +622,10 @@ describe('LicensePlatesAPI', () => {
     it('should enforce QA status workflow', () => {
       // Typical workflow: Pending → Passed/Failed/Quarantine
       const validTransitions: Record<string, string[]> = {
-        'Pending': ['Passed', 'Failed', 'Quarantine'],
-        'Passed': ['Quarantine'], // Can be quarantined later
-        'Failed': [], // Terminal state
-        'Quarantine': ['Passed', 'Failed'] // Can be re-tested
+        Pending: ['Passed', 'Failed', 'Quarantine'],
+        Passed: ['Quarantine'], // Can be quarantined later
+        Failed: [], // Terminal state
+        Quarantine: ['Passed', 'Failed'], // Can be re-tested
       };
 
       expect(validTransitions['Pending']).toContain('Passed');
@@ -662,4 +690,3 @@ describe('LicensePlatesAPI', () => {
     });
   });
 });
-
