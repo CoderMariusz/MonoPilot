@@ -1,12 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm test:unit:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(pnpm lint:fix:*)",
-      "Bash(npx eslint:*)",
-      "Bash(cat:*)"
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

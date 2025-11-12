@@ -700,4 +700,386 @@ export class WorkOrdersAPI {
       throw err;
     }
   }
+
+  // ============================================================================
+  // PHASE 3: WO RESERVATIONS & MATERIAL MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Get required materials for WO with reservation status
+   * Uses RPC function get_wo_required_materials() for progress tracking
+   */
+  static async getRequiredMaterials(woId: number): Promise<Array<{
+    material_id: number;
+    material_part_number: string;
+    material_description: string;
+    required_qty: number;
+    reserved_qty: number;
+    consumed_qty: number;
+    remaining_qty: number;
+    uom: string;
+    operation_sequence: number;
+    progress_pct: number;
+  }>> {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_wo_required_materials', { wo_id_param: woId });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching WO required materials:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get available LPs for a material (FIFO order)
+   * Uses RPC function get_available_lps_for_material()
+   */
+  static async getAvailableLPs(
+    materialId: number,
+    locationId?: number
+  ): Promise<Array<{
+    lp_id: number;
+    lp_number: string;
+    quantity: number;
+    uom: string;
+    batch: string;
+    expiry_date: string;
+    location_name: string;
+    qa_status: string;
+    reserved_qty: number;
+    available_qty: number;
+  }>> {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_available_lps_for_material', {
+          material_id_param: materialId,
+          location_id_param: locationId || null
+        });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching available LPs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reserve material (LP) for work order
+   * Creates reservation record and prevents LP from being moved/split
+   */
+  static async reserveMaterial(data: {
+    wo_id: number;
+    material_id: number;
+    lp_id: number;
+    quantity_reserved: number;
+    uom: string;
+    operation_sequence?: number;
+    userId: string;
+  }): Promise<{
+    reservation_id: number;
+    lp_number: string;
+  }> {
+    try {
+      // 1. Validate WO exists and is in correct status
+      const { data: wo, error: woError } = await supabase
+        .from('work_orders')
+        .select('id, wo_number, status')
+        .eq('id', data.wo_id)
+        .single();
+
+      if (woError) throw woError;
+      if (!wo) throw new Error('Work Order not found');
+      if (!['Released', 'Realise', 'In Progress'].includes(wo.status)) {
+        throw new Error(`Cannot reserve materials for WO with status '${wo.status}'. WO must be Released or In Progress.`);
+      }
+
+      // 2. Validate LP exists and is available
+      const { data: lp, error: lpError } = await supabase
+        .from('license_plates')
+        .select('id, lp_number, product_id, quantity, uom, is_consumed, qa_status')
+        .eq('id', data.lp_id)
+        .single();
+
+      if (lpError) throw lpError;
+      if (!lp) throw new Error('License plate not found');
+      if (lp.is_consumed) {
+        throw new Error('Cannot reserve consumed LP');
+      }
+      if (lp.qa_status !== 'Passed') {
+        throw new Error(`Cannot reserve LP with QA status '${lp.qa_status}'. Only 'Passed' LPs can be reserved.`);
+      }
+
+      // 3. Validate LP product matches material
+      if (lp.product_id !== data.material_id) {
+        throw new Error(`LP product (${lp.product_id}) does not match material (${data.material_id})`);
+      }
+
+      // 4. Calculate available quantity (LP qty - existing reservations)
+      const { data: existingReservations } = await supabase
+        .from('wo_reservations')
+        .select('quantity_reserved, quantity_consumed')
+        .eq('lp_id', data.lp_id)
+        .eq('status', 'active');
+
+      const totalReserved = (existingReservations || []).reduce(
+        (sum, r) => sum + (parseFloat(r.quantity_reserved) - parseFloat(r.quantity_consumed)),
+        0
+      );
+      const availableQty = parseFloat(lp.quantity) - totalReserved;
+
+      if (data.quantity_reserved > availableQty) {
+        throw new Error(
+          `Requested quantity ${data.quantity_reserved} exceeds available quantity ${availableQty} ` +
+          `(LP qty: ${lp.quantity}, already reserved: ${totalReserved})`
+        );
+      }
+
+      // 5. Check if reservation would exceed required quantity
+      const { data: requiredMaterial } = await supabase
+        .rpc('get_wo_required_materials', { wo_id_param: data.wo_id });
+
+      const material = requiredMaterial?.find(m => m.material_id === data.material_id);
+      if (material) {
+        const newTotalReserved = parseFloat(material.reserved_qty) + data.quantity_reserved;
+        if (newTotalReserved > parseFloat(material.required_qty)) {
+          throw new Error(
+            `Total reserved quantity ${newTotalReserved} would exceed required quantity ${material.required_qty} ` +
+            `(already reserved: ${material.reserved_qty})`
+          );
+        }
+      }
+
+      // 6. Create reservation
+      const { data: reservation, error: reservationError } = await supabase
+        .from('wo_reservations')
+        .insert({
+          wo_id: data.wo_id,
+          material_id: data.material_id,
+          lp_id: data.lp_id,
+          quantity_reserved: data.quantity_reserved,
+          quantity_consumed: 0,
+          uom: data.uom,
+          operation_sequence: data.operation_sequence || null,
+          status: 'active',
+          reserved_at: new Date().toISOString(),
+          reserved_by: data.userId
+        })
+        .select()
+        .single();
+
+      if (reservationError) throw reservationError;
+
+      return {
+        reservation_id: reservation.id,
+        lp_number: lp.lp_number
+      };
+    } catch (error) {
+      console.error('Error reserving material:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Release reservation (cancel without consuming)
+   */
+  static async releaseReservation(data: {
+    reservation_id: number;
+    userId: string;
+  }): Promise<void> {
+    try {
+      const { data: reservation, error: fetchError } = await supabase
+        .from('wo_reservations')
+        .select('status, quantity_consumed')
+        .eq('id', data.reservation_id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!reservation) throw new Error('Reservation not found');
+      if (reservation.status === 'consumed') {
+        throw new Error('Cannot release consumed reservation');
+      }
+      if (parseFloat(reservation.quantity_consumed) > 0) {
+        throw new Error('Cannot release partially consumed reservation');
+      }
+
+      const { error } = await supabase
+        .from('wo_reservations')
+        .update({
+          status: 'released'
+        })
+        .eq('id', data.reservation_id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error releasing reservation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Consume material from reservation
+   * Records consumption and creates genealogy entry
+   */
+  static async consumeMaterial(data: {
+    reservation_id: number;
+    quantity_consumed: number;
+    userId: string;
+  }): Promise<{
+    consumed_qty: number;
+    remaining_qty: number;
+  }> {
+    try {
+      // 1. Get reservation details
+      const { data: reservation, error: resError } = await supabase
+        .from('wo_reservations')
+        .select('*, license_plate:license_plates(id, lp_number, quantity)')
+        .eq('id', data.reservation_id)
+        .single();
+
+      if (resError) throw resError;
+      if (!reservation) throw new Error('Reservation not found');
+      if (reservation.status !== 'active') {
+        throw new Error(`Cannot consume from ${reservation.status} reservation`);
+      }
+
+      // 2. Validate consumption quantity
+      const currentConsumed = parseFloat(reservation.quantity_consumed);
+      const reserved = parseFloat(reservation.quantity_reserved);
+      const remaining = reserved - currentConsumed;
+
+      if (data.quantity_consumed > remaining) {
+        throw new Error(
+          `Consumption quantity ${data.quantity_consumed} exceeds remaining reservation ${remaining} ` +
+          `(reserved: ${reserved}, already consumed: ${currentConsumed})`
+        );
+      }
+
+      // 3. Update reservation
+      const newConsumed = currentConsumed + data.quantity_consumed;
+      const fullyConsumed = Math.abs(newConsumed - reserved) < 0.0001;
+
+      const { error: updateError } = await supabase
+        .from('wo_reservations')
+        .update({
+          quantity_consumed: newConsumed,
+          status: fullyConsumed ? 'consumed' : 'active',
+          consumed_at: fullyConsumed ? new Date().toISOString() : reservation.consumed_at,
+          consumed_by: fullyConsumed ? data.userId : reservation.consumed_by
+        })
+        .eq('id', data.reservation_id);
+
+      if (updateError) throw updateError;
+
+      // 4. Record genealogy (LP consumed for WO)
+      const { error: genealogyError } = await supabase
+        .from('lp_genealogy')
+        .insert({
+          parent_lp_id: reservation.lp_id,
+          child_lp_id: null, // Will link to output LP when produced
+          quantity_consumed: data.quantity_consumed,
+          uom: reservation.uom,
+          wo_id: reservation.wo_id,
+          operation_sequence: reservation.operation_sequence,
+          notes: `Material consumed for WO via reservation ${data.reservation_id}`
+        });
+
+      if (genealogyError) {
+        console.warn('Failed to record genealogy:', genealogyError);
+        // Don't fail consumption if genealogy recording fails
+      }
+
+      // 5. If LP fully consumed by all reservations, mark LP as consumed
+      const { data: allReservations } = await supabase
+        .from('wo_reservations')
+        .select('quantity_reserved, quantity_consumed')
+        .eq('lp_id', reservation.lp_id);
+
+      const totalLPConsumed = (allReservations || []).reduce(
+        (sum, r) => sum + parseFloat(r.quantity_consumed),
+        0
+      );
+      const lpQty = parseFloat(reservation.license_plate?.quantity || '0');
+
+      if (Math.abs(totalLPConsumed - lpQty) < 0.0001) {
+        await supabase
+          .from('license_plates')
+          .update({
+            is_consumed: true,
+            consumed_at: new Date().toISOString(),
+            consumed_by: data.userId
+          })
+          .eq('id', reservation.lp_id);
+      }
+
+      return {
+        consumed_qty: newConsumed,
+        remaining_qty: reserved - newConsumed
+      };
+    } catch (error) {
+      console.error('Error consuming material:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all reservations for a work order
+   */
+  static async getReservations(woId: number): Promise<Array<{
+    id: number;
+    material_id: number;
+    material_part_number: string;
+    material_description: string;
+    lp_id: number;
+    lp_number: string;
+    quantity_reserved: number;
+    quantity_consumed: number;
+    uom: string;
+    status: string;
+    batch: string | null;
+    expiry_date: string | null;
+    reserved_at: string;
+    reserved_by: string | null;
+    consumed_at: string | null;
+  }>> {
+    try {
+      const { data, error } = await supabase
+        .from('wo_reservations')
+        .select(`
+          *,
+          material:products!material_id(part_number, description),
+          license_plate:license_plates(lp_number, batch, expiry_date)
+        `)
+        .eq('wo_id', woId)
+        .order('reserved_at', { ascending: true });
+
+      if (error) throw error;
+
+      return (data || []).map(r => ({
+        id: r.id,
+        material_id: r.material_id,
+        material_part_number: r.material?.part_number || '',
+        material_description: r.material?.description || '',
+        lp_id: r.lp_id,
+        lp_number: r.license_plate?.lp_number || '',
+        quantity_reserved: parseFloat(r.quantity_reserved),
+        quantity_consumed: parseFloat(r.quantity_consumed),
+        uom: r.uom,
+        status: r.status,
+        batch: r.license_plate?.batch || null,
+        expiry_date: r.license_plate?.expiry_date || null,
+        reserved_at: r.reserved_at,
+        reserved_by: r.reserved_by,
+        consumed_at: r.consumed_at
+      }));
+    } catch (error) {
+      console.error('Error fetching WO reservations:', error);
+      throw error;
+    }
+  }
 }
