@@ -112,7 +112,7 @@ describe('PalletsAPI', () => {
     it('should create pallet with work order and location', async () => {
       const mockNewPallet = {
         id: 12,
-        pallet_number: 'PALLET-2025-000007',
+        pallet_number: 'PALLET-2025-000001',
         pallet_type: 'EURO',
         wo_id: 5,
         location_id: 10,
@@ -350,7 +350,9 @@ describe('PalletsAPI', () => {
           lp_id: 100,
           userId: 'user-123',
         })
-      ).rejects.toThrow("Cannot add LP with QA status Pending. Only 'Passed' LPs can be added");
+      ).rejects.toThrow(
+        "Cannot add LP with QA status Pending. Only 'Passed' LPs can be added"
+      );
     });
 
     it('should fail if LP is already on pallet', async () => {
@@ -757,7 +759,9 @@ describe('PalletsAPI', () => {
         }),
       } as any);
 
-      await expect(PalletsAPI.delete(1)).rejects.toThrow('Cannot delete closed pallet');
+      await expect(PalletsAPI.delete(1)).rejects.toThrow(
+        'Cannot delete closed pallet'
+      );
     });
 
     it('should fail if pallet has items', async () => {
@@ -788,7 +792,9 @@ describe('PalletsAPI', () => {
           }),
         } as any);
 
-      await expect(PalletsAPI.delete(1)).rejects.toThrow('Cannot delete pallet with items');
+      await expect(PalletsAPI.delete(1)).rejects.toThrow(
+        'Cannot delete pallet with items'
+      );
     });
   });
 });
