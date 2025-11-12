@@ -37,7 +37,6 @@ export default function ReceiveASNModal({
   const { user } = useAuth();
   const [step, setStep] = useState<'select' | 'preview' | 'confirm'>('select');
   const [asnList, setAsnList] = useState<ASNForReceiving[]>([]);
-  const [selectedASNId, setSelectedASNId] = useState<number | null>(preselectedASNId || null);
   const [selectedASN, setSelectedASN] = useState<ASN | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +86,6 @@ export default function ReceiveASNModal({
   };
 
   const handleSelectASN = (asnId: number) => {
-    setSelectedASNId(asnId);
     loadASNDetails(asnId);
   };
 
@@ -141,7 +139,6 @@ export default function ReceiveASNModal({
 
   const resetForm = () => {
     setStep('select');
-    setSelectedASNId(null);
     setSelectedASN(null);
     setNotes('');
     setError(null);

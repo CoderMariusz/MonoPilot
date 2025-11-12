@@ -1750,7 +1750,6 @@ CREATE TABLE pallet_items (
 - idx_grns_po ON (po_id)
 - idx_grns_supplier ON (supplier_id)
 - idx_grns_received_date ON (received_date)
-- idx_grns_asn ON (asn_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1794,7 +1793,6 @@ CREATE TABLE grns (
 | expiry_date | TIMESTAMPTZ | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
-| notes | TEXT | - |
 
 **Foreign Keys**:
 
