@@ -182,9 +182,6 @@ test.describe('ASN (Advanced Shipping Notice) Workflow', () => {
     const draftRow = page.locator('table tbody tr').filter({ hasText: 'draft' }).first();
 
     if (await draftRow.isVisible({ timeout: 3000 })) {
-      // Get ASN number before deletion
-      const rowText = await draftRow.innerText();
-
       // Click delete button (Trash icon)
       const deleteButton = draftRow.locator('button[title="Delete"], button:has-text("Delete")');
       await deleteButton.click();
