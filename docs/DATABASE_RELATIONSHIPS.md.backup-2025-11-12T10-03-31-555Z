@@ -91,7 +91,6 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `asn_items.product_id` → `products.id`
 - `stock_moves.product_id` → `products.id`
 - `product_allergens.product_id` → `products.id`
-- `wo_by_products.product_id` → `products.id`
 
 ### boms
 
@@ -152,7 +151,6 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `lp_reservations.wo_id` → `work_orders.id`
 - `lp_genealogy.wo_id` → `work_orders.id`
 - `pallets.wo_id` → `work_orders.id`
-- `wo_by_products.wo_id` → `work_orders.id`
 
 ### routing_operations
 
@@ -170,7 +168,6 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `lp_compositions.input_lp_id` → `license_plates.id`
 - `lp_genealogy.child_lp_id` → `license_plates.id`
 - `lp_genealogy.parent_lp_id` → `license_plates.id`
-- `wo_by_products.lp_id` → `license_plates.id`
 
 ### pallets
 

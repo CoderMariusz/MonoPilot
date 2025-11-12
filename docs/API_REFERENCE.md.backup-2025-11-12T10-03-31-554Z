@@ -1748,24 +1748,6 @@ static async getWorkOrderStageStatus(woId: number): Promise<{
 
 ---
 
-#### `recordByProductOutput()`
-
-**Signature**:
-```typescript
-static async recordByProductOutput(woId: number, byProductId: number, actualQuantity: number, locationId: number, notes?: string): Promise<{ lp_id: number; lp_number: string }>
-```
-
-**Parameters**:
-- `woId: number`
-- `byProductId: number`
-- `actualQuantity: number`
-- `locationId: number`
-- `notes?: string`
-
-**Returns**: `Promise<{ lp_id: number; lp_number: string }>`
-
----
-
 ### YieldAPI
 
 **Source**: `apps/frontend/lib/api/yield.ts`

@@ -552,4 +552,152 @@ export class WorkOrdersAPI {
       throw error;
     }
   }
+
+  // ============================================================================
+  // EPIC-001 Phase 3: Conditional Components Support
+  // ============================================================================
+
+  /**
+   * Evaluate conditional materials for a Work Order
+   * Returns filtered BOM items based on order_flags and context
+   * 
+   * @param bomId - BOM ID
+   * @param woContext - Work Order context (order_flags, customer_id, order_type)
+   * @returns Filtered BOM materials that meet conditions
+   */
+  static async evaluateConditionalMaterials(
+    bomId: number,
+    woContext: {
+      order_flags?: string[];
+      customer_id?: number;
+      order_type?: string;
+    }
+  ): Promise<Array<{
+    bom_item_id: number;
+    material_id: number;
+    quantity: number;
+    uom: string;
+    sequence: number;
+    is_conditional: boolean;
+    condition_met: boolean;
+    condition: any;
+  }>> {
+    try {
+      const { data, error } = await supabase
+        .rpc('evaluate_bom_materials', {
+          p_bom_id: bomId,
+          p_wo_context: woContext
+        });
+
+      if (error) {
+        console.error('Error evaluating conditional materials:', error);
+        throw new Error(`Failed to evaluate conditional materials: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (err: any) {
+      console.error('Error in evaluateConditionalMaterials:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Get all BOM materials with condition evaluation (for UI preview)
+   * Shows which materials will be included/excluded based on WO context
+   * 
+   * @param bomId - BOM ID
+   * @param woContext - Work Order context
+   * @returns All BOM items with condition_met flag
+   */
+  static async getAllMaterialsWithEvaluation(
+    bomId: number,
+    woContext: {
+      order_flags?: string[];
+      customer_id?: number;
+      order_type?: string;
+    }
+  ): Promise<Array<{
+    bom_item_id: number;
+    material_id: number;
+    quantity: number;
+    uom: string;
+    sequence: number;
+    is_conditional: boolean;
+    condition_met: boolean;
+    condition: any;
+    is_by_product: boolean;
+  }>> {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_all_bom_materials_with_evaluation', {
+          p_bom_id: bomId,
+          p_wo_context: woContext
+        });
+
+      if (error) {
+        console.error('Error getting materials with evaluation:', error);
+        throw new Error(`Failed to get materials with evaluation: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (err: any) {
+      console.error('Error in getAllMaterialsWithEvaluation:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Create Work Order with conditional material evaluation
+   * Automatically filters BOM materials based on order_flags
+   * 
+   * @param data - Work Order data with order_flags, customer_id, order_type
+   * @returns Created Work Order with filtered materials
+   */
+  static async createWithConditionalMaterials(
+    data: CreateWorkOrderData & {
+      order_flags?: string[];
+      customer_id?: number;
+      order_type?: string;
+    }
+  ): Promise<{
+    workOrder: WorkOrder;
+    evaluatedMaterials: Array<{
+      bom_item_id: number;
+      material_id: number;
+      quantity: number;
+      uom: string;
+      is_conditional: boolean;
+      condition_met: boolean;
+    }>;
+  }> {
+    try {
+      // 1. Create Work Order with order_flags
+      const workOrder = await this.create(data);
+
+      // 2. If BOM exists, evaluate conditional materials
+      let evaluatedMaterials: any[] = [];
+      if (workOrder.bom_id) {
+        const woContext = {
+          order_flags: data.order_flags || [],
+          customer_id: data.customer_id,
+          order_type: data.order_type
+        };
+
+        evaluatedMaterials = await this.evaluateConditionalMaterials(
+          Number(workOrder.bom_id),
+          woContext
+        );
+
+        console.log(`WO ${workOrder.wo_number}: Evaluated ${evaluatedMaterials.length} materials (${evaluatedMaterials.filter(m => m.is_conditional).length} conditional)`);
+      }
+
+      return {
+        workOrder,
+        evaluatedMaterials
+      };
+    } catch (err: any) {
+      console.error('Error creating WO with conditional materials:', err);
+      throw err;
+    }
+  }
 }

@@ -286,4 +286,148 @@ export const BomsAPI = {
 
     return response.json();
   },
+
+  // ============================================================================
+  // EPIC-001 Phase 2: Multi-Version BOM Support
+  // ============================================================================
+
+  /**
+   * Get BOM for specific date (BOM versioning)
+   * Selects the correct BOM version that is active on the given date
+   * 
+   * @param productId - Product ID
+   * @param date - Date to find BOM for (defaults to now)
+   * @returns BOM that is active on the given date
+   */
+  async getBOMForDate(
+    productId: number,
+    date?: string
+  ): Promise<{
+    bom_id: number;
+    bom_version: string;
+    effective_from: string;
+    effective_to: string | null;
+    is_current: boolean;
+    is_future: boolean;
+  }> {
+    const params = new URLSearchParams({
+      product_id: productId.toString(),
+      ...(date && { date }),
+    });
+
+    const response = await fetch(`${API_BASE}/select-by-date?${params}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `No active BOM found for product ${productId} on ${date || 'today'}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get all BOM versions for a product
+   * Returns list of all BOMs with status flags (current, future, expired)
+   * 
+   * @param productId - Product ID
+   * @returns Array of BOM versions with status
+   */
+  async getAllVersions(
+    productId: number
+  ): Promise<Array<{
+    bom_id: number;
+    bom_version: string;
+    effective_from: string;
+    effective_to: string | null;
+    status: 'draft' | 'active' | 'archived';
+    is_current: boolean;
+    is_future: boolean;
+    is_expired: boolean;
+    items_count: number;
+  }>> {
+    const response = await fetch(`${API_BASE}/versions/${productId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Failed to fetch BOM versions for product ${productId}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Clone BOM with new effective dates (create new version)
+   * Used to create a future BOM version based on current one
+   * 
+   * @param id - BOM ID to clone
+   * @param effectiveFrom - Start date for new version
+   * @param effectiveTo - End date for new version (optional)
+   * @returns Created BOM version
+   */
+  async cloneBOMWithDates(
+    id: number,
+    effectiveFrom: string,
+    effectiveTo?: string | null
+  ): Promise<BomCloneResponse & { effective_from: string; effective_to: string | null }> {
+    const response = await fetch(`${API_BASE}/${id}/clone-version`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        effective_from: effectiveFrom,
+        effective_to: effectiveTo || null,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to clone BOM version');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Validate BOM date range (check for overlaps)
+   * 
+   * @param productId - Product ID
+   * @param effectiveFrom - Start date
+   * @param effectiveTo - End date (optional)
+   * @param bomId - BOM ID (for updates, to exclude current BOM)
+   * @returns Validation result
+   */
+  async validateDateRange(
+    productId: number,
+    effectiveFrom: string,
+    effectiveTo?: string | null,
+    bomId?: number
+  ): Promise<{
+    is_valid: boolean;
+    error_message: string | null;
+    conflicting_bom_id: number | null;
+  }> {
+    const params = new URLSearchParams({
+      product_id: productId.toString(),
+      effective_from: effectiveFrom,
+      ...(effectiveTo && { effective_to: effectiveTo }),
+      ...(bomId && { bom_id: bomId.toString() }),
+    });
+
+    const response = await fetch(`${API_BASE}/validate-date-range?${params}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to validate date range');
+    }
+
+    return response.json();
+  },
 };

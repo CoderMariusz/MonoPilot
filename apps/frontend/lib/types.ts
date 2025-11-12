@@ -98,6 +98,10 @@ export interface WorkOrder {
     status: string;
   };
   line_number?: string;
+  // EPIC-001 Phase 3: Conditional Components
+  order_flags?: string[]; // e.g., ['organic', 'gluten_free', 'vegan']
+  customer_id?: number;
+  order_type?: string; // e.g., 'standard', 'export', 'premium'
   line_id?: number;  // Production line FK
   priority?: number;
   created_at: string;
