@@ -28,6 +28,10 @@ export interface BomItemUpdateData {
   lead_time_days?: number | null;
   moq?: number | null;
   line_id?: number[] | null;  // Array of production line IDs for line-specific materials
+  // EPIC-001 Phase 1: By-Products
+  is_by_product?: boolean;
+  // EPIC-001 Phase 3: Conditional Components
+  condition?: any | null;  // JSONB condition structure
 }
 
 export interface BomUpdateResponse {
@@ -426,6 +430,91 @@ export const BomsAPI = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to validate date range');
+    }
+
+    return response.json();
+  },
+
+  // ============================================================================
+  // EPIC-001 Phase 3: Conditional Components
+  // ============================================================================
+
+  /**
+   * Evaluate BOM materials based on WO context (order flags, customer, etc.)
+   * Returns only materials that match conditions or are unconditional
+   *
+   * @param bomId - BOM ID
+   * @param context - WO context with order_flags, customer_id, order_type, etc.
+   * @returns Filtered BOM materials that should be included in the WO
+   */
+  async evaluateBOMMaterials(
+    bomId: number,
+    context: {
+      order_flags?: string[];
+      customer_id?: number;
+      order_type?: string;
+      [key: string]: any;
+    }
+  ): Promise<Array<{
+    bom_item_id: number;
+    material_id: number;
+    quantity: number;
+    uom: string;
+    sequence: number;
+    is_conditional: boolean;
+    condition_met: boolean;
+    condition: any | null;
+  }>> {
+    const response = await fetch(`${API_BASE}/${bomId}/evaluate-materials`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ context }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Failed to evaluate BOM materials for BOM ${bomId}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get all BOM materials with condition evaluation results (for UI display)
+   * Returns ALL materials (conditional and unconditional) with evaluation status
+   *
+   * @param bomId - BOM ID
+   * @param context - WO context with order_flags, customer_id, order_type, etc.
+   * @returns All BOM materials with condition evaluation status
+   */
+  async getAllMaterialsWithEvaluation(
+    bomId: number,
+    context: {
+      order_flags?: string[];
+      customer_id?: number;
+      order_type?: string;
+      [key: string]: any;
+    }
+  ): Promise<Array<{
+    bom_item_id: number;
+    material_id: number;
+    quantity: number;
+    uom: string;
+    sequence: number;
+    is_conditional: boolean;
+    condition_met: boolean;
+    condition: any | null;
+    is_by_product: boolean;
+  }>> {
+    const response = await fetch(`${API_BASE}/${bomId}/evaluate-all-materials`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ context }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Failed to evaluate all BOM materials for BOM ${bomId}`);
     }
 
     return response.json();

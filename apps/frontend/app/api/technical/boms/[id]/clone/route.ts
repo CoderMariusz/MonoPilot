@@ -68,7 +68,11 @@ export async function POST(
         unit_cost_std: item.unit_cost_std,
         tax_code_id: item.tax_code_id,
         lead_time_days: item.lead_time_days,
-        moq: item.moq
+        moq: item.moq,
+        // EPIC-001 Phase 1: By-Products
+        is_by_product: item.is_by_product,
+        // EPIC-001 Phase 3: Conditional Components
+        condition: item.condition
       }));
 
       const { error: itemsError } = await supabase

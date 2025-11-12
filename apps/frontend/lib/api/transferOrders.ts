@@ -132,29 +132,60 @@ export class TransferOrdersAPI {
       if (error) throw error;
       // Map to TransferOrder for backward compatibility
       return (data || []).map((to: TOHeader) => ({
-        ...to,
+        id: to.id,
         to_number: to.number,
         from_warehouse_id: to.from_wh_id,
         to_warehouse_id: to.to_wh_id,
+        status: to.status,
         transfer_date: to.transfer_date || to.planned_ship_date, // Ensure required field for TransferOrder
+        requested_date: to.requested_date,
         planned_ship_date: to.planned_ship_date,
         actual_ship_date: to.actual_ship_date,
         planned_receive_date: to.planned_receive_date,
         actual_receive_date: to.actual_receive_date,
-        transfer_order_items: to.to_lines?.map(line => {
-          const lineWithQty = line as TOLine & { qty_shipped?: number; qty_received?: number };
-          return {
-            ...line,
-            product_id: line.item_id,
-            quantity: line.qty_planned,
-            quantity_planned: line.qty_planned,
-            quantity_actual: lineWithQty.qty_received || line.qty_moved || 0,
-            quantity_shipped: lineWithQty.qty_shipped || 0,
-            quantity_received: lineWithQty.qty_received || 0,
-            lp_id: line.lp_id,
-            batch: line.batch
-          };
-        }) || []
+        notes: to.notes,
+        created_by: to.created_by,
+        updated_by: to.updated_by,
+        created_at: to.created_at,
+        updated_at: to.updated_at,
+        from_warehouse: to.from_warehouse,
+        to_warehouse: to.to_warehouse,
+        // Map to_lines to items (new API) and transfer_order_items (deprecated backward compat)
+        items: to.to_lines?.map(line => ({
+          id: line.id,
+          to_id: line.to_id,
+          line_no: line.line_no,
+          item_id: line.item_id,
+          uom: line.uom,
+          qty_planned: line.qty_planned,
+          qty_shipped: line.qty_shipped || 0,
+          qty_received: line.qty_received || 0,
+          lp_id: line.lp_id,
+          batch: line.batch,
+          notes: line.notes,
+          created_at: line.created_at,
+          updated_at: line.updated_at,
+          product: line.item
+        })) || [],
+        // Deprecated backward compatibility
+        from_wh_id: to.from_wh_id,
+        to_wh_id: to.to_wh_id,
+        transfer_order_items: to.to_lines?.map(line => ({
+          id: line.id,
+          to_id: line.to_id,
+          line_no: line.line_no,
+          item_id: line.item_id,
+          uom: line.uom,
+          qty_planned: line.qty_planned,
+          qty_shipped: line.qty_shipped || 0,
+          qty_received: line.qty_received || 0,
+          lp_id: line.lp_id,
+          batch: line.batch,
+          notes: line.notes,
+          created_at: line.created_at,
+          updated_at: line.updated_at,
+          product: line.item
+        })) || []
       })) as TransferOrder[];
     } catch (error) {
       console.error('Error fetching transfer orders:', error);
@@ -467,7 +498,7 @@ export class TransferOrdersAPI {
 // DTO for markReceived line updates
 export interface MarkReceivedLineUpdate {
   line_id: number;
-  qty_moved: number;
+  qty_received: number;
   lp_id?: number;
   batch?: string;
 }

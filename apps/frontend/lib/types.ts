@@ -435,19 +435,21 @@ export interface POCorrection {
 
 // TO Header (replacing TransferOrder)
 export interface TOHeader {
-  transfer_date: any;
   id: number;
   number: string;
   status: TOStatus;
   from_wh_id: number;
   to_wh_id: number;
-  requested_date?: string;
-  planned_ship_date?: string;
-  actual_ship_date?: string;
-  planned_receive_date?: string;
-  actual_receive_date?: string;
-  created_by?: string;
-  approved_by?: string;
+  transfer_date?: string | null;
+  requested_date?: string | null;
+  planned_ship_date?: string | null;
+  actual_ship_date?: string | null;
+  planned_receive_date?: string | null;
+  actual_receive_date?: string | null;
+  notes?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  approved_by?: string | null;
   created_at: string;
   updated_at: string;
   // Relationships
@@ -464,19 +466,15 @@ export interface TOLine {
   item_id: number;
   uom: string;
   qty_planned: number;
-  qty_moved: number;
-  from_location_id?: number;
-  to_location_id?: number;
-  lp_id?: number;
-  batch?: string;
-  scan_required: boolean;
-  approved_line: boolean;
+  qty_shipped: number;
+  qty_received: number;
+  lp_id?: number | null;
+  batch?: string | null;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
   // Relationships
   item?: Product;
-  from_location?: Location;
-  to_location?: Location;
 }
 
 // Audit Log (enhanced audit_events)
@@ -556,11 +554,28 @@ export type UpdateWarehouseData = Partial<CreateWarehouseData>;
 export type TransferOrderStatus = TOStatus;
 
 // Legacy TransferOrder for backward compatibility (deprecated)
+// Transfer Order Item (to_line table)
+export interface TransferOrderItem {
+  id: number;
+  to_id: number;
+  line_no: number;
+  item_id: number;
+  uom: string;
+  qty_planned: number;
+  qty_shipped: number;
+  qty_received: number;
+  lp_id?: number | null;
+  batch?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  // Relationships (populated from joins)
+  product?: Product;
+}
+
 export interface TransferOrder {
   id: number;
   to_number: string;
-  from_wh_id?: number;
-  to_wh_id?: number;
   from_warehouse_id: number;
   to_warehouse_id: number;
   status: TransferOrderStatus;
@@ -573,21 +588,16 @@ export interface TransferOrder {
   notes?: string;
   created_by?: string;
   updated_by?: string;
-  from_warehouse?: Warehouse;
-  to_warehouse?: Warehouse;
-  transfer_order_items?: Array<{
-    id: number;
-    product_id: number;
-    quantity: number;
-    quantity_planned: number;
-    quantity_actual: number;
-    lp_id?: number;
-    batch?: string;
-    product?: Product;
-    [key: string]: any;
-  }>;
   created_at: string;
   updated_at: string;
+  // Relationships (populated from joins)
+  from_warehouse?: Warehouse;
+  to_warehouse?: Warehouse;
+  items?: TransferOrderItem[];
+  // Deprecated aliases for backward compatibility (will be removed)
+  from_wh_id?: number;
+  to_wh_id?: number;
+  transfer_order_items?: TransferOrderItem[];
 }
 
 export interface ProductionOutput {
@@ -689,6 +699,8 @@ export interface BomItemInput {
   is_by_product?: boolean;  // True if OUTPUT (by-product), false if INPUT (material)
   yield_percentage?: number | null;  // Expected yield % for by-products (e.g., 15.00 = 15%)
   line_id?: number[] | null;  // Array of production line IDs for line-specific materials
+  // EPIC-001 Phase 3: Conditional Components
+  condition?: BomItemCondition | null;
 }
 
 export interface CreateSinglePayload {
@@ -908,6 +920,27 @@ export interface Bom {
   defaultRouting?: Routing;
 }
 
+// EPIC-001 Phase 3: Conditional BOM Item types
+export type ConditionOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'contains'
+  | 'not_contains'
+  | 'greater_than'
+  | 'less_than'
+  | 'in';
+
+export interface ConditionRule {
+  field: string;  // e.g., 'order_flags', 'customer_id', 'order_type'
+  operator: ConditionOperator;
+  value: string | number | any;
+}
+
+export interface BomItemCondition {
+  type: 'AND' | 'OR';
+  rules: ConditionRule[];
+}
+
 export interface BomItem {
   id: number;
   bom_id: number;
@@ -926,6 +959,10 @@ export interface BomItem {
   tax_code_id?: number | null;
   lead_time_days?: number | null;
   moq?: number | null;
+  // EPIC-001 Phase 1: By-Products Support
+  is_by_product?: boolean;
+  // EPIC-001 Phase 3: Conditional Components
+  condition?: BomItemCondition | null;
   created_at: string;
   updated_at: string;
   // Enhanced relationships

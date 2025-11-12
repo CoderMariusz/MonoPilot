@@ -73,11 +73,11 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
           planned_receive_date: to.planned_receive_date ? new Date(to.planned_receive_date).toISOString().split('T')[0] : '',
         });
 
-        if (to.transfer_order_items && to.transfer_order_items.length > 0) {
-          setTransferItems(to.transfer_order_items.map(item => ({
+        if (to.items && to.items.length > 0) {
+          setTransferItems(to.items.map(item => ({
             id: item.id.toString(),
-            product_id: item.product_id.toString(),
-            quantity: item.quantity.toString(),
+            product_id: item.item_id.toString(),
+            quantity: item.qty_planned.toString(),
           })));
         }
       }
@@ -128,7 +128,8 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
           item_id: Number(item.product_id),
           uom: product.uom || 'EA',
           qty_planned: quantityNum,
-          qty_moved: 0,
+          qty_shipped: 0,
+          qty_received: 0,
         };
       });
       
