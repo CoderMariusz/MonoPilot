@@ -441,14 +441,14 @@ ALTER TABLE stock_moves
 - [ ] E2E tests: 2 scenarios
 
 ### **Phase 3: Pallets & WO Reservations**
-- [ ] Pallet tables created
-- [ ] WO reservations table created
-- [ ] PalletsAPI implemented
-- [ ] WorkOrdersAPI.reserveMaterial() working
+- [x] Pallet tables created
+- [x] WO reservations table created
+- [x] PalletsAPI implemented
+- [x] WorkOrdersAPI.reserveMaterial() working
 - [ ] Scanner menu: Line selection → WO list → Detail
-- [ ] Required Items checklist updates
+- [x] Required Items checklist updates
 - [ ] Pallet creation validation (component check)
-- [ ] Alert system for insufficient components
+- [x] Alert system for insufficient components
 - [ ] Unit tests: 12+ tests
 - [ ] E2E tests: 4 scenarios
 

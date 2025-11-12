@@ -1115,9 +1115,27 @@ CREATE INDEX idx_bom_tree_cache_product ON bom_tree_cache(product_id);
 
 ---
 
-### Phase 3: Scanner Integration (Deferred)
+### Phase 3: Scanner Integration (Progress Update – 2025-01-11)
 
 **Epic**: "Scanner Integration & Real-time Sync"
+
+**Current Progress**
+
+- [x] **Process terminal flow** – line selection, WO list with required-materials checklist, insufficient component alerts (`apps/frontend/app/scanner/process/page.tsx`)
+- [x] **StageBoard & reservations overlay** – progress bars and staged LP view (`StageBoard.tsx`, `StagedLPsList.tsx`)
+- [x] **Scan → quantity → confirm** reservation flow with validation and QA overrides
+- [x] **Pack terminal pallet flow** – pallet creation and packing forms with input LP selection (`apps/frontend/app/scanner/pack/page.tsx`)
+- [ ] **Scanner landing menu line picker** – pending UI enhancement on `/scanner`
+- [ ] **WorkOrdersAPI reservation unit tests** – tracked in TD backlog
+- [ ] **Playwright E2E coverage** for pallet + reservation scenarios
+- [ ] **Phase 3 summary documentation** (`docs/EPIC-002_PHASE-3_*.md`)
+
+**Next Steps**
+
+1. Add line/process selection shortcut on scanner landing page.
+2. Backfill unit tests for `WorkOrdersAPI.reserveMaterial/consumeMaterial`.
+3. Implement Playwright scenarios: pallet lifecycle, WO reservation → scan → progress.
+4. Publish dedicated Phase 3 summary document.
 
 **Features**: HTTP API, WebSocket sync, offline mode
 
