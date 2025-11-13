@@ -1025,3 +1025,208 @@ export interface WoMaterial {
   // Enhanced relationships
   material?: Product;
 }
+// ============================================================================
+// EPIC-003 Phase 1: Cost Calculation & Analysis Types
+// ============================================================================
+
+// Material Cost tracking
+export interface MaterialCost {
+  id: number;
+  product_id: number;
+  org_id: number;
+  cost: number;
+  currency: string;
+  uom: string;
+  effective_from: string;
+  effective_to?: string | null;
+  source: 'manual' | 'supplier' | 'average' | 'import';
+  notes?: string | null;
+  created_by?: number;
+  created_at: string;
+  updated_by?: number;
+  updated_at: string;
+  // Relationships
+  product?: Product;
+}
+
+// BOM Cost snapshot
+export interface BOMCost {
+  id: number;
+  bom_id: number;
+  org_id: number;
+  total_cost: number;
+  material_costs: number;
+  labor_cost: number;
+  overhead_cost: number;
+  currency: string;
+  material_costs_json?: BOMCostBreakdown;
+  calculated_at: string;
+  calculated_by?: number;
+  calculation_method?: string;
+  notes?: string | null;
+  created_at: string;
+  // Relationships
+  bom?: BOM;
+}
+
+// BOM Cost Breakdown structure
+export interface BOMCostBreakdown {
+  bom_id: number;
+  total_cost: number;
+  material_cost: number;
+  labor_cost: number;
+  overhead_cost: number;
+  currency: string;
+  calculated_at: string;
+  materials: MaterialCostItem[];
+}
+
+// Individual material cost in BOM
+export interface MaterialCostItem {
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  uom: string;
+  unit_cost: number;
+  total_cost: number;
+}
+
+// Product Pricing
+export interface ProductPrice {
+  id: number;
+  product_id: number;
+  org_id: number;
+  price: number;
+  currency: string;
+  effective_from: string;
+  effective_to?: string | null;
+  price_type: 'wholesale' | 'retail' | 'export' | 'internal' | 'custom';
+  customer_id?: number | null;
+  notes?: string | null;
+  created_by?: number;
+  created_at: string;
+  updated_by?: number;
+  updated_at: string;
+  // Relationships
+  product?: Product;
+}
+
+// Work Order Costs
+export interface WOCost {
+  id: number;
+  wo_id: number;
+  org_id: number;
+  // Planned costs
+  planned_cost: number;
+  planned_material_cost: number;
+  planned_labor_cost: number;
+  planned_overhead_cost: number;
+  // Actual costs
+  actual_cost: number;
+  actual_material_cost: number;
+  actual_labor_cost: number;
+  actual_overhead_cost: number;
+  // Variance (computed)
+  cost_variance: number;
+  variance_percent: number;
+  currency: string;
+  planned_calculated_at: string;
+  actual_calculated_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  // Relationships
+  work_order?: WorkOrder;
+}
+
+// Margin Analysis result
+export interface MarginAnalysis {
+  product_id: number;
+  product_name: string;
+  product_code?: string;
+  cost: number;
+  price: number;
+  margin: number;
+  margin_percent: number;
+  currency: string;
+  price_type: string;
+  effective_date: string;
+}
+
+// Cost Comparison between BOM versions
+export interface BOMCostComparison {
+  bom_1: BOMCostBreakdown;
+  bom_2: BOMCostBreakdown;
+  cost_difference: number;
+  cost_difference_percent: number;
+  comparison_date: string;
+  changed_materials?: MaterialCostDiff[];
+}
+
+// Material cost difference in comparison
+export interface MaterialCostDiff {
+  product_id: number;
+  product_name: string;
+  cost_1: number;
+  cost_2: number;
+  difference: number;
+  difference_percent: number;
+}
+
+// Cost trend data point
+export interface CostTrendPoint {
+  date: string;
+  cost: number;
+  source: string;
+}
+
+// WO Cost Variance detail
+export interface WOCostVariance {
+  wo_id: number;
+  wo_number: string;
+  product_name: string;
+  planned_cost: number;
+  actual_cost: number;
+  variance: number;
+  variance_percent: number;
+  material_variance: number;
+  labor_variance: number;
+  overhead_variance: number;
+  currency: string;
+}
+
+// API request/response types
+export interface SetMaterialCostRequest {
+  product_id: number;
+  cost: number;
+  currency?: string;
+  uom: string;
+  effective_from?: string;
+  effective_to?: string | null;
+  source?: 'manual' | 'supplier' | 'average' | 'import';
+  notes?: string;
+}
+
+export interface SetProductPriceRequest {
+  product_id: number;
+  price: number;
+  currency?: string;
+  effective_from?: string;
+  effective_to?: string | null;
+  price_type?: 'wholesale' | 'retail' | 'export' | 'internal' | 'custom';
+  customer_id?: number | null;
+  notes?: string;
+}
+
+export interface CalculateBOMCostRequest {
+  bom_id: number;
+  as_of_date?: string;
+  include_labor?: boolean;
+  include_overhead?: boolean;
+}
+
+export interface CompareBOMCostsRequest {
+  bom_id_1: number;
+  bom_id_2: number;
+  as_of_date?: string;
+}
+
