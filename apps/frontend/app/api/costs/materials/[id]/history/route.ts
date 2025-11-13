@@ -11,11 +11,12 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const productId = parseInt(params.id);
+    const { id } = await params;
+    const productId = parseInt(id);
 
     if (isNaN(productId)) {
       return NextResponse.json(
@@ -27,10 +28,12 @@ export async function GET(
     // Get all material costs for the product, ordered by effective_from descending
     const { data: costs, error } = await supabase
       .from('material_costs')
-      .select(`
+      .select(
+        `
         *,
         product:products(id, name, sku)
-      `)
+      `
+      )
       .eq('product_id', productId)
       .order('effective_from', { ascending: false });
 
@@ -43,7 +46,6 @@ export async function GET(
     }
 
     return NextResponse.json(costs || []);
-
   } catch (error) {
     console.error('Material cost history GET error:', error);
     return NextResponse.json(

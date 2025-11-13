@@ -11,11 +11,12 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const woId = parseInt(params.id);
+    const { id } = await params;
+    const woId = parseInt(id);
 
     if (isNaN(woId)) {
       return NextResponse.json(
@@ -58,10 +59,13 @@ export async function POST(
 
     for (const material of materials || []) {
       // Get material cost at WO scheduled date
-      const { data: costData } = await supabase.rpc('get_material_cost_at_date', {
-        p_product_id: material.item_id,
-        p_date: wo.scheduled_date,
-      });
+      const { data: costData } = await supabase.rpc(
+        'get_material_cost_at_date',
+        {
+          p_product_id: material.item_id,
+          p_date: wo.scheduled_date,
+        }
+      );
 
       const unitCost = costData || 0;
       const totalQty = material.qty_per_unit * wo.qty_planned;
@@ -79,22 +83,27 @@ export async function POST(
     }
 
     // Get user ID for audit trail
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     // Save or update WO cost record
     const { data: woCost, error: costError } = await supabase
       .from('wo_costs')
-      .upsert({
-        wo_id: woId,
-        planned_cost: totalMaterialCost,
-        planned_material_cost: totalMaterialCost,
-        planned_labor_cost: 0, // TODO: Add labor cost calculation
-        planned_overhead_cost: 0, // TODO: Add overhead cost calculation
-        material_breakdown_json: materialBreakdown,
-        created_by: user?.id,
-      }, {
-        onConflict: 'wo_id',
-      })
+      .upsert(
+        {
+          wo_id: woId,
+          planned_cost: totalMaterialCost,
+          planned_material_cost: totalMaterialCost,
+          planned_labor_cost: 0, // TODO: Add labor cost calculation
+          planned_overhead_cost: 0, // TODO: Add overhead cost calculation
+          material_breakdown_json: materialBreakdown,
+          created_by: user?.id,
+        },
+        {
+          onConflict: 'wo_id',
+        }
+      )
       .select()
       .single();
 
@@ -107,7 +116,6 @@ export async function POST(
     }
 
     return NextResponse.json(woCost, { status: 201 });
-
   } catch (error) {
     console.error('WO planned cost POST error:', error);
     return NextResponse.json(

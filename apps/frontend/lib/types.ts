@@ -71,7 +71,14 @@ export interface OrderProgress {
   updated_at: string;
 }
 
-export type UserRole = 'Operator' | 'Planner' | 'Technical' | 'Purchasing' | 'Warehouse' | 'QC' | 'Admin';
+export type UserRole =
+  | 'Operator'
+  | 'Planner'
+  | 'Technical'
+  | 'Purchasing'
+  | 'Warehouse'
+  | 'QC'
+  | 'Admin';
 export type UserStatus = 'active' | 'inactive' | 'suspended';
 
 export interface WorkOrder {
@@ -102,7 +109,7 @@ export interface WorkOrder {
   order_flags?: string[]; // e.g., ['organic', 'gluten_free', 'vegan']
   customer_id?: number;
   order_type?: string; // e.g., 'standard', 'export', 'premium'
-  line_id?: number;  // Production line FK
+  line_id?: number; // Production line FK
   priority?: number;
   created_at: string;
   updated_at: string;
@@ -112,19 +119,24 @@ export type CreateWorkOrderData = Omit<WorkOrder, 'id'>;
 export type UpdateWorkOrderData = Partial<CreateWorkOrderData>;
 
 // WO status values must match database schema constraint (no 'draft' status in DB)
-export type WorkOrderStatus = 'planned' | 'released' | 'in_progress' | 'completed' | 'cancelled';
+export type WorkOrderStatus =
+  | 'planned'
+  | 'released'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
 
 // EPIC-001: By-Products Support
 export interface WOByProduct {
   id: number;
   wo_id: number;
   product_id: number;
-  product?: any;  // Populated from products table
+  product?: any; // Populated from products table
   expected_quantity: number;
   actual_quantity: number;
   uom: string;
   lp_id?: number | null;
-  lp?: any;  // Populated from license_plates table
+  lp?: any; // Populated from license_plates table
   notes?: string | null;
   created_at: string;
   updated_at: string;
@@ -157,7 +169,14 @@ export interface LicensePlate {
   updated_at: string;
 }
 
-export type LicensePlateStatus = 'Available' | 'Reserved' | 'In Production' | 'QA Hold' | 'QA Released' | 'QA Rejected' | 'Shipped';
+export type LicensePlateStatus =
+  | 'Available'
+  | 'Reserved'
+  | 'In Production'
+  | 'QA Hold'
+  | 'QA Released'
+  | 'QA Rejected'
+  | 'Shipped';
 
 export type QAStatus = 'Passed' | 'Failed' | 'Pending' | 'Hold' | 'Quarantine';
 
@@ -193,7 +212,10 @@ export interface Location {
   warehouse?: Warehouse;
 }
 
-export type CreateLocationData = Omit<Location, 'id' | 'created_at' | 'updated_at'>;
+export type CreateLocationData = Omit<
+  Location,
+  'id' | 'created_at' | 'updated_at'
+>;
 export type UpdateLocationData = Partial<CreateLocationData>;
 
 export interface Machine {
@@ -206,7 +228,10 @@ export interface Machine {
   updated_at: string;
 }
 
-export type CreateMachineData = Omit<Machine, 'id' | 'created_at' | 'updated_at'>;
+export type CreateMachineData = Omit<
+  Machine,
+  'id' | 'created_at' | 'updated_at'
+>;
 export type UpdateMachineData = Partial<CreateMachineData>;
 
 // Production Lines
@@ -223,7 +248,10 @@ export interface ProductionLine {
   updated_by?: string;
 }
 
-export type CreateProductionLineData = Omit<ProductionLine, 'id' | 'created_at' | 'updated_at'>;
+export type CreateProductionLineData = Omit<
+  ProductionLine,
+  'id' | 'created_at' | 'updated_at'
+>;
 export type UpdateProductionLineData = Partial<CreateProductionLineData>;
 
 export interface Supplier {
@@ -247,7 +275,10 @@ export interface Supplier {
   updated_at: string;
 }
 
-export type CreateSupplierData = Omit<Supplier, 'id' | 'created_at' | 'updated_at'>;
+export type CreateSupplierData = Omit<
+  Supplier,
+  'id' | 'created_at' | 'updated_at'
+>;
 export type UpdateSupplierData = Partial<CreateSupplierData>;
 
 // ============================================================================
@@ -364,9 +395,20 @@ export interface LPGenealogyChain {
 // Phase 1 Planning Types - Updated for new schema
 
 // PO status values must match database schema constraint
-export type POStatus = 'draft' | 'submitted' | 'confirmed' | 'received' | 'cancelled' | 'closed';
+export type POStatus =
+  | 'draft'
+  | 'submitted'
+  | 'confirmed'
+  | 'received'
+  | 'cancelled'
+  | 'closed';
 // TO status values must match database schema constraint (no 'closed' status in DB)
-export type TOStatus = 'draft' | 'submitted' | 'in_transit' | 'received' | 'cancelled';
+export type TOStatus =
+  | 'draft'
+  | 'submitted'
+  | 'in_transit'
+  | 'received'
+  | 'cancelled';
 
 // PO Header (replacing PurchaseOrder)
 export interface POHeader {
@@ -492,7 +534,15 @@ export interface AuditLogEntry {
 }
 
 // Legacy types for backward compatibility (deprecated)
-export type PurchaseOrderStatus = 'draft' | 'sent' | 'confirmed' | 'partially_received' | 'received' | 'cancelled' | 'submitted' | 'closed';
+export type PurchaseOrderStatus =
+  | 'draft'
+  | 'sent'
+  | 'confirmed'
+  | 'partially_received'
+  | 'received'
+  | 'cancelled'
+  | 'submitted'
+  | 'closed';
 export interface PurchaseOrder extends POHeader {
   po_number: string;
   expected_delivery: string;
@@ -529,7 +579,8 @@ export interface GRN {
   created_by: string;
   grn_items?: any[];
   po?: PurchaseOrder;
-  asn?: { // EPIC-002: ASN relationship
+  asn?: {
+    // EPIC-002: ASN relationship
     asn_number: string;
     status: string;
   };
@@ -546,7 +597,10 @@ export interface Warehouse {
   updated_at: string;
 }
 
-export type CreateWarehouseData = Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>;
+export type CreateWarehouseData = Omit<
+  Warehouse,
+  'id' | 'created_at' | 'updated_at'
+>;
 export type UpdateWarehouseData = Partial<CreateWarehouseData>;
 
 // TransferOrderStatus type for legacy TransferOrder
@@ -613,14 +667,22 @@ export interface ProductionOutput {
 
 // New enums for product taxonomy
 export type ProductGroup = 'MEAT' | 'DRYGOODS' | 'COMPOSITE';
-export type ProductType = 'RM_MEAT' | 'PR' | 'FG' | 'DG_WEB' | 'DG_LABEL' | 'DG_BOX' | 'DG_ING' | 'DG_SAUCE';
+export type ProductType =
+  | 'RM_MEAT'
+  | 'PR'
+  | 'FG'
+  | 'DG_WEB'
+  | 'DG_LABEL'
+  | 'DG_BOX'
+  | 'DG_ING'
+  | 'DG_SAUCE';
 
 // Enhanced Product interface
 export interface Product {
   id: number;
   part_number: string;
   description: string;
-  type: 'RM' | 'DG' | 'PR' | 'FG' | 'WIP';  // DB required field
+  type: 'RM' | 'DG' | 'PR' | 'FG' | 'WIP'; // DB required field
   group: ProductGroup;
   product_group?: ProductGroup; // keep optional for backward compatibility in UI
   product_type: ProductType;
@@ -654,8 +716,11 @@ export interface Product {
 // Note: ProductGroup and ProductType are already declared above; only declare if not present, else fix duplication.
 
 export type DbType = 'RM' | 'DG' | 'PR' | 'FG' | 'WIP';
-export type ExpiryPolicy = 'DAYS_STATIC' | 'FROM_MFG_DATE' | 'FROM_DELIVERY_DATE' | 'FROM_CREATION_DATE';
-
+export type ExpiryPolicy =
+  | 'DAYS_STATIC'
+  | 'FROM_MFG_DATE'
+  | 'FROM_DELIVERY_DATE'
+  | 'FROM_CREATION_DATE';
 
 export interface ProductInsert {
   type: DbType;
@@ -664,7 +729,7 @@ export interface ProductInsert {
   uom: string;
   product_group?: ProductGroup;
   product_type?: ProductType;
-  product_version?: string;  // Product version
+  product_version?: string; // Product version
   is_active?: boolean;
   supplier_id?: number | null;
   tax_code_id?: number | null;
@@ -690,15 +755,15 @@ export interface BomItemInput {
   scrap_std_pct?: number | null;
   is_optional?: boolean;
   is_phantom?: boolean;
-  consume_whole_lp?: boolean;  // renamed from one_to_one
+  consume_whole_lp?: boolean; // renamed from one_to_one
   unit_cost_std?: number | null;
   tax_code_id?: number | null;
   lead_time_days?: number | null;
   moq?: number | null;
   // EPIC-001: By-Products Support
-  is_by_product?: boolean;  // True if OUTPUT (by-product), false if INPUT (material)
-  yield_percentage?: number | null;  // Expected yield % for by-products (e.g., 15.00 = 15%)
-  line_id?: number[] | null;  // Array of production line IDs for line-specific materials
+  is_by_product?: boolean; // True if OUTPUT (by-product), false if INPUT (material)
+  yield_percentage?: number | null; // Expected yield % for by-products (e.g., 15.00 = 15%)
+  line_id?: number[] | null; // Array of production line IDs for line-specific materials
   // EPIC-001 Phase 3: Conditional Components
   condition?: BomItemCondition | null;
 }
@@ -724,7 +789,9 @@ export interface CreateProductData {
   };
 }
 
-export type UpdateProductData = Partial<Omit<Product, 'id' | 'created_at' | 'updated_at' | 'activeBom'>>;
+export type UpdateProductData = Partial<
+  Omit<Product, 'id' | 'created_at' | 'updated_at' | 'activeBom'>
+>;
 
 // Tax codes
 export interface TaxCode {
@@ -759,7 +826,10 @@ export interface Allergen {
   updated_at: string;
 }
 
-export type CreateAllergenData = Omit<Allergen, 'id' | 'created_at' | 'updated_at'>;
+export type CreateAllergenData = Omit<
+  Allergen,
+  'id' | 'created_at' | 'updated_at'
+>;
 export type UpdateAllergenData = Partial<CreateAllergenData>;
 
 // Routing interfaces
@@ -908,7 +978,7 @@ export interface Bom {
   effective_to?: string;
   requires_routing: boolean;
   default_routing_id?: number;
-  line_id?: number[] | null;  // Array of production line IDs
+  line_id?: number[] | null; // Array of production line IDs
   notes?: string;
   archived_at?: string | null;
   deleted_at?: string | null;
@@ -931,7 +1001,7 @@ export type ConditionOperator =
   | 'in';
 
 export interface ConditionRule {
-  field: string;  // e.g., 'order_flags', 'customer_id', 'order_type'
+  field: string; // e.g., 'order_flags', 'customer_id', 'order_type'
   operator: ConditionOperator;
   value: string | number | any;
 }
@@ -954,7 +1024,7 @@ export interface BomItem {
   scrap_std_pct?: number;
   is_optional: boolean;
   is_phantom: boolean;
-  consume_whole_lp: boolean;  // renamed from one_to_one
+  consume_whole_lp: boolean; // renamed from one_to_one
   unit_cost_std?: number;
   tax_code_id?: number | null;
   lead_time_days?: number | null;
@@ -1066,7 +1136,7 @@ export interface BOMCost {
   notes?: string | null;
   created_at: string;
   // Relationships
-  bom?: BOM;
+  bom?: Bom;
 }
 
 // BOM Cost Breakdown structure
@@ -1229,4 +1299,3 @@ export interface CompareBOMCostsRequest {
   bom_id_2: number;
   as_of_date?: string;
 }
-

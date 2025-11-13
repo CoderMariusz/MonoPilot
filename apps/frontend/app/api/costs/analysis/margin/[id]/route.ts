@@ -12,11 +12,12 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const productId = parseInt(params.id);
+    const { id } = await params;
+    const productId = parseInt(id);
 
     if (isNaN(productId)) {
       return NextResponse.json(
@@ -37,10 +38,7 @@ export async function GET(
       .single();
 
     if (productError || !product) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
     // Get current material cost
@@ -80,7 +78,6 @@ export async function GET(
       currency,
       price_type: priceType,
     });
-
   } catch (error) {
     console.error('Margin analysis GET error:', error);
     return NextResponse.json(

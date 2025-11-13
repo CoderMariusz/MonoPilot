@@ -11,26 +11,26 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const bomId = parseInt(params.id);
+    const { id } = await params;
+    const bomId = parseInt(id);
 
     if (isNaN(bomId)) {
-      return NextResponse.json(
-        { error: 'Invalid BOM ID' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid BOM ID' }, { status: 400 });
     }
 
     // Get all cost snapshots for this BOM, ordered by creation date descending
     const { data: snapshots, error } = await supabase
       .from('bom_costs')
-      .select(`
+      .select(
+        `
         *,
         bom:boms(id, name, version, product_id, products(name, sku))
-      `)
+      `
+      )
       .eq('bom_id', bomId)
       .order('created_at', { ascending: false });
 
@@ -43,7 +43,6 @@ export async function GET(
     }
 
     return NextResponse.json(snapshots || []);
-
   } catch (error) {
     console.error('BOM cost history GET error:', error);
     return NextResponse.json(

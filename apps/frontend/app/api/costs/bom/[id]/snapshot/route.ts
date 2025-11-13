@@ -11,24 +11,25 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const bomId = parseInt(params.id);
+    const { id } = await params;
+    const bomId = parseInt(id);
 
     if (isNaN(bomId)) {
-      return NextResponse.json(
-        { error: 'Invalid BOM ID' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid BOM ID' }, { status: 400 });
     }
 
     // First, calculate the current BOM cost
-    const { data: costData, error: calcError } = await supabase.rpc('calculate_bom_cost', {
-      p_bom_id: bomId,
-      p_as_of_date: new Date().toISOString(),
-    });
+    const { data: costData, error: calcError } = await supabase.rpc(
+      'calculate_bom_cost',
+      {
+        p_bom_id: bomId,
+        p_as_of_date: new Date().toISOString(),
+      }
+    );
 
     if (calcError || !costData) {
       console.error('Error calculating BOM cost for snapshot:', calcError);
@@ -39,7 +40,9 @@ export async function POST(
     }
 
     // Get user ID for audit trail
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     // Save the snapshot
     const { data: snapshot, error: insertError } = await supabase
@@ -55,10 +58,12 @@ export async function POST(
         notes: `Snapshot created at ${new Date().toISOString()}`,
         created_by: user?.id,
       })
-      .select(`
+      .select(
+        `
         *,
         bom:boms(id, name, version, product_id, products(name, sku))
-      `)
+      `
+      )
       .single();
 
     if (insertError) {
@@ -69,11 +74,13 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({
-      message: 'BOM cost snapshot saved successfully',
-      data: snapshot,
-    }, { status: 201 });
-
+    return NextResponse.json(
+      {
+        message: 'BOM cost snapshot saved successfully',
+        data: snapshot,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('BOM cost snapshot POST error:', error);
     return NextResponse.json(

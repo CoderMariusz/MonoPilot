@@ -11,11 +11,12 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const woId = parseInt(params.id);
+    const { id } = await params;
+    const woId = parseInt(id);
 
     if (isNaN(woId)) {
       return NextResponse.json(
@@ -27,7 +28,8 @@ export async function GET(
     // Get WO cost data
     const { data: woCost, error } = await supabase
       .from('wo_costs')
-      .select(`
+      .select(
+        `
         *,
         work_order:work_orders(
           id,
@@ -38,7 +40,8 @@ export async function GET(
           product_id,
           products(name, sku)
         )
-      `)
+      `
+      )
       .eq('wo_id', woId)
       .single();
 
@@ -60,7 +63,6 @@ export async function GET(
 
     // cost_variance and variance_percent are calculated by DB (GENERATED columns)
     return NextResponse.json(woCost);
-
   } catch (error) {
     console.error('WO cost variance GET error:', error);
     return NextResponse.json(

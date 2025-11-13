@@ -12,11 +12,12 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const productId = parseInt(params.id);
+    const { id } = await params;
+    const productId = parseInt(id);
 
     if (isNaN(productId)) {
       return NextResponse.json(
@@ -32,10 +33,12 @@ export async function GET(
     // Build query
     let query = supabase
       .from('product_prices')
-      .select(`
+      .select(
+        `
         *,
         product:products(id, name, sku)
-      `)
+      `
+      )
       .eq('product_id', productId)
       .order('effective_from', { ascending: false });
 
@@ -55,7 +58,6 @@ export async function GET(
     }
 
     return NextResponse.json(prices || []);
-
   } catch (error) {
     console.error('Product price history GET error:', error);
     return NextResponse.json(

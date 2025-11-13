@@ -12,11 +12,12 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const productId = parseInt(params.id);
+    const { id } = await params;
+    const productId = parseInt(id);
 
     if (isNaN(productId)) {
       return NextResponse.json(
@@ -64,7 +65,6 @@ export async function GET(
       price: priceData.price,
       currency: priceData.currency,
     });
-
   } catch (error) {
     console.error('Current product price GET error:', error);
     return NextResponse.json(

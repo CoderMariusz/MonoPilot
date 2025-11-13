@@ -11,17 +11,15 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const costId = parseInt(params.id);
+    const { id } = await params;
+    const costId = parseInt(id);
 
     if (isNaN(costId)) {
-      return NextResponse.json(
-        { error: 'Invalid cost ID' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid cost ID' }, { status: 400 });
     }
 
     // Delete the material cost
@@ -41,7 +39,6 @@ export async function DELETE(
     return NextResponse.json({
       message: 'Material cost deleted successfully',
     });
-
   } catch (error) {
     console.error('Material cost DELETE error:', error);
     return NextResponse.json(

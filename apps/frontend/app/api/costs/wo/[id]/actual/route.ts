@@ -11,11 +11,12 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient();
-    const woId = parseInt(params.id);
+    const { id } = await params;
+    const woId = parseInt(id);
 
     if (isNaN(woId)) {
       return NextResponse.json(
@@ -41,14 +42,16 @@ export async function POST(
     // Get consumed license plates (via lp_genealogy)
     const { data: consumedLPs, error: consumedError } = await supabase
       .from('lp_genealogy')
-      .select(`
+      .select(
+        `
         parent_lp_id,
         license_plates!lp_genealogy_parent_lp_id_fkey(
           product_id,
           quantity,
           manufacture_date
         )
-      `)
+      `
+      )
       .eq('consumed_by_wo_id', woId);
 
     if (consumedError) {
@@ -68,10 +71,13 @@ export async function POST(
       if (!lp) continue;
 
       // Get material cost at LP manufacture date
-      const { data: costData } = await supabase.rpc('get_material_cost_at_date', {
-        p_product_id: lp.product_id,
-        p_date: lp.manufacture_date,
-      });
+      const { data: costData } = await supabase.rpc(
+        'get_material_cost_at_date',
+        {
+          p_product_id: lp.product_id,
+          p_date: lp.manufacture_date,
+        }
+      );
 
       const unitCost = costData || 0;
       const totalCost = unitCost * lp.quantity;
@@ -79,7 +85,9 @@ export async function POST(
       totalMaterialCost += totalCost;
 
       // Find if this product is already in breakdown
-      const existing = materialBreakdown.find(m => m.product_id === lp.product_id);
+      const existing = materialBreakdown.find(
+        m => m.product_id === lp.product_id
+      );
       if (existing) {
         existing.total_qty += lp.quantity;
         existing.total_cost += totalCost;
@@ -94,22 +102,27 @@ export async function POST(
     }
 
     // Get user ID for audit trail
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     // Update WO cost record with actual costs
     const { data: woCost, error: costError } = await supabase
       .from('wo_costs')
-      .upsert({
-        wo_id: woId,
-        actual_cost: totalMaterialCost,
-        actual_material_cost: totalMaterialCost,
-        actual_labor_cost: 0, // TODO: Add labor tracking
-        actual_overhead_cost: 0, // TODO: Add overhead tracking
-        material_breakdown_json: materialBreakdown,
-        updated_by: user?.id,
-      }, {
-        onConflict: 'wo_id',
-      })
+      .upsert(
+        {
+          wo_id: woId,
+          actual_cost: totalMaterialCost,
+          actual_material_cost: totalMaterialCost,
+          actual_labor_cost: 0, // TODO: Add labor tracking
+          actual_overhead_cost: 0, // TODO: Add overhead tracking
+          material_breakdown_json: materialBreakdown,
+          updated_by: user?.id,
+        },
+        {
+          onConflict: 'wo_id',
+        }
+      )
       .select()
       .single();
 
@@ -122,7 +135,6 @@ export async function POST(
     }
 
     return NextResponse.json(woCost, { status: 201 });
-
   } catch (error) {
     console.error('WO actual cost POST error:', error);
     return NextResponse.json(
