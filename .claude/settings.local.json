@@ -33,7 +33,11 @@
       "SlashCommand(/bmad:bmm:workflows:prd)",
       "Bash(pnpm test:unit:*)",
       "Bash(xargs:*)",
-      "Bash(pnpm type-check:*)"
+      "Bash(pnpm type-check:*)",
+      "SlashCommand(/bmad:bmm:workflows:architecture)",
+      "SlashCommand(/bmad:bmm:workflows:solutioning-gate-check)",
+      "SlashCommand(/bmad:bmm:workflows:sprint-planning)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

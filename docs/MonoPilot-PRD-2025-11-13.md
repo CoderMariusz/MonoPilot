@@ -2,8 +2,97 @@
 
 **Author:** Mariusz
 **Date:** 2025-11-13
-**Version:** 1.0
+**Version:** 1.1
 **Status:** ✅ COMPLETE - All 9 workflow steps finished (ready for Epic breakdown)
+**Last Updated:** 2025-11-14 (Added Epic 0 prerequisite)
+
+---
+
+## 🔴 CRITICAL PREREQUISITE - Epic 0: P0 Modules Data Integrity Fixes
+
+**⚠️ UWAGA: DISCOVERED 2025-11-14 - MUST BE COMPLETED BEFORE PHASE 1**
+
+Podczas przeglądu solutioning gate check (2025-11-14) **wykryto 7 krytycznych niespójności** między schematem bazy danych, definicjami TypeScript, API i UI w **już zaimplementowanych modułach P0** (Technical, Planning, Production, Warehouse, Scanner, Settings).
+
+### Krytyczne Problemy Znalezione:
+
+1. 🔴 **PO Header - Brakująca kolumna `warehouse_id`**
+   - API `quick_create_pos` próbuje INSERT do nieistniejącej kolumny
+   - Quick PO Entry workflow **NIE DZIAŁA** (SQL error)
+   - **BLOCKER** dla planowania dostaw
+
+2. 🔴 **License Plate Status - Całkowita niespójność enum**
+   - DB: `available, reserved, consumed, in_transit, quarantine, damaged`
+   - TypeScript: `Available, Reserved, In Production, QA Hold, QA Released, QA Rejected, Shipped`
+   - Tylko 2 wartości wspólne - **warehouse workflow nie może działać poprawnie**
+
+3. 🟡 **5 dodatkowych problemów średniego priorytetu**
+   - TO Status enum (DB ma 'closed', TypeScript nie ma)
+   - LP QA Status enum (różne wartości)
+   - LP UoM constraint (tylko 4 jednostki dozwolone)
+   - Work Orders, Products, BOMs (wymagają głębszego audytu)
+
+### Epic 0 - Plan Naprawy:
+
+**Priorytet:** 🔴 **P0 (KRYTYCZNY - PRZED PHASE 1)**
+**Effort:** 71 Story Points (142 godziny, ~7 tygodni)
+**Dokumenty:**
+
+- **Raport Audytu:** `docs/P0-MODULES-AUDIT-REPORT-2025-11-14.md`
+- **Sprint Status:** `docs/sprint-artifacts/sprint-status.yaml` (Epic 0 + 7 stories)
+
+**Stories:**
+
+- 0.1: Fix PO Header `warehouse_id` (8 SP) - 🔴 KRYTYCZNY
+- 0.2: Fix TO Status enum (3 SP) - 🟡 ŚREDNI
+- 0.3: Fix License Plate Status enum (13 SP) - 🔴 KRYTYCZNY
+- 0.4: Fix License Plate QA Status enum (5 SP) - 🟡 ŚREDNI
+- 0.5: Fix License Plate UoM constraint (8 SP) - 🟡 ŚREDNI
+- 0.6: Deep Audit - WO, Products, BOMs (21 SP) - ⚠️ WERYFIKACJA
+- 0.7: Automated Validation Tests (13 SP) - ✅ PREWENCJA
+
+### Impact na Timeline:
+
+**Oryginalny plan:**
+
+- Phase 1 (Epic 1.1-1.6): Start natychmiast, 12 tygodni
+- Phase 2 (Epic 2.1-2.7): Tydzień 13-24, 12 tygodni
+
+**Zaktualizowany plan:**
+
+- **Epic 0 (P0 Fixes): Tydzień 1-7, 7 tygodni** ⬅️ NOWE
+- Phase 1 (Epic 1.1-1.6): Tydzień 8-19, 12 tygodni
+- Phase 2 (Epic 2.1-2.7): Tydzień 20-31, 12 tygodni
+
+**Total MVP Timeline:** 31 tygodni (było: 24 tygodnie) - **+7 tygodni opóźnienia**
+
+### Quality Gate dla Epic 0:
+
+Przed rozpoczęciem Phase 1 (Epic 1.1), **MUSZĄ być spełnione** następujące warunki:
+
+- ✅ Wszystkie 7 stories Epic 0 ukończone i zweryfikowane
+- ✅ Zero krytycznych niespójności między DB ↔ TypeScript ↔ API ↔ UI
+- ✅ Automated validation tests wdrożone i działające
+- ✅ E2E tests zaktualizowane i przechodzące dla wszystkich naprawionych modułów
+- ✅ Database migrations executed successfully on staging environment
+- ✅ Quick PO Entry workflow verified working end-to-end
+- ✅ License Plate lifecycle (create → reserve → consume → ship) verified working
+
+### Przyczyna Źródłowa i Zapobieganie:
+
+**Dlaczego to się stało:**
+
+- Brak automated validation między DB schema a TypeScript types
+- Iteracyjny rozwój bez synchronizacji DB ↔ API ↔ UI
+- Quick PO Entry dodany później, założył nieistniejące kolumny
+- Brak code review checklist dla data integrity
+
+**Jak zapobiegamy w przyszłości (Story 0.7):**
+
+- ✅ Schema-first development (DB jako source of truth)
+- ✅ Automated enum generation (TypeScript z DB schemas)
+- ✅ CI/CD validation (pre-commit hooks)
+- ✅ Code review checklist ("Czy TypeScript pasuje do DB?")
 
 ---
 

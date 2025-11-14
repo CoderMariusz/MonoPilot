@@ -19,7 +19,7 @@ generated: "2025-11-13"
 project: "MonoPilot"
 project_type: "software"
 selected_track: "enterprise"
-field_type: "brownfield"
+field_type: "greenfield"  # Fixed: Project is greenfield (started from scratch per CLAUDE.md)
 workflow_path: "enterprise-brownfield.yaml"
 
 workflow_status:
@@ -32,17 +32,24 @@ workflow_status:
   product-brief: optional  # agent: analyst
 
   # Phase 1: Planning
-  prd: docs/MonoPilot-PRD-2025-11-13.md  # agent: pm (updated Nov 2025 - MVP 82.5%, reality check, P0 fixes)
+  prd: docs/MonoPilot-PRD-2025-11-13.md  # agent: pm (updated 2025-11-14 - added Epic 0 prerequisite)
   validate-prd: docs/MonoPilot-PRD-2025-11-13.md  # agent: pm (validated Nov 2025 - all updates verified)
   create-design: recommended  # agent: ux-designer
 
   # Phase 2: Solutioning
-  create-architecture: required  # agent: architect
+  create-architecture: docs/architecture.md  # agent: architect (completed 2025-11-14)
   test-design: required  # agent: tea
   create-security-architecture: optional  # agent: architect
   create-devops-strategy: optional  # agent: architect
-  validate-architecture: recommended  # agent: architect
-  solutioning-gate-check: required  # agent: architect
+  validate-architecture: docs/architecture-validation-report.md  # agent: architect (completed 2025-11-14)
+  solutioning-gate-check: docs/implementation-readiness-report-2025-11-14.md  # agent: architect (completed 2025-11-14, PASS with Epic 0 condition)
 
-  # Phase 3: Implementation
-  sprint-planning: required  # agent: sm
+  # Phase 2.5: CRITICAL PREREQUISITE (DISCOVERED 2025-11-14)
+  # Epic 0: P0 Modules Data Integrity Audit & Fix
+  # MUST BE COMPLETED BEFORE Phase 3 Implementation
+  epic-0-audit-and-fix: required  # agent: dev (7 weeks, 71 SP, BLOCKER for Phase 3)
+  epic-0-documentation: docs/P0-MODULES-AUDIT-REPORT-2025-11-14.md  # audit report with 7 critical issues
+  epic-0-sprint-status: docs/sprint-artifacts/sprint-status.yaml  # 7 stories tracked
+
+  # Phase 3: Implementation (BLOCKED until Epic 0 complete)
+  sprint-planning: docs/sprint-artifacts/sprint-status.yaml  # agent: sm (completed 2025-11-14)

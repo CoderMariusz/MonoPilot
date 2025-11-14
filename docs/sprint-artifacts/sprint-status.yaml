@@ -1,0 +1,214 @@
+# Sprint Status - MonoPilot Implementation Tracking
+# Generated: 2025-11-14
+# Project: MonoPilot
+# Project Key: monopilot
+# Tracking System: BMM Method
+# Story Location: docs/sprint-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic exists in roadmap but not contexted
+#   - contexted: Epic tech context created (required before drafting stories)
+#
+# Story Status:
+#   - backlog: Story only exists in epic file/roadmap
+#   - drafted: Story file created in stories folder
+#   - ready-for-dev: Draft approved and story context created
+#   - in-progress: Developer actively working on implementation
+#   - review: Under SM review (via code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - completed: Retrospective has been done
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epics should be 'contexted' before stories can be 'drafted'
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically drafts next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', SM reviews, then Dev moves to 'done'
+#
+# IMPORTANT: P0 modules (Technical, Planning, Production, Warehouse, Scanner, Settings)
+# are ALREADY IMPLEMENTED but contain CRITICAL INCONSISTENCIES between DB schema,
+# TypeScript types, API, and UI that must be fixed BEFORE Phase 1.
+#
+# Epic 0 tracks audit and fixes for P0 modules (PREREQUISITE for Phase 1).
+# Phases 1-4 track NEW features from roadmaps (P1/P2 priorities).
+
+generated: 2025-11-14
+project: MonoPilot
+project_key: monopilot
+tracking_system: BMM Method
+story_location: docs/sprint-artifacts
+audit_report: docs/P0-MODULES-AUDIT-REPORT-2025-11-14.md
+
+development_status:
+  # ========================================
+  # EPIC 0: P0 Modules Data Integrity Audit & Fix (PREREQUISITE)
+  # Priority: P0 (CRITICAL - MUST COMPLETE BEFORE PHASE 1)
+  # Total Effort: 71 SP (142 hours, ~7 weeks)
+  # Audit Report: docs/P0-MODULES-AUDIT-REPORT-2025-11-14.md
+  # ========================================
+
+  # Epic 0: P0 Modules Data Integrity Audit & Fix
+  epic-0: backlog
+
+  # Story 0.1: Fix PO Header warehouse_id (CRITICAL)
+  0-1-fix-po-header-warehouse-id: backlog
+
+  # Story 0.2: Fix TO Status enum (MEDIUM)
+  0-2-fix-to-status-enum: backlog
+
+  # Story 0.3: Fix License Plate Status enum (CRITICAL)
+  0-3-fix-lp-status-enum: backlog
+
+  # Story 0.4: Fix License Plate QA Status enum (MEDIUM)
+  0-4-fix-lp-qa-status-enum: backlog
+
+  # Story 0.5: Fix License Plate UoM constraint (MEDIUM)
+  0-5-fix-lp-uom-constraint: backlog
+
+  # Story 0.6: Deep Audit - Work Orders, Products, BOMs (VERIFICATION)
+  0-6-deep-audit-wo-products-boms: backlog
+
+  # Story 0.7: Automated Validation Tests (PREVENTION)
+  0-7-automated-validation-tests: backlog
+
+  epic-0-retrospective: optional
+
+  # ========================================
+  # PHASE 1: Compliance & Audit Foundation (0-3 Months)
+  # Priority: P1 (Critical - Market Entry Blockers)
+  # ========================================
+
+  # Epic 1.1: Enable pgAudit Extension (Audit Trail)
+  epic-1-1: backlog
+  1-1-enable-pgaudit-extension: backlog
+  epic-1-1-retrospective: optional
+
+  # Epic 1.2: Electronic Signatures Workflow
+  epic-1-2: backlog
+  1-2-electronic-signatures-workflow: backlog
+  epic-1-2-retrospective: optional
+
+  # Epic 1.3: FSMA 204 Compliance Enhancements
+  epic-1-3: backlog
+  1-3-fsma-204-compliance-enhancements: backlog
+  epic-1-3-retrospective: optional
+
+  # Epic 1.4: Fix Planning Module UI/Data Gaps
+  epic-1-4: backlog
+  1-4-fix-planning-module-ui-data-gaps: backlog
+  epic-1-4-retrospective: optional
+
+  # Epic 1.5: Production Dashboard (Real-Time KPIs)
+  epic-1-5: backlog
+  1-5-production-dashboard-real-time-kpis: backlog
+  epic-1-5-retrospective: optional
+
+  # Epic 1.6: Additional Phase 1 Tasks
+  epic-1-6: backlog
+  1-6-additional-phase-1-tasks: backlog
+  epic-1-6-retrospective: optional
+
+  # ========================================
+  # PHASE 2: Operational Excellence (3-6 Months)
+  # Priority: P1 (High - Competitive Parity)
+  # ========================================
+
+  # Epic 2.1: Quality Module (QA/QC)
+  epic-2-1: backlog
+  2-1-quality-module-qa-qc: backlog
+  epic-2-1-retrospective: optional
+
+  # Epic 2.2: Shipping Module
+  epic-2-2: backlog
+  2-2-shipping-module: backlog
+  epic-2-2-retrospective: optional
+
+  # Epic 2.3: Deviation Management Workflow
+  epic-2-3: backlog
+  2-3-deviation-management-workflow: backlog
+  epic-2-3-retrospective: optional
+
+  # Epic 2.4: Downtime Tracking
+  epic-2-4: backlog
+  2-4-downtime-tracking: backlog
+  epic-2-4-retrospective: optional
+
+  # Epic 2.5: Background Job Queue (BullMQ)
+  epic-2-5: backlog
+  2-5-background-job-queue-bullmq: backlog
+  epic-2-5-retrospective: optional
+
+  # Epic 2.6: Document Management (Supabase Storage)
+  epic-2-6: backlog
+  2-6-document-management-supabase-storage: backlog
+  epic-2-6-retrospective: optional
+
+  # Epic 2.7: Notification System
+  epic-2-7: backlog
+  2-7-notification-system: backlog
+  epic-2-7-retrospective: optional
+
+  # ========================================
+  # PHASE 3: IoT & Integration (6-12 Months)
+  # Priority: P1-P2 (High-to-Medium - Competitive Differentiation)
+  # ========================================
+
+  # Epic 3.1: IoT Gateway & OPC UA Integration
+  epic-3-1: backlog
+  3-1-iot-gateway-opc-ua-integration: backlog
+  epic-3-1-retrospective: optional
+
+  # Epic 3.2: Advanced Reporting & BI Engine
+  epic-3-2: backlog
+  3-2-advanced-reporting-bi-engine: backlog
+  epic-3-2-retrospective: optional
+
+  # Epic 3.3: ERP Integration Connectors
+  epic-3-3: backlog
+  3-3-erp-integration-connectors: backlog
+  epic-3-3-retrospective: optional
+
+  # Epic 3.4: Warehouse Task Queue & Cycle Counting
+  epic-3-4: backlog
+  3-4-warehouse-task-queue-cycle-counting: backlog
+  epic-3-4-retrospective: optional
+
+  # ========================================
+  # PHASE 4: Advanced Features (12-18 Months)
+  # Priority: P2-P3 (Medium-to-Low - Future Differentiation)
+  # ========================================
+
+  # Epic 4.1: AI-Powered Recall Simulation
+  epic-4-1: backlog
+  4-1-ai-powered-recall-simulation: backlog
+  epic-4-1-retrospective: optional
+
+  # Epic 4.2: AI Yield Prediction Model
+  epic-4-2: backlog
+  4-2-ai-yield-prediction-model: backlog
+  epic-4-2-retrospective: optional
+
+  # Epic 4.3: Predictive Maintenance (Equipment Failure Prediction)
+  epic-4-3: backlog
+  4-3-predictive-maintenance: backlog
+  epic-4-3-retrospective: optional
+
+  # Epic 4.4: BOM Costing & Cost Rollup
+  epic-4-4: backlog
+  4-4-bom-costing-cost-rollup: backlog
+  epic-4-4-retrospective: optional
+
+  # Epic 4.5: MonoPilot Marketplace
+  epic-4-5: backlog
+  4-5-monopilot-marketplace: backlog
+  epic-4-5-retrospective: optional
+
+  # Epic 4.6: Carbon Footprint Tracking (ESG Compliance)
+  epic-4-6: backlog
+  4-6-carbon-footprint-tracking-esg: backlog
+  epic-4-6-retrospective: optional
