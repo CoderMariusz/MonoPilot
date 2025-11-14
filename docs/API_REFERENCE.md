@@ -4,7 +4,7 @@
 
 The MonoPilot MES system uses a dual-mode API layer that seamlessly switches between mock data (development) and real Supabase data (production).
 
-**Last Updated**: 2025-11-12 (auto-generated)
+**Last Updated**: 2025-11-13 (auto-generated)
 
 ## API Classes
 
@@ -888,6 +888,329 @@ static async delete(id: number): Promise<void>
 **Parameters**:
 
 - `id: number`
+
+**Returns**: `Promise<void>`
+
+---
+
+### PalletsAPI
+
+**Source**: `apps/frontend/lib/api/pallets.ts`
+
+**Methods**:
+
+#### `getAll()`
+
+**Signature**:
+
+```typescript
+static async getAll(filters?: {
+    status?: 'open' | 'closed' | 'shipped';
+    location_id?: number;
+    wo_id?: number;
+    pallet_type?: string;
+  }): Promise<{
+    data: Array<{
+      id: number;
+      pallet_number: string;
+      pallet_type: string;
+      wo_id: number | null;
+      wo_number: string | null;
+      line: string | null;
+      location_id: number | null;
+      location_name: string | null;
+      status: string;
+      target_boxes: number | null;
+      actual_boxes: number | null;
+      item_count: number;
+      total_quantity: number;
+      created_at: string;
+      created_by: string | null;
+      closed_at: string | null;
+      closed_by: string | null;
+    }>
+```
+
+**Parameters**:
+
+- `filters?: {
+  status?: 'open' | 'closed' | 'shipped';
+  location_id?: number;
+  wo_id?: number;
+  pallet_type?: string;
+}`
+
+**Returns**: `Promise<{
+    data: Array<{
+      id: number;
+      pallet_number: string;
+      pallet_type: string;
+      wo_id: number | null;
+      wo_number: string | null;
+      line: string | null;
+      location_id: number | null;
+      location_name: string | null;
+      status: string;
+      target_boxes: number | null;
+      actual_boxes: number | null;
+      item_count: number;
+      total_quantity: number;
+      created_at: string;
+      created_by: string | null;
+      closed_at: string | null;
+      closed_by: string | null;
+    }>`
+
+---
+
+#### `getById()`
+
+**Signature**:
+
+```typescript
+static async getById(id: number): Promise<{
+    pallet: {
+      id: number;
+      pallet_number: string;
+      pallet_type: string;
+      wo_id: number | null;
+      wo_number: string | null;
+      line: string | null;
+      location_id: number | null;
+      location_name: string | null;
+      status: string;
+      target_boxes: number | null;
+      actual_boxes: number | null;
+      created_at: string;
+      created_by: string | null;
+      closed_at: string | null;
+      closed_by: string | null;
+    };
+    items: Array<{
+      id: number;
+      lp_id: number;
+      lp_number: string;
+      product_description: string;
+      quantity: number;
+      uom: string;
+      batch: string | null;
+      expiry_date: string | null;
+      added_at: string;
+      added_by: string | null;
+    }>
+```
+
+**Parameters**:
+
+- `id: number`
+
+**Returns**: `Promise<{
+    pallet: {
+      id: number;
+      pallet_number: string;
+      pallet_type: string;
+      wo_id: number | null;
+      wo_number: string | null;
+      line: string | null;
+      location_id: number | null;
+      location_name: string | null;
+      status: string;
+      target_boxes: number | null;
+      actual_boxes: number | null;
+      created_at: string;
+      created_by: string | null;
+      closed_at: string | null;
+      closed_by: string | null;
+    };
+    items: Array<{
+      id: number;
+      lp_id: number;
+      lp_number: string;
+      product_description: string;
+      quantity: number;
+      uom: string;
+      batch: string | null;
+      expiry_date: string | null;
+      added_at: string;
+      added_by: string | null;
+    }>`
+
+---
+
+#### `create()`
+
+**Signature**:
+
+```typescript
+static async create(data: {
+    pallet_number?: string; // Auto-generate if not provided
+    pallet_type: 'EURO' | 'CHEP' | 'CUSTOM' | 'OTHER';
+    wo_id?: number;
+    line?: string;
+    location_id?: number;
+    target_boxes?: number;
+    userId: string;
+  }): Promise<{
+    id: number;
+    pallet_number: string;
+  }>
+```
+
+**Parameters**:
+
+- `data: {
+  pallet_number?: string; // Auto-generate if not provided
+  pallet_type: 'EURO' | 'CHEP' | 'CUSTOM' | 'OTHER';
+  wo_id?: number;
+  line?: string;
+  location_id?: number;
+  target_boxes?: number;
+  userId: string;
+}`
+
+**Returns**: `Promise<{
+    id: number;
+    pallet_number: string;
+  }>`
+
+---
+
+#### `addLP()`
+
+**Signature**:
+
+```typescript
+static async addLP(data: {
+    pallet_id: number;
+    lp_id: number;
+    quantity?: number; // Optional, use full LP quantity if not specified
+    userId: string;
+  }): Promise<{
+    item_id: number;
+    lp_number: string;
+  }>
+```
+
+**Parameters**:
+
+- `data: {
+  pallet_id: number;
+  lp_id: number;
+  quantity?: number; // Optional`
+- `use full LP quantity if not specified
+  userId: string;
+}`
+
+**Returns**: `Promise<{
+    item_id: number;
+    lp_number: string;
+  }>`
+
+---
+
+#### `removeLP()`
+
+**Signature**:
+
+```typescript
+static async removeLP(data: {
+    pallet_id: number;
+    lp_id: number;
+    userId: string;
+  }): Promise<void>
+```
+
+**Parameters**:
+
+- `data: {
+  pallet_id: number;
+  lp_id: number;
+  userId: string;
+}`
+
+**Returns**: `Promise<void>`
+
+---
+
+#### `close()`
+
+**Signature**:
+
+```typescript
+static async close(data: {
+    pallet_id: number;
+    actual_boxes?: number;
+    userId: string;
+  }): Promise<void>
+```
+
+**Parameters**:
+
+- `data: {
+  pallet_id: number;
+  actual_boxes?: number;
+  userId: string;
+}`
+
+**Returns**: `Promise<void>`
+
+---
+
+#### `reopen()`
+
+**Signature**:
+
+```typescript
+static async reopen(data: {
+    pallet_id: number;
+    userId: string;
+  }): Promise<void>
+```
+
+**Parameters**:
+
+- `data: {
+  pallet_id: number;
+  userId: string;
+}`
+
+**Returns**: `Promise<void>`
+
+---
+
+#### `markShipped()`
+
+**Signature**:
+
+```typescript
+static async markShipped(data: {
+    pallet_id: number;
+    userId: string;
+  }): Promise<void>
+```
+
+**Parameters**:
+
+- `data: {
+  pallet_id: number;
+  userId: string;
+}`
+
+**Returns**: `Promise<void>`
+
+---
+
+#### `delete()`
+
+**Signature**:
+
+```typescript
+static async delete(palletId: number): Promise<void>
+```
+
+**Parameters**:
+
+- `palletId: number`
 
 **Returns**: `Promise<void>`
 
@@ -2204,6 +2527,233 @@ static async createWithConditionalMaterials(data: CreateWorkOrderData & {
       is_conditional: boolean;
       condition_met: boolean;
     }>`
+
+---
+
+#### `getRequiredMaterials()`
+
+Get required materials for WO with reservation status Uses RPC function get_wo_required_materials() for progress tracking
+
+**Signature**:
+
+```typescript
+static async getRequiredMaterials(woId: number): Promise<Array<{
+    material_id: number;
+    material_part_number: string;
+    material_description: string;
+    required_qty: number;
+    reserved_qty: number;
+    consumed_qty: number;
+    remaining_qty: number;
+    uom: string;
+    operation_sequence: number;
+    progress_pct: number;
+  }>
+```
+
+**Parameters**:
+
+- `woId: number`
+
+**Returns**: `Promise<Array<{
+    material_id: number;
+    material_part_number: string;
+    material_description: string;
+    required_qty: number;
+    reserved_qty: number;
+    consumed_qty: number;
+    remaining_qty: number;
+    uom: string;
+    operation_sequence: number;
+    progress_pct: number;
+  }>`
+
+---
+
+#### `getAvailableLPs()`
+
+Get available LPs for a material (FIFO order) Uses RPC function get_available_lps_for_material()
+
+**Signature**:
+
+```typescript
+static async getAvailableLPs(materialId: number, locationId?: number): Promise<Array<{
+    lp_id: number;
+    lp_number: string;
+    quantity: number;
+    uom: string;
+    batch: string;
+    expiry_date: string;
+    location_name: string;
+    qa_status: string;
+    reserved_qty: number;
+    available_qty: number;
+  }>
+```
+
+**Parameters**:
+
+- `materialId: number`
+- `locationId?: number`
+
+**Returns**: `Promise<Array<{
+    lp_id: number;
+    lp_number: string;
+    quantity: number;
+    uom: string;
+    batch: string;
+    expiry_date: string;
+    location_name: string;
+    qa_status: string;
+    reserved_qty: number;
+    available_qty: number;
+  }>`
+
+---
+
+#### `reserveMaterial()`
+
+Reserve material (LP) for work order Creates reservation record and prevents LP from being moved/split
+
+**Signature**:
+
+```typescript
+static async reserveMaterial(data: {
+    wo_id: number;
+    material_id: number;
+    lp_id: number;
+    quantity_reserved: number;
+    uom: string;
+    operation_sequence?: number;
+    userId: string;
+  }): Promise<{
+    reservation_id: number;
+    lp_number: string;
+  }>
+```
+
+**Parameters**:
+
+- `data: {
+  wo_id: number;
+  material_id: number;
+  lp_id: number;
+  quantity_reserved: number;
+  uom: string;
+  operation_sequence?: number;
+  userId: string;
+}`
+
+**Returns**: `Promise<{
+    reservation_id: number;
+    lp_number: string;
+  }>`
+
+---
+
+#### `releaseReservation()`
+
+Release reservation (cancel without consuming)
+
+**Signature**:
+
+```typescript
+static async releaseReservation(data: {
+    reservation_id: number;
+    userId: string;
+  }): Promise<void>
+```
+
+**Parameters**:
+
+- `data: {
+  reservation_id: number;
+  userId: string;
+}`
+
+**Returns**: `Promise<void>`
+
+---
+
+#### `consumeMaterial()`
+
+Consume material from reservation Records consumption and creates genealogy entry
+
+**Signature**:
+
+```typescript
+static async consumeMaterial(data: {
+    reservation_id: number;
+    quantity_consumed: number;
+    userId: string;
+  }): Promise<{
+    consumed_qty: number;
+    remaining_qty: number;
+  }>
+```
+
+**Parameters**:
+
+- `data: {
+  reservation_id: number;
+  quantity_consumed: number;
+  userId: string;
+}`
+
+**Returns**: `Promise<{
+    consumed_qty: number;
+    remaining_qty: number;
+  }>`
+
+---
+
+#### `getReservations()`
+
+Get all reservations for a work order
+
+**Signature**:
+
+```typescript
+static async getReservations(woId: number): Promise<Array<{
+    id: number;
+    material_id: number;
+    material_part_number: string;
+    material_description: string;
+    lp_id: number;
+    lp_number: string;
+    quantity_reserved: number;
+    quantity_consumed: number;
+    uom: string;
+    status: string;
+    batch: string | null;
+    expiry_date: string | null;
+    reserved_at: string;
+    reserved_by: string | null;
+    consumed_at: string | null;
+  }>
+```
+
+**Parameters**:
+
+- `woId: number`
+
+**Returns**: `Promise<Array<{
+    id: number;
+    material_id: number;
+    material_part_number: string;
+    material_description: string;
+    lp_id: number;
+    lp_number: string;
+    quantity_reserved: number;
+    quantity_consumed: number;
+    uom: string;
+    status: string;
+    batch: string | null;
+    expiry_date: string | null;
+    reserved_at: string;
+    reserved_by: string | null;
+    consumed_at: string | null;
+  }>`
 
 ---
 

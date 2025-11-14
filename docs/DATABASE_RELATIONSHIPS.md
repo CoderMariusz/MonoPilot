@@ -4,7 +4,7 @@
 
 This document describes the relationships between tables in the MonoPilot MES system.
 
-**Last Updated**: 2025-11-12 (auto-generated)
+**Last Updated**: 2025-11-13 (auto-generated)
 
 ## Entity Relationship Diagram (Text)
 
@@ -32,6 +32,9 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `asns.created_by` → `users.id`
 - `asns.updated_by` → `users.id`
 - `audit_log.actor_id` → `users.id`
+- `material_costs.created_by` → `users.id`
+- `bom_costs.calculated_by` → `users.id`
+- `product_prices.created_by` → `users.id`
 
 ### warehouses
 
@@ -53,6 +56,7 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `machines.location_id` → `locations.id`
 - `po_line.default_location_id` → `locations.id`
 - `license_plates.location_id` → `locations.id`
+- `pallets.location_id` → `locations.id`
 - `grn_items.location_id` → `locations.id`
 - `stock_moves.from_location_id` → `locations.id`
 - `stock_moves.to_location_id` → `locations.id`
@@ -94,6 +98,9 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `stock_moves.product_id` → `products.id`
 - `product_allergens.product_id` → `products.id`
 - `wo_by_products.product_id` → `products.id`
+- `wo_reservations.material_id` → `products.id`
+- `material_costs.product_id` → `products.id`
+- `product_prices.product_id` → `products.id`
 
 ### boms
 
@@ -102,6 +109,7 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `bom_items.bom_id` → `boms.id`
 - `bom_history.bom_id` → `boms.id`
 - `work_orders.bom_id` → `boms.id`
+- `bom_costs.bom_id` → `boms.id`
 
 ### routings
 
@@ -155,6 +163,8 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `lp_genealogy.wo_id` → `work_orders.id`
 - `pallets.wo_id` → `work_orders.id`
 - `wo_by_products.wo_id` → `work_orders.id`
+- `wo_reservations.wo_id` → `work_orders.id`
+- `wo_costs.wo_id` → `work_orders.id`
 
 ### routing_operations
 
@@ -173,6 +183,7 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `lp_genealogy.child_lp_id` → `license_plates.id`
 - `lp_genealogy.parent_lp_id` → `license_plates.id`
 - `wo_by_products.lp_id` → `license_plates.id`
+- `wo_reservations.lp_id` → `license_plates.id`
 
 ### pallets
 
@@ -198,3 +209,11 @@ This document describes the relationships between tables in the MonoPilot MES sy
 
 - `product_allergens.allergen_id` → `allergens.id`
 
+### organizations
+
+**Referenced by**:
+
+- `material_costs.org_id` → `organizations.id`
+- `bom_costs.org_id` → `organizations.id`
+- `product_prices.org_id` → `organizations.id`
+- `wo_costs.org_id` → `organizations.id`

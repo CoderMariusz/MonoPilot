@@ -1,9 +1,43 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(claude mcp list:*)",
+      "Bash(if [ -f \"apps/frontend/.env.local\" ])",
+      "Bash(then grep \"SUPABASE\" apps/frontend/.env.local)",
+      "Bash(else echo \"No .env.local file found\")",
+      "Bash(fi)",
+      "Bash(claude mcp add:*)",
+      "Bash(supabase --version:*)",
+      "Bash(npx supabase --version)",
+      "Bash(npx supabase db execute:*)",
+      "Bash(where:*)",
+      "Bash(export:*)",
+      "Bash(node apply-migrations.mjs:*)",
+      "Bash(pnpm gen-types:*)",
+      "Bash(npx supabase:*)",
+      "Bash(lib/supabase/generated.types.ts)",
+      "Bash(pnpm bmad:status:*)",
+      "Bash(pnpm bmad:list:*)",
+      "Bash(find:*)",
+      "Bash(vercel --version)",
+      "Bash(npx vercel:*)",
+      "Bash(vercel ls:*)",
+      "Bash(vercel logs:*)",
+      "Bash(vercel inspect:*)",
+      "Bash(pnpm build:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "WebSearch",
+      "SlashCommand(/bmad:bmm:workflows:prd)",
+      "Bash(pnpm test:unit:*)",
+      "Bash(xargs:*)",
+      "Bash(pnpm type-check:*)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["supabase"]
 }

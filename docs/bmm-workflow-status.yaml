@@ -1,0 +1,48 @@
+# Workflow Status Template
+
+# This tracks progress through BMM methodology Analysis, Planning, and Solutioning phases.
+# Implementation phase is tracked separately in sprint-status.yaml
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met (e.g., if_has_ui)
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+#   - skipped: Optional/conditional workflow that was skipped
+
+generated: "2025-11-13"
+project: "MonoPilot"
+project_type: "software"
+selected_track: "enterprise"
+field_type: "brownfield"
+workflow_path: "enterprise-brownfield.yaml"
+
+workflow_status:
+  # Prerequisite: Documentation (conditional - if_undocumented)
+  document-project: recommended  # agent: analyst
+
+  # Phase 0: Discovery (Required)
+  brainstorm-project: docs/bmm/sessions/2025-01-11-brainstorm-init.md  # agent: analyst
+  research: docs/bmm-research-master-index-2025-11-13.md  # agent: analyst
+  product-brief: optional  # agent: analyst
+
+  # Phase 1: Planning
+  prd: docs/MonoPilot-PRD-2025-11-13.md  # agent: pm (updated Nov 2025 - MVP 82.5%, reality check, P0 fixes)
+  validate-prd: docs/MonoPilot-PRD-2025-11-13.md  # agent: pm (validated Nov 2025 - all updates verified)
+  create-design: recommended  # agent: ux-designer
+
+  # Phase 2: Solutioning
+  create-architecture: required  # agent: architect
+  test-design: required  # agent: tea
+  create-security-architecture: optional  # agent: architect
+  create-devops-strategy: optional  # agent: architect
+  validate-architecture: recommended  # agent: architect
+  solutioning-gate-check: required  # agent: architect
+
+  # Phase 3: Implementation
+  sprint-planning: required  # agent: sm

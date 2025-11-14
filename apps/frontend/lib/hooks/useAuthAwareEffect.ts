@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth/AuthContext';
  * A hook that runs an effect only after auth is initialized.
  * This prevents making API calls before the auth session is ready,
  * which can cause RLS policy errors in Supabase.
- * 
+ *
  * @param effect - The effect function to run
  * @param deps - Dependencies array (not including auth loading state)
  */
@@ -28,5 +28,3 @@ export function useAuthAwareEffect(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, ...deps]);
 }
-
-

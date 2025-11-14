@@ -6,9 +6,10 @@ When navigating from other pages (like Planning) to Settings, the data in all Se
 
 ## Root Cause
 
-All settings table components and Planning data hooks were fetching data immediately on component mount using `useEffect(() => { fetchData(); }, [])`, without waiting for the authentication session to be initialized. 
+All settings table components and Planning data hooks were fetching data immediately on component mount using `useEffect(() => { fetchData(); }, [])`, without waiting for the authentication session to be initialized.
 
 When navigating between pages:
+
 1. The component would mount
 2. The data fetch would start immediately
 3. The Supabase client might not have the auth session cookies properly set yet
@@ -58,6 +59,7 @@ Updated the following components to use `useAuthAwareEffect` instead of `useEffe
 - `RoutingsTable.tsx` - Routings management
 
 **Change Pattern:**
+
 ```typescript
 // BEFORE
 useEffect(() => {
@@ -85,17 +87,18 @@ Updated the following hooks in `apps/frontend/lib/hooks/useSupabaseData.ts` to c
 - `useSupabaseTransferOrders()`
 
 **Change Pattern:**
+
 ```typescript
 export function useSupabaseWorkOrders() {
   const { loading: authLoading } = useAuth();
-  
+
   useEffect(() => {
     // Wait for auth to be ready before fetching
     if (authLoading) {
       console.log('[useSupabaseWorkOrders] Auth still loading, waiting...');
       return;
     }
-    
+
     async function loadData() {
       // fetch data
     }
@@ -127,12 +130,14 @@ To test the fix:
 ## Console Logs
 
 You should see logs like:
+
 ```
 [useAuthAwareEffect] Auth ready, running effect
 [useSupabaseWorkOrders] Auth ready, fetching work orders...
 ```
 
 If auth is not ready, you'll see:
+
 ```
 [useAuthAwareEffect] Auth still loading, waiting...
 [useSupabaseWorkOrders] Auth still loading, waiting...
@@ -141,9 +146,8 @@ If auth is not ready, you'll see:
 ## Future Improvements
 
 Consider applying this pattern to other components that fetch data on mount, such as:
+
 - Warehouse page tables
 - Production page data
 - Scanner page data
 - Any other component that uses Supabase queries on mount
-
-
