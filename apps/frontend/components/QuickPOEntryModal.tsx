@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { PurchaseOrdersAPI, type QuickPOEntryLine, type QuickPOCreatedPO } from '@/lib/api/purchaseOrders';
+import {
+  PurchaseOrdersAPI,
+  type QuickPOEntryLine,
+  type QuickPOCreatedPO,
+} from '@/lib/api/purchaseOrders';
 import { ProductsAPI } from '@/lib/api/products';
 import { WarehousesAPI } from '@/lib/api/warehouses';
 import type { Product, Warehouse } from '@/lib/types';
@@ -22,9 +26,13 @@ interface EntryLine {
   error?: string;
 }
 
-export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryModalProps) {
+export function QuickPOEntryModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: QuickPOEntryModalProps) {
   const [lines, setLines] = useState<EntryLine[]>([
-    { id: '1', product_code: '', quantity: '' }
+    { id: '1', product_code: '', quantity: '' },
   ]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -44,6 +52,13 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
       setSelectedWarehouse('');
     }
   }, [isOpen]);
+
+  // Smart pre-select: Auto-select warehouse if only 1 exists
+  useEffect(() => {
+    if (warehouses.length === 1 && !selectedWarehouse) {
+      setSelectedWarehouse(warehouses[0].id.toString());
+    }
+  }, [warehouses, selectedWarehouse]);
 
   const loadProducts = async () => {
     setLoadingProducts(true);
@@ -69,7 +84,10 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
   };
 
   const addLine = () => {
-    setLines([...lines, { id: Date.now().toString(), product_code: '', quantity: '' }]);
+    setLines([
+      ...lines,
+      { id: Date.now().toString(), product_code: '', quantity: '' },
+    ]);
   };
 
   const removeLine = (id: string) => {
@@ -79,41 +97,43 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
   };
 
   const updateLine = (id: string, field: keyof EntryLine, value: string) => {
-    setLines(lines.map(line => {
-      if (line.id === id) {
-        const updated = { ...line, [field]: value, error: undefined };
-        
-        // If updating product_code, try to find matching product
-        if (field === 'product_code' && value) {
-          const product = products.find(p => 
-            p.part_number.toLowerCase() === value.toLowerCase()
-          );
-          
-          if (product) {
-            updated.product = product;
-            // Validate product
-            if (!product.is_active) {
-              updated.error = 'Product is inactive';
-            } else if (!product.supplier_id) {
-              updated.error = 'Product has no supplier assigned';
+    setLines(
+      lines.map(line => {
+        if (line.id === id) {
+          const updated = { ...line, [field]: value, error: undefined };
+
+          // If updating product_code, try to find matching product
+          if (field === 'product_code' && value) {
+            const product = products.find(
+              p => p.part_number.toLowerCase() === value.toLowerCase()
+            );
+
+            if (product) {
+              updated.product = product;
+              // Validate product
+              if (!product.is_active) {
+                updated.error = 'Product is inactive';
+              } else if (!product.supplier_id) {
+                updated.error = 'Product has no supplier assigned';
+              }
+            } else {
+              updated.product = undefined;
+              updated.error = 'Product not found';
             }
-          } else {
-            updated.product = undefined;
-            updated.error = 'Product not found';
           }
+
+          return updated;
         }
-        
-        return updated;
-      }
-      return line;
-    }));
+        return line;
+      })
+    );
   };
 
   const validateLines = (): boolean => {
     let isValid = true;
     const updatedLines = lines.map(line => {
       let error: string | undefined;
-      
+
       if (!line.product_code.trim()) {
         error = 'Product code required';
         isValid = false;
@@ -127,59 +147,74 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
         error = 'Product has no supplier';
         isValid = false;
       }
-      
+
       const qty = parseFloat(line.quantity);
       if (!line.quantity || isNaN(qty) || qty <= 0) {
         error = 'Quantity must be > 0';
         isValid = false;
       }
-      
+
       return { ...line, error };
     });
-    
+
     setLines(updatedLines);
     return isValid;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // Validate warehouse selection
+    if (!selectedWarehouse) {
+      toast.error('Please select a destination warehouse');
+      return;
+    }
+
     if (!validateLines()) {
       toast.error('Please fix validation errors');
       return;
     }
-    
+
     setLoading(true);
     try {
       // Aggregate quantities for duplicate product codes (case-insensitive, preserve canonical code)
       const aggregated = new Map<string, { code: string; quantity: number }>();
       lines.forEach(line => {
-        const canonicalCode = (line.product?.part_number ?? line.product_code).trim();
+        const canonicalCode = (
+          line.product?.part_number ?? line.product_code
+        ).trim();
         const key = canonicalCode.toLowerCase();
         const qty = parseFloat(line.quantity);
         const existing = aggregated.get(key);
         if (existing) {
-          aggregated.set(key, { code: existing.code, quantity: existing.quantity + qty });
+          aggregated.set(key, {
+            code: existing.code,
+            quantity: existing.quantity + qty,
+          });
         } else {
           aggregated.set(key, { code: canonicalCode, quantity: qty });
         }
       });
-      
+
       // Build request
-      const request: QuickPOEntryLine[] = Array.from(aggregated.values()).map(({ code, quantity }) => ({
-        product_code: code,
-        quantity
-      }));
-      
-      const response = await PurchaseOrdersAPI.quickCreate({ 
+      const request: QuickPOEntryLine[] = Array.from(aggregated.values()).map(
+        ({ code, quantity }) => ({
+          product_code: code,
+          quantity,
+        })
+      );
+
+      const response = await PurchaseOrdersAPI.quickCreate({
         lines: request,
-        warehouse_id: selectedWarehouse ? Number(selectedWarehouse) : undefined
+        warehouse_id: selectedWarehouse ? Number(selectedWarehouse) : undefined,
       });
-      
+
       setCreatedPOs(response.purchase_orders);
       setShowResults(true);
-      
-      toast.success(`Created ${response.purchase_orders.length} purchase order(s)`);
+
+      toast.success(
+        `Created ${response.purchase_orders.length} purchase order(s)`
+      );
     } catch (error: any) {
       toast.error(error.message || 'Failed to create purchase orders');
     } finally {
@@ -201,7 +236,9 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <div className="flex items-center justify-between p-6 border-b border-slate-200">
-            <h2 className="text-xl font-semibold text-slate-900">Purchase Orders Created</h2>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Purchase Orders Created
+            </h2>
             <button
               onClick={handleClose}
               className="text-slate-400 hover:text-slate-600 transition-colors"
@@ -212,23 +249,45 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
 
           <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-4">
-              {createdPOs.map((po) => (
-                <div key={po.id} className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
+              {createdPOs.map(po => (
+                <div
+                  key={po.id}
+                  className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors"
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-slate-900">{po.number}</h3>
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          {po.number}
+                        </h3>
                         <span className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded font-medium">
                           {po.currency}
                         </span>
                       </div>
                       <div className="text-sm text-slate-600 space-y-1">
-                        <div><span className="font-medium">Supplier:</span> {po.supplier_name}</div>
-                        <div><span className="font-medium">Lines:</span> {po.total_lines}</div>
+                        <div>
+                          <span className="font-medium">Supplier:</span>{' '}
+                          {po.supplier_name}
+                        </div>
+                        <div>
+                          <span className="font-medium">Lines:</span>{' '}
+                          {po.total_lines}
+                        </div>
                         <div className="flex items-center gap-4 mt-2 pt-2 border-t border-slate-100">
-                          <div><span className="font-medium">Net:</span> {po.net_total.toFixed(2)}</div>
-                          <div><span className="font-medium">VAT:</span> {po.vat_total.toFixed(2)}</div>
-                          <div><span className="font-medium text-slate-900">Gross:</span> {po.gross_total.toFixed(2)}</div>
+                          <div>
+                            <span className="font-medium">Net:</span>{' '}
+                            {po.net_total.toFixed(2)}
+                          </div>
+                          <div>
+                            <span className="font-medium">VAT:</span>{' '}
+                            {po.vat_total.toFixed(2)}
+                          </div>
+                          <div>
+                            <span className="font-medium text-slate-900">
+                              Gross:
+                            </span>{' '}
+                            {po.gross_total.toFixed(2)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -264,9 +323,12 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
           <div>
-            <h2 className="text-xl font-semibold text-slate-900">Quick PO Entry</h2>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Quick PO Entry
+            </h2>
             <p className="text-sm text-slate-600 mt-1">
-              Enter product codes and quantities. POs will be auto-split by supplier.
+              Enter product codes and quantities. POs will be auto-split by
+              supplier.
             </p>
           </div>
           <button
@@ -288,22 +350,46 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
               <>
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Destination Warehouse
+                    Destination Warehouse{' '}
+                    <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    data-testid="quick-po-warehouse-select"
-                    value={selectedWarehouse}
-                    onChange={(e) => setSelectedWarehouse(e.target.value)}
-                    className="w-full max-w-md px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  >
-                    <option value="">Select warehouse (optional)...</option>
-                    {warehouses.map((warehouse) => (
-                      <option key={warehouse.id} value={warehouse.id}>
-                        {warehouse.code} - {warehouse.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-slate-500 mt-1">Optional: Specify where goods should be delivered</p>
+                  {warehouses.length === 0 ? (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+                      No warehouses found. Please create a warehouse first.
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        data-testid="quick-po-warehouse-select"
+                        value={selectedWarehouse}
+                        onChange={e => setSelectedWarehouse(e.target.value)}
+                        className={`w-full max-w-md px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:border-transparent ${
+                          !selectedWarehouse &&
+                          lines.some(l => l.product_code || l.quantity)
+                            ? 'border-red-300 focus:ring-red-500'
+                            : 'border-slate-300 focus:ring-slate-900'
+                        }`}
+                        required
+                      >
+                        <option value="">Select warehouse...</option>
+                        {warehouses.map(warehouse => (
+                          <option key={warehouse.id} value={warehouse.id}>
+                            {warehouse.code} - {warehouse.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Where should materials be received? This determines GRN
+                        routing.
+                      </p>
+                      {!selectedWarehouse &&
+                        lines.some(l => l.product_code || l.quantity) && (
+                          <p className="text-xs text-red-600 mt-1">
+                            Please select a destination warehouse
+                          </p>
+                        )}
+                    </>
+                  )}
                 </div>
 
                 <div className="overflow-x-auto">
@@ -326,24 +412,32 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
                       </tr>
                     </thead>
                     <tbody>
-                      {lines.map((line, index) => (
+                      {lines.map(line => (
                         <tr key={line.id} className="border-b border-slate-100">
                           <td className="py-3 px-4">
                             <input
                               data-testid="quick-po-code-input"
                               type="text"
                               value={line.product_code}
-                              onChange={(e) => updateLine(line.id, 'product_code', e.target.value)}
+                              onChange={e =>
+                                updateLine(
+                                  line.id,
+                                  'product_code',
+                                  e.target.value
+                                )
+                              }
                               className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 ${
-                                line.error 
-                                  ? 'border-red-300 focus:ring-red-500' 
+                                line.error
+                                  ? 'border-red-300 focus:ring-red-500'
                                   : 'border-slate-300 focus:ring-slate-900'
                               }`}
                               placeholder="Enter code..."
                               required
                             />
                             {line.error && (
-                              <div className="text-xs text-red-600 mt-1">{line.error}</div>
+                              <div className="text-xs text-red-600 mt-1">
+                                {line.error}
+                              </div>
                             )}
                           </td>
                           <td className="py-3 px-4">
@@ -363,7 +457,9 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
                               step="0.01"
                               min="0.01"
                               value={line.quantity}
-                              onChange={(e) => updateLine(line.id, 'quantity', e.target.value)}
+                              onChange={e =>
+                                updateLine(line.id, 'quantity', e.target.value)
+                              }
                               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900"
                               placeholder="0"
                               required
@@ -427,4 +523,3 @@ export function QuickPOEntryModal({ isOpen, onClose, onSuccess }: QuickPOEntryMo
     </div>
   );
 }
-

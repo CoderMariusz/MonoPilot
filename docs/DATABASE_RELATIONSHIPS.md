@@ -217,3 +217,4 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `bom_costs.org_id` → `organizations.id`
 - `product_prices.org_id` → `organizations.id`
 - `wo_costs.org_id` → `organizations.id`
+

@@ -56,7 +56,7 @@ development_status:
   epic-0: backlog
 
   # Story 0.1: Fix PO Header warehouse_id (CRITICAL)
-  0-1-fix-po-header-warehouse-id: backlog
+  0-1-fix-po-header-warehouse-id: done
 
   # Story 0.2: Fix TO Status enum (MEDIUM)
   0-2-fix-to-status-enum: backlog

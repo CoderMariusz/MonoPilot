@@ -13,21 +13,21 @@ This document describes the complete database schema for the MonoPilot MES syste
 
 **Columns**:
 
-| Column     | Type        | Constraints                                           |
-| ---------- | ----------- | ----------------------------------------------------- |
-| id         | UUID        | PRIMARY KEY                                           |
-| name       | TEXT        | NOT NULL                                              |
-| email      | TEXT        | NOT NULL                                              |
-| role       | TEXT        | NOT NULL                                              |
-| status     | TEXT        | NOT NULL, DEFAULT 'Active' CHECK (status IN ('Active' |
-| avatar_url | TEXT        | -                                                     |
-| phone      | TEXT        | -                                                     |
-| department | TEXT        | -                                                     |
-| created_at | TIMESTAMPTZ | DEFAULT NOW()                                         |
-| updated_at | TIMESTAMPTZ | DEFAULT NOW()                                         |
-| last_login | TIMESTAMPTZ | -                                                     |
-| created_by | UUID        | REFERENCES users(id)                                  |
-| updated_by | UUID        | REFERENCES users(id)                                  |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PRIMARY KEY |
+| name | TEXT | NOT NULL |
+| email | TEXT | NOT NULL |
+| role | TEXT | NOT NULL |
+| status | TEXT | NOT NULL, DEFAULT 'Active' CHECK (status IN ('Active' |
+| avatar_url | TEXT | - |
+| phone | TEXT | - |
+| department | TEXT | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| last_login | TIMESTAMPTZ | - |
+| created_by | UUID | REFERENCES users(id) |
+| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
@@ -69,26 +69,26 @@ CREATE TABLE IF NOT EXISTS users (
 
 **Columns**:
 
-| Column              | Type         | Constraints   |
-| ------------------- | ------------ | ------------- |
-| id                  | SERIAL       | PRIMARY KEY   |
-| name                | VARCHAR(200) | NOT NULL      |
-| legal_name          | VARCHAR(200) | -             |
-| vat_number          | VARCHAR(50)  | -             |
-| tax_number          | VARCHAR(50)  | -             |
-| country             | VARCHAR(3)   | -             |
-| currency            | VARCHAR(3)   | DEFAULT 'USD' |
-| payment_terms       | VARCHAR(100) | -             |
-| incoterms           | VARCHAR(50)  | -             |
-| email               | VARCHAR(200) | -             |
-| phone               | VARCHAR(50)  | -             |
-| address             | JSONB        | -             |
-| default_tax_code_id | INTEGER      | -             |
-| lead_time_days      | INTEGER      | -             |
-| notes               | TEXT         | -             |
-| is_active           | BOOLEAN      | DEFAULT true  |
-| created_at          | TIMESTAMPTZ  | DEFAULT NOW() |
-| updated_at          | TIMESTAMPTZ  | DEFAULT NOW() |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| name | VARCHAR(200) | NOT NULL |
+| legal_name | VARCHAR(200) | - |
+| vat_number | VARCHAR(50) | - |
+| tax_number | VARCHAR(50) | - |
+| country | VARCHAR(3) | - |
+| currency | VARCHAR(3) | DEFAULT 'USD' |
+| payment_terms | VARCHAR(100) | - |
+| incoterms | VARCHAR(50) | - |
+| email | VARCHAR(200) | - |
+| phone | VARCHAR(50) | - |
+| address | JSONB | - |
+| default_tax_code_id | INTEGER | - |
+| lead_time_days | INTEGER | - |
+| notes | TEXT | - |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Indexes**:
 
@@ -129,14 +129,14 @@ CREATE TABLE suppliers (
 
 **Columns**:
 
-| Column     | Type         | Constraints      |
-| ---------- | ------------ | ---------------- |
-| id         | SERIAL       | PRIMARY KEY      |
-| code       | VARCHAR(50)  | NOT NULL, UNIQUE |
-| name       | VARCHAR(200) | NOT NULL         |
-| is_active  | BOOLEAN      | DEFAULT true     |
-| created_at | TIMESTAMPTZ  | DEFAULT NOW()    |
-| updated_at | TIMESTAMPTZ  | DEFAULT NOW()    |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| code | VARCHAR(50) | NOT NULL, UNIQUE |
+| name | VARCHAR(200) | NOT NULL |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Indexes**:
 
@@ -165,16 +165,16 @@ CREATE TABLE warehouses (
 
 **Columns**:
 
-| Column       | Type         | Constraints               |
-| ------------ | ------------ | ------------------------- |
-| id           | SERIAL       | PRIMARY KEY               |
-| warehouse_id | INTEGER      | REFERENCES warehouses(id) |
-| code         | VARCHAR(50)  | NOT NULL, UNIQUE          |
-| name         | VARCHAR(200) | NOT NULL                  |
-| type         | VARCHAR(50)  | -                         |
-| is_active    | BOOLEAN      | DEFAULT true              |
-| created_at   | TIMESTAMPTZ  | DEFAULT NOW()             |
-| updated_at   | TIMESTAMPTZ  | DEFAULT NOW()             |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| warehouse_id | INTEGER | REFERENCES warehouses(id) |
+| code | VARCHAR(50) | NOT NULL, UNIQUE |
+| name | VARCHAR(200) | NOT NULL |
+| type | VARCHAR(50) | - |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -210,15 +210,15 @@ CREATE TABLE locations (
 
 **Columns**:
 
-| Column     | Type         | Constraints      |
-| ---------- | ------------ | ---------------- |
-| id         | SERIAL       | PRIMARY KEY      |
-| code       | VARCHAR(20)  | NOT NULL, UNIQUE |
-| name       | VARCHAR(100) | NOT NULL         |
-| rate       | NUMERIC(5,4) | NOT NULL         |
-| is_active  | BOOLEAN      | DEFAULT true     |
-| created_at | TIMESTAMPTZ  | DEFAULT NOW()    |
-| updated_at | TIMESTAMPTZ  | DEFAULT NOW()    |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| code | VARCHAR(20) | NOT NULL, UNIQUE |
+| name | VARCHAR(100) | NOT NULL |
+| rate | NUMERIC(5,4) | NOT NULL |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Indexes**:
 
@@ -248,16 +248,16 @@ CREATE TABLE settings_tax_codes (
 
 **Columns**:
 
-| Column                        | Type        | Constraints                                 |
-| ----------------------------- | ----------- | ------------------------------------------- |
-| id                            | SERIAL      | PRIMARY KEY                                 |
-| warehouse_id                  | INTEGER     | NOT NULL, UNIQUE, REFERENCES warehouses(id) |
-| default_receiving_location_id | INTEGER     | REFERENCES locations(id)                    |
-| default_shipping_location_id  | INTEGER     | REFERENCES locations(id)                    |
-| allow_negative_stock          | BOOLEAN     | DEFAULT false                               |
-| auto_assign_location          | BOOLEAN     | DEFAULT true                                |
-| created_at                    | TIMESTAMPTZ | DEFAULT NOW()                               |
-| updated_at                    | TIMESTAMPTZ | DEFAULT NOW()                               |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| warehouse_id | INTEGER | NOT NULL, UNIQUE, REFERENCES warehouses(id) |
+| default_receiving_location_id | INTEGER | REFERENCES locations(id) |
+| default_shipping_location_id | INTEGER | REFERENCES locations(id) |
+| allow_negative_stock | BOOLEAN | DEFAULT false |
+| auto_assign_location | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -294,16 +294,16 @@ CREATE TABLE settings_warehouse (
 
 **Columns**:
 
-| Column      | Type         | Constraints      |
-| ----------- | ------------ | ---------------- |
-| id          | SERIAL       | PRIMARY KEY      |
-| code        | VARCHAR(20)  | NOT NULL, UNIQUE |
-| name        | VARCHAR(100) | NOT NULL         |
-| description | TEXT         | -                |
-| icon        | VARCHAR(50)  | -                |
-| is_active   | BOOLEAN      | DEFAULT true     |
-| created_at  | TIMESTAMPTZ  | DEFAULT NOW()    |
-| updated_at  | TIMESTAMPTZ  | DEFAULT NOW()    |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| code | VARCHAR(20) | NOT NULL, UNIQUE |
+| name | VARCHAR(100) | NOT NULL |
+| description | TEXT | - |
+| icon | VARCHAR(50) | - |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Indexes**:
 
@@ -334,16 +334,16 @@ CREATE TABLE allergens (
 
 **Columns**:
 
-| Column      | Type         | Constraints              |
-| ----------- | ------------ | ------------------------ |
-| id          | SERIAL       | PRIMARY KEY              |
-| name        | VARCHAR(200) | NOT NULL                 |
-| code        | VARCHAR(50)  | NOT NULL, UNIQUE         |
-| type        | VARCHAR(50)  | -                        |
-| location_id | INTEGER      | REFERENCES locations(id) |
-| is_active   | BOOLEAN      | DEFAULT true             |
-| created_at  | TIMESTAMPTZ  | DEFAULT NOW()            |
-| updated_at  | TIMESTAMPTZ  | DEFAULT NOW()            |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| name | VARCHAR(200) | NOT NULL |
+| code | VARCHAR(50) | NOT NULL, UNIQUE |
+| type | VARCHAR(50) | - |
+| location_id | INTEGER | REFERENCES locations(id) |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -379,18 +379,18 @@ CREATE TABLE machines (
 
 **Columns**:
 
-| Column       | Type         | Constraints                                 |
-| ------------ | ------------ | ------------------------------------------- |
-| id           | SERIAL       | PRIMARY KEY                                 |
-| code         | VARCHAR(50)  | NOT NULL, UNIQUE                            |
-| name         | VARCHAR(200) | NOT NULL                                    |
-| status       | VARCHAR(20)  | DEFAULT 'active' CHECK (status IN ('active' |
-| warehouse_id | INTEGER      | REFERENCES warehouses(id)                   |
-| is_active    | BOOLEAN      | DEFAULT true                                |
-| created_at   | TIMESTAMPTZ  | DEFAULT NOW()                               |
-| updated_at   | TIMESTAMPTZ  | DEFAULT NOW()                               |
-| created_by   | UUID         | REFERENCES users(id)                        |
-| updated_by   | UUID         | REFERENCES users(id)                        |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| code | VARCHAR(50) | NOT NULL, UNIQUE |
+| name | VARCHAR(200) | NOT NULL |
+| status | VARCHAR(20) | DEFAULT 'active' CHECK (status IN ('active' |
+| warehouse_id | INTEGER | REFERENCES warehouses(id) |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| created_by | UUID | REFERENCES users(id) |
+| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
@@ -430,34 +430,34 @@ CREATE TABLE production_lines (
 
 **Columns**:
 
-| Column             | Type          | Constraints                       |
-| ------------------ | ------------- | --------------------------------- |
-| id                 | SERIAL        | PRIMARY KEY                       |
-| part_number        | VARCHAR(100)  | NOT NULL, UNIQUE                  |
-| description        | TEXT          | NOT NULL                          |
-| type               | VARCHAR(10)   | NOT NULL                          |
-| subtype            | VARCHAR(100)  | -                                 |
-| uom                | VARCHAR(20)   | NOT NULL                          |
-| expiry_policy      | VARCHAR(50)   | -                                 |
-| shelf_life_days    | INTEGER       | -                                 |
-| production_lines   | TEXT          | -                                 |
-| is_active          | BOOLEAN       | DEFAULT true                      |
-| supplier_id        | INTEGER       | REFERENCES suppliers(id)          |
-| tax_code_id        | INTEGER       | REFERENCES settings_tax_codes(id) |
-| lead_time_days     | INTEGER       | -                                 |
-| moq                | NUMERIC(12,4) | -                                 |
-| std_price          | NUMERIC(12,4) | -                                 |
-| requires_routing   | BOOLEAN       | DEFAULT false                     |
-| default_routing_id | INTEGER       | -                                 |
-| notes              | TEXT          | -                                 |
-| allergen_ids       | INTEGER       | -                                 |
-| boxes_per_pallet   | INTEGER       | -                                 |
-| packs_per_box      | INTEGER       | -                                 |
-| product_version    | VARCHAR(20)   | DEFAULT '1.0'                     |
-| created_at         | TIMESTAMPTZ   | DEFAULT NOW()                     |
-| updated_at         | TIMESTAMPTZ   | DEFAULT NOW()                     |
-| created_by         | UUID          | REFERENCES users(id)              |
-| updated_by         | UUID          | REFERENCES users(id)              |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| part_number | VARCHAR(100) | NOT NULL, UNIQUE |
+| description | TEXT | NOT NULL |
+| type | VARCHAR(10) | NOT NULL |
+| subtype | VARCHAR(100) | - |
+| uom | VARCHAR(20) | NOT NULL |
+| expiry_policy | VARCHAR(50) | - |
+| shelf_life_days | INTEGER | - |
+| production_lines | TEXT | - |
+| is_active | BOOLEAN | DEFAULT true |
+| supplier_id | INTEGER | REFERENCES suppliers(id) |
+| tax_code_id | INTEGER | REFERENCES settings_tax_codes(id) |
+| lead_time_days | INTEGER | - |
+| moq | NUMERIC(12,4) | - |
+| std_price | NUMERIC(12,4) | - |
+| requires_routing | BOOLEAN | DEFAULT false |
+| default_routing_id | INTEGER | - |
+| notes | TEXT | - |
+| allergen_ids | INTEGER | - |
+| boxes_per_pallet | INTEGER | - |
+| packs_per_box | INTEGER | - |
+| product_version | VARCHAR(20) | DEFAULT '1.0' |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| created_by | UUID | REFERENCES users(id) |
+| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
@@ -490,33 +490,33 @@ CREATE TABLE products (
   shelf_life_days INTEGER,
   production_lines TEXT[],
   is_active BOOLEAN DEFAULT true,
-
+  
   -- App taxonomy (using ENUMs)
   product_group product_group NOT NULL DEFAULT 'COMPOSITE',
   product_type product_type NOT NULL DEFAULT 'FG',
-
+  
   -- Planning & commercial
   supplier_id INTEGER REFERENCES suppliers(id),
   tax_code_id INTEGER REFERENCES settings_tax_codes(id),
   lead_time_days INTEGER,
   moq NUMERIC(12,4),
   std_price NUMERIC(12,4),
-
+  
   -- Routing
   requires_routing BOOLEAN DEFAULT false,
   default_routing_id INTEGER,
-
+  
   -- Metadata
   notes TEXT,
   allergen_ids INTEGER[],
-
+  
   -- Packaging
   boxes_per_pallet INTEGER,
   packs_per_box INTEGER,
-
+  
   -- Versioning
   product_version VARCHAR(20) DEFAULT '1.0',
-
+  
   -- Audit
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -533,22 +533,22 @@ CREATE TABLE products (
 
 **Columns**:
 
-| Column             | Type        | Constraints             |
-| ------------------ | ----------- | ----------------------- |
-| id                 | SERIAL      | PRIMARY KEY             |
-| product_id         | INTEGER     | REFERENCES products(id) |
-| version            | VARCHAR(50) | NOT NULL                |
-| archived_at        | TIMESTAMPTZ | -                       |
-| deleted_at         | TIMESTAMPTZ | -                       |
-| requires_routing   | BOOLEAN     | DEFAULT false           |
-| default_routing_id | INTEGER     | -                       |
-| notes              | TEXT        | -                       |
-| effective_from     | TIMESTAMPTZ | -                       |
-| effective_to       | TIMESTAMPTZ | -                       |
-| boxes_per_pallet   | INTEGER     | -                       |
-| line_id            | INTEGER     | -                       |
-| created_at         | TIMESTAMPTZ | DEFAULT NOW()           |
-| updated_at         | TIMESTAMPTZ | DEFAULT NOW()           |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| product_id | INTEGER | REFERENCES products(id) |
+| version | VARCHAR(50) | NOT NULL |
+| archived_at | TIMESTAMPTZ | - |
+| deleted_at | TIMESTAMPTZ | - |
+| requires_routing | BOOLEAN | DEFAULT false |
+| default_routing_id | INTEGER | - |
+| notes | TEXT | - |
+| effective_from | TIMESTAMPTZ | - |
+| effective_to | TIMESTAMPTZ | - |
+| boxes_per_pallet | INTEGER | - |
+| line_id | INTEGER | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -573,29 +573,29 @@ CREATE TABLE boms (
   id SERIAL PRIMARY KEY,
   product_id INTEGER REFERENCES products(id),
   version VARCHAR(50) NOT NULL,
-
+  
   -- BOM Lifecycle
   status bom_status NOT NULL DEFAULT 'draft',
   archived_at TIMESTAMPTZ,
   deleted_at TIMESTAMPTZ,
-
+  
   -- BOM Configuration
   requires_routing BOOLEAN DEFAULT false,
   default_routing_id INTEGER,
   notes TEXT,
   effective_from TIMESTAMPTZ,
   effective_to TIMESTAMPTZ,
-
+  
   -- Packaging
   boxes_per_pallet INTEGER,
-
+  
   -- Line restrictions
   line_id INTEGER[],
-
+  
   -- Audit
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-
+  
   -- Constraint: Single active BOM per product
   CONSTRAINT boms_single_active UNIQUE (product_id) WHERE status = 'active'
 );
@@ -609,29 +609,29 @@ CREATE TABLE boms (
 
 **Columns**:
 
-| Column                       | Type          | Constraints                                      |
-| ---------------------------- | ------------- | ------------------------------------------------ |
-| id                           | SERIAL        | PRIMARY KEY                                      |
-| bom_id                       | INTEGER       | REFERENCES boms(id)                              |
-| material_id                  | INTEGER       | REFERENCES products(id)                          |
-| uom                          | VARCHAR(20)   | NOT NULL                                         |
-| quantity                     | NUMERIC(12,4) | NOT NULL                                         |
-| production_line_restrictions | TEXT          | DEFAULT '{}'                                     |
-| sequence                     | INTEGER       | NOT NULL                                         |
-| priority                     | INTEGER       | -                                                |
-| unit_cost_std                | NUMERIC(12,4) | -                                                |
-| scrap_std_pct                | NUMERIC(5,2)  | DEFAULT 0                                        |
-| is_optional                  | BOOLEAN       | DEFAULT false                                    |
-| is_phantom                   | BOOLEAN       | DEFAULT false                                    |
-| consume_whole_lp             | BOOLEAN       | DEFAULT false                                    |
-| production_lines             | TEXT          | -                                                |
-| tax_code_id                  | INTEGER       | REFERENCES settings_tax_codes(id)                |
-| lead_time_days               | INTEGER       | -                                                |
-| moq                          | NUMERIC(12,4) | -                                                |
-| packages_per_box             | NUMERIC(10,4) | NOT NULL, DEFAULT 1 CHECK (packages_per_box > 0) |
-| line_id                      | INTEGER       | -                                                |
-| created_at                   | TIMESTAMPTZ   | DEFAULT NOW()                                    |
-| updated_at                   | TIMESTAMPTZ   | DEFAULT NOW()                                    |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| bom_id | INTEGER | REFERENCES boms(id) |
+| material_id | INTEGER | REFERENCES products(id) |
+| uom | VARCHAR(20) | NOT NULL |
+| quantity | NUMERIC(12,4) | NOT NULL |
+| production_line_restrictions | TEXT | DEFAULT '{}' |
+| sequence | INTEGER | NOT NULL |
+| priority | INTEGER | - |
+| unit_cost_std | NUMERIC(12,4) | - |
+| scrap_std_pct | NUMERIC(5,2) | DEFAULT 0 |
+| is_optional | BOOLEAN | DEFAULT false |
+| is_phantom | BOOLEAN | DEFAULT false |
+| consume_whole_lp | BOOLEAN | DEFAULT false |
+| production_lines | TEXT | - |
+| tax_code_id | INTEGER | REFERENCES settings_tax_codes(id) |
+| lead_time_days | INTEGER | - |
+| moq | NUMERIC(12,4) | - |
+| packages_per_box | NUMERIC(10,4) | NOT NULL, DEFAULT 1 CHECK (packages_per_box > 0) |
+| line_id | INTEGER | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -660,28 +660,28 @@ CREATE TABLE bom_items (
   production_line_restrictions TEXT[] DEFAULT '{}',
   sequence INTEGER NOT NULL,
   priority INTEGER,
-
+  
   -- Costing
   unit_cost_std NUMERIC(12,4),
   scrap_std_pct NUMERIC(5,2) DEFAULT 0,
-
+  
   -- Flags
   is_optional BOOLEAN DEFAULT false,
   is_phantom BOOLEAN DEFAULT false,
   consume_whole_lp BOOLEAN DEFAULT false,
-
+  
   -- Planning
   production_lines TEXT[],
   tax_code_id INTEGER REFERENCES settings_tax_codes(id),
   lead_time_days INTEGER CHECK (lead_time_days IS NULL OR lead_time_days > 0),
   moq NUMERIC(12,4) CHECK (moq IS NULL OR moq > 0),
-
+  
   -- Packaging
   packages_per_box NUMERIC(10,4) NOT NULL DEFAULT 1 CHECK (packages_per_box > 0),
-
+  
   -- Line-specific materials
   line_id INTEGER[],
-
+  
   -- Audit
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -696,17 +696,17 @@ CREATE TABLE bom_items (
 
 **Columns**:
 
-| Column      | Type        | Constraints                   |
-| ----------- | ----------- | ----------------------------- |
-| id          | SERIAL      | PRIMARY KEY                   |
-| bom_id      | INTEGER     | NOT NULL, REFERENCES boms(id) |
-| version     | VARCHAR(50) | NOT NULL                      |
-| changed_by  | UUID        | REFERENCES users(id)          |
-| changed_at  | TIMESTAMPTZ | DEFAULT NOW()                 |
-| status_from | VARCHAR(20) | -                             |
-| status_to   | VARCHAR(20) | -                             |
-| changes     | JSONB       | NOT NULL                      |
-| description | TEXT        | -                             |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| bom_id | INTEGER | NOT NULL, REFERENCES boms(id) |
+| version | VARCHAR(50) | NOT NULL |
+| changed_by | UUID | REFERENCES users(id) |
+| changed_at | TIMESTAMPTZ | DEFAULT NOW() |
+| status_from | VARCHAR(20) | - |
+| status_to | VARCHAR(20) | - |
+| changes | JSONB | NOT NULL |
+| description | TEXT | - |
 
 **Foreign Keys**:
 
@@ -744,17 +744,17 @@ CREATE TABLE bom_history (
 
 **Columns**:
 
-| Column     | Type         | Constraints             |
-| ---------- | ------------ | ----------------------- |
-| id         | SERIAL       | PRIMARY KEY             |
-| name       | VARCHAR(200) | NOT NULL                |
-| product_id | INTEGER      | REFERENCES products(id) |
-| is_active  | BOOLEAN      | DEFAULT true            |
-| notes      | TEXT         | -                       |
-| created_at | TIMESTAMPTZ  | DEFAULT NOW()           |
-| updated_at | TIMESTAMPTZ  | DEFAULT NOW()           |
-| created_by | UUID         | REFERENCES users(id)    |
-| updated_by | UUID         | REFERENCES users(id)    |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| name | VARCHAR(200) | NOT NULL |
+| product_id | INTEGER | REFERENCES products(id) |
+| is_active | BOOLEAN | DEFAULT true |
+| notes | TEXT | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| created_by | UUID | REFERENCES users(id) |
+| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
@@ -792,22 +792,22 @@ CREATE TABLE routings (
 
 **Columns**:
 
-| Column                     | Type         | Constraints                                                                 |
-| -------------------------- | ------------ | --------------------------------------------------------------------------- |
-| id                         | SERIAL       | PRIMARY KEY                                                                 |
-| routing_id                 | INTEGER      | REFERENCES routings(id)                                                     |
-| operation_name             | VARCHAR(200) | NOT NULL                                                                    |
-| sequence_number            | INTEGER      | NOT NULL                                                                    |
-| machine_id                 | INTEGER      | REFERENCES machines(id)                                                     |
-| estimated_duration_minutes | INTEGER      | -                                                                           |
-| setup_time_minutes         | INTEGER      | DEFAULT 0                                                                   |
-| is_active                  | BOOLEAN      | DEFAULT true                                                                |
-| created_at                 | TIMESTAMPTZ  | DEFAULT NOW()                                                               |
-| updated_at                 | TIMESTAMPTZ  | DEFAULT NOW()                                                               |
-| requirements               | TEXT         | DEFAULT '{}'                                                                |
-| code                       | VARCHAR(50)  | -                                                                           |
-| description                | TEXT         | -                                                                           |
-| expected_yield_pct         | NUMERIC(5,2) | DEFAULT 100.0 CHECK (expected_yield_pct >= 0 AND expected_yield_pct <= 100) |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| routing_id | INTEGER | REFERENCES routings(id) |
+| operation_name | VARCHAR(200) | NOT NULL |
+| sequence_number | INTEGER | NOT NULL |
+| machine_id | INTEGER | REFERENCES machines(id) |
+| estimated_duration_minutes | INTEGER | - |
+| setup_time_minutes | INTEGER | DEFAULT 0 |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| requirements | TEXT | DEFAULT '{}' |
+| code | VARCHAR(50) | - |
+| description | TEXT | - |
+| expected_yield_pct | NUMERIC(5,2) | DEFAULT 100.0 CHECK (expected_yield_pct >= 0 AND expected_yield_pct <= 100) |
 
 **Foreign Keys**:
 
@@ -850,17 +850,17 @@ CREATE TABLE routing_operations (
 
 **Columns**:
 
-| Column      | Type         | Constraints          |
-| ----------- | ------------ | -------------------- |
-| id          | SERIAL       | PRIMARY KEY          |
-| name        | VARCHAR(200) | NOT NULL, UNIQUE     |
-| alias       | VARCHAR(100) | -                    |
-| description | TEXT         | -                    |
-| is_active   | BOOLEAN      | DEFAULT true         |
-| created_at  | TIMESTAMPTZ  | DEFAULT NOW()        |
-| updated_at  | TIMESTAMPTZ  | DEFAULT NOW()        |
-| created_by  | UUID         | REFERENCES users(id) |
-| updated_by  | UUID         | REFERENCES users(id) |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| name | VARCHAR(200) | NOT NULL, UNIQUE |
+| alias | VARCHAR(100) | - |
+| description | TEXT | - |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| created_by | UUID | REFERENCES users(id) |
+| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
@@ -897,29 +897,29 @@ CREATE TABLE routing_operation_names (
 
 **Columns**:
 
-| Column                    | Type          | Constraints              |
-| ------------------------- | ------------- | ------------------------ |
-| id                        | SERIAL        | PRIMARY KEY              |
-| number                    | VARCHAR(50)   | NOT NULL, UNIQUE         |
-| supplier_id               | INTEGER       | REFERENCES suppliers(id) |
-| status                    | VARCHAR(20)   | NOT NULL                 |
-| currency                  | VARCHAR(3)    | DEFAULT 'USD'            |
-| exchange_rate             | NUMERIC(12,6) | -                        |
-| order_date                | TIMESTAMPTZ   | NOT NULL                 |
-| requested_delivery_date   | TIMESTAMPTZ   | -                        |
-| promised_delivery_date    | TIMESTAMPTZ   | -                        |
-| payment_due_date          | TIMESTAMPTZ   | -                        |
-| snapshot_supplier_name    | VARCHAR(200)  | -                        |
-| snapshot_supplier_vat     | VARCHAR(50)   | -                        |
-| snapshot_supplier_address | TEXT          | -                        |
-| asn_ref                   | VARCHAR(50)   | -                        |
-| net_total                 | NUMERIC(12,2) | -                        |
-| vat_total                 | NUMERIC(12,2) | -                        |
-| gross_total               | NUMERIC(12,2) | -                        |
-| created_by                | UUID          | REFERENCES users(id)     |
-| approved_by               | UUID          | REFERENCES users(id)     |
-| created_at                | TIMESTAMPTZ   | DEFAULT NOW()            |
-| updated_at                | TIMESTAMPTZ   | DEFAULT NOW()            |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| number | VARCHAR(50) | NOT NULL, UNIQUE |
+| supplier_id | INTEGER | REFERENCES suppliers(id) |
+| status | VARCHAR(20) | NOT NULL |
+| currency | VARCHAR(3) | DEFAULT 'USD' |
+| exchange_rate | NUMERIC(12,6) | - |
+| order_date | TIMESTAMPTZ | NOT NULL |
+| requested_delivery_date | TIMESTAMPTZ | - |
+| promised_delivery_date | TIMESTAMPTZ | - |
+| payment_due_date | TIMESTAMPTZ | - |
+| snapshot_supplier_name | VARCHAR(200) | - |
+| snapshot_supplier_vat | VARCHAR(50) | - |
+| snapshot_supplier_address | TEXT | - |
+| asn_ref | VARCHAR(50) | - |
+| net_total | NUMERIC(12,2) | - |
+| vat_total | NUMERIC(12,2) | - |
+| gross_total | NUMERIC(12,2) | - |
+| created_by | UUID | REFERENCES users(id) |
+| approved_by | UUID | REFERENCES users(id) |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -952,20 +952,20 @@ CREATE TABLE po_header (
   requested_delivery_date TIMESTAMPTZ,
   promised_delivery_date TIMESTAMPTZ,
   payment_due_date TIMESTAMPTZ,
-
+  
   -- Supplier snapshot (for historical accuracy)
   snapshot_supplier_name VARCHAR(200),
   snapshot_supplier_vat VARCHAR(50),
   snapshot_supplier_address TEXT,
-
+  
   -- ASN reference
   asn_ref VARCHAR(50),
-
+  
   -- Totals
   net_total NUMERIC(12,2),
   vat_total NUMERIC(12,2),
   gross_total NUMERIC(12,2),
-
+  
   -- Audit
   created_by UUID REFERENCES users(id),
   approved_by UUID REFERENCES users(id),
@@ -982,23 +982,23 @@ CREATE TABLE po_header (
 
 **Columns**:
 
-| Column                  | Type          | Constraints              |
-| ----------------------- | ------------- | ------------------------ |
-| id                      | SERIAL        | PRIMARY KEY              |
-| po_id                   | INTEGER       | REFERENCES po_header(id) |
-| line_no                 | INTEGER       | NOT NULL                 |
-| item_id                 | INTEGER       | REFERENCES products(id)  |
-| uom                     | VARCHAR(20)   | NOT NULL                 |
-| qty_ordered             | NUMERIC(12,4) | NOT NULL                 |
-| qty_received            | NUMERIC(12,4) | DEFAULT 0                |
-| unit_price              | NUMERIC(12,4) | NOT NULL                 |
-| vat_rate                | NUMERIC(5,4)  | DEFAULT 0                |
-| requested_delivery_date | TIMESTAMPTZ   | -                        |
-| promised_delivery_date  | TIMESTAMPTZ   | -                        |
-| default_location_id     | INTEGER       | REFERENCES locations(id) |
-| note                    | TEXT          | -                        |
-| created_at              | TIMESTAMPTZ   | DEFAULT NOW()            |
-| updated_at              | TIMESTAMPTZ   | DEFAULT NOW()            |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| po_id | INTEGER | REFERENCES po_header(id) |
+| line_no | INTEGER | NOT NULL |
+| item_id | INTEGER | REFERENCES products(id) |
+| uom | VARCHAR(20) | NOT NULL |
+| qty_ordered | NUMERIC(12,4) | NOT NULL |
+| qty_received | NUMERIC(12,4) | DEFAULT 0 |
+| unit_price | NUMERIC(12,4) | NOT NULL |
+| vat_rate | NUMERIC(5,4) | DEFAULT 0 |
+| requested_delivery_date | TIMESTAMPTZ | - |
+| promised_delivery_date | TIMESTAMPTZ | - |
+| default_location_id | INTEGER | REFERENCES locations(id) |
+| note | TEXT | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1043,15 +1043,15 @@ CREATE TABLE po_line (
 
 **Columns**:
 
-| Column       | Type          | Constraints              |
-| ------------ | ------------- | ------------------------ |
-| id           | SERIAL        | PRIMARY KEY              |
-| po_id        | INTEGER       | REFERENCES po_header(id) |
-| po_line_id   | INTEGER       | REFERENCES po_line(id)   |
-| reason       | TEXT          | NOT NULL                 |
-| delta_amount | NUMERIC(12,2) | NOT NULL                 |
-| created_by   | UUID          | REFERENCES users(id)     |
-| created_at   | TIMESTAMPTZ   | DEFAULT NOW()            |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| po_id | INTEGER | REFERENCES po_header(id) |
+| po_line_id | INTEGER | REFERENCES po_line(id) |
+| reason | TEXT | NOT NULL |
+| delta_amount | NUMERIC(12,2) | NOT NULL |
+| created_by | UUID | REFERENCES users(id) |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1088,23 +1088,23 @@ CREATE TABLE po_correction (
 
 **Columns**:
 
-| Column               | Type        | Constraints               |
-| -------------------- | ----------- | ------------------------- |
-| id                   | SERIAL      | PRIMARY KEY               |
-| number               | VARCHAR(50) | NOT NULL, UNIQUE          |
-| status               | VARCHAR(20) | NOT NULL                  |
-| from_wh_id           | INTEGER     | REFERENCES warehouses(id) |
-| to_wh_id             | INTEGER     | REFERENCES warehouses(id) |
-| requested_date       | TIMESTAMPTZ | -                         |
-| planned_ship_date    | TIMESTAMPTZ | -                         |
-| actual_ship_date     | TIMESTAMPTZ | -                         |
-| planned_receive_date | TIMESTAMPTZ | -                         |
-| actual_receive_date  | TIMESTAMPTZ | -                         |
-| notes                | TEXT        | -                         |
-| created_by           | UUID        | REFERENCES users(id)      |
-| approved_by          | UUID        | REFERENCES users(id)      |
-| created_at           | TIMESTAMPTZ | DEFAULT NOW()             |
-| updated_at           | TIMESTAMPTZ | DEFAULT NOW()             |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| number | VARCHAR(50) | NOT NULL, UNIQUE |
+| status | VARCHAR(20) | NOT NULL |
+| from_wh_id | INTEGER | REFERENCES warehouses(id) |
+| to_wh_id | INTEGER | REFERENCES warehouses(id) |
+| requested_date | TIMESTAMPTZ | - |
+| planned_ship_date | TIMESTAMPTZ | - |
+| actual_ship_date | TIMESTAMPTZ | - |
+| planned_receive_date | TIMESTAMPTZ | - |
+| actual_receive_date | TIMESTAMPTZ | - |
+| notes | TEXT | - |
+| created_by | UUID | REFERENCES users(id) |
+| approved_by | UUID | REFERENCES users(id) |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1154,21 +1154,21 @@ CREATE TABLE to_header (
 
 **Columns**:
 
-| Column       | Type          | Constraints              |
-| ------------ | ------------- | ------------------------ |
-| id           | SERIAL        | PRIMARY KEY              |
-| to_id        | INTEGER       | REFERENCES to_header(id) |
-| line_no      | INTEGER       | NOT NULL                 |
-| item_id      | INTEGER       | REFERENCES products(id)  |
-| uom          | VARCHAR(20)   | NOT NULL                 |
-| qty_planned  | NUMERIC(12,4) | NOT NULL                 |
-| qty_shipped  | NUMERIC(12,4) | DEFAULT 0                |
-| qty_received | NUMERIC(12,4) | DEFAULT 0                |
-| lp_id        | INTEGER       | -                        |
-| batch        | VARCHAR(100)  | -                        |
-| notes        | TEXT          | -                        |
-| created_at   | TIMESTAMPTZ   | DEFAULT NOW()            |
-| updated_at   | TIMESTAMPTZ   | DEFAULT NOW()            |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| to_id | INTEGER | REFERENCES to_header(id) |
+| line_no | INTEGER | NOT NULL |
+| item_id | INTEGER | REFERENCES products(id) |
+| uom | VARCHAR(20) | NOT NULL |
+| qty_planned | NUMERIC(12,4) | NOT NULL |
+| qty_shipped | NUMERIC(12,4) | DEFAULT 0 |
+| qty_received | NUMERIC(12,4) | DEFAULT 0 |
+| lp_id | INTEGER | - |
+| batch | VARCHAR(100) | - |
+| notes | TEXT | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1210,28 +1210,28 @@ CREATE TABLE to_line (
 
 **Columns**:
 
-| Column             | Type          | Constraints                               |
-| ------------------ | ------------- | ----------------------------------------- |
-| id                 | SERIAL        | PRIMARY KEY                               |
-| wo_number          | VARCHAR(50)   | NOT NULL, UNIQUE                          |
-| product_id         | INTEGER       | REFERENCES products(id)                   |
-| bom_id             | INTEGER       | REFERENCES boms(id)                       |
-| quantity           | NUMERIC(12,4) | NOT NULL                                  |
-| uom                | VARCHAR(20)   | NOT NULL                                  |
-| priority           | INTEGER       | DEFAULT 3                                 |
-| status             | VARCHAR(20)   | NOT NULL                                  |
-| scheduled_start    | TIMESTAMPTZ   | -                                         |
-| scheduled_end      | TIMESTAMPTZ   | -                                         |
-| actual_start       | TIMESTAMPTZ   | -                                         |
-| actual_end         | TIMESTAMPTZ   | -                                         |
-| machine_id         | INTEGER       | REFERENCES machines(id)                   |
-| line_id            | INTEGER       | NOT NULL, REFERENCES production_lines(id) |
-| source_demand_type | VARCHAR(50)   | -                                         |
-| source_demand_id   | INTEGER       | -                                         |
-| created_by         | INTEGER       | -                                         |
-| approved_by        | INTEGER       | -                                         |
-| created_at         | TIMESTAMPTZ   | DEFAULT NOW()                             |
-| updated_at         | TIMESTAMPTZ   | DEFAULT NOW()                             |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| wo_number | VARCHAR(50) | NOT NULL, UNIQUE |
+| product_id | INTEGER | REFERENCES products(id) |
+| bom_id | INTEGER | REFERENCES boms(id) |
+| quantity | NUMERIC(12,4) | NOT NULL |
+| uom | VARCHAR(20) | NOT NULL |
+| priority | INTEGER | DEFAULT 3 |
+| status | VARCHAR(20) | NOT NULL |
+| scheduled_start | TIMESTAMPTZ | - |
+| scheduled_end | TIMESTAMPTZ | - |
+| actual_start | TIMESTAMPTZ | - |
+| actual_end | TIMESTAMPTZ | - |
+| machine_id | INTEGER | REFERENCES machines(id) |
+| line_id | INTEGER | NOT NULL, REFERENCES production_lines(id) |
+| source_demand_type | VARCHAR(50) | - |
+| source_demand_id | INTEGER | - |
+| created_by | INTEGER | - |
+| approved_by | INTEGER | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1289,17 +1289,17 @@ CREATE TABLE work_orders (
 
 **Columns**:
 
-| Column                       | Type          | Constraints                |
-| ---------------------------- | ------------- | -------------------------- |
-| id                           | SERIAL        | PRIMARY KEY                |
-| wo_id                        | INTEGER       | REFERENCES work_orders(id) |
-| material_id                  | INTEGER       | REFERENCES products(id)    |
-| qty_per_unit                 | NUMERIC(12,4) | NOT NULL                   |
-| total_qty_needed             | NUMERIC(12,4) | NOT NULL                   |
-| uom                          | VARCHAR(20)   | NOT NULL                   |
-| production_line_restrictions | TEXT          | DEFAULT '{}'               |
-| consume_whole_lp             | BOOLEAN       | DEFAULT false              |
-| created_at                   | TIMESTAMPTZ   | DEFAULT NOW()              |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| wo_id | INTEGER | REFERENCES work_orders(id) |
+| material_id | INTEGER | REFERENCES products(id) |
+| qty_per_unit | NUMERIC(12,4) | NOT NULL |
+| total_qty_needed | NUMERIC(12,4) | NOT NULL |
+| uom | VARCHAR(20) | NOT NULL |
+| production_line_restrictions | TEXT | DEFAULT '{}' |
+| consume_whole_lp | BOOLEAN | DEFAULT false |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1336,18 +1336,18 @@ CREATE TABLE wo_materials (
 
 **Columns**:
 
-| Column               | Type        | Constraints                                   |
-| -------------------- | ----------- | --------------------------------------------- |
-| id                   | SERIAL      | PRIMARY KEY                                   |
-| wo_id                | INTEGER     | NOT NULL, REFERENCES work_orders(id)          |
-| routing_operation_id | INTEGER     | REFERENCES routing_operations(id)             |
-| seq_no               | INTEGER     | NOT NULL                                      |
-| status               | VARCHAR(20) | DEFAULT 'PENDING' CHECK (status IN ('PENDING' |
-| operator_id          | UUID        | REFERENCES users(id)                          |
-| device_id            | INTEGER     | -                                             |
-| started_at           | TIMESTAMPTZ | -                                             |
-| finished_at          | TIMESTAMPTZ | -                                             |
-| created_at           | TIMESTAMPTZ | DEFAULT NOW()                                 |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| wo_id | INTEGER | NOT NULL, REFERENCES work_orders(id) |
+| routing_operation_id | INTEGER | REFERENCES routing_operations(id) |
+| seq_no | INTEGER | NOT NULL |
+| status | VARCHAR(20) | DEFAULT 'PENDING' CHECK (status IN ('PENDING' |
+| operator_id | UUID | REFERENCES users(id) |
+| device_id | INTEGER | - |
+| started_at | TIMESTAMPTZ | - |
+| finished_at | TIMESTAMPTZ | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1387,16 +1387,16 @@ CREATE TABLE wo_operations (
 
 **Columns**:
 
-| Column     | Type          | Constraints                          |
-| ---------- | ------------- | ------------------------------------ |
-| id         | SERIAL        | PRIMARY KEY                          |
-| wo_id      | INTEGER       | NOT NULL, REFERENCES work_orders(id) |
-| product_id | INTEGER       | NOT NULL, REFERENCES products(id)    |
-| quantity   | NUMERIC(12,4) | NOT NULL                             |
-| uom        | VARCHAR(20)   | NOT NULL                             |
-| lp_id      | INTEGER       | -                                    |
-| created_by | INTEGER       | -                                    |
-| created_at | TIMESTAMPTZ   | DEFAULT NOW()                        |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| wo_id | INTEGER | NOT NULL, REFERENCES work_orders(id) |
+| product_id | INTEGER | NOT NULL, REFERENCES products(id) |
+| quantity | NUMERIC(12,4) | NOT NULL |
+| uom | VARCHAR(20) | NOT NULL |
+| lp_id | INTEGER | - |
+| created_by | INTEGER | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1433,28 +1433,28 @@ CREATE TABLE production_outputs (
 
 **Columns**:
 
-| Column            | Type          | Constraints                                       |
-| ----------------- | ------------- | ------------------------------------------------- |
-| id                | SERIAL        | PRIMARY KEY                                       |
-| lp_number         | VARCHAR(50)   | NOT NULL, UNIQUE                                  |
-| product_id        | INTEGER       | REFERENCES products(id)                           |
-| quantity          | NUMERIC(12,4) | NOT NULL                                          |
-| uom               | VARCHAR(20)   | NOT NULL                                          |
-| location_id       | INTEGER       | REFERENCES locations(id)                          |
-| status            | VARCHAR(20)   | DEFAULT 'available' CHECK (status IN ('available' |
-| qa_status         | VARCHAR(20)   | DEFAULT 'pending' CHECK (qa_status IN ('pending'  |
-| stage_suffix      | VARCHAR(10)   | -                                                 |
-| batch_number      | VARCHAR(100)  | -                                                 |
-| lp_type           | VARCHAR(20)   | -                                                 |
-| consumed_by_wo_id | INTEGER       | REFERENCES work_orders(id)                        |
-| consumed_at       | TIMESTAMPTZ   | -                                                 |
-| parent_lp_id      | INTEGER       | REFERENCES license_plates(id)                     |
-| parent_lp_number  | VARCHAR(50)   | -                                                 |
-| origin_type       | VARCHAR(50)   | -                                                 |
-| origin_ref        | JSONB         | -                                                 |
-| created_by        | VARCHAR(50)   | -                                                 |
-| created_at        | TIMESTAMPTZ   | DEFAULT NOW()                                     |
-| updated_at        | TIMESTAMPTZ   | DEFAULT NOW()                                     |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| lp_number | VARCHAR(50) | NOT NULL, UNIQUE |
+| product_id | INTEGER | REFERENCES products(id) |
+| quantity | NUMERIC(12,4) | NOT NULL |
+| uom | VARCHAR(20) | NOT NULL |
+| location_id | INTEGER | REFERENCES locations(id) |
+| status | VARCHAR(20) | DEFAULT 'available' CHECK (status IN ('available' |
+| qa_status | VARCHAR(20) | DEFAULT 'pending' CHECK (qa_status IN ('pending' |
+| stage_suffix | VARCHAR(10) | - |
+| batch_number | VARCHAR(100) | - |
+| lp_type | VARCHAR(20) | - |
+| consumed_by_wo_id | INTEGER | REFERENCES work_orders(id) |
+| consumed_at | TIMESTAMPTZ | - |
+| parent_lp_id | INTEGER | REFERENCES license_plates(id) |
+| parent_lp_number | VARCHAR(50) | - |
+| origin_type | VARCHAR(50) | - |
+| origin_ref | JSONB | - |
+| created_by | VARCHAR(50) | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1501,7 +1501,7 @@ CREATE TABLE license_plates (
   stage_suffix VARCHAR(10) CHECK (stage_suffix IS NULL OR stage_suffix ~ '^[A-Z]{2}$'),
   batch_number VARCHAR(100),
   lp_type VARCHAR(20) CHECK (lp_type IN ('PR', 'FG', 'PALLET')),
-
+  
   -- Traceability
   consumed_by_wo_id INTEGER REFERENCES work_orders(id),
   consumed_at TIMESTAMPTZ,
@@ -1509,7 +1509,7 @@ CREATE TABLE license_plates (
   parent_lp_number VARCHAR(50),
   origin_type VARCHAR(50),
   origin_ref JSONB,
-
+  
   -- Metadata
   created_by VARCHAR(50),
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -1525,16 +1525,16 @@ CREATE TABLE license_plates (
 
 **Columns**:
 
-| Column     | Type          | Constraints                                 |
-| ---------- | ------------- | ------------------------------------------- |
-| id         | SERIAL        | PRIMARY KEY                                 |
-| lp_id      | INTEGER       | NOT NULL, REFERENCES license_plates(id)     |
-| wo_id      | INTEGER       | NOT NULL, REFERENCES work_orders(id)        |
-| qty        | NUMERIC(12,4) | NOT NULL                                    |
-| status     | VARCHAR(20)   | DEFAULT 'active' CHECK (status IN ('active' |
-| created_at | TIMESTAMPTZ   | DEFAULT NOW()                               |
-| expires_at | TIMESTAMPTZ   | -                                           |
-| created_by | VARCHAR(50)   | -                                           |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| lp_id | INTEGER | NOT NULL, REFERENCES license_plates(id) |
+| wo_id | INTEGER | NOT NULL, REFERENCES work_orders(id) |
+| qty | NUMERIC(12,4) | NOT NULL |
+| status | VARCHAR(20) | DEFAULT 'active' CHECK (status IN ('active' |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| expires_at | TIMESTAMPTZ | - |
+| created_by | VARCHAR(50) | - |
 
 **Foreign Keys**:
 
@@ -1571,15 +1571,15 @@ CREATE TABLE lp_reservations (
 
 **Columns**:
 
-| Column       | Type          | Constraints                             |
-| ------------ | ------------- | --------------------------------------- |
-| id           | SERIAL        | PRIMARY KEY                             |
-| output_lp_id | INTEGER       | NOT NULL, REFERENCES license_plates(id) |
-| input_lp_id  | INTEGER       | NOT NULL, REFERENCES license_plates(id) |
-| qty          | NUMERIC(12,4) | NOT NULL                                |
-| uom          | VARCHAR(50)   | NOT NULL                                |
-| op_seq       | INTEGER       | -                                       |
-| created_at   | TIMESTAMPTZ   | DEFAULT NOW()                           |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| output_lp_id | INTEGER | NOT NULL, REFERENCES license_plates(id) |
+| input_lp_id | INTEGER | NOT NULL, REFERENCES license_plates(id) |
+| qty | NUMERIC(12,4) | NOT NULL |
+| uom | VARCHAR(50) | NOT NULL |
+| op_seq | INTEGER | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1615,16 +1615,16 @@ CREATE TABLE lp_compositions (
 
 **Columns**:
 
-| Column             | Type          | Constraints                             |
-| ------------------ | ------------- | --------------------------------------- |
-| id                 | SERIAL        | PRIMARY KEY                             |
-| child_lp_id        | INTEGER       | NOT NULL, REFERENCES license_plates(id) |
-| parent_lp_id       | INTEGER       | REFERENCES license_plates(id)           |
-| quantity_consumed  | NUMERIC(12,4) | NOT NULL                                |
-| uom                | VARCHAR(20)   | NOT NULL                                |
-| wo_id              | INTEGER       | REFERENCES work_orders(id)              |
-| operation_sequence | INTEGER       | -                                       |
-| created_at         | TIMESTAMPTZ   | DEFAULT NOW()                           |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| child_lp_id | INTEGER | NOT NULL, REFERENCES license_plates(id) |
+| parent_lp_id | INTEGER | REFERENCES license_plates(id) |
+| quantity_consumed | NUMERIC(12,4) | NOT NULL |
+| uom | VARCHAR(20) | NOT NULL |
+| wo_id | INTEGER | REFERENCES work_orders(id) |
+| operation_sequence | INTEGER | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1663,21 +1663,21 @@ CREATE TABLE lp_genealogy (
 
 **Columns**:
 
-| Column       | Type        | Constraints                                  |
-| ------------ | ----------- | -------------------------------------------- |
-| id           | SERIAL      | PRIMARY KEY                                  |
-| wo_id        | INTEGER     | NOT NULL, REFERENCES work_orders(id)         |
-| line         | VARCHAR(50) | -                                            |
-| code         | VARCHAR(50) | NOT NULL, UNIQUE                             |
-| target_boxes | INTEGER     | -                                            |
-| actual_boxes | INTEGER     | -                                            |
-| created_at   | TIMESTAMPTZ | DEFAULT NOW()                                |
-| created_by   | VARCHAR(50) | -                                            |
-| pallet_type  | VARCHAR(20) | DEFAULT 'EURO' CHECK (pallet_type IN ('EURO' |
-| location_id  | INTEGER     | REFERENCES locations(id)                     |
-| status       | VARCHAR(20) | DEFAULT 'open' CHECK (status IN ('open'      |
-| closed_at    | TIMESTAMPTZ | -                                            |
-| closed_by    | UUID        | -                                            |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| wo_id | INTEGER | NOT NULL, REFERENCES work_orders(id) |
+| line | VARCHAR(50) | - |
+| code | VARCHAR(50) | NOT NULL, UNIQUE |
+| target_boxes | INTEGER | - |
+| actual_boxes | INTEGER | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| created_by | VARCHAR(50) | - |
+| pallet_type | VARCHAR(20) | DEFAULT 'EURO' CHECK (pallet_type IN ('EURO' |
+| location_id | INTEGER | REFERENCES locations(id) |
+| status | VARCHAR(20) | DEFAULT 'open' CHECK (status IN ('open' |
+| closed_at | TIMESTAMPTZ | - |
+| closed_by | UUID | - |
 
 **Foreign Keys**:
 
@@ -1716,18 +1716,18 @@ CREATE TABLE pallets (
 
 **Columns**:
 
-| Column            | Type          | Constraints                      |
-| ----------------- | ------------- | -------------------------------- |
-| id                | SERIAL        | PRIMARY KEY                      |
-| pallet_id         | INTEGER       | NOT NULL, REFERENCES pallets(id) |
-| box_count         | NUMERIC(12,4) | NOT NULL                         |
-| material_snapshot | JSONB         | -                                |
-| sequence          | INTEGER       | -                                |
-| created_at        | TIMESTAMPTZ   | DEFAULT NOW()                    |
-| quantity          | NUMERIC(12,4) | -                                |
-| uom               | VARCHAR(20)   | -                                |
-| added_at          | TIMESTAMPTZ   | DEFAULT NOW()                    |
-| added_by          | UUID          | -                                |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| pallet_id | INTEGER | NOT NULL, REFERENCES pallets(id) |
+| box_count | NUMERIC(12,4) | NOT NULL |
+| material_snapshot | JSONB | - |
+| sequence | INTEGER | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| quantity | NUMERIC(12,4) | - |
+| uom | VARCHAR(20) | - |
+| added_at | TIMESTAMPTZ | DEFAULT NOW() |
+| added_by | UUID | - |
 
 **Foreign Keys**:
 
@@ -1761,18 +1761,18 @@ CREATE TABLE pallet_items (
 
 **Columns**:
 
-| Column        | Type        | Constraints              |
-| ------------- | ----------- | ------------------------ |
-| id            | SERIAL      | PRIMARY KEY              |
-| grn_number    | VARCHAR(50) | NOT NULL, UNIQUE         |
-| po_id         | INTEGER     | REFERENCES po_header(id) |
-| status        | VARCHAR(20) | NOT NULL                 |
-| received_date | TIMESTAMPTZ | NOT NULL                 |
-| received_by   | INTEGER     | -                        |
-| supplier_id   | INTEGER     | REFERENCES suppliers(id) |
-| notes         | TEXT        | -                        |
-| created_at    | TIMESTAMPTZ | DEFAULT NOW()            |
-| updated_at    | TIMESTAMPTZ | DEFAULT NOW()            |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| grn_number | VARCHAR(50) | NOT NULL, UNIQUE |
+| po_id | INTEGER | REFERENCES po_header(id) |
+| status | VARCHAR(20) | NOT NULL |
+| received_date | TIMESTAMPTZ | NOT NULL |
+| received_by | INTEGER | - |
+| supplier_id | INTEGER | REFERENCES suppliers(id) |
+| notes | TEXT | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -1814,23 +1814,23 @@ CREATE TABLE grns (
 
 **Columns**:
 
-| Column            | Type          | Constraints              |
-| ----------------- | ------------- | ------------------------ |
-| id                | SERIAL        | PRIMARY KEY              |
-| grn_id            | INTEGER       | REFERENCES grns(id)      |
-| product_id        | INTEGER       | REFERENCES products(id)  |
-| quantity_ordered  | NUMERIC(12,4) | NOT NULL                 |
-| quantity_received | NUMERIC(12,4) | NOT NULL                 |
-| quantity_accepted | NUMERIC(12,4) | -                        |
-| location_id       | INTEGER       | REFERENCES locations(id) |
-| unit_price        | NUMERIC(12,4) | -                        |
-| batch             | VARCHAR(100)  | -                        |
-| batch_number      | VARCHAR(100)  | -                        |
-| mfg_date          | TIMESTAMPTZ   | -                        |
-| expiry_date       | TIMESTAMPTZ   | -                        |
-| created_at        | TIMESTAMPTZ   | DEFAULT NOW()            |
-| updated_at        | TIMESTAMPTZ   | DEFAULT NOW()            |
-| notes             | TEXT          | -                        |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| grn_id | INTEGER | REFERENCES grns(id) |
+| product_id | INTEGER | REFERENCES products(id) |
+| quantity_ordered | NUMERIC(12,4) | NOT NULL |
+| quantity_received | NUMERIC(12,4) | NOT NULL |
+| quantity_accepted | NUMERIC(12,4) | - |
+| location_id | INTEGER | REFERENCES locations(id) |
+| unit_price | NUMERIC(12,4) | - |
+| batch | VARCHAR(100) | - |
+| batch_number | VARCHAR(100) | - |
+| mfg_date | TIMESTAMPTZ | - |
+| expiry_date | TIMESTAMPTZ | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| notes | TEXT | - |
 
 **Foreign Keys**:
 
@@ -1874,21 +1874,21 @@ CREATE TABLE grn_items (
 
 **Columns**:
 
-| Column           | Type        | Constraints              |
-| ---------------- | ----------- | ------------------------ |
-| id               | SERIAL      | PRIMARY KEY              |
-| asn_number       | VARCHAR(50) | NOT NULL, UNIQUE         |
-| supplier_id      | INTEGER     | REFERENCES suppliers(id) |
-| po_id            | INTEGER     | REFERENCES po_header(id) |
-| status           | VARCHAR(20) | NOT NULL                 |
-| expected_arrival | TIMESTAMPTZ | NOT NULL                 |
-| attachments      | JSONB       | -                        |
-| created_at       | TIMESTAMPTZ | DEFAULT NOW()            |
-| updated_at       | TIMESTAMPTZ | DEFAULT NOW()            |
-| actual_arrival   | TIMESTAMPTZ | -                        |
-| notes            | TEXT        | -                        |
-| created_by       | UUID        | REFERENCES users(id)     |
-| updated_by       | UUID        | REFERENCES users(id)     |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| asn_number | VARCHAR(50) | NOT NULL, UNIQUE |
+| supplier_id | INTEGER | REFERENCES suppliers(id) |
+| po_id | INTEGER | REFERENCES po_header(id) |
+| status | VARCHAR(20) | NOT NULL |
+| expected_arrival | TIMESTAMPTZ | NOT NULL |
+| attachments | JSONB | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| actual_arrival | TIMESTAMPTZ | - |
+| notes | TEXT | - |
+| created_by | UUID | REFERENCES users(id) |
+| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
@@ -1905,7 +1905,7 @@ CREATE TABLE grn_items (
 - idx_asns_expected_arrival ON (expected_arrival)
 - idx_asns_asn_number ON (asn_number)
 - idx_asns_po_id ON (po_id) WHERE po_id IS NOT NULL;
-  CREATE INDEX IF NOT EXISTS idx_asns_supplier_id ON asns(supplier_id)
+CREATE INDEX IF NOT EXISTS idx_asns_supplier_id ON asns(supplier_id)
 - idx_asns_status ON (status)
 - idx_asns_status_expected ON (status, expected_arrival)
 - idx_asns_po_id ON (po_id)
@@ -1937,20 +1937,20 @@ CREATE TABLE asns (
 
 **Columns**:
 
-| Column      | Type          | Constraints             |
-| ----------- | ------------- | ----------------------- |
-| id          | SERIAL        | PRIMARY KEY             |
-| asn_id      | INTEGER       | REFERENCES asns(id)     |
-| product_id  | INTEGER       | REFERENCES products(id) |
-| uom         | VARCHAR(20)   | NOT NULL                |
-| quantity    | NUMERIC(12,4) | NOT NULL                |
-| batch       | VARCHAR(100)  | -                       |
-| pack        | JSONB         | -                       |
-| pallet      | JSONB         | -                       |
-| notes       | TEXT          | -                       |
-| created_at  | TIMESTAMPTZ   | DEFAULT NOW()           |
-| expiry_date | DATE          | -                       |
-| lp_number   | VARCHAR(50)   | -                       |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| asn_id | INTEGER | REFERENCES asns(id) |
+| product_id | INTEGER | REFERENCES products(id) |
+| uom | VARCHAR(20) | NOT NULL |
+| quantity | NUMERIC(12,4) | NOT NULL |
+| batch | VARCHAR(100) | - |
+| pack | JSONB | - |
+| pallet | JSONB | - |
+| notes | TEXT | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| expiry_date | DATE | - |
+| lp_number | VARCHAR(50) | - |
 
 **Foreign Keys**:
 
@@ -1977,7 +1977,6 @@ CREATE POLICY "Allow full access to asns for authenticated users"
 ON asns TO authenticated
 USING (TRUE)
 WITH CHECK (TRUE)
-
 - idx_asn_items_batch ON (batch)
 - idx_asn_items_po_line ON (po_line_id)
 
@@ -2007,22 +2006,22 @@ CREATE TABLE asn_items (
 
 **Columns**:
 
-| Column           | Type          | Constraints              |
-| ---------------- | ------------- | ------------------------ |
-| id               | SERIAL        | PRIMARY KEY              |
-| move_number      | VARCHAR(50)   | NOT NULL, UNIQUE         |
-| product_id       | INTEGER       | REFERENCES products(id)  |
-| from_location_id | INTEGER       | REFERENCES locations(id) |
-| to_location_id   | INTEGER       | REFERENCES locations(id) |
-| quantity         | NUMERIC(12,4) | NOT NULL                 |
-| uom              | VARCHAR(20)   | NOT NULL                 |
-| move_type        | VARCHAR(50)   | NOT NULL                 |
-| move_source      | VARCHAR(50)   | DEFAULT 'portal'         |
-| move_status      | VARCHAR(20)   | DEFAULT 'completed'      |
-| reference_type   | VARCHAR(50)   | -                        |
-| reference_id     | INTEGER       | -                        |
-| created_by       | VARCHAR(50)   | -                        |
-| created_at       | TIMESTAMPTZ   | DEFAULT NOW()            |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| move_number | VARCHAR(50) | NOT NULL, UNIQUE |
+| product_id | INTEGER | REFERENCES products(id) |
+| from_location_id | INTEGER | REFERENCES locations(id) |
+| to_location_id | INTEGER | REFERENCES locations(id) |
+| quantity | NUMERIC(12,4) | NOT NULL |
+| uom | VARCHAR(20) | NOT NULL |
+| move_type | VARCHAR(50) | NOT NULL |
+| move_source | VARCHAR(50) | DEFAULT 'portal' |
+| move_status | VARCHAR(20) | DEFAULT 'completed' |
+| reference_type | VARCHAR(50) | - |
+| reference_id | INTEGER | - |
+| created_by | VARCHAR(50) | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -2070,14 +2069,14 @@ CREATE TABLE stock_moves (
 
 **Columns**:
 
-| Column      | Type        | Constraints                        |
-| ----------- | ----------- | ---------------------------------- |
-| id          | SERIAL      | PRIMARY KEY                        |
-| product_id  | INTEGER     | NOT NULL, REFERENCES products(id)  |
-| allergen_id | INTEGER     | NOT NULL, REFERENCES allergens(id) |
-| contains    | BOOLEAN     | NOT NULL, DEFAULT true             |
-| created_at  | TIMESTAMPTZ | DEFAULT NOW()                      |
-| updated_at  | TIMESTAMPTZ | DEFAULT NOW()                      |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| product_id | INTEGER | NOT NULL, REFERENCES products(id) |
+| allergen_id | INTEGER | NOT NULL, REFERENCES allergens(id) |
+| contains | BOOLEAN | NOT NULL, DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -2112,16 +2111,16 @@ CREATE TABLE product_allergens (
 
 **Columns**:
 
-| Column     | Type         | Constraints          |
-| ---------- | ------------ | -------------------- |
-| id         | SERIAL       | PRIMARY KEY          |
-| entity     | VARCHAR(100) | NOT NULL             |
-| entity_id  | INTEGER      | NOT NULL             |
-| action     | VARCHAR(20)  | NOT NULL             |
-| before     | JSONB        | -                    |
-| after      | JSONB        | -                    |
-| actor_id   | UUID         | REFERENCES users(id) |
-| created_at | TIMESTAMPTZ  | DEFAULT NOW()        |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| entity | VARCHAR(100) | NOT NULL |
+| entity_id | INTEGER | NOT NULL |
+| action | VARCHAR(20) | NOT NULL |
+| before | JSONB | - |
+| after | JSONB | - |
+| actor_id | UUID | REFERENCES users(id) |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -2160,16 +2159,16 @@ CREATE TABLE audit_log (
 
 **Columns**:
 
-| Column                         | Type        | Constraints                                 |
-| ------------------------------ | ----------- | ------------------------------------------- |
-| id                             | SERIAL      | PRIMARY KEY                                 |
-| warehouse_id                   | INTEGER     | NOT NULL, UNIQUE, REFERENCES warehouses(id) |
-| default_to_receive_location_id | INTEGER     | REFERENCES locations(id)                    |
-| default_po_receive_location_id | INTEGER     | REFERENCES locations(id)                    |
-| default_transit_location_id    | INTEGER     | REFERENCES locations(id)                    |
-| notes                          | TEXT        | -                                           |
-| created_at                     | TIMESTAMPTZ | DEFAULT NOW()                               |
-| updated_at                     | TIMESTAMPTZ | DEFAULT NOW()                               |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| warehouse_id | INTEGER | NOT NULL, UNIQUE, REFERENCES warehouses(id) |
+| default_to_receive_location_id | INTEGER | REFERENCES locations(id) |
+| default_po_receive_location_id | INTEGER | REFERENCES locations(id) |
+| default_transit_location_id | INTEGER | REFERENCES locations(id) |
+| notes | TEXT | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -2206,18 +2205,18 @@ CREATE TABLE warehouse_settings (
 
 **Columns**:
 
-| Column            | Type          | Constraints                          |
-| ----------------- | ------------- | ------------------------------------ |
-| id                | SERIAL        | PRIMARY KEY                          |
-| wo_id             | INTEGER       | NOT NULL, REFERENCES work_orders(id) |
-| product_id        | INTEGER       | NOT NULL, REFERENCES products(id)    |
-| expected_quantity | NUMERIC(12,4) | NOT NULL                             |
-| actual_quantity   | NUMERIC(12,4) | DEFAULT 0                            |
-| uom               | VARCHAR(20)   | NOT NULL                             |
-| lp_id             | INTEGER       | REFERENCES license_plates(id)        |
-| notes             | TEXT          | -                                    |
-| created_at        | TIMESTAMPTZ   | DEFAULT NOW()                        |
-| updated_at        | TIMESTAMPTZ   | DEFAULT NOW()                        |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| wo_id | INTEGER | NOT NULL, REFERENCES work_orders(id) |
+| product_id | INTEGER | NOT NULL, REFERENCES products(id) |
+| expected_quantity | NUMERIC(12,4) | NOT NULL |
+| actual_quantity | NUMERIC(12,4) | DEFAULT 0 |
+| uom | VARCHAR(20) | NOT NULL |
+| lp_id | INTEGER | REFERENCES license_plates(id) |
+| notes | TEXT | - |
+| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -2246,7 +2245,7 @@ CREATE TABLE IF NOT EXISTS wo_by_products (
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-
+  
   -- Constraints
   CONSTRAINT wo_by_products_expected_qty_positive CHECK (expected_quantity > 0),
   CONSTRAINT wo_by_products_actual_qty_non_negative CHECK (actual_quantity >= 0)
@@ -2261,22 +2260,22 @@ CREATE TABLE IF NOT EXISTS wo_by_products (
 
 **Columns**:
 
-| Column             | Type          | Constraints                                                                         |
-| ------------------ | ------------- | ----------------------------------------------------------------------------------- |
-| id                 | SERIAL        | PRIMARY KEY                                                                         |
-| wo_id              | INTEGER       | NOT NULL, REFERENCES work_orders(id)                                                |
-| material_id        | INTEGER       | NOT NULL, REFERENCES products(id)                                                   |
-| lp_id              | INTEGER       | NOT NULL, REFERENCES license_plates(id)                                             |
-| quantity_reserved  | NUMERIC(12,4) | NOT NULL                                                                            |
-| quantity_consumed  | NUMERIC(12,4) | DEFAULT 0 CHECK (quantity_consumed >= 0 AND quantity_consumed <= quantity_reserved) |
-| uom                | VARCHAR(20)   | NOT NULL                                                                            |
-| operation_sequence | INTEGER       | -                                                                                   |
-| reserved_at        | TIMESTAMPTZ   | DEFAULT NOW()                                                                       |
-| reserved_by        | UUID          | -                                                                                   |
-| consumed_at        | TIMESTAMPTZ   | -                                                                                   |
-| consumed_by        | UUID          | -                                                                                   |
-| status             | VARCHAR(20)   | DEFAULT 'active' CHECK (status IN ('active'                                         |
-| notes              | TEXT          | -                                                                                   |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| wo_id | INTEGER | NOT NULL, REFERENCES work_orders(id) |
+| material_id | INTEGER | NOT NULL, REFERENCES products(id) |
+| lp_id | INTEGER | NOT NULL, REFERENCES license_plates(id) |
+| quantity_reserved | NUMERIC(12,4) | NOT NULL |
+| quantity_consumed | NUMERIC(12,4) | DEFAULT 0 CHECK (quantity_consumed >= 0 AND quantity_consumed <= quantity_reserved) |
+| uom | VARCHAR(20) | NOT NULL |
+| operation_sequence | INTEGER | - |
+| reserved_at | TIMESTAMPTZ | DEFAULT NOW() |
+| reserved_by | UUID | - |
+| consumed_at | TIMESTAMPTZ | - |
+| consumed_by | UUID | - |
+| status | VARCHAR(20) | DEFAULT 'active' CHECK (status IN ('active' |
+| notes | TEXT | - |
 
 **Foreign Keys**:
 
@@ -2324,23 +2323,23 @@ CREATE TABLE IF NOT EXISTS wo_reservations (
 
 **Columns**:
 
-| Column         | Type           | Constraints                                           |
-| -------------- | -------------- | ----------------------------------------------------- |
-| id             | BIGSERIAL      | PRIMARY KEY                                           |
-| product_id     | BIGINT         | NOT NULL, REFERENCES products(id)                     |
-| org_id         | BIGINT         | NOT NULL, REFERENCES organizations(id)                |
-| cost           | DECIMAL(15, 4) | NOT NULL                                              |
-| currency       | VARCHAR(3)     | NOT NULL, DEFAULT 'USD'                               |
-| uom            | VARCHAR(10)    | NOT NULL                                              |
-| effective_from | TIMESTAMP      | NOT NULL, DEFAULT NOW()                               |
-| effective_to   | TIMESTAMP      | -                                                     |
-| source         | VARCHAR(20)    | NOT NULL, DEFAULT 'manual' CHECK (source IN ('manual' |
-| notes          | TEXT           | -                                                     |
-| created_by     | BIGINT         | REFERENCES users(id)                                  |
-| created_at     | TIMESTAMP      | DEFAULT NOW()                                         |
-| updated_by     | BIGINT         | -                                                     |
-| updated_at     | TIMESTAMP      | DEFAULT NOW()                                         |
-| effective_to   | IS             | -                                                     |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | BIGSERIAL | PRIMARY KEY |
+| product_id | BIGINT | NOT NULL, REFERENCES products(id) |
+| org_id | BIGINT | NOT NULL, REFERENCES organizations(id) |
+| cost | DECIMAL(15, 4) | NOT NULL |
+| currency | VARCHAR(3) | NOT NULL, DEFAULT 'USD' |
+| uom | VARCHAR(10) | NOT NULL |
+| effective_from | TIMESTAMP | NOT NULL, DEFAULT NOW() |
+| effective_to | TIMESTAMP | - |
+| source | VARCHAR(20) | NOT NULL, DEFAULT 'manual' CHECK (source IN ('manual' |
+| notes | TEXT | - |
+| created_by | BIGINT | REFERENCES users(id) |
+| created_at | TIMESTAMP | DEFAULT NOW() |
+| updated_by | BIGINT | - |
+| updated_at | TIMESTAMP | DEFAULT NOW() |
+| effective_to | IS | - |
 
 **Foreign Keys**:
 
@@ -2400,22 +2399,22 @@ CREATE TABLE IF NOT EXISTS material_costs (
 
 **Columns**:
 
-| Column              | Type           | Constraints                                     |
-| ------------------- | -------------- | ----------------------------------------------- |
-| id                  | BIGSERIAL      | PRIMARY KEY                                     |
-| bom_id              | BIGINT         | NOT NULL, REFERENCES boms(id)                   |
-| org_id              | BIGINT         | NOT NULL, REFERENCES organizations(id)          |
-| total_cost          | DECIMAL(15, 4) | NOT NULL                                        |
-| material_costs      | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 CHECK (material_costs >= 0) |
-| labor_cost          | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 CHECK (labor_cost >= 0)     |
-| overhead_cost       | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 CHECK (overhead_cost >= 0)  |
-| currency            | VARCHAR(3)     | NOT NULL, DEFAULT 'USD'                         |
-| material_costs_json | JSONB          | -                                               |
-| calculated_at       | TIMESTAMP      | NOT NULL, DEFAULT NOW()                         |
-| calculated_by       | BIGINT         | REFERENCES users(id)                            |
-| calculation_method  | VARCHAR(50)    | DEFAULT 'standard'                              |
-| notes               | TEXT           | -                                               |
-| created_at          | TIMESTAMP      | DEFAULT NOW()                                   |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | BIGSERIAL | PRIMARY KEY |
+| bom_id | BIGINT | NOT NULL, REFERENCES boms(id) |
+| org_id | BIGINT | NOT NULL, REFERENCES organizations(id) |
+| total_cost | DECIMAL(15, 4) | NOT NULL |
+| material_costs | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 CHECK (material_costs >= 0) |
+| labor_cost | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 CHECK (labor_cost >= 0) |
+| overhead_cost | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 CHECK (overhead_cost >= 0) |
+| currency | VARCHAR(3) | NOT NULL, DEFAULT 'USD' |
+| material_costs_json | JSONB | - |
+| calculated_at | TIMESTAMP | NOT NULL, DEFAULT NOW() |
+| calculated_by | BIGINT | REFERENCES users(id) |
+| calculation_method | VARCHAR(50) | DEFAULT 'standard' |
+| notes | TEXT | - |
+| created_at | TIMESTAMP | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -2469,24 +2468,24 @@ CREATE TABLE IF NOT EXISTS bom_costs (
 
 **Columns**:
 
-| Column         | Type           | Constraints                            |
-| -------------- | -------------- | -------------------------------------- |
-| id             | BIGSERIAL      | PRIMARY KEY                            |
-| product_id     | BIGINT         | NOT NULL, REFERENCES products(id)      |
-| org_id         | BIGINT         | NOT NULL, REFERENCES organizations(id) |
-| price          | DECIMAL(15, 4) | NOT NULL                               |
-| currency       | VARCHAR(3)     | NOT NULL, DEFAULT 'USD'                |
-| effective_from | TIMESTAMP      | NOT NULL, DEFAULT NOW()                |
-| effective_to   | TIMESTAMP      | -                                      |
-| price_type     | VARCHAR(20)    | NOT NULL, DEFAULT 'wholesale' CHECK (  |
-| price_type     | IN             | -                                      |
-| customer_id    | BIGINT         | -                                      |
-| notes          | TEXT           | -                                      |
-| created_by     | BIGINT         | REFERENCES users(id)                   |
-| created_at     | TIMESTAMP      | DEFAULT NOW()                          |
-| updated_by     | BIGINT         | -                                      |
-| updated_at     | TIMESTAMP      | DEFAULT NOW()                          |
-| effective_to   | IS             | -                                      |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | BIGSERIAL | PRIMARY KEY |
+| product_id | BIGINT | NOT NULL, REFERENCES products(id) |
+| org_id | BIGINT | NOT NULL, REFERENCES organizations(id) |
+| price | DECIMAL(15, 4) | NOT NULL |
+| currency | VARCHAR(3) | NOT NULL, DEFAULT 'USD' |
+| effective_from | TIMESTAMP | NOT NULL, DEFAULT NOW() |
+| effective_to | TIMESTAMP | - |
+| price_type | VARCHAR(20) | NOT NULL, DEFAULT 'wholesale' CHECK ( |
+| price_type | IN | - |
+| customer_id | BIGINT | - |
+| notes | TEXT | - |
+| created_by | BIGINT | REFERENCES users(id) |
+| created_at | TIMESTAMP | DEFAULT NOW() |
+| updated_by | BIGINT | - |
+| updated_at | TIMESTAMP | DEFAULT NOW() |
+| effective_to | IS | - |
 
 **Foreign Keys**:
 
@@ -2550,26 +2549,26 @@ CREATE TABLE IF NOT EXISTS product_prices (
 
 **Columns**:
 
-| Column                | Type           | Constraints                                   |
-| --------------------- | -------------- | --------------------------------------------- |
-| id                    | BIGSERIAL      | PRIMARY KEY                                   |
-| wo_id                 | BIGINT         | NOT NULL, REFERENCES work_orders(id)          |
-| org_id                | BIGINT         | NOT NULL, REFERENCES organizations(id)        |
-| planned_cost          | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 CHECK (planned_cost >= 0) |
-| planned_material_cost | DECIMAL(15, 4) | NOT NULL, DEFAULT 0                           |
-| planned_labor_cost    | DECIMAL(15, 4) | NOT NULL, DEFAULT 0                           |
-| planned_overhead_cost | DECIMAL(15, 4) | NOT NULL, DEFAULT 0                           |
-| actual_cost           | DECIMAL(15, 4) | DEFAULT 0 CHECK (actual_cost >= 0)            |
-| actual_material_cost  | DECIMAL(15, 4) | DEFAULT 0                                     |
-| actual_labor_cost     | DECIMAL(15, 4) | DEFAULT 0                                     |
-| actual_overhead_cost  | DECIMAL(15, 4) | DEFAULT 0                                     |
-| cost_variance         | DECIMAL(15, 4) | -                                             |
-| variance_percent      | DECIMAL(8, 4)  | -                                             |
-| currency              | VARCHAR(3)     | NOT NULL, DEFAULT 'USD'                       |
-| planned_calculated_at | TIMESTAMP      | DEFAULT NOW()                                 |
-| actual_calculated_at  | TIMESTAMP      | -                                             |
-| created_at            | TIMESTAMP      | DEFAULT NOW()                                 |
-| updated_at            | TIMESTAMP      | DEFAULT NOW()                                 |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | BIGSERIAL | PRIMARY KEY |
+| wo_id | BIGINT | NOT NULL, REFERENCES work_orders(id) |
+| org_id | BIGINT | NOT NULL, REFERENCES organizations(id) |
+| planned_cost | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 CHECK (planned_cost >= 0) |
+| planned_material_cost | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 |
+| planned_labor_cost | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 |
+| planned_overhead_cost | DECIMAL(15, 4) | NOT NULL, DEFAULT 0 |
+| actual_cost | DECIMAL(15, 4) | DEFAULT 0 CHECK (actual_cost >= 0) |
+| actual_material_cost | DECIMAL(15, 4) | DEFAULT 0 |
+| actual_labor_cost | DECIMAL(15, 4) | DEFAULT 0 |
+| actual_overhead_cost | DECIMAL(15, 4) | DEFAULT 0 |
+| cost_variance | DECIMAL(15, 4) | - |
+| variance_percent | DECIMAL(8, 4) | - |
+| currency | VARCHAR(3) | NOT NULL, DEFAULT 'USD' |
+| planned_calculated_at | TIMESTAMP | DEFAULT NOW() |
+| actual_calculated_at | TIMESTAMP | - |
+| created_at | TIMESTAMP | DEFAULT NOW() |
+| updated_at | TIMESTAMP | DEFAULT NOW() |
 
 **Foreign Keys**:
 
@@ -2629,3 +2628,4 @@ CREATE TABLE IF NOT EXISTS wo_costs (
 </details>
 
 ---
+

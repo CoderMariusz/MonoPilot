@@ -415,6 +415,7 @@ export interface POHeader {
   id: number;
   number: string;
   supplier_id: number;
+  warehouse_id?: number;
   status: POStatus;
   currency: string;
   exchange_rate?: number;
@@ -435,6 +436,7 @@ export interface POHeader {
   updated_at: string;
   // Relationships
   supplier?: Supplier;
+  warehouse?: Warehouse;
   po_lines?: POLine[];
   po_corrections?: POCorrection[];
 }

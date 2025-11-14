@@ -36,6 +36,7 @@ describe('PurchaseOrdersAPI', () => {
 
     it('should call RPC with provided lines and return purchase orders', async () => {
       // Arrange
+      const warehouseId = 1;
       const lines: QuickPOEntryLine[] = [
         { product_code: 'prod-001', quantity: 15 },
         { product_code: 'prod-002', quantity: 20 }
@@ -54,6 +55,7 @@ describe('PurchaseOrdersAPI', () => {
               supplier_id: 1,
               supplier_name: 'Test Supplier',
               currency: 'USD',
+              warehouse_id: warehouseId,
               total_lines: 2,
               net_total: 150,
               vat_total: 30,
@@ -65,13 +67,16 @@ describe('PurchaseOrdersAPI', () => {
       });
 
       // Act
-      const result = await PurchaseOrdersAPI.quickCreate({ lines });
+      const result = await PurchaseOrdersAPI.quickCreate({
+        lines,
+        warehouse_id: warehouseId
+      });
 
       // Assert
       expect(mockRpc).toHaveBeenCalledWith('quick_create_pos', {
         p_product_entries: lines,
         p_user_id: 'test-user-id',
-        p_warehouse_id: null
+        p_warehouse_id: warehouseId
       });
       expect(result.purchase_orders).toHaveLength(1);
     });
@@ -86,8 +91,11 @@ describe('PurchaseOrdersAPI', () => {
         { product_code: 'PROD-001', quantity: 10 }
       ];
 
-      // Act & Assert
-      await expect(PurchaseOrdersAPI.quickCreate({ lines }))
+      // Act & Assert - auth check happens before warehouse_id validation
+      await expect(PurchaseOrdersAPI.quickCreate({
+        lines,
+        warehouse_id: 1
+      }))
         .rejects
         .toThrow('User not authenticated');
     });
@@ -108,7 +116,10 @@ describe('PurchaseOrdersAPI', () => {
       ];
 
       // Act & Assert
-      await expect(PurchaseOrdersAPI.quickCreate({ lines }))
+      await expect(PurchaseOrdersAPI.quickCreate({
+        lines,
+        warehouse_id: 1
+      }))
         .rejects
         .toThrow('Product PROD-001 does not have a supplier assigned');
     });
@@ -129,9 +140,100 @@ describe('PurchaseOrdersAPI', () => {
       ];
 
       // Act & Assert
-      await expect(PurchaseOrdersAPI.quickCreate({ lines }))
+      await expect(PurchaseOrdersAPI.quickCreate({
+        lines,
+        warehouse_id: 1
+      }))
         .rejects
         .toThrow('Supplier Test Supplier does not have currency defined');
+    });
+
+    // Story 0.1: warehouse_id validation tests
+    it('should reject when warehouse_id is missing', async () => {
+      // Arrange
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: 'test-user-id' } }
+      });
+
+      const lines: QuickPOEntryLine[] = [
+        { product_code: 'PROD-001', quantity: 10 }
+      ];
+
+      // Act & Assert
+      await expect(PurchaseOrdersAPI.quickCreate({ lines }))
+        .rejects
+        .toThrow('warehouse_id is required');
+
+      // Verify RPC was NOT called (validation happens before RPC)
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('should reject when warehouse_id is null', async () => {
+      // Arrange
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: 'test-user-id' } }
+      });
+
+      const lines: QuickPOEntryLine[] = [
+        { product_code: 'PROD-001', quantity: 10 }
+      ];
+
+      // Act & Assert - passing undefined triggers validation
+      await expect(PurchaseOrdersAPI.quickCreate({
+        lines,
+        warehouse_id: undefined
+      }))
+        .rejects
+        .toThrow('warehouse_id is required');
+
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('should create PO successfully with valid warehouse_id', async () => {
+      // Arrange
+      const warehouseId = 5;
+      const lines: QuickPOEntryLine[] = [
+        { product_code: 'PROD-001', quantity: 10 }
+      ];
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: 'test-user-id' } }
+      });
+
+      mockRpc.mockResolvedValue({
+        data: {
+          purchase_orders: [
+            {
+              id: 1,
+              number: 'PO-2025-001',
+              supplier_id: 1,
+              supplier_name: 'Test Supplier',
+              currency: 'USD',
+              warehouse_id: warehouseId,
+              total_lines: 1,
+              net_total: 100,
+              vat_total: 20,
+              gross_total: 120
+            }
+          ]
+        },
+        error: null
+      });
+
+      // Act
+      const result = await PurchaseOrdersAPI.quickCreate({
+        lines,
+        warehouse_id: warehouseId
+      });
+
+      // Assert
+      expect(mockRpc).toHaveBeenCalledWith('quick_create_pos', {
+        p_product_entries: lines,
+        p_user_id: 'test-user-id',
+        p_warehouse_id: warehouseId
+      });
+      expect(result.purchase_orders).toHaveLength(1);
+      expect(result.purchase_orders[0].warehouse_id).toBe(warehouseId);
     });
 
     it('should handle currency mismatch in supplier validation', async () => {
@@ -153,13 +255,17 @@ describe('PurchaseOrdersAPI', () => {
       ];
 
       // Act & Assert
-      await expect(PurchaseOrdersAPI.quickCreate({ lines }))
+      await expect(PurchaseOrdersAPI.quickCreate({
+        lines,
+        warehouse_id: 1
+      }))
         .rejects
         .toThrow('Currency mismatch for supplier: expected USD, got EUR');
     });
 
     it('should create multiple POs for different suppliers', async () => {
       // Arrange
+      const warehouseId = 1;
       mockGetUser.mockResolvedValue({
         data: { user: { id: 'test-user-id' } }
       });
@@ -173,6 +279,7 @@ describe('PurchaseOrdersAPI', () => {
               supplier_id: 1,
               supplier_name: 'Supplier A',
               currency: 'USD',
+              warehouse_id: warehouseId,
               total_lines: 1,
               net_total: 100,
               vat_total: 20,
@@ -184,6 +291,7 @@ describe('PurchaseOrdersAPI', () => {
               supplier_id: 2,
               supplier_name: 'Supplier B',
               currency: 'EUR',
+              warehouse_id: warehouseId,
               total_lines: 1,
               net_total: 200,
               vat_total: 40,
@@ -200,7 +308,10 @@ describe('PurchaseOrdersAPI', () => {
       ];
 
       // Act
-      const result = await PurchaseOrdersAPI.quickCreate({ lines });
+      const result = await PurchaseOrdersAPI.quickCreate({
+        lines,
+        warehouse_id: warehouseId
+      });
 
       // Assert
       expect(result.purchase_orders).toHaveLength(2);
@@ -225,7 +336,10 @@ describe('PurchaseOrdersAPI', () => {
       });
 
       // Act & Assert
-      await expect(PurchaseOrdersAPI.quickCreate({ lines }))
+      await expect(PurchaseOrdersAPI.quickCreate({
+        lines,
+        warehouse_id: 1
+      }))
         .rejects
         .toThrow('Quantity must be greater than 0');
     });
@@ -246,7 +360,10 @@ describe('PurchaseOrdersAPI', () => {
       ];
 
       // Act & Assert
-      await expect(PurchaseOrdersAPI.quickCreate({ lines }))
+      await expect(PurchaseOrdersAPI.quickCreate({
+        lines,
+        warehouse_id: 1
+      }))
         .rejects
         .toThrow('Product code INVALID not found or inactive');
     });

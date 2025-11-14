@@ -56,6 +56,64 @@ test.describe('Purchase Order Flow', () => {
     await waitForToast(page, 'Created');
   });
 
+  // Story 0.1: Warehouse validation tests
+  test('should require warehouse selection in Quick PO Entry', async ({ page }) => {
+    await clickButton(page, 'Quick Entry');
+    await waitForModal(page, 'Quick');
+
+    // Verify warehouse field has red asterisk (required indicator)
+    const warehouseLabel = page.locator('label:has-text("Destination Warehouse")');
+    await expect(warehouseLabel).toContainText('*');
+
+    // Verify warehouse dropdown is present
+    const warehouseSelect = page.locator('[data-testid="quick-po-warehouse-select"]');
+    await expect(warehouseSelect).toBeVisible();
+
+    // Verify help text is present
+    await expect(page.locator('text=Where should materials be received')).toBeVisible();
+  });
+
+  test('should show error when warehouse not selected', async ({ page }) => {
+    await clickButton(page, 'Quick Entry');
+    await waitForModal(page, 'Quick');
+
+    // Fill in product but NOT warehouse
+    const testCode = 'BXS-001';
+    await page.locator('[data-testid="quick-po-code-input"]').first().fill(testCode);
+    await page.locator('[data-testid="quick-po-qty-input"]').first().fill('5');
+
+    // Try to submit without selecting warehouse
+    await clickButton(page, 'Create');
+
+    // Should show toast error
+    await waitForToast(page, 'select a destination warehouse');
+
+    // Modal should still be open (submission blocked)
+    await expect(page.locator('text=Quick PO Entry')).toBeVisible();
+  });
+
+  test('should create PO successfully with warehouse selected', async ({ page }) => {
+    await clickButton(page, 'Quick Entry');
+    await waitForModal(page, 'Quick');
+
+    // Select warehouse first
+    await page.locator('[data-testid="quick-po-warehouse-select"]').selectOption({ index: 1 });
+
+    // Fill in product details
+    const testCode = 'BXS-001';
+    await page.locator('[data-testid="quick-po-code-input"]').first().fill(testCode);
+    await page.locator('[data-testid="quick-po-qty-input"]').first().fill('10');
+
+    // Submit
+    await clickButton(page, 'Create');
+
+    // Should succeed
+    await waitForToast(page, 'Created');
+
+    // Results screen should appear
+    await expect(page.locator('text=Purchase Orders Created')).toBeVisible();
+  });
+
   test('should edit a purchase order', async ({ page }) => {
     await createDraftPurchaseOrder(page);
 

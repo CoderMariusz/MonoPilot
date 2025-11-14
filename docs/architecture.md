@@ -2307,6 +2307,115 @@ Flour (500 kg required):
 
 ---
 
+### Pattern 15: Required Business Context (Explicit, No Defaults)
+
+**First Implementation:** Story 0.1 - Fix PO Header warehouse_id (Epic 0)
+
+**Problem:** API consumers (future mobile app, integrations, AI agents) might forget to provide critical business context (warehouse, currency, organization), leading to:
+- Silent failures (NULL values in database)
+- Wrong-warehouse deliveries
+- Broken audit trails
+- Integration bugs
+
+**MonoPilot Solution:** Explicit validation - no magic defaults
+
+**Example: Purchase Order Creation**
+
+**Traditional Approach (Implicit Defaults):**
+```typescript
+// ❌ BAD - Silent default to "main" warehouse
+async function createPO(data: POCreateRequest) {
+  const warehouse_id = data.warehouse_id || getMainWarehouse();  // Magic default
+  // ... creates PO with potentially wrong warehouse
+}
+```
+
+**MonoPilot Approach (Explicit Validation):**
+```typescript
+// ✅ GOOD - Forces API consumer to provide context
+async function createPO(data: POCreateRequest) {
+  if (!data.warehouse_id) {
+    throw new Error('warehouse_id is required');  // Fail fast, explicit
+  }
+  // ... creates PO with correct warehouse
+}
+```
+
+**Business Rules (Story 0.1):**
+
+1. **Quick PO Entry:** warehouse_id is REQUIRED
+2. **No fallbacks:** Don't auto-assign to main warehouse, supplier's preferred warehouse, or last-used warehouse
+3. **UI enforcement:** Red asterisk (*), client-side validation, inline help text
+4. **API enforcement:** Throw error "warehouse_id is required" before RPC call
+5. **Audit trail:** Explicit warehouse selection = clear responsibility
+
+**UI Implementation:**
+
+```tsx
+// QuickPOEntryModal.tsx
+<label>
+  Destination Warehouse <span className="text-red-500">*</span>
+</label>
+<select value={selectedWarehouse} required>
+  <option value="">Select warehouse...</option>
+  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+</select>
+<p className="help-text">
+  Where should materials be received? This determines GRN routing.
+</p>
+
+// Client-side validation
+if (!selectedWarehouse) {
+  toast.error('Please select a destination warehouse');
+  return;
+}
+```
+
+**API Implementation:**
+
+```typescript
+// PurchaseOrdersAPI.quickCreate()
+async quickCreate(request: QuickPOCreateRequest) {
+  const user = await getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  // Validate warehouse_id is provided (Required Business Context Pattern)
+  if (!request.warehouse_id) {
+    throw new Error('warehouse_id is required');
+  }
+
+  // ... proceed with PO creation
+}
+```
+
+**Pattern Benefits:**
+
+1. **API consumers forced to think** - explicit intent, no surprises
+2. **Clean audit trail** - "who selected which warehouse when"
+3. **Prevents wrong-warehouse errors** - materials received to correct location
+4. **Future-proof** - mobile app, integrations must provide context
+5. **Self-documenting code** - required fields are obvious
+
+**Applicable Business Context Fields:**
+
+| Field | Applies To | Why Required |
+|-------|-----------|--------------|
+| warehouse_id | PO, TO, WO | GRN routing, material flow |
+| currency | PO, Invoice | Financial accuracy, exchange rates |
+| org_id | All business tables | Multi-tenant isolation (RLS) |
+| uom | BOM items, PO lines | No automatic conversions |
+| tax_code_id | PO lines | VAT/sales tax calculation |
+
+**AI Agent Implementation Rules:**
+
+1. **NEVER use magic defaults** - throw error if required context missing
+2. **ALWAYS validate at API entry point** - before database operations
+3. **ALWAYS show red asterisk (*)** in UI for required context
+4. **ALWAYS provide inline help text** - explain why context is needed
+5. **ALWAYS document required fields** in API_REFERENCE.md with "REQUIRED" marker
+
+---
+
 ## Settings Module Patterns
 
 ### Pattern 15: Multi-Role Users
