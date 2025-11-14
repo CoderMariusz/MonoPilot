@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase/client-browser';
-import type { Location, CreateLocationData, UpdateLocationData } from '@/lib/types';
+import type {
+  Location,
+  CreateLocationData,
+  UpdateLocationData,
+} from '@/lib/types';
 
 export class LocationsAPI {
   static async getAll(): Promise<Location[]> {
@@ -48,9 +52,15 @@ export class LocationsAPI {
   }
 
   static async update(id: number, data: UpdateLocationData): Promise<Location> {
+    const timestamp = new Date().toISOString();
+    const payload = {
+      ...data,
+      updated_at: timestamp,
+    };
+
     const { data: result, error } = await supabase
       .from('locations')
-      .update(data)
+      .update(payload)
       .eq('id', id)
       .select()
       .single();
@@ -64,9 +74,11 @@ export class LocationsAPI {
   }
 
   static async delete(id: number): Promise<void> {
+    const timestamp = new Date().toISOString();
+
     const { error } = await supabase
       .from('locations')
-      .update({ is_active: false })
+      .update({ is_active: false, updated_at: timestamp })
       .eq('id', id);
 
     if (error) {
