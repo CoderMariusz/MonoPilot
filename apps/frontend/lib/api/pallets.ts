@@ -326,8 +326,8 @@ export class PalletsAPI {
       if (lp.is_consumed) {
         throw new Error('Cannot add consumed LP to pallet');
       }
-      if (lp.qa_status !== 'Passed') {
-        throw new Error(`Cannot add LP with QA status ${lp.qa_status}. Only 'Passed' LPs can be added to pallets.`);
+      if (lp.qa_status !== 'passed') {
+        throw new Error(`Cannot add LP with QA status ${lp.qa_status}. Only 'passed' LPs can be added to pallets.`);
       }
 
       // Check if LP is already on this pallet

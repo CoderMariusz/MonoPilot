@@ -287,10 +287,10 @@ export class CrossWOValidator {
       }
 
       // Validate QA status
-      if (inputLP.qa_status !== 'Passed') {
+      if (inputLP.qa_status !== 'passed') {
         return {
           isValid: false,
-          error: `QA gate blocked. LP ${inputLPNumber} has status ${inputLP.qa_status}, must be Passed`,
+          error: `QA gate blocked. LP ${inputLPNumber} has status ${inputLP.qa_status}, must be passed`,
           expectedProductId: expectedMaterial.material_id,
           expectedStageSuffix: '',
           actualProductId: inputLP.product_id,
@@ -406,10 +406,10 @@ export class QAGateValidator {
 
       if (error) throw error;
 
-      if (lp.qa_status !== 'Passed') {
+      if (lp.qa_status !== 'passed') {
         return {
           isValid: false,
-          error: `QA gate blocked for ${operation}. LP ${lp.lp_number} has status ${lp.qa_status}, must be Passed`
+          error: `QA gate blocked for ${operation}. LP ${lp.lp_number} has status ${lp.qa_status}, must be passed`
         };
       }
 
@@ -445,7 +445,7 @@ export class QAGateValidator {
     }
 
     // Validate status
-    const validStatuses = ['Passed', 'Failed', 'Quarantine', 'Pending'];
+    const validStatuses = ['passed', 'failed', 'on_hold', 'pending'];
     if (!validStatuses.includes(newStatus)) {
       return {
         isValid: false,

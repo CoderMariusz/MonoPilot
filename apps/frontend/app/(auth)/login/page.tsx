@@ -18,6 +18,13 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo');
 
+  // Show session expired message if redirected from middleware
+  useEffect(() => {
+    if (returnTo) {
+      toast.error('Your session has expired. Please sign in again to continue.');
+    }
+  }, [returnTo]);
+
   // LOG AUTH STATE CHANGES
   useEffect(() => {
     console.log('=== LOGIN PAGE - Auth State Changed ===');

@@ -1,3 +1,4 @@
+import type { QAStatus } from '../../../../lib/types';
 import { NextRequest, NextResponse } from 'next/server';
 import { LicensePlatesAPI } from '@/lib/api/licensePlates';
 import { exportLicensePlatesToExcel, generateExcelFile } from '@/lib/utils/exportHelpers';
@@ -5,7 +6,7 @@ import { exportLicensePlatesToExcel, generateExcelFile } from '@/lib/utils/expor
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const qa_status = searchParams.get('qa_status') as 'Pending' | 'Passed' | 'Failed' | 'Quarantine';
+    const qa_status = searchParams.get('qa_status') as QAStatus | null;
     const location = searchParams.get('location');
     const product_id = searchParams.get('product_id');
     const stage_suffix = searchParams.get('stage_suffix');

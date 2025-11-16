@@ -122,9 +122,19 @@ export interface LicensePlate {
   updated_at: string;
 }
 
-export type LicensePlateStatus = 'Available' | 'Reserved' | 'In Production' | 'QA Hold' | 'QA Released' | 'QA Rejected' | 'Shipped';
+export type LicensePlateStatus =
+  | 'available'
+  | 'reserved'
+  | 'in_production'
+  | 'consumed'
+  | 'in_transit'
+  | 'quarantine'
+  | 'qa_passed'
+  | 'qa_rejected'
+  | 'shipped'
+  | 'damaged';
 
-export type QAStatus = 'Passed' | 'Failed' | 'Pending' | 'Hold' | 'Quarantine';
+export type QAStatus = 'pending' | 'passed' | 'failed' | 'on_hold';
 
 export interface StockMove {
   id: string;

@@ -117,7 +117,10 @@ export async function gotoProductionTab(
       ? 'Operations'
       : 'Traceability';
 
-  await expect(page.locator('h2,h1')).toContainText(expectedHeading, {
+  // Use more specific selector to avoid matching multiple headings
+  await expect(
+    page.locator('h2.text-xl, h1.text-3xl').filter({ hasText: expectedHeading })
+  ).toBeVisible({
     timeout: 10000,
   });
 }
@@ -143,7 +146,10 @@ export async function gotoPlanningTab(
       ? 'Purchase Orders'
       : 'Transfer Orders';
 
-  await expect(page.locator('h2,h1')).toContainText(expectedHeading, {
+  // Use more specific selector to avoid matching multiple headings
+  await expect(
+    page.locator('h2.text-xl, h1.text-3xl').filter({ hasText: expectedHeading })
+  ).toBeVisible({
     timeout: 10000,
   });
 }

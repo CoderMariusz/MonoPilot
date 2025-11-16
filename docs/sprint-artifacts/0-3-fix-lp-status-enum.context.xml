@@ -1,0 +1,203 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>3</storyId>
+    <title>Fix License Plate Status enum (CRITICAL)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-14</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-3-fix-lp-status-enum.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Warehouse Manager / Production Operator / QA Inspector</asA>
+    <iWant>License Plate status values synchronized between database and TypeScript with a unified enum</iWant>
+    <soThat>the complete LP lifecycle (create → reserve → consume → ship) and QA workflows function correctly without status recognition errors</soThat>
+    <tasks>
+      - Database Migration (6h): DROP old CHECK, map data, ADD new CHECK with 10 unified statuses
+      - TypeScript Update (4h): Replace LicensePlateStatus with 10 lowercase snake_case values
+      - API Updates (4h): Update all LP methods to use new statuses (consume, ship, quarantine, qa workflow)
+      - UI Updates (8h): Update status badges, labels, all LP views
+      - Unit & E2E Tests (7h): LP lifecycle, QA workflow, status rendering
+      - Documentation (2h): Regenerate docs, add LP lifecycle diagrams
+      - Deployment (3h): Staging test, production deploy, monitoring
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">
+      <title>Database Migration</title>
+      <description>DROP old CHECK constraint, map existing LP data to new statuses, ADD new CHECK with 10 unified values (lowercase, snake_case)</description>
+      <verification>Migration tested on staging, data mapped without loss, rollback script ready</verification>
+    </criterion>
+    <criterion id="AC-2">
+      <title>Unified Enum Definition</title>
+      <description>DB and TS have exactly matching 10 statuses: available, reserved, in_production, consumed, in_transit, quarantine, qa_passed, qa_rejected, shipped, damaged</description>
+      <verification>Zero case mismatches, zero orphaned statuses</verification>
+    </criterion>
+    <criterion id="AC-3">
+      <title>API Updates</title>
+      <description>All LP API methods use new statuses (consume→'consumed', ship→'shipped', QA methods use qa_* statuses)</description>
+      <verification>API validation prevents invalid statuses</verification>
+    </criterion>
+    <criterion id="AC-4">
+      <title>UI Component Updates</title>
+      <description>Status badges render all 10 statuses correctly with appropriate colors, labels display-friendly</description>
+      <verification>All LP views updated, no hardcoded old values</verification>
+    </criterion>
+    <criterion id="AC-5">
+      <title>Unit Tests</title>
+      <description>Tests verify enum completeness, API status transitions</description>
+      <verification>All unit tests passing</verification>
+    </criterion>
+    <criterion id="AC-6">
+      <title>E2E Tests</title>
+      <description>Tests verify LP lifecycle, QA workflow, status rendering</description>
+      <verification>All E2E tests passing</verification>
+    </criterion>
+    <criterion id="AC-7">
+      <title>Data Migration Safety</title>
+      <description>Migration checks existing data, maps values without loss, rollback script ready</description>
+      <verification>Staging test successful, production plan documented</verification>
+    </criterion>
+    <criterion id="AC-8">
+      <title>Documentation</title>
+      <description>API docs regenerated, Warehouse docs updated with LP lifecycle</description>
+      <verification>Documentation reflects new enum</verification>
+    </criterion>
+    <criterion id="AC-9">
+      <title>Quality Gates</title>
+      <description>All tests passing, no TS errors, no regression</description>
+      <verification>300+ unit tests + E2E tests all pass</verification>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/bmm-roadmap-epic-0-p0-fixes.md</path>
+        <title>Epic 0 Roadmap</title>
+        <section>Story 0.3: Fix License Plate Status enum (CRITICAL)</section>
+        <snippet>DB and TS have SEVERE MISMATCH. Only 2 values match (case-insensitive). DB has: consumed, in_transit, quarantine, damaged. TS has: In Production, QA Hold, QA Released, QA Rejected, Shipped. Proposed: Unified enum with 10 statuses using lowercase snake_case.</snippet>
+      </doc>
+      <doc>
+        <path>docs/P0-MODULES-AUDIT-REPORT-2025-11-14.md</path>
+        <title>P0 Audit Report</title>
+        <section>Problem #3: LP Status enum severe mismatch</section>
+        <snippet>Warehouse workflow BROKEN - cannot consume LPs, shipping BROKEN - cannot ship LPs, QA workflow BROKEN. TypeScript and DB "speak different languages".</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>apps/frontend/lib/types.ts</path>
+        <kind>TypeScript Types</kind>
+        <symbol>LicensePlateStatus</symbol>
+        <lines>172-179</lines>
+        <reason>Current enum with PascalCase Title values - MUST BE REPLACED with 10 lowercase snake_case values</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/lib/supabase/migrations/025_license_plates.sql</path>
+        <kind>SQL Migration</kind>
+        <symbol>license_plates table</symbol>
+        <lines>12</lines>
+        <reason>Current CHECK constraint with 6 statuses - will be replaced with 10 statuses in new migration</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/lib/api/licensePlates.ts</path>
+        <kind>API Service</kind>
+        <symbol>LicensePlatesAPI</symbol>
+        <lines>all</lines>
+        <reason>All LP methods - UPDATE to use new lowercase statuses (consume, ship, quarantine, qa methods)</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/e2e/04-license-plates.spec.ts</path>
+        <kind>E2E Test</kind>
+        <symbol>License Plates E2E Tests</symbol>
+        <lines>all</lines>
+        <reason>Add tests for LP lifecycle and QA workflow with new statuses</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <ecosystem name="Node.js/pnpm">
+        <package name="next" version="^15.5.4" />
+        <package name="typescript" version="^5.7.2" />
+        <package name="@supabase/supabase-js" version="^2.75.0" />
+        <package name="vitest" version="^4.0.6" />
+        <package name="@playwright/test" version="^1.56.1" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="breaking-change">
+      This is a BREAKING CHANGE - old status values no longer valid. Requires careful migration with data mapping and rollback plan.
+    </constraint>
+    <constraint type="lowercase-convention">
+      All enum values MUST use lowercase snake_case (e.g., 'in_production', not 'In Production'). This is the new standard for Epic 0.
+    </constraint>
+    <constraint type="data-migration">
+      Existing LP data MUST be mapped: "In Production" → in_production, "QA Hold" → quarantine, "QA Released" → qa_passed, "QA Rejected" → qa_rejected, "Shipped" → shipped
+    </constraint>
+    <constraint type="migration-order">
+      Deploy migration FIRST, then code. Allows rollback if issues found. Test extensively on staging before production.
+    </constraint>
+    <constraint type="comprehensive-testing">
+      MUST test full LP lifecycle: available → reserved → in_production → consumed → (output LP) → shipped. Also test QA workflow: quarantine → qa_passed/qa_rejected.
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>LicensePlateStatus Type (NEW)</name>
+      <kind>TypeScript Type Alias</kind>
+      <signature>export type LicensePlateStatus = 'available' | 'reserved' | 'in_production' | 'consumed' | 'in_transit' | 'quarantine' | 'qa_passed' | 'qa_rejected' | 'shipped' | 'damaged';</signature>
+      <path>apps/frontend/lib/types.ts</path>
+      <usage>Replaces existing LicensePlateStatus, used by LicensePlate interface, API methods, UI components</usage>
+    </interface>
+    <interface>
+      <name>LicensePlatesAPI</name>
+      <kind>API Service Class</kind>
+      <signature>class LicensePlatesAPI { consume(), ship(), quarantine(), qaPass(), qaReject(), ... }</signature>
+      <path>apps/frontend/lib/api/licensePlates.ts</path>
+      <usage>ALL methods setting status must use new lowercase values</usage>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing follows MonoPilot standards. Unit tests (Vitest) for type validation and API logic. E2E tests (Playwright) for full LP lifecycle workflows. CRITICAL: Test data migration on staging before production. Test rollback procedure.
+    </standards>
+
+    <locations>
+      - Unit tests: apps/frontend/__tests__/ (create new file or add to existing)
+      - E2E tests: apps/frontend/e2e/04-license-plates.spec.ts
+      - Migration test: Create test LP data in staging DB
+    </locations>
+
+    <ideas>
+      <test ac="AC-2">
+        Unit test: Verify LicensePlateStatus enum has exactly 10 values in correct order
+      </test>
+      <test ac="AC-3">
+        Unit test: LP API consume() method sets status='consumed' (not old value)
+      </test>
+      <test ac="AC-3">
+        Unit test: LP API ship() method sets status='shipped'
+      </test>
+      <test ac="AC-6">
+        E2E test: LP lifecycle - Create LP (available) → Reserve (reserved) → Consume (consumed) → Ship output LP (shipped)
+      </test>
+      <test ac="AC-6">
+        E2E test: QA workflow - Create LP → Quarantine (quarantine) → QA Pass (qa_passed) OR QA Reject (qa_rejected)
+      </test>
+      <test ac="AC-4">
+        E2E test: Status badge displays correct color for all 10 statuses
+      </test>
+      <test ac="AC-7">
+        Migration test: Create LPs with old statuses on staging, run migration, verify data mapped correctly
+      </test>
+    </ideas>
+  </tests>
+</story-context>

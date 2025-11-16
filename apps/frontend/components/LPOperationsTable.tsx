@@ -117,9 +117,9 @@ export function LPOperationsTable() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lp.quantity} {lp.product?.uom}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      lp.qa_status === 'Passed' ? 'bg-green-100 text-green-800' :
-                      lp.qa_status === 'Failed' ? 'bg-red-100 text-red-800' :
-                      lp.qa_status === 'Quarantine' ? 'bg-orange-100 text-orange-800' :
+                      lp.qa_status === 'passed' ? 'bg-green-100 text-green-800' :
+                      lp.qa_status === 'failed' ? 'bg-red-100 text-red-800' :
+                      lp.qa_status === 'on_hold' ? 'bg-orange-100 text-orange-800' :
                       'bg-yellow-100 text-yellow-800'
                     }`}>
                       {lp.qa_status}

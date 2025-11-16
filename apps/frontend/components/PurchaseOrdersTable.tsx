@@ -322,7 +322,9 @@ export function PurchaseOrdersTable() {
                 <tr key={po.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 px-4 text-sm">{po.po_number}</td>
                   <td className="py-3 px-4 text-sm">{po.supplier?.name}</td>
-                  <td className="py-3 px-4 text-sm">{po.warehouse_id ? `Warehouse ID: ${po.warehouse_id}` : '-'}</td>
+                  <td className="py-3 px-4 text-sm">
+                    {po.warehouse ? `${po.warehouse.code} - ${po.warehouse.name}` : '-'}
+                  </td>
                   <td className="py-3 px-4 text-sm">
                     {po.request_delivery_date ? new Date(po.request_delivery_date).toLocaleDateString() : '-'}
                   </td>

@@ -369,7 +369,7 @@ export function TransferOrdersTable() {
                   </td>
                   <td className="py-3 px-4 text-sm">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      to.status === 'received' ? 'bg-green-100 text-green-800' :
+                      to.status === 'received' || to.status === 'closed' ? 'bg-green-100 text-green-800' :
                       to.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
                       to.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                       to.status === 'submitted' ? 'bg-yellow-100 text-yellow-800' :

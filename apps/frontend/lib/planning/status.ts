@@ -86,7 +86,7 @@ export const PO_STATUS_TRANSITIONS: POStatusTransition[] = [
 // TO STATUS MACHINE
 // =============================================
 
-export type TOAction = 'approve' | 'reopen';
+export type TOAction = 'approve' | 'close' | 'reopen';
 
 export interface TOStatusTransition {
   from: TOStatus;
@@ -96,7 +96,8 @@ export interface TOStatusTransition {
   validationRules: string[];
 }
 
-// TO workflow: draft -> submitted -> in_transit -> received (no 'closed' status in DB schema)
+// TO workflow: draft -> submitted -> in_transit -> received -> closed
+// Can be cancelled at any stage before closed
 export const TO_STATUS_TRANSITIONS: TOStatusTransition[] = [
   {
     from: 'draft',
@@ -107,6 +108,15 @@ export const TO_STATUS_TRANSITIONS: TOStatusTransition[] = [
       'to_has_lines',
       'all_lines_have_items',
       'all_lines_have_quantities'
+    ]
+  },
+  {
+    from: 'received',
+    to: 'closed',
+    action: 'close',
+    requiredFields: [],
+    validationRules: [
+      'to_has_lines'
     ]
   },
   {
@@ -121,6 +131,16 @@ export const TO_STATUS_TRANSITIONS: TOStatusTransition[] = [
   },
   {
     from: 'received',
+    to: 'draft',
+    action: 'reopen',
+    requiredFields: ['reopen_reason'],
+    validationRules: [
+      'reopen_reason_provided',
+      'user_has_approver_role'
+    ]
+  },
+  {
+    from: 'closed',
     to: 'draft',
     action: 'reopen',
     requiredFields: ['reopen_reason'],
@@ -406,7 +426,16 @@ export function canApproveTO(to: TOHeader, lines: TOLine[], userRole: string): b
   return result.isValid;
 }
 
-// canCloseTO removed - TO does not have 'close' action in database schema
+export function canCloseTO(to: TOHeader, lines: TOLine[], userRole: string): boolean {
+  const result = validateTOAction({
+    to,
+    lines,
+    userRole,
+    action: 'close',
+    formData: {}
+  });
+  return result.isValid;
+}
 
 export function canReopenTO(to: TOHeader, userRole: string): boolean {
   const result = validateTOAction({

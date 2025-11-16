@@ -1,0 +1,237 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>0.9</storyId>
+    <title>Database Reset Execution (CRITICAL)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-15</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-9-database-reset-execution.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Developer / Database Administrator</asA>
+    <iWant>to execute database reset with master migration on test DB first, then production</iWant>
+    <soThat>100% schema consistency is achieved with validation before production deployment</soThat>
+    <tasks>
+### Task 1: Test Database Setup (AC-1) - 1 hour
+- [ ] 1.1: Create fresh test database (Supabase or local PostgreSQL)
+- [ ] 1.2: Configure connection string for test DB
+- [ ] 1.3: Verify test DB is empty and accessible
+
+### Task 2: Test DB Migration Execution (AC-1) - 1 hour
+- [ ] 2.1: Execute `master_migration.sql` on test DB
+- [ ] 2.2: Monitor execution, capture any errors
+- [ ] 2.3: Verify all tables created (query `pg_tables`)
+- [ ] 2.4: Check logs for warnings or issues
+
+### Task 3: Schema Validation on Test DB (AC-2) - 2 hours
+- [ ] 3.1: Query all tables and columns
+- [ ] 3.2: Verify to_line.notes exists
+- [ ] 3.3: Verify locations.zone exists
+- [ ] 3.4: Verify po_header.warehouse_id exists
+- [ ] 3.5: Verify license_plates.status has 10 enum values
+- [ ] 3.6: Check all foreign keys and indexes
+- [ ] 3.7: Generate validation report
+
+### Task 4: TypeScript Regeneration (AC-3) - 1 hour
+- [ ] 4.1: Point `pnpm gen-types` to test DB
+- [ ] 4.2: Run `pnpm gen-types`
+- [ ] 4.3: Review generated types
+- [ ] 4.4: Run `pnpm type-check` - verify zero errors
+- [ ] 4.5: Commit regenerated types
+
+### Task 5: Production DB Reset (AC-4) - 2 hours
+- [ ] 5.1: Backup production DB
+- [ ] 5.2: Generate DROP ALL tables script
+- [ ] 5.3: Execute DROP ALL on production
+- [ ] 5.4: Execute `master_migration.sql` on production
+- [ ] 5.5: Verify zero errors
+- [ ] 5.6: Confirm schema matches test DB
+
+### Task 6: Manual UI/API Verification (AC-5) - 2 hours
+- [ ] 6.1: Start dev server
+- [ ] 6.2: Test authentication flow
+- [ ] 6.3: Test PO Create (Quick Entry)
+- [ ] 6.4: Test TO Create (verify notes field)
+- [ ] 6.5: Test Location create/edit (verify zone)
+- [ ] 6.6: Test LP Create (verify status options)
+- [ ] 6.7: Inspect browser console
+
+### Task 7: E2E Test Suite (AC-6) - 1 hour
+- [ ] 7.1-7.5: Run all critical E2E tests
+- [ ] 7.6: Document any new failures
+
+### Task 8: Documentation (AC-7) - 1 hour
+- [ ] 8.1: Run `pnpm docs:update`
+- [ ] 8.2: Verify DATABASE_SCHEMA.md reflects new schema
+- [ ] 8.3: Add reset notes to Epic 0 retrospective
+- [ ] 8.4: Record metrics
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+### AC-1: Test Database Dry Run
+- Fresh test database created (separate from production)
+- Master migration executed successfully on test DB
+- Zero errors, all tables/constraints/indexes created
+- Schema inspection confirms expectations
+
+### AC-2: Schema Validation
+- Verify all 40+ tables exist
+- Check all foreign keys, indexes, constraints
+- Validate Epic 0 audit fixes (to_line.notes, locations.zone, po_header.warehouse_id, license_plates.status)
+
+### AC-3: TypeScript Types Regeneration
+- Run `pnpm gen-types` successfully
+- No TypeScript compilation errors
+- Generated types match master migration schema
+
+### AC-4: Production Database Reset
+- Backup existing production DB
+- DROP ALL tables in correct order
+- Execute master migration on production DB
+- Confirm production schema matches test DB
+
+### AC-5: UI/API Verification
+- Test critical workflows manually (Login, PO, TO, Location, LP)
+- No console errors, no 400 Bad Request
+
+### AC-6: E2E Test Suite
+- Run `pnpm test:e2e:critical`
+- All auth, PO, TO tests pass
+
+### AC-7: Documentation
+- Update DATABASE_SCHEMA.md
+- Document reset process in Epic 0 retrospective
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/0-8-konsolidacja-migracji.md</path>
+        <title>Story 0.8 - Konsolidacja Migracji</title>
+        <section>Outputs</section>
+        <snippet>master_migration.sql - the consolidated migration file that Story 0.9 will execute on test and production databases.</snippet>
+      </doc>
+      <doc>
+        <path>docs/bmm-roadmap-epic-0-p0-fixes.md</path>
+        <title>Epic 0 - P0 Modules Data Integrity Fixes</title>
+        <section>Epic 0 audit issues to verify</section>
+        <snippet>Four critical fixes: to_line.notes (Pattern A), locations.zone (Pattern B), po_header.warehouse_id (Pattern C), license_plates.status enum (Pattern C).</snippet>
+      </doc>
+      <doc>
+        <path>docs/DATABASE_SCHEMA.md</path>
+        <title>Database Schema Documentation</title>
+        <section>Expected schema after reset</section>
+        <snippet>40+ tables reference for validation. Will be regenerated via pnpm docs:update after successful reset.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>master_migration.sql</path>
+        <kind>sql-migration</kind>
+        <symbol>Master migration from Story 0.8</symbol>
+        <lines>~2000-3000</lines>
+        <reason>Primary artifact to execute on test and production databases. Contains consolidated schema from 64 migrations.</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/lib/supabase/generated.types.ts</path>
+        <kind>generated-types</kind>
+        <symbol>Auto-generated Supabase types</symbol>
+        <lines>all</lines>
+        <reason>Will be regenerated via pnpm gen-types after migration execution. Must verify no TypeScript errors.</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/e2e/01-auth.spec.ts</path>
+        <kind>e2e-test</kind>
+        <symbol>Authentication E2E tests</symbol>
+        <lines>all</lines>
+        <reason>Critical validation test - must pass after reset to verify auth flow works.</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/e2e/02-purchase-orders.spec.ts</path>
+        <kind>e2e-test</kind>
+        <symbol>Purchase Order E2E tests</symbol>
+        <lines>all</lines>
+        <reason>Validates po_header.warehouse_id fix (Epic 0 Pattern C). Quick PO Entry workflow must work.</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/e2e/03-transfer-orders.spec.ts</path>
+        <kind>e2e-test</kind>
+        <symbol>Transfer Order E2E tests</symbol>
+        <lines>all</lines>
+        <reason>Validates to_line.notes fix (Epic 0 Pattern A). TO workflow must work end-to-end.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="database">
+        <package name="PostgreSQL" version="15" />
+        <package name="Supabase" version="cloud" />
+        <package name="psql" version="cli-tool" note="For executing SQL files" />
+      </ecosystem>
+      <ecosystem name="node">
+        <package name="@supabase/supabase-js" version="^2.x" />
+        <package name="typescript" version="5.7" />
+        <package name="playwright" version="latest" note="For E2E tests" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>CRITICAL: Test DB first - NEVER execute on production before successful test DB validation</constraint>
+    <constraint>Backup production DB before DROP - catastrophic failure rollback plan required</constraint>
+    <constraint>Sequential validation checkpoints - proceed to next only if previous passes</constraint>
+    <constraint>Epic 0 audit fixes MUST be verified: to_line.notes, locations.zone, po_header.warehouse_id, license_plates.status (10 values)</constraint>
+    <constraint>TypeScript types MUST regenerate without errors after migration</constraint>
+    <constraint>E2E critical tests MUST pass before story completion</constraint>
+    <constraint>Zero tolerance for schema cache errors or 400 Bad Request after reset</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Supabase Database Connection</name>
+      <kind>Database Connection</kind>
+      <signature>psql or Supabase CLI to execute master_migration.sql</signature>
+      <path>Connection string in .env or Supabase dashboard</path>
+    </interface>
+    <interface>
+      <name>pnpm gen-types</name>
+      <kind>Code Generation CLI</kind>
+      <signature>pnpm gen-types - Generates TypeScript types from Supabase schema</signature>
+      <path>package.json scripts</path>
+    </interface>
+    <interface>
+      <name>pnpm docs:update</name>
+      <kind>Documentation CLI</kind>
+      <signature>pnpm docs:update - Regenerates DATABASE_SCHEMA.md from migrations</signature>
+      <path>package.json scripts</path>
+    </interface>
+    <interface>
+      <name>Playwright E2E Tests</name>
+      <kind>Testing Framework</kind>
+      <signature>pnpm test:e2e:critical, pnpm test:e2e:auth, pnpm test:e2e:po, pnpm test:e2e:to</signature>
+      <path>apps/frontend/e2e/*.spec.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Database reset testing: (1) SQL execution validation on test DB, (2) Schema inspection queries (pg_tables, information_schema.columns), (3) Epic 0 audit verification queries, (4) TypeScript type regeneration (pnpm gen-types), (5) Manual UI smoke tests, (6) E2E critical test suite. Each checkpoint must pass before proceeding to next.</standards>
+    <locations>apps/frontend/e2e/ (Playwright E2E tests), apps/frontend/lib/supabase/migrations/ (master migration), docs/ (DATABASE_SCHEMA.md regeneration)</locations>
+    <ideas>
+      <idea ac="AC-1">Test: master_migration.sql executes on test DB without errors</idea>
+      <idea ac="AC-1">Test: Query pg_tables on test DB returns 40+ tables</idea>
+      <idea ac="AC-2">Test: Query to_line table has notes column</idea>
+      <idea ac="AC-2">Test: Query locations table has zone column</idea>
+      <idea ac="AC-2">Test: Query po_header table has warehouse_id column</idea>
+      <idea ac="AC-2">Test: Query license_plates status CHECK constraint has 10 values</idea>
+      <idea ac="AC-3">Test: pnpm gen-types runs without errors</idea>
+      <idea ac="AC-3">Test: pnpm type-check runs without TypeScript errors</idea>
+      <idea ac="AC-4">Test: Production DB schema matches test DB schema (diff pg_dump outputs)</idea>
+      <idea ac="AC-5">Test: Manual login works without errors</idea>
+      <idea ac="AC-5">Test: PO Quick Entry creates PO with warehouse_id</idea>
+      <idea ac="AC-6">Test: pnpm test:e2e:critical passes all tests</idea>
+      <idea ac="AC-7">Test: DATABASE_SCHEMA.md contains all 40+ tables after regeneration</idea>
+    </ideas>
+  </tests>
+</story-context>

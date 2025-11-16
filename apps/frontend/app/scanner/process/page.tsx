@@ -157,7 +157,7 @@ export default function ProcessTerminalPage() {
       return;
     }
 
-    if (lp.qa_status === 'Quarantine') {
+    if (lp.status === 'quarantine') {
       toast.error(`Cannot scan LP ${lp.lp_number} - Status: Quarantine. This item is quarantined and cannot be used.`);
       setLpNumber('');
       setTimeout(() => lpInputRef.current?.focus(), 100);
@@ -407,8 +407,8 @@ export default function ProcessTerminalPage() {
       product_id: selectedWO.product!.id,
       location_id: warehouseLocationId.toString(),
       quantity: qtyToCreate,
-      status: 'Available',
-      qa_status: 'Passed',
+      status: 'available',
+      qa_status: 'passed',
       grn_id: null,
     });
     
@@ -615,7 +615,7 @@ export default function ProcessTerminalPage() {
         item_name: material?.description || 'Unknown Material',
         standard_qty: standardQty,
         consumed_qty: consumedQty,
-        uom: bomItem?.uom || material?.uom || '',
+        uom: bomItem?.uom || material?.uom,
         yield_percentage: yieldPercentage
       };
     });

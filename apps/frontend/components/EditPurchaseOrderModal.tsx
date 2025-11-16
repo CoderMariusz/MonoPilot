@@ -182,7 +182,7 @@ export function EditPurchaseOrderModal({ isOpen, onClose, purchaseOrderId, onSuc
           po_id: purchaseOrderId,
           line_no: index + 1,
           item_id: itemId,
-          uom: product?.uom || 'EA',
+          uom: product?.uom || 'EACH',
           qty_ordered: quantity,
           qty_received: 0,
           unit_price: unitPrice,

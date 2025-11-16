@@ -134,7 +134,7 @@ export interface WOByProduct {
   product?: any; // Populated from products table
   expected_quantity: number;
   actual_quantity: number;
-  uom: string;
+  uom: UoM;
   lp_id?: number | null;
   lp?: any; // Populated from license_plates table
   notes?: string | null;
@@ -150,11 +150,11 @@ export interface LicensePlate {
   product_id?: string;
   product?: any;
   quantity: number;
-  uom?: string;
+  uom?: UoM;
   location_id?: string;
   location?: any;
   status: LicensePlateStatus;
-  qa_status?: string;
+  qa_status?: QAStatus;
   stage_suffix?: string;
   origin_type?: string;
   origin_ref?: any;
@@ -169,16 +169,79 @@ export interface LicensePlate {
   updated_at: string;
 }
 
+/**
+ * License Plate Status Lifecycle (Unified Enum - synchronized with database)
+ *
+ * Primary Lifecycle:
+ *   available → reserved → in_production → consumed → (genealogy tracked)
+ *
+ * Shipping Path:
+ *   consumed → (output LP created) → available → shipped
+ *
+ * QA Path (Optional):
+ *   available → quarantine → qa_passed OR qa_rejected
+ *   └─ (if qa_passed) → available
+ *   └─ (if qa_rejected) → damaged OR (rework)
+ *
+ * Transit Path:
+ *   available → in_transit → available (at destination warehouse)
+ *
+ * Status Definitions:
+ * - available: LP in warehouse, ready for use/shipping
+ * - reserved: LP reserved for specific Work Order (via lp_reservations)
+ * - in_production: LP actively being consumed/processed in WO
+ * - consumed: LP fully consumed, genealogy locked, traceability complete
+ * - in_transit: LP moving between warehouses (via Transfer Order)
+ * - quarantine: LP held for QA inspection
+ * - qa_passed: LP passed QA inspection, available for use
+ * - qa_rejected: LP failed QA inspection, may be damaged or require rework
+ * - shipped: LP shipped to customer (final state)
+ * - damaged: LP physically damaged, unusable
+ *
+ * IMPORTANT: Values must match database CHECK constraint exactly (lowercase snake_case)
+ * See: migrations/058_fix_lp_status_enum.sql
+ */
 export type LicensePlateStatus =
-  | 'Available'
-  | 'Reserved'
-  | 'In Production'
-  | 'QA Hold'
-  | 'QA Released'
-  | 'QA Rejected'
-  | 'Shipped';
+  | 'available'
+  | 'reserved'
+  | 'in_production'
+  | 'consumed'
+  | 'in_transit'
+  | 'quarantine'
+  | 'qa_passed'
+  | 'qa_rejected'
+  | 'shipped'
+  | 'damaged';
 
-export type QAStatus = 'Passed' | 'Failed' | 'Pending' | 'Hold' | 'Quarantine';
+/**
+ * QA Status Enum (synchronized with database)
+ *
+ * QA Inspection Workflow:
+ *   pending → on_hold (inspection needed)
+ *           → passed (approved for use)
+ *           → failed (rejected)
+ *
+ * IMPORTANT: This is SEPARATE from main License Plate status field
+ * - qa_status: Quality inspection result (THIS enum)
+ * - status: Main LP lifecycle state (includes 'quarantine')
+ *
+ * Values must match database CHECK constraint exactly (lowercase snake_case)
+ * See: migrations/025_license_plates.sql:14
+ */
+/**
+ * Units of Measure - matches uom_master table
+ * Extended from 4 units to 22 units for better coverage
+ * Categories: weight, volume, length, count, container
+ * See: migrations/059_uom_master_table.sql
+ */
+export type UoM =
+  | 'KG' | 'POUND' | 'GRAM' | 'TON' | 'OUNCE'  // weight
+  | 'LITER' | 'GALLON' | 'MILLILITER' | 'BARREL' | 'QUART'  // volume
+  | 'METER' | 'FOOT' | 'INCH' | 'CENTIMETER'  // length
+  | 'EACH' | 'DOZEN'  // count
+  | 'BOX' | 'CASE' | 'PALLET' | 'DRUM' | 'BAG' | 'CARTON';  // container
+
+export type QAStatus = 'pending' | 'passed' | 'failed' | 'on_hold';
 
 export interface StockMove {
   id: string;
@@ -312,7 +375,7 @@ export interface ASNItem {
   asn_id: number;
   product_id: number;
   quantity: number;
-  uom: string;
+  uom: UoM;
   batch?: string | null; // Pre-assigned batch from supplier
   expiry_date?: string | null; // DATE
   lp_number?: string | null; // Pre-assigned LP number
@@ -336,7 +399,7 @@ export interface CreateASNData {
 export interface CreateASNItemData {
   product_id: number;
   quantity: number;
-  uom: string;
+  uom: UoM;
   batch?: string | null;
   expiry_date?: string | null;
   lp_number?: string | null;
@@ -360,7 +423,7 @@ export interface ASNForReceiving {
 export interface LicensePlateEnhanced extends LicensePlate {
   batch?: string | null;
   expiry_date?: string | null; // DATE
-  uom: string;
+  uom: UoM;
   parent_lp_id?: number | null;
   is_consumed: boolean;
   consumed_at?: string | null;
@@ -375,7 +438,7 @@ export interface LPForFIFO {
   lp_id: number;
   lp_number: string;
   quantity: number;
-  uom: string;
+  uom: UoM;
   batch?: string | null;
   expiry_date?: string | null;
   created_at: string;
@@ -402,12 +465,15 @@ export type POStatus =
   | 'received'
   | 'cancelled'
   | 'closed';
-// TO status values must match database schema constraint (no 'closed' status in DB)
+// TO status values must match database schema constraint
+// Lifecycle: draft → submitted → in_transit → received → closed (finalized, audit complete)
+// Can be cancelled at any stage before closed
 export type TOStatus =
   | 'draft'
   | 'submitted'
   | 'in_transit'
   | 'received'
+  | 'closed'
   | 'cancelled';
 
 // PO Header (replacing PurchaseOrder)
@@ -447,7 +513,7 @@ export interface POLine {
   po_id: number;
   line_no: number;
   item_id: number;
-  uom: string;
+  uom: UoM;
   qty_ordered: number;
   qty_received: number;
   unit_price: number;
@@ -508,7 +574,7 @@ export interface TOLine {
   to_id: number;
   line_no: number;
   item_id: number;
-  uom: string;
+  uom: UoM;
   qty_planned: number;
   qty_shipped: number;
   qty_received: number;
@@ -616,7 +682,7 @@ export interface TransferOrderItem {
   to_id: number;
   line_no: number;
   item_id: number;
-  uom: string;
+  uom: UoM;
   qty_planned: number;
   qty_shipped: number;
   qty_received: number;
@@ -661,7 +727,7 @@ export interface ProductionOutput {
   wo_id: number;
   product_id: number;
   quantity: number;
-  uom: string;
+  uom: UoM;
   lp_id?: number;
   created_by?: number;
   created_at: string;
@@ -690,7 +756,7 @@ export interface Product {
   product_type: ProductType;
   subtype?: string;
   category?: string;
-  uom: string;
+  uom: UoM;
   is_active: boolean;
   supplier_id?: number;
   lead_time_days?: number;
@@ -728,7 +794,7 @@ export interface ProductInsert {
   type: DbType;
   part_number: string;
   description: string;
-  uom: string;
+  uom: UoM;
   product_group?: ProductGroup;
   product_type?: ProductType;
   product_version?: string; // Product version
@@ -749,7 +815,7 @@ export interface ProductInsert {
 export interface BomItemInput {
   material_id: number | null;
   quantity: number;
-  uom: string;
+  uom: UoM;
   sequence?: number;
   priority?: number | null;
   production_lines?: string[];
@@ -944,7 +1010,7 @@ export interface YieldReportMaterial {
   item_name?: string;
   standard_qty?: number;
   consumed_qty?: number;
-  uom?: string;
+  uom?: UoM;
   yield_percentage?: number;
 }
 
@@ -1018,7 +1084,7 @@ export interface BomItem {
   bom_id: number;
   material_id: number;
   quantity: number;
-  uom: string;
+  uom: UoM;
   sequence: number;
   priority?: number;
   production_lines?: string[];
@@ -1083,7 +1149,7 @@ export interface WoMaterial {
   wo_id: number;
   material_id: number;
   qty_per_unit: number;
-  uom: string;
+  uom: UoM;
   sequence: number;
   consume_whole_lp: boolean;
   is_optional: boolean;
@@ -1108,7 +1174,7 @@ export interface MaterialCost {
   org_id: number;
   cost: number;
   currency: string;
-  uom: string;
+  uom: UoM;
   effective_from: string;
   effective_to?: string | null;
   source: 'manual' | 'supplier' | 'average' | 'import';
@@ -1158,7 +1224,7 @@ export interface MaterialCostItem {
   product_id: number;
   product_name: string;
   quantity: number;
-  uom: string;
+  uom: UoM;
   unit_cost: number;
   total_cost: number;
 }
@@ -1271,7 +1337,7 @@ export interface SetMaterialCostRequest {
   product_id: number;
   cost: number;
   currency?: string;
-  uom: string;
+  uom: UoM;
   effective_from?: string;
   effective_to?: string | null;
   source?: 'manual' | 'supplier' | 'average' | 'import';

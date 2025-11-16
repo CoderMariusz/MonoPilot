@@ -275,10 +275,10 @@ export default function LPGenealogyTree({
                       <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-gray-200">
                         <span className={`
                           px-2 py-0.5 rounded font-medium
-                          ${node.qa_status === 'Passed' ? 'bg-green-100 text-green-800' : ''}
-                          ${node.qa_status === 'Failed' ? 'bg-red-100 text-red-800' : ''}
-                          ${node.qa_status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : ''}
-                          ${node.qa_status === 'Quarantine' ? 'bg-orange-100 text-orange-800' : ''}
+                          ${node.qa_status === 'passed' ? 'bg-green-100 text-green-800' : ''}
+                          ${node.qa_status === 'failed' ? 'bg-red-100 text-red-800' : ''}
+                          ${node.qa_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : ''}
+                          ${node.qa_status === 'on_hold' ? 'bg-orange-100 text-orange-800' : ''}
                         `}>
                           {node.qa_status}
                         </span>

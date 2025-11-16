@@ -102,11 +102,11 @@ export interface LicensePlate {
   product_id?: string;
   product?: any;
   quantity: number;
-  uom?: string;
+  uom?: UoM;
   location_id?: string;
   location?: any;
   status: LicensePlateStatus;
-  qa_status?: string;
+  qa_status?: QAStatus;
   stage_suffix?: string;
   origin_type?: string;
   origin_ref?: any;
@@ -121,9 +121,33 @@ export interface LicensePlate {
   updated_at: string;
 }
 
-export type LicensePlateStatus = 'Available' | 'Reserved' | 'In Production' | 'QA Hold' | 'QA Released' | 'QA Rejected' | 'Shipped';
+export type LicensePlateStatus =
+  | 'available'
+  | 'reserved'
+  | 'in_production'
+  | 'consumed'
+  | 'in_transit'
+  | 'quarantine'
+  | 'qa_passed'
+  | 'qa_rejected'
+  | 'shipped'
+  | 'damaged';
 
-export type QAStatus = 'Passed' | 'Failed' | 'Pending' | 'Hold' | 'Quarantine';
+
+/**
+ * Units of Measure - matches uom_master table
+ * Extended from 4 units to 23 units for better coverage
+ * Categories: weight, volume, length, count, container
+ * See: migrations/059_uom_master_table.sql
+ */
+export type UoM =
+  | 'KG' | 'POUND' | 'GRAM' | 'TON' | 'OUNCE'  // weight
+  | 'LITER' | 'GALLON' | 'MILLILITER' | 'BARREL' | 'QUART'  // volume
+  | 'METER' | 'FOOT' | 'INCH' | 'CENTIMETER'  // length
+  | 'EACH' | 'DOZEN'  // count
+  | 'BOX' | 'CASE' | 'PALLET' | 'DRUM' | 'BAG' | 'CARTON';  // container
+
+export type QAStatus = 'pending' | 'passed' | 'failed' | 'on_hold';
 
 export interface StockMove {
   id: string;
@@ -270,7 +294,7 @@ export interface ProductionOutput {
   wo_id: number;
   product_id: number;
   quantity: number;
-  uom: string;
+  uom: UoM;
   lp_id?: number;
   created_by?: number;
   created_at: string;
@@ -289,7 +313,7 @@ export interface Product {
   product_type: ProductType;
   subtype?: string;
   category?: string;
-  uom: string;
+  uom: UoM;
   is_active: boolean;
   supplier_id?: number;
   lead_time_days?: number;
@@ -439,7 +463,7 @@ export interface YieldReportMaterial {
   item_name?: string;
   standard_qty?: number;
   consumed_qty?: number;
-  uom?: string;
+  uom?: UoM;
   yield_percentage?: number;
 }
 
@@ -489,7 +513,7 @@ export interface BomItem {
   bom_id: number;
   material_id: number;
   quantity: number;
-  uom: string;
+  uom: UoM;
   sequence: number;
   priority?: number;
   production_lines?: string[];

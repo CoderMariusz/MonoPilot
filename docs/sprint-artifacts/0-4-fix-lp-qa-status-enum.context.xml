@@ -1,0 +1,146 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>4</storyId>
+    <title>Fix License Plate QA Status enum (MEDIUM)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-14</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-4-fix-lp-qa-status-enum.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>QA Inspector / Warehouse Manager</asA>
+    <iWant>License Plate QA status values synchronized between database and TypeScript with correct enum values</iWant>
+    <soThat>QA workflow operates correctly without status recognition errors</soThat>
+    <tasks>
+      - TypeScript Enum Update (1.5h): Fix QAStatus - use lowercase, remove 'Quarantine', change 'Hold' to 'on_hold'
+      - API Updates (2h): Update all LP methods setting qa_status to use lowercase values
+      - UI Updates (2h): Update QA status badges and workflow components
+      - Tests (2h): Unit + E2E tests for QA workflow
+      - Documentation (0.5h): Regenerate docs, add QA workflow notes
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">
+      <title>TypeScript Enum Update</title>
+      <description>QAStatus uses lowercase matching DB: 'pending', 'passed', 'failed', 'on_hold'. Remove 'Quarantine', change 'Hold' to 'on_hold'</description>
+    </criterion>
+    <criterion id="AC-2">
+      <title>Database Verification</title>
+      <description>Confirm DB CHECK constraint correct (no migration needed)</description>
+    </criterion>
+    <criterion id="AC-3">
+      <title>API Updates</title>
+      <description>All LP API methods use lowercase qa_status values</description>
+    </criterion>
+    <criterion id="AC-4">
+      <title>UI Component Updates</title>
+      <description>QA status badges use new lowercase values, labels display-friendly</description>
+    </criterion>
+    <criterion id="AC-5">
+      <title>Unit Tests</title>
+      <description>Tests verify QAStatus enum has exactly 4 values</description>
+    </criterion>
+    <criterion id="AC-6">
+      <title>E2E Tests</title>
+      <description>Tests verify QA workflow works correctly</description>
+    </criterion>
+    <criterion id="AC-7">
+      <title>Quality Gates</title>
+      <description>All tests passing, no TS errors, no regression</description>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/bmm-roadmap-epic-0-p0-fixes.md</path>
+        <title>Epic 0 Roadmap</title>
+        <section>Story 0.4 Summary</section>
+        <snippet>Remove 'Quarantine' from QAStatus (belongs to status, not qa_status), change 'Hold' to 'on_hold', use lowercase convention.</snippet>
+      </doc>
+      <doc>
+        <path>docs/P0-MODULES-AUDIT-REPORT-2025-11-14.md</path>
+        <title>P0 Audit Report</title>
+        <section>Problem #4: LP QA Status enum mismatch</section>
+        <snippet>DB has: pending, passed, failed, on_hold. TypeScript has: Passed, Failed, Pending, Hold, Quarantine. PascalCase vs lowercase, 'Hold' vs 'on_hold', 'Quarantine' should NOT be in QAStatus.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>apps/frontend/lib/types.ts</path>
+        <kind>TypeScript Types</kind>
+        <symbol>QAStatus</symbol>
+        <lines>181</lines>
+        <reason>Current enum with PascalCase - UPDATE to lowercase: 'pending' | 'passed' | 'failed' | 'on_hold'</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/lib/supabase/migrations/025_license_plates.sql</path>
+        <kind>SQL Migration</kind>
+        <symbol>qa_status CHECK constraint</symbol>
+        <lines>13</lines>
+        <reason>DB CHECK constraint already correct: ('pending', 'passed', 'failed', 'on_hold'). No migration needed.</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/lib/api/licensePlates.ts</path>
+        <kind>API Service</kind>
+        <symbol>LicensePlatesAPI</symbol>
+        <lines>all</lines>
+        <reason>Update QA-related methods to use lowercase qa_status values</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <ecosystem name="Node.js/pnpm">
+        <package name="typescript" version="^5.7.2" />
+        <package name="vitest" version="^4.0.6" />
+        <package name="@playwright/test" version="^1.56.1" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="no-migration-needed">
+      Database schema is CORRECT. Only TypeScript enum needs updating. No database migration required.
+    </constraint>
+    <constraint type="lowercase-convention">
+      Follow Epic 0 standard: all enum values lowercase. 'on_hold' not 'Hold', 'pending' not 'Pending'.
+    </constraint>
+    <constraint type="clarify-separation">
+      qa_status (QA inspection result) is SEPARATE from status (main LP status). 'Quarantine' belongs to status, NOT qa_status.
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>QAStatus Type (CORRECTED)</name>
+      <kind>TypeScript Type Alias</kind>
+      <signature>export type QAStatus = 'pending' | 'passed' | 'failed' | 'on_hold';</signature>
+      <path>apps/frontend/lib/types.ts</path>
+      <usage>Replaces existing QAStatus, used by LicensePlate interface qa_status field</usage>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Simple enum fix - unit tests for type validation, E2E test for QA workflow. Lower complexity than Story 0.3 (no migration, no breaking changes).
+    </standards>
+
+    <locations>
+      - Unit tests: apps/frontend/__tests__/
+      - E2E tests: apps/frontend/e2e/04-license-plates.spec.ts
+    </locations>
+
+    <ideas>
+      <test ac="AC-5">
+        Unit test: Verify QAStatus enum has exactly 4 values: pending, passed, failed, on_hold
+      </test>
+      <test ac="AC-6">
+        E2E test: QA workflow - Set LP to on_hold → passed/failed, verify status displays correctly
+      </test>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,3 +1,4 @@
+import type { UoM } from '@/lib/types';
 "use client";
 import { useEffect, useMemo, useState } from 'react';
 import { createSingle } from '@/lib/api/products.createSingle';
@@ -5,6 +6,7 @@ import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase/client-browser';
 import type { ProductInsert, ProductGroup, ProductType, DbType, ExpiryPolicy, Product } from '@/lib/types';
 import AllergenChips from '@/components/AllergenChips';
+import UoMSelect from '@/components/UoMSelect';
 import { ProductHistoryModal } from '@/components/ProductHistoryModal';
 import { History } from 'lucide-react';
 
@@ -32,7 +34,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   
   // Normalize UoM to match dropdown values (KG, EACH, METER, LITER)
-  const normalizeUomForSelect = (uom: string): 'KG' | 'EACH' | 'METER' | 'LITER' => {
+  const normalizeUomForSelect = (uom: string): UoM => {
     const upper = uom.toUpperCase().trim();
     if (upper === 'EA' || upper === 'EACH' || upper === 'PC' || upper === 'PCS') return 'EACH';
     if (upper === 'KG' || upper === 'KGS' || upper === 'KILO' || upper === 'KILOGRAM') return 'KG';
@@ -332,17 +334,11 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">UoM</label>
-            <select
+            <UoMSelect
               value={form.uom ?? ''}
-              onChange={e => handleChange('uom', e.target.value)}
-              className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
-            >
-              <option value="">Select…</option>
-              <option value="KG">KG</option>
-              <option value="EACH">EACH</option>
-              <option value="METER">METER</option>
-              <option value="LITER">LITER</option>
-            </select>
+              onChange={uom => handleChange('uom', uom)}
+              showDisplayNames={true}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Supplier</label>

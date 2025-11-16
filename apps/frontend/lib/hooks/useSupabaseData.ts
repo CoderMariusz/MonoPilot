@@ -104,6 +104,7 @@ export function useSupabasePurchaseOrders() {
           .select(`
             *,
             supplier:suppliers(*),
+            warehouse:warehouses(id, code, name),
             po_lines:po_line(*, item:products(*))
           `)
           .order('created_at', { ascending: false });
@@ -116,6 +117,7 @@ export function useSupabasePurchaseOrders() {
           number: po.number,
           po_number: po.number,
           supplier_id: po.supplier_id,
+          warehouse_id: po.warehouse_id,
           status: po.status,
           requested_delivery_date: po.requested_delivery_date,
           promised_delivery_date: po.promised_delivery_date,
@@ -142,6 +144,14 @@ export function useSupabasePurchaseOrders() {
             is_active: po.supplier.is_active,
             created_at: po.supplier.created_at || new Date().toISOString(),
             updated_at: po.supplier.updated_at || new Date().toISOString()
+          } : undefined,
+          warehouse: po.warehouse ? {
+            id: po.warehouse.id,
+            code: po.warehouse.code,
+            name: po.warehouse.name,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           } : undefined,
           purchase_order_items: (po.po_lines || []).map((line: any) => ({
             id: line.id,

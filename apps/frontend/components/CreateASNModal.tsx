@@ -89,7 +89,7 @@ export default function CreateASNModal({
       {
         product_id: 0,
         quantity: 0,
-        uom: 'kg',
+        uom: 'KG',
         batch: '',
         expiry_date: '',
         notes: '',

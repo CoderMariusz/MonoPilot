@@ -63,6 +63,7 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'received':
+      case 'closed':
         return 'bg-green-100 text-green-800';
       case 'in_transit':
         return 'bg-blue-100 text-blue-800';
@@ -71,13 +72,13 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
       case 'submitted':
         return 'bg-yellow-100 text-yellow-800';
       default:
-        return 'bg-slate-100 text-slate-800';
+        return 'bg-slate-100 text-slate-800'; // draft
     }
   };
 
   const canCancel = () => {
     if (!transferOrder) return false;
-    return !['received', 'cancelled'].includes(transferOrder.status);
+    return !['received', 'closed', 'cancelled'].includes(transferOrder.status);
   };
 
   const handleCancel = async () => {

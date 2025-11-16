@@ -102,7 +102,7 @@ describe('LicensePlatesAPI', () => {
           location: { name: 'A-01' },
           quantity: '500',
           uom: 'KG',
-          qa_status: 'Pending',
+          qa_status: 'pending',
           stage_suffix: 'RM',
           parent_lp_id: null,
           parent_lp_number: null,
@@ -136,11 +136,11 @@ describe('LicensePlatesAPI', () => {
 
       (supabase.from as any) = mockFrom;
 
-      const result = await LicensePlatesAPI.getAll({ qa_status: 'Pending' });
+      const result = await LicensePlatesAPI.getAll({ qa_status: 'pending' });
 
-      expect(mockEq).toHaveBeenCalledWith('qa_status', 'Pending');
+      expect(mockEq).toHaveBeenCalledWith('qa_status', 'pending');
       expect(result.data).toHaveLength(1);
-      expect(result.data[0].qa_status).toBe('Pending');
+      expect(result.data[0].qa_status).toBe('pending');
     });
 
     it('should calculate summary statistics', async () => {
@@ -172,7 +172,7 @@ describe('LicensePlatesAPI', () => {
           location: { name: 'Loc-B' },
           quantity: '200',
           uom: 'KG',
-          qa_status: 'Pending',
+          qa_status: 'pending',
           stage_suffix: 'PR',
           parent_lp_id: null,
           parent_lp_number: null,
@@ -207,7 +207,7 @@ describe('LicensePlatesAPI', () => {
       expect(result.summary.total_lps).toBe(2);
       expect(result.summary.total_quantity).toBe(300);
       expect(result.summary.qa_status_counts['Passed']).toBe(1);
-      expect(result.summary.qa_status_counts['Pending']).toBe(1);
+      expect(result.summary.qa_status_counts['pending']).toBe(1);
       expect(result.summary.location_counts['Loc-A']).toBe(1);
       expect(result.summary.location_counts['Loc-B']).toBe(1);
     });
@@ -611,9 +611,9 @@ describe('LicensePlatesAPI', () => {
 
   describe('QA Status Transitions', () => {
     it('should define valid QA statuses', () => {
-      const validStatuses = ['Pending', 'Passed', 'Failed', 'Quarantine'];
+      const validStatuses = ['pending', 'Passed', 'Failed', 'Quarantine'];
 
-      expect(validStatuses).toContain('Pending');
+      expect(validStatuses).toContain('pending');
       expect(validStatuses).toContain('Passed');
       expect(validStatuses).toContain('Failed');
       expect(validStatuses).toContain('Quarantine');
@@ -628,8 +628,8 @@ describe('LicensePlatesAPI', () => {
         Quarantine: ['Passed', 'Failed'], // Can be re-tested
       };
 
-      expect(validTransitions['Pending']).toContain('Passed');
-      expect(validTransitions['Pending']).toContain('Failed');
+      expect(validTransitions['pending']).toContain('Passed');
+      expect(validTransitions['pending']).toContain('Failed');
       expect(validTransitions['Quarantine']).toContain('Passed');
     });
   });

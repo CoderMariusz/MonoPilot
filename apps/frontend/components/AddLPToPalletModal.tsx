@@ -75,7 +75,7 @@ export function AddLPToPalletModal({
           location:locations(name)
         `
         )
-        .eq('qa_status', 'Passed')
+        .eq('qa_status', 'passed')
         .eq('is_consumed', false)
         .order('lp_number', { ascending: false })
         .limit(100);

@@ -4,7 +4,7 @@
 
 The MonoPilot MES system uses a dual-mode API layer that seamlessly switches between mock data (development) and real Supabase data (production).
 
-**Last Updated**: 2025-11-14 (auto-generated)
+**Last Updated**: 2025-11-16 (auto-generated)
 
 ## API Classes
 
@@ -298,6 +298,57 @@ static async getConsumptionTrends(params: {
 
 ---
 
+### GRNsAPI
+
+**Source**: `apps/frontend/lib/api/grns.ts`
+
+**Methods**:
+
+#### `create()`
+
+Create a new GRN from ASN receiving
+
+**Signature**:
+```typescript
+static async create(data: CreateGRNData): Promise<GRN>
+```
+
+**Parameters**:
+- `data: CreateGRNData`
+
+**Returns**: `Promise<GRN>`
+
+---
+
+#### `getById()`
+
+Get GRN by ID
+
+**Signature**:
+```typescript
+static async getById(id: number): Promise<GRN | null>
+```
+
+**Parameters**:
+- `id: number`
+
+**Returns**: `Promise<GRN | null>`
+
+---
+
+#### `getAll()`
+
+Get all GRNs
+
+**Signature**:
+```typescript
+static async getAll(): Promise<GRN[]>
+```
+
+**Returns**: `Promise<GRN[]>`
+
+---
+
 ### LicensePlatesAPI
 
 **Source**: `apps/frontend/lib/api/licensePlates.ts`
@@ -309,7 +360,7 @@ static async getConsumptionTrends(params: {
 **Signature**:
 ```typescript
 static async getAll(filters?: {
-    qa_status?: 'Pending' | 'Passed' | 'Failed' | 'Quarantine';
+    qa_status?: QAStatus;
     location?: string;
     product_id?: number;
     stage_suffix?: string;
@@ -341,7 +392,7 @@ static async getAll(filters?: {
 
 **Parameters**:
 - `filters?: {
-    qa_status?: 'Pending' | 'Passed' | 'Failed' | 'Quarantine';
+    qa_status?: QAStatus;
     location?: string;
     product_id?: number;
     stage_suffix?: string;
@@ -689,6 +740,87 @@ static async getLPDetails(lpId: number): Promise<{
       status: string;
       created_at: string;
     }>`
+
+---
+
+#### `getValidUoMs()`
+
+Get all valid Units of Measure from uom_master table @returns Array of UoM objects with code, display_name, and category
+
+**Signature**:
+```typescript
+static async getValidUoMs(): Promise<Array<{
+    code: string;
+    display_name: string;
+    category: string;
+  }>
+```
+
+**Returns**: `Promise<Array<{
+    code: string;
+    display_name: string;
+    category: string;
+  }>`
+
+---
+
+#### `validateUoM()`
+
+Validate UoM against uom_master table @param uom - Unit of measure code to validate @returns true if valid, false otherwise
+
+**Signature**:
+```typescript
+static async validateUoM(uom: string): Promise<boolean>
+```
+
+**Parameters**:
+- `uom: string`
+
+**Returns**: `Promise<boolean>`
+
+---
+
+#### `create()`
+
+Create new License Plate Story 1.7.1 - Single-Screen Scanner @param data - License Plate creation data @returns Created license plate
+
+**Signature**:
+```typescript
+static async create(data: {
+    lp_number: string;
+    product_id: number;
+    quantity: number;
+    uom: string;
+    location_id: number;
+    warehouse_id: number;
+    status: 'available' | 'reserved' | 'consumed' | 'in_transit' | 'quarantine' | 'damaged';
+    qa_status?: 'pending' | 'passed' | 'failed' | 'on_hold';
+    batch_number?: string;
+    expiry_date?: string | null;
+    grn_id?: number;
+    po_number?: string;
+    supplier_batch_number?: string;
+  }): Promise<any>
+```
+
+**Parameters**:
+- `data: {
+    lp_number: string;
+    product_id: number;
+    quantity: number;
+    uom: string;
+    location_id: number;
+    warehouse_id: number;
+    status: 'available' | 'reserved' | 'consumed' | 'in_transit' | 'quarantine' | 'damaged';
+    qa_status?: 'pending' | 'passed' | 'failed' | 'on_hold';
+    batch_number?: string;
+    expiry_date?: string | null;
+    grn_id?: number;
+    po_number?: string;
+    supplier_batch_number?: string;
+  }`
+
+**Returns**: `Promise<any>`
 
 ---
 

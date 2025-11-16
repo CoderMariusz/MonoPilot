@@ -18,13 +18,11 @@ This validation report assesses the `docs/architecture.md` against the Product R
 4. ✅ Regulatory requirements are covered
 5. ⚠️ Gaps and missing considerations are identified
 
-**Overall Assessment:** ✅ **ARCHITECTURE VALIDATED - READY FOR IMPLEMENTATION (Updated 2025-11-14)**
+**Overall Assessment:** ✅ **ARCHITECTURE VALIDATED - READY FOR IMPLEMENTATION**
 
 **Key Findings:**
-
-- **26 architectural patterns** fully documented with code examples (22 original + 4 new)
-- **All 7 MVP modules** architecturally supported (including Quality & Shipping - added 2025-11-14)
-- **Zero critical gaps** - all blocking issues resolved
+- 22 architectural patterns fully documented with code examples
+- All MVP modules architecturally supported
 - Regulatory compliance (FSMA 204, FDA 21 CFR Part 11) addressed
 - Minor gaps identified in Growth phase features (acceptable for MVP)
 - No critical conflicts or blockers found
@@ -35,13 +33,13 @@ This validation report assesses the `docs/architecture.md` against the Product R
 
 ### 1.1 Five Core Differentiators Validation
 
-| Differentiator          | PRD Requirement                                            | Architecture Coverage                                                                                                                                | Status      |
-| ----------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| **Multi-Version BOM**   | Date-based BOM versions, automatic snapshot, timeline UI   | ✅ Pattern #18: BOM Version Auto-Selection<br>✅ Pattern #1 (Scanner): Hybrid BOM Snapshot<br>✅ Database trigger prevents overlapping dates         | ✅ COMPLETE |
-| **LP Genealogy**        | 30s recall, forward/backward traceability, 1:1 consumption | ✅ Pattern #2: Dual Consumption Model<br>✅ Pattern #3: Hard LP Reservation<br>✅ Recursive CTE queries documented<br>✅ `lp_genealogy` table design | ✅ COMPLETE |
-| **Transparent Pricing** | SaaS tiers, feature flags, self-service activation         | ✅ Multi-tenant architecture (RLS)<br>✅ Feature flags system<br>✅ Pattern #15: Multi-Role Users                                                    | ✅ COMPLETE |
-| **Mobile-First PWA**    | BYOD, offline-first, camera scanning, $30K-$50K savings    | ✅ Pattern #5: Hybrid Offline Sync<br>✅ IndexedDB cache strategy<br>✅ Service Worker design<br>✅ PWA deployment documented                        | ✅ COMPLETE |
-| **Module Build**        | Modular activation, pay-as-you-grow, feature isolation     | ✅ Module boundaries defined<br>✅ Feature flags architecture<br>✅ API class separation by module                                                   | ✅ COMPLETE |
+| Differentiator | PRD Requirement | Architecture Coverage | Status |
+|----------------|-----------------|----------------------|--------|
+| **Multi-Version BOM** | Date-based BOM versions, automatic snapshot, timeline UI | ✅ Pattern #18: BOM Version Auto-Selection<br>✅ Pattern #1 (Scanner): Hybrid BOM Snapshot<br>✅ Database trigger prevents overlapping dates | ✅ COMPLETE |
+| **LP Genealogy** | 30s recall, forward/backward traceability, 1:1 consumption | ✅ Pattern #2: Dual Consumption Model<br>✅ Pattern #3: Hard LP Reservation<br>✅ Recursive CTE queries documented<br>✅ `lp_genealogy` table design | ✅ COMPLETE |
+| **Transparent Pricing** | SaaS tiers, feature flags, self-service activation | ✅ Multi-tenant architecture (RLS)<br>✅ Feature flags system<br>✅ Pattern #15: Multi-Role Users | ✅ COMPLETE |
+| **Mobile-First PWA** | BYOD, offline-first, camera scanning, $30K-$50K savings | ✅ Pattern #5: Hybrid Offline Sync<br>✅ IndexedDB cache strategy<br>✅ Service Worker design<br>✅ PWA deployment documented | ✅ COMPLETE |
+| **Module Build** | Modular activation, pay-as-you-grow, feature isolation | ✅ Module boundaries defined<br>✅ Feature flags architecture<br>✅ API class separation by module | ✅ COMPLETE |
 
 **Validation Result:** ✅ **All 5 core differentiators are architecturally supported.**
 
@@ -52,7 +50,6 @@ This validation report assesses the `docs/architecture.md` against the Product R
 #### Scanner & Warehouse Module (95% complete, Priority 1)
 
 **PRD Requirements:**
-
 - ASN receiving with LP creation
 - Production output registration (LP = PALLET)
 - Manual consumption with scanner
@@ -62,14 +59,14 @@ This validation report assesses the `docs/architecture.md` against the Product R
 
 **Architecture Coverage:**
 
-| Pattern                         | Description                                      | Status      |
-| ------------------------------- | ------------------------------------------------ | ----------- |
-| Pattern #1: LP = PALLET         | Output creates pallet directly (38 boxes = 1 LP) | ✅ COMPLETE |
-| Pattern #2: Dual Consumption    | Automatic (BOM) + Manual (scan) + Odkonsumpcja   | ✅ COMPLETE |
+| Pattern | Description | Status |
+|---------|-------------|--------|
+| Pattern #1: LP = PALLET | Output creates pallet directly (38 boxes = 1 LP) | ✅ COMPLETE |
+| Pattern #2: Dual Consumption | Automatic (BOM) + Manual (scan) + Odkonsumpcja | ✅ COMPLETE |
 | Pattern #3: Hard LP Reservation | Complete lock, prevents moves/splits/consumption | ✅ COMPLETE |
-| Pattern #4: Strict UoM          | No automatic conversions, validation at scan     | ✅ COMPLETE |
-| Pattern #5: Hybrid Offline Sync | Pessimistic (ASN, Output) vs Optimistic (Moves)  | ✅ COMPLETE |
-| Pattern #21: LP Split           | Partial shipment support                         | ✅ COMPLETE |
+| Pattern #4: Strict UoM | No automatic conversions, validation at scan | ✅ COMPLETE |
+| Pattern #5: Hybrid Offline Sync | Pessimistic (ASN, Output) vs Optimistic (Moves) | ✅ COMPLETE |
+| Pattern #21: LP Split | Partial shipment support | ✅ COMPLETE |
 
 **Validation Result:** ✅ **Scanner & Warehouse fully architecturally supported.**
 
@@ -80,7 +77,6 @@ This validation report assesses the `docs/architecture.md` against the Product R
 #### Production Module (70% complete)
 
 **PRD Requirements:**
-
 - Multi-operation WO with intermediate goods
 - Process Products (RM → PR → FG)
 - Yield calculation (consumption-based)
@@ -90,20 +86,19 @@ This validation report assesses the `docs/architecture.md` against the Product R
 
 **Architecture Coverage:**
 
-| Pattern                          | Description                                          | Status      |
-| -------------------------------- | ---------------------------------------------------- | ----------- |
-| Pattern #6: Multi-Operation WO   | Each operation produces intermediate LP (LP-OP1-xxx) | ✅ COMPLETE |
-| Pattern #7: Process Products     | RM → ING → PR → FG workflow                          | ✅ COMPLETE |
-| Pattern #8: Dual Yield Metrics   | Material yield vs planning coverage                  | ✅ COMPLETE |
-| Pattern #9: 2-Step WO Closure    | Operator COMPLETE → Supervisor CLOSE                 | ✅ COMPLETE |
-| Pattern #10: Auto + Manual Scrap | BOM % + operator decision at close                   | ✅ COMPLETE |
-| Pattern #11: By-Products         | Separate LP-BY-xxx creation                          | ✅ COMPLETE |
-| Pattern #20: QA Hold Blocks      | qa_status validation prevents consumption            | ✅ COMPLETE |
+| Pattern | Description | Status |
+|---------|-------------|--------|
+| Pattern #6: Multi-Operation WO | Each operation produces intermediate LP (LP-OP1-xxx) | ✅ COMPLETE |
+| Pattern #7: Process Products | RM → ING → PR → FG workflow | ✅ COMPLETE |
+| Pattern #8: Dual Yield Metrics | Material yield vs planning coverage | ✅ COMPLETE |
+| Pattern #9: 2-Step WO Closure | Operator COMPLETE → Supervisor CLOSE | ✅ COMPLETE |
+| Pattern #10: Auto + Manual Scrap | BOM % + operator decision at close | ✅ COMPLETE |
+| Pattern #11: By-Products | Separate LP-BY-xxx creation | ✅ COMPLETE |
+| Pattern #20: QA Hold Blocks | qa_status validation prevents consumption | ✅ COMPLETE |
 
 **Validation Result:** ✅ **Production module fully architecturally supported.**
 
 **Gaps Identified:**
-
 - ⚠️ **Machine-level costing** mentioned but not deeply detailed (acceptable, Pattern #16 covers basics)
 - ⚠️ **Real-time dashboard** metrics defined but UI patterns not specified (acceptable for architecture doc)
 
@@ -112,7 +107,6 @@ This validation report assesses the `docs/architecture.md` against the Product R
 #### Planning Module (85% complete)
 
 **PRD Requirements:**
-
 - PO creation with multi-supplier auto-split
 - TO between warehouses (not locations)
 - WO creation with BOM snapshot
@@ -121,18 +115,17 @@ This validation report assesses the `docs/architecture.md` against the Product R
 
 **Architecture Coverage:**
 
-| Pattern                                   | Description                                | Status      |
-| ----------------------------------------- | ------------------------------------------ | ----------- |
-| Pattern #12: PO Multi-Supplier Auto-Split | Quick entry creates multiple POs           | ✅ COMPLETE |
-| Pattern #13: Smart LP Suggestions         | FEFO/FIFO suggestions, no auto-reservation | ✅ COMPLETE |
-| Pattern #14: Transit Inventory            | MRP checks in-transit stock                | ✅ COMPLETE |
-| Pattern #16: Production Line vs Machine   | Line for scheduling, machine for cost      | ✅ COMPLETE |
-| Hybrid BOM Snapshot                       | Copy bom_items to wo_materials             | ✅ COMPLETE |
+| Pattern | Description | Status |
+|---------|-------------|--------|
+| Pattern #12: PO Multi-Supplier Auto-Split | Quick entry creates multiple POs | ✅ COMPLETE |
+| Pattern #13: Smart LP Suggestions | FEFO/FIFO suggestions, no auto-reservation | ✅ COMPLETE |
+| Pattern #14: Transit Inventory | MRP checks in-transit stock | ✅ COMPLETE |
+| Pattern #16: Production Line vs Machine | Line for scheduling, machine for cost | ✅ COMPLETE |
+| Hybrid BOM Snapshot | Copy bom_items to wo_materials | ✅ COMPLETE |
 
 **Validation Result:** ✅ **Planning module fully architecturally supported.**
 
 **Gaps Identified:**
-
 - ⚠️ **Visual scheduling (Gantt charts)** is P2, not in MVP architecture (acceptable)
 - ⚠️ **ML Planning** is P0 Growth but deferred post-MVP (acceptable, future consideration documented)
 
@@ -141,7 +134,6 @@ This validation report assesses the `docs/architecture.md` against the Product R
 #### Technical Module (95% complete)
 
 **PRD Requirements:**
-
 - Multi-version BOMs with effective dates
 - BOM snapshot at WO creation
 - Optional BOM components
@@ -150,12 +142,12 @@ This validation report assesses the `docs/architecture.md` against the Product R
 
 **Architecture Coverage:**
 
-| Pattern                                 | Description                                | Status      |
-| --------------------------------------- | ------------------------------------------ | ----------- |
-| Pattern #18: BOM Version Auto-Selection | Based on WO scheduled_date with override   | ✅ COMPLETE |
-| Pattern #19: Optional BOM Components    | is_optional flag for configurable products | ✅ COMPLETE |
-| Pattern #22: BOM Change Warning         | Notify supervisors when active WOs exist   | ✅ COMPLETE |
-| Database Trigger                        | Prevents overlapping BOM dates             | ✅ COMPLETE |
+| Pattern | Description | Status |
+|---------|-------------|--------|
+| Pattern #18: BOM Version Auto-Selection | Based on WO scheduled_date with override | ✅ COMPLETE |
+| Pattern #19: Optional BOM Components | is_optional flag for configurable products | ✅ COMPLETE |
+| Pattern #22: BOM Change Warning | Notify supervisors when active WOs exist | ✅ COMPLETE |
+| Database Trigger | Prevents overlapping BOM dates | ✅ COMPLETE |
 
 **Validation Result:** ✅ **Technical module fully architecturally supported.**
 
@@ -166,7 +158,6 @@ This validation report assesses the `docs/architecture.md` against the Product R
 #### Settings Module (100% complete)
 
 **PRD Requirements:**
-
 - Multi-role users (not single role)
 - Warehouses with default locations
 - Production lines vs machines
@@ -175,11 +166,11 @@ This validation report assesses the `docs/architecture.md` against the Product R
 
 **Architecture Coverage:**
 
-| Pattern                                    | Description                           | Status      |
-| ------------------------------------------ | ------------------------------------- | ----------- |
-| Pattern #15: Multi-Role Users              | roles[] array, not single role        | ✅ COMPLETE |
-| Pattern #16: Production Line vs Machine    | Line for scheduling, machine for cost | ✅ COMPLETE |
-| Pattern #17: Configurable Planning Horizon | Admin-defined per org                 | ✅ COMPLETE |
+| Pattern | Description | Status |
+|---------|-------------|--------|
+| Pattern #15: Multi-Role Users | roles[] array, not single role | ✅ COMPLETE |
+| Pattern #16: Production Line vs Machine | Line for scheduling, machine for cost | ✅ COMPLETE |
+| Pattern #17: Configurable Planning Horizon | Admin-defined per org | ✅ COMPLETE |
 
 **Validation Result:** ✅ **Settings module fully architecturally supported.**
 
@@ -187,57 +178,47 @@ This validation report assesses the `docs/architecture.md` against the Product R
 
 ---
 
-#### Quality Module (0% complete - MVP required) - ✅ **ARCHITECTURE COMPLETE (2025-11-14)**
+#### Quality Module (0% complete - MVP required)
 
 **PRD Requirement:** QA inspections, hold/release, CoA generation
 
 **Architecture Coverage:**
 
-| Feature                    | Architecture Coverage                   | Status                             |
-| -------------------------- | --------------------------------------- | ---------------------------------- |
-| QA Hold Blocks Consumption | Pattern #20: qa_status validation       | ✅ COMPLETE                        |
-| QA Inspections             | Pattern #23: QA Inspection Workflow     | ✅ **COMPLETE (Added 2025-11-14)** |
-| CoA Generation             | Pattern #24: CoA Generation & Templates | ✅ **COMPLETE (Added 2025-11-14)** |
-| QA Status Flow             | PENDING → INSPECTING → PASS/HOLD/FAIL   | ✅ **COMPLETE**                    |
-| LP Integration             | qa_status column, qa_inspection_id      | ✅ **COMPLETE**                    |
-| Scanner QA Flow            | Mobile UI for checklist + photos        | ✅ **COMPLETE**                    |
+| Feature | Architecture Coverage | Status |
+|---------|----------------------|--------|
+| QA Hold Blocks Consumption | Pattern #20: qa_status validation | ✅ COMPLETE |
+| QA Inspections | Not detailed in architecture.md | ⚠️ **GAP** |
+| CoA Generation | Not detailed in architecture.md | ⚠️ **GAP** |
 
-**Validation Result:** ✅ **FULLY ARCHITECTURALLY SUPPORTED**
+**Validation Result:** ⚠️ **PARTIAL COVERAGE - QA module needs detailed architecture**
 
-**Architecture Includes:**
-
-- Pattern #23: QA inspection workflow with templates, checklists, photo capture, hold/release
-- Pattern #24: CoA template-based generation with PDF export, snapshot audit trail
-- Integration with consumption (Pattern #20 implementation details)
-- Scanner UI for mobile QA inspections
+**Action Required:**
+- Add Pattern #23: QA Inspection Workflow
+- Add Pattern #24: CoA Generation & Templates
+- Define QA status flow (PENDING → PASS/FAIL/HOLD)
+- Define integration with LP creation/consumption
 
 ---
 
-#### Shipping Module (0% complete - MVP required) - ✅ **ARCHITECTURE COMPLETE (2025-11-14)**
+#### Shipping Module (0% complete - MVP required)
 
 **PRD Requirement:** Sales Orders, BOL, pallet loading
 
 **Architecture Coverage:**
 
-| Feature                  | Architecture Coverage                                            | Status                             |
-| ------------------------ | ---------------------------------------------------------------- | ---------------------------------- |
-| LP Split Before Shipping | Pattern #21: Partial shipment support                            | ✅ COMPLETE                        |
-| Sales Orders             | Pattern #25: Sales Order → Shipment Flow                         | ✅ **COMPLETE (Added 2025-11-14)** |
-| BOL Generation           | Pattern #26: BOL Generation                                      | ✅ **COMPLETE (Added 2025-11-14)** |
-| LP Allocation            | Smart LP suggestions (Pattern #13) + UoM validation (Pattern #4) | ✅ **COMPLETE**                    |
-| Partial Shipments        | qty_allocated, qty_shipped tracking                              | ✅ **COMPLETE**                    |
-| CoA Integration          | Auto-generate CoAs for FG (Pattern #24)                          | ✅ **COMPLETE**                    |
-| Pallet Loading           | Basic (1 LP = 1 pallet) - advanced optimization P2               | ✅ **MVP SUFFICIENT**              |
+| Feature | Architecture Coverage | Status |
+|---------|----------------------|--------|
+| LP Split Before Shipping | Pattern #21: Partial shipment support | ✅ COMPLETE |
+| Sales Orders | Not detailed in architecture.md | ⚠️ **GAP** |
+| BOL Generation | Not detailed in architecture.md | ⚠️ **GAP** |
+| Pallet Loading | Not detailed in architecture.md | ⚠️ **GAP** |
 
-**Validation Result:** ✅ **FULLY ARCHITECTURALLY SUPPORTED**
+**Validation Result:** ⚠️ **PARTIAL COVERAGE - Shipping module needs detailed architecture**
 
-**Architecture Includes:**
-
-- Pattern #25: Sales order creation, LP allocation with FEFO/FIFO, shipment creation, status tracking
-- Pattern #26: BOL auto-generation with PDF export, carrier SCAC codes, freight terms
-- Integration with Pattern #21 (LP split), Pattern #24 (CoA generation)
-- Database schema for sales_orders, shipments, customers, BOLs
-- Partial shipment support with qty tracking
+**Action Required:**
+- Add Pattern #25: Sales Order → Shipment Flow
+- Add Pattern #26: BOL Generation
+- Define pallet loading optimization (if in MVP scope, otherwise P2)
 
 ---
 
@@ -246,7 +227,6 @@ This validation report assesses the `docs/architecture.md` against the Product R
 #### FSMA 204 (Food Traceability Rule - Mandatory 2028)
 
 **PRD Requirement:**
-
 - <24 hour forward/backward traceability
 - Critical Tracking Events (CTEs)
 - Key Data Elements (KDEs)
@@ -254,14 +234,14 @@ This validation report assesses the `docs/architecture.md` against the Product R
 
 **Architecture Coverage:**
 
-| Requirement                          | Architecture Support                                     | Status      |
-| ------------------------------------ | -------------------------------------------------------- | ----------- |
-| Forward traceability                 | Recursive CTE queries on `lp_genealogy`                  | ✅ COMPLETE |
-| Backward traceability                | Recursive CTE queries (parent_lp_id)                     | ✅ COMPLETE |
-| <24h performance                     | Target: 30 seconds (sub-30s recall)                      | ✅ COMPLETE |
-| TLC (Lot Code)                       | LP.batch_number, LP.po_number, LP.supplier_batch_number  | ✅ COMPLETE |
-| CTEs tracking                        | Pattern #2 (Dual Consumption), Pattern #11 (By-Products) | ✅ COMPLETE |
-| KDEs (quantity, UoM, location, date) | All captured in LP schema                                | ✅ COMPLETE |
+| Requirement | Architecture Support | Status |
+|-------------|---------------------|--------|
+| Forward traceability | Recursive CTE queries on `lp_genealogy` | ✅ COMPLETE |
+| Backward traceability | Recursive CTE queries (parent_lp_id) | ✅ COMPLETE |
+| <24h performance | Target: 30 seconds (sub-30s recall) | ✅ COMPLETE |
+| TLC (Lot Code) | LP.batch_number, LP.po_number, LP.supplier_batch_number | ✅ COMPLETE |
+| CTEs tracking | Pattern #2 (Dual Consumption), Pattern #11 (By-Products) | ✅ COMPLETE |
+| KDEs (quantity, UoM, location, date) | All captured in LP schema | ✅ COMPLETE |
 
 **Validation Result:** ✅ **FSMA 204 compliance architecturally supported (77% current, 90%+ post-MVP).**
 
@@ -270,7 +250,6 @@ This validation report assesses the `docs/architecture.md` against the Product R
 #### FDA 21 CFR Part 11 (Electronic Records & Signatures)
 
 **PRD Requirement:**
-
 - Audit trail (all data changes)
 - Electronic signatures
 - Access controls
@@ -278,13 +257,13 @@ This validation report assesses the `docs/architecture.md` against the Product R
 
 **Architecture Coverage:**
 
-| Requirement                | Architecture Support                                        | Status      |
-| -------------------------- | ----------------------------------------------------------- | ----------- |
-| Basic audit trail          | created_by, updated_by, timestamps on all tables            | ✅ COMPLETE |
-| Full audit trail (pgAudit) | Deferred to P2 Growth (documented in Future Considerations) | ⚠️ P2       |
-| Electronic signatures      | Deferred to P2 Growth                                       | ⚠️ P2       |
-| Access controls            | Pattern #15: Multi-Role Users, RLS policies                 | ✅ COMPLETE |
-| Data integrity             | Database constraints, RLS, validation                       | ✅ COMPLETE |
+| Requirement | Architecture Support | Status |
+|-------------|---------------------|--------|
+| Basic audit trail | created_by, updated_by, timestamps on all tables | ✅ COMPLETE |
+| Full audit trail (pgAudit) | Deferred to P2 Growth (documented in Future Considerations) | ⚠️ P2 |
+| Electronic signatures | Deferred to P2 Growth | ⚠️ P2 |
+| Access controls | Pattern #15: Multi-Role Users, RLS policies | ✅ COMPLETE |
+| Data integrity | Database constraints, RLS, validation | ✅ COMPLETE |
 
 **Validation Result:** ⚠️ **PARTIAL (50% compliance) - Full compliance deferred to P2 (acceptable per PRD).**
 
@@ -297,13 +276,11 @@ This validation report assesses the `docs/architecture.md` against the Product R
 **PRD Requirement:** AI-driven MRP, demand forecasting, auto-scheduling
 
 **Architecture Coverage:**
-
 - ✅ Documented in "Future Considerations" section
 - ✅ Data foundation exists (WO history, material consumption, yields)
 - ⚠️ **No ML architecture details** (acceptable, not MVP)
 
 **Action Required (Post-MVP):**
-
 - Add ML pipeline architecture (training, inference, model storage)
 - Define integration with existing MRP workflow
 
@@ -314,7 +291,6 @@ This validation report assesses the `docs/architecture.md` against the Product R
 **PRD Requirement:** Real-time KPIs, custom dashboards, scheduled reports
 
 **Architecture Coverage:**
-
 - ✅ Pattern: BI & Monitoring Architecture (lines 2709-2814)
 - ✅ Real-time vs Batch calculations defined
 - ✅ Materialized views for real-time metrics
@@ -330,13 +306,11 @@ This validation report assesses the `docs/architecture.md` against the Product R
 **PRD Requirement:** Material costs, BOM rollup, margin analysis, WO cost tracking
 
 **Architecture Coverage:**
-
 - ⚠️ **Not explicitly detailed in architecture.md**
 - ✅ Pattern #8 (Dual Yield Metrics) provides foundation for cost variance
 - ⚠️ Missing: Cost rollup algorithm, margin calculation, cost history tracking
 
 **Action Required (Pre-P1 Implementation):**
-
 - Add Pattern #27: BOM Cost Rollup & Margin Analysis
 - Define cost effective date schema
 - Define cost source tracking (manual, supplier, average)
@@ -349,16 +323,16 @@ This validation report assesses the `docs/architecture.md` against the Product R
 
 **Testing Consistency:** Do patterns support each other or conflict?
 
-| Pattern Pair                                                         | Relationship | Consistency Check                                                                              | Status        |
-| -------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------- | ------------- |
-| Pattern #1 (LP=PALLET) + Pattern #6 (Multi-Op WO)                    | Integration  | Intermediate ops create intermediate LPs (LP-OP1-xxx), final op creates pallet LP (LP-OUT-xxx) | ✅ CONSISTENT |
-| Pattern #2 (Dual Consumption) + Pattern #3 (Hard Reservation)        | Integration  | Hard reservation prevents consumption by other WOs, dual consumption allows manual + automatic | ✅ CONSISTENT |
-| Pattern #4 (Strict UoM) + Pattern #13 (LP Suggestions)               | Integration  | LP suggestions filtered by matching UoM, no conversion                                         | ✅ CONSISTENT |
-| Pattern #5 (Hybrid Sync) + Pattern #1 (LP=PALLET)                    | Integration  | Output registration uses pessimistic sync (critical), pallet data synced immediately           | ✅ CONSISTENT |
-| Pattern #8 (Dual Yield) + Pattern #10 (Auto+Manual Scrap)            | Integration  | Yield calculated from actual consumption + scrap (auto + manual)                               | ✅ CONSISTENT |
-| Pattern #12 (PO Multi-Supplier Split) + Pattern #13 (LP Suggestions) | Integration  | Quick PO creates multiple POs → multiple receipts → multiple LPs for suggestions               | ✅ CONSISTENT |
-| Pattern #18 (BOM Auto-Selection) + Pattern #22 (BOM Change Warning)  | Integration  | Auto-selection picks BOM at WO creation (snapshot), change warning doesn't affect existing WOs | ✅ CONSISTENT |
-| Pattern #20 (QA Hold Blocks) + Pattern #2 (Dual Consumption)         | Integration  | Both automatic and manual consumption check qa_status before proceeding                        | ✅ CONSISTENT |
+| Pattern Pair | Relationship | Consistency Check | Status |
+|--------------|--------------|-------------------|--------|
+| Pattern #1 (LP=PALLET) + Pattern #6 (Multi-Op WO) | Integration | Intermediate ops create intermediate LPs (LP-OP1-xxx), final op creates pallet LP (LP-OUT-xxx) | ✅ CONSISTENT |
+| Pattern #2 (Dual Consumption) + Pattern #3 (Hard Reservation) | Integration | Hard reservation prevents consumption by other WOs, dual consumption allows manual + automatic | ✅ CONSISTENT |
+| Pattern #4 (Strict UoM) + Pattern #13 (LP Suggestions) | Integration | LP suggestions filtered by matching UoM, no conversion | ✅ CONSISTENT |
+| Pattern #5 (Hybrid Sync) + Pattern #1 (LP=PALLET) | Integration | Output registration uses pessimistic sync (critical), pallet data synced immediately | ✅ CONSISTENT |
+| Pattern #8 (Dual Yield) + Pattern #10 (Auto+Manual Scrap) | Integration | Yield calculated from actual consumption + scrap (auto + manual) | ✅ CONSISTENT |
+| Pattern #12 (PO Multi-Supplier Split) + Pattern #13 (LP Suggestions) | Integration | Quick PO creates multiple POs → multiple receipts → multiple LPs for suggestions | ✅ CONSISTENT |
+| Pattern #18 (BOM Auto-Selection) + Pattern #22 (BOM Change Warning) | Integration | Auto-selection picks BOM at WO creation (snapshot), change warning doesn't affect existing WOs | ✅ CONSISTENT |
+| Pattern #20 (QA Hold Blocks) + Pattern #2 (Dual Consumption) | Integration | Both automatic and manual consumption check qa_status before proceeding | ✅ CONSISTENT |
 
 **Validation Result:** ✅ **All 22 patterns are internally consistent - no conflicts detected.**
 
@@ -386,18 +360,18 @@ PO Creation (Pattern #12)
 
 **Validation Checks:**
 
-| Flow Step                 | Pattern Coverage                                       | Status     |
-| ------------------------- | ------------------------------------------------------ | ---------- |
-| PO → ASN                  | Pattern #12 (Quick PO), Pattern #5 (Offline Sync)      | ✅ COVERED |
-| ASN → LP                  | Pattern #1 (LP=PALLET), Pattern #5 (Pessimistic Sync)  | ✅ COVERED |
-| LP → Reservation          | Pattern #3 (Hard Reservation)                          | ✅ COVERED |
+| Flow Step | Pattern Coverage | Status |
+|-----------|------------------|--------|
+| PO → ASN | Pattern #12 (Quick PO), Pattern #5 (Offline Sync) | ✅ COVERED |
+| ASN → LP | Pattern #1 (LP=PALLET), Pattern #5 (Pessimistic Sync) | ✅ COVERED |
+| LP → Reservation | Pattern #3 (Hard Reservation) | ✅ COVERED |
 | Reservation → Consumption | Pattern #2 (Dual Consumption), Pattern #4 (UoM Strict) | ✅ COVERED |
-| Consumption → Output      | Pattern #6 (Multi-Op), Pattern #1 (LP=PALLET)          | ✅ COVERED |
-| Output → By-Product       | Pattern #11 (By-Products)                              | ✅ COVERED |
-| Output → Yield            | Pattern #8 (Dual Yield)                                | ✅ COVERED |
-| Yield → Closure           | Pattern #9 (2-Step Closure)                            | ✅ COVERED |
-| Closure → Shipping        | Pattern #21 (LP Split)                                 | ✅ COVERED |
-| QA Integration            | Pattern #20 (QA Hold Blocks)                           | ✅ COVERED |
+| Consumption → Output | Pattern #6 (Multi-Op), Pattern #1 (LP=PALLET) | ✅ COVERED |
+| Output → By-Product | Pattern #11 (By-Products) | ✅ COVERED |
+| Output → Yield | Pattern #8 (Dual Yield) | ✅ COVERED |
+| Yield → Closure | Pattern #9 (2-Step Closure) | ✅ COVERED |
+| Closure → Shipping | Pattern #21 (LP Split) | ✅ COVERED |
+| QA Integration | Pattern #20 (QA Hold Blocks) | ✅ COVERED |
 
 **Validation Result:** ✅ **End-to-end data flow is architecturally complete and consistent.**
 
@@ -407,16 +381,16 @@ PO Creation (Pattern #12)
 
 **Validating Module Isolation:** Are modules properly decoupled?
 
-| Module A            | Module B           | Integration Point                  | Coupling Type             | Status        |
-| ------------------- | ------------------ | ---------------------------------- | ------------------------- | ------------- |
-| Planning (PO/TO/WO) | Warehouse (ASN/LP) | ASN references PO                  | Loose (foreign key)       | ✅ GOOD       |
-| Warehouse (LP)      | Production (WO)    | LP reservation to WO               | Moderate (business logic) | ✅ ACCEPTABLE |
-| Production (WO)     | Technical (BOM)    | BOM snapshot to wo_materials       | Loose (copy at creation)  | ✅ GOOD       |
-| Scanner             | Warehouse          | Mobile UI → API classes            | Loose (API boundary)      | ✅ GOOD       |
-| Scanner             | Production         | Mobile UI → Output registration    | Loose (API boundary)      | ✅ GOOD       |
-| Settings            | All Modules        | Master data (warehouses, machines) | Loose (reference data)    | ✅ GOOD       |
-| Quality             | Warehouse          | qa_status on LP                    | Moderate (status check)   | ✅ ACCEPTABLE |
-| Quality             | Production         | qa_status blocks consumption       | Moderate (business logic) | ✅ ACCEPTABLE |
+| Module A | Module B | Integration Point | Coupling Type | Status |
+|----------|----------|-------------------|---------------|--------|
+| Planning (PO/TO/WO) | Warehouse (ASN/LP) | ASN references PO | Loose (foreign key) | ✅ GOOD |
+| Warehouse (LP) | Production (WO) | LP reservation to WO | Moderate (business logic) | ✅ ACCEPTABLE |
+| Production (WO) | Technical (BOM) | BOM snapshot to wo_materials | Loose (copy at creation) | ✅ GOOD |
+| Scanner | Warehouse | Mobile UI → API classes | Loose (API boundary) | ✅ GOOD |
+| Scanner | Production | Mobile UI → Output registration | Loose (API boundary) | ✅ GOOD |
+| Settings | All Modules | Master data (warehouses, machines) | Loose (reference data) | ✅ GOOD |
+| Quality | Warehouse | qa_status on LP | Moderate (status check) | ✅ ACCEPTABLE |
+| Quality | Production | qa_status blocks consumption | Moderate (business logic) | ✅ ACCEPTABLE |
 
 **Validation Result:** ✅ **Module boundaries are well-defined with appropriate coupling levels.**
 
@@ -424,35 +398,35 @@ PO Creation (Pattern #12)
 
 ## 3. Gaps & Missing Considerations
 
-### 3.1 Critical Gaps (Blocking MVP) - ✅ **ALL RESOLVED (2025-11-14)**
+### 3.1 Critical Gaps (Blocking MVP)
 
-| Gap #     | Description                               | Impact                            | Status                                                                                    |
-| --------- | ----------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------- |
-| **GAP-1** | Quality Module architecture not detailed  | 🔴 **HIGH** - MVP required module | ✅ **RESOLVED** - Added Pattern #23: QA Inspection Workflow + Pattern #24: CoA Generation |
-| **GAP-2** | Shipping Module architecture not detailed | 🔴 **HIGH** - MVP required module | ✅ **RESOLVED** - Added Pattern #25: Sales Order Flow + Pattern #26: BOL Generation       |
+| Gap # | Description | Impact | Action Required |
+|-------|-------------|--------|-----------------|
+| **GAP-1** | Quality Module architecture not detailed | 🔴 **HIGH** - MVP required module | Add Pattern #23: QA Inspection Workflow<br>Add Pattern #24: CoA Generation |
+| **GAP-2** | Shipping Module architecture not detailed | 🔴 **HIGH** - MVP required module | Add Pattern #25: Sales Order Flow<br>Add Pattern #26: BOL Generation |
 
 ---
 
 ### 3.2 Non-Critical Gaps (Acceptable for MVP)
 
-| Gap #     | Description                     | Impact                    | Action Required                                             |
-| --------- | ------------------------------- | ------------------------- | ----------------------------------------------------------- |
-| **GAP-3** | Machine-level costing details   | 🟡 **MEDIUM** - Growth P1 | Add detailed cost tracking schema in P1 architecture update |
-| **GAP-4** | Real-time dashboard UI patterns | 🟡 **MEDIUM** - UX design | Defer to UX design phase (not architecture blocker)         |
-| **GAP-5** | ML Planning architecture        | 🟡 **MEDIUM** - Growth P0 | Add ML pipeline architecture post-MVP                       |
-| **GAP-6** | BOM Cost Rollup algorithm       | 🟡 **MEDIUM** - Growth P1 | Add Pattern #27 before P1 implementation                    |
-| **GAP-7** | Visual Scheduling architecture  | 🟢 **LOW** - Growth P2    | Defer to P2 planning                                        |
-| **GAP-8** | pgAudit + E-Signatures          | 🟢 **LOW** - Growth P2    | Documented in Future Considerations, acceptable             |
+| Gap # | Description | Impact | Action Required |
+|-------|-------------|--------|-----------------|
+| **GAP-3** | Machine-level costing details | 🟡 **MEDIUM** - Growth P1 | Add detailed cost tracking schema in P1 architecture update |
+| **GAP-4** | Real-time dashboard UI patterns | 🟡 **MEDIUM** - UX design | Defer to UX design phase (not architecture blocker) |
+| **GAP-5** | ML Planning architecture | 🟡 **MEDIUM** - Growth P0 | Add ML pipeline architecture post-MVP |
+| **GAP-6** | BOM Cost Rollup algorithm | 🟡 **MEDIUM** - Growth P1 | Add Pattern #27 before P1 implementation |
+| **GAP-7** | Visual Scheduling architecture | 🟢 **LOW** - Growth P2 | Defer to P2 planning |
+| **GAP-8** | pgAudit + E-Signatures | 🟢 **LOW** - Growth P2 | Documented in Future Considerations, acceptable |
 
 ---
 
 ### 3.3 Minor Enhancements
 
-| Enhancement # | Description                             | Priority | Action                                                        |
-| ------------- | --------------------------------------- | -------- | ------------------------------------------------------------- |
-| **ENH-1**     | Add error handling patterns section     | 🟢 LOW   | Expand "Implementation Patterns" with error handling examples |
-| **ENH-2**     | Add performance optimization guidelines | 🟢 LOW   | Expand "Scalability Considerations" with specific thresholds  |
-| **ENH-3**     | Add security hardening checklist        | 🟢 LOW   | Expand "Security Hardening" with MVP vs Growth checklist      |
+| Enhancement # | Description | Priority | Action |
+|---------------|-------------|----------|--------|
+| **ENH-1** | Add error handling patterns section | 🟢 LOW | Expand "Implementation Patterns" with error handling examples |
+| **ENH-2** | Add performance optimization guidelines | 🟢 LOW | Expand "Scalability Considerations" with specific thresholds |
+| **ENH-3** | Add security hardening checklist | 🟢 LOW | Expand "Security Hardening" with MVP vs Growth checklist |
 
 ---
 
@@ -460,19 +434,19 @@ PO Creation (Pattern #12)
 
 ### 4.1 PRD Tech Stack vs Architecture
 
-| Component          | PRD Requirement               | Architecture Specification    | Status   |
-| ------------------ | ----------------------------- | ----------------------------- | -------- |
-| Frontend Framework | Next.js 15 App Router         | ✅ Next.js 15 App Router      | ✅ MATCH |
-| UI Framework       | React 19                      | ✅ React 19                   | ✅ MATCH |
-| Language           | TypeScript 5.7 (strict)       | ✅ TypeScript 5.7             | ✅ MATCH |
-| Database           | Supabase PostgreSQL 15        | ✅ Supabase PostgreSQL 15     | ✅ MATCH |
-| Auth               | Supabase Auth (JWT)           | ✅ Supabase Auth              | ✅ MATCH |
-| Storage            | Supabase Storage              | ✅ Supabase Storage           | ✅ MATCH |
-| Real-time          | Supabase Realtime             | ✅ WebSocket subscriptions    | ✅ MATCH |
-| Deployment         | Vercel                        | ✅ Vercel (standalone output) | ✅ MATCH |
-| E2E Testing        | Playwright                    | ✅ Playwright (100+ tests)    | ✅ MATCH |
-| Unit Testing       | Vitest                        | ✅ Vitest (95% target)        | ✅ MATCH |
-| PWA                | Offline-first, Service Worker | ✅ IndexedDB + Service Worker | ✅ MATCH |
+| Component | PRD Requirement | Architecture Specification | Status |
+|-----------|-----------------|----------------------------|--------|
+| Frontend Framework | Next.js 15 App Router | ✅ Next.js 15 App Router | ✅ MATCH |
+| UI Framework | React 19 | ✅ React 19 | ✅ MATCH |
+| Language | TypeScript 5.7 (strict) | ✅ TypeScript 5.7 | ✅ MATCH |
+| Database | Supabase PostgreSQL 15 | ✅ Supabase PostgreSQL 15 | ✅ MATCH |
+| Auth | Supabase Auth (JWT) | ✅ Supabase Auth | ✅ MATCH |
+| Storage | Supabase Storage | ✅ Supabase Storage | ✅ MATCH |
+| Real-time | Supabase Realtime | ✅ WebSocket subscriptions | ✅ MATCH |
+| Deployment | Vercel | ✅ Vercel (standalone output) | ✅ MATCH |
+| E2E Testing | Playwright | ✅ Playwright (100+ tests) | ✅ MATCH |
+| Unit Testing | Vitest | ✅ Vitest (95% target) | ✅ MATCH |
+| PWA | Offline-first, Service Worker | ✅ IndexedDB + Service Worker | ✅ MATCH |
 
 **Validation Result:** ✅ **Tech stack fully aligned between PRD and architecture.**
 
@@ -480,13 +454,13 @@ PO Creation (Pattern #12)
 
 ### 4.2 Performance Requirements
 
-| Requirement        | PRD Target        | Architecture Support                      | Status     |
-| ------------------ | ----------------- | ----------------------------------------- | ---------- |
-| Traceability query | <30 seconds       | ✅ Recursive CTE with indexes             | ✅ COVERED |
-| API response time  | <200ms p95        | ✅ Materialized views, connection pooling | ✅ COVERED |
-| Uptime             | 99.5% (MVP)       | ✅ Vercel + Supabase uptime SLA           | ✅ COVERED |
-| Offline sync       | <5 seconds        | ✅ IndexedDB cache, batched sync          | ✅ COVERED |
-| Real-time updates  | <1 second latency | ✅ Supabase Realtime WebSocket            | ✅ COVERED |
+| Requirement | PRD Target | Architecture Support | Status |
+|-------------|-----------|----------------------|--------|
+| Traceability query | <30 seconds | ✅ Recursive CTE with indexes | ✅ COVERED |
+| API response time | <200ms p95 | ✅ Materialized views, connection pooling | ✅ COVERED |
+| Uptime | 99.5% (MVP) | ✅ Vercel + Supabase uptime SLA | ✅ COVERED |
+| Offline sync | <5 seconds | ✅ IndexedDB cache, batched sync | ✅ COVERED |
+| Real-time updates | <1 second latency | ✅ Supabase Realtime WebSocket | ✅ COVERED |
 
 **Validation Result:** ✅ **Performance targets architecturally supported.**
 
@@ -494,13 +468,13 @@ PO Creation (Pattern #12)
 
 ### 4.3 Security Requirements
 
-| Requirement            | PRD Target                               | Architecture Support                    | Status     |
-| ---------------------- | ---------------------------------------- | --------------------------------------- | ---------- |
-| Multi-tenant isolation | org_id on all tables                     | ✅ RLS policies + app-level filter      | ✅ COVERED |
-| Role-based access      | 7 roles (Admin, Manager, Operator, etc.) | ✅ Pattern #15: Multi-Role Users        | ✅ COVERED |
-| Data encryption        | Transit + at rest                        | ✅ Supabase SSL + PostgreSQL encryption | ✅ COVERED |
-| Session management     | JWT, auto-refresh                        | ✅ Supabase Auth, middleware refresh    | ✅ COVERED |
-| Audit trail            | Basic (MVP), Full (P2)                   | ✅ created_by/updated_by, pgAudit in P2 | ✅ COVERED |
+| Requirement | PRD Target | Architecture Support | Status |
+|-------------|-----------|----------------------|--------|
+| Multi-tenant isolation | org_id on all tables | ✅ RLS policies + app-level filter | ✅ COVERED |
+| Role-based access | 7 roles (Admin, Manager, Operator, etc.) | ✅ Pattern #15: Multi-Role Users | ✅ COVERED |
+| Data encryption | Transit + at rest | ✅ Supabase SSL + PostgreSQL encryption | ✅ COVERED |
+| Session management | JWT, auto-refresh | ✅ Supabase Auth, middleware refresh | ✅ COVERED |
+| Audit trail | Basic (MVP), Full (P2) | ✅ created_by/updated_by, pgAudit in P2 | ✅ COVERED |
 
 **Validation Result:** ✅ **Security requirements architecturally supported.**
 
@@ -514,13 +488,13 @@ PO Creation (Pattern #12)
 
 **Sample Validation:**
 
-| Pattern    | Rule                                                             | Consistency Check                                                | Status        |
-| ---------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | ------------- |
-| Pattern #1 | "ALWAYS create LP at output registration"                        | Conflicts with Pattern #6? NO - intermediate ops also create LPs | ✅ CONSISTENT |
-| Pattern #2 | "NEVER mix automatic and manual consumption in same transaction" | Clear boundary defined                                           | ✅ CONSISTENT |
-| Pattern #3 | "ALWAYS check reservation before LP operations"                  | Enforced in all consumption/movement patterns                    | ✅ CONSISTENT |
-| Pattern #4 | "NEVER perform automatic UoM conversion"                         | Reinforced in Pattern #13 (LP Suggestions)                       | ✅ CONSISTENT |
-| Pattern #5 | "ALWAYS use pessimistic sync for ASN/Output/QA"                  | Clear categorization of critical vs non-critical ops             | ✅ CONSISTENT |
+| Pattern | Rule | Consistency Check | Status |
+|---------|------|-------------------|--------|
+| Pattern #1 | "ALWAYS create LP at output registration" | Conflicts with Pattern #6? NO - intermediate ops also create LPs | ✅ CONSISTENT |
+| Pattern #2 | "NEVER mix automatic and manual consumption in same transaction" | Clear boundary defined | ✅ CONSISTENT |
+| Pattern #3 | "ALWAYS check reservation before LP operations" | Enforced in all consumption/movement patterns | ✅ CONSISTENT |
+| Pattern #4 | "NEVER perform automatic UoM conversion" | Reinforced in Pattern #13 (LP Suggestions) | ✅ CONSISTENT |
+| Pattern #5 | "ALWAYS use pessimistic sync for ASN/Output/QA" | Clear categorization of critical vs non-critical ops | ✅ CONSISTENT |
 
 **Validation Result:** ✅ **AI Agent rules are consistent and non-contradictory.**
 
@@ -630,15 +604,13 @@ PO Creation (Pattern #12)
 
 ## 8. Final Validation Decision
 
-### ✅ **ARCHITECTURE APPROVED FOR IMPLEMENTATION (Updated 2025-11-14)**
+### ✅ **ARCHITECTURE APPROVED FOR IMPLEMENTATION**
 
-**Status:** 🟢 **ALL CONDITIONS MET - READY TO START MVP IMPLEMENTATION**
+**Conditions:**
 
-**Conditions (Updated):**
-
-1. ~~**Before starting MVP implementation:**~~
-   - ~~Add Quality Module architecture (Pattern #23-24) - 1-2 days~~ ✅ **COMPLETE (2025-11-14)**
-   - ~~Add Shipping Module architecture (Pattern #25-26) - 1-2 days~~ ✅ **COMPLETE (2025-11-14)**
+1. **Before starting MVP implementation:**
+   - Add Quality Module architecture (Pattern #23-24) - 1-2 days
+   - Add Shipping Module architecture (Pattern #25-26) - 1-2 days
 
 2. **Before starting P1 (BOM Cost Calculation):**
    - Add Pattern #27: BOM Cost Rollup
@@ -648,17 +620,15 @@ PO Creation (Pattern #12)
 
 **Justification:**
 
-- **26 patterns** fully documented with code examples (including Quality & Shipping)
-- **All 7 MVP modules** (Scanner, Production, Planning, Technical, Settings, Quality, Shipping) architecturally complete
-- **Zero blocking gaps** - all critical architecture work complete
+- 22 patterns fully documented with code examples
+- All existing MVP modules (Scanner, Production, Planning, Technical, Settings) architecturally complete
+- 2 missing modules (Quality, Shipping) are 0% implemented, so architecture can be added in parallel with development
 - No blocking conflicts or inconsistencies
 - Regulatory compliance path defined
 - Tech stack aligned
 - Performance and security requirements met
 
-**Risk Assessment:** 🟢 **ZERO RISK** - Architecture is complete and validated for MVP implementation.
-
-**Go/No-Go Decision:** ✅ **GO** - Proceed to implementation phase.
+**Risk Assessment:** 🟢 **LOW RISK** - Missing module architectures can be added incrementally.
 
 ---
 
@@ -686,13 +656,4 @@ PO Creation (Pattern #12)
 
 **Report End**
 
-**Architecture Statistics (Updated 2025-11-14):**
-
-- **Patterns Validated:** 26/26 (100%) - includes 22 original + 4 new (Quality & Shipping)
-- **Module Coverage:** 7/7 MVP modules (100%) - ALL modules architecturally complete
-- **Critical Gaps:** 0 - all resolved
-- **PRD Requirements:** 100% architecturally covered
-- **Tech Stack Alignment:** 100%
-- **Regulatory Compliance:** On track (77% → 90%+)
-
-**Next Step:** ✅ **Proceed to solutioning-gate-check** - Architecture complete and validated.
+**Next Step:** Proceed to **solutioning-gate-check** or address critical gaps (Quality/Shipping architecture).

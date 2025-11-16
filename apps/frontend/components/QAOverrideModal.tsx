@@ -73,11 +73,11 @@ export function QAOverrideModal({
     const options = [];
     
     switch (currentStatus) {
-      case 'Pending':
+      case 'pending':
         options.push(
           { value: 'Passed', label: 'Passed', color: 'text-green-600' },
-          { value: 'Failed', label: 'Failed', color: 'text-red-600' },
-          { value: 'Quarantine', label: 'Quarantine', color: 'text-orange-600' }
+          { value: 'failed', label: 'Failed', color: 'text-red-600' },
+          { value: 'on_hold', label: 'On Hold', color: 'text-orange-600' }
         );
         break;
       case 'Failed':
@@ -94,8 +94,8 @@ export function QAOverrideModal({
         break;
       case 'Passed':
         options.push(
-          { value: 'Failed', label: 'Failed', color: 'text-red-600' },
-          { value: 'Quarantine', label: 'Quarantine', color: 'text-orange-600' }
+          { value: 'failed', label: 'Failed', color: 'text-red-600' },
+          { value: 'on_hold', label: 'On Hold', color: 'text-orange-600' }
         );
         break;
     }
@@ -111,7 +111,7 @@ export function QAOverrideModal({
         return 'bg-red-100 text-red-800 border-red-200';
       case 'Quarantine':
         return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'Pending':
+      case 'pending':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';

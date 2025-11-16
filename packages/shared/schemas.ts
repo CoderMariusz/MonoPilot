@@ -4,4 +4,17 @@ export const userRoleSchema = z.enum(['Operator', 'Planner', 'Technical', 'Purch
 
 export const workOrderStatusSchema = z.enum(['Released', 'Started', 'In Progress', 'Completed', 'Closed']);
 
-export const licensePlateStatusSchema = z.enum(['Available', 'Reserved', 'In Production', 'QA Hold', 'QA Released', 'QA Rejected', 'Shipped']);
+export const licensePlateStatusSchema = z.enum([
+  'available',
+  'reserved',
+  'in_production',
+  'consumed',
+  'in_transit',
+  'quarantine',
+  'qa_passed',
+  'qa_rejected',
+  'shipped',
+  'damaged'
+]);
+
+export const qaStatusSchema = z.enum(['pending', 'passed', 'failed', 'on_hold']);

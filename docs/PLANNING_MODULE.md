@@ -92,7 +92,13 @@ PurchaseOrdersAPI.delete(id); // Delete draft PO only
    - draft → submitted: Approval required
    - submitted → in_transit: Ship materials (markShipped RPC)
    - in_transit → received: Receive materials (markReceived RPC)
-   - received → closed: Finalize transfer
+   - received → closed: Finalize transfer (inventory reconciled, audit trail complete)
+   - **When to close a TO:**
+     * All materials received and confirmed in destination warehouse
+     * Discrepancies (if any) resolved
+     * Audit trail complete
+     * TO no longer editable
+   - **Note:** TOs can be cancelled from any status before 'closed'
 
 **API Methods:**
 

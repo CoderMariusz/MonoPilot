@@ -319,7 +319,7 @@ describe('PalletsAPI', () => {
         id: 100,
         lp_number: 'LP-2025-001',
         is_consumed: false,
-        qa_status: 'Pending',
+        qa_status: 'pending',
       };
 
       vi.mocked(supabase.from)

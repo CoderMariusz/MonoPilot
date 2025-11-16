@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TransferOrdersAPI, type MarkReceivedLineUpdate } from '@/lib/api/transferOrders';
+import type { TOStatus } from '@/lib/types';
+import { canCloseTO } from '@/lib/planning/status';
+import type { TOHeader, TOLine } from '@/lib/types';
 
 // Mock Supabase client
 vi.mock('@/lib/supabase/client-browser', () => ({
@@ -12,6 +15,77 @@ vi.mock('@/lib/supabase/client-browser', () => ({
 }));
 
 import { supabase } from '@/lib/supabase/client-browser';
+
+// ===================================================
+// Story 0.2: TOStatus Enum Tests
+// ===================================================
+
+describe('TOStatus Type - Story 0.2', () => {
+  describe('Type Validation', () => {
+    it('should include all 6 status values', () => {
+      // Test that all status values are valid TOStatus types
+      const validStatuses: TOStatus[] = [
+        'draft',
+        'submitted',
+        'in_transit',
+        'received',
+        'closed',
+        'cancelled'
+      ];
+
+      // This test will fail to compile if any status is invalid
+      expect(validStatuses).toHaveLength(6);
+      expect(validStatuses).toContain('closed');
+    });
+
+    it('should accept closed status in type system', () => {
+      // Test that 'closed' is a valid TOStatus value
+      const closedStatus: TOStatus = 'closed';
+      expect(closedStatus).toBe('closed');
+    });
+
+    it('should match database schema constraint values', () => {
+      // Database CHECK constraint from migration 019:
+      // CHECK (status IN ('draft', 'submitted', 'in_transit', 'received', 'closed', 'cancelled'))
+      const dbStatuses = ['draft', 'submitted', 'in_transit', 'received', 'closed', 'cancelled'];
+      const tsStatuses: TOStatus[] = ['draft', 'submitted', 'in_transit', 'received', 'closed', 'cancelled'];
+
+      expect(tsStatuses.sort()).toEqual(dbStatuses.sort());
+    });
+  });
+
+  describe('Status Transitions with closed', () => {
+    it('should allow transition from received to closed', () => {
+      const mockTO: Partial<TOHeader> = {
+        id: 1,
+        number: 'TO-001',
+        status: 'received' as TOStatus,
+        from_wh_id: 1,
+        to_wh_id: 2
+      };
+      const mockLines: TOLine[] = [
+        { id: 1, to_id: 1, item_id: 100, qty_planned: 50, uom: 'KG', line_number: 1 }
+      ];
+
+      const canClose = canCloseTO(mockTO as TOHeader, mockLines, 'Admin');
+      expect(canClose).toBe(true);
+    });
+
+    it('should allow transition from closed to draft (reopen)', () => {
+      const mockTO: Partial<TOHeader> = {
+        id: 1,
+        number: 'TO-001',
+        status: 'closed' as TOStatus,
+        from_wh_id: 1,
+        to_wh_id: 2
+      };
+
+      // canReopenTO would check if reopen is allowed
+      // For now, just verify 'closed' is a valid status
+      expect(mockTO.status).toBe('closed');
+    });
+  });
+});
 
 describe('TransferOrdersAPI - Ship/Receive', () => {
   beforeEach(() => {

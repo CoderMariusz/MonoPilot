@@ -1,7 +1,7 @@
 # Technical Debt TODO - MonoPilot
 
-**Last Updated**: January 11, 2025  
-**Overall Progress**: 3/8 Complete (37.5%)
+**Last Updated**: 2025-11-15
+**Overall Progress**: 3/9 Complete (33.3%)
 
 ---
 
@@ -12,7 +12,7 @@
 | **P0 - Critical** | 1/1 Complete ✅ | 1 item | Must fix before Phase 1 |
 | **P1 - High** | 2/3 Complete ✅ | 3 items | Fix during Phase 1 |
 | **P2 - Medium** | 0/2 Complete ❌ | 2 items | Fix during Phase 2 |
-| **P3 - Low** | 0/2 Complete ❌ | 2 items | Nice to have |
+| **P3 - Low** | 0/3 Complete ❌ | 3 items | Nice to have |
 
 ---
 
@@ -383,20 +383,90 @@ Implement when team grows (5+ developers) or deployment frequency increases (>5 
 
 ---
 
+### ❌ TD-009: Unit Tests for Schema Generation Scripts - **NOT STARTED**
+
+**Category**: Testing / Tooling
+**Impact**: LOW - Scripts work correctly, validation exists
+**Effort**: 4 hours
+**Status**: ❌ **NOT STARTED** - Nice to have for maintainability
+**Source**: Story 0.12 Code Review Advisory Note
+
+#### Current State:
+- Schema generation scripts (`scripts/generate-master-migration.mjs`) work correctly
+- Manual validation performed (syntax checks, table count, topological ordering)
+- POC and full migration tested successfully
+
+#### Target State:
+- Unit tests for `TABLE_LEVELS` topological sort logic
+- Tests for edge cases (circular dependencies, self-referential FKs)
+- Automated regression testing for generation workflow
+
+#### Implementation Plan:
+
+**Test Suite Structure**:
+```javascript
+// scripts/__tests__/generate-master-migration.test.mjs
+
+describe('TABLE_LEVELS topological sorting', () => {
+  test('should place tables with no dependencies at level 0', () => {
+    // Test: users, suppliers, warehouses, etc.
+  });
+
+  test('should place tables with level 0 dependencies at level 1', () => {
+    // Test: locations → warehouses
+  });
+
+  test('should handle self-referential FKs correctly', () => {
+    // Test: license_plates.parent_lp_id → license_plates
+  });
+
+  test('should detect circular dependencies', () => {
+    // Test: Table A → B, Table B → A pattern
+  });
+});
+
+describe('extractTableSQL', () => {
+  test('should extract CREATE TABLE from Architecture.md', () => {
+    // Test: SQL block extraction
+  });
+
+  test('should return null for missing tables', () => {
+    // Test: error handling
+  });
+});
+```
+
+**Testing Framework**: Vitest (already used in project)
+
+**Coverage Target**: 80% for generation scripts
+
+#### Priority:
+**P3 - Low** - Scripts are production-ready and validated. Unit tests would improve maintainability but not critical for current use.
+
+#### Recommendation:
+Implement when:
+- Schema generation workflow needs extension (new features)
+- Team onboarding requires test-driven examples
+- Frequent modifications to TABLE_LEVELS require regression testing
+
+**Defer until**: Phase 2 or when generation scripts are actively modified.
+
+---
+
 ## 📈 Overall Progress
 
 ### Summary Statistics:
 
 | Metric | Value |
 |--------|-------|
-| **Total TD Items** | 8 |
-| **Completed** | 3 (37.5%) |
-| **In Progress** | 1 (12.5%) |
-| **Not Started** | 4 (50%) |
+| **Total TD Items** | 9 |
+| **Completed** | 3 (33.3%) |
+| **In Progress** | 1 (11.1%) |
+| **Not Started** | 5 (55.6%) |
 | **P0 Complete** | 1/1 (100%) ✅ |
 | **P1 Complete** | 2/3 (67%) 🟡 |
 | **P2 Complete** | 0/2 (0%) ❌ |
-| **P3 Complete** | 0/2 (0%) ❌ |
+| **P3 Complete** | 0/3 (0%) ❌ |
 
 ### Completion Timeline:
 
@@ -482,7 +552,7 @@ No immediate action required. Focus on feature development.
 
 ---
 
-**Last Updated**: January 11, 2025  
-**Next Review**: When LP/Traceability modules enter development  
+**Last Updated**: 2025-11-15 (Added TD-009: Schema Generation Unit Tests)
+**Next Review**: When LP/Traceability modules enter development
 **Overall Health**: ✅ **GOOD** - All critical TD items resolved or in acceptable state
 

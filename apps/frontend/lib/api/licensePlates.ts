@@ -1,10 +1,11 @@
 import { supabase } from '../supabase/client-browser';
+import type { QAStatus } from '../types';
 
 // License Plates API - Warehouse license plate management
 export class LicensePlatesAPI {
   // Get all license plates with filters
   static async getAll(filters?: {
-    qa_status?: 'Pending' | 'Passed' | 'Failed' | 'Quarantine';
+    qa_status?: QAStatus;
     location?: string;
     product_id?: number;
     stage_suffix?: string;
@@ -729,6 +730,111 @@ export class LicensePlatesAPI {
       };
     } catch (error) {
       console.error('Error fetching LP details:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all valid Units of Measure from uom_master table
+   * @returns Array of UoM objects with code, display_name, and category
+   */
+  static async getValidUoMs(): Promise<Array<{
+    code: string;
+    display_name: string;
+    category: string;
+  }>> {
+    try {
+      const { data, error } = await supabase
+        .from('uom_master')
+        .select('code, display_name, category')
+        .order('category', { ascending: true })
+        .order('code', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching valid UoMs:', error);
+      throw new Error('Failed to fetch valid units of measure');
+    }
+  }
+
+  /**
+   * Validate UoM against uom_master table
+   * @param uom - Unit of measure code to validate
+   * @returns true if valid, false otherwise
+   */
+  static async validateUoM(uom: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('uom_master')
+        .select('code')
+        .eq('code', uom)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = not found (expected for invalid UoM)
+        throw error;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Error validating UoM:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Create new License Plate
+   * Story 1.7.1 - Single-Screen Scanner
+   * @param data - License Plate creation data
+   * @returns Created license plate
+   */
+  static async create(data: {
+    lp_number: string;
+    product_id: number;
+    quantity: number;
+    uom: string;
+    location_id: number;
+    warehouse_id: number;
+    status: 'available' | 'reserved' | 'consumed' | 'in_transit' | 'quarantine' | 'damaged';
+    qa_status?: 'pending' | 'passed' | 'failed' | 'on_hold';
+    batch_number?: string;
+    expiry_date?: string | null;
+    grn_id?: number;
+    po_number?: string;
+    supplier_batch_number?: string;
+  }): Promise<any> {
+    try {
+      const { data: lp, error } = await supabase
+        .from('license_plates')
+        .insert({
+          lp_number: data.lp_number,
+          product_id: data.product_id,
+          quantity: data.quantity,
+          uom: data.uom,
+          location_id: data.location_id,
+          status: data.status,
+          qa_status: data.qa_status || 'pending',
+          batch_number: data.batch_number,
+          expiry_date: data.expiry_date,
+          origin_type: 'GRN',
+          origin_ref: {
+            grn_id: data.grn_id,
+            po_number: data.po_number,
+            supplier_batch_number: data.supplier_batch_number,
+          },
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[LicensePlatesAPI.create] Error:', error);
+        throw new Error(`Failed to create license plate: ${error.message}`);
+      }
+
+      return lp;
+    } catch (error: any) {
+      console.error('[LicensePlatesAPI.create] Error:', error);
       throw error;
     }
   }

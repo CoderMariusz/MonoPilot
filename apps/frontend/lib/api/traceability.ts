@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client-browser';
+import type { QAStatus } from '../types';
 
 // Traceability API utilities for forward and backward traceability
 
@@ -32,7 +33,7 @@ export interface LPNode {
   quantity: number;
   uom: string;
   location: string;
-  qa_status: 'Pending' | 'Passed' | 'Failed' | 'Quarantine';
+  qa_status: QAStatus;
   stage_suffix: string;
   parent_lp_id?: number;
   parent_lp_number?: string;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, ArrowRight, ArrowLeft, Package, Users, Calendar, Search } from 'lucide-react';
+import { getLPStatusColor, getLPStatusLabel } from '@/lib/warehouse/lpStatus';
 
 interface TraceLPModalProps {
   isOpen: boolean;

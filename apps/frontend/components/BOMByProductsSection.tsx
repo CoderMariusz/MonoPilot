@@ -49,7 +49,7 @@ export default function BOMByProductsSection({
     const newByProduct: BomItemInput = {
       material_id: null,
       quantity: 0, // Not used for by-products
-      uom: 'kg',
+      uom: 'KG',
       is_by_product: true,
       yield_percentage: null,
       sequence: byProducts.length + 1,

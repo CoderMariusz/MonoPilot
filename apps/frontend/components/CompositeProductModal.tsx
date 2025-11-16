@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { createComposite } from '@/lib/api/products.createComposite';
-import type { ProductInsert, BomItemInput, ExpiryPolicy, Product } from '@/lib/types';
+import type { ProductInsert, BomItemInput, ExpiryPolicy, Product, UoM } from '@/lib/types';
 import { supabase } from '@/lib/supabase/client-browser';
 import { toast } from '@/lib/toast';
 import ProductSelect from '@/components/ProductSelect';
@@ -1093,7 +1093,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
             <label className="block text-sm font-medium text-slate-700 mb-1">UoM</label>
             <select
               value={product.uom ?? ''}
-              onChange={e => setProduct(p => ({ ...p, uom: e.target.value }))}
+              onChange={e => setProduct(p => ({ ...p, uom: e.target.value as UoM }))}
               disabled={bomStatus === 'active' && !!editingProduct}
               className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
             >

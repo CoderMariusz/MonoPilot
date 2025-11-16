@@ -5,6 +5,7 @@ import { X, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { QAStatus, LicensePlate } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import { QA_STATUS_VALUES, getQAStatusLabel, getQAStatusColor } from '@/lib/warehouse/qaStatus';
 
 interface ChangeQAStatusModalProps {
   lpId: number;
@@ -13,11 +14,9 @@ interface ChangeQAStatusModalProps {
   onSuccess?: () => void;
 }
 
-const QA_STATUSES: QAStatus[] = ['Pending', 'Passed', 'Failed', 'Quarantine'];
-
 export function ChangeQAStatusModal({ lpId, isOpen, onClose, onSuccess }: ChangeQAStatusModalProps) {
   const [lp, setLp] = useState<LicensePlate | null>(null);
-  const [qaStatus, setQAStatus] = useState<QAStatus>('Pending');
+  const [qaStatus, setQAStatus] = useState<QAStatus>('pending');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -46,7 +45,7 @@ export function ChangeQAStatusModal({ lpId, isOpen, onClose, onSuccess }: Change
       if (error) throw error;
       
       setLp(data);
-      setQAStatus((data.qa_status as QAStatus) || 'Pending');
+      setQAStatus((data.qa_status as QAStatus) || 'pending');
     } catch (error) {
       console.error('Error loading license plate:', error);
       toast.error('Failed to load license plate');
@@ -150,13 +149,8 @@ export function ChangeQAStatusModal({ lpId, isOpen, onClose, onSuccess }: Change
                 Current QA Status
               </label>
               <div className="px-3 py-2 border border-slate-300 rounded-md bg-slate-50">
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                  lp.qa_status === 'Passed' ? 'bg-green-100 text-green-800' :
-                  lp.qa_status === 'Failed' ? 'bg-red-100 text-red-800' :
-                  lp.qa_status === 'Quarantine' ? 'bg-orange-100 text-orange-800' :
-                  'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {lp.qa_status}
+                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${getQAStatusColor(lp.qa_status as QAStatus)}`}>
+                  {getQAStatusLabel(lp.qa_status as QAStatus)}
                 </span>
               </div>
             </div>
@@ -171,8 +165,8 @@ export function ChangeQAStatusModal({ lpId, isOpen, onClose, onSuccess }: Change
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
                 required
               >
-                {QA_STATUSES.map((status) => (
-                  <option key={status} value={status}>{status}</option>
+                {QA_STATUS_VALUES.map((status) => (
+                  <option key={status} value={status}>{getQAStatusLabel(status)}</option>
                 ))}
               </select>
             </div>

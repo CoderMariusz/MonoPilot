@@ -88,8 +88,8 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
         product_id: item.product_id.toString(),
         location_id: item.location_id.toString(),
         quantity: parseFloat(item.quantity_received),
-        status: 'Available',
-        qa_status: 'Passed',
+        status: 'available',
+        qa_status: 'passed',
         grn_id: null,
       });
 
