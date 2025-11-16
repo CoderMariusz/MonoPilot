@@ -1,5 +1,5 @@
 # Sprint Status - MonoPilot Implementation Tracking
-# Generated: 2025-11-14
+# Generated: 2025-11-16
 # Project: MonoPilot
 # Project Key: monopilot
 # Tracking System: BMM Method
@@ -18,6 +18,7 @@
 #   - in-progress: Developer actively working on implementation
 #   - review: Under SM review (via code-review workflow)
 #   - done: Story completed
+#   - superseded: Story replaced by alternative approach
 #
 # Retrospective Status:
 #   - optional: Can be completed but not required
@@ -37,10 +38,10 @@
 # Epic 0 tracks audit and fixes for P0 modules (PREREQUISITE for Phase 1).
 # Phases 1-4 track NEW features from roadmaps (P1/P2 priorities).
 
-generated: 2025-11-14
+generated: 2025-11-16
 project: MonoPilot
 project_key: monopilot
-tracking_system: BMM Method
+tracking_system: file-system
 story_location: docs/sprint-artifacts
 audit_report: docs/P0-MODULES-AUDIT-REPORT-2025-11-14.md
 
@@ -59,28 +60,133 @@ development_status:
   0-1-fix-po-header-warehouse-id: done
 
   # Story 0.2: Fix TO Status enum (MEDIUM)
-  0-2-fix-to-status-enum: backlog
+  0-2-fix-to-status-enum: done
 
   # Story 0.3: Fix License Plate Status enum (CRITICAL)
-  0-3-fix-lp-status-enum: backlog
+  0-3-fix-lp-status-enum: done
 
   # Story 0.4: Fix License Plate QA Status enum (MEDIUM)
-  0-4-fix-lp-qa-status-enum: backlog
+  0-4-fix-lp-qa-status-enum: done
 
-  # Story 0.5: Fix License Plate UoM constraint (MEDIUM)
-  0-5-fix-lp-uom-constraint: backlog
+  # Story 0.5: Fix License Plate UoM constraint (MEDIUM) - SUPERSEDED by 0.8 (reset strategy)
+  0-5-fix-lp-uom-constraint: superseded
 
-  # Story 0.6: Deep Audit - Work Orders, Products, BOMs (VERIFICATION)
-  0-6-deep-audit-wo-products-boms: backlog
+  # Story 0.6: Deep Audit - Work Orders, Products, BOMs (VERIFICATION) - SUPERSEDED by 0.8 (reset strategy)
+  0-6-deep-audit-wo-products-boms: superseded
 
-  # Story 0.7: Automated Validation Tests (PREVENTION)
-  0-7-automated-validation-tests: backlog
+  # Story 0.7: Automated Validation Tests (PREVENTION) - MOVED to Epic 1 (post-reset)
+  0-7-automated-validation-tests: superseded
+
+  # ========================================
+  # NEW STORIES from Brainstorming Session (2025-11-15)
+  # Strategy Change: Incremental fixes → Database Reset + Architecture.md as Single Source
+  # Reference: docs/brainstorming-session-results-2025-11-15.md
+  # ========================================
+
+  # Story 0.8: Konsolidacja Migracji (64 → 1 Master) (CRITICAL)
+  0-8-konsolidacja-migracji: done
+
+  # Story 0.9: Database Reset Execution (CRITICAL)
+  0-9-database-reset-execution: done
+
+  # Story 0.10: Fix Session Management (MEDIUM)
+  0-10-fix-session-management: done
+
+  # Story 0.11: Architecture.md Completeness Audit (LOW)
+  0-11-architecture-completeness-audit: done
+
+  # Story 0.12: Architecture.md Auto-Generation Setup (LOW)
+  0-12-architecture-auto-generation-setup: done
 
   epic-0-retrospective: optional
 
   # ========================================
+  # NPD MODULE EPICS (Premium Add-On - Separate Track)
+  # Runs in parallel with MonoPilot core development
+  # Duration: 4-6 weeks (7 epics, 47 stories)
+  # Reference: docs/NPD-Module-Epics.md
+  # ========================================
+
+  # Epic NPD-6: Database Schema & Infrastructure (FOUNDATION - MUST BE FIRST)
+  epic-npd-6: backlog
+  npd-6-1-create-core-npd-tables: ready-for-dev
+  npd-6-2-create-supporting-npd-tables: ready-for-dev
+  npd-6-3-implement-rls-policies: ready-for-dev
+  npd-6-4-modify-existing-tables-for-npd: ready-for-dev
+  npd-6-5-create-temporal-versioning-constraints: ready-for-dev
+  npd-6-6-setup-edge-functions-cicd: ready-for-dev
+  epic-npd-6-retrospective: optional
+
+  # Epic NPD-1: Core NPD Project Management
+  epic-npd-1: backlog
+  npd-1-1-npdprojectsapi-crud-operations: backlog
+  npd-1-2-stage-gate-workflow-logic: backlog
+  npd-1-3-npd-dashboard-kanban-board-ui: backlog
+  npd-1-4-gate-checklists-management: backlog
+  npd-1-5-approval-workflow-integration: backlog
+  npd-1-6-timeline-view-csv-export: backlog
+  npd-1-7-rbac-implementation: backlog
+  npd-1-8-notifications-architecture-implementation: backlog
+  npd-1-9-project-detail-page-navigation: backlog
+  npd-1-10-e2e-tests-for-core-project-management: backlog
+  epic-npd-1-retrospective: optional
+
+  # Epic NPD-2: Formulation Versioning & Management
+  epic-npd-2: backlog
+  npd-2-1-formulationsapi-crud-versioning-logic: backlog
+  npd-2-2-formulation-items-management: backlog
+  npd-2-3-allergen-auto-aggregation: backlog
+  npd-2-4-effective-date-management-overlap-detection: backlog
+  npd-2-5-version-locking-immutability: backlog
+  npd-2-6-formulation-lineage-tracking: backlog
+  npd-2-7-version-comparison-ui: backlog
+  npd-2-8-clone-formulation-feature: backlog
+  npd-2-9-formulation-spreadsheet-editor-ui: backlog
+  epic-npd-2-retrospective: optional
+
+  # Epic NPD-3: Handoff Wizard (NPD → Production)
+  epic-npd-3: backlog
+  npd-3-1-handoff-wizard-step-1-validation-checklist: backlog
+  npd-3-2-handoff-wizard-step-2-product-decision: backlog
+  npd-3-3-handoff-wizard-step-3-bom-transfer-logic: backlog
+  npd-3-4-handoff-wizard-step-4-pilot-wo-creation: backlog
+  npd-3-5-handoff-wizard-step-5-execute-transactionally: backlog
+  npd-3-6-event-sourcing-implementation: backlog
+  npd-3-7-npd-only-mode-excel-pdf-export: backlog
+  npd-3-8-handoff-wizard-ui-5-step-stepper: backlog
+  epic-npd-3-retrospective: optional
+
+  # Epic NPD-4: Risk Management
+  epic-npd-4: backlog
+  npd-4-1-risksapi-crud-operations: backlog
+  npd-4-2-risk-score-calculation: backlog
+  npd-4-3-mitigation-tracking-status-workflow: backlog
+  npd-4-4-risk-matrix-ui: backlog
+  epic-npd-4-retrospective: optional
+
+  # Epic NPD-5: Costing & Compliance
+  epic-npd-5: backlog
+  npd-5-1-costingapi-target-estimated-actual-cost-management: backlog
+  npd-5-2-cost-variance-calculation-alerts: backlog
+  npd-5-3-finance-approval-workflow-for-standard-cost: backlog
+  npd-5-4-document-upload-supabase-storage-integration: backlog
+  npd-5-5-document-metadata-tracking-history: backlog
+  npd-5-6-compliance-checklist-validation: backlog
+  epic-npd-5-retrospective: optional
+
+  # Epic NPD-7: E2E Testing & Documentation
+  epic-npd-7: backlog
+  npd-7-1-e2e-test-suite-full-npd-flow: backlog
+  npd-7-2-e2e-test-suite-dual-mode-scenarios: backlog
+  npd-7-3-performance-testing: backlog
+  npd-7-4-api-documentation-generation: backlog
+  npd-7-5-user-guide-release-notes: backlog
+  epic-npd-7-retrospective: optional
+
+  # ========================================
   # PHASE 1: Compliance & Audit Foundation (0-3 Months)
   # Priority: P1 (Critical - Market Entry Blockers)
+  # Reference: docs/MonoPilot-PRD-2025-11-13.md
   # ========================================
 
   # Epic 1.1: Enable pgAudit Extension (Audit Trail)
@@ -98,20 +204,64 @@ development_status:
   1-3-fsma-204-compliance-enhancements: backlog
   epic-1-3-retrospective: optional
 
-  # Epic 1.4: Fix Planning Module UI/Data Gaps
+  # Epic 1.4: Planning Module Complete Redesign (EXPANDED - UX + Data Integrity)
+  # Duration: 5-6 weeks | ROI: $296k/year | Source: ux-design-planning-module.md
   epic-1-4: backlog
-  1-4-fix-planning-module-ui-data-gaps: backlog
+
+  # Phase 0: Planning UX Redesign (P0 - CRITICAL)
+  1-4-1-spreadsheet-mode-bulk-creation: backlog  # Variant B: Excel-like, inline edit, keyboard shortcuts (8-10 days)
+  1-4-2-timeline-mode-visual-scheduling: backlog  # Variant C: Gantt, drag-drop, visual conflicts (6-8 days)
+  1-4-3-wizard-mode-onboarding: backlog           # Variant D: Step-by-step for new users (4-5 days)
+
+  # Phase 1: Data Integrity Fixes (P1)
+  1-4-4-planning-data-integrity-fixes: backlog    # Fix existing data gaps (5-10 days)
+
   epic-1-4-retrospective: optional
 
-  # Epic 1.5: Production Dashboard (Real-Time KPIs)
+  # Epic 1.5: Production Module Complete Redesign (EXPANDED - UX + Dashboard)
+  # Duration: 5 weeks | ROI: $180k/year | Source: ux-design-production-module.md
   epic-1-5: backlog
-  1-5-production-dashboard-real-time-kpis: backlog
+
+  # Phase 0: Production UX Redesign (P0 - CRITICAL)
+  1-5-1-wo-kanban-board-variant-b: backlog        # Kanban: drag-drop WO cards, real-time updates (6-8 days)
+  1-5-2-production-templates-variant-c: backlog   # Templates: save/reuse WO setups (4-5 days)
+  1-5-3-realtime-dashboard-widgets: backlog       # Widgets: OEE, utilization, shortages (5-7 days)
+
+  # Phase 1: Advanced Analytics (P1)
+  1-5-4-advanced-analytics-variant-d: backlog     # Analytics: trends, predictions (5-10 days)
+
   epic-1-5-retrospective: optional
 
-  # Epic 1.6: Additional Phase 1 Tasks
+  # Epic 1.6: Technical + Settings UX Redesign (EXPANDED - NEW SCOPE)
+  # Duration: 6-8 weeks | ROI: $41k/year | Source: ux-design-technical-module.md + ux-design-settings-module.md
   epic-1-6: backlog
-  1-6-additional-phase-1-tasks: backlog
+
+  # Phase 0: Technical Module UX Redesign (P0)
+  1-6-1-grouped-dashboard-3-categories: backlog   # Products, BOMs, Routings grouped (5-7 days)
+  1-6-2-bom-timeline-multi-version: backlog       # Visual BOM version timeline, drag-drop dates (6-8 days)
+  1-6-3-allergen-matrix-visualization: backlog    # Cross-contamination matrix, PDF export (4-5 days)
+
+  # Phase 1: Settings Module UX Redesign (P1)
+  1-6-4-settings-wizard-onboarding: backlog       # 6-step org setup wizard (5-7 days)
+  1-6-5-settings-templates-preconfig: backlog     # Pre-configured templates for food/beverage (3-4 days)
+
   epic-1-6-retrospective: optional
+
+  # Epic 1.7: Scanner Module UX Redesign (NEW EPIC - CRITICAL)
+  # Duration: 4-5 weeks | ROI: $250k/year | Source: ux-design-scanner-module.md
+  # Priority: P0 (implement FIRST - highest frequency, biggest ROI)
+  epic-1-7: contexted
+
+  # Phase 0: Scanner UX Redesign MVP (P0 - CRITICAL)
+  1-7-1-single-screen-scanner-variant-b: in-progress  # Camera viewfinder, single-screen UI, offline queue (CHANGES REQUESTED - address AC-4 gaps)
+  1-7-2-gloves-friendly-tap-targets: backlog      # 60px buttons, 16px spacing, visual feedback (2-3 days)
+  1-7-3-offline-indicator-queue: backlog          # Offline badge, queue counter, auto-sync (2 days)
+
+  # Phase 1: Scanner Pro Features (P1)
+  1-7-4-bulk-mode-variant-d: backlog              # Desktop table view, keyboard shortcuts, expert toggle (5-7 days)
+  1-7-5-camera-performance-optimization: backlog  # <1s start, barcode overlay, multi-format (2-3 days)
+
+  epic-1-7-retrospective: optional
 
   # ========================================
   # PHASE 2: Operational Excellence (3-6 Months)

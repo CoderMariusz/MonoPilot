@@ -38,7 +38,7 @@ workflow_status:
 
   # Phase 2: Solutioning
   create-architecture: docs/architecture.md  # agent: architect (completed 2025-11-14)
-  test-design: required  # agent: tea
+  test-design: docs/test-design.md  # agent: tea (completed 2025-11-15)
   create-security-architecture: optional  # agent: architect
   create-devops-strategy: optional  # agent: architect
   validate-architecture: docs/architecture-validation-report.md  # agent: architect (completed 2025-11-14)
@@ -53,3 +53,31 @@ workflow_status:
 
   # Phase 3: Implementation (BLOCKED until Epic 0 complete)
   sprint-planning: docs/sprint-artifacts/sprint-status.yaml  # agent: sm (completed 2025-11-14)
+
+# NPD MODULE WORKFLOW (Premium Add-On)
+# Separate track from MonoPilot core - runs in parallel with Epic 0
+npd_module_workflow:
+  # Phase 0: Discovery
+  brainstorm-npd: docs/brainstorming-npd-module-2025-11-15.md  # agent: analyst (completed 2025-11-15)
+
+  # Phase 1: Planning
+  prd-npd: docs/MonoPilot-NPD-Module-PRD-2025-11-15.md  # agent: pm (completed 2025-11-15)
+
+  # Phase 2: Solutioning
+  architecture-npd: docs/NPD-Module-Architecture-2025-11-15.md  # agent: architect (completed 2025-11-15)
+  ux-design-npd: docs/ux-design-npd-module-2025-11-16.md  # agent: ux-designer (completed 2025-11-16)
+  solutioning-gate-check-npd: docs/implementation-readiness-report-npd-2025-11-16.md  # agent: architect (completed 2025-11-16, PASS Grade A with 2 conditions)
+
+  # Phase 2.5: Pre-Implementation Actions (COMPLETED 2025-11-16)
+  npd-condition-1-notifications: docs/NPD-Module-Architecture-2025-11-15.md  # ADR-006 added (completed 2025-11-16)
+  npd-condition-2-edge-functions: docs/sprint-artifacts/NPD-6-prerequisite-edge-functions-setup.md  # Story created (completed 2025-11-16)
+
+  # Phase 3: Implementation (READY - Sprint Planning Complete)
+  epic-breakdown-npd: docs/NPD-Module-Epics.md  # agent: pm (completed 2025-11-16, 7 epics, 47 stories)
+  sprint-planning-npd: docs/sprint-artifacts/sprint-status.yaml  # agent: sm (completed 2025-11-16, all epics tracked)
+  implementation-npd: required  # 4-6 weeks, 7 epics, 47 stories (Epic NPD-6 ready to start)
+
+  # Phase 4: Testing & Launch
+  mvp-testing-npd: required
+  pilot-deployment-npd: required  # ≥3 pilot customers
+  retrospective-npd: recommended

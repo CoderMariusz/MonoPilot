@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story_key>npd-6-4-modify-existing-tables-for-npd</story_key>
+    <epic_id>NPD-6</epic_id>
+    <story_id>6.4</story_id>
+    <title>Modify Existing Tables for NPD Integration</title>
+    <generated>2025-11-16</generated>
+  </metadata>
+
+  <user_story>
+    <as_a>database administrator</as_a>
+    <i_want>existing MonoPilot tables extended with NPD foreign keys</i_want>
+    <so_that>handoff wizard can create Products, BOMs, and Pilot WOs linked to NPD projects</so_that>
+  </user_story>
+
+  <acceptance_criteria>
+    <criterion id="AC-1">
+      <given>existing tables (work_orders, products, boms, production_outputs) exist</given>
+      <when>migration 103 executes</when>
+      <then>columns added to work_orders</then>
+      <details>
+        - type TEXT CHECK (type IN ('regular', 'pilot')) DEFAULT 'regular'
+        - npd_project_id UUID REFERENCES npd_projects(id) ON DELETE SET NULL
+      </details>
+    </criterion>
+    <criterion id="AC-2">
+      <description>Columns added to products</description>
+      <details>
+        - npd_project_id UUID REFERENCES npd_projects(id) ON DELETE SET NULL
+        - source TEXT CHECK (source IN ('manual', 'npd_handoff', 'import')) DEFAULT 'manual'
+      </details>
+    </criterion>
+    <criterion id="AC-3">
+      <description>Columns added to boms</description>
+      <details>
+        - npd_formulation_id UUID REFERENCES npd_formulations(id) ON DELETE SET NULL
+        - source TEXT CHECK (source IN ('manual', 'npd_handoff')) DEFAULT 'manual'
+      </details>
+    </criterion>
+    <criterion id="AC-4">
+      <description>Columns added to production_outputs</description>
+      <details>
+        - type TEXT CHECK (type IN ('production', 'trial')) DEFAULT 'production'
+        - npd_trial_id UUID (future use, nullable)
+      </details>
+    </criterion>
+    <criterion id="AC-5">
+      <description>Indexes created for foreign keys</description>
+      <details>
+        - idx_work_orders_npd_project_id
+        - idx_products_npd_project_id
+        - idx_boms_npd_formulation_id
+      </details>
+    </criterion>
+    <criterion id="AC-6">
+      <description>Existing data unaffected (columns nullable, defaults set)</description>
+    </criterion>
+  </acceptance_criteria>
+
+  <tasks>
+    <task id="T-1">Create migration file 103_modify_existing_tables_for_npd.sql</task>
+    <task id="T-2">Add columns to work_orders (type, npd_project_id)</task>
+    <task id="T-3">Add columns to products (npd_project_id, source)</task>
+    <task id="T-4">Add columns to boms (npd_formulation_id, source)</task>
+    <task id="T-5">Add columns to production_outputs (type, npd_trial_id)</task>
+    <task id="T-6">Create foreign keys with ON DELETE SET NULL</task>
+    <task id="T-7">Create indexes for foreign keys</task>
+    <task id="T-8">Test: Create WO with type='pilot', verify type constraint</task>
+    <task id="T-9">Run pnpm gen-types to update TypeScript types</task>
+    <task id="T-10">Update TypeScript interfaces (WorkOrder, Product, BOM, ProductionOutput)</task>
+  </tasks>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/NPD-Module-Architecture-2025-11-15.md</path>
+        <title>NPD Module Architecture</title>
+        <section>ADR-001: Bounded Context with Optional Integration</section>
+        <snippet>NPD module uses separate npd_* tables with optional foreign keys to MonoPilot core (work_orders, products, boms). Loose coupling via nullable FKs.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>apps/frontend/lib/types.ts</path>
+        <kind>types</kind>
+        <symbol>WorkOrder, Product, BOM, ProductionOutput interfaces</symbol>
+        <reason>Must be updated to include new NPD-related columns</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/lib/supabase/migrations</path>
+        <kind>directory</kind>
+        <symbol>Existing table definitions</symbol>
+        <reason>Locate original migrations for work_orders, products, boms, production_outputs</reason>
+      </artifact>
+    </code>
+  </artifacts>
+
+  <interfaces>
+    <interface>
+      <name>npd_projects table</name>
+      <kind>database-table</kind>
+      <signature>Created in Story 6.1 - work_orders.npd_project_id and products.npd_project_id reference this</signature>
+      <path>Migration 100</path>
+    </interface>
+    <interface>
+      <name>npd_formulations table</name>
+      <kind>database-table</kind>
+      <signature>Created in Story 6.1 - boms.npd_formulation_id references this</signature>
+      <path>Migration 100</path>
+    </interface>
+  </interfaces>
+
+  <constraints>
+    <constraint>Use sequential migration numbering: 103_modify_existing_tables_for_npd.sql</constraint>
+    <constraint>NULLABLE foreign keys = loose coupling (NPD module optional)</constraint>
+    <constraint>ON DELETE SET NULL = if NPD project deleted, WO/Product/BOM remain (orphaned but valid)</constraint>
+    <constraint>Document in Architecture: Decision 2 (Optional Foreign Keys + Feature Flags)</constraint>
+  </constraints>
+
+  <tests>
+    <standards>
+      Database migrations tested via staging deployment. TypeScript type updates validated by type-check.
+    </standards>
+    <locations>
+      - Migrations tested via staging Supabase deployment
+      - TypeScript: pnpm type-check
+    </locations>
+    <ideas>
+      <idea criterion="AC-1">Test: Create WO with type='pilot', verify type constraint accepts it</idea>
+      <idea criterion="AC-1">Test: Create WO with type='invalid', verify constraint rejects it</idea>
+      <idea criterion="AC-2">Test: Create Product with source='npd_handoff', verify accepted</idea>
+      <idea criterion="AC-3">Test: Create BOM with npd_formulation_id, verify FK works</idea>
+      <idea criterion="AC-5">Verify indexes exist using pg_indexes system view</idea>
+      <idea criterion="AC-6">Verify existing records unaffected (all new columns NULL)</idea>
+    </ideas>
+  </tests>
+
+  <technical_notes>
+    <note>Nullable FKs enable NPD module to be optional - MonoPilot works without it</note>
+    <note>ON DELETE SET NULL prevents cascade deletion of core MonoPilot data</note>
+    <note>This migration enables Epic NPD-3 (Handoff Wizard) functionality</note>
+  </technical_notes>
+
+  <prerequisites>
+    <prerequisite>Stories 6.1, 6.2 (npd_projects, npd_formulations must exist for FKs)</prerequisite>
+  </prerequisites>
+</story-context>
