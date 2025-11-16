@@ -3,14 +3,12 @@ import type { RoutingOperationName } from '@/lib/types';
 
 export interface CreateRoutingOperationNameDTO {
   name: string;
-  alias?: string;
   description?: string;
   is_active?: boolean;
 }
 
 export interface UpdateRoutingOperationNameDTO {
   name?: string;
-  alias?: string;
   description?: string;
   is_active?: boolean;
 }
@@ -65,7 +63,6 @@ export class RoutingOperationNamesAPI {
       .from('routing_operation_names')
       .insert({
         name: data.name,
-        alias: data.alias || null,
         description: data.description || null,
         is_active: data.is_active ?? true,
       })

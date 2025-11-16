@@ -264,13 +264,17 @@ export interface StockMove {
 export interface Location {
   id: number;
   code: string;
-  name: string;
-  type: string;
+  name: string | null;
+  type: string | null;
   warehouse_id: number;
-  zone?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  zone?: string | null;
+  capacity_qty?: number | null;
+  capacity_uom?: string | null;
+  is_active: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
+  updated_by?: string | null;
+  deleted_at?: string | null;
   // Relationships
   warehouse?: Warehouse;
 }
@@ -660,9 +664,11 @@ export interface Warehouse {
   id: number;
   code: string;
   name: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  address?: any | null;
+  type?: string | null;
+  is_active: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export type CreateWarehouseData = Omit<
@@ -865,11 +871,10 @@ export type UpdateProductData = Partial<
 export interface TaxCode {
   id: number;
   code: string;
-  name: string;
+  description: string | null;
   rate: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  is_active: boolean | null;
+  created_at: string | null;
 }
 
 // Product allergens junction
@@ -931,13 +936,8 @@ export interface RoutingOperation {
 export interface RoutingOperationName {
   id: number;
   name: string;
-  alias?: string;
-  description?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-  updated_by?: string;
+  description?: string | null;
+  is_active: boolean | null;
 }
 
 export interface WoOperation {

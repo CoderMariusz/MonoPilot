@@ -247,7 +247,7 @@ export function SupplierModal({ isOpen, onClose, supplier, onSuccess }: Supplier
                       .filter(tc => tc.is_active)
                       .map(tc => (
                         <option key={tc.id} value={tc.id}>
-                          {tc.code} - {tc.name} ({(tc.rate * 100).toFixed(2)}%)
+                          {tc.code} - {tc.description || tc.code} ({(tc.rate * 100).toFixed(2)}%)
                         </option>
                       ))}
                   </select>

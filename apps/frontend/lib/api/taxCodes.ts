@@ -36,7 +36,7 @@ export class TaxCodesAPI {
       .from('settings_tax_codes')
       .insert({
         code: data.code,
-        name: data.name,
+        description: data.description || null,
         rate: data.rate,
         is_active: data.is_active
       })

@@ -250,8 +250,8 @@ export class TransferOrdersAPI {
         .insert({
           number: toNumber,
           status,
-          from_wh_id,
-          to_wh_id,
+          from_warehouse_id: from_wh_id,
+          to_warehouse_id: to_wh_id,
           requested_date: requested_date || planned_ship_date || new Date().toISOString(),
           planned_ship_date: planned_ship_date || null,
           planned_receive_date: planned_receive_date || null,

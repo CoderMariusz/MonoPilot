@@ -14,7 +14,6 @@ export function RoutingOperationNamesTable() {
   const [editingItem, setEditingItem] = useState<RoutingOperationName | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    alias: '',
     description: '',
     is_active: true,
   });
@@ -40,7 +39,6 @@ export function RoutingOperationNamesTable() {
     setEditingItem(null);
     setFormData({
       name: '',
-      alias: '',
       description: '',
       is_active: true,
     });
@@ -51,9 +49,8 @@ export function RoutingOperationNamesTable() {
     setEditingItem(item);
     setFormData({
       name: item.name,
-      alias: item.alias || '',
       description: item.description || '',
-      is_active: item.is_active,
+      is_active: item.is_active ?? true,
     });
     setShowModal(true);
   };
@@ -163,9 +160,7 @@ export function RoutingOperationNamesTable() {
                       <td className="px-6 py-4 text-sm font-medium text-slate-900">
                         {item.name}
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">
-                        {item.alias || '-'}
-                      </td>
+                      {/* Alias column removed - field doesn't exist in DB */}
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {item.description || '-'}
                       </td>
@@ -242,18 +237,7 @@ export function RoutingOperationNamesTable() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Alias
-                </label>
-                <input
-                  type="text"
-                  value={formData.alias}
-                  onChange={(e) => setFormData(prev => ({ ...prev, alias: e.target.value }))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  placeholder="e.g., SMK"
-                />
-              </div>
+              {/* Alias field removed - column doesn't exist in DB */}
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">

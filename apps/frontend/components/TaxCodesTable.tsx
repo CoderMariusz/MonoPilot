@@ -33,7 +33,7 @@ export function TaxCodesTable() {
   const [editingTaxCode, setEditingTaxCode] = useState<TaxCode | null>(null);
   const [formData, setFormData] = useState({
     code: '',
-    name: '',
+    description: '',
     rate: '',
     is_active: true,
   });
@@ -42,7 +42,7 @@ export function TaxCodesTable() {
     setEditingTaxCode(null);
     setFormData({
       code: '',
-      name: '',
+      description: '',
       rate: '',
       is_active: true,
     });
@@ -53,9 +53,9 @@ export function TaxCodesTable() {
     setEditingTaxCode(taxCode);
     setFormData({
       code: taxCode.code,
-      name: taxCode.name,
+      description: taxCode.description || '',
       rate: taxCode.rate.toString(),
-      is_active: taxCode.is_active,
+      is_active: taxCode.is_active ?? true,
     });
     setIsModalOpen(true);
   };
@@ -76,7 +76,7 @@ export function TaxCodesTable() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.code.trim() || !formData.name.trim() || !formData.rate.trim()) {
+    if (!formData.code.trim() || !formData.rate.trim()) {
       showToast('Please fill in all required fields', 'error');
       return;
     }
@@ -91,7 +91,7 @@ export function TaxCodesTable() {
       if (editingTaxCode) {
         const updatedItem = await TaxCodesAPI.update(editingTaxCode.id, {
           code: formData.code.trim(),
-          name: formData.name.trim(),
+          description: formData.description.trim() || null,
           rate: rate,
           is_active: formData.is_active,
         });
@@ -100,7 +100,7 @@ export function TaxCodesTable() {
       } else {
         const newItem = await TaxCodesAPI.create({
           code: formData.code.trim(),
-          name: formData.name.trim(),
+          description: formData.description.trim() || null,
           rate: rate,
           is_active: formData.is_active,
         });
@@ -111,7 +111,7 @@ export function TaxCodesTable() {
       setIsModalOpen(false);
       setFormData({
         code: '',
-        name: '',
+        description: '',
         rate: '',
         is_active: true,
       });
@@ -184,7 +184,7 @@ export function TaxCodesTable() {
                       <div className="text-sm font-medium text-slate-900">{taxCode.code}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-900">{taxCode.name}</div>
+                      <div className="text-sm text-slate-900">{taxCode.description || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-slate-900">
@@ -262,8 +262,8 @@ export function TaxCodesTable() {
                   </label>
                   <input
                     type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                     placeholder="e.g., Standard Rate"
                     required
