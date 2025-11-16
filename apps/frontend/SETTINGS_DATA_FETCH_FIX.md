@@ -151,4 +151,3 @@ Consider applying this pattern to other components that fetch data on mount, suc
 - Production page data
 - Scanner page data
 - Any other component that uses Supabase queries on mount
-
