@@ -241,4 +241,3 @@ This document describes the relationships between tables in the MonoPilot MES sy
 
 - `npd_formulations.parent_formulation_id` → `npd_formulations.id`
 - `npd_formulation_items.npd_formulation_id` → `npd_formulations.id`
-
