@@ -4,7 +4,7 @@
 
 This document describes the relationships between tables in the MonoPilot MES system.
 
-**Last Updated**: 2025-11-16 (auto-generated)
+**Last Updated**: 2025-11-17 (auto-generated)
 
 ## Entity Relationship Diagram (Text)
 
@@ -241,4 +241,3 @@ This document describes the relationships between tables in the MonoPilot MES sy
 
 - `npd_formulations.parent_formulation_id` → `npd_formulations.id`
 - `npd_formulation_items.npd_formulation_id` → `npd_formulations.id`
-

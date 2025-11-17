@@ -4,7 +4,7 @@
 
 The MonoPilot MES system uses a dual-mode API layer that seamlessly switches between mock data (development) and real Supabase data (production).
 
-**Last Updated**: 2025-11-16 (auto-generated)
+**Last Updated**: 2025-11-17 (auto-generated)
 
 ## API Classes
 
@@ -17,6 +17,7 @@ The MonoPilot MES system uses a dual-mode API layer that seamlessly switches bet
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<Allergen[]>
 ```
@@ -28,11 +29,13 @@ static async getAll(): Promise<Allergen[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<Allergen | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<Allergen | null>`
@@ -42,11 +45,13 @@ static async getById(id: number): Promise<Allergen | null>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: CreateAllergenData): Promise<Allergen>
 ```
 
 **Parameters**:
+
 - `data: CreateAllergenData`
 
 **Returns**: `Promise<Allergen>`
@@ -56,11 +61,13 @@ static async create(data: CreateAllergenData): Promise<Allergen>
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: number, data: UpdateAllergenData): Promise<Allergen>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `data: UpdateAllergenData`
 
@@ -71,11 +78,13 @@ static async update(id: number, data: UpdateAllergenData): Promise<Allergen>
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<void>`
@@ -93,11 +102,13 @@ static async delete(id: number): Promise<void>
 Get all audit logs with optional filtering and pagination Returns unified view of application-level and database-level audit trails
 
 **Signature**:
+
 ```typescript
 static async getAll(filters?: AuditLogFilters, pagination?: PaginationParams): Promise<AuditLogsResponse>
 ```
 
 **Parameters**:
+
 - `filters?: AuditLogFilters`
 - `pagination?: PaginationParams`
 
@@ -110,11 +121,13 @@ static async getAll(filters?: AuditLogFilters, pagination?: PaginationParams): P
 Get audit trail for a specific entity Returns complete history of changes for an entity
 
 **Signature**:
+
 ```typescript
 static async getEntityAuditTrail(entityName: string, entityId: number): Promise<AuditLog[]>
 ```
 
 **Parameters**:
+
 - `entityName: string`
 - `entityId: number`
 
@@ -127,6 +140,7 @@ static async getEntityAuditTrail(entityName: string, entityId: number): Promise<
 Get pgAudit statistics for performance monitoring Returns log volume metrics and retention info
 
 **Signature**:
+
 ```typescript
 static async getStats(): Promise<{
     total_logs: number;
@@ -154,11 +168,13 @@ static async getStats(): Promise<{
 Export audit logs to CSV format Returns CSV string with all audit log data Limited to MAX_EXPORT_LIMIT (5000) records to prevent memory exhaustion
 
 **Signature**:
+
 ```typescript
 static async exportToCSV(filters?: AuditLogFilters): Promise<string>
 ```
 
 **Parameters**:
+
 - `filters?: AuditLogFilters`
 
 **Returns**: `Promise<string>`
@@ -170,11 +186,13 @@ static async exportToCSV(filters?: AuditLogFilters): Promise<string>
 Archive old audit logs (admin only) Deletes logs older than specified retention period @param retentionDays Number of days to retain logs (default: 90)
 
 **Signature**:
+
 ```typescript
 static async archiveOldLogs(retentionDays: number = 90): Promise<number>
 ```
 
 **Parameters**:
+
 - `retentionDays: number = 90`
 
 **Returns**: `Promise<number>`
@@ -186,11 +204,13 @@ static async archiveOldLogs(retentionDays: number = 90): Promise<number>
 Add a reason to the most recent audit event for an entity Legacy method - kept for backward compatibility
 
 **Signature**:
+
 ```typescript
 static async addReason(entityType: string, entityId: number, reason: string): Promise<void>
 ```
 
 **Parameters**:
+
 - `entityType: string`
 - `entityId: number`
 - `reason: string`
@@ -208,6 +228,7 @@ static async addReason(entityType: string, entityId: number, reason: string): Pr
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: {
     bom_id: number;
@@ -220,14 +241,15 @@ static async create(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    bom_id: number;
-    version: string;
-    status_from: string;
-    status_to: string;
-    changes: object;
-    description?: string;
-  }`
+  bom_id: number;
+  version: string;
+  status_from: string;
+  status_to: string;
+  changes: object;
+  description?: string;
+}`
 
 **Returns**: `Promise<BomHistory>`
 
@@ -236,11 +258,13 @@ static async create(data: {
 #### `getByBomId()`
 
 **Signature**:
+
 ```typescript
 static async getByBomId(bomId: number): Promise<BomHistory[]>
 ```
 
 **Parameters**:
+
 - `bomId: number`
 
 **Returns**: `Promise<BomHistory[]>`
@@ -250,6 +274,7 @@ static async getByBomId(bomId: number): Promise<BomHistory[]>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(options?: {
     limit?: number;
@@ -259,11 +284,12 @@ static async getAll(options?: {
 ```
 
 **Parameters**:
+
 - `options?: {
-    limit?: number;
-    offset?: number;
-    bom_id?: number;
-  }`
+  limit?: number;
+  offset?: number;
+  bom_id?: number;
+}`
 
 **Returns**: `Promise<BomHistory[]>`
 
@@ -278,6 +304,7 @@ static async getAll(options?: {
 #### `getConsumptionData()`
 
 **Signature**:
+
 ```typescript
 static async getConsumptionData(params: {
     woId?: number;
@@ -305,13 +332,14 @@ static async getConsumptionData(params: {
 ```
 
 **Parameters**:
+
 - `params: {
-    woId?: number;
-    from?: string;
-    to?: string;
-    materialId?: number;
-    line?: string;
-  }`
+  woId?: number;
+  from?: string;
+  to?: string;
+  materialId?: number;
+  line?: string;
+}`
 
 **Returns**: `Promise<{
     data: Array<{
@@ -336,6 +364,7 @@ static async getConsumptionData(params: {
 #### `getConsumptionVarianceByMaterial()`
 
 **Signature**:
+
 ```typescript
 static async getConsumptionVarianceByMaterial(params: {
     from?: string;
@@ -355,11 +384,12 @@ static async getConsumptionVarianceByMaterial(params: {
 ```
 
 **Parameters**:
+
 - `params: {
-    from?: string;
-    to?: string;
-    line?: string;
-  }`
+  from?: string;
+  to?: string;
+  line?: string;
+}`
 
 **Returns**: `Promise<Array<{
     material_id: number;
@@ -378,6 +408,7 @@ static async getConsumptionVarianceByMaterial(params: {
 #### `getConsumptionTrends()`
 
 **Signature**:
+
 ```typescript
 static async getConsumptionTrends(params: {
     materialId?: number;
@@ -396,13 +427,14 @@ static async getConsumptionTrends(params: {
 ```
 
 **Parameters**:
+
 - `params: {
-    materialId?: number;
-    line?: string;
-    bucket: 'day' | 'week' | 'month';
-    from?: string;
-    to?: string;
-  }`
+  materialId?: number;
+  line?: string;
+  bucket: 'day' | 'week' | 'month';
+  from?: string;
+  to?: string;
+}`
 
 **Returns**: `Promise<Array<{
     date: string;
@@ -426,11 +458,13 @@ static async getConsumptionTrends(params: {
 Create a new GRN from ASN receiving
 
 **Signature**:
+
 ```typescript
 static async create(data: CreateGRNData): Promise<GRN>
 ```
 
 **Parameters**:
+
 - `data: CreateGRNData`
 
 **Returns**: `Promise<GRN>`
@@ -442,11 +476,13 @@ static async create(data: CreateGRNData): Promise<GRN>
 Get GRN by ID
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<GRN | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<GRN | null>`
@@ -458,6 +494,7 @@ static async getById(id: number): Promise<GRN | null>
 Get all GRNs
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<GRN[]>
 ```
@@ -475,6 +512,7 @@ static async getAll(): Promise<GRN[]>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(filters?: {
     qa_status?: QAStatus;
@@ -508,14 +546,15 @@ static async getAll(filters?: {
 ```
 
 **Parameters**:
+
 - `filters?: {
-    qa_status?: QAStatus;
-    location?: string;
-    product_id?: number;
-    stage_suffix?: string;
-    origin_type?: string;
-    has_reservations?: boolean;
-  }`
+  qa_status?: QAStatus;
+  location?: string;
+  product_id?: number;
+  stage_suffix?: string;
+  origin_type?: string;
+  has_reservations?: boolean;
+}`
 
 **Returns**: `Promise<{
     data: Array<{
@@ -545,6 +584,7 @@ static async getAll(filters?: {
 #### `getLPComposition()`
 
 **Signature**:
+
 ```typescript
 static async getLPComposition(lpId: number): Promise<{
     forward: Array<{
@@ -565,6 +605,7 @@ static async getLPComposition(lpId: number): Promise<{
 ```
 
 **Parameters**:
+
 - `lpId: number`
 
 **Returns**: `Promise<{
@@ -589,6 +630,7 @@ static async getLPComposition(lpId: number): Promise<{
 #### `split()`
 
 **Signature**:
+
 ```typescript
 static async split(lpId: number, childQuantities: Array<{ quantity: number; uom?: string }>, userId: string, woId?: number, opSeq?: number): Promise<{
     parent_lp: { id: number; lp_number: string; is_consumed: boolean };
@@ -603,6 +645,7 @@ static async split(lpId: number, childQuantities: Array<{ quantity: number; uom?
 ```
 
 **Parameters**:
+
 - `lpId: number`
 - `childQuantities: Array<{ quantity: number; uom?: string }>`
 - `userId: string`
@@ -625,6 +668,7 @@ static async split(lpId: number, childQuantities: Array<{ quantity: number; uom?
 #### `merge()`
 
 **Signature**:
+
 ```typescript
 static async merge(inputLpIds: number[], outputData: {
       product_id: number;
@@ -651,17 +695,18 @@ static async merge(inputLpIds: number[], outputData: {
 ```
 
 **Parameters**:
+
 - `inputLpIds: number[]`
 - `outputData: {
-      product_id: number;
-      location_id: number;
-      quantity: number;
-      uom: string;
-      batch?: string;
-      expiry_date?: string;
-      qa_status?: string;
-      stage_suffix?: string;
-    }`
+    product_id: number;
+    location_id: number;
+    quantity: number;
+    uom: string;
+    batch?: string;
+    expiry_date?: string;
+    qa_status?: string;
+    stage_suffix?: string;
+  }`
 - `userId: string`
 - `woId?: number`
 - `opSeq?: number`
@@ -685,6 +730,7 @@ static async merge(inputLpIds: number[], outputData: {
 #### `getGenealogy()`
 
 **Signature**:
+
 ```typescript
 static async getGenealogy(lpId: number): Promise<{
     tree: Array<{
@@ -706,6 +752,7 @@ static async getGenealogy(lpId: number): Promise<{
 ```
 
 **Parameters**:
+
 - `lpId: number`
 
 **Returns**: `Promise<{
@@ -731,6 +778,7 @@ static async getGenealogy(lpId: number): Promise<{
 #### `getReverseGenealogy()`
 
 **Signature**:
+
 ```typescript
 static async getReverseGenealogy(lpId: number): Promise<{
     chain: Array<{
@@ -755,6 +803,7 @@ static async getReverseGenealogy(lpId: number): Promise<{
 ```
 
 **Parameters**:
+
 - `lpId: number`
 
 **Returns**: `Promise<{
@@ -783,6 +832,7 @@ static async getReverseGenealogy(lpId: number): Promise<{
 #### `getLPDetails()`
 
 **Signature**:
+
 ```typescript
 static async getLPDetails(lpId: number): Promise<{
     id: number;
@@ -821,6 +871,7 @@ static async getLPDetails(lpId: number): Promise<{
 ```
 
 **Parameters**:
+
 - `lpId: number`
 
 **Returns**: `Promise<{
@@ -865,6 +916,7 @@ static async getLPDetails(lpId: number): Promise<{
 Get all valid Units of Measure from uom_master table @returns Array of UoM objects with code, display_name, and category
 
 **Signature**:
+
 ```typescript
 static async getValidUoMs(): Promise<Array<{
     code: string;
@@ -886,11 +938,13 @@ static async getValidUoMs(): Promise<Array<{
 Validate UoM against uom_master table @param uom - Unit of measure code to validate @returns true if valid, false otherwise
 
 **Signature**:
+
 ```typescript
 static async validateUoM(uom: string): Promise<boolean>
 ```
 
 **Parameters**:
+
 - `uom: string`
 
 **Returns**: `Promise<boolean>`
@@ -902,6 +956,7 @@ static async validateUoM(uom: string): Promise<boolean>
 Create new License Plate Story 1.7.1 - Single-Screen Scanner @param data - License Plate creation data @returns Created license plate
 
 **Signature**:
+
 ```typescript
 static async create(data: {
     lp_number: string;
@@ -921,21 +976,22 @@ static async create(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    lp_number: string;
-    product_id: number;
-    quantity: number;
-    uom: string;
-    location_id: number;
-    warehouse_id: number;
-    status: 'available' | 'reserved' | 'consumed' | 'in_transit' | 'quarantine' | 'damaged';
-    qa_status?: 'pending' | 'passed' | 'failed' | 'on_hold';
-    batch_number?: string;
-    expiry_date?: string | null;
-    grn_id?: number;
-    po_number?: string;
-    supplier_batch_number?: string;
-  }`
+  lp_number: string;
+  product_id: number;
+  quantity: number;
+  uom: string;
+  location_id: number;
+  warehouse_id: number;
+  status: 'available' | 'reserved' | 'consumed' | 'in_transit' | 'quarantine' | 'damaged';
+  qa_status?: 'pending' | 'passed' | 'failed' | 'on_hold';
+  batch_number?: string;
+  expiry_date?: string | null;
+  grn_id?: number;
+  po_number?: string;
+  supplier_batch_number?: string;
+}`
 
 **Returns**: `Promise<any>`
 
@@ -950,6 +1006,7 @@ static async create(data: {
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<Location[]>
 ```
@@ -961,11 +1018,13 @@ static async getAll(): Promise<Location[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<Location | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<Location | null>`
@@ -975,11 +1034,13 @@ static async getById(id: number): Promise<Location | null>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: CreateLocationData): Promise<Location>
 ```
 
 **Parameters**:
+
 - `data: CreateLocationData`
 
 **Returns**: `Promise<Location>`
@@ -989,11 +1050,13 @@ static async create(data: CreateLocationData): Promise<Location>
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: number, data: UpdateLocationData): Promise<Location>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `data: UpdateLocationData`
 
@@ -1004,11 +1067,13 @@ static async update(id: number, data: UpdateLocationData): Promise<Location>
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<void>`
@@ -1024,6 +1089,7 @@ static async delete(id: number): Promise<void>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<Machine[]>
 ```
@@ -1035,11 +1101,13 @@ static async getAll(): Promise<Machine[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<Machine | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<Machine | null>`
@@ -1049,11 +1117,13 @@ static async getById(id: number): Promise<Machine | null>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: CreateMachineData): Promise<Machine>
 ```
 
 **Parameters**:
+
 - `data: CreateMachineData`
 
 **Returns**: `Promise<Machine>`
@@ -1063,11 +1133,13 @@ static async create(data: CreateMachineData): Promise<Machine>
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: number, data: UpdateMachineData): Promise<Machine>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `data: UpdateMachineData`
 
@@ -1078,11 +1150,13 @@ static async update(id: number, data: UpdateMachineData): Promise<Machine>
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<void>`
@@ -1098,11 +1172,13 @@ static async delete(id: number): Promise<void>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(filters?: NPDProjectFilters): Promise<NPDProject[]>
 ```
 
 **Parameters**:
+
 - `filters?: NPDProjectFilters`
 
 **Returns**: `Promise<NPDProject[]>`
@@ -1111,14 +1187,16 @@ static async getAll(filters?: NPDProjectFilters): Promise<NPDProject[]>
 
 #### `getById()`
 
-Get NPD project by ID RLS: Only returns project if it belongs to user's org  @param id - Project UUID @returns Promise<NPDProject | null>
+Get NPD project by ID RLS: Only returns project if it belongs to user's org @param id - Project UUID @returns Promise<NPDProject | null>
 
 **Signature**:
+
 ```typescript
 static async getById(id: string): Promise<NPDProject | null>
 ```
 
 **Parameters**:
+
 - `id: string`
 
 **Returns**: `Promise<NPDProject | null>`
@@ -1128,11 +1206,13 @@ static async getById(id: string): Promise<NPDProject | null>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: CreateNPDProjectInput): Promise<NPDProject>
 ```
 
 **Parameters**:
+
 - `data: CreateNPDProjectInput`
 
 **Returns**: `Promise<NPDProject>`
@@ -1142,11 +1222,13 @@ static async create(data: CreateNPDProjectInput): Promise<NPDProject>
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: string, data: UpdateNPDProjectInput): Promise<NPDProject>
 ```
 
 **Parameters**:
+
 - `id: string`
 - `data: UpdateNPDProjectInput`
 
@@ -1157,11 +1239,13 @@ static async update(id: string, data: UpdateNPDProjectInput): Promise<NPDProject
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: string): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: string`
 
 **Returns**: `Promise<void>`
@@ -1171,11 +1255,13 @@ static async delete(id: string): Promise<void>
 #### `advanceGate()`
 
 **Signature**:
+
 ```typescript
 static async advanceGate(id: string, toGate: NPDProjectGate): Promise<NPDProject>
 ```
 
 **Parameters**:
+
 - `id: string`
 - `toGate: NPDProjectGate`
 
@@ -1192,6 +1278,7 @@ static async advanceGate(id: string, toGate: NPDProjectGate): Promise<NPDProject
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(filters?: {
     status?: 'open' | 'closed' | 'shipped';
@@ -1221,12 +1308,13 @@ static async getAll(filters?: {
 ```
 
 **Parameters**:
+
 - `filters?: {
-    status?: 'open' | 'closed' | 'shipped';
-    location_id?: number;
-    wo_id?: number;
-    pallet_type?: string;
-  }`
+  status?: 'open' | 'closed' | 'shipped';
+  location_id?: number;
+  wo_id?: number;
+  pallet_type?: string;
+}`
 
 **Returns**: `Promise<{
     data: Array<{
@@ -1254,6 +1342,7 @@ static async getAll(filters?: {
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<{
     pallet: {
@@ -1288,6 +1377,7 @@ static async getById(id: number): Promise<{
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<{
@@ -1326,6 +1416,7 @@ static async getById(id: number): Promise<{
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: {
     pallet_number?: string; // Auto-generate if not provided
@@ -1342,15 +1433,16 @@ static async create(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    pallet_number?: string; // Auto-generate if not provided
-    pallet_type: 'EURO' | 'CHEP' | 'CUSTOM' | 'OTHER';
-    wo_id?: number;
-    line?: string;
-    location_id?: number;
-    target_boxes?: number;
-    userId: string;
-  }`
+  pallet_number?: string; // Auto-generate if not provided
+  pallet_type: 'EURO' | 'CHEP' | 'CUSTOM' | 'OTHER';
+  wo_id?: number;
+  line?: string;
+  location_id?: number;
+  target_boxes?: number;
+  userId: string;
+}`
 
 **Returns**: `Promise<{
     id: number;
@@ -1362,6 +1454,7 @@ static async create(data: {
 #### `addLP()`
 
 **Signature**:
+
 ```typescript
 static async addLP(data: {
     pallet_id: number;
@@ -1375,13 +1468,14 @@ static async addLP(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    pallet_id: number;
-    lp_id: number;
-    quantity?: number; // Optional`
+  pallet_id: number;
+  lp_id: number;
+  quantity?: number; // Optional`
 - `use full LP quantity if not specified
-    userId: string;
-  }`
+  userId: string;
+}`
 
 **Returns**: `Promise<{
     item_id: number;
@@ -1393,6 +1487,7 @@ static async addLP(data: {
 #### `removeLP()`
 
 **Signature**:
+
 ```typescript
 static async removeLP(data: {
     pallet_id: number;
@@ -1402,11 +1497,12 @@ static async removeLP(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    pallet_id: number;
-    lp_id: number;
-    userId: string;
-  }`
+  pallet_id: number;
+  lp_id: number;
+  userId: string;
+}`
 
 **Returns**: `Promise<void>`
 
@@ -1415,6 +1511,7 @@ static async removeLP(data: {
 #### `close()`
 
 **Signature**:
+
 ```typescript
 static async close(data: {
     pallet_id: number;
@@ -1424,11 +1521,12 @@ static async close(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    pallet_id: number;
-    actual_boxes?: number;
-    userId: string;
-  }`
+  pallet_id: number;
+  actual_boxes?: number;
+  userId: string;
+}`
 
 **Returns**: `Promise<void>`
 
@@ -1437,6 +1535,7 @@ static async close(data: {
 #### `reopen()`
 
 **Signature**:
+
 ```typescript
 static async reopen(data: {
     pallet_id: number;
@@ -1445,10 +1544,11 @@ static async reopen(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    pallet_id: number;
-    userId: string;
-  }`
+  pallet_id: number;
+  userId: string;
+}`
 
 **Returns**: `Promise<void>`
 
@@ -1457,6 +1557,7 @@ static async reopen(data: {
 #### `markShipped()`
 
 **Signature**:
+
 ```typescript
 static async markShipped(data: {
     pallet_id: number;
@@ -1465,10 +1566,11 @@ static async markShipped(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    pallet_id: number;
-    userId: string;
-  }`
+  pallet_id: number;
+  userId: string;
+}`
 
 **Returns**: `Promise<void>`
 
@@ -1477,11 +1579,13 @@ static async markShipped(data: {
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(palletId: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `palletId: number`
 
 **Returns**: `Promise<void>`
@@ -1497,6 +1601,7 @@ static async delete(palletId: number): Promise<void>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<Product[]>
 ```
@@ -1508,11 +1613,13 @@ static async getAll(): Promise<Product[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<Product | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<Product | null>`
@@ -1528,6 +1635,7 @@ static async getById(id: number): Promise<Product | null>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<Product[]>
 ```
@@ -1539,11 +1647,13 @@ static async getAll(): Promise<Product[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<Product | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<Product | null>`
@@ -1553,11 +1663,13 @@ static async getById(id: number): Promise<Product | null>
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: number, data: UpdateProductData): Promise<Product>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `data: UpdateProductData`
 
@@ -1568,11 +1680,13 @@ static async update(id: number, data: UpdateProductData): Promise<Product>
 #### `checkPartNumberExists()`
 
 **Signature**:
+
 ```typescript
 static async checkPartNumberExists(partNumber: string, excludeId?: number): Promise<boolean>
 ```
 
 **Parameters**:
+
 - `partNumber: string`
 - `excludeId?: number`
 
@@ -1589,6 +1703,7 @@ static async checkPartNumberExists(partNumber: string, excludeId?: number): Prom
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<PurchaseOrder[]>
 ```
@@ -1600,11 +1715,13 @@ static async getAll(): Promise<PurchaseOrder[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<PurchaseOrder | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<PurchaseOrder | null>`
@@ -1614,11 +1731,13 @@ static async getById(id: number): Promise<PurchaseOrder | null>
 #### `getDefaultUnitPrice()`
 
 **Signature**:
+
 ```typescript
 static async getDefaultUnitPrice(productId: number, supplierId?: number, asOfDate?: Date, currency?: string): Promise<number>
 ```
 
 **Parameters**:
+
 - `productId: number`
 - `supplierId?: number`
 - `asOfDate?: Date`
@@ -1631,11 +1750,13 @@ static async getDefaultUnitPrice(productId: number, supplierId?: number, asOfDat
 #### `cancel()`
 
 **Signature**:
+
 ```typescript
 static async cancel(id: number, reason?: string, source?: string): Promise<{ success: boolean; message: string }>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `reason?: string`
 - `source?: string`
@@ -1647,11 +1768,13 @@ static async cancel(id: number, reason?: string, source?: string): Promise<{ suc
 #### `close()`
 
 **Signature**:
+
 ```typescript
 static async close(id: number): Promise<{ success: boolean; message: string; grnNumber?: string }>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<{ success: boolean; message: string; grnNumber?: string }>`
@@ -1661,11 +1784,13 @@ static async close(id: number): Promise<{ success: boolean; message: string; grn
 #### `quickCreate()`
 
 **Signature**:
+
 ```typescript
 static async quickCreate(request: QuickPOCreateRequest): Promise<QuickPOCreateResponse>
 ```
 
 **Parameters**:
+
 - `request: QuickPOCreateRequest`
 
 **Returns**: `Promise<QuickPOCreateResponse>`
@@ -1675,11 +1800,13 @@ static async quickCreate(request: QuickPOCreateRequest): Promise<QuickPOCreateRe
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<{ success: boolean; message: string }>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<{ success: boolean; message: string }>`
@@ -1695,6 +1822,7 @@ static async delete(id: number): Promise<{ success: boolean; message: string }>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<RoutingOperationName[]>
 ```
@@ -1706,6 +1834,7 @@ static async getAll(): Promise<RoutingOperationName[]>
 #### `getAllIncludingInactive()`
 
 **Signature**:
+
 ```typescript
 static async getAllIncludingInactive(): Promise<RoutingOperationName[]>
 ```
@@ -1717,11 +1846,13 @@ static async getAllIncludingInactive(): Promise<RoutingOperationName[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<RoutingOperationName | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<RoutingOperationName | null>`
@@ -1731,11 +1862,13 @@ static async getById(id: number): Promise<RoutingOperationName | null>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: CreateRoutingOperationNameDTO): Promise<RoutingOperationName>
 ```
 
 **Parameters**:
+
 - `data: CreateRoutingOperationNameDTO`
 
 **Returns**: `Promise<RoutingOperationName>`
@@ -1745,11 +1878,13 @@ static async create(data: CreateRoutingOperationNameDTO): Promise<RoutingOperati
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: number, data: UpdateRoutingOperationNameDTO): Promise<RoutingOperationName>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `data: UpdateRoutingOperationNameDTO`
 
@@ -1760,11 +1895,13 @@ static async update(id: number, data: UpdateRoutingOperationNameDTO): Promise<Ro
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<void>`
@@ -1774,11 +1911,13 @@ static async delete(id: number): Promise<void>
 #### `hardDelete()`
 
 **Signature**:
+
 ```typescript
 static async hardDelete(id: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<void>`
@@ -1794,6 +1933,7 @@ static async hardDelete(id: number): Promise<void>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<Routing[]>
 ```
@@ -1805,11 +1945,13 @@ static async getAll(): Promise<Routing[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<Routing>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<Routing>`
@@ -1819,11 +1961,13 @@ static async getById(id: number): Promise<Routing>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: CreateRoutingDTO): Promise<Routing>
 ```
 
 **Parameters**:
+
 - `data: CreateRoutingDTO`
 
 **Returns**: `Promise<Routing>`
@@ -1833,11 +1977,13 @@ static async create(data: CreateRoutingDTO): Promise<Routing>
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: number, data: Partial<Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'>> & { operations?: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>[] }): Promise<Routing>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `data: Partial<Omit<Routing`
 - `'id' | 'created_at' | 'updated_at' | 'operations'>> & { operations?: Omit<RoutingOperation`
@@ -1850,11 +1996,13 @@ static async update(id: number, data: Partial<Omit<Routing, 'id' | 'created_at' 
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<void>`
@@ -1864,11 +2012,13 @@ static async delete(id: number): Promise<void>
 #### `addOperation()`
 
 **Signature**:
+
 ```typescript
 static async addOperation(routingId: number, operation: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>): Promise<RoutingOperation>
 ```
 
 **Parameters**:
+
 - `routingId: number`
 - `operation: Omit<RoutingOperation`
 - `'id' | 'routing_id' | 'created_at' | 'updated_at'>`
@@ -1880,11 +2030,13 @@ static async addOperation(routingId: number, operation: Omit<RoutingOperation, '
 #### `updateOperation()`
 
 **Signature**:
+
 ```typescript
 static async updateOperation(operationId: number, data: Partial<Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>>): Promise<RoutingOperation>
 ```
 
 **Parameters**:
+
 - `operationId: number`
 - `data: Partial<Omit<RoutingOperation`
 - `'id' | 'routing_id' | 'created_at' | 'updated_at'>>`
@@ -1896,11 +2048,13 @@ static async updateOperation(operationId: number, data: Partial<Omit<RoutingOper
 #### `deleteOperation()`
 
 **Signature**:
+
 ```typescript
 static async deleteOperation(operationId: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `operationId: number`
 
 **Returns**: `Promise<void>`
@@ -1916,6 +2070,7 @@ static async deleteOperation(operationId: number): Promise<void>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<Supplier[]>
 ```
@@ -1927,11 +2082,13 @@ static async getAll(): Promise<Supplier[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<Supplier | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<Supplier | null>`
@@ -1941,11 +2098,13 @@ static async getById(id: number): Promise<Supplier | null>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: CreateSupplierData): Promise<Supplier>
 ```
 
 **Parameters**:
+
 - `data: CreateSupplierData`
 
 **Returns**: `Promise<Supplier>`
@@ -1955,11 +2114,13 @@ static async create(data: CreateSupplierData): Promise<Supplier>
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: number, data: UpdateSupplierData): Promise<Supplier>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `data: UpdateSupplierData`
 
@@ -1970,11 +2131,13 @@ static async update(id: number, data: UpdateSupplierData): Promise<Supplier>
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<void>`
@@ -1990,6 +2153,7 @@ static async delete(id: number): Promise<void>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<TaxCode[]>
 ```
@@ -2001,11 +2165,13 @@ static async getAll(): Promise<TaxCode[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<TaxCode>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<TaxCode>`
@@ -2015,11 +2181,13 @@ static async getById(id: number): Promise<TaxCode>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: Omit<TaxCode, 'id' | 'created_at' | 'updated_at'>): Promise<TaxCode>
 ```
 
 **Parameters**:
+
 - `data: Omit<TaxCode`
 - `'id' | 'created_at' | 'updated_at'>`
 
@@ -2030,11 +2198,13 @@ static async create(data: Omit<TaxCode, 'id' | 'created_at' | 'updated_at'>): Pr
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: number, data: Partial<Omit<TaxCode, 'id' | 'created_at' | 'updated_at'>>): Promise<TaxCode>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `data: Partial<Omit<TaxCode`
 - `'id' | 'created_at' | 'updated_at'>>`
@@ -2046,11 +2216,13 @@ static async update(id: number, data: Partial<Omit<TaxCode, 'id' | 'created_at' 
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<void>`
@@ -2066,11 +2238,13 @@ static async delete(id: number): Promise<void>
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(toId: number, payload: UpdateTransferOrderRequest): Promise<TOHeader>
 ```
 
 **Parameters**:
+
 - `toId: number`
 - `payload: UpdateTransferOrderRequest`
 
@@ -2081,6 +2255,7 @@ static async update(toId: number, payload: UpdateTransferOrderRequest): Promise<
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<TransferOrder[]>
 ```
@@ -2092,11 +2267,13 @@ static async getAll(): Promise<TransferOrder[]>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(payload: CreateTransferOrderRequest): Promise<TOHeader>
 ```
 
 **Parameters**:
+
 - `payload: CreateTransferOrderRequest`
 
 **Returns**: `Promise<TOHeader>`
@@ -2106,11 +2283,13 @@ static async create(payload: CreateTransferOrderRequest): Promise<TOHeader>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<TransferOrder | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<TransferOrder | null>`
@@ -2120,11 +2299,13 @@ static async getById(id: number): Promise<TransferOrder | null>
 #### `cancel()`
 
 **Signature**:
+
 ```typescript
 static async cancel(id: number, reason?: string, source?: string): Promise<{ success: boolean; message: string }>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `reason?: string`
 - `source?: string`
@@ -2138,11 +2319,13 @@ static async cancel(id: number, reason?: string, source?: string): Promise<{ suc
 Mark a transfer order as shipped Sets actual_ship_date and updates status to 'in_transit' Only works if current status is 'submitted'
 
 **Signature**:
+
 ```typescript
 static async markShipped(toId: number, actualShipDate: string): Promise<TOHeader>
 ```
 
 **Parameters**:
+
 - `toId: number`
 - `actualShipDate: string`
 
@@ -2153,11 +2336,13 @@ static async markShipped(toId: number, actualShipDate: string): Promise<TOHeader
 #### `markReceived()`
 
 **Signature**:
+
 ```typescript
 static async markReceived(toId: number, actualReceiveDate: string, lineUpdates: MarkReceivedLineUpdate[]): Promise<TOHeader>
 ```
 
 **Parameters**:
+
 - `toId: number`
 - `actualReceiveDate: string`
 - `lineUpdates: MarkReceivedLineUpdate[]`
@@ -2169,11 +2354,13 @@ static async markReceived(toId: number, actualReceiveDate: string, lineUpdates: 
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(toId: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `toId: number`
 
 **Returns**: `Promise<void>`
@@ -2189,6 +2376,7 @@ static async delete(toId: number): Promise<void>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<User[]>
 ```
@@ -2200,11 +2388,13 @@ static async getAll(): Promise<User[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: string): Promise<User | null>
 ```
 
 **Parameters**:
+
 - `id: string`
 
 **Returns**: `Promise<User | null>`
@@ -2214,6 +2404,7 @@ static async getById(id: string): Promise<User | null>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(userData: {
     name: string;
@@ -2225,13 +2416,14 @@ static async create(userData: {
 ```
 
 **Parameters**:
+
 - `userData: {
-    name: string;
-    email: string;
-    password: string;
-    role: string;
-    status?: string;
-  }`
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  status?: string;
+}`
 
 **Returns**: `Promise<{ user?: User; error?: any }>`
 
@@ -2240,11 +2432,13 @@ static async create(userData: {
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: string, updates: Partial<User>): Promise<{ user?: User; error?: any }>
 ```
 
 **Parameters**:
+
 - `id: string`
 - `updates: Partial<User>`
 
@@ -2255,11 +2449,13 @@ static async update(id: string, updates: Partial<User>): Promise<{ user?: User; 
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: string): Promise<{ error?: any }>
 ```
 
 **Parameters**:
+
 - `id: string`
 
 **Returns**: `Promise<{ error?: any }>`
@@ -2269,11 +2465,13 @@ static async delete(id: string): Promise<{ error?: any }>
 #### `updateStatus()`
 
 **Signature**:
+
 ```typescript
 static async updateStatus(id: string, status: string): Promise<{ user?: User; error?: any }>
 ```
 
 **Parameters**:
+
 - `id: string`
 - `status: string`
 
@@ -2284,11 +2482,13 @@ static async updateStatus(id: string, status: string): Promise<{ user?: User; er
 #### `updateRole()`
 
 **Signature**:
+
 ```typescript
 static async updateRole(id: string, role: string): Promise<{ user?: User; error?: any }>
 ```
 
 **Parameters**:
+
 - `id: string`
 - `role: string`
 
@@ -2305,6 +2505,7 @@ static async updateRole(id: string, role: string): Promise<{ user?: User; error?
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(): Promise<Warehouse[]>
 ```
@@ -2316,11 +2517,13 @@ static async getAll(): Promise<Warehouse[]>
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<Warehouse | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<Warehouse | null>`
@@ -2330,11 +2533,13 @@ static async getById(id: number): Promise<Warehouse | null>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: CreateWarehouseData): Promise<Warehouse>
 ```
 
 **Parameters**:
+
 - `data: CreateWarehouseData`
 
 **Returns**: `Promise<Warehouse>`
@@ -2344,11 +2549,13 @@ static async create(data: CreateWarehouseData): Promise<Warehouse>
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: number, data: UpdateWarehouseData): Promise<Warehouse>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `data: UpdateWarehouseData`
 
@@ -2359,11 +2566,13 @@ static async update(id: number, data: UpdateWarehouseData): Promise<Warehouse>
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<void>`
@@ -2379,6 +2588,7 @@ static async delete(id: number): Promise<void>
 #### `getAll()`
 
 **Signature**:
+
 ```typescript
 static async getAll(filters?: {
     line?: string;
@@ -2390,13 +2600,14 @@ static async getAll(filters?: {
 ```
 
 **Parameters**:
+
 - `filters?: {
-    line?: string;
-    qa_status?: string;
-    date_bucket?: 'day' | 'week' | 'month';
-    kpi_scope?: 'PR' | 'FG';
-    status?: string;
-  }`
+  line?: string;
+  qa_status?: string;
+  date_bucket?: 'day' | 'week' | 'month';
+  kpi_scope?: 'PR' | 'FG';
+  status?: string;
+}`
 
 **Returns**: `Promise<WorkOrder[]>`
 
@@ -2405,11 +2616,13 @@ static async getAll(filters?: {
 #### `getById()`
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<WorkOrder | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<WorkOrder | null>`
@@ -2419,11 +2632,13 @@ static async getById(id: number): Promise<WorkOrder | null>
 #### `create()`
 
 **Signature**:
+
 ```typescript
 static async create(data: CreateWorkOrderData): Promise<WorkOrder>
 ```
 
 **Parameters**:
+
 - `data: CreateWorkOrderData`
 
 **Returns**: `Promise<WorkOrder>`
@@ -2433,11 +2648,13 @@ static async create(data: CreateWorkOrderData): Promise<WorkOrder>
 #### `update()`
 
 **Signature**:
+
 ```typescript
 static async update(id: number, data: UpdateWorkOrderData): Promise<WorkOrder>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `data: UpdateWorkOrderData`
 
@@ -2448,11 +2665,13 @@ static async update(id: number, data: UpdateWorkOrderData): Promise<WorkOrder>
 #### `delete()`
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<boolean>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<boolean>`
@@ -2462,11 +2681,13 @@ static async delete(id: number): Promise<boolean>
 #### `getProductionStats()`
 
 **Signature**:
+
 ```typescript
 static async getProductionStats(woId: number): Promise<{ madeQty: number; plannedQty: number; progressPct: number }>
 ```
 
 **Parameters**:
+
 - `woId: number`
 
 **Returns**: `Promise<{ madeQty: number; plannedQty: number; progressPct: number }>`
@@ -2476,11 +2697,13 @@ static async getProductionStats(woId: number): Promise<{ madeQty: number; planne
 #### `cancel()`
 
 **Signature**:
+
 ```typescript
 static async cancel(id: number, reason?: string, source?: string): Promise<{ success: boolean; message: string }>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `reason?: string`
 - `source?: string`
@@ -2492,6 +2715,7 @@ static async cancel(id: number, reason?: string, source?: string): Promise<{ suc
 #### `getWorkOrderStageStatus()`
 
 **Signature**:
+
 ```typescript
 static async getWorkOrderStageStatus(woId: number): Promise<{
     wo_id: number;
@@ -2511,6 +2735,7 @@ static async getWorkOrderStageStatus(woId: number): Promise<{
 ```
 
 **Parameters**:
+
 - `woId: number`
 
 **Returns**: `Promise<{
@@ -2534,11 +2759,13 @@ static async getWorkOrderStageStatus(woId: number): Promise<{
 #### `recordByProductOutput()`
 
 **Signature**:
+
 ```typescript
 static async recordByProductOutput(woId: number, byProductId: number, actualQuantity: number, locationId: number, notes?: string): Promise<{ lp_id: number; lp_number: string }>
 ```
 
 **Parameters**:
+
 - `woId: number`
 - `byProductId: number`
 - `actualQuantity: number`
@@ -2552,6 +2779,7 @@ static async recordByProductOutput(woId: number, byProductId: number, actualQuan
 #### `evaluateConditionalMaterials()`
 
 **Signature**:
+
 ```typescript
 static async evaluateConditionalMaterials(bomId: number, woContext: {
       order_flags?: string[];
@@ -2570,12 +2798,13 @@ static async evaluateConditionalMaterials(bomId: number, woContext: {
 ```
 
 **Parameters**:
+
 - `bomId: number`
 - `woContext: {
-      order_flags?: string[];
-      customer_id?: number;
-      order_type?: string;
-    }`
+    order_flags?: string[];
+    customer_id?: number;
+    order_type?: string;
+  }`
 
 **Returns**: `Promise<Array<{
     bom_item_id: number;
@@ -2593,6 +2822,7 @@ static async evaluateConditionalMaterials(bomId: number, woContext: {
 #### `getAllMaterialsWithEvaluation()`
 
 **Signature**:
+
 ```typescript
 static async getAllMaterialsWithEvaluation(bomId: number, woContext: {
       order_flags?: string[];
@@ -2612,12 +2842,13 @@ static async getAllMaterialsWithEvaluation(bomId: number, woContext: {
 ```
 
 **Parameters**:
+
 - `bomId: number`
 - `woContext: {
-      order_flags?: string[];
-      customer_id?: number;
-      order_type?: string;
-    }`
+    order_flags?: string[];
+    customer_id?: number;
+    order_type?: string;
+  }`
 
 **Returns**: `Promise<Array<{
     bom_item_id: number;
@@ -2636,6 +2867,7 @@ static async getAllMaterialsWithEvaluation(bomId: number, woContext: {
 #### `createWithConditionalMaterials()`
 
 **Signature**:
+
 ```typescript
 static async createWithConditionalMaterials(data: CreateWorkOrderData & {
       order_flags?: string[];
@@ -2654,11 +2886,12 @@ static async createWithConditionalMaterials(data: CreateWorkOrderData & {
 ```
 
 **Parameters**:
+
 - `data: CreateWorkOrderData & {
-      order_flags?: string[];
-      customer_id?: number;
-      order_type?: string;
-    }`
+    order_flags?: string[];
+    customer_id?: number;
+    order_type?: string;
+  }`
 
 **Returns**: `Promise<{
     workOrder: WorkOrder;
@@ -2678,6 +2911,7 @@ static async createWithConditionalMaterials(data: CreateWorkOrderData & {
 Get required materials for WO with reservation status Uses RPC function get_wo_required_materials() for progress tracking
 
 **Signature**:
+
 ```typescript
 static async getRequiredMaterials(woId: number): Promise<Array<{
     material_id: number;
@@ -2694,6 +2928,7 @@ static async getRequiredMaterials(woId: number): Promise<Array<{
 ```
 
 **Parameters**:
+
 - `woId: number`
 
 **Returns**: `Promise<Array<{
@@ -2716,6 +2951,7 @@ static async getRequiredMaterials(woId: number): Promise<Array<{
 Get available LPs for a material (FIFO order) Uses RPC function get_available_lps_for_material()
 
 **Signature**:
+
 ```typescript
 static async getAvailableLPs(materialId: number, locationId?: number): Promise<Array<{
     lp_id: number;
@@ -2732,6 +2968,7 @@ static async getAvailableLPs(materialId: number, locationId?: number): Promise<A
 ```
 
 **Parameters**:
+
 - `materialId: number`
 - `locationId?: number`
 
@@ -2755,6 +2992,7 @@ static async getAvailableLPs(materialId: number, locationId?: number): Promise<A
 Reserve material (LP) for work order Creates reservation record and prevents LP from being moved/split
 
 **Signature**:
+
 ```typescript
 static async reserveMaterial(data: {
     wo_id: number;
@@ -2771,15 +3009,16 @@ static async reserveMaterial(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    wo_id: number;
-    material_id: number;
-    lp_id: number;
-    quantity_reserved: number;
-    uom: string;
-    operation_sequence?: number;
-    userId: string;
-  }`
+  wo_id: number;
+  material_id: number;
+  lp_id: number;
+  quantity_reserved: number;
+  uom: string;
+  operation_sequence?: number;
+  userId: string;
+}`
 
 **Returns**: `Promise<{
     reservation_id: number;
@@ -2793,6 +3032,7 @@ static async reserveMaterial(data: {
 Release reservation (cancel without consuming)
 
 **Signature**:
+
 ```typescript
 static async releaseReservation(data: {
     reservation_id: number;
@@ -2801,10 +3041,11 @@ static async releaseReservation(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    reservation_id: number;
-    userId: string;
-  }`
+  reservation_id: number;
+  userId: string;
+}`
 
 **Returns**: `Promise<void>`
 
@@ -2815,6 +3056,7 @@ static async releaseReservation(data: {
 Consume material from reservation Records consumption and creates genealogy entry
 
 **Signature**:
+
 ```typescript
 static async consumeMaterial(data: {
     reservation_id: number;
@@ -2827,11 +3069,12 @@ static async consumeMaterial(data: {
 ```
 
 **Parameters**:
+
 - `data: {
-    reservation_id: number;
-    quantity_consumed: number;
-    userId: string;
-  }`
+  reservation_id: number;
+  quantity_consumed: number;
+  userId: string;
+}`
 
 **Returns**: `Promise<{
     consumed_qty: number;
@@ -2845,6 +3088,7 @@ static async consumeMaterial(data: {
 Get all reservations for a work order
 
 **Signature**:
+
 ```typescript
 static async getReservations(woId: number): Promise<Array<{
     id: number;
@@ -2866,6 +3110,7 @@ static async getReservations(woId: number): Promise<Array<{
 ```
 
 **Parameters**:
+
 - `woId: number`
 
 **Returns**: `Promise<Array<{
@@ -2899,6 +3144,7 @@ static async getReservations(woId: number): Promise<Array<{
 Get all templates with optional filtering
 
 **Signature**:
+
 ```typescript
 static async getAll(filters?: {
     product_id?: number;
@@ -2909,12 +3155,13 @@ static async getAll(filters?: {
 ```
 
 **Parameters**:
+
 - `filters?: {
-    product_id?: number;
-    line_id?: number;
-    created_by?: number;
-    search?: string;
-  }`
+  product_id?: number;
+  line_id?: number;
+  created_by?: number;
+  search?: string;
+}`
 
 **Returns**: `Promise<WOTemplate[]>`
 
@@ -2925,11 +3172,13 @@ static async getAll(filters?: {
 Get template by ID
 
 **Signature**:
+
 ```typescript
 static async getById(id: number): Promise<WOTemplate | null>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<WOTemplate | null>`
@@ -2941,11 +3190,13 @@ static async getById(id: number): Promise<WOTemplate | null>
 Get default template for a product
 
 **Signature**:
+
 ```typescript
 static async getDefaultForProduct(product_id: number): Promise<WOTemplate | null>
 ```
 
 **Parameters**:
+
 - `product_id: number`
 
 **Returns**: `Promise<WOTemplate | null>`
@@ -2957,11 +3208,13 @@ static async getDefaultForProduct(product_id: number): Promise<WOTemplate | null
 Get popular templates (top N by usage_count)
 
 **Signature**:
+
 ```typescript
 static async getPopular(limit: number = 5): Promise<WOTemplate[]>
 ```
 
 **Parameters**:
+
 - `limit: number = 5`
 
 **Returns**: `Promise<WOTemplate[]>`
@@ -2973,11 +3226,13 @@ static async getPopular(limit: number = 5): Promise<WOTemplate[]>
 Create a new template
 
 **Signature**:
+
 ```typescript
 static async create(templateData: CreateWOTemplateData): Promise<WOTemplate>
 ```
 
 **Parameters**:
+
 - `templateData: CreateWOTemplateData`
 
 **Returns**: `Promise<WOTemplate>`
@@ -2989,11 +3244,13 @@ static async create(templateData: CreateWOTemplateData): Promise<WOTemplate>
 Update a template
 
 **Signature**:
+
 ```typescript
 static async update(id: number, updates: UpdateWOTemplateData): Promise<WOTemplate>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `updates: UpdateWOTemplateData`
 
@@ -3006,11 +3263,13 @@ static async update(id: number, updates: UpdateWOTemplateData): Promise<WOTempla
 Delete a template
 
 **Signature**:
+
 ```typescript
 static async delete(id: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `id: number`
 
 **Returns**: `Promise<void>`
@@ -3022,11 +3281,13 @@ static async delete(id: number): Promise<void>
 Duplicate a template
 
 **Signature**:
+
 ```typescript
 static async duplicate(id: number, newName: string): Promise<WOTemplate>
 ```
 
 **Parameters**:
+
 - `id: number`
 - `newName: string`
 
@@ -3039,11 +3300,13 @@ static async duplicate(id: number, newName: string): Promise<WOTemplate>
 Apply template - returns config to pre-fill WO creation form
 
 **Signature**:
+
 ```typescript
 static async applyTemplate(templateId: number, overrides?: ApplyTemplateOverrides): Promise<WOTemplateConfig & ApplyTemplateOverrides>
 ```
 
 **Parameters**:
+
 - `templateId: number`
 - `overrides?: ApplyTemplateOverrides`
 
@@ -3056,11 +3319,13 @@ static async applyTemplate(templateId: number, overrides?: ApplyTemplateOverride
 Unset default flag for all templates of a product (except optionally one)
 
 **Signature**:
+
 ```typescript
 static async unsetDefaultForProduct(product_id: number, except_id?: number): Promise<void>
 ```
 
 **Parameters**:
+
 - `product_id: number`
 - `except_id?: number`
 
@@ -3073,6 +3338,7 @@ static async unsetDefaultForProduct(product_id: number, except_id?: number): Pro
 Validate template config before applying
 
 **Signature**:
+
 ```typescript
 static async validateTemplate(templateId: number): Promise<{
     valid: boolean;
@@ -3081,6 +3347,7 @@ static async validateTemplate(templateId: number): Promise<{
 ```
 
 **Parameters**:
+
 - `templateId: number`
 
 **Returns**: `Promise<{
@@ -3099,6 +3366,7 @@ static async validateTemplate(templateId: number): Promise<{
 #### `getPRYield()`
 
 **Signature**:
+
 ```typescript
 static async getPRYield(params: {
     bucket: 'day' | 'week' | 'month';
@@ -3122,12 +3390,13 @@ static async getPRYield(params: {
 ```
 
 **Parameters**:
+
 - `params: {
-    bucket: 'day' | 'week' | 'month';
-    from?: string;
-    to?: string;
-    line?: string;
-  }`
+  bucket: 'day' | 'week' | 'month';
+  from?: string;
+  to?: string;
+  line?: string;
+}`
 
 **Returns**: `Promise<{
     data: Array<{
@@ -3149,6 +3418,7 @@ static async getPRYield(params: {
 #### `getFGYield()`
 
 **Signature**:
+
 ```typescript
 static async getFGYield(params: {
     bucket: 'day' | 'week' | 'month';
@@ -3175,12 +3445,13 @@ static async getFGYield(params: {
 ```
 
 **Parameters**:
+
 - `params: {
-    bucket: 'day' | 'week' | 'month';
-    from?: string;
-    to?: string;
-    line?: string;
-  }`
+  bucket: 'day' | 'week' | 'month';
+  from?: string;
+  to?: string;
+  line?: string;
+}`
 
 **Returns**: `Promise<{
     data: Array<{
@@ -3205,6 +3476,7 @@ static async getFGYield(params: {
 #### `getYieldKPIs()`
 
 **Signature**:
+
 ```typescript
 static async getYieldKPIs(params: {
     kpi_scope: 'PR' | 'FG';
@@ -3223,12 +3495,13 @@ static async getYieldKPIs(params: {
 ```
 
 **Parameters**:
+
 - `params: {
-    kpi_scope: 'PR' | 'FG';
-    bucket: 'day' | 'week' | 'month';
-    from?: string;
-    to?: string;
-  }`
+  kpi_scope: 'PR' | 'FG';
+  bucket: 'day' | 'week' | 'month';
+  from?: string;
+  to?: string;
+}`
 
 **Returns**: `Promise<{
     yield_percent: number;
@@ -3241,4 +3514,3 @@ static async getYieldKPIs(params: {
   }>`
 
 ---
-
