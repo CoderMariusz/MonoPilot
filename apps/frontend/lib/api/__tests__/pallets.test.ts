@@ -172,7 +172,7 @@ describe('PalletsAPI', () => {
         quantity: '500',
         uom: 'kg',
         is_consumed: false,
-        qa_status: 'Passed',
+        qa_status: 'passed',
       };
 
       const mockItem = {
@@ -351,7 +351,7 @@ describe('PalletsAPI', () => {
           userId: 'user-123',
         })
       ).rejects.toThrow(
-        "Cannot add LP with QA status Pending. Only 'Passed' LPs can be added"
+        "Cannot add LP with QA status pending. Only 'passed' LPs can be added to pallets."
       );
     });
 
@@ -365,7 +365,7 @@ describe('PalletsAPI', () => {
         id: 100,
         lp_number: 'LP-2025-001',
         is_consumed: false,
-        qa_status: 'Passed',
+        qa_status: 'passed',
       };
 
       const mockExisting = {
@@ -423,6 +423,14 @@ describe('PalletsAPI', () => {
         status: 'open',
       };
 
+      const mockDelete = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({
+            error: null,
+          }),
+        }),
+      });
+
       vi.mocked(supabase.from)
         .mockReturnValueOnce({
           select: vi.fn().mockReturnValue({
@@ -435,13 +443,7 @@ describe('PalletsAPI', () => {
           }),
         } as any)
         .mockReturnValueOnce({
-          delete: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                error: null,
-              }),
-            }),
-          }),
+          delete: mockDelete,
         } as any);
 
       await expect(
