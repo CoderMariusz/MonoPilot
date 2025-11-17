@@ -1,0 +1,71 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1.5</epicId>
+    <storyId>4</storyId>
+    <title>Advanced Analytics Variant D</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-16</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-5-4-advanced-analytics-variant-d.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Plant Manager / Operations Director</asA>
+    <iWant>Trend analytics, predictive insights, and anomaly detection for production data</iWant>
+    <soThat>data-driven decisions improve OEE by 15% and prevent downtime</soThat>
+    <tasks>10 tasks: Analytics API, 7-day OEE trend chart, material shortage forecast (3-day lookahead), anomaly detection (IQR method), predictive maintenance alerts, export to PDF, caching (Redis or SWR), E2E tests, performance, documentation. Total: 56h (~7 days)</tasks>
+  </story>
+
+  <acceptanceCriteria>9 ACs covering: (1) 7-day OEE trend (line chart), (2) Material shortage forecast (3-day lookahead based on WO schedule vs stock), (3) Anomaly detection (IQR method for yield %, downtime, quality rate), (4) Predictive maintenance (alert when machine downtime &gt; 2 std deviations), (5) Top 5 bottlenecks (slowest operations, longest downtime), (6) Export analytics to PDF, (7) Caching (Redis or SWR for 5min), (8) Performance (&lt;2s query), (9) Documentation</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/ux-design-production-module.md" title="Production Module UX" section="Variant D: Advanced Analytics">
+        Trend analytics, predictive insights, anomaly detection. Features: 7-day OEE trend, material shortage forecast, IQR anomaly detection. ROI: 15% OEE improvement, prevent downtime.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Caching">
+        Decision #9: Application-Level caching (SWR, React Query). No server-side Redis for MVP.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="apps/frontend/lib/api/analytics.ts" kind="API Class">
+        Create AnalyticsAPI with methods: getOEETrend(), getForecast(), detectAnomalies(), getBottlenecks()
+      </artifact>
+    </code>
+    <dependencies>
+      <framework>PostgreSQL window functions for trend calculations</framework>
+      <framework>SWR or React Query for client-side caching</framework>
+      <framework>Recharts for trend visualizations</framework>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="performance">Analytics queries &lt;2s. Use materialized views or pre-aggregation if needed</constraint>
+    <constraint type="caching">Cache analytics results for 5min using SWR</constraint>
+    <constraint type="anomaly">IQR method: Detect values outside Q1 - 1.5*IQR or Q3 + 1.5*IQR</constraint>
+    <constraint type="forecast">Material shortage forecast: Compare WO scheduled_qty vs available stock for next 3 days</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="AnalyticsAPI.getOEETrend()" kind="Method">
+      <signature>static async getOEETrend(lineId: number, days: number): Promise&lt;{ date: string, oee: number }[]&gt;</signature>
+    </interface>
+    <interface name="AnalyticsAPI.detectAnomalies()" kind="Method">
+      <signature>static async detectAnomalies(metric: 'yield' | 'downtime' | 'quality', lineId: number): Promise&lt;Anomaly[]&gt;</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>E2E required for: Trend calculation accuracy, forecast logic, anomaly detection algorithm, PDF export</standards>
+    <locations>
+      <e2e>apps/frontend/e2e/advanced-analytics.spec.ts</e2e>
+      <unit>apps/frontend/__tests__/analytics.test.ts</unit>
+    </locations>
+    <ideas>
+      <test ac="AC-1" risk="MEDIUM">Unit: Calculate 7-day OEE trend → verify calculation matches expected values</test>
+      <test ac="AC-2" risk="HIGH">E2E: Forecast shows material shortage 2 days ahead → verify alert displayed</test>
+      <test ac="AC-3" risk="HIGH">Unit: IQR anomaly detection → value outside Q1-1.5*IQR flagged as anomaly</test>
+      <test ac="AC-6" risk="MEDIUM">E2E: Export analytics to PDF → file downloaded with charts</test>
+    </ideas>
+  </tests>
+</story-context>

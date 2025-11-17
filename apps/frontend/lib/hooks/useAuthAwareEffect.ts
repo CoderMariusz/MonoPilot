@@ -28,3 +28,4 @@ export function useAuthAwareEffect(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, ...deps]);
 }
+

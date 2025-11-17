@@ -21,6 +21,7 @@ import * as path from 'path';
 
 const ROOT_DIR = path.join(__dirname, '../../..');
 const MIGRATIONS_DIR = path.join(ROOT_DIR, 'apps/frontend/lib/supabase/migrations');
+const MASTER_MIGRATION_FILE = path.join(ROOT_DIR, 'master_migration.sql');
 const API_DIR = path.join(ROOT_DIR, 'apps/frontend/lib/api');
 const TYPES_FILE = path.join(ROOT_DIR, 'packages/shared/types.ts');
 const DOCS_DIR = path.join(ROOT_DIR, 'docs');
@@ -69,19 +70,27 @@ interface APIEndpoint {
 
 function parseSQLMigrations(): TableSchema[] {
   const tables: TableSchema[] = [];
-  
+
+  // Parse master_migration.sql first (contains base schema from Epic 0.8 consolidation)
+  if (fs.existsSync(MASTER_MIGRATION_FILE)) {
+    console.log(`📄 Parsing master_migration.sql (base schema)`);
+    const masterContent = fs.readFileSync(MASTER_MIGRATION_FILE, 'utf-8');
+    const masterTables = parseCreateTableStatements(masterContent, 'master_migration.sql');
+    tables.push(...masterTables);
+  }
+
   if (!fs.existsSync(MIGRATIONS_DIR)) {
     console.warn(`⚠️  Migrations directory not found: ${MIGRATIONS_DIR}`);
     return tables;
   }
-  
+
   const migrationFiles = fs.readdirSync(MIGRATIONS_DIR)
     .filter(f => f.endsWith('.sql'))
     .sort();
-  
+
   console.log(`📄 Found ${migrationFiles.length} migration files`);
-  
-  // First pass: parse CREATE TABLE statements
+
+  // First pass: parse CREATE TABLE statements from individual migrations
   for (const file of migrationFiles) {
     const content = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8');
     const fileTables = parseCreateTableStatements(content, file);

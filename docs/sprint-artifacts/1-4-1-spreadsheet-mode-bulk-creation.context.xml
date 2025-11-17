@@ -1,0 +1,72 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1.4</epicId>
+    <storyId>1</storyId>
+    <title>Spreadsheet Mode Bulk Creation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-16</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-4-1-spreadsheet-mode-bulk-creation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Production Planner / Purchasing Manager</asA>
+    <iWant>Excel-like spreadsheet interface for bulk PO/WO creation with drag-drop row reordering</iWant>
+    <soThat>data entry time drops 97% (5 minutes vs 3 hours for 50 POs)</soThat>
+    <tasks>10 tasks: Spreadsheet component, Excel paste parser, inline editing, drag-drop reordering, batch validation, batch API, conflict resolution, E2E tests, performance optimization, documentation. Total: 68h (~8-10 days)</tasks>
+  </story>
+
+  <acceptanceCriteria>9 ACs: (1) Excel paste (TSV format, 20 columns), (2) Inline editing (auto-save, validation), (3) Drag-drop priority reordering, (4) Batch validation (duplicate SKUs, invalid dates), (5) Batch API (50 POs in 1 transaction), (6) Conflict resolution (optimistic locking), (7) Undo/Redo (10-step history), (8) Performance (&lt;2s for 100 rows), (9) Documentation</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/ux-design-planning-module.md" title="Planning Module UX" section="Variant B: Spreadsheet Mode">
+        Excel-like bulk entry for PO/WO. Features: Paste from Excel, drag-drop rows, inline edit, batch create. Time savings: 97% (5min vs 3h for 50 POs). ROI: $296k/year.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="API Structure">
+        Class-based API pattern. Batch operations require transaction handling and optimistic locking for conflict resolution.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="apps/frontend/lib/api/purchaseOrders.ts" kind="API Class" symbol="PurchaseOrdersAPI">
+        Extend with batchCreate() method for atomic multi-PO creation
+      </artifact>
+      <artifact path="apps/frontend/lib/api/workOrders.ts" kind="API Class" symbol="WorkOrdersAPI">
+        Extend with batchCreate() method for atomic multi-WO creation
+      </artifact>
+    </code>
+    <dependencies>
+      <framework>React Data Grid or AG-Grid for spreadsheet UI</framework>
+      <framework>PapaParse for TSV/CSV parsing</framework>
+      <package>immer for undo/redo state management</package>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="performance">Render &lt;2s for 100 rows. Use virtualization (react-window)</constraint>
+    <constraint type="transaction">Batch create must be atomic - all succeed or all fail</constraint>
+    <constraint type="validation">Validate before batch create: duplicate SKUs, invalid dates, missing required fields</constraint>
+    <constraint type="ux">Auto-save on cell edit (debounced 500ms). Show validation errors inline.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="PurchaseOrdersAPI.batchCreate()" kind="Method">
+      <signature>static async batchCreate(pos: POInput[]): Promise&lt;BatchResult&gt;</signature>
+    </interface>
+    <interface name="SpreadsheetMode component" kind="React Component">
+      <signature>&lt;SpreadsheetMode entityType="po" | "wo" onBatchCreate={handleBatch} /&gt;</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>E2E required for: Excel paste parsing, drag-drop reordering, batch validation, transaction rollback on error</standards>
+    <locations>
+      <e2e>apps/frontend/e2e/spreadsheet-mode.spec.ts</e2e>
+    </locations>
+    <ideas>
+      <test ac="AC-1" risk="HIGH">E2E: Paste 50 rows from Excel → all parsed correctly</test>
+      <test ac="AC-5" risk="CRITICAL">E2E: Batch create 50 POs → verify atomic transaction (all or none)</test>
+      <test ac="AC-3" risk="MEDIUM">E2E: Drag row 10 to position 3 → priority recalculated for all rows</test>
+    </ideas>
+  </tests>
+</story-context>

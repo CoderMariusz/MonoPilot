@@ -14,10 +14,18 @@ export async function middleware(request: NextRequest) {
   // Database-first mode - always run auth middleware
 
   // Allow auth pages without any checks
-  if (request.nextUrl.pathname.startsWith('/login') || 
+  if (request.nextUrl.pathname.startsWith('/login') ||
       request.nextUrl.pathname.startsWith('/signup')) {
     console.log('Main Middleware - Auth page, allowing');
     return NextResponse.next();
+  }
+
+  // TODO Story NPD-1.7: Add feature flag check for NPD module
+  // Check org_settings.enabled_modules includes 'npd' before allowing /npd routes
+  // For MVP, NPD routes are accessible to all authenticated users
+  if (request.nextUrl.pathname.startsWith('/npd')) {
+    console.log('Main Middleware - NPD route accessed');
+    // Feature flag check will be added in Story NPD-1.7 (RBAC Implementation)
   }
 
   // Update session and check authentication for protected routes
@@ -35,6 +43,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public folder
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

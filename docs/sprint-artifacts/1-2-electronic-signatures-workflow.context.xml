@@ -1,0 +1,246 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>2</storyId>
+    <title>Electronic Signatures Workflow</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-16</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-2-electronic-signatures-workflow.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Quality Manager / Production Supervisor</asA>
+    <iWant>electronic signatures for critical operations (WO release, BOM approval, QC approval)</iWant>
+    <soThat>regulatory compliance is maintained per FDA 21 CFR Part 11 requirements</soThat>
+    <tasks>
+### Task 1: Signature Infrastructure (AC-1) - 4 hours
+- [ ] 1.1: Create migration `XXX_create_electronic_signatures_table.sql`
+- [ ] 1.2: Define table schema (id, user_id, org_id, operation_type, entity_type, entity_id, signature_hash, reason, timestamp)
+- [ ] 1.3: Add RLS policy for org_id isolation
+- [ ] 1.4: Create indexes: (org_id, entity_type, entity_id), (user_id, timestamp)
+- [ ] 1.5: Run `pnpm gen-types` to regenerate TypeScript types
+
+### Task 2: Signature Generation Logic (AC-1) - 3 hours
+- [ ] 2.1: Create `ElectronicSignaturesAPI` class
+- [ ] 2.2: Implement `generateSignature(operation, entity, reason)` method
+- [ ] 2.3: Generate JWT with payload: {user_id, operation, entity, timestamp, reason}
+- [ ] 2.4: Sign JWT with secret key (from environment variable)
+- [ ] 2.5: Hash JWT using SHA-256, store hash in database
+- [ ] 2.6: Add unit tests for signature generation
+
+### Task 3: Signature Modal Component (AC-3) - 5 hours
+- [ ] 3.1: Create `<ElectronicSignatureModal>` component
+- [ ] 3.2: Add form fields: username (read-only, pre-filled), password (input), reason (textarea)
+- [ ] 3.3: Implement re-authentication via Supabase Auth (verify password)
+- [ ] 3.4: On success: call ElectronicSignaturesAPI.generateSignature()
+- [ ] 3.5: On error: show error message ("Invalid credentials")
+- [ ] 3.6: Add loading state and success feedback
+- [ ] 3.7: Accessibility: keyboard navigation, ARIA labels
+
+### Task 4: Integrate Signatures into Operations (AC-2) - 6 hours
+- [ ] 4.1: WO Release: Intercept work_orders.status update → show signature modal
+- [ ] 4.2: BOM Approval: Intercept boms.status update → show signature modal
+- [ ] 4.3: QC Approval: Intercept license_plates.qa_status update → show signature modal
+- [ ] 4.4: API validation: reject status change if signature not provided
+- [ ] 4.5: Transaction: update entity + create signature record atomically
+- [ ] 4.6: Add unit tests for signature-required operations
+
+### Task 5: Signature Verification (AC-4) - 3 hours
+- [ ] 5.1: Implement `ElectronicSignaturesAPI.verify(signature_id)` method
+- [ ] 5.2: Load signature record from database
+- [ ] 5.3: Verify JWT hash matches stored hash
+- [ ] 5.4: Verify user_id exists and was active at signing time
+- [ ] 5.5: Return verification result object
+- [ ] 5.6: Add unit tests for verification (valid/invalid scenarios)
+
+### Task 6: Signature History UI (AC-5) - 4 hours
+- [ ] 6.1: Add "Signatures" tab to WO detail page
+- [ ] 6.2: Add "Signatures" tab to BOM detail page
+- [ ] 6.3: Add "Signatures" tab to LP detail page
+- [ ] 6.4: Create `<SignatureHistoryTable>` component
+- [ ] 6.5: Display columns: timestamp, user, operation, reason, verification status
+- [ ] 6.6: Implement PDF export for signature history (compliance report)
+
+### Task 7: Audit Integration (AC-6) - 2 hours
+- [ ] 7.1: Update pgAudit view to include signature_id column
+- [ ] 7.2: Link audit log entries to signature records (foreign key)
+- [ ] 7.3: Update Audit Log UI to show signature reference
+- [ ] 7.4: Cross-reference query: "Show all operations with/without signatures"
+
+### Task 8: E2E Tests (4 hours)
+- [ ] 8.1: E2E test: Release WO → signature modal appears
+- [ ] 8.2: E2E test: Enter invalid password → error shown
+- [ ] 8.3: E2E test: Enter valid credentials → WO released + signature created
+- [ ] 8.4: E2E test: Signature history shows on WO detail page
+- [ ] 8.5: E2E test: Signature verification badge shows ✅ Valid
+- [ ] 8.6: E2E test: PDF export downloads signature report
+
+### Task 9: Documentation (AC-7) - 2 hours
+- [ ] 9.1: Run `pnpm docs:update` to regenerate API docs
+- [ ] 9.2: Update `docs/architecture.md` with e-signature workflow diagram
+- [ ] 9.3: Document signature schema and JWT structure
+- [ ] 9.4: Add compliance section: FDA 21 CFR Part 11 e-signature (meaning + intent)
+</tasks>
+  </story>
+
+  <acceptanceCriteria>
+### AC-1: Signature Infrastructure
+- Create `electronic_signatures` table with columns: id, user_id, org_id, operation_type, entity_type, entity_id, signature_hash, timestamp, reason_for_change
+- Implement JWT-based signature generation (sign with user's credentials + timestamp + operation context)
+- Store signature hash (SHA-256) for verification
+- RLS policy: users can view signatures for their org_id only
+
+### AC-2: Signature Required Operations
+- WO Release: Require signature when changing work_orders.status from 'planned' → 'released'
+- BOM Approval: Require signature when changing boms.status from 'draft' → 'active'
+- QC Approval: Require signature when changing license_plates.qa_status to 'approved'
+- Deviation Approval: Require signature when creating/approving deviations (future)
+
+### AC-3: Signature Modal UI Component
+- Create `<ElectronicSignatureModal>` component
+- Modal prompts: username, password, reason for change (text area)
+- Re-authenticate user (verify password against Supabase Auth)
+- Generate signature JWT with: {user_id, operation, entity, timestamp, reason}
+- Store signature record in database
+- Show success/error feedback
+
+### AC-4: Signature Verification
+- Create `ElectronicSignaturesAPI.verify(signature_id)` method
+- Verify JWT signature hash matches stored hash
+- Verify user credentials were valid at time of signing
+- Verify operation context (entity_type, entity_id) matches
+- Return verification result: {valid: true/false, signed_by, signed_at, reason}
+
+### AC-5: Signature History UI
+- Add "Signatures" tab to entity detail pages (WO, BOM, LP)
+- Show signature history table: timestamp, user, operation, reason
+- Verification badge: ✅ Valid or ⚠️ Invalid
+- Export signatures to PDF (compliance report)
+
+### AC-6: Audit Integration
+- Link electronic signatures to pgAudit logs (Story 1.1 dependency)
+- Audit log entry references signature_id when operation requires signature
+- Cross-reference audit logs ↔ signatures for compliance reporting
+
+### AC-7: Documentation
+- Update `docs/architecture.md` with e-signature workflow
+- Document signature schema and verification algorithm
+- Update `docs/API_REFERENCE.md` with ElectronicSignaturesAPI
+- Add compliance note: FDA 21 CFR Part 11 e-signature requirement (meaning and intent)
+</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/MonoPilot-PRD-2025-11-13.md" title="Main PRD" section="G4. Audit Trail & Electronic Signatures">
+        Electronic Signatures: Custom JWT-based signature system. Signature required for critical operations (WO release, BOM approval, QC approval). Signature verification and history tracking. Compliance: FDA 21 CFR Part 11 (meaning and intent of signature).
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Document" section="Decision Summary">
+        Decision #10: Audit Trail - Basic MVP defers pgAudit + e-signatures to Growth (P2). Story 1.2 implements e-signatures as P2 feature. Decision #5: RLS + Application-Level Filtering for multi-tenant isolation must apply to electronic_signatures table.
+      </doc>
+      <doc path="docs/sprint-artifacts/1-1-enable-pgaudit-extension.context.xml" title="Story 1.1 Context" section="Dependencies">
+        Story 1.2 depends on Story 1.1 (pgAudit) for audit trail infrastructure. Audit log table pattern and RLS policy pattern established in Story 1.1 can be reused.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="apps/frontend/lib/api/users.ts" kind="API Class" symbol="UsersAPI" lines="1-50">
+        API class pattern for ElectronicSignaturesAPI: static methods (getAll, getById, create, verify), Supabase client usage, error handling
+      </artifact>
+      <artifact path="apps/frontend/lib/api/workOrders.ts" kind="API Class" symbol="WorkOrdersAPI">
+        Existing WO release logic - needs to be updated to require signature when status changes from 'planned' → 'released'
+      </artifact>
+      <artifact path="apps/frontend/lib/api/boms.ts" kind="API Class" symbol="BomsAPI">
+        Existing BOM approval logic - needs to be updated to require signature when status changes from 'draft' → 'active'
+      </artifact>
+      <artifact path="apps/frontend/lib/api/licensePlates.ts" kind="API Class" symbol="LicensePlatesAPI">
+        Existing QC approval logic - needs to be updated to require signature when qa_status changes to 'approved'
+      </artifact>
+      <artifact path="apps/frontend/lib/supabase/migrations/040_rls_policies.sql" kind="Migration" symbol="RLS Policies">
+        RLS pattern for org_id filtering - apply same pattern to electronic_signatures table
+      </artifact>
+    </code>
+    <dependencies>
+      <framework>Next.js 15 (App Router)</framework>
+      <framework>React 19</framework>
+      <framework>TypeScript 5.7</framework>
+      <framework>Supabase Auth (re-authentication)</framework>
+      <framework>Supabase PostgreSQL 15</framework>
+      <testing>Playwright (E2E testing)</testing>
+      <testing>Vitest (unit testing)</testing>
+      <package>jsonwebtoken (JWT generation and verification)</package>
+      <package>crypto (SHA-256 hashing)</package>
+      <package>@supabase/supabase-js</package>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architectural">All API classes must follow static class pattern. ElectronicSignaturesAPI must have methods: getAll(), getById(), generateSignature(), verify()</constraint>
+    <constraint type="security">RLS policy required on electronic_signatures table with org_id filtering. JWT secret key must be stored in environment variable (SIGNATURE_SECRET_KEY)</constraint>
+    <constraint type="compliance">FDA 21 CFR Part 11 requirements: (1) Meaning - signature must show who/when/why, (2) Intent - user must re-authenticate to prove intent, (3) Uniqueness - signature must be unique and non-reusable, (4) Link - signature must be permanently linked to signed record</constraint>
+    <constraint type="testing">HIGH RISK: Password re-authentication and signature bypass prevention require E2E tests. COMPLEX: Modal workflow requires E2E test.</constraint>
+    <constraint type="transaction">Entity update + signature creation must be atomic (database transaction). If signature fails, entity update must be rolled back.</constraint>
+    <constraint type="mvp">MVP: 3 critical operations (WO release, BOM approval, QC approval). Defer: deviation approval, multi-factor auth, biometric signatures</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="ElectronicSignaturesAPI" kind="Class API">
+      <signature>
+        static async generateSignature(operation: string, entityType: string, entityId: number, reason: string): Promise&lt;{ signature_id: string, signature_hash: string }&gt;
+        static async verify(signatureId: string): Promise&lt;{ valid: boolean, signed_by: string, signed_at: Date, reason: string }&gt;
+        static async getAll(filters?: { entityType?: string, entityId?: number }): Promise&lt;ElectronicSignature[]&gt;
+      </signature>
+      <path>apps/frontend/lib/api/electronicSignatures.ts</path>
+    </interface>
+    <interface name="electronic_signatures table" kind="Database Table">
+      <signature>
+        CREATE TABLE electronic_signatures (
+          id UUID PRIMARY KEY,
+          user_id UUID REFERENCES users(id),
+          org_id BIGINT REFERENCES organizations(id),
+          operation_type VARCHAR(50),
+          entity_type VARCHAR(50),
+          entity_id BIGINT,
+          signature_hash VARCHAR(256),
+          reason TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        );
+      </signature>
+      <path>apps/frontend/lib/supabase/migrations/XXX_create_electronic_signatures_table.sql</path>
+    </interface>
+    <interface name="ElectronicSignatureModal" kind="React Component">
+      <signature>
+        &lt;ElectronicSignatureModal
+          operation="wo_release"
+          entityType="work_order"
+          entityId={123}
+          onSuccess={(signatureId) => void}
+          onCancel={() => void}
+        /&gt;
+      </signature>
+      <path>apps/frontend/components/ElectronicSignatureModal.tsx</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Risk-Based E2E Testing Strategy: HIGH RISK features (password re-authentication, signature bypass prevention) require E2E tests. COMPLEX features (modal workflow, multi-step interactions) require E2E tests. Simple features (signature history display) can use unit tests. All E2E tests must verify multi-tenant isolation and that signatures cannot be bypassed.
+    </standards>
+    <locations>
+      <e2e>apps/frontend/e2e/electronic-signatures.spec.ts</e2e>
+      <unit>apps/frontend/__tests__/electronicSignatures.test.ts</unit>
+      <unit>apps/frontend/lib/api/__tests__/electronicSignatures.test.ts</unit>
+    </locations>
+    <ideas>
+      <test ac="AC-2" risk="CRITICAL">E2E: Attempt to release WO without signature → blocked with validation error</test>
+      <test ac="AC-3" risk="HIGH">E2E: Release WO → signature modal appears → enter invalid password → error shown "Invalid credentials"</test>
+      <test ac="AC-3" risk="HIGH">E2E: Release WO → signature modal appears → enter valid password + reason → WO released + signature created</test>
+      <test ac="AC-2" risk="HIGH">E2E: Approve BOM → signature modal appears → complete signature → BOM approved</test>
+      <test ac="AC-2" risk="HIGH">E2E: QC Approve LP → signature modal appears → complete signature → LP qa_status = 'approved'</test>
+      <test ac="AC-5" risk="COMPLEX">E2E: View WO detail page → "Signatures" tab shows all signatures with verification badges (✅ Valid)</test>
+      <test ac="AC-5" risk="MEDIUM">E2E: Signature history → export to PDF → file downloaded with correct data</test>
+      <test ac="AC-4" risk="MEDIUM">Unit: ElectronicSignaturesAPI.verify() with valid signature → returns {valid: true}</test>
+      <test ac="AC-4" risk="MEDIUM">Unit: ElectronicSignaturesAPI.verify() with tampered signature → returns {valid: false}</test>
+      <test ac="AC-6" risk="MEDIUM">Unit: Audit log entry includes signature_id reference when operation requires signature</test>
+    </ideas>
+  </tests>
+</story-context>

@@ -519,4 +519,68 @@ export const BomsAPI = {
 
     return response.json();
   },
+
+  // ============================================================================
+  // Story 1.6.2: BOM Timeline Methods
+  // ============================================================================
+
+  /**
+   * Get BOM by ID
+   * @param id - BOM ID
+   * @returns BOM object or null if not found
+   */
+  async getById(id: number): Promise<Bom | null> {
+    const response = await fetch(`${API_BASE}/${id}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch BOM');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get all BOMs for a product
+   * @param productId - Product ID
+   * @returns Array of BOMs for the product
+   */
+  async getByProduct(productId: number): Promise<Bom[]> {
+    const response = await fetch(`${API_BASE}?product_id=${productId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch BOMs');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get BOM items
+   * @param bomId - BOM ID
+   * @returns Array of BOM items
+   */
+  async getItems(bomId: number): Promise<BomItem[]> {
+    const response = await fetch(`${API_BASE}/${bomId}/items`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch BOM items');
+    }
+
+    return response.json();
+  },
 };

@@ -1,0 +1,66 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1.4</epicId>
+    <storyId>4</storyId>
+    <title>Planning Data Integrity Fixes</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-16</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-4-4-planning-data-integrity-fixes.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Data Integrity / System Administrator</asA>
+    <iWant>Validate and cleanup WO/PO/TO data, add database constraints, fix Epic 0 audit findings</iWant>
+    <soThat>planning data is 100% consistent and business rules are enforced at database level</soThat>
+    <tasks>9 tasks: Validation queries, data cleanup scripts, database constraints (7 types), triggers (status validation, BOM snapshot), validation dashboard UI, automated tests, documentation. Total: 48h (~6 days)</tasks>
+  </story>
+
+  <acceptanceCriteria>9 ACs covering: (1) Validation queries for 7 data issues (orphaned WO materials, missing BOM snapshots, invalid statuses, duplicate priorities, negative quantities, future dates, missing warehouse), (2) Data cleanup scripts, (3) Database constraints (NOT NULL, CHECK, FK), (4) Triggers (status transitions, BOM snapshot enforcement), (5) Validation dashboard UI, (6) Automated validation tests, (7) Migration rollback safety, (8) Performance (validation &lt;5s), (9) Documentation</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/P0-MODULES-AUDIT-REPORT-2025-11-14.md" title="P0 Modules Audit" section="Epic 0 Findings">
+        7 critical data integrity issues found: (1) Orphaned WO materials, (2) Missing BOM snapshots, (3) Invalid status transitions, (4) Duplicate priorities, (5) Negative quantities, (6) Future scheduled dates without validation, (7) Missing warehouse assignments. All require database-level fixes.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="BOM Snapshot Pattern">
+        Decision #2: BOM materials copied to wo_materials for immutability. This story adds enforcement triggers.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="apps/frontend/lib/supabase/migrations/040_rls_policies.sql" kind="Migration">
+        Reference for constraint and trigger syntax
+      </artifact>
+    </code>
+    <dependencies>
+      <framework>PostgreSQL constraints and triggers</framework>
+      <framework>Supabase migrations</framework>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="data-integrity">Add NOT NULL constraints on critical fields (product_id, org_id, warehouse_id)</constraint>
+    <constraint type="validation">Add CHECK constraints (qty &gt; 0, scheduled_end &gt; scheduled_start)</constraint>
+    <constraint type="immutability">Add trigger to enforce BOM snapshot: Reject WO creation if wo_materials empty for non-draft status</constraint>
+    <constraint type="migration">All constraints must have rollback scripts</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="ValidationDashboard" kind="React Component">
+      <signature>&lt;ValidationDashboard /&gt; shows 7 validation checks with pass/fail status</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>E2E required for: Constraint enforcement (violate constraint → operation blocked), trigger validation, dashboard display</standards>
+    <locations>
+      <e2e>apps/frontend/e2e/data-integrity.spec.ts</e2e>
+      <unit>apps/frontend/__tests__/validation.test.ts</unit>
+    </locations>
+    <ideas>
+      <test ac="AC-3" risk="CRITICAL">E2E: Try to create WO with negative quantity → blocked by CHECK constraint</test>
+      <test ac="AC-4" risk="HIGH">E2E: Try to release WO without BOM snapshot → blocked by trigger</test>
+      <test ac="AC-5" risk="MEDIUM">E2E: Validation dashboard shows all checks as passed</test>
+    </ideas>
+  </tests>
+</story-context>

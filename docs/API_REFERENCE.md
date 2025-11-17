@@ -82,6 +82,123 @@ static async delete(id: number): Promise<void>
 
 ---
 
+### AuditLogsAPI
+
+**Source**: `apps/frontend/lib/api/audit.ts`
+
+**Methods**:
+
+#### `getAll()`
+
+Get all audit logs with optional filtering and pagination Returns unified view of application-level and database-level audit trails
+
+**Signature**:
+```typescript
+static async getAll(filters?: AuditLogFilters, pagination?: PaginationParams): Promise<AuditLogsResponse>
+```
+
+**Parameters**:
+- `filters?: AuditLogFilters`
+- `pagination?: PaginationParams`
+
+**Returns**: `Promise<AuditLogsResponse>`
+
+---
+
+#### `getEntityAuditTrail()`
+
+Get audit trail for a specific entity Returns complete history of changes for an entity
+
+**Signature**:
+```typescript
+static async getEntityAuditTrail(entityName: string, entityId: number): Promise<AuditLog[]>
+```
+
+**Parameters**:
+- `entityName: string`
+- `entityId: number`
+
+**Returns**: `Promise<AuditLog[]>`
+
+---
+
+#### `getStats()`
+
+Get pgAudit statistics for performance monitoring Returns log volume metrics and retention info
+
+**Signature**:
+```typescript
+static async getStats(): Promise<{
+    total_logs: number;
+    logs_last_24h: number;
+    logs_last_7d: number;
+    oldest_log: string | null;
+    newest_log: string | null;
+    avg_logs_per_day: number;
+  }>
+```
+
+**Returns**: `Promise<{
+    total_logs: number;
+    logs_last_24h: number;
+    logs_last_7d: number;
+    oldest_log: string | null;
+    newest_log: string | null;
+    avg_logs_per_day: number;
+  }>`
+
+---
+
+#### `exportToCSV()`
+
+Export audit logs to CSV format Returns CSV string with all audit log data Limited to MAX_EXPORT_LIMIT (5000) records to prevent memory exhaustion
+
+**Signature**:
+```typescript
+static async exportToCSV(filters?: AuditLogFilters): Promise<string>
+```
+
+**Parameters**:
+- `filters?: AuditLogFilters`
+
+**Returns**: `Promise<string>`
+
+---
+
+#### `archiveOldLogs()`
+
+Archive old audit logs (admin only) Deletes logs older than specified retention period @param retentionDays Number of days to retain logs (default: 90)
+
+**Signature**:
+```typescript
+static async archiveOldLogs(retentionDays: number = 90): Promise<number>
+```
+
+**Parameters**:
+- `retentionDays: number = 90`
+
+**Returns**: `Promise<number>`
+
+---
+
+#### `addReason()`
+
+Add a reason to the most recent audit event for an entity Legacy method - kept for backward compatibility
+
+**Signature**:
+```typescript
+static async addReason(entityType: string, entityId: number, reason: string): Promise<void>
+```
+
+**Parameters**:
+- `entityType: string`
+- `entityId: number`
+- `reason: string`
+
+**Returns**: `Promise<void>`
+
+---
+
 ### BomHistoryAPI
 
 **Source**: `apps/frontend/lib/api/bomHistory.ts`
@@ -969,6 +1086,100 @@ static async delete(id: number): Promise<void>
 - `id: number`
 
 **Returns**: `Promise<void>`
+
+---
+
+### NPDProjectsAPI
+
+**Source**: `apps/frontend/lib/api/npdProjects.ts`
+
+**Methods**:
+
+#### `getAll()`
+
+**Signature**:
+```typescript
+static async getAll(filters?: NPDProjectFilters): Promise<NPDProject[]>
+```
+
+**Parameters**:
+- `filters?: NPDProjectFilters`
+
+**Returns**: `Promise<NPDProject[]>`
+
+---
+
+#### `getById()`
+
+Get NPD project by ID RLS: Only returns project if it belongs to user's org  @param id - Project UUID @returns Promise<NPDProject | null>
+
+**Signature**:
+```typescript
+static async getById(id: string): Promise<NPDProject | null>
+```
+
+**Parameters**:
+- `id: string`
+
+**Returns**: `Promise<NPDProject | null>`
+
+---
+
+#### `create()`
+
+**Signature**:
+```typescript
+static async create(data: CreateNPDProjectInput): Promise<NPDProject>
+```
+
+**Parameters**:
+- `data: CreateNPDProjectInput`
+
+**Returns**: `Promise<NPDProject>`
+
+---
+
+#### `update()`
+
+**Signature**:
+```typescript
+static async update(id: string, data: UpdateNPDProjectInput): Promise<NPDProject>
+```
+
+**Parameters**:
+- `id: string`
+- `data: UpdateNPDProjectInput`
+
+**Returns**: `Promise<NPDProject>`
+
+---
+
+#### `delete()`
+
+**Signature**:
+```typescript
+static async delete(id: string): Promise<void>
+```
+
+**Parameters**:
+- `id: string`
+
+**Returns**: `Promise<void>`
+
+---
+
+#### `advanceGate()`
+
+**Signature**:
+```typescript
+static async advanceGate(id: string, toGate: NPDProjectGate): Promise<NPDProject>
+```
+
+**Parameters**:
+- `id: string`
+- `toGate: NPDProjectGate`
+
+**Returns**: `Promise<NPDProject>`
 
 ---
 
@@ -2673,6 +2884,208 @@ static async getReservations(woId: number): Promise<Array<{
     reserved_at: string;
     reserved_by: string | null;
     consumed_at: string | null;
+  }>`
+
+---
+
+### WOTemplatesAPI
+
+**Source**: `apps/frontend/lib/api/woTemplates.ts`
+
+**Methods**:
+
+#### `getAll()`
+
+Get all templates with optional filtering
+
+**Signature**:
+```typescript
+static async getAll(filters?: {
+    product_id?: number;
+    line_id?: number;
+    created_by?: number;
+    search?: string;
+  }): Promise<WOTemplate[]>
+```
+
+**Parameters**:
+- `filters?: {
+    product_id?: number;
+    line_id?: number;
+    created_by?: number;
+    search?: string;
+  }`
+
+**Returns**: `Promise<WOTemplate[]>`
+
+---
+
+#### `getById()`
+
+Get template by ID
+
+**Signature**:
+```typescript
+static async getById(id: number): Promise<WOTemplate | null>
+```
+
+**Parameters**:
+- `id: number`
+
+**Returns**: `Promise<WOTemplate | null>`
+
+---
+
+#### `getDefaultForProduct()`
+
+Get default template for a product
+
+**Signature**:
+```typescript
+static async getDefaultForProduct(product_id: number): Promise<WOTemplate | null>
+```
+
+**Parameters**:
+- `product_id: number`
+
+**Returns**: `Promise<WOTemplate | null>`
+
+---
+
+#### `getPopular()`
+
+Get popular templates (top N by usage_count)
+
+**Signature**:
+```typescript
+static async getPopular(limit: number = 5): Promise<WOTemplate[]>
+```
+
+**Parameters**:
+- `limit: number = 5`
+
+**Returns**: `Promise<WOTemplate[]>`
+
+---
+
+#### `create()`
+
+Create a new template
+
+**Signature**:
+```typescript
+static async create(templateData: CreateWOTemplateData): Promise<WOTemplate>
+```
+
+**Parameters**:
+- `templateData: CreateWOTemplateData`
+
+**Returns**: `Promise<WOTemplate>`
+
+---
+
+#### `update()`
+
+Update a template
+
+**Signature**:
+```typescript
+static async update(id: number, updates: UpdateWOTemplateData): Promise<WOTemplate>
+```
+
+**Parameters**:
+- `id: number`
+- `updates: UpdateWOTemplateData`
+
+**Returns**: `Promise<WOTemplate>`
+
+---
+
+#### `delete()`
+
+Delete a template
+
+**Signature**:
+```typescript
+static async delete(id: number): Promise<void>
+```
+
+**Parameters**:
+- `id: number`
+
+**Returns**: `Promise<void>`
+
+---
+
+#### `duplicate()`
+
+Duplicate a template
+
+**Signature**:
+```typescript
+static async duplicate(id: number, newName: string): Promise<WOTemplate>
+```
+
+**Parameters**:
+- `id: number`
+- `newName: string`
+
+**Returns**: `Promise<WOTemplate>`
+
+---
+
+#### `applyTemplate()`
+
+Apply template - returns config to pre-fill WO creation form
+
+**Signature**:
+```typescript
+static async applyTemplate(templateId: number, overrides?: ApplyTemplateOverrides): Promise<WOTemplateConfig & ApplyTemplateOverrides>
+```
+
+**Parameters**:
+- `templateId: number`
+- `overrides?: ApplyTemplateOverrides`
+
+**Returns**: `Promise<WOTemplateConfig & ApplyTemplateOverrides>`
+
+---
+
+#### `unsetDefaultForProduct()`
+
+Unset default flag for all templates of a product (except optionally one)
+
+**Signature**:
+```typescript
+static async unsetDefaultForProduct(product_id: number, except_id?: number): Promise<void>
+```
+
+**Parameters**:
+- `product_id: number`
+- `except_id?: number`
+
+**Returns**: `Promise<void>`
+
+---
+
+#### `validateTemplate()`
+
+Validate template config before applying
+
+**Signature**:
+```typescript
+static async validateTemplate(templateId: number): Promise<{
+    valid: boolean;
+    errors: string[];
+  }>
+```
+
+**Parameters**:
+- `templateId: number`
+
+**Returns**: `Promise<{
+    valid: boolean;
+    errors: string[];
   }>`
 
 ---

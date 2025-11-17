@@ -27,6 +27,7 @@ import { toast } from '../../lib/toast';
 import { offlineQueue } from '../../lib/offline/offlineQueue';
 import { syncManager } from '../../lib/offline/syncManager';
 import { predictBatch, type BatchPrediction } from '../../lib/scanner/batchPrediction';
+import { generateValidatedLPNumber } from '../../lib/scanner/lpGenerator';
 
 interface ScannedItem {
   asn_item_id: number;
@@ -182,7 +183,6 @@ export default function SingleScreenScanner({
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [cameraFallback, setCameraFallback] = useState(false);
   const [finishing, setFinishing] = useState(false);
-  const [lpSequence, setLpSequence] = useState(1);
 
   // Undo state (for swipe-to-remove error correction)
   const [undoItem, setUndoItem] = useState<ScannedItem | null>(null);
@@ -245,18 +245,25 @@ export default function SingleScreenScanner({
     };
   }, []);
 
-  // Generate LP number in format: LP-YYYYMMDD-NNN
-  const generateLpNumber = useCallback(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const sequence = String(lpSequence).padStart(3, '0');
-
-    setLpSequence(prev => prev + 1);
-
-    return `LP-${year}${month}${day}-${sequence}`;
-  }, [lpSequence]);
+  // Generate LP number in format: LP-YYYYMMDD-NNN (ATOMIC)
+  // Story 1.7.1 AC-4 Gap 1 Fix: Uses database sequence for atomicity
+  // Story 1.7.1 AC-4 Gap 5 Fix: Validates uniqueness before returning
+  const generateLpNumber = useCallback(async (): Promise<string> => {
+    try {
+      const lpNumber = await generateValidatedLPNumber();
+      console.log('[SingleScreenScanner] Generated LP:', lpNumber);
+      return lpNumber;
+    } catch (error) {
+      console.error('[SingleScreenScanner] Failed to generate LP:', error);
+      // Fallback: client-side generation (should never happen in production)
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+      return `LP-${year}${month}${day}-${random}`;
+    }
+  }, []);
 
   // Handle barcode scan
   const handleScan = useCallback(
@@ -300,8 +307,8 @@ export default function SingleScreenScanner({
         return;
       }
 
-      // Auto-generate LP number
-      const lpNumber = generateLpNumber();
+      // Auto-generate LP number (atomic, with uniqueness validation)
+      const lpNumber = await generateLpNumber();
 
       // Use AI batch prediction
       const batchPrediction = await predictBatch(

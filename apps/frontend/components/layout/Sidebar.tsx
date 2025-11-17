@@ -11,10 +11,12 @@ import {
   Settings, 
   Wrench,
   FileText,
-  ShieldAlert
+  ShieldAlert,
+  Lightbulb
 } from 'lucide-react';
 
 const menuItems = [
+  { href: '/npd', label: 'NPD', icon: Lightbulb },
   { href: '/planning', label: 'Planning', icon: ClipboardList },
   { href: '/production', label: 'Production', icon: Factory },
   { href: '/warehouse', label: 'Warehouse', icon: Warehouse },

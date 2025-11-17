@@ -1,0 +1,61 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1.4</epicId>
+    <storyId>2</storyId>
+    <title>Timeline Mode Visual Scheduling</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-16</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-4-2-timeline-mode-visual-scheduling.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Production Planner / Scheduler</asA>
+    <iWant>Gantt chart timeline for visual WO scheduling with drag-drop (horizontal/vertical/diagonal)</iWant>
+    <soThat>weekly planning time drops 94% (15 minutes vs 4 hours)</soThat>
+    <tasks>11 tasks: Gantt chart component, drag-drop (3 directions), conflict detection, capacity visualization, multi-select, resize handles, zoom/pan, E2E tests, performance, documentation. Total: 80h (~10 days)</tasks>
+  </story>
+
+  <acceptanceCriteria>9 ACs: (1) Gantt chart (X-axis dates, Y-axis production lines), (2) Horizontal drag (reschedule date), (3) Vertical drag (change line), (4) Diagonal drag (date + line), (5) Conflict detection (overlapping WOs), (6) Capacity visualization (line utilization %), (7) Multi-select operations (shift+click), (8) Resize handles (adjust duration), (9) Documentation</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/ux-design-planning-module.md" title="Planning Module UX" section="Variant C: Timeline Mode">
+        Gantt chart visual scheduling. Features: Drag WOs horizontally (date), vertically (line), diagonally (both). Conflict detection. Time savings: 94% (15min vs 4h weekly). ROI: $296k/year.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="apps/frontend/lib/api/workOrders.ts" kind="API Class" symbol="WorkOrdersAPI.update()">
+        Update WO scheduled_start, scheduled_end, line_id via drag-drop
+      </artifact>
+    </code>
+    <dependencies>
+      <framework>dhtmlx-gantt or bryntum-gantt for timeline visualization</framework>
+      <framework>date-fns for date calculations</framework>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="performance">Render &lt;1s for 500 WOs. Use canvas rendering or virtualization</constraint>
+    <constraint type="validation">Prevent overlapping WOs on same line. Show conflict modal</constraint>
+    <constraint type="ux">Snap to 15-minute grid for drag-drop. Visual feedback during drag (ghost bar)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="TimelineMode component" kind="React Component">
+      <signature>&lt;TimelineMode dateRange={[start, end]} onWOUpdate={handleUpdate} /&gt;</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>E2E required for: Drag-drop (all 3 directions), conflict detection, multi-select, capacity calculation</standards>
+    <locations>
+      <e2e>apps/frontend/e2e/timeline-mode.spec.ts</e2e>
+    </locations>
+    <ideas>
+      <test ac="AC-2" risk="HIGH">E2E: Drag WO horizontally → scheduled_start/end updated</test>
+      <test ac="AC-5" risk="CRITICAL">E2E: Drag WO to overlapping slot → conflict modal shown</test>
+      <test ac="AC-7" risk="MEDIUM">E2E: Multi-select 5 WOs → bulk reschedule</test>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,61 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1.4</epicId>
+    <storyId>3</storyId>
+    <title>Wizard Mode Onboarding</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-16</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-4-3-wizard-mode-onboarding.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>New User / Junior Planner</asA>
+    <iWant>5-step guided WO creation wizard with smart defaults and validation</iWant>
+    <soThat>WO creation is 71% faster for new users (7min vs 24min) with 0% errors</soThat>
+    <tasks>9 tasks: Wizard component, 5 step screens, smart defaults, validation per step, progress tracking, first-time detection, graduation popup, E2E tests, documentation. Total: 40h (~5 days)</tasks>
+  </story>
+
+  <acceptanceCriteria>9 ACs covering: (1) 5-step flow (Product→BOM→Schedule→Materials→Review), (2) Smart defaults (line based on product, shift based on time), (3) Step validation (cannot proceed with errors), (4) Progress bar (Step 3/5), (5) First-time user detection (account age &lt;14 days OR &lt;3 WOs created), (6) Graduation popup (after 10 WOs → "Switch to Spreadsheet Mode?"), (7) Skip to advanced mode toggle, (8) Accessibility (keyboard nav), (9) Documentation</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/ux-design-planning-module.md" title="Planning Module UX" section="Variant D: Wizard Mode">
+        5-step guided WO creation for new users. Features: Step validation, smart defaults, graduation popup. Time savings: 71% for new users (7min vs 24min). 0% error rate. ROI: $296k/year.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="apps/frontend/lib/api/workOrders.ts" kind="API Class" symbol="WorkOrdersAPI.create()">
+        Use existing create() method for wizard final step
+      </artifact>
+    </code>
+    <dependencies>
+      <framework>React Hook Form for wizard step validation</framework>
+      <framework>Zod schemas for validation</framework>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="ux">Each step must validate before proceeding. Show inline errors</constraint>
+    <constraint type="onboarding">Detect first-time users: account_age &lt; 14 days OR wo_created_count &lt; 3</constraint>
+    <constraint type="graduation">After 10 WOs → show "Ready for Spreadsheet Mode?" popup</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="WizardMode component" kind="React Component">
+      <signature>&lt;WizardMode onComplete={(woData) =&gt; void} onCancel={() =&gt; void} /&gt;</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>E2E required for: Multi-step workflow, validation blocking, smart defaults, first-time detection, graduation popup</standards>
+    <locations>
+      <e2e>apps/frontend/e2e/wizard-mode.spec.ts</e2e>
+    </locations>
+    <ideas>
+      <test ac="AC-3" risk="HIGH">E2E: Try to proceed from Step 2 with invalid data → blocked</test>
+      <test ac="AC-5" risk="MEDIUM">E2E: First-time user logs in → wizard auto-launches</test>
+      <test ac="AC-6" risk="MEDIUM">E2E: Create 10th WO → graduation popup shows</test>
+    </ideas>
+  </tests>
+</story-context>

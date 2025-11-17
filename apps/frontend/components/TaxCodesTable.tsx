@@ -126,7 +126,7 @@ export function TaxCodesTable() {
     setEditingTaxCode(null);
     setFormData({
       code: '',
-      name: '',
+      description: '',
       rate: '',
       is_active: true,
     });

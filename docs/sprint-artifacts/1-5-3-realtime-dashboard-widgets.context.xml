@@ -1,0 +1,70 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1.5</epicId>
+    <storyId>3</storyId>
+    <title>Realtime Dashboard Widgets</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-16</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-5-3-realtime-dashboard-widgets.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Plant Manager / Production Director</asA>
+    <iWant>10 configurable KPI widgets with drag-drop layout + TV display mode</iWant>
+    <soThat>production visibility is real-time and customizable per role</soThat>
+    <tasks>9 tasks: Widget library (10 widget types), drag-drop layout, widget configuration modal, TV display mode (auto-rotate, fullscreen), WebSocket real-time, user preferences persistence, E2E tests, performance, documentation. Total: 48h (~6 days)</tasks>
+  </story>
+
+  <acceptanceCriteria>9 ACs covering: (1) 10 widget types (OEE Gauge, Throughput Chart, Quality Rate, Downtime Log, WO Status, Material Availability, Yield %, Alerts, Schedule Adherence, Line Utilization), (2) Drag-drop layout (grid), (3) Widget config modal (time range, line filter, chart type), (4) TV display mode (fullscreen, auto-rotate every 30s), (5) WebSocket real-time updates, (6) User layout preferences (save/load), (7) Widget refresh intervals (configurable), (8) Mobile responsive, (9) Documentation</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/ux-design-production-module.md" title="Production Module UX" section="Realtime Dashboard Widgets">
+        10 configurable KPI widgets with TV mode. Features: Drag-drop layout, real-time WebSocket, auto-rotate for TV screens. ROI: Real-time production visibility, role-based dashboards.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Real-Time Updates">
+        Decision #15: Supabase Realtime for critical tables. Use for dashboard widget updates.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="apps/frontend/components/dashboard/widgets/" kind="Component Directory">
+        Create widget components: OEEGauge.tsx, ThroughputChart.tsx, QualityRate.tsx, etc.
+      </artifact>
+    </code>
+    <dependencies>
+      <framework>react-grid-layout for drag-drop widget placement</framework>
+      <framework>Recharts for data visualizations</framework>
+      <framework>Supabase Realtime for WebSocket</framework>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="performance">Widget rendering &lt;200ms. Use React.memo and useMemo</constraint>
+    <constraint type="real-time">WebSocket subscriptions for all widgets (configurable refresh: 5s/15s/30s/1min)</constraint>
+    <constraint type="storage">Store layout in user_preferences table as JSONB: {layout: [{i, x, y, w, h}], widgets: {i: {type, config}}}</constraint>
+    <constraint type="tv-mode">Fullscreen API + auto-rotate every 30s (configurable)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="DashboardGrid component" kind="React Component">
+      <signature>&lt;DashboardGrid layout={userLayout} onLayoutChange={saveLayout} tvMode={boolean} /&gt;</signature>
+    </interface>
+    <interface name="Widget interface" kind="TypeScript Interface">
+      <signature>interface Widget { type: string; config: WidgetConfig; data: any; }</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>E2E required for: Drag-drop layout, widget configuration, TV mode auto-rotate, WebSocket real-time</standards>
+    <locations>
+      <e2e>apps/frontend/e2e/dashboard-widgets.spec.ts</e2e>
+    </locations>
+    <ideas>
+      <test ac="AC-2" risk="MEDIUM">E2E: Drag OEE widget from (0,0) to (2,1) → layout saved</test>
+      <test ac="AC-3" risk="MEDIUM">E2E: Click widget config → modal opens → change time range → widget updates</test>
+      <test ac="AC-4" risk="COMPLEX">E2E: Enable TV mode → widgets auto-rotate every 30s</test>
+      <test ac="AC-5" risk="HIGH">E2E: WO status changes → widget updates in real-time via WebSocket</test>
+    </ideas>
+  </tests>
+</story-context>
