@@ -1,11 +1,22 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { DataGrid, Column, RenderCellProps, RenderEditCellProps } from 'react-data-grid';
-import { GripVertical, Plus, Trash2, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import DataGrid, {
+  Column,
+  RenderCellProps,
+  RenderEditCellProps,
+} from 'react-data-grid';
+import {
+  GripVertical,
+  Plus,
+  Trash2,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+} from 'lucide-react';
 import { produce } from 'immer';
 import Papa from 'papaparse';
-import { parsePastedData, validatePastedData } from '@/lib/spreadsheet/pasteHandler';
+import { parsePastedData } from '@/lib/spreadsheet/pasteHandler';
 import 'react-data-grid/lib/styles.css';
 
 // ============================================================================
@@ -41,7 +52,13 @@ interface SpreadsheetTableProps<T extends SpreadsheetRow> {
   entityType: EntityType;
   columns: ColumnConfig<T>[];
   rows: T[];
-  onRowsChange: (rows: T[], changes: { type: 'add' | 'update' | 'delete' | 'reorder'; indexes?: number[] }) => void;
+  onRowsChange: (
+    rows: T[],
+    changes: {
+      type: 'add' | 'update' | 'delete' | 'reorder';
+      indexes?: number[];
+    }
+  ) => void;
   onPaste?: (data: string[][]) => void;
   onBatchValidate?: (rows: T[]) => Promise<T[]>;
   autoSaveDelay?: number; // ms, default 500
@@ -55,7 +72,11 @@ interface SpreadsheetTableProps<T extends SpreadsheetRow> {
 // Sub-Components
 // ============================================================================
 
-function DragHandle({ rowIdx, onDragStart, onDrop }: {
+function DragHandle({
+  rowIdx,
+  onDragStart,
+  onDrop,
+}: {
   rowIdx: number;
   onDragStart: (e: React.DragEvent, rowIdx: number) => void;
   onDrop: (e: React.DragEvent, rowIdx: number) => void;
@@ -63,9 +84,9 @@ function DragHandle({ rowIdx, onDragStart, onDrop }: {
   return (
     <div
       draggable
-      onDragStart={(e) => onDragStart(e, rowIdx)}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => onDrop(e, rowIdx)}
+      onDragStart={e => onDragStart(e, rowIdx)}
+      onDragOver={e => e.preventDefault()}
+      onDrop={e => onDrop(e, rowIdx)}
       className="cursor-grab active:cursor-grabbing px-2 py-1 text-gray-400 hover:text-gray-600 flex items-center justify-center h-full"
       title="Drag to reorder"
     >
@@ -83,13 +104,21 @@ function ValidationIcon({ status }: { status: ValidationStatus }) {
     case 'error':
       return <XCircle size={16} className="text-red-600" />;
     case 'pending':
-      return <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />;
+      return (
+        <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+      );
     default:
       return null;
   }
 }
 
-function RowNumberCell({ rowIdx, status }: { rowIdx: number; status: ValidationStatus }) {
+function RowNumberCell({
+  rowIdx,
+  status,
+}: {
+  rowIdx: number;
+  status: ValidationStatus;
+}) {
   return (
     <div className="flex items-center gap-2 px-2">
       <span className="text-sm text-gray-500">{rowIdx + 1}</span>
@@ -108,7 +137,6 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
   rows,
   onRowsChange,
   onPaste,
-  onBatchValidate,
   autoSaveDelay = 500,
   enableDragDrop = true,
   enablePaste = true,
@@ -143,7 +171,7 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
     } as T;
 
     // Initialize fields based on column config
-    columns.forEach((col) => {
+    columns.forEach(col => {
       if (typeof col.key === 'string' && !col.key.startsWith('_')) {
         (newRow as any)[col.key] = '';
       }
@@ -197,7 +225,7 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
       e.preventDefault();
       if (draggedRow === null || draggedRow === dropIdx) return;
 
-      const updatedRows = produce(localRows, (draft) => {
+      const updatedRows = produce(localRows, draft => {
         const [movedRow] = draft.splice(draggedRow, 1);
         draft.splice(dropIdx, 0, movedRow);
 
@@ -208,7 +236,10 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
       });
 
       setLocalRows(updatedRows);
-      onRowsChange(updatedRows, { type: 'reorder', indexes: [draggedRow, dropIdx] });
+      onRowsChange(updatedRows, {
+        type: 'reorder',
+        indexes: [draggedRow, dropIdx],
+      });
       setDraggedRow(null);
     },
     [draggedRow, localRows, onRowsChange]
@@ -265,7 +296,9 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
         // Show success message
         alert(
           `✓ Pasted ${result.rows.length} rows from Excel\n${
-            result.warnings.length > 0 ? `\nWarnings:\n${result.warnings.join('\n')}` : ''
+            result.warnings.length > 0
+              ? `\nWarnings:\n${result.warnings.join('\n')}`
+              : ''
           }`
         );
       }
@@ -283,19 +316,25 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
    * Heuristic: If first row contains mostly text and subsequent rows contain numbers,
    * it's likely a header
    */
-  function detectHeaderRow(firstRow: string[], columns: ColumnConfig<T>[]): boolean {
+  function detectHeaderRow(
+    firstRow: string[],
+    columns: ColumnConfig<T>[]
+  ): boolean {
     if (firstRow.length === 0) return false;
 
     // Check if first row matches column names (case-insensitive)
     const editableColumns = columns.filter(
-      (col) => col.editable !== false && !String(col.key).startsWith('_')
+      col => col.editable !== false && !String(col.key).startsWith('_')
     );
 
     const matchCount = firstRow.filter((cell, idx) => {
       if (idx >= editableColumns.length) return false;
       const colName = editableColumns[idx].name.toLowerCase();
       const cellLower = cell.trim().toLowerCase();
-      return colName.includes(cellLower) || cellLower.includes(colName.replace(' *', ''));
+      return (
+        colName.includes(cellLower) ||
+        cellLower.includes(colName.replace(' *', ''))
+      );
     }).length;
 
     // If > 50% of cells match column names, it's likely a header
@@ -338,7 +377,7 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
     } as Column<T>);
 
     // Data columns
-    columns.forEach((col) => {
+    columns.forEach(col => {
       cols.push({
         key: col.key as string,
         name: col.name + (col.required ? ' *' : ''),
@@ -348,7 +387,7 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
           const value = props.row[col.key];
           const displayValue = col.formatter
             ? col.formatter(value, props.row)
-            : value?.toString() ?? '';
+            : (value?.toString() ?? '');
 
           return (
             <div className="px-2 py-1 h-full flex items-center">
@@ -365,7 +404,7 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
                 autoFocus
                 className="w-full h-full px-2 border-2 border-blue-500 focus:outline-none"
                 value={value?.toString() ?? ''}
-                onChange={(e) => {
+                onChange={e => {
                   props.onRowChange(
                     { ...props.row, [col.key]: e.target.value },
                     true
@@ -374,7 +413,7 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
                 onBlur={() => props.onClose(true)}
               >
                 <option value="">Select...</option>
-                {col.options.map((opt) => (
+                {col.options.map(opt => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
@@ -387,10 +426,10 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
             col.type === 'number'
               ? 'number'
               : col.type === 'date'
-              ? 'date'
-              : col.type === 'datetime'
-              ? 'datetime-local'
-              : 'text';
+                ? 'date'
+                : col.type === 'datetime'
+                  ? 'datetime-local'
+                  : 'text';
 
           return (
             <input
@@ -398,7 +437,7 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
               type={inputType}
               className="w-full h-full px-2 border-2 border-blue-500 focus:outline-none"
               value={value?.toString() ?? ''}
-              onChange={(e) => {
+              onChange={e => {
                 props.onRowChange(
                   { ...props.row, [col.key]: e.target.value },
                   true
@@ -473,7 +512,7 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
           columns={gridColumns()}
           rows={localRows}
           onRowsChange={updateRows}
-          rowKeyGetter={(row) => row.id}
+          rowKeyGetter={row => row.id}
           className="fill-grid"
           style={{ height: '600px' }}
           rowHeight={40}
@@ -484,7 +523,8 @@ export function SpreadsheetTable<T extends SpreadsheetRow>({
       {/* Help Text */}
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-900">
-          <strong>Keyboard Shortcuts:</strong> Tab/Shift+Tab = Navigate cells, Enter = Edit cell, Esc = Cancel edit
+          <strong>Keyboard Shortcuts:</strong> Tab/Shift+Tab = Navigate cells,
+          Enter = Edit cell, Esc = Cancel edit
           {enablePaste && ', Ctrl+V = Paste from Excel'}
           {enableDragDrop && ', Drag ⋮⋮ icon = Reorder rows'}
         </p>
