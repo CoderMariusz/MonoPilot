@@ -413,9 +413,9 @@ function ProductsTable({
                 <tr className="border-b border-slate-200">
                   <th 
                     className="text-left py-3 px-4 text-sm font-semibold text-slate-700 cursor-pointer hover:bg-slate-50"
-                    onClick={() => handleSort('part_number')}
+                    onClick={() => handleSort('sku')}
                   >
-                    Item # {sortColumn === 'part_number' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Item # {sortColumn === 'sku' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th 
                     className="text-left py-3 px-4 text-sm font-semibold text-slate-700 cursor-pointer hover:bg-slate-50"

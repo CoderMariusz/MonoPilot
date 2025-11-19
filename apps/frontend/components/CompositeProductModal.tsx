@@ -234,7 +234,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               production_lines,
               production_line_restrictions,
               scrap_percent,
-              scrap_std_pct,
+              scrap_percent,
               is_optional,
               is_phantom,
               consume_whole_lp,
@@ -271,7 +271,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               production_lines: item.production_lines || [],
               production_line_restrictions: item.production_line_restrictions || [],
               scrap_percent: item.scrap_percent,
-              scrap_std_pct: item.scrap_std_pct,
+              scrap_percent: item.scrap_percent,
               is_optional: item.is_optional,
               is_phantom: item.is_phantom,
               consume_whole_lp: item.consume_whole_lp,
@@ -381,7 +381,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
       const oldItem = oldItemsMap.get(newItem.material_id!);
       if (oldItem) {
         // Tax code is managed at PO/Supplier level, not in BOM
-        const fieldsToCompare = ['quantity', 'uom', 'sequence', 'priority', 'scrap_std_pct', 'is_optional', 'is_phantom', 'consume_whole_lp', 'unit_cost_std', 'line_id', 'lead_time_days', 'moq'];
+        const fieldsToCompare = ['quantity', 'uom', 'sequence', 'priority', 'scrap_percent', 'is_optional', 'is_phantom', 'consume_whole_lp', 'unit_cost_std', 'line_id', 'lead_time_days', 'moq'];
         const itemChanges: any = {};
         
         fieldsToCompare.forEach(field => {
@@ -607,7 +607,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           priority: item.priority,
           production_lines: item.production_lines,
           production_line_restrictions: item.production_line_restrictions,
-          scrap_std_pct: item.scrap_std_pct || item.scrap_percent,
+          scrap_percent: item.scrap_percent || item.scrap_percent,
           is_optional: item.is_optional,
           is_phantom: item.is_phantom,
           consume_whole_lp: item.consume_whole_lp,
@@ -915,7 +915,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
                       else if (field === 'uom') fieldDisplay = 'uom';
                       else if (field === 'line_id') fieldDisplay = 'line';
                       else if (field === 'unit_cost_std') fieldDisplay = 'cost';
-                      else if (field === 'scrap_std_pct') fieldDisplay = 'scrap';
+                      else if (field === 'scrap_percent') fieldDisplay = 'scrap';
                       else if (field === 'sequence') fieldDisplay = 'sequence';
                       else if (field === 'priority') fieldDisplay = 'priority';
                       else if (field === 'is_optional') fieldDisplay = 'optional';
@@ -1005,7 +1005,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               priority: item.priority,
               production_lines: item.production_lines,
               production_line_restrictions: item.production_line_restrictions,
-              scrap_std_pct: item.scrap_std_pct || item.scrap_percent,
+              scrap_percent: item.scrap_percent || item.scrap_percent,
               is_optional: item.is_optional,
               is_phantom: item.is_phantom,
               consume_whole_lp: item.consume_whole_lp,

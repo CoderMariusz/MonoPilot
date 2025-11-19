@@ -213,7 +213,7 @@ class ClientState {
 
   getStockMoves(): StockMove[] {
     return this.stockMoves.map(move => {
-      const lp = this.licensePlates.find(l => l.id === move.lp_id);
+      const lp = this.licensePlates.find(l => l.id === Number(move.lp_id));
       const from_location = this.locations.find(loc => loc.id === parseInt(move.from_location_id));
       const to_location = this.locations.find(loc => loc.id === parseInt(move.to_location_id));
       
@@ -396,7 +396,7 @@ class ClientState {
   addWorkOrder(workOrder: Omit<WorkOrder, 'id' | 'created_at' | 'updated_at'>): WorkOrder {
     const newWorkOrder: WorkOrder = {
       ...workOrder,
-      id: (Math.max(...this.workOrders.map(wo => wo.id), 0) + 1).toString(),
+      id: Math.max(...this.workOrders.map(wo => wo.id), 0) + 1,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -407,7 +407,7 @@ class ClientState {
   }
 
   updateWorkOrder(id: number, updates: Partial<WorkOrder>): WorkOrder | null {
-    const index = this.workOrders.findIndex(wo => wo.id === id.toString());
+    const index = this.workOrders.findIndex(wo => wo.id === id);
     if (index === -1) return null;
 
     const updatedWorkOrder: WorkOrder = {
@@ -438,7 +438,7 @@ class ClientState {
   }
 
   cancelWorkOrder(id: number, reason?: string): boolean {
-    const index = this.workOrders.findIndex(wo => wo.id === id.toString());
+    const index = this.workOrders.findIndex(wo => wo.id === id);
     if (index === -1) return false;
 
     const oldStatus = this.workOrders[index].status;
@@ -790,7 +790,7 @@ class ClientState {
   addLicensePlate(lp: Omit<LicensePlate, 'id' | 'created_at' | 'updated_at'>): LicensePlate {
     const newLP: LicensePlate = {
       ...lp,
-      id: (Math.max(...this.licensePlates.map(lp => lp.id), 0) + 1).toString(),
+      id: Math.max(...this.licensePlates.map(lp => lp.id), 0) + 1,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -800,7 +800,7 @@ class ClientState {
   }
 
   updateLicensePlate(id: number, updates: Partial<LicensePlate>): LicensePlate | null {
-    const index = this.licensePlates.findIndex(lp => lp.id === id.toString());
+    const index = this.licensePlates.findIndex(lp => lp.id === id);
     if (index === -1) return null;
 
     const updatedLP: LicensePlate = {
@@ -822,7 +822,7 @@ class ClientState {
 
   deleteLicensePlate(id: number): boolean {
     const initialLength = this.licensePlates.length;
-    this.licensePlates = this.licensePlates.filter(lp => lp.id !== id.toString());
+    this.licensePlates = this.licensePlates.filter(lp => lp.id !== id);
     if (this.licensePlates.length < initialLength) {
       this.notifyLicensePlateListeners();
       return true;

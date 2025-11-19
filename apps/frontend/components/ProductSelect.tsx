@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase/client-browser';
 
 interface ProductOption {
   id: number;
-  part_number: string;
+  sku: string;
   description: string;
   uom?: string;
   product_group?: string;
