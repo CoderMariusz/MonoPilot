@@ -105,7 +105,7 @@ development_status:
   # ========================================
 
   # Story 0.13: Add Missing BOM API GET Endpoints (CRITICAL - BOM edit broken)
-  0-13-add-bom-api-get-endpoints: ready-for-dev
+  0-13-add-bom-api-get-endpoints: review
 
   # Story 0.14: Fix BOM History Display (CRITICAL - History not showing)
   0-14-fix-bom-history-display: ready-for-dev
