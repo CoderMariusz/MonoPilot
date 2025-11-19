@@ -823,34 +823,36 @@ export function requiresExpiryDate(productType: ProductType): boolean {
 // Enhanced Product interface
 export interface Product {
   id: number;
-  part_number: string;
-  description: string;
-  type: 'RM' | 'DG' | 'PR' | 'FG' | 'WIP'; // DB required field
-  group: ProductGroup;
-  product_group?: ProductGroup; // keep optional for backward compatibility in UI
+  org_id?: number;
+  sku: string;  // Match DB: was 'part_number'
+  name: string;  // Match DB: was missing
+  description?: string;
   product_type: ProductType;
+  type?: 'RM' | 'DG' | 'PR' | 'FG' | 'WIP';
   subtype?: string;
   category?: string;
-  uom: UoM;
+  uom: string;
   is_active: boolean;
   supplier_id?: number;
   lead_time_days?: number;
+  shelf_life_days?: number;
   moq?: number;
   tax_code_id?: number;
   std_price?: number;
-  shelf_life_days?: number;
   expiry_policy?: string;
   rate?: number;
   production_lines?: string[];
   default_routing_id?: number | null;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-  updated_by?: string;
+  requires_routing?: boolean;
   boxes_per_pallet?: number;
   packs_per_box?: number;
-  // Remove: category (migrated to group/product_type)
-  // Enhanced relationships
+  product_version?: string;
+  notes?: string;
+  created_by?: string;
+  updated_by?: string;
+  created_at: string;
+  updated_at: string;
+  // Relationships
   activeBom?: Bom;
   allergens?: ProductAllergen[];
 }
@@ -1106,15 +1108,20 @@ export interface YieldReport {
 // Enhanced BOM interfaces
 export interface Bom {
   id: number;
+  org_id?: number;
   product_id: number;
-  version: string;
+  name?: string;
+  version: number; // DB uses INTEGER not VARCHAR
   status: 'draft' | 'active' | 'archived';
   is_active: boolean;
   effective_from?: string;
   effective_to?: string;
+  yield_qty?: number;
+  yield_uom?: string;
   requires_routing: boolean;
   default_routing_id?: number;
   line_id?: number[] | null; // Array of production line IDs
+  boxes_per_pallet?: number;
   notes?: string;
   archived_at?: string | null;
   deleted_at?: string | null;
@@ -1157,7 +1164,7 @@ export interface BomItem {
   priority?: number;
   production_lines?: string[];
   production_line_restrictions?: string[];
-  scrap_std_pct?: number;
+  scrap_percent?: number; // DB uses scrap_percent not scrap_std_pct
   is_optional: boolean;
   is_phantom: boolean;
   consume_whole_lp: boolean; // renamed from one_to_one
@@ -1165,6 +1172,7 @@ export interface BomItem {
   tax_code_id?: number | null;
   lead_time_days?: number | null;
   moq?: number | null;
+  notes?: string;
   // EPIC-001 Phase 1: By-Products Support
   is_by_product?: boolean;
   // EPIC-001 Phase 3: Conditional Components
