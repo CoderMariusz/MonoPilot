@@ -3,6 +3,12 @@
 **Priority:** P0 (CRITICAL - History not displaying)
 **Effort:** 5 SP (10 hours)
 **Epic:** Epic 0 - P0 Data Integrity Fixes
+**Status:** ready-for-dev
+
+## Dev Agent Record
+
+### Context Reference
+- `docs/sprint-artifacts/0-14-fix-bom-history-display.context.xml`
 
 ---
 

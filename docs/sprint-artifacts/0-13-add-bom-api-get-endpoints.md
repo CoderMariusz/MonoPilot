@@ -3,6 +3,12 @@
 **Priority:** P0 (CRITICAL - Blocker for BOM edit)
 **Effort:** 3 SP (6 hours)
 **Epic:** Epic 0 - P0 Data Integrity Fixes
+**Status:** ready-for-dev
+
+## Dev Agent Record
+
+### Context Reference
+- `docs/sprint-artifacts/0-13-add-bom-api-get-endpoints.context.xml`
 
 ---
 

@@ -1,0 +1,145 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>14</storyId>
+    <title>Fix BOM History Display</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-19</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-14-fix-bom-history-display.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>production manager</asA>
+    <iWant>to see BOM change history when I click the History button</iWant>
+    <soThat>I can track who changed what and when for compliance audits</soThat>
+    <tasks>
+      <task n="1">Update BomHistory type in lib/types.ts to reflect actual DB structure with JSONB fields</task>
+      <task n="2">Update BomHistoryModal to parse old_values/new_values JSONB correctly</task>
+      <task n="3">Fix field access: version, status_from, status_to, changed_at, description, changes</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="AC1" title="History Display">
+      <given>BOM has history entries in database</given>
+      <when>user opens BomHistoryModal</when>
+      <then>history entries are displayed with version, status change, timestamp, user, description</then>
+    </ac>
+    <ac id="AC2" title="Changes Detail View">
+      <given>history entry is displayed</given>
+      <when>user clicks on entry to expand</when>
+      <then>modal shows detailed changes for BOM header, product, and items</then>
+    </ac>
+    <ac id="AC3" title="Types Alignment">
+      <given>BomHistory type in lib/types.ts</given>
+      <when>checking against actual DB structure</when>
+      <then>type matches what API returns with old_values/new_values JSONB fields</then>
+    </ac>
+    <ac id="AC4" title="Empty State">
+      <given>BOM has no history entries</given>
+      <when>user opens BomHistoryModal</when>
+      <then>modal shows "No history entries found" accurately</then>
+    </ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/archive/epic-0/EPIC-0-API-AUDIT-REPORT.md</path>
+        <title>Epic 0 API Audit Report</title>
+        <section>BomHistoryAPI</section>
+        <snippet>BomHistoryAPI was completely rewritten to use correct schema with JSON storage in old_values/new_values. Database has bom_id, change_type, changed_by, created_at, old_values, new_values.</snippet>
+      </doc>
+      <doc>
+        <path>docs/archive/modules/technical/BOM_ARCHITECTURE.md</path>
+        <title>BOM Architecture</title>
+        <section>Version Bumping Logic</section>
+        <snippet>Major version bump for items added/removed/modified. Minor bump for description, price, routing changes. History should capture all these change types.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>apps/frontend/components/BomHistoryModal.tsx</path>
+        <kind>Component</kind>
+        <symbol>BomHistoryModal</symbol>
+        <lines>1-259</lines>
+        <reason>PRIMARY TARGET. Uses wrong field names: entry.version (line 72), entry.status_from (74), entry.changed_at (81), entry.description (96), entry.changes.bom (103). Must parse JSONB fields instead.</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/api/bomHistory.ts</path>
+        <kind>API Class</kind>
+        <symbol>BomHistoryAPI</symbol>
+        <lines>1-93</lines>
+        <reason>API correctly returns old_values/new_values JSONB fields from database. No changes needed here.</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/types.ts</path>
+        <kind>Type Definitions</kind>
+        <symbol>BomHistory</symbol>
+        <lines>search for BomHistory interface</lines>
+        <reason>May need update to properly type old_values and new_values as JSONB with nested structure for version, status, description, changes.</reason>
+      </file>
+      <file>
+        <path>apps/frontend/components/CompositeProductModal.tsx</path>
+        <kind>Component</kind>
+        <symbol>createHistoryEntry</symbol>
+        <lines>980-985</lines>
+        <reason>Creates history entries with structure: { bom_id, change_type, old_values: {version, status}, new_values: {version, status, changes, description} }. Modal must match this structure.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>react</package>
+        <version>^19.0.0</version>
+      </node>
+      <node>
+        <package>lucide-react</package>
+        <version>^0.469.0</version>
+      </node>
+      <node>
+        <package>typescript</package>
+        <version>^5.7.2</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="backward-compat">Existing history entries in database must display correctly after fix</constraint>
+    <constraint type="type-safety">BomHistory interface must match actual DB structure with JSONB fields</constraint>
+    <constraint type="null-safety">Handle cases where old_values or new_values may be null</constraint>
+    <constraint type="nested-access">Use optional chaining when accessing nested JSONB fields</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>bom_history table</name>
+      <kind>Database Table</kind>
+      <signature>id, bom_id, change_type, changed_by, created_at, old_values (JSONB), new_values (JSONB)</signature>
+      <path>apps/frontend/lib/supabase/migrations/000_complete_reset.sql</path>
+    </interface>
+    <interface>
+      <name>BomHistory type</name>
+      <kind>TypeScript interface</kind>
+      <signature>BomHistory with old_values?: { version, status }, new_values?: { version, status, description, changes }</signature>
+      <path>apps/frontend/lib/types.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Vitest for unit tests, Playwright for E2E. Manual testing required for modal interaction.</standards>
+    <locations>
+      <location>apps/frontend/e2e/**/*.spec.ts</location>
+      <location>apps/frontend/**/*.test.ts</location>
+    </locations>
+    <ideas>
+      <idea acRef="AC1">Test history entries display with version parsed from new_values</idea>
+      <idea acRef="AC1">Test status change displays from old_values.status to new_values.status</idea>
+      <idea acRef="AC1">Test timestamp uses created_at not changed_at</idea>
+      <idea acRef="AC2">Test expanded view shows bom header changes from new_values.changes.bom</idea>
+      <idea acRef="AC2">Test items changes (added/removed/modified) display correctly</idea>
+      <idea acRef="AC3">Test BomHistory type matches API response structure</idea>
+      <idea acRef="AC4">Test empty history shows message only when truly empty</idea>
+    </ideas>
+  </tests>
+</story-context>
