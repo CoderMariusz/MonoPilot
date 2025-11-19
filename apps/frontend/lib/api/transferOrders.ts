@@ -8,7 +8,7 @@ export class TransferOrdersAPI {
         throw new Error('Transfer order ID is required');
       }
 
-      if (!payload.from_wh_id || !payload.to_wh_id) {
+      if (!payload.from_warehouse_id || !payload.to_warehouse_id) {
         throw new Error('Source and destination warehouses are required');
       }
 
@@ -17,10 +17,10 @@ export class TransferOrdersAPI {
       }
 
       payload.lines.forEach((line, index) => {
-        if (!line.item_id) {
+        if (!line.product_id) {
           throw new Error(`Line ${index + 1}: product is required`);
         }
-        if (!line.qty_planned || line.qty_planned <= 0) {
+        if (!line.quantity || line.quantity <= 0) {
           throw new Error(`Line ${index + 1}: quantity must be greater than zero`);
         }
         if (!line.uom) {
@@ -34,26 +34,23 @@ export class TransferOrdersAPI {
       }
 
       const {
-        from_wh_id,
-        to_wh_id,
-        planned_ship_date,
-        planned_receive_date,
-        requested_date,
+        from_warehouse_id,
+        to_warehouse_id,
+        scheduled_date,
         status,
+        notes,
         lines,
       } = payload;
 
       const { error: headerError } = await supabase
         .from('to_header')
         .update({
-          from_wh_id,
-          to_wh_id,
+          from_warehouse_id,
+          to_warehouse_id,
           status,
-          requested_date: requested_date || planned_ship_date || new Date().toISOString(),
-          planned_ship_date: planned_ship_date || null,
-          planned_receive_date: planned_receive_date || null,
+          scheduled_date: scheduled_date || null,
+          notes: notes || null,
           updated_by: user.id,
-          updated_at: new Date().toISOString(),
         })
         .eq('id', toId);
 
@@ -66,14 +63,11 @@ export class TransferOrdersAPI {
 
       const lineRecords = lines.map((line, index) => ({
         to_id: toId,
-        line_no: index + 1,
-        item_id: line.item_id,
+        line_number: index + 1,
+        product_id: line.product_id,
         uom: line.uom,
-        qty_planned: line.qty_planned,
-        qty_shipped: line.qty_shipped || 0,
-        qty_received: line.qty_received || 0,
-        lp_id: line.lp_id || null,
-        batch: line.batch || null,
+        quantity: line.quantity,
+        transferred_qty: line.transferred_qty || 0,
         notes: line.notes || null,
       }));
 
@@ -92,11 +86,11 @@ export class TransferOrdersAPI {
         .from('to_header')
         .select(`
           *,
-          from_warehouse:warehouses!to_header_from_wh_id_fkey(*),
-          to_warehouse:warehouses!to_header_to_wh_id_fkey(*),
+          from_warehouse:warehouses!to_header_from_warehouse_id_fkey(*),
+          to_warehouse:warehouses!to_header_to_warehouse_id_fkey(*),
           to_lines:to_line(
             *,
-            item:products(*)
+            product:products(*)
           )
         `)
         .eq('id', toId)
@@ -120,29 +114,24 @@ export class TransferOrdersAPI {
         .from('to_header')
         .select(`
           *,
-          from_warehouse:warehouses!to_header_from_wh_id_fkey(*),
-          to_warehouse:warehouses!to_header_to_wh_id_fkey(*),
+          from_warehouse:warehouses!to_header_from_warehouse_id_fkey(*),
+          to_warehouse:warehouses!to_header_to_warehouse_id_fkey(*),
           to_lines:to_line(
             *,
-            item:products(*)
+            product:products(*)
           )
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       // Map to TransferOrder for backward compatibility
-      return (data || []).map((to: TOHeader) => ({
+      return (data || []).map((to: any) => ({
         id: to.id,
-        to_number: to.number,
-        from_warehouse_id: to.from_wh_id,
-        to_warehouse_id: to.to_wh_id,
+        to_number: to.to_number,
+        from_warehouse_id: to.from_warehouse_id,
+        to_warehouse_id: to.to_warehouse_id,
         status: to.status,
-        transfer_date: to.transfer_date || to.planned_ship_date, // Ensure required field for TransferOrder
-        requested_date: to.requested_date,
-        planned_ship_date: to.planned_ship_date,
-        actual_ship_date: to.actual_ship_date,
-        planned_receive_date: to.planned_receive_date,
-        actual_receive_date: to.actual_receive_date,
+        scheduled_date: to.scheduled_date,
         notes: to.notes,
         created_by: to.created_by,
         updated_by: to.updated_by,
@@ -150,41 +139,33 @@ export class TransferOrdersAPI {
         updated_at: to.updated_at,
         from_warehouse: to.from_warehouse,
         to_warehouse: to.to_warehouse,
-        // Map to_lines to items (new API) and transfer_order_items (deprecated backward compat)
-        items: to.to_lines?.map(line => ({
+        // Map to_lines to items
+        items: to.to_lines?.map((line: any) => ({
           id: line.id,
           to_id: line.to_id,
-          line_no: line.line_no,
-          item_id: line.item_id,
+          line_number: line.line_number,
+          product_id: line.product_id,
           uom: line.uom,
-          qty_planned: line.qty_planned,
-          qty_shipped: line.qty_shipped || 0,
-          qty_received: line.qty_received || 0,
-          lp_id: line.lp_id,
-          batch: line.batch,
+          quantity: line.quantity,
+          transferred_qty: line.transferred_qty || 0,
           notes: line.notes,
           created_at: line.created_at,
           updated_at: line.updated_at,
-          product: line.item
+          product: line.product
         })) || [],
         // Deprecated backward compatibility
-        from_wh_id: to.from_wh_id,
-        to_wh_id: to.to_wh_id,
-        transfer_order_items: to.to_lines?.map(line => ({
+        transfer_order_items: to.to_lines?.map((line: any) => ({
           id: line.id,
           to_id: line.to_id,
-          line_no: line.line_no,
-          item_id: line.item_id,
+          line_number: line.line_number,
+          product_id: line.product_id,
           uom: line.uom,
-          qty_planned: line.qty_planned,
-          qty_shipped: line.qty_shipped || 0,
-          qty_received: line.qty_received || 0,
-          lp_id: line.lp_id,
-          batch: line.batch,
+          quantity: line.quantity,
+          transferred_qty: line.transferred_qty || 0,
           notes: line.notes,
           created_at: line.created_at,
           updated_at: line.updated_at,
-          product: line.item
+          product: line.product
         })) || []
       })) as TransferOrder[];
     } catch (error) {
@@ -196,7 +177,7 @@ export class TransferOrdersAPI {
   static async create(payload: CreateTransferOrderRequest): Promise<TOHeader> {
     try {
       // Validate required fields
-      if (!payload.from_wh_id || !payload.to_wh_id) {
+      if (!payload.from_warehouse_id || !payload.to_warehouse_id) {
         throw new Error('Source and destination warehouses are required');
       }
 
@@ -206,10 +187,10 @@ export class TransferOrdersAPI {
 
       // Ensure quantities are positive
       payload.lines.forEach((line, index) => {
-        if (!line.item_id) {
+        if (!line.product_id) {
           throw new Error(`Line ${index + 1}: product is required`);
         }
-        if (!line.qty_planned || line.qty_planned <= 0) {
+        if (!line.quantity || line.quantity <= 0) {
           throw new Error(`Line ${index + 1}: quantity must be greater than zero`);
         }
         if (!line.uom) {
@@ -218,12 +199,11 @@ export class TransferOrdersAPI {
       });
 
       const {
-        from_wh_id,
-        to_wh_id,
-        planned_ship_date,
-        planned_receive_date,
-        requested_date,
+        from_warehouse_id,
+        to_warehouse_id,
+        scheduled_date,
         status = 'draft',
+        notes,
         lines,
       } = payload;
 
@@ -248,15 +228,13 @@ export class TransferOrdersAPI {
       const { data: header, error: headerError } = await supabase
         .from('to_header')
         .insert({
-          number: toNumber,
+          to_number: toNumber,
           status,
-          from_warehouse_id: from_wh_id,
-          to_warehouse_id: to_wh_id,
-          requested_date: requested_date || planned_ship_date || new Date().toISOString(),
-          planned_ship_date: planned_ship_date || null,
-          planned_receive_date: planned_receive_date || null,
+          from_warehouse_id,
+          to_warehouse_id,
+          scheduled_date: scheduled_date || null,
+          notes: notes || null,
           created_by: user.id,
-          approved_by: status !== 'draft' ? user.id : null,
         })
         .select()
         .single();
@@ -269,14 +247,11 @@ export class TransferOrdersAPI {
       // Insert lines
       const lineRecords = lines.map((line, index) => ({
         to_id: header.id,
-        line_no: index + 1,
-        item_id: line.item_id,
+        line_number: index + 1,
+        product_id: line.product_id,
         uom: line.uom,
-        qty_planned: line.qty_planned,
-        qty_shipped: line.qty_shipped || 0,
-        qty_received: line.qty_received || 0,
-        lp_id: line.lp_id || null,
-        batch: line.batch || null,
+        quantity: line.quantity,
+        transferred_qty: line.transferred_qty || 0,
         notes: line.notes || null,
       }));
 
@@ -296,11 +271,11 @@ export class TransferOrdersAPI {
         .from('to_header')
         .select(`
           *,
-          from_warehouse:warehouses!to_header_from_wh_id_fkey(*),
-          to_warehouse:warehouses!to_header_to_wh_id_fkey(*),
+          from_warehouse:warehouses!to_header_from_warehouse_id_fkey(*),
+          to_warehouse:warehouses!to_header_to_warehouse_id_fkey(*),
           to_lines:to_line(
             *,
-            item:products(*)
+            product:products(*)
           )
         `)
         .eq('id', header.id)
@@ -324,11 +299,11 @@ export class TransferOrdersAPI {
         .from('to_header')
         .select(`
           *,
-          from_warehouse:warehouses!to_header_from_wh_id_fkey(*),
-          to_warehouse:warehouses!to_header_to_wh_id_fkey(*),
+          from_warehouse:warehouses!to_header_from_warehouse_id_fkey(*),
+          to_warehouse:warehouses!to_header_to_warehouse_id_fkey(*),
           to_lines:to_line(
             *,
-            item:products(*)
+            product:products(*)
           )
         `)
         .eq('id', id)
@@ -336,32 +311,20 @@ export class TransferOrdersAPI {
 
       if (error) throw error;
       if (!data) return null;
-      
+
       // Map to TransferOrder for backward compatibility
       return {
         ...data,
-        to_number: data.number,
-        from_warehouse_id: data.from_wh_id,
-        to_warehouse_id: data.to_wh_id,
-        transfer_date: data.transfer_date || data.planned_ship_date,
-        planned_ship_date: data.planned_ship_date,
-        actual_ship_date: data.actual_ship_date,
-        planned_receive_date: data.planned_receive_date,
-        actual_receive_date: data.actual_receive_date,
-        transfer_order_items: data.to_lines?.map(line => {
-          const lineWithQty = line as TOLine & { qty_shipped?: number; qty_received?: number };
-          return {
-            ...line,
-            product_id: line.item_id,
-            quantity: line.qty_planned,
-            quantity_planned: line.qty_planned,
-            quantity_actual: lineWithQty.qty_received || line.qty_moved || 0,
-            quantity_shipped: lineWithQty.qty_shipped || 0,
-            quantity_received: lineWithQty.qty_received || 0,
-            lp_id: line.lp_id,
-            batch: line.batch
-          };
-        }) || []
+        to_number: data.to_number,
+        from_warehouse_id: data.from_warehouse_id,
+        to_warehouse_id: data.to_warehouse_id,
+        scheduled_date: data.scheduled_date,
+        transfer_order_items: data.to_lines?.map((line: any) => ({
+          ...line,
+          product_id: line.product_id,
+          quantity: line.quantity,
+          transferred_qty: line.transferred_qty || 0,
+        })) || []
       } as TransferOrder;
     } catch (error) {
       console.error('Error fetching transfer order:', error);
@@ -373,107 +336,27 @@ export class TransferOrdersAPI {
     try {
       // Get current user from Supabase auth
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       const { data, error } = await supabase.rpc('cancel_transfer_order', {
         p_to_id: id,
         p_user_id: user?.id || null,
         p_reason: reason || null,
         p_source: source || 'web_ui'
       });
-      
+
       if (error) throw error;
-      
+
       // New RPC returns JSONB with success/note
       if (data && typeof data === 'object') {
-        return { 
-          success: data.success || true, 
-          message: data.note || 'Transfer order cancelled successfully' 
+        return {
+          success: data.success || true,
+          message: data.note || 'Transfer order cancelled successfully'
         };
       }
-      
+
       return { success: true, message: 'Transfer order cancelled' };
     } catch (error: any) {
       return { success: false, message: error.message || 'Failed to cancel transfer order' };
-    }
-  }
-
-  /**
-   * Mark a transfer order as shipped
-   * Sets actual_ship_date and updates status to 'in_transit'
-   * Only works if current status is 'submitted'
-   */
-  static async markShipped(toId: number, actualShipDate: string): Promise<TOHeader> {
-    try {
-      // Get current user from Supabase auth
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-      
-      const { data, error } = await supabase.rpc('mark_transfer_shipped', {
-        p_to_id: toId,
-        p_actual_ship_date: actualShipDate,
-        p_user_id: user.id
-      });
-      
-      if (error) throw error;
-      if (!data) throw new Error('No data returned from mark_transfer_shipped');
-      
-      return data as TOHeader;
-    } catch (error: any) {
-      console.error('Error marking transfer as shipped:', error);
-      throw new Error(error.message || 'Failed to mark transfer as shipped');
-    }
-  }
-
-  /**
-   * Mark a transfer order as received
-   * Sets actual_receive_date and updates status to 'received'
-   * Updates line items with qty_moved, lp_id, and batch
-   * Only works if current status is 'in_transit'
-   */
-  static async markReceived(
-    toId: number,
-    actualReceiveDate: string,
-    lineUpdates: MarkReceivedLineUpdate[]
-  ): Promise<TOHeader> {
-    try {
-      // Get current user from Supabase auth
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-      
-      const { data, error } = await supabase.rpc('mark_transfer_received', {
-        p_to_id: toId,
-        p_actual_receive_date: actualReceiveDate,
-        p_line_updates: lineUpdates,
-        p_user_id: user.id
-      });
-      
-      if (error) throw error;
-      if (!data) throw new Error('No data returned from mark_transfer_received');
-      
-      return data as TOHeader;
-    } catch (error: any) {
-      console.error('Error marking transfer as received:', error);
-      throw new Error(error.message || 'Failed to mark transfer as received');
-    }
-  }
-
-  /**
-   * Validate that planned receive date is after or equal to planned ship date
-   */
-  static validateDateOrder(
-    plannedShip?: string,
-    plannedReceive?: string
-  ): void {
-    if (plannedShip && plannedReceive) {
-      const shipDate = new Date(plannedShip);
-      const receiveDate = new Date(plannedReceive);
-      if (receiveDate < shipDate) {
-        throw new Error('Planned receive date must be >= planned ship date');
-      }
     }
   }
 
@@ -495,32 +378,20 @@ export class TransferOrdersAPI {
   }
 }
 
-// DTO for markReceived line updates
-export interface MarkReceivedLineUpdate {
-  line_id: number;
-  qty_received: number;
-  lp_id?: number;
-  batch?: string;
-}
-
 export interface CreateTransferOrderRequest {
-  from_wh_id: number;
-  to_wh_id: number;
-  requested_date?: string | null;
-  planned_ship_date?: string | null;
-  planned_receive_date?: string | null;
+  from_warehouse_id: number;
+  to_warehouse_id: number;
+  scheduled_date?: string | null;
+  notes?: string | null;
   status?: TOStatus;
   lines: CreateTransferOrderLineRequest[];
 }
 
 export interface CreateTransferOrderLineRequest {
-  item_id: number;
+  product_id: number;
   uom: string;
-  qty_planned: number;
-  qty_shipped?: number;
-  qty_received?: number;
-  lp_id?: number;
-  batch?: string;
+  quantity: number;
+  transferred_qty?: number;
   notes?: string;
 }
 

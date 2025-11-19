@@ -323,6 +323,7 @@ export type UpdateProductionLineData = Partial<CreateProductionLineData>;
 
 export interface Supplier {
   id: number;
+  code: string;
   name: string;
   legal_name?: string;
   vat_number?: string;
@@ -681,24 +682,28 @@ export type UpdateWarehouseData = Partial<CreateWarehouseData>;
 // TransferOrderStatus is deprecated, use TOStatus instead (which matches DB schema)
 export type TransferOrderStatus = TOStatus;
 
-// Legacy TransferOrder for backward compatibility (deprecated)
 // Transfer Order Item (to_line table)
 export interface TransferOrderItem {
   id: number;
   to_id: number;
-  line_no: number;
-  item_id: number;
-  uom: UoM;
-  qty_planned: number;
-  qty_shipped: number;
-  qty_received: number;
-  lp_id?: number | null;
-  batch?: string | null;
+  line_number: number;
+  product_id: number;
+  uom: string;
+  quantity: number;
+  transferred_qty?: number | null;
   notes?: string | null;
   created_at: string;
   updated_at: string;
   // Relationships (populated from joins)
   product?: Product;
+  // Deprecated aliases for backward compatibility
+  line_no?: number;
+  item_id?: number;
+  qty_planned?: number;
+  qty_shipped?: number;
+  qty_received?: number;
+  lp_id?: number | null;
+  batch?: string | null;
 }
 
 export interface TransferOrder {
@@ -707,25 +712,25 @@ export interface TransferOrder {
   from_warehouse_id: number;
   to_warehouse_id: number;
   status: TransferOrderStatus;
-  transfer_date: string;
-  requested_date?: string;
-  planned_ship_date?: string;
-  actual_ship_date?: string;
-  planned_receive_date?: string;
-  actual_receive_date?: string;
-  notes?: string;
-  created_by?: string;
-  updated_by?: string;
+  scheduled_date?: string | null;
+  notes?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
   created_at: string;
   updated_at: string;
   // Relationships (populated from joins)
   from_warehouse?: Warehouse;
   to_warehouse?: Warehouse;
   items?: TransferOrderItem[];
-  // Deprecated aliases for backward compatibility (will be removed)
+  // Deprecated aliases for backward compatibility
+  transfer_order_items?: TransferOrderItem[];
   from_wh_id?: number;
   to_wh_id?: number;
-  transfer_order_items?: TransferOrderItem[];
+  transfer_date?: string;
+  planned_ship_date?: string;
+  actual_ship_date?: string;
+  planned_receive_date?: string;
+  actual_receive_date?: string;
 }
 
 export interface ProductionOutput {
@@ -749,7 +754,19 @@ export type ProductType =
   | 'DG_LABEL'
   | 'DG_BOX'
   | 'DG_ING'
-  | 'DG_SAUCE';
+  | 'DG_SAUCE'
+  | 'DG_OTHER';
+
+// Product types that require expiry date tracking
+export const EXPIRY_REQUIRED_TYPES: ProductType[] = ['RM_MEAT', 'DG_ING', 'DG_SAUCE', 'PR', 'FG'];
+
+// Product types that are packaging (no expiry required)
+export const PACKAGING_TYPES: ProductType[] = ['DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_OTHER'];
+
+// Helper function to check if product type requires expiry date
+export function requiresExpiryDate(productType: ProductType): boolean {
+  return EXPIRY_REQUIRED_TYPES.includes(productType);
+}
 
 // Enhanced Product interface
 export interface Product {
@@ -826,20 +843,19 @@ export interface BomItemInput {
   priority?: number | null;
   production_lines?: string[];
   production_line_restrictions?: string[];
+  scrap_percent?: number | null;
   scrap_std_pct?: number | null;
   is_optional?: boolean;
   is_phantom?: boolean;
-  consume_whole_lp?: boolean; // renamed from one_to_one
+  consume_whole_lp?: boolean;
   unit_cost_std?: number | null;
-  tax_code_id?: number | null;
   lead_time_days?: number | null;
   moq?: number | null;
-  // EPIC-001: By-Products Support
-  is_by_product?: boolean; // True if OUTPUT (by-product), false if INPUT (material)
-  yield_percentage?: number | null; // Expected yield % for by-products (e.g., 15.00 = 15%)
-  line_id?: number[] | null; // Array of production line IDs for line-specific materials
-  // EPIC-001 Phase 3: Conditional Components
-  condition?: BomItemCondition | null;
+  line_id?: number[] | null;
+  notes?: string | null;
+  // EPIC-001 planned fields
+  is_by_product?: boolean;
+  yield_percentage?: number | null;
 }
 
 export interface CreateSinglePayload {
@@ -848,7 +864,7 @@ export interface CreateSinglePayload {
 
 export interface CreateCompositePayload {
   product: ProductInsert;
-  bom: { version?: string; status?: 'active' | 'draft' | 'archived' };
+  bom: { version?: string; status?: 'Active' | 'Draft' | 'Archived' | 'active' | 'draft' | 'archived' };
   items: BomItemInput[];
 }
 
@@ -922,13 +938,13 @@ export interface Routing {
 export interface RoutingOperation {
   id: number;
   routing_id: number;
-  seq_no: number;
-  name: string;
-  code?: string;
-  description?: string;
-  requirements?: string[];
-  machine_id?: number;
-  expected_yield_pct?: number;
+  sequence: number;
+  operation_name: string;
+  machine_id?: number | null;
+  run_time_mins?: number | null;
+  setup_time_mins?: number | null;
+  work_center?: string | null;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1110,21 +1126,11 @@ export interface BomItem {
 export interface BomHistory {
   id: number;
   bom_id: number;
-  version: string;
-  changed_by?: string;
-  changed_at: string;
-  status_from?: string;
-  status_to?: string;
-  changes: {
-    bom?: Record<string, { old: any; new: any }>;
-    product?: Record<string, { old: any; new: any }>;
-    items?: {
-      added?: any[];
-      removed?: any[];
-      modified?: any[];
-    };
-  };
-  description?: string;
+  change_type: string;
+  changed_by?: string | null;
+  created_at: string;
+  old_values?: Record<string, any> | null;
+  new_values?: Record<string, any> | null;
   // Enhanced relationships from API
   changed_by_user?: {
     id: string;
@@ -1133,12 +1139,27 @@ export interface BomHistory {
   bom?: {
     id: number;
     product_id: number;
-    version: string;
+    version: number;
     status: string;
     products?: {
       id: number;
       part_number: string;
       description: string;
+    };
+  };
+  // Deprecated aliases for backward compatibility
+  version?: string;
+  changed_at?: string;
+  status_from?: string;
+  status_to?: string;
+  description?: string;
+  changes?: {
+    bom?: Record<string, { old: any; new: any }>;
+    product?: Record<string, { old: any; new: any }>;
+    items?: {
+      added?: any[];
+      removed?: any[];
+      modified?: any[];
     };
   };
 }

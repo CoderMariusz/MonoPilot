@@ -46,7 +46,7 @@ export default function BomCatalogClient({ initialData }: BomCatalogClientProps)
 
   const tabs: TabConfig[] = [
     { id: 'MEAT', label: 'Meat', icon: Beef, group: 'MEAT', productTypes: ['RM_MEAT'] },
-    { id: 'DRYGOODS', label: 'Dry Goods', icon: ShoppingBag, group: 'DRYGOODS', productTypes: ['DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_ING', 'DG_SAUCE'] },
+    { id: 'DRYGOODS', label: 'Dry Goods', icon: ShoppingBag, group: 'DRYGOODS', productTypes: ['DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_ING', 'DG_SAUCE', 'DG_OTHER'] },
     { id: 'FINISHED_GOODS', label: 'Finished Goods', icon: Package, group: 'COMPOSITE', productTypes: ['FG'] },
     { id: 'PROCESS', label: 'Process', icon: FlaskConical, group: 'COMPOSITE', productTypes: ['PR'] },
     { id: 'ARCHIVE', label: 'Archive', icon: Package, group: 'COMPOSITE', productTypes: [] },
@@ -195,7 +195,7 @@ function ProductsTable({
   // Get the tab configuration for filtering
   const tabs: TabConfig[] = [
     { id: 'MEAT', label: 'Meat', icon: Beef, group: 'MEAT', productTypes: ['RM_MEAT'] },
-    { id: 'DRYGOODS', label: 'Dry Goods', icon: ShoppingBag, group: 'DRYGOODS', productTypes: ['DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_ING', 'DG_SAUCE'] },
+    { id: 'DRYGOODS', label: 'Dry Goods', icon: ShoppingBag, group: 'DRYGOODS', productTypes: ['DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_ING', 'DG_SAUCE', 'DG_OTHER'] },
     { id: 'FINISHED_GOODS', label: 'Finished Goods', icon: Package, group: 'COMPOSITE', productTypes: ['FG'] },
     { id: 'PROCESS', label: 'Process', icon: FlaskConical, group: 'COMPOSITE', productTypes: ['PR'] },
     { id: 'ARCHIVE', label: 'Archive', icon: Package, group: 'COMPOSITE', productTypes: [] },

@@ -86,19 +86,6 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
     setError(null);
 
     try {
-      // Validate date order
-      try {
-        TransferOrdersAPI.validateDateOrder(
-          formData.planned_ship_date || undefined,
-          formData.planned_receive_date || undefined
-        );
-      } catch (validationError: any) {
-        toast.error(validationError.message);
-        setError(validationError.message);
-        setLoading(false);
-        return;
-      }
-
       const fromWarehouse = warehouses.find(w => w.id === Number(formData.from_warehouse_id));
       const toWarehouse = warehouses.find(w => w.id === Number(formData.to_warehouse_id));
 
@@ -118,21 +105,18 @@ export function CreateTransferOrderModal({ isOpen, onClose, onSuccess }: CreateT
         }
 
         return {
-          item_id: Number(item.product_id),
+          product_id: Number(item.product_id),
           uom: product.uom || 'EA',
-          qty_planned: quantityNum,
-          qty_shipped: 0,
-          qty_received: 0,
+          quantity: quantityNum,
+          transferred_qty: 0,
         };
       });
 
       await TransferOrdersAPI.create({
-        from_wh_id: Number(formData.from_warehouse_id),
-        to_wh_id: Number(formData.to_warehouse_id),
+        from_warehouse_id: Number(formData.from_warehouse_id),
+        to_warehouse_id: Number(formData.to_warehouse_id),
         status: formData.status,
-        planned_ship_date: formData.planned_ship_date || null,
-        planned_receive_date: formData.planned_receive_date || null,
-        requested_date: formData.planned_ship_date || null,
+        scheduled_date: formData.planned_ship_date || null,
         lines,
       });
 

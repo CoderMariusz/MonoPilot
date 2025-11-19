@@ -4,7 +4,7 @@
 
 This document describes the relationships between tables in the MonoPilot MES system.
 
-**Last Updated**: 2025-11-17 (auto-generated)
+**Last Updated**: 2025-11-19 (auto-generated)
 
 ## Entity Relationship Diagram (Text)
 
@@ -23,16 +23,30 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `routings.created_by` → `users.id`
 - `routings.updated_by` → `users.id`
 - `audit_log.actor_id` → `users.id`
+- `audit_log.user_id` → `users.id`
+- `boms.created_by` → `users.id`
+- `boms.updated_by` → `users.id`
 - `bom_history.changed_by` → `users.id`
 - `material_costs.created_by` → `users.id`
 - `product_prices.created_by` → `users.id`
+- `work_orders.created_by` → `users.id`
+- `work_orders.updated_by` → `users.id`
 - `bom_costs.calculated_by` → `users.id`
 - `po_header.created_by` → `users.id`
 - `po_header.approved_by` → `users.id`
+- `po_header.updated_by` → `users.id`
 - `to_header.created_by` → `users.id`
 - `to_header.approved_by` → `users.id`
+- `to_header.updated_by` → `users.id`
+- `asns.created_by` → `users.id`
+- `grns.created_by` → `users.id`
 - `wo_operations.operator_id` → `users.id`
+- `production_outputs.produced_by` → `users.id`
 - `po_correction.created_by` → `users.id`
+- `pallets.created_by` → `users.id`
+- `license_plates.created_by` → `users.id`
+- `lp_reservations.reserved_by` → `users.id`
+- `stock_moves.moved_by` → `users.id`
 - `wo_templates.created_by` → `users.id`
 - `npd_projects.owner_id` → `users.id`
 - `npd_projects.created_by` → `users.id`
@@ -42,6 +56,37 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `npd_formulations.updated_by` → `users.id`
 - `npd_documents.uploaded_by` → `users.id`
 
+### organizations
+
+**Referenced by**:
+
+- `users.org_id` → `organizations.id`
+- `suppliers.org_id` → `organizations.id`
+- `warehouses.org_id` → `organizations.id`
+- `allergens.org_id` → `organizations.id`
+- `locations.org_id` → `organizations.id`
+- `machines.org_id` → `organizations.id`
+- `production_lines.org_id` → `organizations.id`
+- `products.org_id` → `organizations.id`
+- `routings.org_id` → `organizations.id`
+- `audit_log.org_id` → `organizations.id`
+- `boms.org_id` → `organizations.id`
+- `material_costs.org_id` → `organizations.id`
+- `product_prices.org_id` → `organizations.id`
+- `work_orders.org_id` → `organizations.id`
+- `bom_costs.org_id` → `organizations.id`
+- `po_header.org_id` → `organizations.id`
+- `to_header.org_id` → `organizations.id`
+- `asns.org_id` → `organizations.id`
+- `grns.org_id` → `organizations.id`
+- `wo_costs.org_id` → `organizations.id`
+- `production_outputs.org_id` → `organizations.id`
+- `pallets.org_id` → `organizations.id`
+- `license_plates.org_id` → `organizations.id`
+- `stock_moves.org_id` → `organizations.id`
+- `tax_codes.org_id` → `organizations.id`
+- `wo_templates.org_id` → `organizations.id`
+
 ### warehouses
 
 **Referenced by**:
@@ -50,8 +95,16 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `production_lines.warehouse_id` → `warehouses.id`
 - `settings_warehouse.warehouse_id` → `warehouses.id`
 - `warehouse_settings.warehouse_id` → `warehouses.id`
+- `work_orders.warehouse_id` → `warehouses.id`
+- `po_header.warehouse_id` → `warehouses.id`
 - `to_header.from_wh_id` → `warehouses.id`
 - `to_header.to_wh_id` → `warehouses.id`
+- `to_header.from_warehouse_id` → `warehouses.id`
+- `to_header.to_warehouse_id` → `warehouses.id`
+- `asns.warehouse_id` → `warehouses.id`
+- `grns.warehouse_id` → `warehouses.id`
+- `pallets.warehouse_id` → `warehouses.id`
+- `license_plates.warehouse_id` → `warehouses.id`
 
 ### locations
 
@@ -65,9 +118,18 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `warehouse_settings.default_transit_location_id` → `locations.id`
 - `po_line.default_location_id` → `locations.id`
 - `grn_items.location_id` → `locations.id`
+- `pallets.location_id` → `locations.id`
 - `license_plates.location_id` → `locations.id`
 - `stock_moves.from_location_id` → `locations.id`
 - `stock_moves.to_location_id` → `locations.id`
+
+### production_lines
+
+**Referenced by**:
+
+- `machines.production_line_id` → `production_lines.id`
+- `work_orders.line_id` → `production_lines.id`
+- `work_orders.production_line_id` → `production_lines.id`
 
 ### suppliers
 
@@ -101,7 +163,9 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `wo_reservations.material_id` → `products.id`
 - `production_outputs.product_id` → `products.id`
 - `po_line.item_id` → `products.id`
+- `po_line.product_id` → `products.id`
 - `to_line.item_id` → `products.id`
+- `to_line.product_id` → `products.id`
 - `asn_items.product_id` → `products.id`
 - `grn_items.product_id` → `products.id`
 - `license_plates.product_id` → `products.id`
@@ -129,6 +193,7 @@ This document describes the relationships between tables in the MonoPilot MES sy
 **Referenced by**:
 
 - `routing_operations.routing_id` → `routings.id`
+- `work_orders.routing_id` → `routings.id`
 
 ### machines
 
@@ -136,22 +201,7 @@ This document describes the relationships between tables in the MonoPilot MES sy
 
 - `routing_operations.machine_id` → `machines.id`
 - `work_orders.machine_id` → `machines.id`
-
-### organizations
-
-**Referenced by**:
-
-- `material_costs.org_id` → `organizations.id`
-- `product_prices.org_id` → `organizations.id`
-- `bom_costs.org_id` → `organizations.id`
-- `wo_costs.org_id` → `organizations.id`
-- `wo_templates.org_id` → `organizations.id`
-
-### production_lines
-
-**Referenced by**:
-
-- `work_orders.line_id` → `production_lines.id`
+- `wo_operations.machine_id` → `machines.id`
 
 ### po_header
 
@@ -161,6 +211,14 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `grns.po_id` → `po_header.id`
 - `po_line.po_id` → `po_header.id`
 - `po_correction.po_id` → `po_header.id`
+- `license_plates.po_id` → `po_header.id`
+
+### asns
+
+**Referenced by**:
+
+- `grns.asn_id` → `asns.id`
+- `asn_items.asn_id` → `asns.id`
 
 ### work_orders
 
@@ -174,6 +232,7 @@ This document describes the relationships between tables in the MonoPilot MES sy
 - `production_outputs.wo_id` → `work_orders.id`
 - `pallets.wo_id` → `work_orders.id`
 - `license_plates.consumed_by_wo_id` → `work_orders.id`
+- `license_plates.wo_id` → `work_orders.id`
 - `lp_reservations.wo_id` → `work_orders.id`
 - `lp_genealogy.wo_id` → `work_orders.id`
 
@@ -189,36 +248,50 @@ This document describes the relationships between tables in the MonoPilot MES sy
 
 - `wo_by_products.lp_id` → `license_plates.id`
 - `wo_reservations.lp_id` → `license_plates.id`
+- `production_outputs.lp_id` → `license_plates.id`
+- `pallet_items.lp_id` → `license_plates.id`
 - `license_plates.parent_lp_id` → `license_plates.id`
 - `lp_reservations.lp_id` → `license_plates.id`
 - `lp_compositions.output_lp_id` → `license_plates.id`
 - `lp_compositions.input_lp_id` → `license_plates.id`
+- `lp_compositions.parent_lp_id` → `license_plates.id`
+- `lp_compositions.child_lp_id` → `license_plates.id`
 - `lp_genealogy.child_lp_id` → `license_plates.id`
 - `lp_genealogy.parent_lp_id` → `license_plates.id`
+- `stock_moves.lp_id` → `license_plates.id`
+
+### tax_codes
+
+**Referenced by**:
+
+- `po_line.tax_code_id` → `tax_codes.id`
 
 ### po_line
 
 **Referenced by**:
 
 - `po_correction.po_line_id` → `po_line.id`
+- `asn_items.po_line_id` → `po_line.id`
 
 ### to_header
 
 **Referenced by**:
 
 - `to_line.to_id` → `to_header.id`
-
-### asns
-
-**Referenced by**:
-
-- `asn_items.asn_id` → `asns.id`
+- `lp_reservations.to_id` → `to_header.id`
 
 ### grns
 
 **Referenced by**:
 
 - `grn_items.grn_id` → `grns.id`
+- `license_plates.grn_id` → `grns.id`
+
+### asn_items
+
+**Referenced by**:
+
+- `grn_items.asn_item_id` → `asn_items.id`
 
 ### pallets
 

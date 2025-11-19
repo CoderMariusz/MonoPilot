@@ -83,11 +83,6 @@ export function RoutingsTable() {
     setEditingRouting(null);
   };
 
-  const getRequirementsText = (requirements: string[] = []) => {
-    if (requirements.length === 0) return 'None';
-    return requirements.join(', ');
-  };
-
   const getOperationsCount = (routing: Routing) => {
     return routing.operations?.length || 0;
   };
@@ -150,7 +145,7 @@ export function RoutingsTable() {
                           <div className="text-sm font-medium text-slate-900">{routing.name}</div>
                           {routing.operations && routing.operations.length > 0 && (
                             <div className="text-xs text-slate-500 mt-1">
-                              {routing.operations.map(op => op.name).join(' → ')}
+                              {routing.operations.map(op => op.operation_name).join(' → ')}
                             </div>
                           )}
                         </div>
@@ -167,10 +162,7 @@ export function RoutingsTable() {
                       </div>
                       {routing.operations && routing.operations.length > 0 && (
                         <div className="text-xs text-slate-500 mt-1">
-                          {routing.operations.map(op => {
-                            const reqs = getRequirementsText(op.requirements);
-                            return `${op.name}${reqs !== 'None' ? ` (${reqs})` : ''}`;
-                          }).join(', ')}
+                          {routing.operations.map(op => op.operation_name).join(', ')}
                         </div>
                       )}
                     </td>

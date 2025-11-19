@@ -49,7 +49,7 @@ export class PurchaseOrdersAPI {
         const poLines = po.po_lines || [];
         const calculatedTotal = poLines.reduce((sum: number, line: any) => {
           const qty =
-            typeof line.qty_ordered === 'number' ? line.qty_ordered : 0;
+            typeof line.quantity === 'number' ? line.quantity : 0;
           const price =
             typeof line.unit_price === 'number' ? line.unit_price : 0;
           const vatRate = typeof line.vat_rate === 'number' ? line.vat_rate : 0;
@@ -58,12 +58,12 @@ export class PurchaseOrdersAPI {
 
         return {
           ...po,
-          po_number: po.number,
+          // po_number is already correct in database
           expected_delivery:
-            po.promised_delivery_date || po.requested_delivery_date || null,
-          due_date: po.payment_due_date || po.promised_delivery_date || null,
+            po.promised_delivery_date || po.requested_delivery_date || po.expected_date || null,
+          due_date: po.payment_due_date || po.promised_delivery_date || po.expected_date || null,
           payment_due_date: po.payment_due_date || null,
-          expected_delivery_date: po.promised_delivery_date || null,
+          expected_delivery_date: po.promised_delivery_date || po.expected_date || null,
           request_delivery_date: po.requested_delivery_date || null,
           currency: po.currency || 'USD',
           exchange_rate: po.exchange_rate || 1.0,
@@ -71,18 +71,18 @@ export class PurchaseOrdersAPI {
           purchase_order_items:
             poLines.map((line: any) => {
               const qty =
-                typeof line.qty_ordered === 'number' ? line.qty_ordered : 0;
+                typeof line.quantity === 'number' ? line.quantity : 0;
               const price =
                 typeof line.unit_price === 'number' ? line.unit_price : 0;
               const vatRate =
                 typeof line.vat_rate === 'number' ? line.vat_rate : 0;
               return {
                 ...line,
-                product_id: line.item_id,
+                // product_id is already correct in database
                 quantity: qty,
                 quantity_ordered: qty,
                 quantity_received:
-                  typeof line.qty_received === 'number' ? line.qty_received : 0,
+                  typeof line.received_qty === 'number' ? line.received_qty : 0,
                 unit_price: price,
                 tax_rate: vatRate,
                 total_price: price * qty * (1 + vatRate / 100),
@@ -116,7 +116,7 @@ export class PurchaseOrdersAPI {
 
       const poLines = data.po_lines || [];
       const calculatedTotal = poLines.reduce((sum: number, line: any) => {
-        const qty = typeof line.qty_ordered === 'number' ? line.qty_ordered : 0;
+        const qty = typeof line.quantity === 'number' ? line.quantity : 0;
         const price = typeof line.unit_price === 'number' ? line.unit_price : 0;
         const vatRate = typeof line.vat_rate === 'number' ? line.vat_rate : 0;
         return sum + price * qty * (1 + vatRate / 100);
@@ -125,12 +125,12 @@ export class PurchaseOrdersAPI {
       // Map to PurchaseOrder for backward compatibility
       return {
         ...data,
-        po_number: data.number,
+        // po_number is already correct in database
         expected_delivery:
-          data.promised_delivery_date || data.requested_delivery_date || null,
-        due_date: data.payment_due_date || data.promised_delivery_date || null,
+          data.promised_delivery_date || data.requested_delivery_date || data.expected_date || null,
+        due_date: data.payment_due_date || data.promised_delivery_date || data.expected_date || null,
         payment_due_date: data.payment_due_date || null,
-        expected_delivery_date: data.promised_delivery_date || null,
+        expected_delivery_date: data.promised_delivery_date || data.expected_date || null,
         request_delivery_date: data.requested_delivery_date || null,
         currency: data.currency || 'USD',
         exchange_rate: data.exchange_rate || 1.0,
@@ -138,18 +138,18 @@ export class PurchaseOrdersAPI {
         purchase_order_items:
           poLines.map((line: any) => {
             const qty =
-              typeof line.qty_ordered === 'number' ? line.qty_ordered : 0;
+              typeof line.quantity === 'number' ? line.quantity : 0;
             const price =
               typeof line.unit_price === 'number' ? line.unit_price : 0;
             const vatRate =
               typeof line.vat_rate === 'number' ? line.vat_rate : 0;
             return {
               ...line,
-              product_id: line.item_id,
+              // product_id is already correct in database
               quantity: qty,
               quantity_ordered: qty,
               quantity_received:
-                typeof line.qty_received === 'number' ? line.qty_received : 0,
+                typeof line.received_qty === 'number' ? line.received_qty : 0,
               unit_price: price,
               tax_rate: vatRate,
               total_price: price * qty * (1 + vatRate / 100),
@@ -286,9 +286,9 @@ export class PurchaseOrdersAPI {
       // Create GRN items from po_lines
       const grnItems = po.po_lines.map(poLine => ({
         grn_id: grn.id,
-        product_id: poLine.item_id,
-        quantity_ordered: poLine.qty_ordered,
-        quantity_received: poLine.qty_received || poLine.qty_ordered,
+        product_id: poLine.product_id,
+        quantity_ordered: poLine.quantity,
+        quantity_received: poLine.received_qty || poLine.quantity,
         location_id: poLine.default_location_id || null,
       }));
 

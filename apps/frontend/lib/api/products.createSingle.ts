@@ -12,6 +12,10 @@ function assertMapping(product: ProductInsert) {
 
 function pickInsertColumns(product: ProductInsert) {
   return {
+    // Required fields - map from UI inputs
+    sku: product.part_number,  // part_number becomes sku (required)
+    name: product.description, // description becomes name (required)
+    // Optional fields
     type: product.type,
     part_number: product.part_number,
     description: product.description,
@@ -31,23 +35,40 @@ function pickInsertColumns(product: ProductInsert) {
 
 export async function createSingle({ product }: CreateSinglePayload) {
   assertMapping(product);
-  
+
+  // Get user's org_id
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data: userData, error: userError } = await supabase
+    .from('users')
+    .select('org_id')
+    .eq('id', user.id)
+    .single();
+
+  if (userError || !userData?.org_id) {
+    console.error('Error getting user org_id:', userError);
+    throw new Error('Failed to get user organization');
+  }
+
   // Check if part_number already exists
   const { data: existing } = await supabase
     .from('products')
     .select('id')
     .eq('part_number', product.part_number)
     .limit(1);
-  
+
   if (existing && existing.length > 0) {
     throw new Error(`Part number "${product.part_number}" already exists. Please use a unique part number.`);
   }
-  
+
   const insert = pickInsertColumns(product);
 
   const { data, error } = await supabase
     .from('products')
-    .insert([insert])
+    .insert([{ ...insert, org_id: userData.org_id }])
     .select()
     .single();
 

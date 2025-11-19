@@ -68,13 +68,13 @@ export class WorkOrdersAPI {
         wo_number: wo.wo_number,
         product_id: wo.product_id,
         bom_id: wo.bom_id,
-        quantity: parseFloat(wo.quantity),
+        quantity: parseFloat(wo.planned_qty), // Database uses planned_qty
         uom: wo.uom,
         priority: wo.priority,
         status: wo.status,
-        scheduled_start: wo.scheduled_start,
-        scheduled_end: wo.scheduled_end,
-        due_date: wo.scheduled_end, // Use scheduled_end as due_date
+        scheduled_start: wo.start_date, // Database uses start_date
+        scheduled_end: wo.end_date, // Database uses end_date
+        due_date: wo.end_date, // Use end_date as due_date
         actual_start: wo.actual_start,
         actual_end: wo.actual_end,
         actual_output_qty: wo.actual_output_qty ? parseFloat(wo.actual_output_qty) : null,
@@ -223,21 +223,21 @@ export class WorkOrdersAPI {
     try {
       const { data: wo } = await supabase
         .from('work_orders')
-        .select('quantity, uom')
+        .select('planned_qty, uom') // Database uses planned_qty
         .eq('id', woId)
         .single();
-      
+
       if (!wo) return { madeQty: 0, plannedQty: 0, progressPct: 0 };
-      
+
       const { data: outputs } = await supabase
         .from('production_outputs')
         .select('quantity')
         .eq('wo_id', woId);
-      
+
       const madeQty = outputs?.reduce((sum, o) => sum + parseFloat(o.quantity.toString()), 0) || 0;
-      const plannedQty = parseFloat(wo.quantity.toString());
+      const plannedQty = parseFloat(wo.planned_qty.toString()); // Database uses planned_qty
       const progressPct = plannedQty > 0 ? Math.round((madeQty / plannedQty) * 100) : 0;
-      
+
       return { madeQty, plannedQty, progressPct };
     } catch (error) {
       console.error('Error fetching production stats:', error);

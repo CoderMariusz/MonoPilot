@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, GripVertical, Save, X } from 'lucide-react';
-import type { Routing, RoutingOperation, Machine, RoutingOperationName } from '@/lib/types';
+import type { Routing, RoutingOperation, Machine } from '@/lib/types';
 import { MachinesAPI } from '@/lib/api/machines';
-import { RoutingOperationNamesAPI } from '@/lib/api/routingOperationNames';
 
 interface RoutingBuilderProps {
   routing?: Routing;
-  onSave: (routing: Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'> & { 
-    operations?: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>[] 
+  onSave: (routing: Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'> & {
+    operations?: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>[]
   }) => void;
   onCancel: () => void;
 }
@@ -24,44 +23,37 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
 
   const [operations, setOperations] = useState<Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>[]>(
     routing?.operations?.map(op => ({
-      seq_no: op.seq_no,
-      name: op.name,
-      code: op.code || undefined,
-      description: op.description || undefined,
-      requirements: op.requirements || [],
+      sequence: op.sequence,
+      operation_name: op.operation_name,
       machine_id: op.machine_id || undefined,
-      expected_yield_pct: op.expected_yield_pct || undefined,
+      run_time_mins: op.run_time_mins || undefined,
+      setup_time_mins: op.setup_time_mins || undefined,
+      work_center: op.work_center || undefined,
+      notes: op.notes || undefined,
     })) || [
       {
-        seq_no: 1,
-        name: '',
-        code: undefined,
-        description: undefined,
-        requirements: [],
+        sequence: 1,
+        operation_name: '',
         machine_id: undefined,
-        expected_yield_pct: undefined,
+        run_time_mins: undefined,
+        setup_time_mins: undefined,
+        work_center: undefined,
+        notes: undefined,
       }
     ]
   );
 
   const [machines, setMachines] = useState<Machine[]>([]);
-  const [availableRequirements, setAvailableRequirements] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [machinesData, operationNamesData] = await Promise.all([
-          MachinesAPI.getAll(),
-          RoutingOperationNamesAPI.getAll()
-        ]);
+        const machinesData = await MachinesAPI.getAll();
         setMachines(machinesData);
-        setAvailableRequirements(operationNamesData.map(on => on.name));
       } catch (error) {
-        console.error('Error loading data:', error);
-        // Fallback to default requirements if API fails
-        setAvailableRequirements(['Smoke', 'Roast', 'Dice', 'Mix']);
+        console.error('Error loading machines:', error);
       } finally {
         setLoading(false);
       }
@@ -70,34 +62,21 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
   }, []);
 
   const handleOperationChange = (index: number, field: keyof typeof operations[0], value: any) => {
-    setOperations(prev => prev.map((op, i) => 
+    setOperations(prev => prev.map((op, i) =>
       i === index ? { ...op, [field]: value } : op
     ));
   };
 
-  const handleRequirementToggle = (operationIndex: number, requirement: string) => {
-    setOperations(prev => prev.map((op, i) => {
-      if (i === operationIndex) {
-        const currentRequirements = op.requirements || [];
-        const newRequirements = currentRequirements.includes(requirement)
-          ? currentRequirements.filter(r => r !== requirement)
-          : [...currentRequirements, requirement];
-        return { ...op, requirements: newRequirements };
-      }
-      return op;
-    }));
-  };
-
   const addOperation = () => {
-    const nextSeqNo = Math.max(...operations.map(op => op.seq_no), 0) + 1;
+    const nextSequence = Math.max(...operations.map(op => op.sequence), 0) + 1;
     setOperations(prev => [...prev, {
-      seq_no: nextSeqNo,
-      name: '',
-      code: undefined,
-      description: undefined,
-      requirements: [],
+      sequence: nextSequence,
+      operation_name: '',
       machine_id: undefined,
-      expected_yield_pct: undefined,
+      run_time_mins: undefined,
+      setup_time_mins: undefined,
+      work_center: undefined,
+      notes: undefined,
     }]);
   };
 
@@ -109,17 +88,17 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
 
   const moveOperation = (fromIndex: number, toIndex: number) => {
     if (toIndex < 0 || toIndex >= operations.length) return;
-    
+
     const newOperations = [...operations];
     const [movedOperation] = newOperations.splice(fromIndex, 1);
     newOperations.splice(toIndex, 0, movedOperation);
-    
+
     // Update sequence numbers
     const updatedOperations = newOperations.map((op, index) => ({
       ...op,
-      seq_no: index + 1,
+      sequence: index + 1,
     }));
-    
+
     setOperations(updatedOperations);
   };
 
@@ -134,27 +113,21 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
       return;
     }
 
-    if (operations.some(op => !op.name.trim())) {
+    if (operations.some(op => !op.operation_name.trim())) {
       alert('Please fill in all operation names');
-      return;
-    }
-
-    // Validate expected_yield_pct
-    if (operations.some(op => op.expected_yield_pct !== undefined && (op.expected_yield_pct < 0 || op.expected_yield_pct > 100))) {
-      alert('Expected yield percentage must be between 0 and 100');
       return;
     }
 
     onSave({
       ...formData,
       operations: operations.map((op, index) => ({
-        seq_no: index + 1, // Auto-numeruj: 1, 2, 3...
-        name: op.name,
-        code: op.code || undefined,
-        description: op.description || undefined,
-        requirements: op.requirements || [],
+        sequence: index + 1,
+        operation_name: op.operation_name,
         machine_id: op.machine_id || undefined,
-        expected_yield_pct: op.expected_yield_pct || undefined,
+        run_time_mins: op.run_time_mins || undefined,
+        setup_time_mins: op.setup_time_mins || undefined,
+        work_center: op.work_center || undefined,
+        notes: op.notes || undefined,
       })),
     });
   };
@@ -167,7 +140,7 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
             {routing ? 'Edit Routing' : 'Create Routing'}
           </h3>
           <p className="text-sm text-slate-600 mt-1">
-            Define the sequence of operations and their requirements
+            Define the sequence of operations and their settings
           </p>
         </div>
         <button
@@ -258,7 +231,7 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
                     <div className="flex items-center gap-1">
                       <GripVertical className="w-4 h-4 text-slate-400 cursor-move" />
                       <span className="text-sm font-medium text-slate-600">
-                        Step {operation.seq_no}
+                        Step {operation.sequence}
                       </span>
                     </div>
                     {index > 0 && (
@@ -296,8 +269,8 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
                     </label>
                     <input
                       type="text"
-                      value={operation.name}
-                      onChange={(e) => handleOperationChange(index, 'name', e.target.value)}
+                      value={operation.operation_name}
+                      onChange={(e) => handleOperationChange(index, 'operation_name', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                       placeholder="e.g., Preparation"
                     />
@@ -305,14 +278,14 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Code
+                      Work Center
                     </label>
                     <input
                       type="text"
-                      value={operation.code || ''}
-                      onChange={(e) => handleOperationChange(index, 'code', e.target.value)}
+                      value={operation.work_center || ''}
+                      onChange={(e) => handleOperationChange(index, 'work_center', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                      placeholder="e.g., PREP"
+                      placeholder="e.g., Assembly Line 1"
                     />
                   </div>
 
@@ -324,6 +297,7 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
                       value={operation.machine_id || ''}
                       onChange={(e) => handleOperationChange(index, 'machine_id', e.target.value ? parseInt(e.target.value) : undefined)}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      disabled={loading}
                     >
                       <option value="">None</option>
                       {machines.map(machine => (
@@ -336,64 +310,46 @@ export function RoutingBuilder({ routing, onSave, onCancel }: RoutingBuilderProp
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Expected Yield %
+                      Setup Time (mins)
                     </label>
                     <input
                       type="number"
                       min="0"
-                      max="100"
-                      step="0.01"
-                      value={operation.expected_yield_pct || ''}
-                      onChange={(e) => handleOperationChange(index, 'expected_yield_pct', e.target.value ? parseFloat(e.target.value) : undefined)}
+                      step="0.1"
+                      value={operation.setup_time_mins || ''}
+                      onChange={(e) => handleOperationChange(index, 'setup_time_mins', e.target.value ? parseFloat(e.target.value) : undefined)}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                      placeholder="e.g., 95.5"
+                      placeholder="e.g., 15"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Run Time (mins)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={operation.run_time_mins || ''}
+                      onChange={(e) => handleOperationChange(index, 'run_time_mins', e.target.value ? parseFloat(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      placeholder="e.g., 30"
                     />
                   </div>
 
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Description
+                      Notes
                     </label>
                     <textarea
-                      value={operation.description || ''}
-                      onChange={(e) => handleOperationChange(index, 'description', e.target.value)}
+                      value={operation.notes || ''}
+                      onChange={(e) => handleOperationChange(index, 'notes', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                       rows={2}
-                      placeholder="Describe what this operation does"
+                      placeholder="Additional notes for this operation"
                     />
                   </div>
-                </div>
-
-                {/* Requirements */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Requirements
-                  </label>
-                  {loading ? (
-                    <p className="text-sm text-slate-500">Loading requirements...</p>
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap gap-2">
-                        {availableRequirements.map(requirement => (
-                          <button
-                            key={requirement}
-                            type="button"
-                            onClick={() => handleRequirementToggle(index, requirement)}
-                            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                              operation.requirements?.includes(requirement)
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
-                            }`}
-                          >
-                            {requirement}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Select the requirements for this operation
-                      </p>
-                    </>
-                  )}
                 </div>
               </div>
             ))}

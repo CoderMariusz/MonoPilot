@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, User, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useUserProfile } from '@/lib/hooks/useUserProfile';
 
 export default function Topbar() {
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const { user, profile, signOut, loading } = useAuth();
+  const { user, signOut, loading } = useAuth();
+  const { profile, loading: profileLoading } = useUserProfile();
   const router = useRouter();
 
   const handleSignOut = async () => {
@@ -33,7 +35,7 @@ export default function Topbar() {
         </div>
         
         <div className="flex items-center gap-4 ml-6">
-          {loading ? (
+          {loading || profileLoading ? (
             <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
               <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
             </div>

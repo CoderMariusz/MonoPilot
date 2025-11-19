@@ -560,9 +560,9 @@ function createBackup(filePath: string): void {
 }
 
 function writeDocument(filePath: string, content: string): void {
-  // Create backup
-  createBackup(filePath);
-  
+  // Note: Backups disabled - auto-generate before commit, files should be clean after commit
+  // createBackup(filePath);
+
   // Write new content
   fs.writeFileSync(filePath, content, 'utf-8');
   console.log(`  ✅ Updated: ${path.basename(filePath)}`);

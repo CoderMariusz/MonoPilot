@@ -26,11 +26,18 @@ export function SessionsTable() {
         .select('*')
         .order('login_time', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        // Don't show error for empty results or auth issues during initial load
+        if (error.code !== 'PGRST116' && error.code !== '42P01') {
+          console.error('Error loading sessions:', error);
+        }
+        setSessions([]);
+        return;
+      }
       setSessions(data || []);
     } catch (error) {
       console.error('Error loading sessions:', error);
-      toast.error('Failed to load sessions');
+      setSessions([]);
     } finally {
       setLoading(false);
     }

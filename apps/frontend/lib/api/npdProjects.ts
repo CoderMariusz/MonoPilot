@@ -169,16 +169,23 @@ export class NPDProjectsAPI {
         throw new Error('User not authenticated');
       }
 
-      // Get org_id from user metadata (assumes org_id is stored in user metadata or profile)
-      // Note: This should be fetched from user's organization membership
-      // For now, we'll let the database function handle it via RLS context
-      // The function will use the session's org_id automatically via RLS
+      // Get user's org_id from users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('org_id')
+        .eq('id', user.id)
+        .single();
+
+      if (userError || !userData?.org_id) {
+        console.error('Error getting user org_id:', userError);
+        throw new Error('Failed to get user organization');
+      }
 
       // Generate project number atomically using PostgreSQL function
       // This prevents race conditions when multiple users create projects simultaneously
       const { data: numberData, error: numberError } = await supabase
         .rpc('generate_npd_project_number', {
-          p_org_id: user.id // Note: Replace with actual org_id from user profile
+          p_org_id: userData.org_id
         });
 
       if (numberError) {
@@ -201,6 +208,7 @@ export class NPDProjectsAPI {
           portfolio_category: validated.portfolio_category || null,
           owner_id: validated.owner_id || null,
           target_launch_date: validated.target_launch_date || null,
+          org_id: userData.org_id,
         })
         .select()
         .single();

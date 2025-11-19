@@ -191,9 +191,11 @@ export interface Machine {
 
 export interface Supplier {
   id: number;
+  code: string;
   name: string;
   legal_name?: string;
   vat_number?: string;
+  tax_number?: string;
   country?: string;
   currency?: string;
   payment_terms?: string;

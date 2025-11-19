@@ -1,3 +1,4 @@
 // Export client-side supabase instance
-export { supabase, isSupabaseConfigured } from './client';
+// Use the browser client for proper cookie/session handling in Next.js App Router
+export { supabase, isSupabaseConfigured } from './client-browser';
 

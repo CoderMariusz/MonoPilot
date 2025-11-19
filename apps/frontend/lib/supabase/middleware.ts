@@ -9,70 +9,45 @@ import { API_CONFIG } from '../api/config';
 const REFRESH_THRESHOLD_SECONDS = 10 * 60;
 
 /**
- * User role cache to avoid database queries on every request
- * Cache expires after 5 minutes to stay reasonably fresh
+ * Check if a route is public (doesn't require authentication)
  */
-const roleCache = new Map<string, { role: string; expiresAt: number }>();
-const ROLE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
-
-/**
- * Get user role from cache or database
- * @param userId - User ID to fetch role for
- * @param supabase - Supabase client instance
- * @returns User role string or null
- */
-async function getUserRole(userId: string, supabase: any): Promise<string | null> {
-  const now = Date.now();
-  const cached = roleCache.get(userId);
-
-  // Return cached role if still valid
-  if (cached && cached.expiresAt > now) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Middleware - User role (cached):', cached.role);
-    }
-    return cached.role;
-  }
-
-  // Fetch from database
-  try {
-    const { data: userProfile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
-
-    if (userProfile?.role) {
-      // Cache the role
-      roleCache.set(userId, {
-        role: userProfile.role,
-        expiresAt: now + ROLE_CACHE_TTL,
-      });
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Middleware - User role (from DB):', userProfile.role);
-      }
-      return userProfile.role;
-    }
-  } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Middleware - Error fetching user role:', error);
-    }
-  }
-
-  return null;
+function isPublicRoute(pathname: string): boolean {
+  const publicRoutes = ['/login', '/signup'];
+  return publicRoutes.some(route => pathname.startsWith(route));
 }
 
 /**
- * Updates and manages user session with automatic token refresh
+ * Check if session needs refresh (within 10 minutes of expiry)
+ */
+function needsRefresh(session: any): boolean {
+  if (!session?.expires_at) return false;
+
+  const expiresAt = session.expires_at;
+  const now = Math.floor(Date.now() / 1000);
+  const timeUntilExpiry = expiresAt - now;
+
+  return timeUntilExpiry < REFRESH_THRESHOLD_SECONDS && timeUntilExpiry > 0;
+}
+
+/**
+ * Simplified session middleware
  *
- * This middleware:
- * 1. Checks current session validity
- * 2. Automatically refreshes tokens 10 minutes before expiration
- * 3. Handles expired sessions gracefully with redirect to login
- * 4. Validates returnTo parameter to prevent open redirect attacks
+ * Responsibilities:
+ * 1. Check if user has valid session
+ * 2. Refresh token if near expiry (< 10 min)
+ * 3. Redirect to /login if no session on protected routes
  *
- * @param request - Next.js request object
- * @returns NextResponse with updated session cookies or redirect
+ * REMOVED (moved to page level):
+ * - Role-based access control
+ * - User profile fetching
+ * - Complex expiry scenarios
+ * - Role caching
+ *
+ * Benefits:
+ * - No race conditions
+ * - Easy to debug
+ * - Single responsibility
+ * - Better performance
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -88,10 +63,8 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
@@ -101,126 +74,62 @@ export async function updateSession(request: NextRequest) {
   );
 
   // Get current session
-  const { data: { session } } = await supabase.auth.getSession();
-
-  // Check if session needs refresh (refresh before expiration to prevent interruption)
-  let refreshedSession = session;
-  if (session) {
-    const expiresAt = session.expires_at;
-    if (expiresAt) {
-      const now = Math.floor(Date.now() / 1000);
-      const timeUntilExpiry = expiresAt - now;
-
-      // Scenario 1: Near expiry - refresh proactively (10 min before expiration)
-      if (timeUntilExpiry < REFRESH_THRESHOLD_SECONDS && timeUntilExpiry > 0) {
-        const minutesUntilExpiry = Math.floor(timeUntilExpiry / 60);
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`Middleware - Session expires in ${minutesUntilExpiry} min, refreshing...`);
-        }
-
-        try {
-          const { data, error } = await supabase.auth.refreshSession();
-
-          if (error) {
-            if (process.env.NODE_ENV === 'development') {
-              console.error('Middleware - Session refresh failed:', error.message);
-            }
-          } else if (data.session) {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('Middleware - Session refreshed successfully');
-            }
-            refreshedSession = data.session;
-          }
-        } catch (err) {
-          if (process.env.NODE_ENV === 'development') {
-            console.error('Middleware - Session refresh error:', err);
-          }
-        }
-      }
-      // Scenario 2: Already expired - attempt refresh, fallback to redirect
-      else if (timeUntilExpiry <= 0) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Middleware - Session expired, attempting refresh...');
-        }
-
-        try {
-          const { data, error } = await supabase.auth.refreshSession();
-
-          if (error) {
-            if (process.env.NODE_ENV === 'development') {
-              console.error('Middleware - Session refresh failed for expired session:', error.message);
-            }
-            refreshedSession = null;
-          } else if (data.session) {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('Middleware - Expired session refreshed successfully');
-            }
-            refreshedSession = data.session;
-          }
-        } catch (err) {
-          if (process.env.NODE_ENV === 'development') {
-            console.error('Middleware - Session refresh error for expired session:', err);
-          }
-          refreshedSession = null;
-        }
-      }
-    }
-  }
-
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session }, error } = await supabase.auth.getSession();
 
   if (process.env.NODE_ENV === 'development') {
-    console.log('Middleware - Path:', request.nextUrl.pathname, 'User:', !!user, 'Session:', !!refreshedSession);
+    console.log('Middleware - Path:', request.nextUrl.pathname, 'Session:', !!session);
   }
 
-  // Redirect to login if no valid user session
-  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/signup')) {
+  // Allow public routes without session check
+  if (isPublicRoute(request.nextUrl.pathname)) {
+    return supabaseResponse;
+  }
+
+  // Redirect to login if no valid session
+  if (error || !session) {
     const loginUrl = new URL('/login', request.url);
 
-    // Validate returnTo parameter to prevent open redirect attacks
-    // Only allow relative paths starting with / (not //)
+    // Preserve returnTo for redirect after login
     const returnToPath = request.nextUrl.pathname;
     if (returnToPath && /^\/[^\/]/.test(returnToPath)) {
       loginUrl.searchParams.set('returnTo', returnToPath);
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('Middleware - Redirecting to login with returnTo:', returnToPath);
+      console.log('Middleware - No session, redirecting to login');
     }
+
     return NextResponse.redirect(loginUrl);
   }
 
-  if (user) {
-    // Get user role from cache or database
-    const userRole = await getUserRole(user.id, supabase);
+  // Refresh token if near expiry
+  if (needsRefresh(session)) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Middleware - Session near expiry, refreshing...');
+    }
 
-    if (userRole) {
-      const roleAccess: Record<string, string[]> = {
-        'Admin': ['/admin', '/planning', '/production', '/warehouse', '/technical', '/scanner', '/settings'],
-        'Planner': ['/planning', '/production', '/warehouse'],
-        'Operator': ['/production', '/scanner'],
-        'Warehouse': ['/warehouse', '/scanner'],
-        'QC': ['/warehouse', '/scanner'],
-        'Technical': ['/technical', '/settings'],
-        'Purchasing': ['/planning', '/warehouse']
-      };
+    try {
+      const { error: refreshError } = await supabase.auth.refreshSession();
 
-      const allowedPaths = roleAccess[userRole] || [];
-      const currentPath = request.nextUrl.pathname;
+      if (refreshError) {
+        console.error('Middleware - Session refresh failed:', refreshError.message);
 
-      const hasAccess = allowedPaths.some(path => currentPath.startsWith(path)) ||
-                       currentPath === '/' ||
-                       currentPath.startsWith('/login') ||
-                       currentPath.startsWith('/signup');
-
-      if (!hasAccess) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Middleware - Access denied for role:', userRole, 'to path:', currentPath);
-        }
+        // If refresh fails, redirect to login
         const loginUrl = new URL('/login', request.url);
-        loginUrl.searchParams.set('returnTo', currentPath);
+        loginUrl.searchParams.set('returnTo', request.nextUrl.pathname);
         return NextResponse.redirect(loginUrl);
       }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Middleware - Session refreshed successfully');
+      }
+    } catch (err) {
+      console.error('Middleware - Session refresh error:', err);
+
+      // On error, redirect to login
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('returnTo', request.nextUrl.pathname);
+      return NextResponse.redirect(loginUrl);
     }
   }
 

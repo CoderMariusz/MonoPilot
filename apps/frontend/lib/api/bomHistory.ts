@@ -4,23 +4,19 @@ import type { BomHistory } from '@/lib/types';
 export class BomHistoryAPI {
   static async create(data: {
     bom_id: number;
-    version: string;
-    status_from: string;
-    status_to: string;
-    changes: object;
-    description?: string;
+    change_type: string;
+    old_values?: object | null;
+    new_values?: object | null;
   }): Promise<BomHistory> {
     const { data: user } = await supabase.auth.getUser();
-    
+
     const { data: result, error } = await supabase
       .from('bom_history')
       .insert({
         bom_id: data.bom_id,
-        version: data.version,
-        status_from: data.status_from,
-        status_to: data.status_to,
-        changes: data.changes,
-        description: data.description,
+        change_type: data.change_type,
+        old_values: data.old_values || null,
+        new_values: data.new_values || null,
         changed_by: user?.user?.id || null,
       })
       .select()
@@ -42,7 +38,7 @@ export class BomHistoryAPI {
         changed_by_user:users!changed_by(id, email)
       `)
       .eq('bom_id', bomId)
-      .order('changed_at', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching BOM history:', error);
@@ -70,7 +66,7 @@ export class BomHistoryAPI {
           products!product_id(id, part_number, description)
         )
       `)
-      .order('changed_at', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (options?.bom_id) {
       query = query.eq('bom_id', options.bom_id);
@@ -94,5 +90,3 @@ export class BomHistoryAPI {
     return data || [];
   }
 }
-
-

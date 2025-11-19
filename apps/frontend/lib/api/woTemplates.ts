@@ -213,6 +213,23 @@ export class WOTemplatesAPI {
    * Create a new template
    */
   static async create(templateData: CreateWOTemplateData): Promise<WOTemplate> {
+    // Get user's org_id
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user.id)
+      .single();
+
+    if (userError || !userData?.org_id) {
+      console.error('Error getting user org_id:', userError);
+      throw new Error('Failed to get user organization');
+    }
+
     // If is_default is true, we need to unset other default templates for this product first
     if (templateData.is_default) {
       await this.unsetDefaultForProduct(templateData.product_id);
@@ -227,6 +244,7 @@ export class WOTemplatesAPI {
         config_json: templateData.config_json,
         is_default: templateData.is_default || false,
         usage_count: 0,
+        org_id: userData.org_id,
       })
       .select(`
         *,

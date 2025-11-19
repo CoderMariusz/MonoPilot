@@ -19,6 +19,7 @@ export function SupplierModal({ isOpen, onClose, supplier, onSuccess }: Supplier
   const [loading, setLoading] = useState(false);
   const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
   const [formData, setFormData] = useState({
+    code: '',
     name: '',
     legal_name: '',
     vat_number: '',
@@ -46,6 +47,7 @@ export function SupplierModal({ isOpen, onClose, supplier, onSuccess }: Supplier
           ? supplier.address as any 
           : {};
         setFormData({
+          code: supplier.code || '',
           name: supplier.name || '',
           legal_name: supplier.legal_name || '',
           vat_number: supplier.vat_number || '',
@@ -66,6 +68,7 @@ export function SupplierModal({ isOpen, onClose, supplier, onSuccess }: Supplier
       } else {
         // Create mode - reset form
         setFormData({
+          code: '',
           name: '',
           legal_name: '',
           vat_number: '',
@@ -99,6 +102,11 @@ export function SupplierModal({ isOpen, onClose, supplier, onSuccess }: Supplier
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.code.trim()) {
+      showToast('Code is required', 'error');
+      return;
+    }
+
     if (!formData.name.trim()) {
       showToast('Name is required', 'error');
       return;
@@ -114,15 +122,16 @@ export function SupplierModal({ isOpen, onClose, supplier, onSuccess }: Supplier
       if (formData.address_country) address.country = formData.address_country;
 
       const supplierData = {
+        code: formData.code.trim(),
         name: formData.name.trim(),
-        legal_name: formData.legal_name.trim() || undefined,
-        vat_number: formData.vat_number.trim() || undefined,
-        tax_number: formData.tax_number.trim() || undefined,
-        country: formData.country.trim() || undefined,
+        legal_name: formData.legal_name?.trim() || undefined,
+        vat_number: formData.vat_number?.trim() || undefined,
+        tax_number: formData.tax_number?.trim() || undefined,
+        country: formData.country?.trim() || undefined,
         currency: formData.currency || 'USD',
-        payment_terms: formData.payment_terms.trim() || undefined,
-        email: formData.email.trim() || undefined,
-        phone: formData.phone.trim() || undefined,
+        payment_terms: formData.payment_terms?.trim() || undefined,
+        email: formData.email?.trim() || undefined,
+        phone: formData.phone?.trim() || undefined,
         address: Object.keys(address).length > 0 ? address : undefined,
         default_tax_code_id: formData.default_tax_code_id ? parseInt(formData.default_tax_code_id) : undefined,
         lead_time_days: formData.lead_time_days ? parseInt(formData.lead_time_days) : undefined,
@@ -170,7 +179,20 @@ export function SupplierModal({ isOpen, onClose, supplier, onSuccess }: Supplier
             <div>
               <h3 className="text-sm font-semibold text-slate-900 mb-4">Basic Information</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Code <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    placeholder="e.g., SUP001"
+                    required
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Name <span className="text-red-500">*</span>
                   </label>

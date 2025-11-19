@@ -32,9 +32,26 @@ export class AllergensAPI {
   }
 
   static async create(data: CreateAllergenData): Promise<Allergen> {
+    // Get user's org_id
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user.id)
+      .single();
+
+    if (userError || !userData?.org_id) {
+      console.error('Error getting user org_id:', userError);
+      throw new Error('Failed to get user organization');
+    }
+
     const { data: result, error } = await supabase
       .from('allergens')
-      .insert(data)
+      .insert({ ...data, org_id: userData.org_id })
       .select()
       .single();
 

@@ -77,7 +77,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
       .from('product_allergens')
       .select('allergen_id')
       .in('product_id', materialIds)
-      .eq('contains', true);
+      .eq('is_contains', true);
 
     const allergenIds = [...new Set(data?.map(pa => pa.allergen_id) || [])];
     setInheritedAllergens(allergenIds);
@@ -233,6 +233,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               priority,
               production_lines,
               production_line_restrictions,
+              scrap_percent,
               scrap_std_pct,
               is_optional,
               is_phantom,
@@ -241,6 +242,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               lead_time_days,
               moq,
               line_id,
+              notes,
               material:products!bom_items_material_id_fkey(
                 id,
                 part_number,
@@ -251,14 +253,14 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
             `)
             .eq('bom_id', bom.id)
             .order('sequence');
-          
+
           if (bomItemsError) {
             console.error('Failed to load BOM items:', bomItemsError);
             return;
           }
-          
+
           console.log('BOM Items from database:', bomItemsData);
-          
+
           if (bomItemsData && bomItemsData.length > 0) {
             const mappedItems = bomItemsData.map(item => ({
               material_id: item.material_id,
@@ -268,6 +270,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               priority: item.priority,
               production_lines: item.production_lines || [],
               production_line_restrictions: item.production_line_restrictions || [],
+              scrap_percent: item.scrap_percent,
               scrap_std_pct: item.scrap_std_pct,
               is_optional: item.is_optional,
               is_phantom: item.is_phantom,
@@ -275,7 +278,8 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               unit_cost_std: item.unit_cost_std,
               lead_time_days: item.lead_time_days,
               moq: item.moq,
-              line_id: item.line_id || null
+              line_id: item.line_id,
+              notes: item.notes
             }));
             console.log('Mapped items:', mappedItems);
             setItems(mappedItems);
@@ -589,28 +593,28 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           lead_time_days: product.lead_time_days ?? null,
           moq: product.moq ?? null,
         },
-        bom: { 
-          version: '1.0', 
-          status: bomStatus, 
+        bom: {
+          version: '1.0',
+          status: bomStatus.charAt(0).toUpperCase() + bomStatus.slice(1) as 'Draft' | 'Active' | 'Archived',  // Capitalize for DB enum
           default_routing_id: (product as any).default_routing_id ?? null,
           line_id: bomLineIds.length > 0 ? bomLineIds : null,  // NEW: Production line IDs
         },
         items: items.map(item => ({
           material_id: item.material_id,
           quantity: item.quantity,
-          uom: normalizeUom(item.uom || 'KG'),  // Normalize UoM before sending
+          uom: normalizeUom(item.uom || 'KG'),
           sequence: item.sequence,
           priority: item.priority,
           production_lines: item.production_lines,
           production_line_restrictions: item.production_line_restrictions,
-          scrap_std_pct: item.scrap_std_pct,
+          scrap_std_pct: item.scrap_std_pct || item.scrap_percent,
           is_optional: item.is_optional,
           is_phantom: item.is_phantom,
           consume_whole_lp: item.consume_whole_lp,
           unit_cost_std: item.unit_cost_std,
           lead_time_days: item.lead_time_days,
           moq: item.moq,
-          line_id: item.line_id ?? null,
+          line_id: item.line_id,
         })),
       };
 
@@ -641,13 +645,29 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           moq: editingProduct.moq,
         };
         
-        const { error: updateError } = await supabase
+        const { data: updatedProduct, error: updateError } = await supabase
           .from('products')
           .update(productUpdate)
-          .eq('id', editingProduct.id);
-        
+          .eq('id', editingProduct.id)
+          .select()
+          .single();
+
         if (updateError) throw updateError;
-        
+
+        // Write to audit_log for product update
+        if (updatedProduct) {
+          const { data: { user } } = await supabase.auth.getUser();
+          await supabase.from('audit_log').insert({
+            table_name: 'products',
+            record_id: editingProduct.id,
+            action: 'UPDATE',
+            old_values: oldProductData,
+            new_values: updatedProduct,
+            user_id: user?.id || null,
+            org_id: updatedProduct.org_id
+          });
+        }
+
         // Update allergens
         await supabase.from('product_allergens').delete().eq('product_id', editingProduct.id);
         const allAllergens = [...new Set([...inheritedAllergens, ...selectedAllergens])];
@@ -959,11 +979,9 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
 
               await BomHistoryAPI.create({
                 bom_id: bomId,
-                version: newVersion,
-                status_from: oldBomData?.status || 'draft',
-                status_to: bomStatus,
-                changes,
-                description
+                change_type: `${oldBomData?.status || 'draft'} -> ${bomStatus}`,
+                old_values: { version: oldBomData?.version, status: oldBomData?.status },
+                new_values: { version: newVersion, status: bomStatus, changes, description }
               });
             } catch (historyError) {
               console.error('Failed to create BOM history:', historyError);
@@ -982,12 +1000,12 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               bom_id: bomId,
               material_id: item.material_id,
               quantity: item.quantity,
-              uom: normalizeUom(item.uom || 'KG'),  // Normalize UoM
+              uom: normalizeUom(item.uom || 'KG'),
               sequence: item.sequence,
               priority: item.priority,
               production_lines: item.production_lines,
               production_line_restrictions: item.production_line_restrictions,
-              scrap_std_pct: item.scrap_std_pct,
+              scrap_std_pct: item.scrap_std_pct || item.scrap_percent,
               is_optional: item.is_optional,
               is_phantom: item.is_phantom,
               consume_whole_lp: item.consume_whole_lp,
@@ -1380,10 +1398,10 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
                     </div>
                     {items.map((it, idx) => {
                       // Calculate available lines for this item
-                      const availableLinesForItem = bomLineIds.length > 0 
+                      const availableLinesForItem = bomLineIds.length > 0
                         ? productionLines.filter(line => bomLineIds.includes(line.id))
                         : productionLines;
-                      
+
                       return (
                         <div key={idx} className="grid grid-cols-10 gap-2 p-3 border-b border-slate-100 items-center hover:bg-slate-50">
                           <div>
@@ -1404,15 +1422,15 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
                           <div className="text-slate-600 text-xs truncate" title={itemNames[idx]}>
                             {itemNames[idx] || '-'}
                           </div>
-                          <input 
-                            type="number" 
-                            className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                          <input
+                            type="number"
+                            className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                             value={it.quantity}
-                            onChange={e => handleChangeItem(idx, 'quantity', Number(e.target.value))} 
+                            onChange={e => handleChangeItem(idx, 'quantity', Number(e.target.value))}
                             disabled={bomStatus === 'active'}
-                            placeholder="Qty" 
+                            placeholder="Qty"
                           />
-                          <div 
+                          <div
                             className="w-full border border-slate-300 rounded px-2 py-1 text-sm bg-slate-50 text-slate-600 flex items-center"
                             title="UoM inherited from selected material (automatically set)"
                           >
@@ -1435,43 +1453,43 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
                               </option>
                             ))}
                           </select>
-                          <input 
-                            type="number" 
-                            className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed" 
+                          <input
+                            type="number"
+                            className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                             value={it.sequence ?? idx + 1}
-                            onChange={e => handleChangeItem(idx, 'sequence', Number(e.target.value))} 
+                            onChange={e => handleChangeItem(idx, 'sequence', Number(e.target.value))}
                             disabled={bomStatus === 'active'}
-                            placeholder="Seq" 
+                            placeholder="Seq"
                           />
                           <div className="flex items-center justify-center">
-                            <input 
-                              type="checkbox" 
-                              checked={it.is_optional || false} 
-                              onChange={e => handleChangeItem(idx, 'is_optional', e.target.checked)} 
+                            <input
+                              type="checkbox"
+                              checked={it.is_optional || false}
+                              onChange={e => handleChangeItem(idx, 'is_optional', e.target.checked)}
                               disabled={bomStatus === 'active'}
-                              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed" 
+                              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                           <div className="flex items-center justify-center">
-                            <input 
-                              type="checkbox" 
-                              checked={it.is_phantom || false} 
-                              onChange={e => handleChangeItem(idx, 'is_phantom', e.target.checked)} 
+                            <input
+                              type="checkbox"
+                              checked={it.is_phantom || false}
+                              onChange={e => handleChangeItem(idx, 'is_phantom', e.target.checked)}
                               disabled={bomStatus === 'active'}
-                              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed" 
+                              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                           <div className="flex items-center justify-center">
-                            <input 
-                              type="checkbox" 
-                              checked={it.consume_whole_lp || false} 
-                              onChange={e => handleChangeItem(idx, 'consume_whole_lp', e.target.checked)} 
+                            <input
+                              type="checkbox"
+                              checked={it.consume_whole_lp || false}
+                              onChange={e => handleChangeItem(idx, 'consume_whole_lp', e.target.checked)}
                               disabled={bomStatus === 'active'}
-                              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed" 
+                              className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
-                          <button 
-                            onClick={() => handleRemoveItem(idx)} 
+                          <button
+                            onClick={() => handleRemoveItem(idx)}
                             disabled={bomStatus === 'active'}
                             className="px-2 py-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >

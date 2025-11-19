@@ -136,9 +136,11 @@ export function useSupabasePurchaseOrders() {
           updated_at: po.updated_at,
           supplier: po.supplier ? {
             id: po.supplier.id,
+            code: po.supplier.code,
             name: po.supplier.name,
             legal_name: po.supplier.legal_name,
             vat_number: po.supplier.vat_number,
+            tax_number: po.supplier.tax_number,
             country: po.supplier.country,
             currency: po.supplier.currency,
             is_active: po.supplier.is_active,

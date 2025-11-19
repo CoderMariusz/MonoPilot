@@ -24,7 +24,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const { profile } = useAuth();
+  // profile not needed here
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);

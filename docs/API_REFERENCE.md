@@ -4,7 +4,7 @@
 
 The MonoPilot MES system uses a dual-mode API layer that seamlessly switches between mock data (development) and real Supabase data (production).
 
-**Last Updated**: 2025-11-17 (auto-generated)
+**Last Updated**: 2025-11-19 (auto-generated)
 
 ## API Classes
 
@@ -211,22 +211,18 @@ static async addReason(entityType: string, entityId: number, reason: string): Pr
 ```typescript
 static async create(data: {
     bom_id: number;
-    version: string;
-    status_from: string;
-    status_to: string;
-    changes: object;
-    description?: string;
+    change_type: string;
+    old_values?: object | null;
+    new_values?: object | null;
   }): Promise<BomHistory>
 ```
 
 **Parameters**:
 - `data: {
     bom_id: number;
-    version: string;
-    status_from: string;
-    status_to: string;
-    changes: object;
-    description?: string;
+    change_type: string;
+    old_values?: object | null;
+    new_values?: object | null;
   }`
 
 **Returns**: `Promise<BomHistory>`
@@ -1834,14 +1830,12 @@ static async create(data: CreateRoutingDTO): Promise<Routing>
 
 **Signature**:
 ```typescript
-static async update(id: number, data: Partial<Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'>> & { operations?: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>[] }): Promise<Routing>
+static async update(id: number, data: any): Promise<Routing>
 ```
 
 **Parameters**:
 - `id: number`
-- `data: Partial<Omit<Routing`
-- `'id' | 'created_at' | 'updated_at' | 'operations'>> & { operations?: Omit<RoutingOperation`
-- `'id' | 'routing_id' | 'created_at' | 'updated_at'>[] }`
+- `data: any`
 
 **Returns**: `Promise<Routing>`
 
@@ -1856,52 +1850,6 @@ static async delete(id: number): Promise<void>
 
 **Parameters**:
 - `id: number`
-
-**Returns**: `Promise<void>`
-
----
-
-#### `addOperation()`
-
-**Signature**:
-```typescript
-static async addOperation(routingId: number, operation: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>): Promise<RoutingOperation>
-```
-
-**Parameters**:
-- `routingId: number`
-- `operation: Omit<RoutingOperation`
-- `'id' | 'routing_id' | 'created_at' | 'updated_at'>`
-
-**Returns**: `Promise<RoutingOperation>`
-
----
-
-#### `updateOperation()`
-
-**Signature**:
-```typescript
-static async updateOperation(operationId: number, data: Partial<Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>>): Promise<RoutingOperation>
-```
-
-**Parameters**:
-- `operationId: number`
-- `data: Partial<Omit<RoutingOperation`
-- `'id' | 'routing_id' | 'created_at' | 'updated_at'>>`
-
-**Returns**: `Promise<RoutingOperation>`
-
----
-
-#### `deleteOperation()`
-
-**Signature**:
-```typescript
-static async deleteOperation(operationId: number): Promise<void>
-```
-
-**Parameters**:
-- `operationId: number`
 
 **Returns**: `Promise<void>`
 
@@ -2130,39 +2078,6 @@ static async cancel(id: number, reason?: string, source?: string): Promise<{ suc
 - `source?: string`
 
 **Returns**: `Promise<{ success: boolean; message: string }>`
-
----
-
-#### `markShipped()`
-
-Mark a transfer order as shipped Sets actual_ship_date and updates status to 'in_transit' Only works if current status is 'submitted'
-
-**Signature**:
-```typescript
-static async markShipped(toId: number, actualShipDate: string): Promise<TOHeader>
-```
-
-**Parameters**:
-- `toId: number`
-- `actualShipDate: string`
-
-**Returns**: `Promise<TOHeader>`
-
----
-
-#### `markReceived()`
-
-**Signature**:
-```typescript
-static async markReceived(toId: number, actualReceiveDate: string, lineUpdates: MarkReceivedLineUpdate[]): Promise<TOHeader>
-```
-
-**Parameters**:
-- `toId: number`
-- `actualReceiveDate: string`
-- `lineUpdates: MarkReceivedLineUpdate[]`
-
-**Returns**: `Promise<TOHeader>`
 
 ---
 
