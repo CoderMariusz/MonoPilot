@@ -508,13 +508,15 @@ export type TOStatus =
 // PO Header (replacing PurchaseOrder)
 export interface POHeader {
   id: number;
-  number: string;
+  org_id?: number;
+  po_number: string;  // Match DB: was 'number'
   supplier_id: number;
   warehouse_id?: number;
   status: POStatus;
   currency: string;
   exchange_rate?: number;
   order_date: string;
+  expected_date?: string;
   requested_delivery_date?: string;
   promised_delivery_date?: string;
   payment_due_date?: string;
@@ -525,10 +527,12 @@ export interface POHeader {
   net_total?: number;
   vat_total?: number;
   gross_total?: number;
+  notes?: string;
   created_by?: string;
+  updated_by?: string;
   approved_by?: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   // Relationships
   supplier?: Supplier;
   warehouse?: Warehouse;
@@ -540,19 +544,20 @@ export interface POHeader {
 export interface POLine {
   id: number;
   po_id: number;
-  line_no: number;
-  item_id: number;
-  uom: UoM;
-  qty_ordered: number;
-  qty_received: number;
+  line_number: number;  // Match DB: was 'line_no'
+  product_id: number;   // Match DB: was 'item_id'
+  uom: string;
+  quantity: number;     // Match DB: was 'qty_ordered'
+  received_qty: number; // Match DB: was 'qty_received'
   unit_price: number;
-  vat_rate: number;
+  vat_rate?: number;
+  tax_code_id?: number;
   requested_delivery_date?: string;
   promised_delivery_date?: string;
   default_location_id?: number;
-  note?: string;
-  created_at: string;
-  updated_at: string;
+  notes?: string;       // Match DB: was 'note'
+  created_at?: string;
+  updated_at?: string;
   // Relationships
   item?: Product;
   default_location?: Location;
