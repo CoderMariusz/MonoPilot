@@ -6812,45 +6812,94 @@ All API routes and types must use these actual DB column names.
 
 ```sql
 CREATE TABLE work_orders (
-  id SERIAL PRIMARY KEY,
-  wo_number VARCHAR(50) UNIQUE NOT NULL,
-  product_id INTEGER REFERENCES products(id),
-  bom_id INTEGER REFERENCES boms(id),
-  quantity NUMERIC(12,4) NOT NULL,
-  uom VARCHAR(20) NOT NULL,
-  priority INTEGER DEFAULT 3,
-  status VARCHAR(20) NOT NULL,
-  scheduled_start TIMESTAMPTZ,
-  scheduled_end TIMESTAMPTZ,
-  actual_start TIMESTAMPTZ,
-  actual_end TIMESTAMPTZ,
-  machine_id INTEGER REFERENCES machines(id),
-  line_id INTEGER NOT NULL REFERENCES production_lines(id),
-  source_demand_type VARCHAR(50),
-  source_demand_id INTEGER,
-  created_by INTEGER,
-  approved_by INTEGER,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  wo_number TEXT NOT NULL,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  bom_id BIGINT REFERENCES boms(id) ON DELETE SET NULL,
+  routing_id BIGINT REFERENCES routings(id) ON DELETE SET NULL,
+  warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
+  production_line_id BIGINT REFERENCES production_lines(id) ON DELETE SET NULL,  -- Note: not line_id
+  machine_id BIGINT REFERENCES machines(id) ON DELETE SET NULL,
+  status wo_status NOT NULL DEFAULT 'Draft',
+
+  -- Quantities
+  planned_qty DECIMAL(15,4) NOT NULL,  -- Note: use planned_qty, not quantity
+  completed_qty DECIMAL(15,4) DEFAULT 0,
+  uom TEXT NOT NULL,
+
+  -- Dates
+  scheduled_date DATE,  -- Note: use scheduled_date, not due_date
+  start_date TIMESTAMPTZ,  -- Note: use start_date, not scheduled_start
+  end_date TIMESTAMPTZ,    -- Note: use end_date, not scheduled_end
+
+  -- Planning
+  priority INTEGER DEFAULT 5,
+  source_demand_type VARCHAR(50),  -- 'Manual', 'TO', 'PO', 'SO'
+  source_demand_id BIGINT,
+
+  notes TEXT,
+
+  -- Audit
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
+  approved_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT work_orders_unique_number_per_org UNIQUE (org_id, wo_number)
 );
 ```
+
+**Column Naming Note:** DB column names differ from some legacy code:
+- `planned_qty` (not `quantity`)
+- `scheduled_date` (not `due_date`)
+- `start_date` (not `scheduled_start`)
+- `end_date` (not `scheduled_end`)
+- `production_line_id` (not `line_id`)
+- IDs are numeric BIGINT (not strings)
+
+All API routes and types must use these actual DB column names with correct types.
+
+#### wo_materials
+
+```sql
+CREATE TABLE wo_materials (
+  id BIGSERIAL PRIMARY KEY,
+  wo_id BIGINT NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  material_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  planned_qty DECIMAL(15,4) NOT NULL,
+  consumed_qty DECIMAL(15,4) DEFAULT 0,
+  uom TEXT NOT NULL,
+  scrap_percent DECIMAL(5,2) DEFAULT 0,
+  consume_whole_lp BOOLEAN DEFAULT false,
+  sequence INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**Note:** This is a BOM snapshot - materials are copied from BOM when WO is created.
 
 #### wo_operations
 
 ```sql
 CREATE TABLE wo_operations (
-  id SERIAL PRIMARY KEY,
-  wo_id INTEGER NOT NULL REFERENCES work_orders(id),
-  routing_operation_id INTEGER REFERENCES routing_operations(id),
-  seq_no INTEGER NOT NULL,
-  status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED')),
-  operator_id UUID REFERENCES users(id),
-  device_id INTEGER,
-  started_at TIMESTAMPTZ,
-  finished_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  id BIGSERIAL PRIMARY KEY,
+  wo_id BIGINT NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  sequence INTEGER NOT NULL,  -- Note: use sequence, not seq_no
+  operation_name TEXT NOT NULL,
+  machine_id BIGINT REFERENCES machines(id) ON DELETE SET NULL,
+  status TEXT DEFAULT 'Pending',
+  planned_start TIMESTAMPTZ,
+  actual_start TIMESTAMPTZ,
+  actual_end TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
+
+**Column Naming Note:** Use `sequence` not `seq_no`.
 
 #### wo_reservations
 
