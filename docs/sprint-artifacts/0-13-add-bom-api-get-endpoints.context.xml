@@ -1,0 +1,177 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>13</storyId>
+    <title>Add Missing BOM API GET Endpoints</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-19</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-13-add-bom-api-get-endpoints.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer maintaining MonoPilot</asA>
+    <iWant>BOM API routes to have GET methods</iWant>
+    <soThat>BomsAPI.getById() and BomsAPI.getItems() work correctly and BOM edit flows function properly</soThat>
+    <tasks>
+      <task n="1">Add GET method to apps/frontend/app/api/technical/boms/[id]/route.ts</task>
+      <task n="2">Add GET method to apps/frontend/app/api/technical/boms/[id]/items/route.ts</task>
+      <task n="3" optional="true">Refactor CompositeProductModal to use BomsAPI instead of direct Supabase calls</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="AC1" title="GET /api/technical/boms/[id]">
+      <given>a valid BOM ID exists in database</given>
+      <when>client calls BomsAPI.getById(bomId)</when>
+      <then>API returns BOM with product and items included</then>
+      <and>response matches Bom type from lib/types.ts</and>
+    </ac>
+    <ac id="AC2" title="GET /api/technical/boms/[id]/items">
+      <given>a valid BOM ID exists in database</given>
+      <when>client calls BomsAPI.getItems(bomId)</when>
+      <then>API returns array of BOM items with material details</then>
+      <and>items are ordered by sequence</and>
+      <and>each item includes material object with product details</and>
+    </ac>
+    <ac id="AC3" title="Error Handling">
+      <given>invalid BOM ID (non-existent or malformed)</given>
+      <when>client calls GET endpoint</when>
+      <then>API returns appropriate error (404 for not found, 400 for invalid)</then>
+      <and>error format matches standard API error structure</and>
+    </ac>
+    <ac id="AC4" title="API Layer Consistency">
+      <given>BOM GET endpoints exist</given>
+      <when>reviewing CompositeProductModal</when>
+      <then>component should be refactored to use BomsAPI instead of direct Supabase calls</then>
+      <and>all BOM data access goes through API layer</and>
+    </ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/archive/modules/technical/BOM_ARCHITECTURE.md</path>
+        <title>BOM Architecture</title>
+        <section>API Endpoints</section>
+        <snippet>Defines all BOM lifecycle endpoints including GET /api/technical/products/:productId/boms and bulk upsert PUT /api/technical/boms/:id/items. Current implementation missing GET for individual BOM.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>MonoPilot Architecture</title>
+        <section>Pattern 2: Automatic Consumption (BOM-Based)</section>
+        <snippet>BOM snapshot pattern and BomsAPI class in lib/api/technical folder. 28 API classes with strict TypeScript types.</snippet>
+      </doc>
+      <doc>
+        <path>docs/archive/epic-0/EPIC-0-API-AUDIT-REPORT.md</path>
+        <title>Epic 0 API Audit Report</title>
+        <section>API Status Overview</section>
+        <snippet>BomsAPI marked as "OK - Uses server-side API routes" but missing GET endpoints cause 405 errors when calling getById() and getItems().</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>apps/frontend/app/api/technical/boms/[id]/route.ts</path>
+        <kind>API Route</kind>
+        <symbol>PATCH, DELETE</symbol>
+        <lines>1-189</lines>
+        <reason>Target file for adding GET method. Currently has PATCH (clone-on-edit for active BOMs) and DELETE (soft/hard delete). GET must follow same patterns.</reason>
+      </file>
+      <file>
+        <path>apps/frontend/app/api/technical/boms/[id]/items/route.ts</path>
+        <kind>API Route</kind>
+        <symbol>PUT</symbol>
+        <lines>1-108</lines>
+        <reason>Target file for adding GET method. Currently has PUT for bulk upsert. GET must return items with material relationships ordered by sequence.</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/api/boms.ts</path>
+        <kind>API Class</kind>
+        <symbol>BomsAPI.getById, BomsAPI.getItems</symbol>
+        <lines>532-585</lines>
+        <reason>Client-side API methods already defined. They call GET endpoints that don't exist, causing 405 errors. No changes needed here after routes added.</reason>
+      </file>
+      <file>
+        <path>apps/frontend/components/BOMComparisonModal.tsx</path>
+        <kind>Component</kind>
+        <symbol>BomsAPI.getById, BomsAPI.getItems</symbol>
+        <lines>41-56</lines>
+        <reason>Uses BomsAPI.getById() and getItems() for BOM version comparison. Will work after GET endpoints added.</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/supabase/server.ts</path>
+        <kind>Service</kind>
+        <symbol>supabase</symbol>
+        <lines>all</lines>
+        <reason>Server-side Supabase client import. All API routes use this for database queries.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>next</package>
+        <version>^15.5.4</version>
+      </node>
+      <node>
+        <package>@supabase/supabase-js</package>
+        <version>^2.75.0</version>
+      </node>
+      <node>
+        <package>typescript</package>
+        <version>^5.7.2</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Follow existing API route patterns: NextRequest, NextResponse, params Promise, parseInt for IDs</constraint>
+    <constraint type="pattern">Use server-side Supabase client: import { supabase } from '@/lib/supabase/server'</constraint>
+    <constraint type="error-handling">Return 400 for invalid ID (isNaN), 404 for not found, 500 for internal errors</constraint>
+    <constraint type="response">Return JSON with data directly or { error: message } for errors</constraint>
+    <constraint type="query">Include nested relationships using Supabase select syntax with FK hints</constraint>
+    <constraint type="ordering">BOM items must be ordered by sequence field</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>GET /api/technical/boms/[id]</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/technical/boms/:id → Bom with product and bom_items</signature>
+      <path>apps/frontend/app/api/technical/boms/[id]/route.ts</path>
+    </interface>
+    <interface>
+      <name>GET /api/technical/boms/[id]/items</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/technical/boms/:id/items → BomItem[] with material</signature>
+      <path>apps/frontend/app/api/technical/boms/[id]/items/route.ts</path>
+    </interface>
+    <interface>
+      <name>Bom type</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface Bom { id, product_id, version, status, ... }</signature>
+      <path>apps/frontend/lib/types.ts</path>
+    </interface>
+    <interface>
+      <name>BomItem type</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface BomItem { id, bom_id, material_id, quantity, uom, sequence, ... }</signature>
+      <path>apps/frontend/lib/types.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Vitest for unit tests, Playwright for E2E. Test files in apps/frontend/e2e/ and alongside source files. Follow existing patterns in route tests.</standards>
+    <locations>
+      <location>apps/frontend/e2e/**/*.spec.ts</location>
+      <location>apps/frontend/**/*.test.ts</location>
+    </locations>
+    <ideas>
+      <idea acRef="AC1">Test GET /api/technical/boms/1 returns BOM with product and items relationships</idea>
+      <idea acRef="AC1">Test response matches Bom type structure</idea>
+      <idea acRef="AC2">Test GET /api/technical/boms/1/items returns items array ordered by sequence</idea>
+      <idea acRef="AC2">Test each item has material object with part_number, description, uom</idea>
+      <idea acRef="AC3">Test GET with invalid ID (abc) returns 400</idea>
+      <idea acRef="AC3">Test GET with non-existent ID (99999) returns 404</idea>
+      <idea acRef="AC4">Verify BOMComparisonModal works after endpoints added</idea>
+    </ideas>
+  </tests>
+</story-context>

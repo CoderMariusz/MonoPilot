@@ -1,6 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase/server';
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const bomId = parseInt(id);
+
+    if (isNaN(bomId)) {
+      return NextResponse.json({ error: 'Invalid BOM ID' }, { status: 400 });
+    }
+
+    const { data: bom, error } = await supabase
+      .from('boms')
+      .select(`
+        *,
+        product:products(id, part_number, description, uom),
+        bom_items(
+          *,
+          material:products!bom_items_material_id_fkey(
+            id, part_number, description, uom, is_active
+          )
+        )
+      `)
+      .eq('id', bomId)
+      .single();
+
+    if (error || !bom) {
+      return NextResponse.json({ error: 'BOM not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(bom);
+
+  } catch (error) {
+    console.error('BOM GET error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -3891,6 +3891,129 @@ async function deactivateProduct(productId: string) {
 
 ---
 
+### Pattern 22b: BOM API Route Requirements
+
+**Problem:** BOM API routes must provide complete CRUD operations including GET methods for reading BOM and BOM items. Missing GET endpoints break edit flows.
+
+**Required API Routes:**
+
+```
+/api/technical/boms/
+├── route.ts                    # GET (list all), POST (create)
+├── [id]/
+│   ├── route.ts                # GET (by id), PATCH (update), DELETE
+│   ├── items/
+│   │   └── route.ts            # GET (items), PUT (bulk upsert)
+│   ├── activate/route.ts       # POST
+│   ├── archive/route.ts        # POST
+│   ├── clone/route.ts          # POST
+│   ├── clone-version/route.ts  # POST (with dates)
+│   ├── evaluate-materials/route.ts      # POST
+│   └── evaluate-all-materials/route.ts  # POST
+├── versions/[productId]/route.ts        # GET (all versions)
+├── select-by-date/route.ts              # GET (BOM for date)
+└── validate-date-range/route.ts         # GET (overlap check)
+```
+
+**GET /api/technical/boms/[id] (REQUIRED):**
+
+```typescript
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const bomId = parseInt(id);
+
+  const { data: bom, error } = await supabase
+    .from('boms')
+    .select(`
+      *,
+      product:products(id, part_number, description),
+      bom_items(*)
+    `)
+    .eq('id', bomId)
+    .single();
+
+  if (error || !bom) {
+    return NextResponse.json({ error: 'BOM not found' }, { status: 404 });
+  }
+
+  return NextResponse.json(bom);
+}
+```
+
+**GET /api/technical/boms/[id]/items (REQUIRED):**
+
+```typescript
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const bomId = parseInt(id);
+
+  const { data: items, error } = await supabase
+    .from('bom_items')
+    .select(`
+      *,
+      material:products!bom_items_material_id_fkey(
+        id, part_number, description, uom, is_active
+      )
+    `)
+    .eq('bom_id', bomId)
+    .order('sequence');
+
+  if (error) {
+    return NextResponse.json({ error: 'Failed to fetch BOM items' }, { status: 500 });
+  }
+
+  return NextResponse.json(items || []);
+}
+```
+
+**BomsAPI Client Methods (must match routes):**
+
+```typescript
+export const BomsAPI = {
+  // Standard CRUD
+  async getById(id: number): Promise<Bom | null>;
+  async getByProduct(productId: number): Promise<Bom[]>;
+  async getItems(bomId: number): Promise<BomItem[]>;
+
+  // Updates
+  async updateHeader(id: number, data: BomUpdateData): Promise<BomUpdateResponse>;
+  async updateItems(id: number, items: BomItemUpdateData[]): Promise<BomItemsUpdateResponse>;
+
+  // Lifecycle
+  async clone(id: number): Promise<BomCloneResponse>;
+  async activate(id: number): Promise<BomActivateResponse>;
+  async archive(id: number): Promise<BomArchiveResponse>;
+  async hardDelete(id: number): Promise<BomDeleteResponse>;
+  async softDelete(id: number): Promise<BomDeleteResponse>;
+
+  // Multi-Version (EPIC-001 Phase 2)
+  async getBOMForDate(productId: number, date?: string): Promise<BomVersionInfo>;
+  async getAllVersions(productId: number): Promise<BomVersionInfo[]>;
+  async cloneBOMWithDates(id: number, effectiveFrom: string, effectiveTo?: string): Promise<BomCloneResponse>;
+  async validateDateRange(productId: number, effectiveFrom: string, effectiveTo?: string, bomId?: number): Promise<ValidationResult>;
+
+  // Conditional Components (EPIC-001 Phase 3)
+  async evaluateBOMMaterials(bomId: number, context: WOContext): Promise<EvaluatedMaterial[]>;
+  async getAllMaterialsWithEvaluation(bomId: number, context: WOContext): Promise<EvaluatedMaterial[]>;
+};
+```
+
+**AI Agent Implementation Rules:**
+
+1. **ALWAYS implement GET methods** - routes without GET break client API
+2. **ALWAYS include related data** - BOM GET should include product and items
+3. **ALWAYS validate params** - check ID format before DB query
+4. **ALWAYS return consistent errors** - use standard error format
+5. **NEVER use only Supabase in components** - use API layer for consistency
+
+---
+
 ## Quality Module Patterns
 
 ### Pattern #23: QA Inspection Workflow
@@ -6527,13 +6650,16 @@ CREATE TABLE suppliers (
 
 ```sql
 CREATE TABLE po_header (
-  id SERIAL PRIMARY KEY,
-  number VARCHAR(50) UNIQUE NOT NULL,
-  supplier_id INTEGER REFERENCES suppliers(id),
-  status VARCHAR(20) NOT NULL CHECK (status IN ('draft', 'approved', 'closed')),
-  currency VARCHAR(3) DEFAULT 'USD',
-  exchange_rate NUMERIC(12,6),
-  order_date TIMESTAMPTZ NOT NULL,
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  po_number TEXT NOT NULL,  -- Note: DB uses po_number, not number
+  supplier_id BIGINT NOT NULL REFERENCES suppliers(id) ON DELETE RESTRICT,
+  warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
+  status po_status NOT NULL DEFAULT 'Draft',
+  currency TEXT DEFAULT 'PLN',
+  exchange_rate NUMERIC(12,6) DEFAULT 1.0,
+  order_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  expected_date DATE,
   requested_delivery_date TIMESTAMPTZ,
   promised_delivery_date TIMESTAMPTZ,
   payment_due_date TIMESTAMPTZ,
@@ -6546,40 +6672,59 @@ CREATE TABLE po_header (
   -- ASN reference
   asn_ref VARCHAR(50),
 
-  -- Totals
-  net_total NUMERIC(12,2),
-  vat_total NUMERIC(12,2),
-  gross_total NUMERIC(12,2),
+  -- Totals (calculated)
+  net_total NUMERIC(12,2) DEFAULT 0,
+  vat_total NUMERIC(12,2) DEFAULT 0,
+  gross_total NUMERIC(12,2) DEFAULT 0,
+
+  notes TEXT,
 
   -- Audit
   created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
   approved_by UUID REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT po_header_unique_number_per_org UNIQUE (org_id, po_number)
 );
 ```
+
+**Column Naming Note:** DB uses `po_number` (not `number`). All API routes and types must use `po_number`.
 
 #### po_line
 
 ```sql
 CREATE TABLE po_line (
-  id SERIAL PRIMARY KEY,
-  po_id INTEGER REFERENCES po_header(id),
-  line_no INTEGER NOT NULL,
-  item_id INTEGER REFERENCES products(id),
-  uom VARCHAR(20) NOT NULL,
-  qty_ordered NUMERIC(12,4) NOT NULL,
-  qty_received NUMERIC(12,4) DEFAULT 0,
-  unit_price NUMERIC(12,4) NOT NULL,
+  id BIGSERIAL PRIMARY KEY,
+  po_id BIGINT NOT NULL REFERENCES po_header(id) ON DELETE CASCADE,
+  line_number INTEGER NOT NULL,  -- Note: DB uses line_number, not line_no
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,  -- Note: DB uses product_id, not item_id
+  quantity DECIMAL(15,4) NOT NULL,  -- Note: DB uses quantity, not qty_ordered
+  received_qty DECIMAL(15,4) DEFAULT 0,  -- Note: DB uses received_qty, not qty_received
+  uom TEXT NOT NULL,
+  unit_price DECIMAL(15,4),
   vat_rate NUMERIC(5,4) DEFAULT 0,
+  tax_code_id BIGINT REFERENCES tax_codes(id),
   requested_delivery_date TIMESTAMPTZ,
   promised_delivery_date TIMESTAMPTZ,
-  default_location_id INTEGER REFERENCES locations(id),
-  note TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  default_location_id BIGINT REFERENCES locations(id),
+  notes TEXT,  -- Note: DB uses notes, not note
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT po_line_unique_number UNIQUE (po_id, line_number)
 );
 ```
+
+**Column Naming Note:** DB column names differ from some legacy code:
+- `line_number` (not `line_no`)
+- `product_id` (not `item_id`)
+- `quantity` (not `qty_ordered`)
+- `received_qty` (not `qty_received`)
+- `notes` (not `note`)
+
+All API routes and types must use these actual DB column names.
 
 #### po_correction
 
@@ -6599,11 +6744,14 @@ CREATE TABLE po_correction (
 
 ```sql
 CREATE TABLE to_header (
-  id SERIAL PRIMARY KEY,
-  number VARCHAR(50) UNIQUE NOT NULL,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('draft', 'submitted', 'in_transit', 'received', 'closed', 'cancelled')),
-  from_wh_id INTEGER REFERENCES warehouses(id),
-  to_wh_id INTEGER REFERENCES warehouses(id),
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  to_number TEXT NOT NULL,  -- Note: DB uses to_number, not number
+  from_warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,  -- Note: not from_wh_id
+  to_warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,    -- Note: not to_wh_id
+  status to_status NOT NULL DEFAULT 'Draft',
+  scheduled_date DATE,
+  transfer_date TIMESTAMPTZ,
   requested_date TIMESTAMPTZ,
   planned_ship_date TIMESTAMPTZ,
   actual_ship_date TIMESTAMPTZ,
@@ -6611,75 +6759,147 @@ CREATE TABLE to_header (
   actual_receive_date TIMESTAMPTZ,
   notes TEXT,
   created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
   approved_by UUID REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT to_header_unique_number_per_org UNIQUE (org_id, to_number)
 );
 ```
+
+**Column Naming Note:** DB column names differ from some legacy code:
+- `to_number` (not `number`)
+- `from_warehouse_id` (not `from_wh_id`)
+- `to_warehouse_id` (not `to_wh_id`)
+
+All API routes and types must use these actual DB column names.
 
 #### to_line
 
 ```sql
 CREATE TABLE to_line (
-  id SERIAL PRIMARY KEY,
-  to_id INTEGER REFERENCES to_header(id),
-  line_no INTEGER NOT NULL,
-  item_id INTEGER REFERENCES products(id),
-  uom VARCHAR(20) NOT NULL,
-  qty_planned NUMERIC(12,4) NOT NULL,
-  qty_shipped NUMERIC(12,4) DEFAULT 0,
-  qty_received NUMERIC(12,4) DEFAULT 0,
-  lp_id INTEGER,
+  id BIGSERIAL PRIMARY KEY,
+  to_id BIGINT NOT NULL REFERENCES to_header(id) ON DELETE CASCADE,
+  line_number INTEGER NOT NULL,  -- Note: DB uses line_number, not line_no
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,  -- Note: not item_id
+  quantity DECIMAL(15,4) NOT NULL,  -- Note: DB uses quantity, not qty_planned
+  qty_shipped DECIMAL(15,4) DEFAULT 0,
+  transferred_qty DECIMAL(15,4) DEFAULT 0,  -- Note: not qty_received
+  uom TEXT NOT NULL,
+  lp_id BIGINT REFERENCES license_plates(id),
   batch VARCHAR(100),
+  from_location_id BIGINT REFERENCES locations(id),
+  to_location_id BIGINT REFERENCES locations(id),
+  scan_required BOOLEAN DEFAULT false,
   notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT to_line_unique_number UNIQUE (to_id, line_number)
 );
 ```
+
+**Column Naming Note:** DB column names differ from some legacy code:
+- `line_number` (not `line_no`)
+- `product_id` (not `item_id`)
+- `quantity` (not `qty_planned`)
+- `transferred_qty` (not `qty_received`)
+
+All API routes and types must use these actual DB column names.
 
 #### work_orders
 
 ```sql
 CREATE TABLE work_orders (
-  id SERIAL PRIMARY KEY,
-  wo_number VARCHAR(50) UNIQUE NOT NULL,
-  product_id INTEGER REFERENCES products(id),
-  bom_id INTEGER REFERENCES boms(id),
-  quantity NUMERIC(12,4) NOT NULL,
-  uom VARCHAR(20) NOT NULL,
-  priority INTEGER DEFAULT 3,
-  status VARCHAR(20) NOT NULL,
-  scheduled_start TIMESTAMPTZ,
-  scheduled_end TIMESTAMPTZ,
-  actual_start TIMESTAMPTZ,
-  actual_end TIMESTAMPTZ,
-  machine_id INTEGER REFERENCES machines(id),
-  line_id INTEGER NOT NULL REFERENCES production_lines(id),
-  source_demand_type VARCHAR(50),
-  source_demand_id INTEGER,
-  created_by INTEGER,
-  approved_by INTEGER,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  wo_number TEXT NOT NULL,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  bom_id BIGINT REFERENCES boms(id) ON DELETE SET NULL,
+  routing_id BIGINT REFERENCES routings(id) ON DELETE SET NULL,
+  warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
+  production_line_id BIGINT REFERENCES production_lines(id) ON DELETE SET NULL,  -- Note: not line_id
+  machine_id BIGINT REFERENCES machines(id) ON DELETE SET NULL,
+  status wo_status NOT NULL DEFAULT 'Draft',
+
+  -- Quantities
+  planned_qty DECIMAL(15,4) NOT NULL,  -- Note: use planned_qty, not quantity
+  completed_qty DECIMAL(15,4) DEFAULT 0,
+  uom TEXT NOT NULL,
+
+  -- Dates
+  scheduled_date DATE,  -- Note: use scheduled_date, not due_date
+  start_date TIMESTAMPTZ,  -- Note: use start_date, not scheduled_start
+  end_date TIMESTAMPTZ,    -- Note: use end_date, not scheduled_end
+
+  -- Planning
+  priority INTEGER DEFAULT 5,
+  source_demand_type VARCHAR(50),  -- 'Manual', 'TO', 'PO', 'SO'
+  source_demand_id BIGINT,
+
+  notes TEXT,
+
+  -- Audit
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
+  approved_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT work_orders_unique_number_per_org UNIQUE (org_id, wo_number)
 );
 ```
+
+**Column Naming Note:** DB column names differ from some legacy code:
+- `planned_qty` (not `quantity`)
+- `scheduled_date` (not `due_date`)
+- `start_date` (not `scheduled_start`)
+- `end_date` (not `scheduled_end`)
+- `production_line_id` (not `line_id`)
+- IDs are numeric BIGINT (not strings)
+
+All API routes and types must use these actual DB column names with correct types.
+
+#### wo_materials
+
+```sql
+CREATE TABLE wo_materials (
+  id BIGSERIAL PRIMARY KEY,
+  wo_id BIGINT NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  material_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  planned_qty DECIMAL(15,4) NOT NULL,
+  consumed_qty DECIMAL(15,4) DEFAULT 0,
+  uom TEXT NOT NULL,
+  scrap_percent DECIMAL(5,2) DEFAULT 0,
+  consume_whole_lp BOOLEAN DEFAULT false,
+  sequence INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**Note:** This is a BOM snapshot - materials are copied from BOM when WO is created.
 
 #### wo_operations
 
 ```sql
 CREATE TABLE wo_operations (
-  id SERIAL PRIMARY KEY,
-  wo_id INTEGER NOT NULL REFERENCES work_orders(id),
-  routing_operation_id INTEGER REFERENCES routing_operations(id),
-  seq_no INTEGER NOT NULL,
-  status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED')),
-  operator_id UUID REFERENCES users(id),
-  device_id INTEGER,
-  started_at TIMESTAMPTZ,
-  finished_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  id BIGSERIAL PRIMARY KEY,
+  wo_id BIGINT NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  sequence INTEGER NOT NULL,  -- Note: use sequence, not seq_no
+  operation_name TEXT NOT NULL,
+  machine_id BIGINT REFERENCES machines(id) ON DELETE SET NULL,
+  status TEXT DEFAULT 'Pending',
+  planned_start TIMESTAMPTZ,
+  actual_start TIMESTAMPTZ,
+  actual_end TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
+
+**Column Naming Note:** Use `sequence` not `seq_no`.
 
 #### wo_reservations
 
@@ -6710,52 +6930,123 @@ CREATE TABLE IF NOT EXISTS wo_reservations (
 
 ```sql
 CREATE TABLE boms (
-  id SERIAL PRIMARY KEY,
-  product_id INTEGER REFERENCES products(id),
-  version VARCHAR(50) NOT NULL,
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL DEFAULT 1,  -- Note: INTEGER not VARCHAR
+  name TEXT NOT NULL,
+  status bom_status NOT NULL DEFAULT 'Draft',
+  effective_from DATE,
+  effective_to DATE,
+  yield_qty DECIMAL(15,4) NOT NULL DEFAULT 1,
+  yield_uom TEXT NOT NULL DEFAULT 'kg',
+  notes TEXT,
 
-  -- BOM Lifecycle
-  status bom_status NOT NULL DEFAULT 'draft',
+  -- BOM Configuration (expanded)
+  requires_routing BOOLEAN DEFAULT false,
+  default_routing_id BIGINT REFERENCES routings(id),
+  line_id BIGINT[],
+  boxes_per_pallet INTEGER,
+  is_active BOOLEAN DEFAULT true,
   archived_at TIMESTAMPTZ,
   deleted_at TIMESTAMPTZ,
 
-  -- BOM Configuration
-  requires_routing BOOLEAN DEFAULT false,
-  default_routing_id INTEGER,
-  notes TEXT,
-  effective_from TIMESTAMPTZ,
-  effective_to TIMESTAMPTZ,
-
-  -- Packaging
-  boxes_per_pallet INTEGER,
-
-  -- Line restrictions
-  line_id INTEGER[],
-
   -- Audit
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  -- Constraint: Single active BOM per product
-  CONSTRAINT boms_single_active UNIQUE (product_id) WHERE status = 'active'
+  CONSTRAINT boms_unique_version_per_product UNIQUE (product_id, version)
 );
 ```
+
+**Column Naming Note:**
+- `version` is INTEGER (not VARCHAR/string) - types must use `number`
+- Use `yield_qty` and `yield_uom` for BOM output quantity
+
+All API routes and types must use these actual DB column names with correct types.
 
 #### bom_history
 
+**Purpose:** Audit trail for all BOM changes with structured change tracking.
+
 ```sql
 CREATE TABLE bom_history (
-  id SERIAL PRIMARY KEY,
-  bom_id INTEGER NOT NULL REFERENCES boms(id),
-  version VARCHAR(50) NOT NULL,
+  id BIGSERIAL PRIMARY KEY,
+  bom_id BIGINT NOT NULL REFERENCES boms(id) ON DELETE CASCADE,
   changed_by UUID REFERENCES users(id),
-  changed_at TIMESTAMPTZ DEFAULT NOW(),
-  status_from VARCHAR(20),
-  status_to VARCHAR(20),
-  changes JSONB NOT NULL,
-  description TEXT
+  change_type TEXT NOT NULL,  -- 'created', 'updated', 'status_changed', 'items_modified'
+  old_values JSONB,           -- Previous state snapshot
+  new_values JSONB,           -- New state with changes structure
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX idx_bom_history_bom_id ON bom_history(bom_id);
 ```
+
+**new_values Structure (when saving from UI):**
+
+```typescript
+interface BomHistoryNewValues {
+  version: string;           // e.g., "1.1"
+  status: string;            // e.g., "active"
+  description?: string;      // Human-readable change description
+  changes: {
+    bom?: Record<string, { old: any; new: any }>;     // BOM header field changes
+    product?: Record<string, { old: any; new: any }>; // Product field changes
+    items?: {
+      added: BomItemData[];
+      removed: BomItemData[];
+      modified: Array<{
+        material_id: number;
+        changes: Record<string, { old: any; new: any }>;
+      }>;
+    };
+  };
+}
+```
+
+**API Methods (BomHistoryAPI):**
+
+```typescript
+class BomHistoryAPI {
+  // Create history entry
+  static async create(data: {
+    bom_id: number;
+    change_type: string;
+    old_values?: object | null;
+    new_values?: object | null;
+  }): Promise<BomHistory>;
+
+  // Get history for specific BOM
+  static async getByBomId(bomId: number): Promise<BomHistory[]>;
+
+  // Get all history with pagination
+  static async getAll(options?: {
+    limit?: number;
+    offset?: number;
+    bom_id?: number;
+  }): Promise<BomHistory[]>;
+}
+```
+
+**Frontend Display Requirements:**
+
+The `BomHistoryModal` must parse `new_values` to extract:
+- `new_values.version` → Display version
+- `old_values.status` → Status from
+- `new_values.status` → Status to
+- `new_values.description` → Change description
+- `new_values.changes` → Detailed changes breakdown
+- `created_at` → Timestamp (NOT changed_at)
+
+**AI Agent Implementation Rules:**
+
+1. **ALWAYS save history** on any BOM modification (header, items, status)
+2. **ALWAYS include description** - human-readable summary of changes
+3. **ALWAYS track old_values** - enable diff view and rollback
+4. **ALWAYS use created_at** - not changed_at (field doesn't exist)
 
 #### routings
 
@@ -7245,87 +7536,128 @@ CREATE TABLE IF NOT EXISTS wo_costs (
 
 ```sql
 CREATE TABLE bom_items (
-  id SERIAL PRIMARY KEY,
-  bom_id INTEGER REFERENCES boms(id),
-  material_id INTEGER REFERENCES products(id),
-  uom VARCHAR(20) NOT NULL CHECK (uom IN ('KG', 'EACH', 'METER', 'LITER')),
-  quantity NUMERIC(12,4) NOT NULL,
-  production_line_restrictions TEXT[] DEFAULT '{}',
-  sequence INTEGER NOT NULL,
-  priority INTEGER,
+  id BIGSERIAL PRIMARY KEY,
+  bom_id BIGINT NOT NULL REFERENCES boms(id) ON DELETE CASCADE,
+  material_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  quantity DECIMAL(15,4) NOT NULL,
+  uom TEXT NOT NULL,
+  scrap_percent DECIMAL(5,2) DEFAULT 0,  -- Note: use scrap_percent, not scrap_std_pct
+  consume_whole_lp BOOLEAN DEFAULT false,
+  sequence INTEGER DEFAULT 0,
+  notes TEXT,
 
-  -- Costing
-  unit_cost_std NUMERIC(12,4),
-  scrap_std_pct NUMERIC(5,2) DEFAULT 0,
-
-  -- Flags
+  -- Flags (expanded)
   is_optional BOOLEAN DEFAULT false,
   is_phantom BOOLEAN DEFAULT false,
-  consume_whole_lp BOOLEAN DEFAULT false,
+  is_by_product BOOLEAN DEFAULT false,
 
-  -- Planning
+  -- Planning (expanded)
+  priority INTEGER,
   production_lines TEXT[],
-  tax_code_id INTEGER REFERENCES settings_tax_codes(id),
-  lead_time_days INTEGER CHECK (lead_time_days IS NULL OR lead_time_days > 0),
-  moq NUMERIC(12,4) CHECK (moq IS NULL OR moq > 0),
+  production_line_restrictions TEXT[] DEFAULT '{}',
+  tax_code_id BIGINT REFERENCES tax_codes(id),
+  lead_time_days INTEGER,
+  moq DECIMAL(12,4),
 
-  -- Packaging
-  packages_per_box NUMERIC(10,4) NOT NULL DEFAULT 1 CHECK (packages_per_box > 0),
+  -- Costing
+  unit_cost_std DECIMAL(12,4),
 
-  -- Line-specific materials
-  line_id INTEGER[],
-
-  -- Audit
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
+
+**Column Naming Note:**
+- `scrap_percent` (not `scrap_std_pct`) - types must use correct name
+- Use `notes` field for item-level comments
+
+All API routes and types must use these actual DB column names.
 
 #### license_plates
 
 ```sql
 CREATE TABLE license_plates (
-  id SERIAL PRIMARY KEY,
-  lp_number VARCHAR(50) UNIQUE NOT NULL,
-  product_id INTEGER REFERENCES products(id),
-  quantity NUMERIC(12,4) NOT NULL,
-  uom VARCHAR(20) NOT NULL CHECK (uom IN ('KG', 'EACH', 'METER', 'LITER')),
-  location_id INTEGER REFERENCES locations(id),
-  status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'reserved', 'consumed', 'in_transit', 'quarantine', 'damaged')),
-  qa_status VARCHAR(20) DEFAULT 'pending' CHECK (qa_status IN ('pending', 'passed', 'failed', 'on_hold')),
-  stage_suffix VARCHAR(10) CHECK (stage_suffix IS NULL OR stage_suffix ~ '^[A-Z]{2}$'),
-  batch_number VARCHAR(100),
-  lp_type VARCHAR(20) CHECK (lp_type IN ('PR', 'FG', 'PALLET')),
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  lp_number TEXT NOT NULL,  -- Note: Use lp_number, not lp_code
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,  -- Note: not item_id
+  quantity DECIMAL(15,4) NOT NULL,
+  uom TEXT NOT NULL,
+  status lp_status NOT NULL DEFAULT 'Available',
+  location_id BIGINT REFERENCES locations(id) ON DELETE SET NULL,
+  warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
 
-  -- Traceability
-  consumed_by_wo_id INTEGER REFERENCES work_orders(id),
+  -- Batch & Dates
+  batch_number TEXT,  -- Note: use batch_number, not batch
+  supplier_batch_number TEXT,
+  manufacture_date DATE,
+  expiry_date DATE,
+
+  -- QA (added for QA workflow)
+  qa_status VARCHAR(20) DEFAULT 'pending'
+    CHECK (qa_status IN ('pending', 'passed', 'failed', 'on_hold')),
+  stage_suffix VARCHAR(10)
+    CHECK (stage_suffix IS NULL OR stage_suffix ~ '^[A-Z]{2}$'),
+  lp_type VARCHAR(20)
+    CHECK (lp_type IN ('PR', 'FG', 'PALLET', 'RM', 'WIP')),
+
+  -- References
+  po_id BIGINT REFERENCES po_header(id) ON DELETE SET NULL,
+  po_number TEXT,
+  grn_id BIGINT REFERENCES grns(id) ON DELETE SET NULL,
+  wo_id BIGINT REFERENCES work_orders(id) ON DELETE SET NULL,
+
+  -- Traceability / Genealogy
+  parent_lp_id BIGINT REFERENCES license_plates(id) ON DELETE SET NULL,
+  parent_lp_number TEXT,  -- Denormalized for display
+  consumed_by_wo_id BIGINT REFERENCES work_orders(id) ON DELETE SET NULL,
   consumed_at TIMESTAMPTZ,
-  parent_lp_id INTEGER REFERENCES license_plates(id),
-  parent_lp_number VARCHAR(50),
-  origin_type VARCHAR(50),
+
+  -- Origin tracking
+  origin_type VARCHAR(50),  -- GRN, PRODUCTION, SPLIT, MANUAL
   origin_ref JSONB,
 
-  -- Metadata
-  created_by VARCHAR(50),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  -- Pallet reference
+  pallet_id BIGINT REFERENCES pallets(id) ON DELETE SET NULL,
+
+  -- Audit
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT license_plates_unique_number_per_org UNIQUE (org_id, lp_number)
 );
 ```
+
+**Column Naming Note:** DB column names differ from some legacy code:
+- `lp_number` (not `lp_code`)
+- `product_id` (not `item_id`)
+- `batch_number` (not `batch`)
+- IDs are numeric BIGINT (not strings)
+
+All API routes and types must use these actual DB column names with correct types.
 
 #### lp_reservations
 
 ```sql
 CREATE TABLE lp_reservations (
-  id SERIAL PRIMARY KEY,
-  lp_id INTEGER NOT NULL REFERENCES license_plates(id),
-  wo_id INTEGER NOT NULL REFERENCES work_orders(id),
-  qty NUMERIC(12,4) NOT NULL CHECK (qty > 0),
-  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'consumed', 'expired', 'cancelled')),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  expires_at TIMESTAMPTZ,
-  created_by VARCHAR(50)
+  id BIGSERIAL PRIMARY KEY,
+  lp_id BIGINT NOT NULL REFERENCES license_plates(id) ON DELETE CASCADE,
+  wo_id BIGINT REFERENCES work_orders(id) ON DELETE CASCADE,
+  to_id BIGINT REFERENCES to_header(id) ON DELETE CASCADE,
+  reserved_qty DECIMAL(15,4) NOT NULL,  -- Note: use reserved_qty, not qty
+  reserved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reserved_by UUID REFERENCES users(id),
+
+  CONSTRAINT lp_reservations_single_reference CHECK (
+    (wo_id IS NOT NULL AND to_id IS NULL) OR
+    (wo_id IS NULL AND to_id IS NOT NULL)
+  )
 );
 ```
+
+**Note:** Reservations can be for either WO or TO, but not both (enforced by CHECK constraint).
 
 #### machines
 
@@ -7378,35 +7710,32 @@ CREATE TABLE production_outputs (
 
 ```sql
 CREATE TABLE products (
-  id SERIAL PRIMARY KEY,
-  part_number VARCHAR(100) UNIQUE NOT NULL,
-  description TEXT NOT NULL,
-  type VARCHAR(10) NOT NULL CHECK (type IN ('RM', 'DG', 'PR', 'FG', 'WIP')),
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  sku TEXT NOT NULL,  -- Note: DB uses 'sku', not 'part_number'
+  name TEXT NOT NULL,
+  description TEXT,
+  product_type product_type NOT NULL DEFAULT 'Raw Material',
+  type VARCHAR(10) CHECK (type IN ('RM', 'DG', 'PR', 'FG', 'WIP')),
   subtype VARCHAR(100),
-  uom VARCHAR(20) NOT NULL,
-  expiry_policy VARCHAR(50) CHECK (expiry_policy IN ('DAYS_STATIC', 'FROM_MFG_DATE', 'FROM_DELIVERY_DATE', 'FROM_CREATION_DATE')),
-  shelf_life_days INTEGER,
-  production_lines TEXT[],
+  category VARCHAR(100),
+  uom TEXT NOT NULL DEFAULT 'kg',
   is_active BOOLEAN DEFAULT true,
 
-  -- App taxonomy (using ENUMs)
-  product_group product_group NOT NULL DEFAULT 'COMPOSITE',
-  product_type product_type NOT NULL DEFAULT 'FG',
-
   -- Planning & commercial
-  supplier_id INTEGER REFERENCES suppliers(id),
-  tax_code_id INTEGER REFERENCES settings_tax_codes(id),
-  lead_time_days INTEGER,
-  moq NUMERIC(12,4),
-  std_price NUMERIC(12,4),
+  supplier_id BIGINT REFERENCES suppliers(id) ON DELETE SET NULL,
+  lead_time_days INTEGER DEFAULT 0,
+  shelf_life_days INTEGER,
+  moq DECIMAL(12,4),
+  tax_code_id BIGINT REFERENCES tax_codes(id),
+  std_price DECIMAL(12,4),
+  expiry_policy VARCHAR(50) CHECK (expiry_policy IN ('DAYS_STATIC', 'FROM_MFG_DATE', 'FROM_DELIVERY_DATE', 'FROM_CREATION_DATE')),
+  rate DECIMAL(12,4),
 
-  -- Routing
+  -- Production
+  production_lines TEXT[],
+  default_routing_id BIGINT REFERENCES routings(id),
   requires_routing BOOLEAN DEFAULT false,
-  default_routing_id INTEGER,
-
-  -- Metadata
-  notes TEXT,
-  allergen_ids INTEGER[],
 
   -- Packaging
   boxes_per_pallet INTEGER,
@@ -7414,14 +7743,23 @@ CREATE TABLE products (
 
   -- Versioning
   product_version VARCHAR(20) DEFAULT '1.0',
+  notes TEXT,
 
   -- Audit
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_by UUID REFERENCES users(id),
-  updated_by UUID REFERENCES users(id)
+  updated_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT products_unique_sku_per_org UNIQUE (org_id, sku)
 );
 ```
+
+**Column Naming Note:**
+- `sku` (not `part_number`) - types and API must use `sku`
+- `name` is separate from `description`
+
+All API routes and types must use these actual DB column names.
 
 #### users
 

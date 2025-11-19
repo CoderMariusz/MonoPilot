@@ -98,90 +98,43 @@ development_status:
   # Story 0.12: Architecture.md Auto-Generation Setup (LOW)
   0-12-architecture-auto-generation-setup: done
 
+  # ========================================
+  # NEW STORIES from BOM Analysis (2025-11-19)
+  # Critical fixes for BOM edit and history functionality
+  # Reference: Architecture.md Pattern 22b
+  # ========================================
+
+  # Story 0.13: Add Missing BOM API GET Endpoints (CRITICAL - BOM edit broken)
+  0-13-add-bom-api-get-endpoints: review
+
+  # Story 0.14: Fix BOM History Display (CRITICAL - History not showing)
+  0-14-fix-bom-history-display: review
+
+  # ========================================
+  # NEW STORIES from PO Analysis (2025-11-19)
+  # Critical fixes for PO database/API/types alignment
+  # Reference: Architecture.md po_header/po_line sections
+  # ========================================
+
+  # Story 0.15: PO Database & API Alignment (CRITICAL - Data layer mismatch)
+  0-15-po-database-api-alignment: review
+
+  # Story 0.16: TO Database & API Alignment (CRITICAL - Data layer mismatch)
+  0-16-to-database-api-alignment: review
+
+  # Story 0.17: LP Database & API Alignment (CRITICAL - Data layer mismatch)
+  # Note: 13 SP. Missing QA fields, wrong types (string→number), wrong names (item_id→product_id)
+  0-17-lp-database-api-alignment: review
+
+  # Story 0.18: WO Database & API Alignment (CRITICAL - Data layer mismatch)
+  # Note: Wrong types (string→number), wrong names (quantity→planned_qty, due_date→scheduled_date)
+  0-18-wo-database-api-alignment: review
+
+  # Story 0.19: Products & BOMs Database & API Alignment (CRITICAL - LARGEST FIX)
+  # Note: 21 SP - sku vs part_number, version string→number, scrap_std_pct→scrap_percent, ~32 columns to add
+  0-19-products-boms-database-api-alignment: review
+
   epic-0-retrospective: done
-
-  # ========================================
-  # NPD MODULE EPICS (Premium Add-On - Separate Track)
-  # Runs in parallel with MonoPilot core development
-  # Duration: 4-6 weeks (7 epics, 47 stories)
-  # Reference: docs/NPD-Module-Epics.md
-  # ========================================
-
-  # Epic NPD-6: Database Schema & Infrastructure (FOUNDATION - MUST BE FIRST)
-  epic-npd-6: backlog
-  npd-6-1-create-core-npd-tables: done
-  npd-6-2-create-supporting-npd-tables: done
-  npd-6-3-implement-rls-policies: done
-  npd-6-4-modify-existing-tables-for-npd: done
-  npd-6-5-create-temporal-versioning-constraints: done
-  npd-6-6-setup-edge-functions-cicd: done
-  epic-npd-6-retrospective: done
-
-  # Epic NPD-1: Core NPD Project Management
-  epic-npd-1: backlog
-  npd-1-1-npdprojectsapi-crud-operations: done
-  npd-1-2-stage-gate-workflow-logic: done
-  npd-1-3-npd-dashboard-kanban-board-ui: in-progress
-  npd-1-4-gate-checklists-management: backlog
-  npd-1-5-approval-workflow-integration: backlog
-  npd-1-6-timeline-view-csv-export: backlog
-  npd-1-7-rbac-implementation: backlog
-  npd-1-8-notifications-architecture-implementation: backlog
-  npd-1-9-project-detail-page-navigation: backlog
-  npd-1-10-e2e-tests-for-core-project-management: backlog
-  epic-npd-1-retrospective: optional
-
-  # Epic NPD-2: Formulation Versioning & Management
-  epic-npd-2: backlog
-  npd-2-1-formulationsapi-crud-versioning-logic: backlog
-  npd-2-2-formulation-items-management: backlog
-  npd-2-3-allergen-auto-aggregation: backlog
-  npd-2-4-effective-date-management-overlap-detection: backlog
-  npd-2-5-version-locking-immutability: backlog
-  npd-2-6-formulation-lineage-tracking: backlog
-  npd-2-7-version-comparison-ui: backlog
-  npd-2-8-clone-formulation-feature: backlog
-  npd-2-9-formulation-spreadsheet-editor-ui: backlog
-  epic-npd-2-retrospective: optional
-
-  # Epic NPD-3: Handoff Wizard (NPD → Production)
-  epic-npd-3: backlog
-  npd-3-1-handoff-wizard-step-1-validation-checklist: backlog
-  npd-3-2-handoff-wizard-step-2-product-decision: backlog
-  npd-3-3-handoff-wizard-step-3-bom-transfer-logic: backlog
-  npd-3-4-handoff-wizard-step-4-pilot-wo-creation: backlog
-  npd-3-5-handoff-wizard-step-5-execute-transactionally: backlog
-  npd-3-6-event-sourcing-implementation: backlog
-  npd-3-7-npd-only-mode-excel-pdf-export: backlog
-  npd-3-8-handoff-wizard-ui-5-step-stepper: backlog
-  epic-npd-3-retrospective: optional
-
-  # Epic NPD-4: Risk Management
-  epic-npd-4: backlog
-  npd-4-1-risksapi-crud-operations: backlog
-  npd-4-2-risk-score-calculation: backlog
-  npd-4-3-mitigation-tracking-status-workflow: backlog
-  npd-4-4-risk-matrix-ui: backlog
-  epic-npd-4-retrospective: optional
-
-  # Epic NPD-5: Costing & Compliance
-  epic-npd-5: backlog
-  npd-5-1-costingapi-target-estimated-actual-cost-management: backlog
-  npd-5-2-cost-variance-calculation-alerts: backlog
-  npd-5-3-finance-approval-workflow-for-standard-cost: backlog
-  npd-5-4-document-upload-supabase-storage-integration: backlog
-  npd-5-5-document-metadata-tracking-history: backlog
-  npd-5-6-compliance-checklist-validation: backlog
-  epic-npd-5-retrospective: optional
-
-  # Epic NPD-7: E2E Testing & Documentation
-  epic-npd-7: backlog
-  npd-7-1-e2e-test-suite-full-npd-flow: backlog
-  npd-7-2-e2e-test-suite-dual-mode-scenarios: backlog
-  npd-7-3-performance-testing: backlog
-  npd-7-4-api-documentation-generation: backlog
-  npd-7-5-user-guide-release-notes: backlog
-  epic-npd-7-retrospective: optional
 
   # ========================================
   # PHASE 1: Compliance & Audit Foundation (0-3 Months)
@@ -302,6 +255,90 @@ development_status:
   epic-2-7: backlog
   2-7-notification-system: backlog
   epic-2-7-retrospective: optional
+
+  # ========================================
+  # NPD MODULE EPICS (Phase 2 - DEFERRED from MVP)
+  # Priority: P2 (Medium - Premium Add-On)
+  # Duration: 4-6 weeks (7 epics, 47 stories)
+  # Reference: docs/NPD-Module-Epics.md
+  # Note: Moved from parallel track to Phase 2 - focus on MVP first
+  # ========================================
+
+  # Epic NPD-6: Database Schema & Infrastructure (FOUNDATION - MUST BE FIRST)
+  epic-npd-6: backlog
+  npd-6-1-create-core-npd-tables: done
+  npd-6-2-create-supporting-npd-tables: done
+  npd-6-3-implement-rls-policies: done
+  npd-6-4-modify-existing-tables-for-npd: done
+  npd-6-5-create-temporal-versioning-constraints: done
+  npd-6-6-setup-edge-functions-cicd: done
+  epic-npd-6-retrospective: done
+
+  # Epic NPD-1: Core NPD Project Management
+  epic-npd-1: backlog
+  npd-1-1-npdprojectsapi-crud-operations: done
+  npd-1-2-stage-gate-workflow-logic: done
+  npd-1-3-npd-dashboard-kanban-board-ui: deferred  # Was in-progress, deferred for MVP focus
+  npd-1-4-gate-checklists-management: backlog
+  npd-1-5-approval-workflow-integration: backlog
+  npd-1-6-timeline-view-csv-export: backlog
+  npd-1-7-rbac-implementation: backlog
+  npd-1-8-notifications-architecture-implementation: backlog
+  npd-1-9-project-detail-page-navigation: backlog
+  npd-1-10-e2e-tests-for-core-project-management: backlog
+  epic-npd-1-retrospective: optional
+
+  # Epic NPD-2: Formulation Versioning & Management
+  epic-npd-2: backlog
+  npd-2-1-formulationsapi-crud-versioning-logic: backlog
+  npd-2-2-formulation-items-management: backlog
+  npd-2-3-allergen-auto-aggregation: backlog
+  npd-2-4-effective-date-management-overlap-detection: backlog
+  npd-2-5-version-locking-immutability: backlog
+  npd-2-6-formulation-lineage-tracking: backlog
+  npd-2-7-version-comparison-ui: backlog
+  npd-2-8-clone-formulation-feature: backlog
+  npd-2-9-formulation-spreadsheet-editor-ui: backlog
+  epic-npd-2-retrospective: optional
+
+  # Epic NPD-3: Handoff Wizard (NPD → Production)
+  epic-npd-3: backlog
+  npd-3-1-handoff-wizard-step-1-validation-checklist: backlog
+  npd-3-2-handoff-wizard-step-2-product-decision: backlog
+  npd-3-3-handoff-wizard-step-3-bom-transfer-logic: backlog
+  npd-3-4-handoff-wizard-step-4-pilot-wo-creation: backlog
+  npd-3-5-handoff-wizard-step-5-execute-transactionally: backlog
+  npd-3-6-event-sourcing-implementation: backlog
+  npd-3-7-npd-only-mode-excel-pdf-export: backlog
+  npd-3-8-handoff-wizard-ui-5-step-stepper: backlog
+  epic-npd-3-retrospective: optional
+
+  # Epic NPD-4: Risk Management
+  epic-npd-4: backlog
+  npd-4-1-risksapi-crud-operations: backlog
+  npd-4-2-risk-score-calculation: backlog
+  npd-4-3-mitigation-tracking-status-workflow: backlog
+  npd-4-4-risk-matrix-ui: backlog
+  epic-npd-4-retrospective: optional
+
+  # Epic NPD-5: Costing & Compliance
+  epic-npd-5: backlog
+  npd-5-1-costingapi-target-estimated-actual-cost-management: backlog
+  npd-5-2-cost-variance-calculation-alerts: backlog
+  npd-5-3-finance-approval-workflow-for-standard-cost: backlog
+  npd-5-4-document-upload-supabase-storage-integration: backlog
+  npd-5-5-document-metadata-tracking-history: backlog
+  npd-5-6-compliance-checklist-validation: backlog
+  epic-npd-5-retrospective: optional
+
+  # Epic NPD-7: E2E Testing & Documentation
+  epic-npd-7: backlog
+  npd-7-1-e2e-test-suite-full-npd-flow: backlog
+  npd-7-2-e2e-test-suite-dual-mode-scenarios: backlog
+  npd-7-3-performance-testing: backlog
+  npd-7-4-api-documentation-generation: backlog
+  npd-7-5-user-guide-release-notes: backlog
+  epic-npd-7-retrospective: optional
 
   # ========================================
   # PHASE 3: IoT & Integration (6-12 Months)

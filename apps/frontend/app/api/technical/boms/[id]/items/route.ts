@@ -1,6 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase/server';
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const bomId = parseInt(id);
+
+    if (isNaN(bomId)) {
+      return NextResponse.json({ error: 'Invalid BOM ID' }, { status: 400 });
+    }
+
+    const { data: items, error } = await supabase
+      .from('bom_items')
+      .select(`
+        *,
+        material:products!bom_items_material_id_fkey(
+          id, part_number, description, uom, is_active
+        )
+      `)
+      .eq('bom_id', bomId)
+      .order('sequence');
+
+    if (error) {
+      console.error('Failed to fetch BOM items:', error);
+      return NextResponse.json({ error: 'Failed to fetch BOM items' }, { status: 500 });
+    }
+
+    return NextResponse.json(items || []);
+
+  } catch (error) {
+    console.error('BOM items GET error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

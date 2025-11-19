@@ -60,7 +60,16 @@ export function BomHistoryModal({ isOpen, onClose, bomId }: BomHistoryModalProps
             </div>
           ) : (
             <div className="space-y-4">
-              {history.map((entry) => (
+              {history.map((entry) => {
+                // Parse values from JSONB fields
+                const version = entry.new_values?.version || entry.old_values?.version || 'N/A';
+                const statusFrom = entry.old_values?.status || '';
+                const statusTo = entry.new_values?.status || '';
+                const description = entry.new_values?.description || '';
+                const changes = entry.new_values?.changes || {};
+                const timestamp = entry.created_at; // NOT changed_at
+
+                return (
                 <div
                   key={entry.id}
                   className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer"
@@ -69,16 +78,21 @@ export function BomHistoryModal({ isOpen, onClose, bomId }: BomHistoryModalProps
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium text-slate-900">
-                        Version {entry.version}
+                        Version {version}
                       </span>
-                      {entry.status_from && entry.status_to && (
+                      {statusFrom && statusTo && (
                         <span className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700">
-                          {entry.status_from} → {entry.status_to}
+                          {statusFrom} → {statusTo}
+                        </span>
+                      )}
+                      {!statusFrom && !statusTo && entry.change_type && (
+                        <span className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700">
+                          {entry.change_type}
                         </span>
                       )}
                     </div>
                     <div className="text-xs text-slate-500 flex flex-col items-end gap-1">
-                      <div>{new Date(entry.changed_at).toLocaleString()}</div>
+                      <div>{new Date(timestamp).toLocaleString()}</div>
                       {entry.changed_by_user?.email && (
                         <div className="text-slate-600">
                           by {entry.changed_by_user.email}
@@ -92,19 +106,19 @@ export function BomHistoryModal({ isOpen, onClose, bomId }: BomHistoryModalProps
                       )}
                     </div>
                   </div>
-                  
-                  {entry.description && (
-                    <p className="text-sm text-slate-600 mb-2">{entry.description}</p>
+
+                  {description && (
+                    <p className="text-sm text-slate-600 mb-2">{description}</p>
                   )}
 
                   {selectedEntry?.id === entry.id && (
                     <div className="mt-4 pt-4 border-t border-slate-200">
                       <div className="space-y-3">
-                        {Object.keys(entry.changes.bom || {}).length > 0 && (
+                        {changes.bom && Object.keys(changes.bom || {}).length > 0 && (
                           <div>
                             <h4 className="text-sm font-medium text-slate-900 mb-2">BOM Header Changes:</h4>
                             <div className="bg-slate-50 rounded p-3 space-y-2">
-                              {Object.entries(entry.changes.bom || {}).map(([field, change]: [string, any]) => {
+                              {Object.entries(changes.bom || {}).map(([field, change]: [string, any]) => {
                                 // Format field name for display
                                 let fieldDisplay = field;
                                 if (field === 'status') fieldDisplay = 'Status';
@@ -144,11 +158,11 @@ export function BomHistoryModal({ isOpen, onClose, bomId }: BomHistoryModalProps
                           </div>
                         )}
 
-                        {Object.keys(entry.changes.product || {}).length > 0 && (
+                        {changes.product && Object.keys(changes.product || {}).length > 0 && (
                           <div>
                             <h4 className="text-sm font-medium text-slate-900 mb-2">Product Changes:</h4>
                             <div className="bg-slate-50 rounded p-3 space-y-2">
-                              {Object.entries(entry.changes.product || {}).map(([field, change]: [string, any]) => {
+                              {Object.entries(changes.product || {}).map(([field, change]: [string, any]) => {
                                 let fieldDisplay = field;
                                 if (field === 'description') fieldDisplay = 'Description';
                                 else if (field === 'std_price') fieldDisplay = 'Std Price';
@@ -180,15 +194,15 @@ export function BomHistoryModal({ isOpen, onClose, bomId }: BomHistoryModalProps
                           </div>
                         )}
 
-                        {entry.changes.items && (
+                        {changes.items && (
                           <div>
                             <h4 className="text-sm font-medium text-slate-900 mb-2">Items Changes:</h4>
                             <div className="space-y-2">
-                              {entry.changes.items.added && entry.changes.items.added.length > 0 && (
+                              {changes.items.added && changes.items.added.length > 0 && (
                                 <div>
-                                  <span className="text-xs font-medium text-green-700">Added ({entry.changes.items.added.length}):</span>
+                                  <span className="text-xs font-medium text-green-700">Added ({changes.items.added.length}):</span>
                                   <div className="bg-green-50 rounded p-2 mt-1">
-                                    {entry.changes.items.added.map((item: any, idx: number) => (
+                                    {changes.items.added.map((item: any, idx: number) => (
                                       <div key={idx} className="text-xs text-slate-700">
                                         Material ID {item.material_id}: {item.quantity} {item.uom}
                                       </div>
@@ -197,11 +211,11 @@ export function BomHistoryModal({ isOpen, onClose, bomId }: BomHistoryModalProps
                                 </div>
                               )}
 
-                              {entry.changes.items.removed && entry.changes.items.removed.length > 0 && (
+                              {changes.items.removed && changes.items.removed.length > 0 && (
                                 <div>
-                                  <span className="text-xs font-medium text-red-700">Removed ({entry.changes.items.removed.length}):</span>
+                                  <span className="text-xs font-medium text-red-700">Removed ({changes.items.removed.length}):</span>
                                   <div className="bg-red-50 rounded p-2 mt-1">
-                                    {entry.changes.items.removed.map((item: any, idx: number) => (
+                                    {changes.items.removed.map((item: any, idx: number) => (
                                       <div key={idx} className="text-xs text-slate-700">
                                         Material ID {item.material_id}: {item.quantity}
                                       </div>
@@ -210,11 +224,11 @@ export function BomHistoryModal({ isOpen, onClose, bomId }: BomHistoryModalProps
                                 </div>
                               )}
 
-                              {entry.changes.items.modified && entry.changes.items.modified.length > 0 && (
+                              {changes.items.modified && changes.items.modified.length > 0 && (
                                 <div>
-                                  <span className="text-xs font-medium text-blue-700">Modified ({entry.changes.items.modified.length}):</span>
+                                  <span className="text-xs font-medium text-blue-700">Modified ({changes.items.modified.length}):</span>
                                   <div className="bg-blue-50 rounded p-2 mt-1 space-y-2">
-                                    {entry.changes.items.modified.map((item: any, idx: number) => (
+                                    {changes.items.modified.map((item: any, idx: number) => (
                                       <div key={idx} className="text-xs">
                                         <div className="font-medium text-slate-900">Material ID {item.material_id}:</div>
                                         {Object.entries(item.changes || {}).map(([field, change]: [string, any]) => (
@@ -237,7 +251,8 @@ export function BomHistoryModal({ isOpen, onClose, bomId }: BomHistoryModalProps
                     </div>
                   )}
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>

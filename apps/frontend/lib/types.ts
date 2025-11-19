@@ -82,37 +82,52 @@ export type UserRole =
 export type UserStatus = 'active' | 'inactive' | 'suspended';
 
 export interface WorkOrder {
-  id: string;
+  id: number;  // Fix: was string
+  org_id?: number;
   wo_number: string;
-  product_id: string;
-  quantity: number;
+  product_id: number;  // Fix: was string
+  bom_id?: number | null;  // Fix: was string | number
+  routing_id?: number | null;
+  warehouse_id: number;
+  production_line_id?: number | null;  // Match DB: was line_id
   status: WorkOrderStatus;
-  due_date: string;
-  scheduled_start?: string;
-  scheduled_end?: string;
-  actual_start?: string;
-  actual_end?: string;
-  source_demand_type?: string; // 'Manual' | 'TO' | 'PO' | 'SO'
-  source_demand_id?: number;
-  bom_id?: string | number;
-  created_by?: string;
-  machine_id?: string;
-  machine?: any;
-  product?: any;
-  bom?: {
-    id: number;
-    version: number;
-    status: string;
-  };
-  line_number?: string;
-  // EPIC-001 Phase 3: Conditional Components
-  order_flags?: string[]; // e.g., ['organic', 'gluten_free', 'vegan']
-  customer_id?: number;
-  order_type?: string; // e.g., 'standard', 'export', 'premium'
-  line_id?: number; // Production line FK
-  priority?: number;
+
+  // Quantities
+  planned_qty: number;  // Match DB: was quantity
+  completed_qty: number;
+  uom: string;
+
+  // Dates
+  scheduled_date?: string | null;  // Match DB: was due_date
+  start_date?: string | null;  // Match DB: was scheduled_start
+  end_date?: string | null;  // Match DB: was scheduled_end
+
+  // Planning
+  priority: number;
+  machine_id?: number | null;  // Fix: was string
+
+  // Demand tracking
+  source_demand_type?: string | null;
+  source_demand_id?: number | null;
+
+  // Notes
+  notes?: string | null;
+
+  // Audit
+  created_by?: string | null;
+  updated_by?: string | null;
+  approved_by?: string | null;
   created_at: string;
   updated_at: string;
+
+  // Relationships (computed)
+  product?: Product;
+  bom?: Bom;
+  machine?: Machine;
+  production_line?: ProductionLine;
+  wo_materials?: WOMaterial[];
+  wo_operations?: WOOperation[];
+  wo_by_products?: WOByProduct[];
 }
 
 export type CreateWorkOrderData = Omit<WorkOrder, 'id'>;
@@ -143,30 +158,54 @@ export interface WOByProduct {
 }
 
 export interface LicensePlate {
-  id: string;
-  lp_code: string;
-  lp_number?: string;
-  item_id: string;
-  product_id?: string;
-  product?: any;
+  id: number;  // Fixed: was string
+  org_id?: number;
+  lp_number: string;  // Fixed: was optional, removed lp_code
+  product_id: number;  // Fixed: was item_id and string
   quantity: number;
-  uom?: UoM;
-  location_id?: string;
-  location?: any;
+  uom: string;  // Fixed: was optional UoM
   status: LicensePlateStatus;
-  qa_status?: QAStatus;
-  stage_suffix?: string;
-  origin_type?: string;
-  origin_ref?: any;
-  parent_lp_id?: string | number | null;
-  parent_lp_number?: string | null;
-  batch?: string | null;
+  location_id?: number | null;  // Fixed: was string
+  warehouse_id: number;  // Added: was missing
+
+  // Batch & Dates
+  batch_number?: string | null;  // Fixed: was batch
+  supplier_batch_number?: string | null;  // Added: was missing
+  manufacture_date?: string | null;  // Added: was missing
   expiry_date?: string | null;
-  is_consumed?: boolean;
-  pallet_code?: string | null;
-  grn_id?: number;
+
+  // QA
+  qa_status?: QAStatus;
+  stage_suffix?: string | null;
+  lp_type?: 'PR' | 'FG' | 'PALLET' | 'RM' | 'WIP';
+
+  // Traceability
+  po_id?: number | null;  // Added: was missing
+  po_number?: string | null;  // Added: was missing
+  grn_id?: number | null;
+  wo_id?: number | null;  // Added: was missing
+  parent_lp_id?: number | null;  // Fixed: was string | number
+  parent_lp_number?: string | null;
+  consumed_by_wo_id?: number | null;  // Added: was missing
+  consumed_at?: string | null;
+
+  // Origin
+  origin_type?: 'GRN' | 'PRODUCTION' | 'SPLIT' | 'MANUAL';
+  origin_ref?: Record<string, any>;
+
+  // Pallet
+  pallet_id?: number | null;  // Fixed: was pallet_code
+
+  // Audit
+  created_by?: string | null;
+  updated_by?: string | null;
   created_at: string;
   updated_at: string;
+
+  // Relationships (computed)
+  product?: Product;
+  location?: Location;
+  warehouse?: Warehouse;
 }
 
 /**
@@ -484,13 +523,15 @@ export type TOStatus =
 // PO Header (replacing PurchaseOrder)
 export interface POHeader {
   id: number;
-  number: string;
+  org_id?: number;
+  po_number: string;  // Match DB: was 'number'
   supplier_id: number;
   warehouse_id?: number;
   status: POStatus;
   currency: string;
   exchange_rate?: number;
   order_date: string;
+  expected_date?: string;
   requested_delivery_date?: string;
   promised_delivery_date?: string;
   payment_due_date?: string;
@@ -501,10 +542,12 @@ export interface POHeader {
   net_total?: number;
   vat_total?: number;
   gross_total?: number;
+  notes?: string;
   created_by?: string;
+  updated_by?: string;
   approved_by?: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   // Relationships
   supplier?: Supplier;
   warehouse?: Warehouse;
@@ -516,19 +559,20 @@ export interface POHeader {
 export interface POLine {
   id: number;
   po_id: number;
-  line_no: number;
-  item_id: number;
-  uom: UoM;
-  qty_ordered: number;
-  qty_received: number;
+  line_number: number;  // Match DB: was 'line_no'
+  product_id: number;   // Match DB: was 'item_id'
+  uom: string;
+  quantity: number;     // Match DB: was 'qty_ordered'
+  received_qty: number; // Match DB: was 'qty_received'
   unit_price: number;
-  vat_rate: number;
+  vat_rate?: number;
+  tax_code_id?: number;
   requested_delivery_date?: string;
   promised_delivery_date?: string;
   default_location_id?: number;
-  note?: string;
-  created_at: string;
-  updated_at: string;
+  notes?: string;       // Match DB: was 'note'
+  created_at?: string;
+  updated_at?: string;
   // Relationships
   item?: Product;
   default_location?: Location;
@@ -551,10 +595,12 @@ export interface POCorrection {
 // TO Header (replacing TransferOrder)
 export interface TOHeader {
   id: number;
-  number: string;
+  org_id?: number;
+  to_number: string;  // Match DB: was 'number'
   status: TOStatus;
-  from_wh_id: number;
-  to_wh_id: number;
+  from_warehouse_id: number;  // Match DB: was 'from_wh_id'
+  to_warehouse_id: number;    // Match DB: was 'to_wh_id'
+  scheduled_date?: string | null;
   transfer_date?: string | null;
   requested_date?: string | null;
   planned_ship_date?: string | null;
@@ -565,8 +611,8 @@ export interface TOHeader {
   created_by?: string | null;
   updated_by?: string | null;
   approved_by?: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   // Relationships
   from_warehouse?: Warehouse;
   to_warehouse?: Warehouse;
@@ -577,19 +623,25 @@ export interface TOHeader {
 export interface TOLine {
   id: number;
   to_id: number;
-  line_no: number;
-  item_id: number;
-  uom: UoM;
-  qty_planned: number;
+  line_number: number;      // Match DB: was 'line_no'
+  product_id: number;       // Match DB: was 'item_id'
+  uom: string;
+  quantity: number;         // Match DB: was 'qty_planned'
   qty_shipped: number;
-  qty_received: number;
+  transferred_qty: number;  // Match DB: was 'qty_received'
   lp_id?: number | null;
   batch?: string | null;
+  from_location_id?: number | null;
+  to_location_id?: number | null;
+  scan_required?: boolean;
   notes?: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   // Relationships
-  item?: Product;
+  product?: Product;
+  from_location?: Location;
+  to_location?: Location;
+  license_plate?: LicensePlate;
 }
 
 // Audit Log (enhanced audit_events)
@@ -771,34 +823,36 @@ export function requiresExpiryDate(productType: ProductType): boolean {
 // Enhanced Product interface
 export interface Product {
   id: number;
-  part_number: string;
-  description: string;
-  type: 'RM' | 'DG' | 'PR' | 'FG' | 'WIP'; // DB required field
-  group: ProductGroup;
-  product_group?: ProductGroup; // keep optional for backward compatibility in UI
+  org_id?: number;
+  sku: string;  // Match DB: was 'part_number'
+  name: string;  // Match DB: was missing
+  description?: string;
   product_type: ProductType;
+  type?: 'RM' | 'DG' | 'PR' | 'FG' | 'WIP';
   subtype?: string;
   category?: string;
-  uom: UoM;
+  uom: string;
   is_active: boolean;
   supplier_id?: number;
   lead_time_days?: number;
+  shelf_life_days?: number;
   moq?: number;
   tax_code_id?: number;
   std_price?: number;
-  shelf_life_days?: number;
   expiry_policy?: string;
   rate?: number;
   production_lines?: string[];
   default_routing_id?: number | null;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-  updated_by?: string;
+  requires_routing?: boolean;
   boxes_per_pallet?: number;
   packs_per_box?: number;
-  // Remove: category (migrated to group/product_type)
-  // Enhanced relationships
+  product_version?: string;
+  notes?: string;
+  created_by?: string;
+  updated_by?: string;
+  created_at: string;
+  updated_at: string;
+  // Relationships
   activeBom?: Bom;
   allergens?: ProductAllergen[];
 }
@@ -1054,15 +1108,20 @@ export interface YieldReport {
 // Enhanced BOM interfaces
 export interface Bom {
   id: number;
+  org_id?: number;
   product_id: number;
-  version: string;
+  name?: string;
+  version: number; // DB uses INTEGER not VARCHAR
   status: 'draft' | 'active' | 'archived';
   is_active: boolean;
   effective_from?: string;
   effective_to?: string;
+  yield_qty?: number;
+  yield_uom?: string;
   requires_routing: boolean;
   default_routing_id?: number;
   line_id?: number[] | null; // Array of production line IDs
+  boxes_per_pallet?: number;
   notes?: string;
   archived_at?: string | null;
   deleted_at?: string | null;
@@ -1105,7 +1164,7 @@ export interface BomItem {
   priority?: number;
   production_lines?: string[];
   production_line_restrictions?: string[];
-  scrap_std_pct?: number;
+  scrap_percent?: number; // DB uses scrap_percent not scrap_std_pct
   is_optional: boolean;
   is_phantom: boolean;
   consume_whole_lp: boolean; // renamed from one_to_one
@@ -1113,6 +1172,7 @@ export interface BomItem {
   tax_code_id?: number | null;
   lead_time_days?: number | null;
   moq?: number | null;
+  notes?: string;
   // EPIC-001 Phase 1: By-Products Support
   is_by_product?: boolean;
   // EPIC-001 Phase 3: Conditional Components

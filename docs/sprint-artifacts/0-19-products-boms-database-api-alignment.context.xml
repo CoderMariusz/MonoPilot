@@ -1,0 +1,97 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>19</storyId>
+    <title>Products &amp; BOMs Database &amp; API Alignment</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-19</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-19-products-boms-database-api-alignment.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer maintaining MonoPilot</asA>
+    <iWant>Products and BOMs database schema, API routes, and types to be aligned</iWant>
+    <soThat>Technical module CRUD operations work correctly without data loss</soThat>
+    <tasks>
+      <task n="1">Create migration 090_products_boms_schema_alignment.sql with ~32 missing columns</task>
+      <task n="2">Fix field names: sku not part_number, version number not string, scrap_percent not scrap_std_pct</task>
+      <task n="3">Update Product, Bom, BomItem interfaces in lib/types.ts</task>
+      <task n="4">Update ProductsAPI and BomsAPI field mappings</task>
+      <task n="5">Backfill computed fields for existing records</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="AC1" title="Database Migration">Add ~32 columns across products, boms, bom_items tables</ac>
+    <ac id="AC2" title="TypeScript Type Alignment">Product: sku not part_number; Bom: version INTEGER; BomItem: scrap_percent not scrap_std_pct</ac>
+    <ac id="AC3" title="API Route Alignment">All API routes in /api/technical use correct column names</ac>
+    <ac id="AC4" title="BOM Lifecycle">Version management, status transitions work correctly</ac>
+    <ac id="AC5" title="Backward Compatibility">Existing product and BOM records remain valid</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>MonoPilot Architecture</title>
+        <section>products (7709-7762), boms (6929-6968), bom_items (7535-7574)</section>
+        <snippet>Products use sku not part_number. BOMs use INTEGER version not VARCHAR. BOM items use scrap_percent not scrap_std_pct. ~32 columns to add.</snippet>
+      </doc>
+      <doc>
+        <path>docs/archive/modules/technical/BOM_ARCHITECTURE.md</path>
+        <title>BOM Architecture</title>
+        <section>Database Schema</section>
+        <snippet>Complete BOM schema with lifecycle management, versioning rules, clone-on-edit pattern</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>apps/frontend/app/api/technical/products/route.ts</path>
+        <kind>API Route</kind>
+        <symbol>GET, POST</symbol>
+        <reason>Use sku column name, add all missing product fields</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/types.ts</path>
+        <kind>Type Definitions</kind>
+        <symbol>Product, Bom, BomItem</symbol>
+        <reason>LARGEST UPDATE: fix field names, add missing fields, correct types</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/api/products.ts</path>
+        <kind>API Class</kind>
+        <symbol>ProductsAPI</symbol>
+        <reason>Update field mappings for sku and all product operations</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/api/boms.ts</path>
+        <kind>API Class</kind>
+        <symbol>BomsAPI</symbol>
+        <reason>Ensure version is handled as INTEGER, scrap_percent naming</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node><package>@supabase/supabase-js</package><version>^2.75.0</version></node>
+      <node><package>typescript</package><version>^5.7.2</version></node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="scope">LARGEST FIX - 21 SP, ~32 columns across 3 tables</constraint>
+    <constraint type="naming">Products: sku not part_number; BOMs: version INTEGER; BOM items: scrap_percent</constraint>
+    <constraint type="migration">Preserve existing data, backfill computed fields</constraint>
+  </constraints>
+
+  <tests>
+    <standards>Manual testing for all Technical module operations, type-check critical</standards>
+    <locations><location>apps/frontend/e2e/**/*.spec.ts</location></locations>
+    <ideas>
+      <idea acRef="AC1">Test migration adds all 32 columns without errors</idea>
+      <idea acRef="AC2">Test Product type uses sku field</idea>
+      <idea acRef="AC2">Test Bom version is INTEGER not string</idea>
+      <idea acRef="AC3">Test ProductsAPI.getAll() returns sku field</idea>
+      <idea acRef="AC4">Test BOM activation archives previous active version</idea>
+    </ideas>
+  </tests>
+</story-context>

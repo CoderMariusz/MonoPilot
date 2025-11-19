@@ -235,7 +235,7 @@ export class LicensePlatesAPI {
       if (!parentLP) throw new Error('Parent LP not found');
 
       // 2. Validate parent LP
-      if (parentLP.is_consumed) {
+      if (parentLP.consumed_by_wo_id) {
         throw new Error('Cannot split consumed LP');
       }
 
@@ -273,15 +273,16 @@ export class LicensePlatesAPI {
         lp_number: `LP-${year}-${(nextSequence + index).toString().padStart(6, '0')}`,
         product_id: parentLP.product_id,
         location_id: parentLP.location_id,
+        warehouse_id: parentLP.warehouse_id,
         quantity: child.quantity,
         uom: child.uom || parentLP.uom,
-        batch: parentLP.batch, // Inherit batch
+        batch_number: parentLP.batch_number, // Inherit batch
         expiry_date: parentLP.expiry_date, // Inherit expiry
         qa_status: parentLP.qa_status, // Inherit QA status
         stage_suffix: parentLP.stage_suffix,
         parent_lp_id: lpId, // Set parent reference
-        is_consumed: false,
-        origin_type: 'split',
+        parent_lp_number: parentLP.lp_number, // Denormalized for display
+        origin_type: 'SPLIT',
         origin_ref: { parent_lp_id: lpId, split_date: new Date().toISOString() }
       }));
 
@@ -318,9 +319,8 @@ export class LicensePlatesAPI {
         const { error: updateError } = await supabase
           .from('license_plates')
           .update({
-            is_consumed: true,
             consumed_at: new Date().toISOString(),
-            consumed_by: userId
+            status: 'consumed'
           })
           .eq('id', lpId);
 
@@ -338,7 +338,7 @@ export class LicensePlatesAPI {
           lp_number: child.lp_number,
           quantity: parseFloat(child.quantity),
           uom: child.uom,
-          batch: child.batch,
+          batch: child.batch_number,
           expiry_date: child.expiry_date
         }))
       };
@@ -398,10 +398,10 @@ export class LicensePlatesAPI {
       const firstLP = inputLPs[0];
       const invalidLP = inputLPs.find(lp =>
         lp.product_id !== firstLP.product_id ||
-        lp.batch !== firstLP.batch ||
+        lp.batch_number !== firstLP.batch_number ||
         lp.expiry_date !== firstLP.expiry_date ||
         lp.qa_status !== firstLP.qa_status ||
-        lp.is_consumed === true
+        lp.consumed_by_wo_id !== null
       );
 
       if (invalidLP) {
@@ -437,14 +437,14 @@ export class LicensePlatesAPI {
           lp_number: outputLpNumber,
           product_id: outputData.product_id,
           location_id: outputData.location_id,
+          warehouse_id: firstLP.warehouse_id,
           quantity: outputData.quantity,
           uom: outputData.uom,
-          batch: outputData.batch || firstLP.batch,
+          batch_number: outputData.batch || firstLP.batch_number,
           expiry_date: outputData.expiry_date || firstLP.expiry_date,
           qa_status: outputData.qa_status || firstLP.qa_status,
           stage_suffix: outputData.stage_suffix || firstLP.stage_suffix,
-          is_consumed: false,
-          origin_type: 'merge',
+          origin_type: 'MERGE',
           origin_ref: { input_lp_ids: inputLpIds, merge_date: new Date().toISOString() }
         })
         .select()
@@ -475,9 +475,8 @@ export class LicensePlatesAPI {
       const { error: consumeError } = await supabase
         .from('license_plates')
         .update({
-          is_consumed: true,
           consumed_at: new Date().toISOString(),
-          consumed_by: userId
+          status: 'consumed'
         })
         .in('id', inputLpIds);
 
@@ -813,15 +812,16 @@ export class LicensePlatesAPI {
           quantity: data.quantity,
           uom: data.uom,
           location_id: data.location_id,
+          warehouse_id: data.warehouse_id,
           status: data.status,
           qa_status: data.qa_status || 'pending',
           batch_number: data.batch_number,
+          supplier_batch_number: data.supplier_batch_number,
           expiry_date: data.expiry_date,
           origin_type: 'GRN',
           origin_ref: {
             grn_id: data.grn_id,
             po_number: data.po_number,
-            supplier_batch_number: data.supplier_batch_number,
           },
         })
         .select()
