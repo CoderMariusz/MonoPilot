@@ -110,6 +110,15 @@ development_status:
   # Story 0.14: Fix BOM History Display (CRITICAL - History not showing)
   0-14-fix-bom-history-display: backlog
 
+  # ========================================
+  # NEW STORIES from PO Analysis (2025-11-19)
+  # Critical fixes for PO database/API/types alignment
+  # Reference: Architecture.md po_header/po_line sections
+  # ========================================
+
+  # Story 0.15: PO Database & API Alignment (CRITICAL - Data layer mismatch)
+  0-15-po-database-api-alignment: backlog
+
   epic-0-retrospective: done
 
   # ========================================

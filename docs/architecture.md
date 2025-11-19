@@ -6650,13 +6650,16 @@ CREATE TABLE suppliers (
 
 ```sql
 CREATE TABLE po_header (
-  id SERIAL PRIMARY KEY,
-  number VARCHAR(50) UNIQUE NOT NULL,
-  supplier_id INTEGER REFERENCES suppliers(id),
-  status VARCHAR(20) NOT NULL CHECK (status IN ('draft', 'approved', 'closed')),
-  currency VARCHAR(3) DEFAULT 'USD',
-  exchange_rate NUMERIC(12,6),
-  order_date TIMESTAMPTZ NOT NULL,
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  po_number TEXT NOT NULL,  -- Note: DB uses po_number, not number
+  supplier_id BIGINT NOT NULL REFERENCES suppliers(id) ON DELETE RESTRICT,
+  warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
+  status po_status NOT NULL DEFAULT 'Draft',
+  currency TEXT DEFAULT 'PLN',
+  exchange_rate NUMERIC(12,6) DEFAULT 1.0,
+  order_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  expected_date DATE,
   requested_delivery_date TIMESTAMPTZ,
   promised_delivery_date TIMESTAMPTZ,
   payment_due_date TIMESTAMPTZ,
@@ -6669,40 +6672,59 @@ CREATE TABLE po_header (
   -- ASN reference
   asn_ref VARCHAR(50),
 
-  -- Totals
-  net_total NUMERIC(12,2),
-  vat_total NUMERIC(12,2),
-  gross_total NUMERIC(12,2),
+  -- Totals (calculated)
+  net_total NUMERIC(12,2) DEFAULT 0,
+  vat_total NUMERIC(12,2) DEFAULT 0,
+  gross_total NUMERIC(12,2) DEFAULT 0,
+
+  notes TEXT,
 
   -- Audit
   created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
   approved_by UUID REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT po_header_unique_number_per_org UNIQUE (org_id, po_number)
 );
 ```
+
+**Column Naming Note:** DB uses `po_number` (not `number`). All API routes and types must use `po_number`.
 
 #### po_line
 
 ```sql
 CREATE TABLE po_line (
-  id SERIAL PRIMARY KEY,
-  po_id INTEGER REFERENCES po_header(id),
-  line_no INTEGER NOT NULL,
-  item_id INTEGER REFERENCES products(id),
-  uom VARCHAR(20) NOT NULL,
-  qty_ordered NUMERIC(12,4) NOT NULL,
-  qty_received NUMERIC(12,4) DEFAULT 0,
-  unit_price NUMERIC(12,4) NOT NULL,
+  id BIGSERIAL PRIMARY KEY,
+  po_id BIGINT NOT NULL REFERENCES po_header(id) ON DELETE CASCADE,
+  line_number INTEGER NOT NULL,  -- Note: DB uses line_number, not line_no
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,  -- Note: DB uses product_id, not item_id
+  quantity DECIMAL(15,4) NOT NULL,  -- Note: DB uses quantity, not qty_ordered
+  received_qty DECIMAL(15,4) DEFAULT 0,  -- Note: DB uses received_qty, not qty_received
+  uom TEXT NOT NULL,
+  unit_price DECIMAL(15,4),
   vat_rate NUMERIC(5,4) DEFAULT 0,
+  tax_code_id BIGINT REFERENCES tax_codes(id),
   requested_delivery_date TIMESTAMPTZ,
   promised_delivery_date TIMESTAMPTZ,
-  default_location_id INTEGER REFERENCES locations(id),
-  note TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  default_location_id BIGINT REFERENCES locations(id),
+  notes TEXT,  -- Note: DB uses notes, not note
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT po_line_unique_number UNIQUE (po_id, line_number)
 );
 ```
+
+**Column Naming Note:** DB column names differ from some legacy code:
+- `line_number` (not `line_no`)
+- `product_id` (not `item_id`)
+- `quantity` (not `qty_ordered`)
+- `received_qty` (not `qty_received`)
+- `notes` (not `note`)
+
+All API routes and types must use these actual DB column names.
 
 #### po_correction
 
