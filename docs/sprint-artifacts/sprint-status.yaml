@@ -108,7 +108,7 @@ development_status:
   0-13-add-bom-api-get-endpoints: review
 
   # Story 0.14: Fix BOM History Display (CRITICAL - History not showing)
-  0-14-fix-bom-history-display: ready-for-dev
+  0-14-fix-bom-history-display: review
 
   # ========================================
   # NEW STORIES from PO Analysis (2025-11-19)
