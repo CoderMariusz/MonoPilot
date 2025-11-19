@@ -82,37 +82,52 @@ export type UserRole =
 export type UserStatus = 'active' | 'inactive' | 'suspended';
 
 export interface WorkOrder {
-  id: string;
+  id: number;  // Fix: was string
+  org_id?: number;
   wo_number: string;
-  product_id: string;
-  quantity: number;
+  product_id: number;  // Fix: was string
+  bom_id?: number | null;  // Fix: was string | number
+  routing_id?: number | null;
+  warehouse_id: number;
+  production_line_id?: number | null;  // Match DB: was line_id
   status: WorkOrderStatus;
-  due_date: string;
-  scheduled_start?: string;
-  scheduled_end?: string;
-  actual_start?: string;
-  actual_end?: string;
-  source_demand_type?: string; // 'Manual' | 'TO' | 'PO' | 'SO'
-  source_demand_id?: number;
-  bom_id?: string | number;
-  created_by?: string;
-  machine_id?: string;
-  machine?: any;
-  product?: any;
-  bom?: {
-    id: number;
-    version: number;
-    status: string;
-  };
-  line_number?: string;
-  // EPIC-001 Phase 3: Conditional Components
-  order_flags?: string[]; // e.g., ['organic', 'gluten_free', 'vegan']
-  customer_id?: number;
-  order_type?: string; // e.g., 'standard', 'export', 'premium'
-  line_id?: number; // Production line FK
-  priority?: number;
+
+  // Quantities
+  planned_qty: number;  // Match DB: was quantity
+  completed_qty: number;
+  uom: string;
+
+  // Dates
+  scheduled_date?: string | null;  // Match DB: was due_date
+  start_date?: string | null;  // Match DB: was scheduled_start
+  end_date?: string | null;  // Match DB: was scheduled_end
+
+  // Planning
+  priority: number;
+  machine_id?: number | null;  // Fix: was string
+
+  // Demand tracking
+  source_demand_type?: string | null;
+  source_demand_id?: number | null;
+
+  // Notes
+  notes?: string | null;
+
+  // Audit
+  created_by?: string | null;
+  updated_by?: string | null;
+  approved_by?: string | null;
   created_at: string;
   updated_at: string;
+
+  // Relationships (computed)
+  product?: Product;
+  bom?: Bom;
+  machine?: Machine;
+  production_line?: ProductionLine;
+  wo_materials?: WOMaterial[];
+  wo_operations?: WOOperation[];
+  wo_by_products?: WOByProduct[];
 }
 
 export type CreateWorkOrderData = Omit<WorkOrder, 'id'>;

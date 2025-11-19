@@ -128,7 +128,7 @@ development_status:
 
   # Story 0.18: WO Database & API Alignment (CRITICAL - Data layer mismatch)
   # Note: Wrong types (string→number), wrong names (quantity→planned_qty, due_date→scheduled_date)
-  0-18-wo-database-api-alignment: ready-for-dev
+  0-18-wo-database-api-alignment: review
 
   # Story 0.19: Products & BOMs Database & API Alignment (CRITICAL - LARGEST FIX)
   # Note: 21 SP - sku vs part_number, version string→number, scrap_std_pct→scrap_percent, ~32 columns to add
