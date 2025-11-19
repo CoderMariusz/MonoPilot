@@ -1225,10 +1225,11 @@ This Scanner deep dive establishes the **UX Design Methodology** for all MonoPil
 
 ### B. References
 
-- **PRD:** `docs/MonoPilot-PRD-2025-11-13.md`
+- **PRD:** `docs/prd/modules/warehouse.md` (Scanner workflows)
+- **Architecture:** `docs/architecture/patterns/scanner.md` (PWA patterns)
+- **Architecture Index:** `docs/architecture/index.md`
 - **Brainstorming:** `docs/brainstorming-session-results-2025-11-15.md`
 - **Product Brief:** `docs/product-brief-MonoPilot-2025-11-15.md`
-- **Architecture:** `docs/architecture.md`
 - **Scanner Implementation:** `apps/frontend/app/scanner/` (page.tsx, receive/page.tsx, process/page.tsx)
 - **Component Library:** `apps/frontend/components/scanner/` (StageBoard.tsx, StagedLPsList.tsx, QAOverrideModal.tsx)
 

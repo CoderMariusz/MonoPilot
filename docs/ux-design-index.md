@@ -31,7 +31,9 @@ This index tracks all UX design work for MonoPilot modules. Each module follows 
 | **Settings** | P0 🔴 | ✅ **Complete** | [ux-design-settings-module.md](./ux-design-settings-module.md) | 2025-11-15 | Hybrid approach: Variant B (Wizard P0) + Variant C (Templates P0) + Variant D (Analytics P2) |
 | **Technical** | P1 🟡 | ✅ **Complete** | [ux-design-technical-module.md](./ux-design-technical-module.md) | 2025-11-15 | Grouped Dashboard (3 categories) + BOM Timeline + Allergen Matrix |
 | **QA** | P1 🟡 | ✅ **Complete** | [ux-design-qa-module.md](./ux-design-qa-module.md) | 2025-11-15 | Mobile PWA (offline) + NCR Kanban + CoA Auto-gen + Quarantine |
-| **NPD** | P1 🟡 | 📋 **Planned** | `ux-design-npd-module.md` | - | Idea management, innovation pipeline (Growth/Enterprise) |
+| **Warehouse** | P0 🔴 | ✅ **Complete** | [ux-design-warehouse-module.md](./ux-design-warehouse-module.md) | 2025-11-19 | Dual-interface: Desktop compact + Scanner mobile (1:20 ratio) |
+| **Shipping** | P1 🟡 | ✅ **Complete** | [ux-design-shipping-module.md](./ux-design-shipping-module.md) | 2025-11-19 | Paper + Scanner toggle, Scan-to-pack, Generic carriers, PDF BOL |
+| **NPD** | P1 🟡 | ✅ **Complete** | [ux-design-npd-module-2025-11-16.md](./ux-design-npd-module-2025-11-16.md) | 2025-11-16 | Idea management, innovation pipeline (Growth/Enterprise) |
 
 **Legend:**
 - ✅ **Complete** - Specification finished, ready for implementation
@@ -451,8 +453,11 @@ docs/ux-design-{module}-module.md
 ## References
 
 ### Internal Docs
-- **PRD:** [MonoPilot-PRD-2025-11-13.md](./MonoPilot-PRD-2025-11-13.md)
-- **Architecture:** [architecture.md](./architecture.md)
+- **PRD Index:** [prd/index.md](./prd/index.md) (216 FRs across 9 modules)
+- **PRD Modules:** `docs/prd/modules/*.md` (Settings, Technical, Planning, Production, Warehouse, Quality, Shipping, NPD, Finance)
+- **Architecture Index:** [architecture/index.md](./architecture/index.md)
+- **Architecture Patterns:** `docs/architecture/patterns/*.md` (Infrastructure, Database, API, Frontend, Security, Scanner)
+- **Architecture Modules:** `docs/architecture/modules/*.md` (Settings, Technical, Planning, Production, Warehouse, Quality, Shipping)
 - **Product Brief:** [product-brief-MonoPilot-2025-11-15.md](./product-brief-MonoPilot-2025-11-15.md)
 - **Brainstorming:** [brainstorming-session-results-2025-11-15.md](./brainstorming-session-results-2025-11-15.md)
 - **Sprint Status:** [sprint-artifacts/sprint-status.yaml](./sprint-artifacts/sprint-status.yaml)
@@ -476,6 +481,8 @@ docs/ux-design-{module}-module.md
 | 2025-11-15 | 1.3 | Settings Module complete (Wizard + Templates + Analytics) | Mary |
 | 2025-11-15 | 1.4 | Technical Module complete (Grouped Dashboard + BOM Timeline + Allergen Matrix) | Mary |
 | 2025-11-15 | 1.5 | QA Module complete (Mobile PWA + NCR Kanban + CoA + Quarantine) | Mary |
+| 2025-11-16 | 1.6 | NPD Module complete (Innovation pipeline, Idea management) | Mary |
+| 2025-11-19 | 2.0 | **Major Update:** Warehouse + Shipping modules complete, references updated to modular PRD/Architecture structure | AI UX Designer |
 
 ---
 
