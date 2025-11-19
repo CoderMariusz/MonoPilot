@@ -10,7 +10,7 @@ interface ConsumeData {
   production_date_utc: string;
   product: string;
   material: string;
-  material_part_number: string;
+  material_sku: string;
   bom_standard_kg: number;
   actual_consumed_kg: number;
   variance_kg: number;
@@ -268,7 +268,7 @@ export function ConsumeReportTab() {
                   <td className="px-4 py-3 text-sm text-slate-900">
                     <div>
                       <div className="font-medium">{row.material}</div>
-                      <div className="text-slate-500">{row.material_part_number}</div>
+                      <div className="text-slate-500">{row.material_sku}</div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-900 text-right">

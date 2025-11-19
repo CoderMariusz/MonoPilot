@@ -99,7 +99,7 @@ export default function ScannerReceiveV2Page() {
 
     // Get warehouse_id from PO if available
     const warehouseId = selectedASN.purchase_order?.warehouse_id || 1; // TODO: Get from settings
-    const poNumber = selectedASN.purchase_order?.number || '';
+    const poNumber = selectedASN.purchase_order?.po_number || '';
 
     // Check if offline
     if (!navigator.onLine) {

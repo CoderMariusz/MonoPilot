@@ -247,7 +247,7 @@ export default function CreateASNModal({
                 <option value="">No PO</option>
                 {purchaseOrders.map((po) => (
                   <option key={po.id} value={po.id}>
-                    {po.number} - {po.supplier?.name}
+                    {po.po_number} - {po.supplier?.name}
                   </option>
                 ))}
               </select>

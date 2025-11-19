@@ -208,7 +208,7 @@ export default function ASNTable({
                     <div className="font-medium text-slate-900">{asn.asn_number}</div>
                     {asn.po_id && asn.purchase_order && (
                       <div className="text-xs text-slate-500 mt-1">
-                        PO: {asn.purchase_order.number}
+                        PO: {asn.purchase_order.po_number}
                       </div>
                     )}
                   </td>

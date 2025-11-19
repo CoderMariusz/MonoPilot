@@ -31,7 +31,7 @@ interface LPDetails {
   origin_type: string;
   origin_ref: any;
   product: {
-    part_number: string;
+    sku: string;
     description: string;
     uom: string;
   };

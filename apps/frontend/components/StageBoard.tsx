@@ -23,7 +23,7 @@ interface StageBoardData {
 
 interface ComponentData {
   material_id: number;
-  part_number: string;
+  sku: string;
   description: string;
   uom: string;
   required_kg: number;

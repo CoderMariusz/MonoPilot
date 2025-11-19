@@ -32,7 +32,7 @@ export function useSupabaseWorkOrders() {
 
         if (error) throw error;
 
-        const mapped: WorkOrder[] = (workOrders || []).map(wo => ({
+        const mapped = (workOrders || []).map(wo => ({
           id: wo.id,
           wo_number: wo.wo_number,
           product_id: wo.product_id,
@@ -51,9 +51,11 @@ export function useSupabaseWorkOrders() {
           created_at: wo.created_at,
           updated_at: wo.updated_at,
           product: wo.product ? {
-            id: wo.product.id.toString(),
+            id: wo.product.id,
             sku: wo.product.sku,
+            name: wo.product.description || '',
             description: wo.product.description,
+            product_type: wo.product.product_type || wo.product.type,
             type: wo.product.type,
             uom: wo.product.uom,
             expiry_policy: wo.product.expiry_policy,
@@ -63,7 +65,7 @@ export function useSupabaseWorkOrders() {
             created_at: wo.product.created_at,
             updated_at: wo.product.updated_at
           } : undefined
-        }));
+        })) as WorkOrder[];
 
         setData(mapped);
         setError(null);

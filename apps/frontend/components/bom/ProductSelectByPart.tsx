@@ -39,10 +39,10 @@ export default function ProductSelectByPart({
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('id, part_number, description, uom, product_group, product_type')
+          .select('id, sku, description, uom, product_group, product_type')
           .in('product_group', groups)
           .eq('is_active', true)
-          .order('part_number')
+          .order('sku')
           .limit(100);
 
         if (error) {

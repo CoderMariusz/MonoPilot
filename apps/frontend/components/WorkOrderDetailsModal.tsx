@@ -8,7 +8,7 @@ import { toast } from '@/lib/toast';
 
 interface BomComponent {
   material_id: number;
-  part_number: string;
+  sku: string;
   description: string;
   uom: string;
   qty_per_unit: number;
@@ -102,7 +102,7 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
           const bomQty = typeof bomItem.quantity === 'number' ? bomItem.quantity : parseFloat(String(bomItem.quantity || 0));
           return {
             material_id: bomItem.material_id,
-            part_number: bomItem.material?.sku || '',
+            sku: bomItem.material?.sku || '',
             description: bomItem.material?.description || '',
             uom: bomItem.uom,
             qty_per_unit: bomQty,
@@ -112,8 +112,8 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
           };
         })
       };
-      
-      setDetails(data);
+
+      setDetails(data as WorkOrderDetails);
     } catch (err: any) {
       setError(err.message || 'Failed to load work order details');
     } finally {

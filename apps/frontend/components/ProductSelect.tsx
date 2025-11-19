@@ -32,8 +32,8 @@ export default function ProductSelect({ value, onChange, placeholder = 'Search p
       const like = `%${query}%`;
       const { data, error } = await supabase
         .from('products')
-        .select('id, part_number, description, uom, product_group, product_type')
-        .or(`part_number.ilike.${like},description.ilike.${like}`)
+        .select('id, sku, description, uom, product_group, product_type')
+        .or(`sku.ilike.${like},description.ilike.${like}`)
         .in('product_group', groups)
         .limit(20);
       if (!active) return;

@@ -258,7 +258,7 @@ export default function ProcessTerminalPage() {
       const needed = needs[materialId];
       
       const availableInStaging = stagedLPsForCurrentOrder
-        .filter(staged => staged.lp.product_id === materialId.toString())
+        .filter(staged => staged.lp.product_id === materialId)
         .reduce((sum, staged) => sum + staged.quantity, 0);
       
       if (availableInStaging < needed) {
@@ -302,22 +302,22 @@ export default function ProcessTerminalPage() {
       for (let i = 0; i < updatedStaging.length && remainingToConsume > 0; i++) {
         const staged = updatedStaging[i];
         
-        if (staged.lp.product_id === materialId.toString()) {
+        if (staged.lp.product_id === materialId) {
           if (selectedLine && staged.line !== selectedLine) {
             continue;
           }
-          
+
           const toConsume = Math.min(remainingToConsume, staged.quantity);
-          
+
           const currentLPQty = staged.lp.quantity;
           const newLPQty = currentLPQty - toConsume;
-          updateLicensePlate(parseInt(staged.lp.id), { planned_qty: newLPQty });
-          
+          updateLicensePlate(staged.lp.id, { quantity: newLPQty });
+
           addStockMove({
             move_number: `SM-CONSUME-${Date.now()}-${staged.lp.lp_number}`,
-            lp_id: staged.lp.id,
-            from_location_id: staged.lp.location_id,
-            to_location_id: null,
+            lp_id: String(staged.lp.id),
+            from_location_id: String(staged.lp.location_id),
+            to_location_id: '',
             quantity: -toConsume,
             reason: 'Consumption for Work Order',
             status: 'completed',
@@ -402,24 +402,23 @@ export default function ProcessTerminalPage() {
     
     const newPRLP = addLicensePlate({
       lp_number: prLPNumber,
-      lp_code: prLPNumber,
-      item_id: selectedWO.product!.id,
       product_id: selectedWO.product!.id,
-      location_id: warehouseLocationId.toString(),
+      location_id: warehouseLocationId,
+      warehouse_id: 1,
       quantity: qtyToCreate,
+      uom: selectedWO.product!.uom || 'kg',
       status: 'available',
       qa_status: 'passed',
-      grn_id: null,
     });
-    
+
     const now = new Date();
     const moveDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-    
+
     addStockMove({
       move_number: `SM-${prLPNumber}`,
-      lp_id: newPRLP.id,
-      from_location_id: null,
-      to_location_id: warehouseLocationId.toString(),
+      lp_id: String(newPRLP.id),
+      from_location_id: '',
+      to_location_id: String(warehouseLocationId),
       quantity: qtyToCreate,
       reason: 'Production Output',
       status: 'completed',
@@ -431,14 +430,14 @@ export default function ProcessTerminalPage() {
     const remainingQty = woQty - qtyToCreate;
     
     if (remainingQty <= 0) {
-      updateWorkOrder(selectedWO.id, { 
+      updateWorkOrder(selectedWO.id, {
         status: 'completed',
-        quantity: 0
+        planned_qty: 0
       });
       toast.success(`Work Order ${selectedWO.wo_number} completed!`);
     } else {
-      updateWorkOrder(selectedWO.id, { 
-        quantity: remainingQty
+      updateWorkOrder(selectedWO.id, {
+        planned_qty: remainingQty
       });
     }
 
@@ -463,10 +462,10 @@ export default function ProcessTerminalPage() {
 
     const currentLPQty = lp.quantity;
     const newLPQty = currentLPQty - quantity;
-    updateLicensePlate(parseInt(lp.id), { planned_qty: newLPQty });
+    updateLicensePlate(lp.id, { quantity: newLPQty });
 
     const updatedStaging = stagedLPsForCurrentOrder.map(staged => {
-      if (staged.lp.id === lp.id.toString()) {
+      if (staged.lp.id === lp.id) {
         return {
           ...staged,
           quantity: staged.quantity - quantity
@@ -490,9 +489,9 @@ export default function ProcessTerminalPage() {
 
     addStockMove({
       move_number: `SM-MANUAL-${Date.now()}`,
-      lp_id: lp.id,
-      from_location_id: lp.location_id,
-      to_location_id: null,
+      lp_id: String(lp.id),
+      from_location_id: String(lp.location_id),
+      to_location_id: '',
       quantity: -quantity,
       reason: 'Manual Consumption',
       status: 'completed',
@@ -615,7 +614,7 @@ export default function ProcessTerminalPage() {
         item_name: material?.description || 'Unknown Material',
         standard_qty: standardQty,
         consumed_qty: consumedQty,
-        uom: bomItem?.uom || material?.uom,
+        uom: (bomItem?.uom || material?.uom) as import('@/lib/types').UoM | undefined,
         yield_percentage: yieldPercentage
       };
     });
@@ -632,7 +631,7 @@ export default function ProcessTerminalPage() {
       materials_used: materialsUsed,
       work_order_number: selectedWO.wo_number,
       product_name: `${selectedWO.product?.sku} - ${selectedWO.product?.description}`,
-      line_number: selectedWO.production_line_id || '',
+      line_number: selectedWO.production_line_id ? String(selectedWO.production_line_id) : '',
       target_quantity: targetQty,
       actual_quantity: createdItemsCount,
       efficiency_percentage: efficiency,
@@ -1112,7 +1111,7 @@ export default function ProcessTerminalPage() {
                         </div>
                         <div>
                           <p className="text-sm text-slate-600">Line</p>
-                          <p className="text-lg font-semibold text-slate-900">{latestReport.production_line_id}</p>
+                          <p className="text-lg font-semibold text-slate-900">{latestReport.line_number}</p>
                         </div>
                         <div>
                           <p className="text-sm text-slate-600">Efficiency</p>

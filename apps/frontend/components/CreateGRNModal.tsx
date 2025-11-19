@@ -95,9 +95,9 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
 
       addStockMove({
         move_number: grnNumber,
-        lp_id: newLP.id,
-        from_location_id: null,
-        to_location_id: warehouseLocationId,
+        lp_id: String(newLP.id),
+        from_location_id: '',
+        to_location_id: String(warehouseLocationId),
         quantity: parseFloat(item.quantity_received),
         reason: 'Goods Received',
         status: 'completed',

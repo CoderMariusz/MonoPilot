@@ -19,7 +19,7 @@ interface YieldData {
   production_date_utc: string;
   production_line: string;
   product: string;
-  part_number: string;
+  sku: string;
   work_order_count: number;
   total_input_kg: number;
   total_output_kg: number;

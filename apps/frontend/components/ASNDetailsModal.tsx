@@ -200,7 +200,7 @@ export default function ASNDetailsModal({
                       <div>
                         <p className="text-xs text-slate-500">Purchase Order</p>
                         <p className="text-sm text-slate-700">
-                          {asn.purchase_order.number} ({asn.purchase_order.status})
+                          {asn.purchase_order.po_number} ({asn.purchase_order.status})
                         </p>
                       </div>
                     )}

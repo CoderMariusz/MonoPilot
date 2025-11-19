@@ -44,7 +44,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
   const [itemNames, setItemNames] = useState<Record<number, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [components, setComponents] = useState<Array<{ id: number; part_number: string; description: string; uom: string }>>([]);
+  const [components, setComponents] = useState<Array<{ id: number; sku: string; description: string; uom: string }>>([]);
 
   const [productionLines, setProductionLines] = useState<Array<{ id: number; code: string; name: string }>>([]);
   const [machines, setMachines] = useState<Array<{ id: number; code: string; name: string }>>([]);
@@ -109,10 +109,10 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           supabase.from('routings').select('id,name').order('name'),
           supabase.from('allergens').select('id,code,name').order('code'),
           supabase.from('products')
-            .select('id, part_number, description, uom')
+            .select('id, sku, description, uom')
             .in('product_group', ['MEAT', 'DRYGOODS', 'COMPOSITE'])
             .eq('is_active', true)
-            .order('part_number'),
+            .order('sku'),
           supabase.from('production_lines')
             .select('id, code, name')
             .eq('is_active', true)
@@ -270,7 +270,6 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
               priority: item.priority,
               production_lines: item.production_lines || [],
               production_line_restrictions: item.production_line_restrictions || [],
-              scrap_percent: item.scrap_percent,
               scrap_percent: item.scrap_percent,
               is_optional: item.is_optional,
               is_phantom: item.is_phantom,

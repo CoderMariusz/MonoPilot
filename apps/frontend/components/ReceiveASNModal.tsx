@@ -255,7 +255,7 @@ export default function ReceiveASNModal({
                     <div>
                       <p className="text-xs text-slate-500">Purchase Order</p>
                       <p className="text-sm font-medium text-slate-900">
-                        {selectedASN.purchase_order.number}
+                        {selectedASN.purchase_order.po_number}
                       </p>
                     </div>
                   )}

@@ -125,7 +125,7 @@ export class WorkOrdersAPI {
         wo_materials: wo.wo_materials || [],
         wo_operations: wo.wo_operations || [],
         production_outputs: wo.production_outputs || []
-      }));
+      })) as unknown as WorkOrder[];
     } catch (error) {
       console.error('Error fetching work orders:', error);
       return [];

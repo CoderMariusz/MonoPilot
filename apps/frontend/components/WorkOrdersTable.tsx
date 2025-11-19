@@ -55,7 +55,7 @@ export function WorkOrdersTable() {
 
     return base.filter(wo => {
       const matchesStatus = statusFilter ? wo.status === statusFilter : true;
-      const matchesLine = lineFilter ? (wo.machine?.name || wo.production_line_id || '').toLowerCase().includes(lineFilter.toLowerCase()) : true;
+      const matchesLine = lineFilter ? (wo.machine?.name || String(wo.production_line_id || '')).toLowerCase().includes(lineFilter.toLowerCase()) : true;
       const matchesProduct = productFilter ? (wo.product?.description || '').toLowerCase().includes(productFilter.toLowerCase()) : true;
       // Placeholder QA filter (no QA flags on WO yet)
       const matchesQa = qaFilter ? qaFilter === 'Passed' : true;

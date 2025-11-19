@@ -347,7 +347,7 @@ export async function validateWORows(
         const bom = getLatestActiveBOM(product);
         if (bom) {
           validatedRow._bom_id = bom.id.toString();
-          validatedRow.bom_version = bom.version || 'Latest';
+          validatedRow.bom_version = String(bom.version || 'Latest');
         } else {
           warnings.push(`No active BOM found for '${validatedRow.product_code}'`);
           hasWarnings = true;

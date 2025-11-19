@@ -61,13 +61,13 @@ export function CreateStockMoveModal({ isOpen, onClose, onSuccess }: CreateStock
 
     addStockMove({
       move_number: moveNumber,
-      lp_id: selectedLP,
-      from_location_id: selectedLPData.location_id,
-      to_location_id: toLocationId,
+      lp_id: String(selectedLP),
+      from_location_id: String(selectedLPData.location_id),
+      to_location_id: String(toLocationId),
       quantity: parseFloat(quantity),
       reason: 'Manual Stock Move',
       status: 'draft',
-      move_date: null,
+      move_date: '',
     });
 
     toast.success('Stock Move created successfully');

@@ -429,7 +429,7 @@ class ClientState {
 
   deleteWorkOrder(id: number): boolean {
     const initialLength = this.workOrders.length;
-    this.workOrders = this.workOrders.filter(wo => wo.id !== id.toString());
+    this.workOrders = this.workOrders.filter(wo => wo.id !== id);
     if (this.workOrders.length < initialLength) {
       this.notifyWorkOrderListeners();
       return true;
