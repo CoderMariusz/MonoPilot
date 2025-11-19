@@ -42,7 +42,7 @@ export function CreateStockMoveModal({ isOpen, onClose, onSuccess }: CreateStock
 
   if (!isOpen) return null;
 
-  const selectedLPData = licensePlates.find(lp => lp.id === selectedLP.toString());
+  const selectedLPData = licensePlates.find(lp => lp.id === selectedLP);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,9 +61,9 @@ export function CreateStockMoveModal({ isOpen, onClose, onSuccess }: CreateStock
 
     addStockMove({
       move_number: moveNumber,
-      lp_id: selectedLP.toString(),
+      lp_id: selectedLP,
       from_location_id: selectedLPData.location_id,
-      to_location_id: toLocationId.toString(),
+      to_location_id: toLocationId,
       quantity: parseFloat(quantity),
       reason: 'Manual Stock Move',
       status: 'draft',
