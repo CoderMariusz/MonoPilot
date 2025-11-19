@@ -38,8 +38,10 @@ All Quality features are controlled via Settings toggles.
 | `hold_notification_email` | boolean | true | Email on quality hold |
 | `release_requires_approval` | boolean | true | Manager approval for release |
 | `quarantine_location_id` | FK | null | Default quarantine location |
-| `enable_supplier_quality` | boolean | false | Track supplier quality metrics |
+| `enable_supplier_quality` | boolean | true | Track supplier quality metrics (accept/reject rate) |
 | `enable_certificates` | boolean | false | Manage quality certificates |
+| `enable_lab_testing` | boolean | false | Enable lab test with equipment tracking |
+| `enable_custom_spec_attributes` | boolean | true | Allow custom specification attributes |
 
 ---
 
@@ -186,7 +188,7 @@ Specifications define acceptable ranges for product attributes. Used for incomin
 |-------|------|----------|-------------|
 | `id` | PK | Yes | Unique spec ID |
 | `product_id` | FK | Yes | Product reference |
-| `attribute_name` | string | Yes | What is measured |
+| `attribute_name` | string | Yes | Custom title (user-defined) |
 | `attribute_type` | enum | Yes | numeric, text, boolean |
 | `unit` | string | No | Unit of measure |
 | `min_value` | decimal | Conditional | Minimum acceptable |
@@ -197,10 +199,16 @@ Specifications define acceptable ranges for product attributes. Used for incomin
 | `test_method` | string | No | How to test |
 | `test_frequency` | string | No | When to test |
 
-### 4.3 Common Specifications
+### 4.3 Custom Specification Attributes
 
-| Attribute | Type | Example | Unit |
-|-----------|------|---------|------|
+Users can create custom attributes with:
+- **Title**: Attribute name (e.g., "Moisture", "pH", "Viscosity")
+- **Value**: Expected value or range
+
+Examples of custom specifications:
+
+| Attribute (Title) | Type | Value | Unit |
+|-------------------|------|-------|------|
 | Moisture | numeric | 5-8 | % |
 | pH | numeric | 4.0-4.5 | - |
 | Temperature | numeric | 2-4 | °C |
@@ -208,6 +216,9 @@ Specifications define acceptable ranges for product attributes. Used for incomin
 | Allergen Free | boolean | true/false | - |
 | Brix | numeric | 10-12 | °Bx |
 | Viscosity | numeric | 100-150 | cP |
+| *Custom...* | *any* | *user-defined* | *user-defined* |
+
+**Note**: Toggle `enable_custom_spec_attributes` allows organizations to add their own attributes beyond defaults.
 
 ### 4.4 Specification UI
 
@@ -324,6 +335,7 @@ Document quality issues that deviate from specifications or standards. Track roo
    - Verify actions completed
    - Document resolution
    - Close NCR
+   - **Authorized roles**: Technical Officer, Supervisor QA only
 
 ### 6.4 NCR UI
 
@@ -351,7 +363,9 @@ Document quality issues that deviate from specifications or standards. Track roo
 ## 7. Certificate of Analysis (CoA)
 
 ### 7.1 CoA Concept
-Document from supplier certifying quality of delivered materials. Can be required on receipt.
+Document from supplier certifying quality of delivered materials. CoA requirement is **per-product** - some products require CoA on receipt, others don't.
+
+**Product-level setting**: `require_coa` flag on product determines if CoA is mandatory during GRN receipt.
 
 ### 7.2 CoA Fields
 

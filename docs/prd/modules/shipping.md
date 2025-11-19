@@ -28,22 +28,28 @@ All Shipping features are controlled via Settings toggles.
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `enable_shipping_module` | boolean | true | Enable shipping management |
-| `require_sales_order` | boolean | true | Require SO for shipments |
-| `enable_wave_picking` | boolean | false | Group picks into waves |
-| `enable_zone_picking` | boolean | false | Pick by zone |
-| `enable_batch_picking` | boolean | false | Batch similar items |
-| `picking_strategy` | enum | 'fifo' | fifo, fefo, manual |
+| `shipping_mode` | enum | 'sales_order' | sales_order (use SO), direct_ship (ship without SO) |
+| `enable_fifo_picking` | boolean | true | FIFO picking strategy |
+| `enable_fefo_picking` | boolean | true | FEFO picking strategy (expiry-based) |
+| `enable_zone_picking` | boolean | true | Pick by warehouse zone |
+| `enable_wave_picking` | boolean | true | Group picks into waves |
+| `enable_batch_picking` | boolean | true | Batch similar items |
+| `default_picking_strategy` | enum | 'fifo' | Default strategy for new picks |
 | `enable_pack_station` | boolean | true | Enable packing workflow |
-| `enable_carrier_integration` | boolean | false | Integrate with carriers |
+| `enable_carrier_integration` | boolean | false | Integrate with carriers (Phase 4) |
 | `default_carrier` | string | null | Default carrier |
 | `auto_generate_tracking` | boolean | false | Auto-generate tracking numbers |
 | `require_qa_passed` | boolean | true | Only ship QA passed LPs |
-| `enable_proof_of_delivery` | boolean | false | Capture POD |
+| `enable_proof_of_delivery` | boolean | true | Capture POD signature |
 | `enable_partial_shipment` | boolean | true | Allow partial shipments |
 | `enable_backorder` | boolean | true | Create backorders |
 | `enable_shipping_labels` | boolean | true | Print shipping labels |
 | `enable_packing_slip` | boolean | true | Print packing slips |
 | `enable_bill_of_lading` | boolean | false | Generate BOL |
+
+**Note**:
+- `shipping_mode`: Some organizations use Sales Orders, others ship directly from WO output
+- Carrier integration: Manual entry now, API integration planned for Phase 4 (FedEx, UPS, DHL)
 
 ---
 
