@@ -147,17 +147,17 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
     if (editingWorkOrder) {
       setFormData({
         product_id: editingWorkOrder.product_id?.toString() || '',
-        quantity: editingWorkOrder.quantity?.toString() || '',
+        quantity: editingWorkOrder.planned_qty?.toString() || '',
         scheduled_date: editingWorkOrder.scheduled_date || '',
         start_date: editingWorkOrder.start_date || '',
         end_date: editingWorkOrder.end_date || '',
         machine_id: editingWorkOrder.machine_id?.toString() || '',
-        line_id: (editingWorkOrder as any).line_id?.toString() || '',
+        line_id: editingWorkOrder.production_line_id?.toString() || '',
         status: editingWorkOrder.status || 'planned',
         source_demand_type: (editingWorkOrder.source_demand_type as 'Manual' | 'TO' | 'PO' | 'SO') || 'Manual',
         source_demand_id: editingWorkOrder.source_demand_id?.toString() || '',
         bom_id: editingWorkOrder.bom_id?.toString() || '',
-        order_flags: editingWorkOrder.order_flags || [],
+        order_flags: (editingWorkOrder as any).order_flags || [],
       });
     } else {
       setFormData({
@@ -195,34 +195,34 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
 
       if (editingWorkOrder) {
         const { updateWorkOrder } = await import('@/lib/clientState');
-        updateWorkOrder(parseInt(editingWorkOrder.id), {
-          product_id: formData.product_id,
+        updateWorkOrder(editingWorkOrder.id, {
+          product_id: Number(formData.product_id),
           product,
-          quantity: parseFloat(formData.quantity),
+          planned_qty: parseFloat(formData.quantity),
           status: formData.status,
           scheduled_date: formData.scheduled_date || null,
           start_date: formData.start_date || null,
           end_date: formData.end_date || null,
-          machine_id: formData.machine_id || null,
+          machine_id: formData.machine_id ? Number(formData.machine_id) : null,
           machine,
-          line_id: Number(formData.line_id),  // NEW: Production line FK
+          production_line_id: Number(formData.line_id) || null,
         });
       } else {
         const { addWorkOrder } = await import('@/lib/clientState');
         const nextWoNumber = `WO-2024-${String(Date.now()).slice(-3).padStart(3, '0')}`;
-        
+
         addWorkOrder({
           wo_number: nextWoNumber,
-          product_id: formData.product_id,
+          product_id: Number(formData.product_id),
           product,
-          quantity: parseFloat(formData.quantity),
+          planned_qty: parseFloat(formData.quantity),
           status: formData.status,
           scheduled_date: formData.scheduled_date || null,
           start_date: formData.start_date || null,
           end_date: formData.end_date || null,
-          machine_id: formData.machine_id || null,
+          machine_id: formData.machine_id ? Number(formData.machine_id) : null,
           machine,
-          line_id: Number(formData.line_id),  // NEW: Production line FK (required)
+          production_line_id: Number(formData.line_id) || null,
           source_demand_type: formData.source_demand_type === 'Manual' ? undefined : formData.source_demand_type,
           source_demand_id: formData.source_demand_id ? Number(formData.source_demand_id) : undefined,
           bom_id: formData.bom_id ? Number(formData.bom_id) : undefined,
