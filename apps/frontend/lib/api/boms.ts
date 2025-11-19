@@ -19,7 +19,7 @@ export interface BomItemUpdateData {
   priority?: number | null;
   production_lines?: string[];
   production_line_restrictions?: string[];
-  scrap_std_pct?: number | null;
+  scrap_percent?: number | null;
   is_optional?: boolean;
   is_phantom?: boolean;
   consume_whole_lp?: boolean;
@@ -135,7 +135,7 @@ export const BomVersionHelper = {
 
       if (
         oldItem.quantity !== newItem.quantity ||
-        oldItem.scrap_std_pct !== newItem.scrap_std_pct ||
+        oldItem.scrap_percent !== newItem.scrap_percent ||
         oldItem.uom !== newItem.uom ||
         oldItem.sequence !== newItem.sequence ||
         JSON.stringify(oldItem.line_id) !== JSON.stringify(newItem.line_id)

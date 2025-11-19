@@ -17,7 +17,7 @@ export interface WOTemplate {
   // Joined data
   product?: {
     id: number;
-    part_number: string;
+    sku: string;
     description: string;
   };
   line?: {
@@ -83,7 +83,7 @@ export class WOTemplatesAPI {
         *,
         product:products!wo_templates_product_id_fkey(
           id,
-          part_number,
+          sku,
           description
         ),
         created_by_user:users!wo_templates_created_by_fkey(
@@ -132,7 +132,7 @@ export class WOTemplatesAPI {
         *,
         product:products!wo_templates_product_id_fkey(
           id,
-          part_number,
+          sku,
           description
         ),
         created_by_user:users!wo_templates_created_by_fkey(
@@ -164,7 +164,7 @@ export class WOTemplatesAPI {
         *,
         product:products!wo_templates_product_id_fkey(
           id,
-          part_number,
+          sku,
           description
         )
       `)
@@ -193,7 +193,7 @@ export class WOTemplatesAPI {
         *,
         product:products!wo_templates_product_id_fkey(
           id,
-          part_number,
+          sku,
           description
         )
       `)
@@ -250,7 +250,7 @@ export class WOTemplatesAPI {
         *,
         product:products!wo_templates_product_id_fkey(
           id,
-          part_number,
+          sku,
           description
         )
       `)
@@ -284,7 +284,7 @@ export class WOTemplatesAPI {
         *,
         product:products!wo_templates_product_id_fkey(
           id,
-          part_number,
+          sku,
           description
         )
       `)

@@ -36,7 +36,7 @@ export async function exportProductsToXlsx(
     let query = supabase
       .from('products')
       .select(`
-        part_number,
+        sku,
         description,
         group:product_group,
         product_type,
@@ -54,7 +54,7 @@ export async function exportProductsToXlsx(
           status
         )
       `)
-      .order('part_number');
+      .order('sku');
 
     // Apply filters
     if (filters?.group && filters.group.length > 0) {
@@ -106,7 +106,7 @@ export async function exportProductsToXlsx(
         : '-';
 
       return {
-        part_number: product.part_number,
+        part_number: product.sku,
         description: product.description || '-',
         group: product.group || '-',
         type: product.product_type || '-',

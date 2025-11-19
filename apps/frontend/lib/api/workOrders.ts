@@ -100,7 +100,7 @@ export class WorkOrdersAPI {
         updated_at: wo.updated_at,
         product: wo.product ? {
           id: wo.product.id.toString(),
-          part_number: wo.product.part_number,
+          sku: wo.product.sku,
           description: wo.product.description,
           type: wo.product.type,
           uom: wo.product.uom,
@@ -1052,7 +1052,7 @@ export class WorkOrdersAPI {
         .from('wo_reservations')
         .select(`
           *,
-          material:products!material_id(part_number, description),
+          material:products!material_id(sku, description),
           license_plate:license_plates(lp_number, batch, expiry_date)
         `)
         .eq('wo_id', woId)
@@ -1063,7 +1063,7 @@ export class WorkOrdersAPI {
       return (data || []).map(r => ({
         id: r.id,
         material_id: r.material_id,
-        material_part_number: r.material?.part_number || '',
+        material_part_number: r.material?.sku || '',
         material_description: r.material?.description || '',
         lp_id: r.lp_id,
         lp_number: r.license_plate?.lp_number || '',

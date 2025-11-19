@@ -35,7 +35,7 @@ export async function exportBomToXlsx(
         status,
         line_id,
         product:products(
-          part_number,
+          sku,
           description
         )
       `)
@@ -54,14 +54,14 @@ export async function exportBomToXlsx(
         quantity,
         uom,
         sequence,
-        scrap_std_pct,
+        scrap_percent,
         consume_whole_lp,
         line_id,
         is_optional,
         is_phantom,
         priority,
         material:products(
-          part_number,
+          sku,
           description,
           allergens:product_allergens(
             allergen_id,
@@ -99,11 +99,11 @@ export async function exportBomToXlsx(
         .join(', ') || '-';
 
       return {
-        material_code: item.material?.part_number || '-',
+        material_code: item.material?.sku || '-',
         material_name: item.material?.description || '-',
         quantity: item.quantity,
         uom: item.uom,
-        scrap_pct: item.scrap_std_pct || 0,
+        scrap_pct: item.scrap_percent || 0,
         consume_whole_lp: item.consume_whole_lp || false,
         line: lineCodes,
         allergens: allergens,
@@ -121,7 +121,7 @@ export async function exportBomToXlsx(
     const headerData = [
       ['BOM Export'],
       [''],
-      ['Product:', (bom.product as any)?.part_number || '-'],
+      ['Product:', (bom.product as any)?.sku || '-'],
       ['Description:', (bom.product as any)?.description || '-'],
       ['Version:', bom.version],
       ['Status:', bom.status],
@@ -185,7 +185,7 @@ export async function exportBomToXlsx(
     XLSX.utils.book_append_sheet(workbook, itemsSheet, 'BOM Items');
 
     // Generate filename
-    const defaultFilename = `BOM-${(bom.product as any)?.part_number || bomId}-v${bom.version}.xlsx`;
+    const defaultFilename = `BOM-${(bom.product as any)?.sku || bomId}-v${bom.version}.xlsx`;
     const finalFilename = filename || defaultFilename;
 
     // Write file

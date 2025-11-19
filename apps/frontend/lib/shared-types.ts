@@ -309,7 +309,7 @@ export type ProductType = 'RM_MEAT' | 'PR' | 'FG' | 'DG_WEB' | 'DG_LABEL' | 'DG_
 // Enhanced Product interface
 export interface Product {
   id: number;
-  part_number: string;
+  sku: string;
   description: string;
   group: ProductGroup;
   product_type: ProductType;
@@ -480,7 +480,7 @@ export interface YieldReport {
   work_orders: Array<{
     id: number;
     wo_number: string;
-    product: { id: number; part_number: string; description: string };
+    product: { id: number; sku: string; description: string };
     target_qty: number;
     actual_output: number;
     scrap: number;
@@ -520,7 +520,7 @@ export interface BomItem {
   priority?: number;
   production_lines?: string[];
   production_line_restrictions?: string[];
-  scrap_std_pct?: number;
+  scrap_percent?: number;
   is_optional: boolean;
   is_phantom: boolean;
   unit_cost_std?: number;

@@ -34,7 +34,7 @@ export class ProductsServerAPI {
         )
       `)
       .eq('is_active', true)
-      .order('part_number');
+      .order('sku');
 
     if (error) {
       console.error('Error fetching products:', error);

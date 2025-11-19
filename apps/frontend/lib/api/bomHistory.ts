@@ -63,7 +63,7 @@ export class BomHistoryAPI {
           product_id,
           version,
           status,
-          products!product_id(id, part_number, description)
+          products!product_id(id, sku, description)
         )
       `)
       .order('created_at', { ascending: false });

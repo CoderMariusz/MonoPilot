@@ -45,7 +45,7 @@ export class LicensePlatesAPI {
         .from('license_plates')
         .select(`
           *,
-          product:products(description, part_number),
+          product:products(description, sku),
           location:locations(name)
         `);
 
@@ -88,7 +88,7 @@ export class LicensePlatesAPI {
             lp_number: lp.lp_number,
             product_id: lp.product_id,
             product_description: lp.product?.description || '',
-            product_part_number: lp.product?.part_number || '',
+            product_part_number: lp.product?.sku || '',
             location_id: lp.location_id,
             location_name: lp.location?.name || '',
             quantity: parseFloat(lp.quantity),
@@ -579,7 +579,7 @@ export class LicensePlatesAPI {
     lp_number: string;
     product: {
       id: number;
-      part_number: string;
+      sku: string;
       description: string;
       type: string;
       uom: string;
@@ -679,7 +679,7 @@ export class LicensePlatesAPI {
         lp_number: lpData.lp_number,
         product: {
           id: lpData.product.id,
-          part_number: lpData.product.part_number,
+          sku: lpData.product.sku,
           description: lpData.product.description,
           type: lpData.product.type,
           uom: lpData.product.uom

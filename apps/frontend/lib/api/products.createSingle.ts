@@ -17,7 +17,6 @@ function pickInsertColumns(product: ProductInsert) {
     name: product.description, // description becomes name (required)
     // Optional fields
     type: product.type,
-    part_number: product.part_number,
     description: product.description,
     uom: product.uom,
     product_group: product.product_group,
@@ -57,7 +56,7 @@ export async function createSingle({ product }: CreateSinglePayload) {
   const { data: existing } = await supabase
     .from('products')
     .select('id')
-    .eq('part_number', product.part_number)
+    .eq('sku', product.part_number)
     .limit(1);
 
   if (existing && existing.length > 0) {

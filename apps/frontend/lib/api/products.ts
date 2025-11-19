@@ -36,7 +36,7 @@ export class ProductsAPI {
             updated_at,
             material:products!bom_items_material_id_fkey(
               id,
-              part_number,
+              sku,
               description,
               uom,
               product_group,
@@ -45,7 +45,7 @@ export class ProductsAPI {
           )
         )
       `)
-      .order('part_number');
+      .order('sku');
 
     if (error) {
       console.error('Error fetching products:', error);
@@ -153,7 +153,7 @@ export class ProductsAPI {
     let query = supabase
       .from('products')
       .select('id')
-      .eq('part_number', partNumber)
+      .eq('sku', partNumber)
       .limit(1);
 
     if (excludeId) {

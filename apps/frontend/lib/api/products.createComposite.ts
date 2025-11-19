@@ -18,7 +18,7 @@ export async function createComposite(payload: CreateCompositePayload) {
   const { data: existing } = await supabase
     .from('products')
     .select('id')
-    .eq('part_number', product.part_number)
+    .eq('sku', product.part_number)
     .limit(1);
   
   if (existing && existing.length > 0) {

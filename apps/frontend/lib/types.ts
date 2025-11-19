@@ -898,7 +898,6 @@ export interface BomItemInput {
   production_lines?: string[];
   production_line_restrictions?: string[];
   scrap_percent?: number | null;
-  scrap_std_pct?: number | null;
   is_optional?: boolean;
   is_phantom?: boolean;
   consume_whole_lp?: boolean;
@@ -1095,7 +1094,7 @@ export interface YieldReport {
   work_orders: Array<{
     id: number;
     wo_number: string;
-    product: { id: number; part_number: string; description: string };
+    product: { id: number; sku: string; description: string };
     target_qty: number;
     actual_output: number;
     scrap: number;
@@ -1203,7 +1202,7 @@ export interface BomHistory {
     status: string;
     products?: {
       id: number;
-      part_number: string;
+      sku: string;
       description: string;
     };
   };
@@ -1234,7 +1233,7 @@ export interface WoMaterial {
   sequence: number;
   consume_whole_lp: boolean;
   is_optional: boolean;
-  scrap_std_pct?: number;
+  scrap_percent?: number;
   unit_cost_std?: number;
   tax_code_id?: number;
   lead_time_days?: number;
