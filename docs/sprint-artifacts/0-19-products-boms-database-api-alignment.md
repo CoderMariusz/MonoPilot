@@ -3,6 +3,12 @@
 **Priority:** P0 (CRITICAL - Data layer mismatch)
 **Effort:** 21 SP (42 hours)
 **Epic:** Epic 0 - P0 Data Integrity Fixes
+**Status:** ready-for-dev
+
+## Dev Agent Record
+
+### Context Reference
+- `docs/sprint-artifacts/0-19-products-boms-database-api-alignment.context.xml`
 
 ---
 

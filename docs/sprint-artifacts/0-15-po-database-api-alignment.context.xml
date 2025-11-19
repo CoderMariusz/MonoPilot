@@ -1,0 +1,84 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>15</storyId>
+    <title>PO Database &amp; API Alignment</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-19</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-15-po-database-api-alignment.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer maintaining MonoPilot</asA>
+    <iWant>PO database schema, API routes, and types to be aligned</iWant>
+    <soThat>Purchase Order CRUD operations work correctly without silent data loss</soThat>
+    <tasks>
+      <task n="1">Create migration 086_po_schema_alignment.sql with missing columns</task>
+      <task n="2">Update API routes to use correct column names (po_number, line_number, product_id, quantity)</task>
+      <task n="3">Update POHeader and POLine interfaces in lib/types.ts</task>
+      <task n="4">Update PurchaseOrdersAPI field mappings</task>
+      <task n="5">Backfill supplier snapshots and calculate totals for existing POs</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="AC1" title="Database Migration">Add missing columns: exchange_rate, delivery dates, supplier snapshots, totals, approved_by</ac>
+    <ac id="AC2" title="API Route Alignment">All column names match actual DB columns in /api/planning/po routes</ac>
+    <ac id="AC3" title="TypeScript Types Match">POHeader and POLine interfaces match DB schema exactly</ac>
+    <ac id="AC4" title="Frontend Client API">PurchaseOrdersAPI operations succeed without silent data loss</ac>
+    <ac id="AC5" title="Backward Compatibility">Existing PO records remain valid with sensible defaults</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>MonoPilot Architecture</title>
+        <section>po_header and po_line (lines 6649-6704)</section>
+        <snippet>Defines expected PO schema with columns not yet in DB: exchange_rate, supplier snapshots, delivery dates, totals, vat_rate</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>apps/frontend/app/api/planning/po/route.ts</path>
+        <kind>API Route</kind>
+        <symbol>GET, POST</symbol>
+        <reason>Update column names: po_number not number, line_number not line_no, product_id not item_id, quantity not qty_ordered</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/types.ts</path>
+        <kind>Type Definitions</kind>
+        <symbol>POHeader, POLine</symbol>
+        <reason>Update interfaces to match DB column names and add missing fields</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/api/purchaseOrders.ts</path>
+        <kind>API Class</kind>
+        <symbol>PurchaseOrdersAPI</symbol>
+        <reason>Update field mappings in getAll(), getById(), create(), update()</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node><package>@supabase/supabase-js</package><version>^2.75.0</version></node>
+      <node><package>typescript</package><version>^5.7.2</version></node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="naming">Keep DB column names as source of truth, update API/types to match</constraint>
+    <constraint type="migration">Preserve existing data with NULL defaults for new columns</constraint>
+    <constraint type="backfill">Populate supplier snapshots and calculate totals for existing POs</constraint>
+  </constraints>
+
+  <tests>
+    <standards>Manual testing for CRUD operations, type-check for TypeScript validation</standards>
+    <locations><location>apps/frontend/e2e/02-purchase-orders/**/*.spec.ts</location></locations>
+    <ideas>
+      <idea acRef="AC1">Test migration adds all missing columns without errors</idea>
+      <idea acRef="AC2">Test POST /api/planning/po creates PO with all new fields</idea>
+      <idea acRef="AC3">Test pnpm type-check passes after type updates</idea>
+      <idea acRef="AC4">Test PurchaseOrdersAPI.getAll() returns correct field names</idea>
+    </ideas>
+  </tests>
+</story-context>

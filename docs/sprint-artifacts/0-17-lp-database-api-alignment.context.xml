@@ -1,0 +1,84 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>17</storyId>
+    <title>LP Database &amp; API Alignment</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-19</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-17-lp-database-api-alignment.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer maintaining MonoPilot</asA>
+    <iWant>LP database schema, API routes, and types to be aligned</iWant>
+    <soThat>License Plate operations work correctly for traceability and genealogy</soThat>
+    <tasks>
+      <task n="1">Create migration 088_lp_schema_alignment.sql with missing QA/traceability columns</task>
+      <task n="2">Fix TypeScript types: id number not string, product_id not item_id, batch_number not batch</task>
+      <task n="3">Update LicensePlatesAPI field mappings</task>
+      <task n="4">Backfill origin_type, lp_type, parent_lp_number for existing LPs</task>
+      <task n="5">Verify scanner LP operations work correctly</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="AC1" title="Database Migration">Add QA columns: qa_status, stage_suffix, lp_type, origin_type, origin_ref, parent_lp_number, consumed_at</ac>
+    <ac id="AC2" title="TypeScript Type Alignment">LicensePlate interface: number IDs not strings, correct field names</ac>
+    <ac id="AC3" title="API Route Alignment">Scanner LP routes use correct column names</ac>
+    <ac id="AC4" title="Scanner Functionality">Split, move, QA status operations work correctly</ac>
+    <ac id="AC5" title="Backward Compatibility">Existing LP records remain valid with backfilled data</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>MonoPilot Architecture</title>
+        <section>license_plates (lines 7520-7582)</section>
+        <snippet>Defines LP schema with QA workflow fields, origin tracking, genealogy. Column Naming Note: lp_number not lp_code, product_id not item_id, batch_number not batch</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>apps/frontend/app/api/scanner/lp/[id]/route.ts</path>
+        <kind>API Route</kind>
+        <symbol>GET, POST, PUT, PATCH</symbol>
+        <reason>Verify column names match DB: qa_status, origin_type, parent_lp_number</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/types.ts</path>
+        <kind>Type Definitions</kind>
+        <symbol>LicensePlate</symbol>
+        <reason>Fix: id number not string, product_id not item_id, batch_number not batch, add missing fields</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/api/licensePlates.ts</path>
+        <kind>API Class</kind>
+        <symbol>LicensePlatesAPI</symbol>
+        <reason>Update field mappings for type consistency</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node><package>@supabase/supabase-js</package><version>^2.75.0</version></node>
+      <node><package>typescript</package><version>^5.7.2</version></node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="type-fix">IDs must be number type (BIGINT), not string</constraint>
+    <constraint type="naming">Use lp_number, product_id, batch_number - not aliases</constraint>
+    <constraint type="backfill">Populate origin_type from grn_id/wo_id/parent_lp_id, lp_type from product_type</constraint>
+  </constraints>
+
+  <tests>
+    <standards>Manual testing for scanner operations, type-check for TypeScript validation</standards>
+    <locations><location>apps/frontend/e2e/04-license-plates/**/*.spec.ts</location></locations>
+    <ideas>
+      <idea acRef="AC1">Test migration adds QA columns without errors</idea>
+      <idea acRef="AC2">Test LicensePlate type uses number for IDs</idea>
+      <idea acRef="AC4">Test scanner LP split operation creates child LPs correctly</idea>
+      <idea acRef="AC4">Test scanner QA status change updates qa_status column</idea>
+    </ideas>
+  </tests>
+</story-context>
