@@ -66,7 +66,7 @@ export default function ProcessTerminalPage() {
     wo.product?.type === 'PR'
   );
   
-  const selectedWO = selectedWOId ? workOrders.find(wo => wo.id === selectedWOId.toString()) : undefined;
+  const selectedWO = selectedWOId ? workOrders.find(wo => wo.id === selectedWOId) : undefined;
   const stagedLPsForCurrentOrder = selectedWOId ? (stagedLPsByOrder[selectedWOId] || []) : [];
   const bomItems = selectedWO ? getFilteredBomForWorkOrder(selectedWO) : [];
 
