@@ -1,0 +1,195 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>20</storyId>
+    <title>Refaktoryzacja Inline Types w Komponentach WorkOrder</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-19</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-20-workorder-inline-types-refactor.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Developer</asA>
+    <iWant>Refaktoryzować inline type definitions w komponentach WorkOrder do używania wspólnego typu z lib/types.ts</iWant>
+    <soThat>pnpm type-check przechodzi bez błędów i kod jest spójny typowo</soThat>
+    <tasks>
+      <task id="1">Analiza inline types - zidentyfikuj wszystkie inline type definitions</task>
+      <task id="2">Zmapuj stare nazwy pól → nowe nazwy</task>
+      <task id="3">Refaktoryzacja scanner/process/page.tsx (26 błędów)</task>
+      <task id="4">Refaktoryzacja WorkOrderDetailsModal.tsx (25 błędów)</task>
+      <task id="5">Refaktoryzacja CreateWorkOrderModal.tsx (16 błędów)</task>
+      <task id="6">Refaktoryzacja clientState.ts (14 błędów)</task>
+      <task id="7">Refaktoryzacja WorkOrdersTable.tsx (9 błędów)</task>
+      <task id="8">Refaktoryzacja pozostałych plików (LPOperationsTable, CreateGRNModal, CompositeProductModal, inne)</task>
+      <task id="9">Uruchom pnpm type-check</task>
+      <task id="10">Uruchom pnpm test:e2e:critical</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">pnpm type-check przechodzi bez błędów</criterion>
+    <criterion id="AC2">Wszystkie komponenty używają typu WorkOrder z lib/types.ts</criterion>
+    <criterion id="AC3">Usunięte duplikowane inline type definitions</criterion>
+    <criterion id="AC4">Testy E2E dla WorkOrder przechodzą</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/0-20-workorder-inline-types-refactor.md</path>
+        <title>Story 0-20</title>
+        <section>Mapowanie pól</section>
+        <snippet>Tabela mapowania starych nazw pól na nowe: quantity→planned_qty, due_date→scheduled_date, scheduled_start→start_date, scheduled_end→end_date, line_number→production_line_id, id(string)→id(number)</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/CONSISTENCY_REPORT_0-13-0-19.md</path>
+        <title>Raport zgodności DB/API/Types</title>
+        <section>Pozostałe błędy</section>
+        <snippet>119 błędów TypeScript w 14 plikach wynikających z inline type definitions używających starych nazw pól WorkOrder.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>apps/frontend/lib/types.ts</path>
+        <kind>types</kind>
+        <symbol>WorkOrder interface</symbol>
+        <lines>84-131</lines>
+        <reason>Główna definicja typu WorkOrder z nowymi nazwami pól - wszystkie komponenty powinny używać tego typu</reason>
+      </file>
+      <file>
+        <path>apps/frontend/app/scanner/process/page.tsx</path>
+        <kind>page component</kind>
+        <symbol>ScannerProcessPage</symbol>
+        <lines>all</lines>
+        <reason>26 błędów TypeScript - inline type definitions ze starymi nazwami pól</reason>
+      </file>
+      <file>
+        <path>apps/frontend/components/WorkOrderDetailsModal.tsx</path>
+        <kind>component</kind>
+        <symbol>WorkOrderDetailsModal</symbol>
+        <lines>all</lines>
+        <reason>25 błędów TypeScript - inline type definitions ze starymi nazwami pól</reason>
+      </file>
+      <file>
+        <path>apps/frontend/components/CreateWorkOrderModal.tsx</path>
+        <kind>component</kind>
+        <symbol>CreateWorkOrderModal</symbol>
+        <lines>all</lines>
+        <reason>16 błędów TypeScript - inline type definitions ze starymi nazwami pól</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/clientState.ts</path>
+        <kind>state management</kind>
+        <symbol>ClientState class</symbol>
+        <lines>all</lines>
+        <reason>14 błędów TypeScript - ID types (number vs string) i inline type definitions</reason>
+      </file>
+      <file>
+        <path>apps/frontend/components/WorkOrdersTable.tsx</path>
+        <kind>component</kind>
+        <symbol>WorkOrdersTable</symbol>
+        <lines>all</lines>
+        <reason>9 błędów TypeScript - inline type definitions ze starymi nazwami pól</reason>
+      </file>
+      <file>
+        <path>apps/frontend/components/LPOperationsTable.tsx</path>
+        <kind>component</kind>
+        <symbol>LPOperationsTable</symbol>
+        <lines>all</lines>
+        <reason>3 błędy TypeScript</reason>
+      </file>
+      <file>
+        <path>apps/frontend/components/CreateGRNModal.tsx</path>
+        <kind>component</kind>
+        <symbol>CreateGRNModal</symbol>
+        <lines>all</lines>
+        <reason>3 błędy TypeScript</reason>
+      </file>
+      <file>
+        <path>apps/frontend/components/CompositeProductModal.tsx</path>
+        <kind>component</kind>
+        <symbol>CompositeProductModal</symbol>
+        <lines>all</lines>
+        <reason>3 błędy TypeScript</reason>
+      </file>
+      <file>
+        <path>apps/frontend/lib/api/workOrders.ts</path>
+        <kind>api</kind>
+        <symbol>WorkOrdersAPI</symbol>
+        <lines>all</lines>
+        <reason>API zwraca dane w nowym formacie - komponenty muszą być zgodne</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>typescript</package>
+        <version>5.7</version>
+      </node>
+      <node>
+        <package>react</package>
+        <version>19</version>
+      </node>
+      <node>
+        <package>next</package>
+        <version>15</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Wszystkie ID pól muszą być typu number (nie string)</constraint>
+    <constraint>Używać wspólnego typu WorkOrder z lib/types.ts zamiast inline definitions</constraint>
+    <constraint>Mapowanie pól: quantity→planned_qty, due_date→scheduled_date, scheduled_start→start_date, scheduled_end→end_date, line_number→production_line_id</constraint>
+    <constraint>Nie zmieniać logiki biznesowej - tylko typy</constraint>
+    <constraint>Zachować backward compatibility gdzie możliwe</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>WorkOrder</name>
+      <kind>TypeScript interface</kind>
+      <signature>
+export interface WorkOrder {
+  id: number;
+  wo_number: string;
+  product_id: number;
+  bom_id?: number | null;
+  warehouse_id: number;
+  production_line_id?: number | null;
+  status: WorkOrderStatus;
+  planned_qty: number;
+  completed_qty: number;
+  uom: string;
+  scheduled_date?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  priority: number;
+  machine_id?: number | null;
+  ...
+}
+      </signature>
+      <path>apps/frontend/lib/types.ts</path>
+    </interface>
+    <interface>
+      <name>WorkOrdersAPI.getAll()</name>
+      <kind>API method</kind>
+      <signature>static async getAll(filters?): Promise&lt;WorkOrder[]&gt;</signature>
+      <path>apps/frontend/lib/api/workOrders.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Projekt używa Vitest dla unit tests i Playwright dla E2E tests. Testy powinny weryfikować że komponenty WorkOrder działają poprawnie z nowymi typami. Uruchomić pnpm type-check przed commit i pnpm test:e2e:critical po zmianach.</standards>
+    <locations>
+      <location>apps/frontend/e2e/</location>
+      <location>apps/frontend/lib/api/__tests__/</location>
+    </locations>
+    <ideas>
+      <idea acRef="AC1">Uruchomić pnpm type-check i upewnić się że przechodzi bez błędów</idea>
+      <idea acRef="AC2">Sprawdzić że wszystkie komponenty importują WorkOrder z lib/types.ts</idea>
+      <idea acRef="AC3">Grep za inline type definitions typu "type WO" lub podobne</idea>
+      <idea acRef="AC4">Uruchomić pnpm test:e2e:critical szczególnie testy work-orders</idea>
+    </ideas>
+  </tests>
+</story-context>
