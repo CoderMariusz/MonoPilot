@@ -34,8 +34,8 @@ export default function BomHistoryPage() {
   };
 
   const filteredHistory = history.filter(entry => {
-    if (filters.product && entry.bom?.products?.part_number) {
-      const partNumber = entry.bom.products.part_number.toLowerCase();
+    if (filters.product && entry.bom?.products?.sku) {
+      const partNumber = entry.bom.products.sku.toLowerCase();
       if (!partNumber.includes(filters.product.toLowerCase())) return false;
     }
     if (filters.dateFrom && new Date(entry.changed_at) < new Date(filters.dateFrom)) return false;
@@ -147,9 +147,9 @@ export default function BomHistoryPage() {
                     {new Date(entry.changed_at).toLocaleString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                    {entry.bom?.products?.part_number ? (
+                    {entry.bom?.products?.sku ? (
                       <div>
-                        <div className="font-medium">{entry.bom.products.part_number}</div>
+                        <div className="font-medium">{entry.bom.products.sku}</div>
                         <div className="text-xs text-slate-500">{entry.bom.products.description}</div>
                       </div>
                     ) : (

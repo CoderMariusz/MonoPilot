@@ -14,7 +14,7 @@ export class YieldAPI {
       production_date_utc: string;
       production_line: string;
       product: string;
-      part_number: string;
+      sku: string;
       work_order_count: number;
       total_input_kg: number;
       total_output_kg: number;
@@ -94,7 +94,7 @@ export class YieldAPI {
       production_date_utc: string;
       production_line: string;
       product: string;
-      part_number: string;
+      sku: string;
       work_order_count: number;
       total_planned_boxes: number;
       total_actual_boxes: number;

@@ -280,7 +280,7 @@ export default function SingleScreenScanner({
       // Find matching item in remaining items
       const matchedItem = remainingItems.find(
         item =>
-          item.product?.part_number === barcode ||
+          item.product?.sku === barcode ||
           item.product?.description?.toLowerCase().includes(barcode.toLowerCase())
       );
 
@@ -321,7 +321,7 @@ export default function SingleScreenScanner({
       const scannedItem: ScannedItem = {
         asn_item_id: matchedItem.id,
         product_id: matchedItem.product_id,
-        product_code: matchedItem.product?.part_number || '',
+        product_code: matchedItem.product?.sku || '',
         product_name: matchedItem.product?.description || 'Unknown Product',
         quantity: matchedItem.quantity,
         uom: matchedItem.uom,

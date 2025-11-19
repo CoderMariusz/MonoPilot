@@ -174,7 +174,7 @@ export function TraceLPModal({ isOpen, onClose, lpId, lpNumber }: TraceLPModalPr
                   <div>
                     <div className="text-sm text-slate-600">Product</div>
                     <div className="font-medium">
-                      {lpDetails.product.part_number} - {lpDetails.product.description}
+                      {lpDetails.product.sku} - {lpDetails.product.description}
                     </div>
                   </div>
                   <div>

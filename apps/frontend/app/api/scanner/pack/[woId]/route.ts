@@ -61,7 +61,7 @@ export async function POST(
         .from('license_plates')
         .select(`
           *,
-          product:products(description, part_number, type)
+          product:products(description, sku, type)
         `)
         .eq('id', lp_id)
         .single();

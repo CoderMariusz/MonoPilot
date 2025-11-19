@@ -318,7 +318,7 @@ export function PurchaseOrderDetailsModal({ isOpen, onClose, purchaseOrderId }: 
                                 )}
                                 <div>
                                   <div className="font-medium text-slate-900">
-                                    {item.product?.part_number || '-'}
+                                    {item.product?.sku || '-'}
                                   </div>
                                   <div className="text-slate-600 text-xs">
                                     {item.product?.description || '-'}

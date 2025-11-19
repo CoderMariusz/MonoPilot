@@ -323,7 +323,7 @@ export function YieldReportTab() {
                   <td className="px-4 py-3 text-sm text-slate-900">
                     <div>
                       <div className="font-medium">{row.product}</div>
-                      <div className="text-slate-500">{row.part_number}</div>
+                      <div className="text-slate-500">{row.sku}</div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-900">

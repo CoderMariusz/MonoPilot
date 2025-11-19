@@ -283,7 +283,7 @@ export default function ReceiveASNModal({
                         <tr key={item.id}>
                           <td className="py-2 px-3 text-sm">
                             <div className="font-medium text-slate-900">
-                              {item.product?.part_number || 'Unknown'}
+                              {item.product?.sku || 'Unknown'}
                             </div>
                             <div className="text-xs text-slate-500">
                               {item.product?.description || ''}

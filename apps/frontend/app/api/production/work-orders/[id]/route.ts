@@ -11,7 +11,7 @@ export async function GET(
       .from('work_orders')
       .select(`
         *,
-        products!inner(description, part_number, uom),
+        products!inner(description, sku, uom),
         machines(name, code, type),
         users!work_orders_created_by_fkey(name, email),
         wo_operations(
@@ -39,7 +39,7 @@ export async function GET(
           uom,
           boxes,
           created_at,
-          products!inner(description, part_number)
+          products!inner(description, sku)
         )
       `)
       .eq('id', id)

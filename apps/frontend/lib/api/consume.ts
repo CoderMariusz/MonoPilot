@@ -16,7 +16,7 @@ export class ConsumeAPI {
       production_date_utc: string;
       product: string;
       material: string;
-      material_part_number: string;
+      material_sku: string;
       bom_standard_kg: number;
       actual_consumed_kg: number;
       variance_kg: number;
@@ -88,7 +88,7 @@ export class ConsumeAPI {
   }): Promise<Array<{
     material_id: number;
     material_name: string;
-    material_part_number: string;
+    material_sku: string;
     total_standard_kg: number;
     total_actual_kg: number;
     total_variance_kg: number;
@@ -100,7 +100,7 @@ export class ConsumeAPI {
       const { data, error } = await supabase
         .from('vw_consume')
         .select(`
-          material_part_number,
+          material_sku,
           material,
           bom_standard_kg,
           actual_consumed_kg,
@@ -116,12 +116,12 @@ export class ConsumeAPI {
       const materialMap = new Map();
       
       data?.forEach(row => {
-        const key = row.material_part_number;
+        const key = row.material_sku;
         if (!materialMap.has(key)) {
           materialMap.set(key, {
             material_id: 0, // Would need to join with products table
             material_name: row.material,
-            material_part_number: row.material_part_number,
+            material_sku: row.material_sku,
             total_standard_kg: 0,
             total_actual_kg: 0,
             total_variance_kg: 0,
@@ -144,7 +144,7 @@ export class ConsumeAPI {
       return Array.from(materialMap.values()).map(material => ({
         material_id: material.material_id,
         material_name: material.material_name,
-        material_part_number: material.material_part_number,
+        material_sku: material.material_sku,
         total_standard_kg: material.total_standard_kg,
         total_actual_kg: material.total_actual_kg,
         total_variance_kg: material.total_variance_kg,

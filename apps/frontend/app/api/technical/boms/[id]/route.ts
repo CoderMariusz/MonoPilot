@@ -17,11 +17,11 @@ export async function GET(
       .from('boms')
       .select(`
         *,
-        product:products(id, part_number, description, uom),
+        product:products(id, sku, description, uom),
         bom_items(
           *,
           material:products!bom_items_material_id_fkey(
-            id, part_number, description, uom, is_active
+            id, sku, description, uom, is_active
           )
         )
       `)

@@ -293,7 +293,7 @@ function validatePORule(
       break;
 
     case 'all_lines_have_items':
-      const linesWithoutItems = lines.filter(line => !line.item_id);
+      const linesWithoutItems = lines.filter(line => !line.product_id);
       if (linesWithoutItems.length > 0) {
         errors.push(`${linesWithoutItems.length} line(s) missing items`);
       }
@@ -340,14 +340,14 @@ function validateTORule(
       break;
 
     case 'all_lines_have_items':
-      const linesWithoutItems = lines.filter(line => !line.item_id);
+      const linesWithoutItems = lines.filter(line => !line.product_id);
       if (linesWithoutItems.length > 0) {
         errors.push(`${linesWithoutItems.length} line(s) missing items`);
       }
       break;
 
     case 'all_lines_have_quantities':
-      const linesWithoutQuantities = lines.filter(line => !line.qty_planned || line.qty_planned <= 0);
+      const linesWithoutQuantities = lines.filter(line => !line.quantity || line.quantity <= 0);
       if (linesWithoutQuantities.length > 0) {
         errors.push(`${linesWithoutQuantities.length} line(s) missing valid quantities`);
       }

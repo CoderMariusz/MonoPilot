@@ -66,7 +66,7 @@ export function ManualConsumeModal({ isOpen, onClose, lp, availableQuantity, onC
             <div className="space-y-1 text-sm">
               <p>
                 <span className="font-medium text-slate-600">Product:</span>{' '}
-                <span className="text-slate-900">{lp.product?.part_number} - {lp.product?.description}</span>
+                <span className="text-slate-900">{lp.product?.sku} - {lp.product?.description}</span>
               </p>
               <p>
                 <span className="font-medium text-slate-600">Available to Consume:</span>{' '}

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       .from('work_orders')
       .select(`
         *,
-        products!inner(description, part_number),
+        products!inner(description, sku),
         machines(name, code),
         users!work_orders_created_by_fkey(name),
         wo_operations(

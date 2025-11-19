@@ -38,7 +38,7 @@ export async function POST(
         wo_number,
         kpi_scope,
         product_id,
-        product:products(part_number, description, uom)
+        product:products(sku, description, uom)
       `)
       .eq('id', woId)
       .single();

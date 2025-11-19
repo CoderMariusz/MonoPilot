@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const baseProductSchema = z.object({
-  part_number: z.string().min(1, 'Item number is required'),
+  sku: z.string().min(1, 'Item number is required'),
   description: z.string().min(1, 'Name is required'),
   uom: z.string().min(1, 'UoM is required'),
   std_price: z.string().refine((val) => {

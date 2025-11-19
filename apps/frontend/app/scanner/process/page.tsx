@@ -266,7 +266,7 @@ export default function ProcessTerminalPage() {
         const material = bomItem?.material;
         
         insufficient.push({
-          material: material?.part_number || `Material ${materialId}`,
+          material: material?.sku || `Material ${materialId}`,
           needed,
           available: availableInStaging,
           shortage: needed - availableInStaging,
@@ -376,7 +376,7 @@ export default function ProcessTerminalPage() {
       const needsLineSelection = productionLines && productionLines.length > 0 && !productionLines.includes('ALL');
       
       if (needsLineSelection && !componentLineSelections[item.material_id]) {
-        toast.error(`Please select production line for ${item.material?.part_number || 'component'}`);
+        toast.error(`Please select production line for ${item.material?.sku || 'component'}`);
         return;
       }
     }
@@ -427,7 +427,7 @@ export default function ProcessTerminalPage() {
       wo_number: selectedWO.wo_number,
     });
 
-    const woQty = selectedWO.quantity;
+    const woQty = selectedWO.planned_qty;
     const remainingQty = woQty - qtyToCreate;
     
     if (remainingQty <= 0) {
@@ -611,7 +611,7 @@ export default function ProcessTerminalPage() {
         planned_qty: standardQty,
         actual_qty: consumedQty,
         variance: consumedQty - standardQty,
-        item_code: material?.part_number || `MAT-${materialId}`,
+        item_code: material?.sku || `MAT-${materialId}`,
         item_name: material?.description || 'Unknown Material',
         standard_qty: standardQty,
         consumed_qty: consumedQty,
@@ -631,7 +631,7 @@ export default function ProcessTerminalPage() {
       created_at: new Date().toISOString(),
       materials_used: materialsUsed,
       work_order_number: selectedWO.wo_number,
-      product_name: `${selectedWO.product?.part_number} - ${selectedWO.product?.description}`,
+      product_name: `${selectedWO.product?.sku} - ${selectedWO.product?.description}`,
       line_number: selectedWO.line_number || '',
       target_quantity: targetQty,
       actual_quantity: createdItemsCount,
@@ -782,7 +782,7 @@ export default function ProcessTerminalPage() {
               <option value="">-- Select a WO --</option>
               {availableWOs.map(wo => (
                 <option key={wo.id} value={wo.id}>
-                  {wo.wo_number} - {wo.product?.part_number} ({wo.quantity} {wo.product?.uom})
+                  {wo.wo_number} - {wo.product?.sku} ({wo.planned_qty} {wo.product?.uom})
                 </option>
               ))}
             </select>
@@ -796,10 +796,10 @@ export default function ProcessTerminalPage() {
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">{selectedWO.wo_number}</h2>
                   <p className="text-sm text-slate-600 mt-1">
-                    {selectedWO.product?.part_number} - {selectedWO.product?.description}
+                    {selectedWO.product?.sku} - {selectedWO.product?.description}
                   </p>
                   <p className="text-sm text-slate-600 mt-1">
-                    Remaining: {selectedWO.quantity} {selectedWO.product?.uom}
+                    Remaining: {selectedWO.planned_qty} {selectedWO.product?.uom}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -830,7 +830,7 @@ export default function ProcessTerminalPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <p className="text-sm font-medium text-slate-900">
-                              {item.material?.part_number} - {item.material?.description}
+                              {item.material?.sku} - {item.material?.description}
                             </p>
                             <p className="text-xs text-slate-500">
                               Required: {item.quantity} {item.uom}
@@ -902,7 +902,7 @@ export default function ProcessTerminalPage() {
                     <h3 className="font-semibold text-slate-900 mb-2">Scanned LP Details</h3>
                     <div className="space-y-1 text-sm text-slate-700">
                       <p><span className="font-medium">LP Number:</span> {currentScannedLP.lp_number}</p>
-                      <p><span className="font-medium">Product:</span> {currentScannedLP.product?.part_number} - {currentScannedLP.product?.description}</p>
+                      <p><span className="font-medium">Product:</span> {currentScannedLP.product?.sku} - {currentScannedLP.product?.description}</p>
                       <p><span className="font-medium">Location:</span> {currentScannedLP.location?.code} - {currentScannedLP.location?.name}</p>
                       <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
                         <p><span className="font-medium">Original LP Quantity:</span> {currentScannedLP.quantity} {currentScannedLP.product?.uom}</p>
@@ -953,7 +953,7 @@ export default function ProcessTerminalPage() {
                       <div className="flex-1">
                         <p className="font-medium text-slate-900">{staged.lp.lp_number}</p>
                         <p className="text-sm text-slate-600">
-                          {staged.lp.product?.part_number} - {staged.lp.product?.description}
+                          {staged.lp.product?.sku} - {staged.lp.product?.description}
                         </p>
                         <p className="text-sm font-semibold text-blue-700">
                           Staged: {staged.quantity} {staged.lp.product?.uom}

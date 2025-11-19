@@ -84,7 +84,7 @@ export async function initializeValidationCache(): Promise<void> {
 
     // Build lookup maps
     validationCache.products = new Map(
-      products.map((p) => [p.part_number.toLowerCase(), p])
+      products.map((p) => [p.sku.toLowerCase(), p])
     );
 
     validationCache.suppliers = new Map(

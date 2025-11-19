@@ -76,7 +76,7 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
 
       const bomItems = getFilteredBomForWorkOrder(workOrder);
       
-      const woQuantity = typeof workOrder.quantity === 'string' ? parseFloat(workOrder.quantity) : workOrder.quantity;
+      const woQuantity = typeof workOrder.planned_qty === 'string' ? parseFloat(workOrder.planned_qty) : workOrder.planned_qty;
       
       const data = {
         work_order: {
@@ -84,15 +84,15 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
           wo_number: workOrder.wo_number,
           product_id: parseInt(workOrder.product_id),
           product_name: workOrder.product?.description || '',
-          product_part_number: workOrder.product?.part_number || '',
+          product_part_number: workOrder.product?.sku || '',
           quantity: woQuantity || 0,
           uom: workOrder.product?.uom || '',
           status: workOrder.status,
-          due_date: workOrder.due_date,
-          scheduled_start: workOrder.scheduled_start,
-          scheduled_end: workOrder.scheduled_end,
-          actual_start: workOrder.actual_start,
-          actual_end: workOrder.actual_end,
+          due_date: workOrder.scheduled_date,
+          scheduled_start: workOrder.start_date,
+          scheduled_end: workOrder.end_date,
+          actual_start: workOrder.start_date,
+          actual_end: workOrder.end_date,
           source_demand_type: workOrder.source_demand_type,
           source_demand_id: workOrder.source_demand_id,
           bom_id: workOrder.bom_id,
@@ -103,10 +103,10 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
           machine_name: workOrder.machine?.name || null,
         },
         bom_components: bomItems.map(bomItem => {
-          const bomQty = typeof bomItem.quantity === 'string' ? parseFloat(bomItem.quantity) : bomItem.quantity;
+          const bomQty = typeof bomItem.planned_qty === 'string' ? parseFloat(bomItem.planned_qty) : bomItem.planned_qty;
           return {
             material_id: parseInt(bomItem.material_id.toString()),
-            part_number: bomItem.material?.part_number || '',
+            part_number: bomItem.material?.sku || '',
             description: bomItem.material?.description || '',
             uom: bomItem.uom,
             qty_per_unit: bomQty,
@@ -240,12 +240,12 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
                   <div className="text-sm text-blue-900">
                     <div className="font-medium">Scheduled:</div>
                     <div className="text-xs">
-                      {details.work_order.due_date ? formatDate(details.work_order.due_date) : 'Not set'}
+                      {details.work_order.scheduled_date ? formatDate(details.work_order.scheduled_date) : 'Not set'}
                     </div>
-                    {details.work_order.actual_start ? (
+                    {details.work_order.start_date ? (
                       <div className="text-xs text-blue-700 font-bold mt-1">
-                        Actual: {formatDate(details.work_order.actual_start)}
-                        {details.work_order.actual_end && ` → ${formatDate(details.work_order.actual_end)}`}
+                        Actual: {formatDate(details.work_order.start_date)}
+                        {details.work_order.end_date && ` → ${formatDate(details.work_order.end_date)}`}
                       </div>
                     ) : (
                       <div className="text-xs text-blue-500 mt-1">Actual: Not started</div>
@@ -319,14 +319,14 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
                 <div>
                   <div className="text-sm text-slate-600 mb-1">Total Quantity</div>
                   <div className="text-base font-medium text-slate-900">
-                    {details.work_order.quantity} {details.work_order.uom}
+                    {details.work_order.planned_qty} {details.work_order.uom}
                   </div>
                 </div>
-                {details.work_order.due_date && (
+                {details.work_order.scheduled_date && (
                   <div>
                     <div className="text-sm text-slate-600 mb-1">Due Date</div>
                     <div className="text-base font-medium text-slate-900">
-                      {new Date(details.work_order.due_date).toLocaleDateString()}
+                      {new Date(details.work_order.scheduled_date).toLocaleDateString()}
                     </div>
                   </div>
                 )}
@@ -348,18 +348,18 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
                 <div>
                   <span className="text-sm text-slate-600">Scheduled:</span>
                   <div className="font-medium text-slate-900 mt-1">
-                    {details.work_order.scheduled_start 
-                      ? `${formatDate(details.work_order.scheduled_start)} → ${formatDate(details.work_order.scheduled_end)}` 
+                    {details.work_order.start_date 
+                      ? `${formatDate(details.work_order.start_date)} → ${formatDate(details.work_order.end_date)}` 
                       : 'Not scheduled'}
                   </div>
                 </div>
                 <div>
                   <span className="text-sm text-slate-600">Actual:</span>
                   <div className={`font-bold mt-1 ${
-                    details.work_order.actual_start ? 'text-blue-700' : 'text-slate-400'
+                    details.work_order.start_date ? 'text-blue-700' : 'text-slate-400'
                   }`}>
-                    {details.work_order.actual_start 
-                      ? `${formatDate(details.work_order.actual_start)} → ${details.work_order.actual_end ? formatDate(details.work_order.actual_end) : 'In progress'}`
+                    {details.work_order.start_date 
+                      ? `${formatDate(details.work_order.start_date)} → ${details.work_order.end_date ? formatDate(details.work_order.end_date) : 'In progress'}`
                       : 'Not started'}
                   </div>
                 </div>
@@ -431,7 +431,7 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
                             className={`border-b border-slate-100 hover:bg-slate-50 ${hasShortage ? 'bg-red-50' : ''}`}
                           >
                             <td className="py-3 px-4 text-sm">
-                              <div className="font-medium text-slate-900">{component.part_number}</div>
+                              <div className="font-medium text-slate-900">{component.sku}</div>
                               <div className="text-slate-600 text-xs">{component.description}</div>
                             </td>
                             <td className="py-3 px-4 text-sm text-slate-700">

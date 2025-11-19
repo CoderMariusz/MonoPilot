@@ -91,7 +91,7 @@ export default function ProductSelectByPart({
         <option value="">{loading ? 'Loading...' : placeholder}</option>
         {options.map((product) => (
           <option key={product.id} value={product.id}>
-            {product.part_number} — {product.description} ({product.uom})
+            {product.sku} — {product.description} ({product.uom})
           </option>
         ))}
       </select>

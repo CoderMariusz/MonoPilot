@@ -54,7 +54,7 @@ export async function POST(
         lp_number,
         status,
         qa_status,
-        product:products(part_number, description, uom)
+        product:products(sku, description, uom)
       `)
       .in('id', box_lp_ids);
 
@@ -147,7 +147,7 @@ export async function POST(
           id,
           lp_number,
           quantity,
-          product:products(part_number, description, uom)
+          product:products(sku, description, uom)
         )
       `);
 

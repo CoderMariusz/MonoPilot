@@ -67,8 +67,8 @@ class ClientState {
 
   getWorkOrders(): WorkOrder[] {
     return this.workOrders.map(wo => {
-      const product = wo.product_id ? this.products.find(p => p.id === parseInt(wo.product_id)) : undefined;
-      const machine = wo.machine_id ? this.machines.find(m => m.id === parseInt(wo.machine_id)) : undefined;
+      const product = wo.product_id ? this.products.find(p => p.id === wo.product_id) : undefined;
+      const machine = wo.machine_id ? this.machines.find(m => m.id === wo.machine_id) : undefined;
       
       let enrichedProduct = product;
       if (product && product.activeBom?.bomItems) {
@@ -97,8 +97,8 @@ class ClientState {
     if (!wo) return { madeQty: 0, plannedQty: 0, progressPct: 0 };
     
     const outputs = this.productionOutputs.filter(o => o.wo_id === woId);
-    const madeQty = outputs.reduce((sum, o) => sum + parseFloat(o.quantity.toString()), 0);
-    const plannedQty = parseFloat(wo.quantity.toString());
+    const madeQty = outputs.reduce((sum, o) => sum + parseFloat(o.planned_qty.toString()), 0);
+    const plannedQty = parseFloat(wo.planned_qty.toString());
     const progressPct = plannedQty > 0 ? Math.round((madeQty / plannedQty) * 100) : 0;
     
     return { madeQty, plannedQty, progressPct };
@@ -178,8 +178,8 @@ class ClientState {
   getLicensePlates(): LicensePlate[] {
     return this.licensePlates.map(lp => ({
       ...lp,
-      product: lp.product_id ? this.products.find(p => p.id === parseInt(lp.product_id)) : undefined,
-      location: lp.location_id ? this.locations.find(loc => loc.id === parseInt(lp.location_id)) : undefined,
+      product: lp.product_id ? this.products.find(p => p.id === lp.product_id) : undefined,
+      location: lp.location_id ? this.locations.find(loc => loc.id === lp.location_id) : undefined,
     }));
   }
 
@@ -219,7 +219,7 @@ class ClientState {
       
       let enrichedLP = lp;
       if (lp) {
-        const product = this.products.find(p => p.id === parseInt(lp.product_id));
+        const product = this.products.find(p => p.id === lp.product_id);
         enrichedLP = { ...lp, product };
       }
       
@@ -734,12 +734,12 @@ class ClientState {
       existingGrns.forEach(grn => {
         grn.grn_items?.forEach(grnItem => {
           if (grnItem.product_id === poItem.product_id) {
-            totalReceived += parseFloat(grnItem.quantity_received || '0');
+            totalReceived += parseFloat(grnItem.planned_qty_received || '0');
           }
         });
       });
 
-      const quantityOrdered = parseFloat(poItem.quantity_ordered.toString());
+      const quantityOrdered = parseFloat(poItem.planned_qty_ordered.toString());
       const remainingQty = quantityOrdered - totalReceived;
       const quantityToReceive = remainingQty > 0 ? remainingQty : 0;
 
@@ -747,7 +747,7 @@ class ClientState {
         id: Date.now() + poItem.id,
         grn_id: 0,
         product_id: poItem.product_id,
-        quantity_ordered: poItem.quantity_ordered,
+        quantity_ordered: poItem.planned_qty_ordered,
         quantity_received: quantityToReceive.toString(),
         location_id: po.warehouse_id || 1,
         lp_number: null,

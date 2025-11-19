@@ -40,7 +40,7 @@ interface Pallet {
   work_order?: {
     wo_number: string;
     product: {
-      part_number: string;
+      sku: string;
       description: string;
     };
   };
@@ -55,7 +55,7 @@ interface PalletItem {
   license_plate: {
     lp_code: string;
     product: {
-      part_number: string;
+      sku: string;
       description: string;
     };
   };

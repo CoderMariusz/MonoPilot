@@ -105,7 +105,7 @@ export function QuickPOEntryModal({
           // If updating product_code, try to find matching product
           if (field === 'product_code' && value) {
             const product = products.find(
-              p => p.part_number.toLowerCase() === value.toLowerCase()
+              p => p.sku.toLowerCase() === value.toLowerCase()
             );
 
             if (product) {
@@ -181,7 +181,7 @@ export function QuickPOEntryModal({
       const aggregated = new Map<string, { code: string; quantity: number }>();
       lines.forEach(line => {
         const canonicalCode = (
-          line.product?.part_number ?? line.product_code
+          line.product?.sku ?? line.product_code
         ).trim();
         const key = canonicalCode.toLowerCase();
         const qty = parseFloat(line.quantity);

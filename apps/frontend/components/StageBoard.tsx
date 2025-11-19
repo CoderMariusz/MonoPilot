@@ -241,7 +241,7 @@ export function StageBoard({ woId, operationSeq, onRefresh }: StageBoardProps) {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h5 className="font-medium text-slate-900">
-                      {component.part_number}
+                      {component.sku}
                     </h5>
                     {component.one_to_one && (
                       <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full font-medium">

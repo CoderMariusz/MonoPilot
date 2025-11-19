@@ -264,7 +264,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess }: CreateP
                             <option value="">Select...</option>
                             {products.map((product) => (
                               <option key={product.id} value={product.id}>
-                                {product.part_number} - {product.description}
+                                {product.sku} - {product.description}
                               </option>
                             ))}
                           </select>

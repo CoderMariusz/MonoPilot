@@ -293,7 +293,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
                 <option value="">Select a product...</option>
                 {products.map((product) => (
                   <option key={product.id} value={product.id}>
-                    {product.part_number} - {product.description}
+                    {product.sku} - {product.description}
                   </option>
                 ))}
               </select>

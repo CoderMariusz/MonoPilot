@@ -49,13 +49,13 @@ export function WorkOrdersTable() {
           const query = searchQuery.toLowerCase();
           const woNumber = wo.wo_number?.toLowerCase() || '';
           const productName = wo.product?.description?.toLowerCase() || '';
-          const itemCode = wo.product?.part_number?.toLowerCase() || '';
+          const itemCode = wo.product?.sku?.toLowerCase() || '';
           return woNumber.includes(query) || productName.includes(query) || itemCode.includes(query);
         });
 
     return base.filter(wo => {
       const matchesStatus = statusFilter ? wo.status === statusFilter : true;
-      const matchesLine = lineFilter ? (wo.machine?.name || wo.line_number || '').toLowerCase().includes(lineFilter.toLowerCase()) : true;
+      const matchesLine = lineFilter ? (wo.machine?.name || wo.production_line_id || '').toLowerCase().includes(lineFilter.toLowerCase()) : true;
       const matchesProduct = productFilter ? (wo.product?.description || '').toLowerCase().includes(productFilter.toLowerCase()) : true;
       // Placeholder QA filter (no QA flags on WO yet)
       const matchesQa = qaFilter ? qaFilter === 'Passed' : true;
@@ -80,8 +80,8 @@ export function WorkOrdersTable() {
           bVal = b.product?.description || '';
           break;
         case 'quantity':
-          aVal = a.quantity || 0;
-          bVal = b.quantity || 0;
+          aVal = a.planned_qty || 0;
+          bVal = b.planned_qty || 0;
           break;
         case 'status':
           aVal = a.status;
@@ -92,8 +92,8 @@ export function WorkOrdersTable() {
           bVal = b.machine?.name || '';
           break;
         case 'due_date':
-          aVal = a.due_date ? new Date(a.due_date).getTime() : 0;
-          bVal = b.due_date ? new Date(b.due_date).getTime() : 0;
+          aVal = a.scheduled_date ? new Date(a.scheduled_date).getTime() : 0;
+          bVal = b.scheduled_date ? new Date(b.scheduled_date).getTime() : 0;
           break;
         default:
           return 0;
@@ -153,7 +153,7 @@ export function WorkOrdersTable() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actual_end: new Date().toISOString(),
-          actual_output_qty: Number(wo.quantity) || 0,
+          actual_output_qty: Number(wo.planned_qty) || 0,
           actual_boxes: null,
           notes: 'Closed from UI',
           quality_checks: { passed: true, issues: [] }
@@ -358,11 +358,11 @@ export function WorkOrdersTable() {
                   <td className="py-3 px-4 text-sm">
                     <div>
                       <div className="font-medium text-slate-900">{wo.product?.description || '-'}</div>
-                      <div className="text-xs text-slate-500">{wo.product?.part_number || ''}</div>
+                      <div className="text-xs text-slate-500">{wo.product?.sku || ''}</div>
                     </div>
                   </td>
                   <td className="py-3 px-4 text-sm">
-                    <div className="font-medium">{wo.quantity}</div>
+                    <div className="font-medium">{wo.planned_qty}</div>
                     <div className="text-xs text-slate-500">{wo.product?.uom || ''}</div>
                   </td>
                   <td className="py-3 px-4 text-sm">
@@ -377,16 +377,16 @@ export function WorkOrdersTable() {
                     </span>
                   </td>
                   <td className="py-3 px-4 text-sm">
-                    <div className="text-sm">{wo.machine?.name || wo.line_number || '-'}</div>
+                    <div className="text-sm">{wo.machine?.name || wo.production_line_id || '-'}</div>
                   </td>
                   <td className="py-3 px-4 text-sm">
                     <div className="text-sm">
-                      {wo.due_date ? formatDate(wo.due_date) : 
-                       wo.scheduled_start ? formatDate(wo.scheduled_start) : '–'}
+                      {wo.scheduled_date ? formatDate(wo.scheduled_date) : 
+                       wo.start_date ? formatDate(wo.start_date) : '–'}
                     </div>
-                    {wo.scheduled_start && wo.scheduled_end && (
+                    {wo.start_date && wo.end_date && (
                       <div className="text-xs text-slate-500">
-                        {formatDate(wo.scheduled_start)} - {formatDate(wo.scheduled_end)}
+                        {formatDate(wo.start_date)} - {formatDate(wo.end_date)}
                       </div>
                     )}
                   </td>

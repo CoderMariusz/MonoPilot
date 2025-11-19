@@ -107,7 +107,7 @@ const validators = {
     try {
       const products = await ProductsAPI.getAll();
       const product = products.find(
-        (p) => p.part_number.toLowerCase() === value.toLowerCase()
+        (p) => p.sku.toLowerCase() === value.toLowerCase()
       );
       if (!product) {
         return { isValid: false, message: 'Product not found' };

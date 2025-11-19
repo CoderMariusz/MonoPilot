@@ -456,7 +456,7 @@ function ProductsTable({
                 {sortedProducts.map((product) => (
                   <tr key={product.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-3 px-4 text-sm font-medium text-slate-900">
-                      {product.part_number}
+                      {product.sku}
                     </td>
                     <td className="py-3 px-4 text-sm text-slate-700">
                       {product.description}

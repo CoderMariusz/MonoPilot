@@ -343,7 +343,7 @@ export default function CreateASNModal({
                           <option value={0}>Select product...</option>
                           {products.map((product) => (
                             <option key={product.id} value={product.id}>
-                              {product.part_number} - {product.description}
+                              {product.sku} - {product.description}
                             </option>
                           ))}
                         </select>

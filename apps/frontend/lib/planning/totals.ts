@@ -25,7 +25,7 @@ export interface POLineTotals {
 }
 
 export function calculatePOLineTotals(line: POLine): POLineTotals {
-  const netTotal = line.qty_ordered * line.unit_price;
+  const netTotal = line.quantity * line.unit_price;
   const vatAmount = netTotal * (line.vat_rate / 100);
   const grossTotal = netTotal + vatAmount;
 
@@ -63,7 +63,7 @@ export function calculatePOTotals(po: POHeader, lines: POLine[]): POTotals {
     vatTotal += lineTotals.vatAmount;
     grossTotal += lineTotals.grossTotal;
     
-    totalQuantity += line.qty_ordered;
+    totalQuantity += line.quantity;
     totalUnitPrice += line.unit_price;
   }
 
@@ -74,7 +74,7 @@ export function calculatePOTotals(po: POHeader, lines: POLine[]): POTotals {
     vatTotal: Math.round(vatTotal * 100) / 100,
     grossTotal: Math.round(grossTotal * 100) / 100,
     lineCount: lines.length,
-    itemCount: new Set(lines.map(l => l.item_id)).size,
+    itemCount: new Set(lines.map(l => l.product_id)).size,
     averageUnitPrice: Math.round(averageUnitPrice * 100) / 100,
     currency: po.currency || 'USD'
   };
@@ -102,7 +102,7 @@ export interface TOLineTotals {
 }
 
 export function calculateTOLineTotals(line: TOLine): TOLineTotals {
-  const plannedQuantity = line.qty_planned;
+  const plannedQuantity = line.quantity;
   const movedQuantity = line.qty_shipped; // Use qty_shipped as moved quantity
   const remainingQuantity = Math.max(0, plannedQuantity - movedQuantity);
   const completionPercentage = plannedQuantity > 0 
@@ -136,7 +136,7 @@ export function calculateTOTotals(to: TOHeader, lines: TOLine[]): TOTotals {
   let approvedLineCount = 0;
 
   for (const line of lines) {
-    totalPlanned += line.qty_planned;
+    totalPlanned += line.quantity;
     totalMoved += line.qty_shipped; // Use qty_shipped as moved quantity
 
     // scan_required and approved_line fields deprecated
@@ -152,7 +152,7 @@ export function calculateTOTotals(to: TOHeader, lines: TOLine[]): TOTotals {
     totalMoved: Math.round(totalMoved * 100) / 100,
     completionPercentage,
     lineCount: lines.length,
-    itemCount: new Set(lines.map(l => l.item_id)).size,
+    itemCount: new Set(lines.map(l => l.product_id)).size,
     scanRequiredCount,
     approvedLineCount
   };
@@ -223,8 +223,8 @@ export function calculatePOProgress(po: POHeader, lines: POLine[]): ProgressSumm
   let totalReceived = 0;
 
   for (const line of lines) {
-    totalOrdered += line.qty_ordered;
-    totalReceived += line.qty_received;
+    totalOrdered += line.quantity;
+    totalReceived += line.received_qty;
   }
 
   const progressPercentage = totalOrdered > 0 
@@ -240,7 +240,7 @@ export function calculatePOProgress(po: POHeader, lines: POLine[]): ProgressSumm
 
   return {
     totalItems: lines.length,
-    completedItems: lines.filter(l => l.qty_received >= l.qty_ordered).length,
+    completedItems: lines.filter(l => l.received_qty >= l.quantity).length,
     progressPercentage,
     status
   };
@@ -260,7 +260,7 @@ export function calculateTOProgress(to: TOHeader, lines: TOLine[]): ProgressSumm
   let totalMoved = 0;
 
   for (const line of lines) {
-    totalPlanned += line.qty_planned;
+    totalPlanned += line.quantity;
     totalMoved += line.qty_shipped; // Use qty_shipped as moved quantity
   }
 
@@ -277,7 +277,7 @@ export function calculateTOProgress(to: TOHeader, lines: TOLine[]): ProgressSumm
 
   return {
     totalItems: lines.length,
-    completedItems: lines.filter(l => l.qty_shipped >= l.qty_planned).length,
+    completedItems: lines.filter(l => l.qty_shipped >= l.quantity).length,
     progressPercentage,
     status
   };
@@ -306,17 +306,17 @@ export function detectPOWarnings(po: POHeader, lines: POLine[]): POWarnings {
 
   for (const line of lines) {
     // Check for partial receipts
-    if (line.qty_received > 0 && line.qty_received < line.qty_ordered) {
+    if (line.received_qty > 0 && line.received_qty < line.quantity) {
       hasPartialReceipts = true;
     }
 
     // Check for backorders (negative received)
-    if (line.qty_received < 0) {
+    if (line.received_qty < 0) {
       hasBackorders = true;
     }
 
     // Check for over-receipts
-    if (line.qty_received > line.qty_ordered) {
+    if (line.received_qty > line.quantity) {
       hasOverReceipts = true;
     }
 
@@ -372,7 +372,7 @@ export function detectTOWarnings(to: TOHeader, lines: TOLine[]): TOWarnings {
 
   for (const line of lines) {
     // Check for incomplete shipments
-    if (line.qty_shipped < line.qty_planned) {
+    if (line.qty_shipped < line.quantity) {
       hasIncompleteScans = true;
     }
 

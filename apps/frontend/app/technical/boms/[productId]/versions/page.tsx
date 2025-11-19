@@ -112,7 +112,7 @@ export default function BOMVersionsPage({ params }: PageProps) {
           <h1 className="text-2xl font-bold text-slate-900">BOM Version Timeline</h1>
           {product && (
             <p className="text-sm text-slate-600 mt-1">
-              Product: <span className="font-medium">{product.part_number}</span> - {product.description}
+              Product: <span className="font-medium">{product.sku}</span> - {product.description}
             </p>
           )}
         </div>

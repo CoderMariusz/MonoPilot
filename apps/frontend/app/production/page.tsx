@@ -560,7 +560,7 @@ function ConsumeReportTab() {
                     <td className="py-3 px-4 text-sm font-medium">{record.wo_number}</td>
                     <td className="py-3 px-4 text-sm">
                       <div>
-                        <div className="font-medium">{record.material_part_number}</div>
+                        <div className="font-medium">{record.material_sku}</div>
                         <div className="text-xs text-slate-500">{record.material_description}</div>
                       </div>
                     </td>

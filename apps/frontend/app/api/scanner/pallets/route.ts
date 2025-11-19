@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
         id,
         wo_number,
         kpi_scope,
-        product:products(part_number, description, uom)
+        product:products(sku, description, uom)
       `)
       .eq('id', wo_id)
       .single();
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
         line_id,
         status,
         created_at,
-        work_order:work_orders(wo_number, product:products(part_number, description))
+        work_order:work_orders(wo_number, product:products(sku, description))
       `)
       .order('created_at', { ascending: false });
 

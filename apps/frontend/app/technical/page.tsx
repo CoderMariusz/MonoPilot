@@ -201,7 +201,7 @@ function SmartProductsTable({
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matches =
-          product.part_number.toLowerCase().includes(query) ||
+          product.sku.toLowerCase().includes(query) ||
           product.description.toLowerCase().includes(query);
         if (!matches) return false;
       }
@@ -496,7 +496,7 @@ function SmartProductsTable({
                   </td>
                   {columns.find(c => c.key === 'sku')?.visible && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
-                      {product.part_number}
+                      {product.sku}
                     </td>
                   )}
                   {columns.find(c => c.key === 'name')?.visible && (
@@ -580,7 +580,7 @@ function ProductCard({
 
       {/* Product Info */}
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-slate-900 mb-1">{product.part_number}</h3>
+        <h3 className="text-sm font-semibold text-slate-900 mb-1">{product.sku}</h3>
         <p className="text-sm text-slate-600 mb-2">{product.description}</p>
         <div className="flex gap-2 flex-wrap">
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">

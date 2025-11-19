@@ -57,7 +57,7 @@ export function LPOperationsTable() {
     const query = searchQuery.toLowerCase();
     return licensePlates.filter(lp => 
       lp.lp_number?.toLowerCase().includes(query) ||
-      lp.product?.part_number?.toLowerCase().includes(query) ||
+      lp.product?.sku?.toLowerCase().includes(query) ||
       lp.product?.description?.toLowerCase().includes(query) ||
       lp.location?.name?.toLowerCase().includes(query) ||
       lp.qa_status?.toLowerCase().includes(query)
@@ -111,7 +111,7 @@ export function LPOperationsTable() {
               filteredLPs.map((lp) => (
                 <tr key={lp.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{lp.lp_number}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lp.product?.part_number || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lp.product?.sku || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lp.product?.description || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lp.location?.name || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{lp.quantity} {lp.product?.uom}</td>

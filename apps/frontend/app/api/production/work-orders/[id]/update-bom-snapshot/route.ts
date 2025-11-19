@@ -61,7 +61,7 @@ export async function POST(
       .from('wo_materials')
       .select(`
         *,
-        material:products(description, part_number)
+        material:products(description, sku)
       `)
       .eq('wo_id', woId)
       .order('sequence');
@@ -102,7 +102,7 @@ export async function POST(
           id: mat.id,
           material_id: mat.material_id,
           material_name: mat.material?.description,
-          material_part_number: mat.material?.part_number,
+          material_sku: mat.material?.sku,
           quantity: parseFloat(mat.quantity),
           uom: mat.uom,
           sequence: mat.sequence,

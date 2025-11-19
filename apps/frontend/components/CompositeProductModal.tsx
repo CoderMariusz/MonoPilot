@@ -147,7 +147,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
     if (editingProduct) {
       console.log('Editing product:', editingProduct);
       const productData = {
-        part_number: editingProduct.part_number,
+        part_number: editingProduct.sku,
         description: editingProduct.description,
         product_group: editingProduct.product_group,
         product_type: editingProduct.product_type,
@@ -551,7 +551,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
     setSubmitting(true);
     setError(null);
     try {
-      if (!product.part_number || !product.description || !product.uom) {
+      if (!product.sku || !product.description || !product.uom) {
         setError('part_number, description and uom are required');
         setSubmitting(false);
         return;
@@ -576,7 +576,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
       const payload = {
         product: {
           type: product.product_type as 'PR' | 'FG',
-          part_number: product.part_number!,
+          part_number: product.sku!,
           description: product.description!,
           uom: product.uom!,
           product_group: 'COMPOSITE' as const,
@@ -1089,7 +1089,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Part Number</label>
             <input
-              value={product.part_number ?? ''}
+              value={product.sku ?? ''}
               onChange={e => setProduct(p => ({ ...p, part_number: e.target.value }))}
               disabled={!!editingProduct}
               className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
@@ -1414,7 +1414,7 @@ export default function CompositeProductModal({ isOpen, onClose, onSuccess, prod
                               <option value="">Select...</option>
                               {components.map(component => (
                                 <option key={component.id} value={component.id}>
-                                  {component.part_number}
+                                  {component.sku}
                                 </option>
                               ))}
                             </select>

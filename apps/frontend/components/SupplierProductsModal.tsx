@@ -147,7 +147,7 @@ export function SupplierProductsModal({
                     <option value="">Select product...</option>
                     {availableProducts.map(product => (
                       <option key={product.id} value={product.id}>
-                        {product.part_number} - {product.description}
+                        {product.sku} - {product.description}
                       </option>
                     ))}
                   </select>
@@ -232,7 +232,7 @@ export function SupplierProductsModal({
                       <tr key={product.id} className="hover:bg-slate-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-slate-900">
-                            {product.part_number}
+                            {product.sku}
                           </div>
                         </td>
                         <td className="px-6 py-4">

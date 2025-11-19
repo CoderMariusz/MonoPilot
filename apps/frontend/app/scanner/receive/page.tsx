@@ -141,7 +141,7 @@ export default function ScannerReceivePage() {
     const scannedItem: ScannedItem = {
       asn_item_id: currentItem.id,
       product_id: currentItem.product_id,
-      product_code: currentItem.product?.part_number || 'Unknown',
+      product_code: currentItem.product?.sku || 'Unknown',
       product_name: currentItem.product?.description || '',
       expected_quantity: currentItem.quantity,
       received_quantity: parseFloat(receivedQty),
@@ -387,7 +387,7 @@ export default function ScannerReceivePage() {
             <div className="bg-white rounded-lg border border-slate-200 p-4">
               <div className="text-xs text-slate-500 mb-1">PRODUCT</div>
               <div className="font-semibold text-slate-900 text-lg mb-1">
-                {currentItem.product?.part_number || 'Unknown'}
+                {currentItem.product?.sku || 'Unknown'}
               </div>
               <div className="text-sm text-slate-600 mb-3">
                 {currentItem.product?.description || ''}

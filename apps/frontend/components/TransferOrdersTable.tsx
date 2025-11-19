@@ -53,7 +53,7 @@ export function TransferOrdersTable() {
       const toWarehouseName = to.to_warehouse?.name?.toLowerCase() || '';
       const toWarehouseCode = to.to_warehouse?.code?.toLowerCase() || '';
       const itemCodes = to.items?.map(item =>
-        item.product?.part_number?.toLowerCase() || ''
+        item.product?.sku?.toLowerCase() || ''
       ).join(' ') || '';
       
       return (

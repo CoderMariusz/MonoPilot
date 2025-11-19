@@ -64,7 +64,7 @@ export function StockMoveTable() {
       return (
         move.move_number?.toLowerCase().includes(query) ||
         move.lp?.lp_number?.toLowerCase().includes(query) ||
-        move.lp?.product?.part_number?.toLowerCase().includes(query) ||
+        move.lp?.product?.sku?.toLowerCase().includes(query) ||
         fromLocation?.toLowerCase().includes(query) ||
         toLocation?.toLowerCase().includes(query)
       );
@@ -130,7 +130,7 @@ export function StockMoveTable() {
                   <tr key={move.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{move.move_number}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.lp_number || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.product?.part_number || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.lp?.product?.sku || 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{fromLocation}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{toLocation}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{move.quantity}</td>

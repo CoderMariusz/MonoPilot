@@ -18,7 +18,7 @@ export async function GET(
       .select(`
         *,
         material:products!bom_items_material_id_fkey(
-          id, part_number, description, uom, is_active
+          id, sku, description, uom, is_active
         )
       `)
       .eq('bom_id', bomId)

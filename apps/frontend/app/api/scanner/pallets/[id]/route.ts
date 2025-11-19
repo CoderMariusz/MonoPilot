@@ -29,7 +29,7 @@ export async function GET(
         updated_at,
         work_order:work_orders(
           wo_number,
-          product:products(part_number, description, uom)
+          product:products(sku, description, uom)
         ),
         machine:machines(name, code)
       `)
@@ -55,7 +55,7 @@ export async function GET(
           lp_number,
           quantity,
           qa_status,
-          product:products(part_number, description, uom)
+          product:products(sku, description, uom)
         )
       `)
       .eq('pallet_id', palletId)

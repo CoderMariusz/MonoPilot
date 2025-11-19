@@ -51,7 +51,7 @@ export default function TemplatesPage() {
   const uniqueProducts = useMemo(() => {
     const products = templates
       .filter((t) => t.product)
-      .map((t) => ({ id: t.product!.id, name: t.product!.part_number }));
+      .map((t) => ({ id: t.product!.id, name: t.product!.sku }));
     return Array.from(new Map(products.map((p) => [p.id, p])).values());
   }, [templates]);
 
@@ -73,7 +73,7 @@ export default function TemplatesPage() {
         (t) =>
           t.template_name.toLowerCase().includes(term) ||
           t.description?.toLowerCase().includes(term) ||
-          t.product?.part_number.toLowerCase().includes(term)
+          t.product?.sku.toLowerCase().includes(term)
       );
     }
 
@@ -351,7 +351,7 @@ export default function TemplatesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">
-                      {template.product?.part_number || 'N/A'}
+                      {template.product?.sku || 'N/A'}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600">
                       {template.description ? (

@@ -305,7 +305,7 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                         <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-3 px-4 text-sm">
                             <div className="font-medium text-slate-900">
-                              {item.product?.part_number || '-'}
+                              {item.product?.sku || '-'}
                             </div>
                             <div className="text-slate-600 text-xs">
                               {item.product?.description || '-'}
@@ -449,7 +449,7 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
                     {transferOrder?.items?.map((item) => (
                       <tr key={item.id} className="border-t border-slate-100">
                         <td className="py-2 px-3 text-xs">
-                          <div className="font-medium text-slate-900">{item.product?.part_number || '-'}</div>
+                          <div className="font-medium text-slate-900">{item.product?.sku || '-'}</div>
                         </td>
                         <td className="py-2 px-3 text-xs text-right text-slate-600">{item.qty_planned}</td>
                         <td className="py-2 px-3">

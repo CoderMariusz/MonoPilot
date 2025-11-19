@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         product_id,
         quantity,
         qa_status,
-        product:products(part_number, description, uom)
+        product:products(sku, description, uom)
       `)
       .eq('id', lp_id)
       .single();
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
         reserved_at,
         consumed_at,
         notes,
-        license_plate:license_plates(lp_number, product:products(part_number, description)),
+        license_plate:license_plates(lp_number, product:products(sku, description)),
         work_order:work_orders(wo_number),
         operation:wo_operations(seq_no)
       `)

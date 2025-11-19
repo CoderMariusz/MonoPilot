@@ -26,7 +26,7 @@ export async function GET(
           quantity,
           one_to_one,
           is_optional,
-          material:products(description, part_number)
+          material:products(description, sku)
         ),
         wo_operations:wo_operations(
           sequence,
@@ -106,7 +106,7 @@ export async function GET(
           .map((mat: any) => ({
             material_id: mat.material_id,
             material_name: mat.material?.description,
-            material_part_number: mat.material?.part_number,
+            material_sku: mat.material?.sku,
             one_to_one: mat.one_to_one,
             is_optional: mat.is_optional
           })),
@@ -115,7 +115,7 @@ export async function GET(
           .map((mat: any) => ({
             material_id: mat.material_id,
             material_name: mat.material?.description,
-            material_part_number: mat.material?.part_number,
+            material_sku: mat.material?.sku,
             one_to_one: mat.one_to_one,
             is_optional: mat.is_optional
           })),

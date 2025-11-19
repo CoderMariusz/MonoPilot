@@ -29,7 +29,7 @@ export function PurchaseOrdersTable() {
       const poNumber = po.po_number?.toLowerCase() || '';
       const supplier = po.supplier?.name?.toLowerCase() || '';
       const itemCodes = po.purchase_order_items?.map(item => 
-        item.product?.part_number?.toLowerCase() || ''
+        item.product?.sku?.toLowerCase() || ''
       ).join(' ') || '';
       
       return poNumber.includes(query) || 

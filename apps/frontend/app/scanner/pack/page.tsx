@@ -21,7 +21,7 @@ interface WorkOrder {
   status: string;
   kpi_scope: string;
   product: {
-    part_number: string;
+    sku: string;
     description: string;
   uom: string;
   };
@@ -36,7 +36,7 @@ interface Pallet {
   work_order: {
     wo_number: string;
     product: {
-      part_number: string;
+      sku: string;
       description: string;
     };
   };
@@ -221,7 +221,7 @@ export default function PackTerminal() {
                     <option value="">Select a work order</option>
                     {workOrders.map((wo) => (
                 <option key={wo.id} value={wo.id}>
-                        {wo.wo_number} - {wo.product.part_number}
+                        {wo.wo_number} - {wo.product.sku}
                 </option>
               ))}
             </select>
@@ -232,7 +232,7 @@ export default function PackTerminal() {
                     <h3 className="font-medium text-blue-900 mb-2">Selected Work Order</h3>
                     <div className="text-sm text-blue-800 space-y-1">
                       <div><strong>WO:</strong> {selectedWO.wo_number}</div>
-                      <div><strong>Product:</strong> {selectedWO.product.part_number}</div>
+                      <div><strong>Product:</strong> {selectedWO.product.sku}</div>
                       <div><strong>Description:</strong> {selectedWO.product.description}</div>
                       <div><strong>Quantity:</strong> {selectedWO.quantity} {selectedWO.product.uom}</div>
                       <div><strong>Status:</strong> {selectedWO.status}</div>
@@ -391,7 +391,7 @@ export default function PackTerminal() {
                     <option value="">Select work order</option>
                     {workOrders.map((wo) => (
                       <option key={wo.id} value={wo.id}>
-                        {wo.wo_number} - {wo.product.part_number}
+                        {wo.wo_number} - {wo.product.sku}
                       </option>
                     ))}
                   </select>
@@ -432,7 +432,7 @@ export default function PackTerminal() {
                           {pallet.work_order.wo_number}
                         </div>
                         <div className="text-sm text-slate-600">
-                          {pallet.work_order.product.part_number}
+                          {pallet.work_order.product.sku}
                         </div>
                       </div>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${

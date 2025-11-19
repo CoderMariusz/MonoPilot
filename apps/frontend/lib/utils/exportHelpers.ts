@@ -118,7 +118,7 @@ export function exportYieldToExcel(
       'Production Date (London)': dates.london,
       'Production Line': row.production_line,
       'Product': row.product,
-      'Part Number': row.part_number,
+      'Part Number': row.sku,
       'Work Orders': row.work_order_count,
       ...(kpiScope === 'PR' ? {
         'Total Input (kg)': row.total_input_kg,
@@ -169,7 +169,7 @@ export function exportConsumeToExcel(data: any[]): any {
       'Production Date (London)': dates.london,
       'Product': row.product,
       'Material': row.material,
-      'Material Part Number': row.material_part_number,
+      'Material Part Number': row.material_sku,
       'BOM Standard (kg)': row.bom_standard_kg,
       'Actual Consumed (kg)': row.actual_consumed_kg,
       'Variance (kg)': row.variance_kg,
@@ -257,7 +257,7 @@ export function exportWorkOrdersToExcel(data: any[]): any {
     return {
       'WO Number': row.wo_number,
       'Product': row.product?.description,
-      'Part Number': row.product?.part_number,
+      'Part Number': row.product?.sku,
       'Quantity': row.quantity,
       'UOM': row.uom,
       'Priority': row.priority,
@@ -311,7 +311,7 @@ export function exportLicensePlatesToExcel(data: any[]): any {
     return {
       'LP Number': row.lp_number,
       'Product': row.product_description,
-      'Part Number': row.product_part_number,
+      'Part Number': row.product_sku,
       'Quantity': row.quantity,
       'UOM': row.uom,
       'Location': row.location_name,

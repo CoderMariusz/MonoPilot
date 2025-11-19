@@ -31,7 +31,7 @@ export async function GET(
         stage_suffix,
         origin_type,
         origin_ref,
-        product:products(part_number, description, uom)
+        product:products(sku, description, uom)
       `)
       .eq('id', lpId)
       .single();
@@ -112,7 +112,7 @@ export async function POST(
         warehouse_id,
         uom,
         batch_number,
-        product:products(part_number, description, uom)
+        product:products(sku, description, uom)
       `)
       .eq('id', lpId)
       .single();
@@ -272,7 +272,7 @@ export async function PUT(
         product_id,
         quantity,
         location_id,
-        product:products(part_number, description, uom)
+        product:products(sku, description, uom)
       `)
       .eq('id', lpId)
       .single();

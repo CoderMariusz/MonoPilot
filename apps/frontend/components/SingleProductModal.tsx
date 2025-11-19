@@ -53,7 +53,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
   useEffect(() => {
     if (product) {
       setForm({
-        part_number: product.part_number,
+        part_number: product.sku,
         description: product.description,
         product_group: product.product_group,
         product_type: product.product_type,
@@ -146,7 +146,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
     setSubmitting(true);
     setError(null);
     try {
-      if (!form.part_number || !form.description || !form.uom) {
+      if (!form.sku || !form.description || !form.uom) {
         setError('part_number, description and uom are required');
         setSubmitting(false);
         return;
@@ -190,7 +190,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
       
       const productPayload: ProductInsert = {
         type: mappedType,
-        part_number: form.part_number!,
+        part_number: form.sku!,
         description: form.description!,
         uom: form.uom!,
         product_group: group,
@@ -345,7 +345,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Part Number</label>
             <input
-              value={form.part_number ?? ''}
+              value={form.sku ?? ''}
               onChange={e => handleChange('part_number', e.target.value)}
               disabled={!!product}
               className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"

@@ -73,11 +73,11 @@ export default function ProductSelect({ value, onChange, placeholder = 'Search p
                 type="button"
                 onClick={() => {
                   onChange(opt);
-                  setQuery(`${opt.part_number} — ${opt.description}`);
+                  setQuery(`${opt.sku} — ${opt.description}`);
                 }}
                 className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
               >
-                <div className="font-medium text-slate-900">{opt.part_number}</div>
+                <div className="font-medium text-slate-900">{opt.sku}</div>
                 <div className="text-slate-600">{opt.description}</div>
               </button>
             ))
