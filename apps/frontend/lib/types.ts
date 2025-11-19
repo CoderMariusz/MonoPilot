@@ -580,10 +580,12 @@ export interface POCorrection {
 // TO Header (replacing TransferOrder)
 export interface TOHeader {
   id: number;
-  number: string;
+  org_id?: number;
+  to_number: string;  // Match DB: was 'number'
   status: TOStatus;
-  from_wh_id: number;
-  to_wh_id: number;
+  from_warehouse_id: number;  // Match DB: was 'from_wh_id'
+  to_warehouse_id: number;    // Match DB: was 'to_wh_id'
+  scheduled_date?: string | null;
   transfer_date?: string | null;
   requested_date?: string | null;
   planned_ship_date?: string | null;
@@ -594,8 +596,8 @@ export interface TOHeader {
   created_by?: string | null;
   updated_by?: string | null;
   approved_by?: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   // Relationships
   from_warehouse?: Warehouse;
   to_warehouse?: Warehouse;
@@ -606,19 +608,25 @@ export interface TOHeader {
 export interface TOLine {
   id: number;
   to_id: number;
-  line_no: number;
-  item_id: number;
-  uom: UoM;
-  qty_planned: number;
+  line_number: number;      // Match DB: was 'line_no'
+  product_id: number;       // Match DB: was 'item_id'
+  uom: string;
+  quantity: number;         // Match DB: was 'qty_planned'
   qty_shipped: number;
-  qty_received: number;
+  transferred_qty: number;  // Match DB: was 'qty_received'
   lp_id?: number | null;
   batch?: string | null;
+  from_location_id?: number | null;
+  to_location_id?: number | null;
+  scan_required?: boolean;
   notes?: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   // Relationships
-  item?: Product;
+  product?: Product;
+  from_location?: Location;
+  to_location?: Location;
+  license_plate?: LicensePlate;
 }
 
 // Audit Log (enhanced audit_events)
