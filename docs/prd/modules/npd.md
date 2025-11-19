@@ -926,7 +926,55 @@ CREATE INDEX idx_npd_events_type ON npd_events(event_type);
 
 ---
 
-## 14. Success Metrics
+## 14. Non-Functional Requirements
+
+### Performance
+
+| ID | Requirement |
+|----|-------------|
+| NPD-NFR-01 | NPD Dashboard (Kanban view) must load in <500ms (p95) for 50 projects |
+| NPD-NFR-02 | Formulation detail page must load in <300ms (p95) including allergen aggregation |
+| NPD-NFR-03 | Handoff wizard validation must complete in <2 seconds |
+| NPD-NFR-04 | Handoff execution (Product + BOM + WO) must complete in <5 seconds |
+| NPD-NFR-05 | CSV export must complete in <3 seconds for 200 projects |
+| NPD-NFR-06 | Document upload must support files up to 50MB with progress indicator |
+| NPD-NFR-07 | Event retry mechanism must process failed events within 1 minute |
+
+### Security
+
+| ID | Requirement |
+|----|-------------|
+| NPD-NFR-08 | All NPD API endpoints must require authentication |
+| NPD-NFR-09 | All NPD tables must enforce RLS policies (org_id isolation) |
+| NPD-NFR-10 | Formulation access must be logged in audit_log (IP protection) |
+| NPD-NFR-11 | Compliance documents must be stored with encryption at rest |
+| NPD-NFR-12 | Standard cost approval must require Finance role |
+| NPD-NFR-13 | Handoff wizard must validate user has permission to create Product/BOM/WO |
+| NPD-NFR-14 | Event log must be read-only for non-Admin users |
+
+### Scalability
+
+| ID | Requirement |
+|----|-------------|
+| NPD-NFR-15 | System must support 500 active NPD projects per organization |
+| NPD-NFR-16 | System must support 10 formulation versions per project |
+| NPD-NFR-17 | System must support 50 formulation items per formulation |
+| NPD-NFR-18 | System must support 100 NPD projects per user (NPD Lead) |
+| NPD-NFR-19 | Handoff wizard must handle concurrent handoffs |
+| NPD-NFR-20 | Event log must retain events for 90 days |
+
+### Accessibility
+
+| ID | Requirement |
+|----|-------------|
+| NPD-NFR-21 | NPD Dashboard must be keyboard-navigable |
+| NPD-NFR-22 | Handoff wizard must support screen readers (ARIA labels) |
+| NPD-NFR-23 | Document upload must support drag-and-drop AND file picker |
+| NPD-NFR-24 | Color-coded risk scores must include text labels |
+
+---
+
+## 15. Success Metrics
 
 ### Adoption (4-6 weeks post-launch)
 - ≥3 pilot customers activate NPD Module
