@@ -98,6 +98,18 @@ development_status:
   # Story 0.12: Architecture.md Auto-Generation Setup (LOW)
   0-12-architecture-auto-generation-setup: done
 
+  # ========================================
+  # NEW STORIES from BOM Analysis (2025-11-19)
+  # Critical fixes for BOM edit and history functionality
+  # Reference: Architecture.md Pattern 22b
+  # ========================================
+
+  # Story 0.13: Add Missing BOM API GET Endpoints (CRITICAL - BOM edit broken)
+  0-13-add-bom-api-get-endpoints: backlog
+
+  # Story 0.14: Fix BOM History Display (CRITICAL - History not showing)
+  0-14-fix-bom-history-display: backlog
+
   epic-0-retrospective: done
 
   # ========================================

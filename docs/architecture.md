@@ -3891,6 +3891,129 @@ async function deactivateProduct(productId: string) {
 
 ---
 
+### Pattern 22b: BOM API Route Requirements
+
+**Problem:** BOM API routes must provide complete CRUD operations including GET methods for reading BOM and BOM items. Missing GET endpoints break edit flows.
+
+**Required API Routes:**
+
+```
+/api/technical/boms/
+├── route.ts                    # GET (list all), POST (create)
+├── [id]/
+│   ├── route.ts                # GET (by id), PATCH (update), DELETE
+│   ├── items/
+│   │   └── route.ts            # GET (items), PUT (bulk upsert)
+│   ├── activate/route.ts       # POST
+│   ├── archive/route.ts        # POST
+│   ├── clone/route.ts          # POST
+│   ├── clone-version/route.ts  # POST (with dates)
+│   ├── evaluate-materials/route.ts      # POST
+│   └── evaluate-all-materials/route.ts  # POST
+├── versions/[productId]/route.ts        # GET (all versions)
+├── select-by-date/route.ts              # GET (BOM for date)
+└── validate-date-range/route.ts         # GET (overlap check)
+```
+
+**GET /api/technical/boms/[id] (REQUIRED):**
+
+```typescript
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const bomId = parseInt(id);
+
+  const { data: bom, error } = await supabase
+    .from('boms')
+    .select(`
+      *,
+      product:products(id, part_number, description),
+      bom_items(*)
+    `)
+    .eq('id', bomId)
+    .single();
+
+  if (error || !bom) {
+    return NextResponse.json({ error: 'BOM not found' }, { status: 404 });
+  }
+
+  return NextResponse.json(bom);
+}
+```
+
+**GET /api/technical/boms/[id]/items (REQUIRED):**
+
+```typescript
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const bomId = parseInt(id);
+
+  const { data: items, error } = await supabase
+    .from('bom_items')
+    .select(`
+      *,
+      material:products!bom_items_material_id_fkey(
+        id, part_number, description, uom, is_active
+      )
+    `)
+    .eq('bom_id', bomId)
+    .order('sequence');
+
+  if (error) {
+    return NextResponse.json({ error: 'Failed to fetch BOM items' }, { status: 500 });
+  }
+
+  return NextResponse.json(items || []);
+}
+```
+
+**BomsAPI Client Methods (must match routes):**
+
+```typescript
+export const BomsAPI = {
+  // Standard CRUD
+  async getById(id: number): Promise<Bom | null>;
+  async getByProduct(productId: number): Promise<Bom[]>;
+  async getItems(bomId: number): Promise<BomItem[]>;
+
+  // Updates
+  async updateHeader(id: number, data: BomUpdateData): Promise<BomUpdateResponse>;
+  async updateItems(id: number, items: BomItemUpdateData[]): Promise<BomItemsUpdateResponse>;
+
+  // Lifecycle
+  async clone(id: number): Promise<BomCloneResponse>;
+  async activate(id: number): Promise<BomActivateResponse>;
+  async archive(id: number): Promise<BomArchiveResponse>;
+  async hardDelete(id: number): Promise<BomDeleteResponse>;
+  async softDelete(id: number): Promise<BomDeleteResponse>;
+
+  // Multi-Version (EPIC-001 Phase 2)
+  async getBOMForDate(productId: number, date?: string): Promise<BomVersionInfo>;
+  async getAllVersions(productId: number): Promise<BomVersionInfo[]>;
+  async cloneBOMWithDates(id: number, effectiveFrom: string, effectiveTo?: string): Promise<BomCloneResponse>;
+  async validateDateRange(productId: number, effectiveFrom: string, effectiveTo?: string, bomId?: number): Promise<ValidationResult>;
+
+  // Conditional Components (EPIC-001 Phase 3)
+  async evaluateBOMMaterials(bomId: number, context: WOContext): Promise<EvaluatedMaterial[]>;
+  async getAllMaterialsWithEvaluation(bomId: number, context: WOContext): Promise<EvaluatedMaterial[]>;
+};
+```
+
+**AI Agent Implementation Rules:**
+
+1. **ALWAYS implement GET methods** - routes without GET break client API
+2. **ALWAYS include related data** - BOM GET should include product and items
+3. **ALWAYS validate params** - check ID format before DB query
+4. **ALWAYS return consistent errors** - use standard error format
+5. **NEVER use only Supabase in components** - use API layer for consistency
+
+---
+
 ## Quality Module Patterns
 
 ### Pattern #23: QA Inspection Workflow
@@ -6743,19 +6866,84 @@ CREATE TABLE boms (
 
 #### bom_history
 
+**Purpose:** Audit trail for all BOM changes with structured change tracking.
+
 ```sql
 CREATE TABLE bom_history (
-  id SERIAL PRIMARY KEY,
-  bom_id INTEGER NOT NULL REFERENCES boms(id),
-  version VARCHAR(50) NOT NULL,
+  id BIGSERIAL PRIMARY KEY,
+  bom_id BIGINT NOT NULL REFERENCES boms(id) ON DELETE CASCADE,
   changed_by UUID REFERENCES users(id),
-  changed_at TIMESTAMPTZ DEFAULT NOW(),
-  status_from VARCHAR(20),
-  status_to VARCHAR(20),
-  changes JSONB NOT NULL,
-  description TEXT
+  change_type TEXT NOT NULL,  -- 'created', 'updated', 'status_changed', 'items_modified'
+  old_values JSONB,           -- Previous state snapshot
+  new_values JSONB,           -- New state with changes structure
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX idx_bom_history_bom_id ON bom_history(bom_id);
 ```
+
+**new_values Structure (when saving from UI):**
+
+```typescript
+interface BomHistoryNewValues {
+  version: string;           // e.g., "1.1"
+  status: string;            // e.g., "active"
+  description?: string;      // Human-readable change description
+  changes: {
+    bom?: Record<string, { old: any; new: any }>;     // BOM header field changes
+    product?: Record<string, { old: any; new: any }>; // Product field changes
+    items?: {
+      added: BomItemData[];
+      removed: BomItemData[];
+      modified: Array<{
+        material_id: number;
+        changes: Record<string, { old: any; new: any }>;
+      }>;
+    };
+  };
+}
+```
+
+**API Methods (BomHistoryAPI):**
+
+```typescript
+class BomHistoryAPI {
+  // Create history entry
+  static async create(data: {
+    bom_id: number;
+    change_type: string;
+    old_values?: object | null;
+    new_values?: object | null;
+  }): Promise<BomHistory>;
+
+  // Get history for specific BOM
+  static async getByBomId(bomId: number): Promise<BomHistory[]>;
+
+  // Get all history with pagination
+  static async getAll(options?: {
+    limit?: number;
+    offset?: number;
+    bom_id?: number;
+  }): Promise<BomHistory[]>;
+}
+```
+
+**Frontend Display Requirements:**
+
+The `BomHistoryModal` must parse `new_values` to extract:
+- `new_values.version` → Display version
+- `old_values.status` → Status from
+- `new_values.status` → Status to
+- `new_values.description` → Change description
+- `new_values.changes` → Detailed changes breakdown
+- `created_at` → Timestamp (NOT changed_at)
+
+**AI Agent Implementation Rules:**
+
+1. **ALWAYS save history** on any BOM modification (header, items, status)
+2. **ALWAYS include description** - human-readable summary of changes
+3. **ALWAYS track old_values** - enable diff view and rollback
+4. **ALWAYS use created_at** - not changed_at (field doesn't exist)
 
 #### routings
 
