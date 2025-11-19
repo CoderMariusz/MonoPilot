@@ -7521,47 +7521,87 @@ CREATE TABLE bom_items (
 
 ```sql
 CREATE TABLE license_plates (
-  id SERIAL PRIMARY KEY,
-  lp_number VARCHAR(50) UNIQUE NOT NULL,
-  product_id INTEGER REFERENCES products(id),
-  quantity NUMERIC(12,4) NOT NULL,
-  uom VARCHAR(20) NOT NULL CHECK (uom IN ('KG', 'EACH', 'METER', 'LITER')),
-  location_id INTEGER REFERENCES locations(id),
-  status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'reserved', 'consumed', 'in_transit', 'quarantine', 'damaged')),
-  qa_status VARCHAR(20) DEFAULT 'pending' CHECK (qa_status IN ('pending', 'passed', 'failed', 'on_hold')),
-  stage_suffix VARCHAR(10) CHECK (stage_suffix IS NULL OR stage_suffix ~ '^[A-Z]{2}$'),
-  batch_number VARCHAR(100),
-  lp_type VARCHAR(20) CHECK (lp_type IN ('PR', 'FG', 'PALLET')),
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  lp_number TEXT NOT NULL,  -- Note: Use lp_number, not lp_code
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,  -- Note: not item_id
+  quantity DECIMAL(15,4) NOT NULL,
+  uom TEXT NOT NULL,
+  status lp_status NOT NULL DEFAULT 'Available',
+  location_id BIGINT REFERENCES locations(id) ON DELETE SET NULL,
+  warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
 
-  -- Traceability
-  consumed_by_wo_id INTEGER REFERENCES work_orders(id),
+  -- Batch & Dates
+  batch_number TEXT,  -- Note: use batch_number, not batch
+  supplier_batch_number TEXT,
+  manufacture_date DATE,
+  expiry_date DATE,
+
+  -- QA (added for QA workflow)
+  qa_status VARCHAR(20) DEFAULT 'pending'
+    CHECK (qa_status IN ('pending', 'passed', 'failed', 'on_hold')),
+  stage_suffix VARCHAR(10)
+    CHECK (stage_suffix IS NULL OR stage_suffix ~ '^[A-Z]{2}$'),
+  lp_type VARCHAR(20)
+    CHECK (lp_type IN ('PR', 'FG', 'PALLET', 'RM', 'WIP')),
+
+  -- References
+  po_id BIGINT REFERENCES po_header(id) ON DELETE SET NULL,
+  po_number TEXT,
+  grn_id BIGINT REFERENCES grns(id) ON DELETE SET NULL,
+  wo_id BIGINT REFERENCES work_orders(id) ON DELETE SET NULL,
+
+  -- Traceability / Genealogy
+  parent_lp_id BIGINT REFERENCES license_plates(id) ON DELETE SET NULL,
+  parent_lp_number TEXT,  -- Denormalized for display
+  consumed_by_wo_id BIGINT REFERENCES work_orders(id) ON DELETE SET NULL,
   consumed_at TIMESTAMPTZ,
-  parent_lp_id INTEGER REFERENCES license_plates(id),
-  parent_lp_number VARCHAR(50),
-  origin_type VARCHAR(50),
+
+  -- Origin tracking
+  origin_type VARCHAR(50),  -- GRN, PRODUCTION, SPLIT, MANUAL
   origin_ref JSONB,
 
-  -- Metadata
-  created_by VARCHAR(50),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  -- Pallet reference
+  pallet_id BIGINT REFERENCES pallets(id) ON DELETE SET NULL,
+
+  -- Audit
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT license_plates_unique_number_per_org UNIQUE (org_id, lp_number)
 );
 ```
+
+**Column Naming Note:** DB column names differ from some legacy code:
+- `lp_number` (not `lp_code`)
+- `product_id` (not `item_id`)
+- `batch_number` (not `batch`)
+- IDs are numeric BIGINT (not strings)
+
+All API routes and types must use these actual DB column names with correct types.
 
 #### lp_reservations
 
 ```sql
 CREATE TABLE lp_reservations (
-  id SERIAL PRIMARY KEY,
-  lp_id INTEGER NOT NULL REFERENCES license_plates(id),
-  wo_id INTEGER NOT NULL REFERENCES work_orders(id),
-  qty NUMERIC(12,4) NOT NULL CHECK (qty > 0),
-  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'consumed', 'expired', 'cancelled')),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  expires_at TIMESTAMPTZ,
-  created_by VARCHAR(50)
+  id BIGSERIAL PRIMARY KEY,
+  lp_id BIGINT NOT NULL REFERENCES license_plates(id) ON DELETE CASCADE,
+  wo_id BIGINT REFERENCES work_orders(id) ON DELETE CASCADE,
+  to_id BIGINT REFERENCES to_header(id) ON DELETE CASCADE,
+  reserved_qty DECIMAL(15,4) NOT NULL,  -- Note: use reserved_qty, not qty
+  reserved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reserved_by UUID REFERENCES users(id),
+
+  CONSTRAINT lp_reservations_single_reference CHECK (
+    (wo_id IS NOT NULL AND to_id IS NULL) OR
+    (wo_id IS NULL AND to_id IS NOT NULL)
+  )
 );
 ```
+
+**Note:** Reservations can be for either WO or TO, but not both (enforced by CHECK constraint).
 
 #### machines
 

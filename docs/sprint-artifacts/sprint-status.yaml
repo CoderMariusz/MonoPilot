@@ -122,6 +122,10 @@ development_status:
   # Story 0.16: TO Database & API Alignment (CRITICAL - Data layer mismatch)
   0-16-to-database-api-alignment: backlog
 
+  # Story 0.17: LP Database & API Alignment (CRITICAL - Data layer mismatch)
+  # Note: Largest fix - 13 SP. Missing QA fields, wrong types (string→number), wrong names (item_id→product_id)
+  0-17-lp-database-api-alignment: backlog
+
   epic-0-retrospective: done
 
   # ========================================
