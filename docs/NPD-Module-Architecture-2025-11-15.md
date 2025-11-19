@@ -5,6 +5,7 @@
 MonoPilot NPD (New Product Development) Module is a **premium add-on** implementing **bounded context architecture** within the existing MonoPilot monorepo. The module enables **dual-mode operation**: standalone (R&D consultancies without production) or integrated (full manufacturing workflow with handoff to production).
 
 **Key Architectural Decisions:**
+
 - **Bounded Context Isolation:** Separate `npd_*` tables with optional foreign keys, feature flag controlled
 - **Event Sourcing Pattern:** Outbox pattern with pg_notify for reliable handoff and audit trail
 - **Hybrid Versioning Service:** PostgreSQL functions (enforcement) + TypeScript wrapper (UI validation)
@@ -18,30 +19,31 @@ MonoPilot NPD (New Product Development) Module is a **premium add-on** implement
 NPD Module extends existing MonoPilot codebase - **no new project initialization required**.
 
 **Setup Steps:**
-1. Run database migrations (100-113: create npd_* tables + modify existing tables)
+
+1. Run database migrations (100-113: create npd\_\* tables + modify existing tables)
 2. Deploy Edge Function (`supabase/functions/npd-event-processor`)
 3. Enable NPD Module per organization (`UPDATE org_settings SET enabled_modules = ARRAY['production', 'npd']`)
 
 ## Decision Summary
 
-| Category | Decision | Version | Affects Epics | Rationale |
-| -------- | -------- | ------- | ------------- | --------- |
-| Database Schema | Same schema (`public`) with `npd_` prefix | PostgreSQL 15+ | All NPD epics | Consistency with MonoPilot, simple RLS policies, native foreign keys |
-| Bounded Context | Optional foreign keys + Feature flags | N/A | NPD-3, all integration points | Enables NPD-only mode (R&D consultancies) and NPD+Production mode |
-| Event Sourcing | Outbox pattern + pg_notify + sequence_number | N/A | NPD-3, NPD-5 | Transactional safety, ordering guarantees, Supabase Realtime integration |
-| Versioning Service | Hybrid (PostgreSQL functions + TypeScript wrapper) | N/A | NPD-2, BOM integration | Database triggers enforce (compliance), TypeScript provides instant UI feedback |
-| Handoff Wizard | Server-side wizard state (`npd_handoff_sessions`) | N/A | NPD-3, NPD-6 | Resumable flow, server-side validation, audit trail, transactional final step |
-| Feature Flags | Database column (`org_settings.enabled_modules TEXT[]`) | N/A | All NPD epics, access control | Per-org control, PostgreSQL native, RLS friendly, future-proof |
-| API Layer | Static Class Pattern | N/A | NPD-1, NPD-2, NPD-3, NPD-4, NPD-5 | Consistency with 28 existing MonoPilot API classes |
-| RLS Policies | Per-table RLS with org_id isolation | N/A | NPD-6, all NPD APIs | Consistency with 40+ existing tables, database-enforced security |
-| UI Organization | Separate `/npd` route group | Next.js 15 | NPD-1, NPD-2, NPD-3 | Clear module boundary, middleware feature flag check, co-location |
-| Document Storage | Hierarchical `npd/{org_id}/{project_id}/{category}/` | Supabase Storage | NPD-4 | Organized by project, category folders, RLS friendly, easy cleanup |
-| Integration Points | Event-driven (NPD emits events, Production listens) | N/A | NPD-3, NPD-5, Production integration | Loose coupling, retry mechanism, audit trail, bounded context principle |
-| State Management | React Context + SWR | SWR 2.x | NPD-1, NPD-2, NPD-3 | Consistency with MonoPilot, optimistic updates, cache management |
-| Caching Strategy | SWR default config (60s stale, revalidate on focus) | SWR 2.x | All NPD UI | Standard SWR sufficient for NPD use cases |
-| Optimistic Updates | Enabled for create/update operations | SWR 2.x | NPD-1, NPD-2 | Better UX (instant feedback), SWR built-in support |
-| Error Boundary | Shared ErrorBoundary component (MonoPilot reused) | N/A | All NPD UI | General pattern sufficient, no NPD-specific error handling needed |
-| Notifications | Supabase Realtime + shadcn/ui Toast | Supabase Realtime | NPD-1, NPD-2, NPD-3, NPD-5 | Real-time notifications, audit trail via audit_log, consistent UX with MonoPilot |
+| Category           | Decision                                                | Version           | Affects Epics                        | Rationale                                                                        |
+| ------------------ | ------------------------------------------------------- | ----------------- | ------------------------------------ | -------------------------------------------------------------------------------- |
+| Database Schema    | Same schema (`public`) with `npd_` prefix               | PostgreSQL 15+    | All NPD epics                        | Consistency with MonoPilot, simple RLS policies, native foreign keys             |
+| Bounded Context    | Optional foreign keys + Feature flags                   | N/A               | NPD-3, all integration points        | Enables NPD-only mode (R&D consultancies) and NPD+Production mode                |
+| Event Sourcing     | Outbox pattern + pg_notify + sequence_number            | N/A               | NPD-3, NPD-5                         | Transactional safety, ordering guarantees, Supabase Realtime integration         |
+| Versioning Service | Hybrid (PostgreSQL functions + TypeScript wrapper)      | N/A               | NPD-2, BOM integration               | Database triggers enforce (compliance), TypeScript provides instant UI feedback  |
+| Handoff Wizard     | Server-side wizard state (`npd_handoff_sessions`)       | N/A               | NPD-3, NPD-6                         | Resumable flow, server-side validation, audit trail, transactional final step    |
+| Feature Flags      | Database column (`org_settings.enabled_modules TEXT[]`) | N/A               | All NPD epics, access control        | Per-org control, PostgreSQL native, RLS friendly, future-proof                   |
+| API Layer          | Static Class Pattern                                    | N/A               | NPD-1, NPD-2, NPD-3, NPD-4, NPD-5    | Consistency with 28 existing MonoPilot API classes                               |
+| RLS Policies       | Per-table RLS with org_id isolation                     | N/A               | NPD-6, all NPD APIs                  | Consistency with 40+ existing tables, database-enforced security                 |
+| UI Organization    | Separate `/npd` route group                             | Next.js 15        | NPD-1, NPD-2, NPD-3                  | Clear module boundary, middleware feature flag check, co-location                |
+| Document Storage   | Hierarchical `npd/{org_id}/{project_id}/{category}/`    | Supabase Storage  | NPD-4                                | Organized by project, category folders, RLS friendly, easy cleanup               |
+| Integration Points | Event-driven (NPD emits events, Production listens)     | N/A               | NPD-3, NPD-5, Production integration | Loose coupling, retry mechanism, audit trail, bounded context principle          |
+| State Management   | React Context + SWR                                     | SWR 2.x           | NPD-1, NPD-2, NPD-3                  | Consistency with MonoPilot, optimistic updates, cache management                 |
+| Caching Strategy   | SWR default config (60s stale, revalidate on focus)     | SWR 2.x           | All NPD UI                           | Standard SWR sufficient for NPD use cases                                        |
+| Optimistic Updates | Enabled for create/update operations                    | SWR 2.x           | NPD-1, NPD-2                         | Better UX (instant feedback), SWR built-in support                               |
+| Error Boundary     | Shared ErrorBoundary component (MonoPilot reused)       | N/A               | All NPD UI                           | General pattern sufficient, no NPD-specific error handling needed                |
+| Notifications      | Supabase Realtime + shadcn/ui Toast                     | Supabase Realtime | NPD-1, NPD-2, NPD-3, NPD-5           | Real-time notifications, audit trail via audit_log, consistent UX with MonoPilot |
 
 ## Project Structure
 
@@ -136,42 +138,48 @@ MonoPilot/
 
 ## Epic to Architecture Mapping
 
-| Epic | Architecture Components | Database Tables | API Classes | UI Pages | Integration Points |
-|------|------------------------|-----------------|-------------|----------|-------------------|
-| **NPD-1: Core Project Management** | NPDContext, ProjectCard, Dashboard | npd_projects | NPDProjectsAPI | /npd (Kanban), /npd/projects, /npd/projects/[id] | audit_log (reused) |
-| **NPD-2: Formulation Versioning** | FormulationEditor, VersionTimeline, AllergenDisplay | npd_formulations, npd_formulation_items | FormulationsAPI | /npd/projects/[id]/formulation | VersioningService (shared), allergens (reused) |
-| **NPD-3: Handoff Wizard** | HandoffWizard (5 steps), Event Processor | npd_handoff_sessions, npd_events | HandoffAPI, NPDEventsAPI | /npd/projects/[id]/handoff | ProductsAPI, BomsAPI, WorkOrdersAPI (event-driven) |
-| **NPD-4: Costing & Compliance** | CostingCalculator, DocumentUpload | npd_costing, npd_documents | CostingAPI | /npd/projects/[id]/costing, /npd/projects/[id]/compliance | Supabase Storage |
-| **NPD-5: Risk & Approvals** | RiskMatrix, GateChecklist | npd_risks, approvals (reused) | GateReviewsAPI | /npd/projects/[id] (tabs) | approvals table (reused) |
-| **NPD-6: Database Schema** | Migrations, RLS policies, triggers | All 8 npd_* tables + 4 modified tables | VersioningService | N/A | org_settings (feature flags) |
-| **NPD-7: E2E Testing** | Playwright test specs | N/A | All NPD APIs | All NPD pages | N/A |
+| Epic                               | Architecture Components                             | Database Tables                          | API Classes              | UI Pages                                                  | Integration Points                                 |
+| ---------------------------------- | --------------------------------------------------- | ---------------------------------------- | ------------------------ | --------------------------------------------------------- | -------------------------------------------------- |
+| **NPD-1: Core Project Management** | NPDContext, ProjectCard, Dashboard                  | npd_projects                             | NPDProjectsAPI           | /npd (Kanban), /npd/projects, /npd/projects/[id]          | audit_log (reused)                                 |
+| **NPD-2: Formulation Versioning**  | FormulationEditor, VersionTimeline, AllergenDisplay | npd_formulations, npd_formulation_items  | FormulationsAPI          | /npd/projects/[id]/formulation                            | VersioningService (shared), allergens (reused)     |
+| **NPD-3: Handoff Wizard**          | HandoffWizard (5 steps), Event Processor            | npd_handoff_sessions, npd_events         | HandoffAPI, NPDEventsAPI | /npd/projects/[id]/handoff                                | ProductsAPI, BomsAPI, WorkOrdersAPI (event-driven) |
+| **NPD-4: Costing & Compliance**    | CostingCalculator, DocumentUpload                   | npd_costing, npd_documents               | CostingAPI               | /npd/projects/[id]/costing, /npd/projects/[id]/compliance | Supabase Storage                                   |
+| **NPD-5: Risk & Approvals**        | RiskMatrix, GateChecklist                           | npd_risks, approvals (reused)            | GateReviewsAPI           | /npd/projects/[id] (tabs)                                 | approvals table (reused)                           |
+| **NPD-6: Database Schema**         | Migrations, RLS policies, triggers                  | All 8 npd\_\* tables + 4 modified tables | VersioningService        | N/A                                                       | org_settings (feature flags)                       |
+| **NPD-7: E2E Testing**             | Playwright test specs                               | N/A                                      | All NPD APIs             | All NPD pages                                             | N/A                                                |
 
 ## Technology Stack Details
 
 ### Core Technologies
 
 **Frontend:**
+
 - Next.js 15 (App Router)
 - React 19
 - TypeScript 5.7
 - Tailwind CSS 3.4
 
 **Backend/Database:**
+
 - Supabase (PostgreSQL 15+, Auth, RLS, Storage, Realtime)
 - Edge Functions (Deno runtime)
 
 **State Management:**
+
 - React Context (global NPD state)
 - SWR 2.x (data fetching, caching, optimistic updates)
 
 **Validation:**
+
 - Zod schemas (packages/shared/schemas/npd.ts)
 
 **Testing:**
+
 - Playwright (E2E tests)
 - Vitest (unit tests)
 
 **Package Manager:**
+
 - pnpm 8.15 (monorepo)
 
 ### Integration Points
@@ -222,6 +230,7 @@ Deno.serve(async (req) => {
 ```
 
 **NPD → Shared Services:**
+
 - `VersioningService` (shared with BOM versioning)
 - `audit_log` table (reused for NPD actions)
 - `approvals` table (reused for gate reviews)
@@ -263,6 +272,7 @@ class NPDProjectsAPI {
 **Components:**
 
 **Database Schema:**
+
 ```sql
 CREATE TABLE npd_formulations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -305,6 +315,7 @@ CREATE TRIGGER formulation_lock_trigger
 ```
 
 **Lineage Tracking:**
+
 ```sql
 CREATE TABLE npd_formulation_lineage (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -318,6 +329,7 @@ CREATE TABLE npd_formulation_lineage (
 ```
 
 **VersioningService (Shared with BOM):**
+
 ```typescript
 export class VersioningService {
   // TypeScript wrapper (UI validation)
@@ -327,19 +339,28 @@ export class VersioningService {
     existingVersions: Version[]
   ): ValidationResult {
     // Check overlaps
-    const hasOverlap = existingVersions.some(v =>
-      (effectiveFrom >= v.effective_from && effectiveFrom < v.effective_to) ||
-      (effectiveTo && effectiveTo > v.effective_from && effectiveTo <= v.effective_to)
+    const hasOverlap = existingVersions.some(
+      v =>
+        (effectiveFrom >= v.effective_from && effectiveFrom < v.effective_to) ||
+        (effectiveTo &&
+          effectiveTo > v.effective_from &&
+          effectiveTo <= v.effective_to)
     );
 
     if (hasOverlap) {
-      return { valid: false, error: 'Date range overlaps with existing version' };
+      return {
+        valid: false,
+        error: 'Date range overlaps with existing version',
+      };
     }
 
     return { valid: true };
   }
 
-  static calculateNextVersion(currentVersion: string, changeType: 'major' | 'minor'): string {
+  static calculateNextVersion(
+    currentVersion: string,
+    changeType: 'major' | 'minor'
+  ): string {
     const [major, minor] = currentVersion.split('.').map(Number);
 
     if (changeType === 'major') {
@@ -357,6 +378,7 @@ export class VersioningService {
 ```
 
 **Usage in Epic NPD-2:**
+
 ```typescript
 // Create new formulation version
 const nextVersion = VersioningService.calculateNextVersion('1.0', 'minor'); // "1.1"
@@ -376,7 +398,7 @@ if (!validation.valid) {
 await FormulationsAPI.create({
   version: nextVersion,
   effective_from: '2025-12-01',
-  effective_to: '2026-06-01'
+  effective_to: '2026-06-01',
 });
 ```
 
@@ -387,6 +409,7 @@ await FormulationsAPI.create({
 **Components:**
 
 **Strategy Interface:**
+
 ```typescript
 interface HandoffStrategy {
   execute(session: HandoffSession): Promise<HandoffResult>;
@@ -397,14 +420,14 @@ class TransferStrategy implements HandoffStrategy {
     // Path A: Create Product + BOM + Pilot WO
     const event = await NPDEventsAPI.emit({
       type: 'NPD.HandoffRequested',
-      payload: session.data
+      payload: session.data,
     });
 
     return {
       success: true,
       type: 'transfer',
       eventId: event.id,
-      message: 'Handoff initiated. Creating Product, BOM, and Pilot WO...'
+      message: 'Handoff initiated. Creating Product, BOM, and Pilot WO...',
     };
   }
 }
@@ -418,13 +441,14 @@ class ExportStrategy implements HandoffStrategy {
       success: true,
       type: 'export',
       fileUrl: exportFile.url,
-      message: 'Project exported successfully. Download link generated.'
+      message: 'Project exported successfully. Download link generated.',
     };
   }
 }
 ```
 
 **Strategy Router:**
+
 ```typescript
 class HandoffAPI {
   static async executeHandoff(sessionId: string): Promise<HandoffResult> {
@@ -448,6 +472,7 @@ class HandoffAPI {
 ```
 
 **Usage in Epic NPD-3:**
+
 - Wizard UI is identical for both modes
 - Step 5 (Execute) calls `HandoffAPI.executeHandoff(sessionId)`
 - Router determines strategy at runtime
@@ -462,6 +487,7 @@ class HandoffAPI {
 **Components:**
 
 **Outbox Table:**
+
 ```sql
 CREATE TABLE npd_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -490,11 +516,12 @@ CREATE TRIGGER npd_events_notify
 ```
 
 **Event Processor (Edge Function):**
+
 ```typescript
 // supabase/functions/npd-event-processor/index.ts
 import { createClient } from '@supabase/supabase-js';
 
-Deno.serve(async (req) => {
+Deno.serve(async req => {
   const event = await req.json();
   const supabase = createClient(/* ... */);
 
@@ -515,12 +542,11 @@ Deno.serve(async (req) => {
       .from('npd_events')
       .update({
         status: 'completed',
-        processed_at: new Date().toISOString()
+        processed_at: new Date().toISOString(),
       })
       .eq('id', event.id);
 
     return new Response('Event processed', { status: 200 });
-
   } catch (error) {
     // Mark failed + increment retry
     await supabase
@@ -528,7 +554,7 @@ Deno.serve(async (req) => {
       .update({
         status: 'failed',
         error_message: error.message,
-        retry_count: event.retry_count + 1
+        retry_count: event.retry_count + 1,
       })
       .eq('id', event.id);
 
@@ -543,6 +569,7 @@ async function handleHandoff(payload: any) {
 ```
 
 **Retry Mechanism (Scheduled Job):**
+
 ```typescript
 // Cron job: Every 5 minutes, retry failed events
 const failedEvents = await supabase
@@ -557,6 +584,7 @@ for (const event of failedEvents) {
 ```
 
 **Usage in Epic NPD-3:**
+
 - Handoff wizard emits event (transactionally with session update)
 - Edge Function processes asynchronously
 - User sees progress via session status polling
@@ -568,28 +596,33 @@ for (const event of failedEvents) {
 ### Naming Conventions
 
 **Database:**
+
 - Tables: `snake_case` with `npd_` prefix (`npd_projects`, `npd_formulations`)
 - Columns: `snake_case` (`effective_from`, `target_launch_date`, `retry_count`)
 - Foreign keys: `{table}_id` (`npd_project_id`, `owner_id`, `npd_formulation_id`)
 - Enums: `lowercase_with_underscores` (`idea`, `feasibility`, `business_case`, `development`, `testing`, `launched`)
 
 **TypeScript/API:**
+
 - API Classes: `PascalCase` + `API` suffix (`NPDProjectsAPI`, `FormulationsAPI`, `HandoffAPI`)
 - Types: `PascalCase` (`NPDProject`, `Formulation`, `HandoffSession`, `GateReview`)
 - Functions: `camelCase` (`createProject`, `advanceGate`, `validateDates`, `executeHandoff`)
 - Enums: `PascalCase` values (`Gate.G0`, `Gate.G1`, `FormulationStatus.Draft`)
 
 **React Components:**
+
 - Components: `PascalCase` (`ProjectCard`, `HandoffWizard`, `FormulationEditor`, `AllergenDisplay`)
 - Files: Match component name (`ProjectCard.tsx`, `HandoffWizard.tsx`)
 - Folders: Component name for complex components (`HandoffWizard/`, contains ValidationStep.tsx, etc.)
 
 **Routes:**
+
 - URL paths: `kebab-case` (`/npd/projects/[id]/formulation`, `/npd/projects/[id]/handoff`)
 
 ### Code Organization
 
 **File Co-location:**
+
 ```
 apps/frontend/
 ├── app/(authenticated)/npd/          # Pages (co-located with route)
@@ -602,6 +635,7 @@ apps/frontend/
 ```
 
 **Import Order (Enforced):**
+
 ```typescript
 // 1. React/Next imports
 import { useState, useEffect } from 'react';
@@ -628,6 +662,7 @@ import styles from './styles.module.css';
 ### Consistency Rules
 
 **API Response Format (All NPD APIs MUST follow):**
+
 ```typescript
 // Success
 {
@@ -646,10 +681,13 @@ import styles from './styles.module.css';
 ```
 
 **Error Handling Pattern:**
+
 ```typescript
 // API Layer (MUST catch and transform errors)
 class NPDProjectsAPI {
-  static async create(input: CreateNPDProject): Promise<ApiResponse<NPDProject>> {
+  static async create(
+    input: CreateNPDProject
+  ): Promise<ApiResponse<NPDProject>> {
     try {
       const { data, error } = await supabase
         .from('npd_projects')
@@ -663,7 +701,7 @@ class NPDProjectsAPI {
       await AuditLogAPI.log({
         action: 'npd_project_created',
         entity_type: 'npd_project',
-        entity_id: data.id
+        entity_id: data.id,
       });
 
       return { data, error: null };
@@ -674,8 +712,8 @@ class NPDProjectsAPI {
         data: null,
         error: {
           message: 'Failed to create project',
-          code: error.code
-        }
+          code: error.code,
+        },
       };
     }
   }
@@ -697,6 +735,7 @@ const handleCreate = async (input: CreateNPDProject) => {
 ```
 
 **Date Handling Pattern:**
+
 ```typescript
 // Storage: ALWAYS UTC (ISO 8601 strings)
 const formulation = {
@@ -718,6 +757,7 @@ const formatDate = (isoString: string) => {
 ```
 
 **Versioning Pattern:**
+
 ```typescript
 // Semantic versioning for formulations
 // Format: "major.minor"
@@ -727,7 +767,7 @@ const formatDate = (isoString: string) => {
 //   "2.0" - Major change (complete recipe overhaul)
 
 // MUST use VersioningService for version calculation
-const currentVersion = "1.0";
+const currentVersion = '1.0';
 const nextVersion = VersioningService.calculateNextVersion(
   currentVersion,
   'minor' // 'major' | 'minor'
@@ -736,17 +776,17 @@ const nextVersion = VersioningService.calculateNextVersion(
 ```
 
 **RLS Enforcement (CRITICAL):**
+
 ```typescript
 // ✅ CORRECT: Use Supabase client (auto-applies RLS policies)
-const { data } = await supabase
-  .from('npd_projects')
-  .select('*');
+const { data } = await supabase.from('npd_projects').select('*');
 
 // ❌ WRONG: Direct SQL query bypasses RLS
 const projects = await db.query('SELECT * FROM npd_projects');
 ```
 
 **Feature Flag Check Pattern:**
+
 ```typescript
 // Middleware (route-level check)
 export async function middleware(req: NextRequest) {
@@ -767,7 +807,7 @@ class NPDProjectsAPI {
     if (!org.enabled_modules.includes('npd')) {
       return {
         data: null,
-        error: { message: 'NPD Module not enabled for this organization' }
+        error: { message: 'NPD Module not enabled for this organization' },
       };
     }
 
@@ -777,11 +817,11 @@ class NPDProjectsAPI {
 ```
 
 **Optimistic Updates Pattern (SWR):**
+
 ```typescript
 function NPDDashboard() {
-  const { data: projects, mutate } = useSWR(
-    '/npd/projects',
-    () => NPDProjectsAPI.getAll()
+  const { data: projects, mutate } = useSWR('/npd/projects', () =>
+    NPDProjectsAPI.getAll()
   );
 
   const createProject = async (input: CreateNPDProject) => {
@@ -790,11 +830,11 @@ function NPDDashboard() {
       id: 'temp-' + Date.now(),
       ...input,
       status: 'idea',
-      current_gate: 'G0'
+      current_gate: 'G0',
     };
 
     mutate(
-      async (currentProjects) => {
+      async currentProjects => {
         const result = await NPDProjectsAPI.create(input);
 
         if (result.error) {
@@ -806,7 +846,7 @@ function NPDDashboard() {
       },
       {
         optimisticData: [...projects, optimisticProject], // Show immediately
-        revalidate: false // Don't refetch until mutation completes
+        revalidate: false, // Don't refetch until mutation completes
       }
     );
   };
@@ -818,6 +858,7 @@ function NPDDashboard() {
 ### NPD Module Tables (8 new tables)
 
 **1. npd_projects**
+
 ```sql
 CREATE TABLE npd_projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -844,6 +885,7 @@ CREATE INDEX idx_npd_projects_owner_id ON npd_projects(owner_id);
 ```
 
 **2. npd_formulations**
+
 ```sql
 CREATE TABLE npd_formulations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -872,6 +914,7 @@ CREATE INDEX idx_npd_formulations_status ON npd_formulations(status);
 ```
 
 **3. npd_formulation_items**
+
 ```sql
 CREATE TABLE npd_formulation_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -889,6 +932,7 @@ CREATE INDEX idx_npd_formulation_items_formulation_id ON npd_formulation_items(n
 ```
 
 **4. npd_costing**
+
 ```sql
 CREATE TABLE npd_costing (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -908,6 +952,7 @@ CREATE INDEX idx_npd_costing_project_id ON npd_costing(npd_project_id);
 ```
 
 **5. npd_risks**
+
 ```sql
 CREATE TABLE npd_risks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -931,6 +976,7 @@ CREATE INDEX idx_npd_risks_risk_score ON npd_risks(risk_score DESC);
 ```
 
 **6. npd_documents**
+
 ```sql
 CREATE TABLE npd_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -951,6 +997,7 @@ CREATE INDEX idx_npd_documents_file_type ON npd_documents(file_type);
 ```
 
 **7. npd_events**
+
 ```sql
 CREATE TABLE npd_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -969,6 +1016,7 @@ CREATE INDEX idx_npd_events_sequence ON npd_events(sequence_number);
 ```
 
 **8. npd_handoff_sessions**
+
 ```sql
 CREATE TABLE npd_handoff_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -991,6 +1039,7 @@ CREATE INDEX idx_npd_handoff_sessions_status ON npd_handoff_sessions(status);
 ### Modified Existing Tables (4 tables)
 
 **1. work_orders (add pilot support)**
+
 ```sql
 ALTER TABLE work_orders
 ADD COLUMN type TEXT CHECK (type IN ('production', 'pilot')) DEFAULT 'production',
@@ -1000,6 +1049,7 @@ CREATE INDEX idx_work_orders_npd_project_id ON work_orders(npd_project_id);
 ```
 
 **2. products (add NPD traceability)**
+
 ```sql
 ALTER TABLE products
 ADD COLUMN npd_project_id UUID REFERENCES npd_projects(id) ON DELETE SET NULL,
@@ -1009,6 +1059,7 @@ CREATE INDEX idx_products_npd_project_id ON products(npd_project_id);
 ```
 
 **3. boms (add formulation traceability)**
+
 ```sql
 ALTER TABLE boms
 ADD COLUMN npd_formulation_id UUID REFERENCES npd_formulations(id) ON DELETE SET NULL,
@@ -1018,6 +1069,7 @@ CREATE INDEX idx_boms_npd_formulation_id ON boms(npd_formulation_id);
 ```
 
 **4. production_outputs (add trial support)**
+
 ```sql
 ALTER TABLE production_outputs
 ADD COLUMN type TEXT CHECK (type IN ('production', 'trial')) DEFAULT 'production',
@@ -1027,6 +1079,7 @@ CREATE INDEX idx_production_outputs_npd_trial_id ON production_outputs(npd_trial
 ```
 
 **5. org_settings (add feature flags)**
+
 ```sql
 ALTER TABLE org_settings
 ADD COLUMN enabled_modules TEXT[] DEFAULT ARRAY['production'];
@@ -1085,7 +1138,10 @@ class NPDProjectsAPI {
     toGate: 'G1' | 'G2' | 'G3' | 'G4'
   ): Promise<ApiResponse<NPDProject>>;
 
-  static async cancel(id: string, reason: string): Promise<ApiResponse<NPDProject>>;
+  static async cancel(
+    id: string,
+    reason: string
+  ): Promise<ApiResponse<NPDProject>>;
 }
 ```
 
@@ -1093,7 +1149,9 @@ class NPDProjectsAPI {
 
 ```typescript
 class FormulationsAPI {
-  static async getByProject(projectId: string): Promise<ApiResponse<Formulation[]>>;
+  static async getByProject(
+    projectId: string
+  ): Promise<ApiResponse<Formulation[]>>;
 
   static async getById(id: string): Promise<ApiResponse<Formulation>>;
 
@@ -1131,9 +1189,13 @@ class FormulationsAPI {
 ```typescript
 class HandoffAPI {
   // Wizard Session Management
-  static async startWizard(projectId: string): Promise<ApiResponse<HandoffSession>>;
+  static async startWizard(
+    projectId: string
+  ): Promise<ApiResponse<HandoffSession>>;
 
-  static async getSession(sessionId: string): Promise<ApiResponse<HandoffSession>>;
+  static async getSession(
+    sessionId: string
+  ): Promise<ApiResponse<HandoffSession>>;
 
   // Step-by-Step Execution
   static async validateStep(
@@ -1231,6 +1293,7 @@ class NotificationsAPI {
 ### Authentication
 
 **Supabase Auth (Session-Based JWT):**
+
 - All `/npd/*` routes protected by middleware
 - JWT contains: `user_id`, `org_id`, `role`
 - Session refresh automatic (middleware)
@@ -1238,6 +1301,7 @@ class NotificationsAPI {
 ### Authorization (RBAC)
 
 **NPD-Specific Roles:**
+
 - `NPD Lead`: Full access (create, edit, delete projects, approve gates)
 - `R&D`: Create/edit formulations, view projects
 - `Regulatory`: View compliance checklists, upload docs
@@ -1245,6 +1309,7 @@ class NotificationsAPI {
 - `Production`: View projects in handoff stage (read-only)
 
 **Implementation:**
+
 ```typescript
 // Check role in API
 class NPDProjectsAPI {
@@ -1254,7 +1319,7 @@ class NPDProjectsAPI {
     if (user.role !== 'NPD Lead' && user.role !== 'Admin') {
       return {
         data: null,
-        error: { message: 'Insufficient permissions' }
+        error: { message: 'Insufficient permissions' },
       };
     }
 
@@ -1265,7 +1330,8 @@ class NPDProjectsAPI {
 
 ### Row-Level Security (RLS)
 
-**All npd_* tables have org_id isolation:**
+**All npd\_\* tables have org_id isolation:**
+
 ```sql
 ALTER TABLE npd_projects ENABLE ROW LEVEL SECURITY;
 
@@ -1280,11 +1346,13 @@ CREATE POLICY npd_projects_org_isolation ON npd_projects
 ### Data Protection
 
 **Sensitive Data:**
+
 - Formulations: Access logged in `audit_log` (IP protection)
 - Costing: Only Finance + NPD Lead can view
 - Documents: RLS on Supabase Storage (path-based policies)
 
 **Audit Logging:**
+
 ```typescript
 await AuditLogAPI.log({
   action: 'npd_formulation_viewed',
@@ -1292,7 +1360,7 @@ await AuditLogAPI.log({
   entity_id: formulation.id,
   user_id: currentUser.id,
   org_id: currentOrg.id,
-  details: { version: formulation.version }
+  details: { version: formulation.version },
 });
 ```
 
@@ -1301,23 +1369,25 @@ await AuditLogAPI.log({
 ### Caching Strategy
 
 **SWR Configuration:**
+
 ```typescript
 // Default cache config
 const swrConfig = {
   revalidateOnFocus: true,
   revalidateOnReconnect: true,
   dedupingInterval: 2000,
-  focusThrottleInterval: 5000
+  focusThrottleInterval: 5000,
 };
 
 // Per-resource overrides
 useSWR('/npd/projects', NPDProjectsAPI.getAll, {
   ...swrConfig,
-  refreshInterval: 60000 // 1 minute auto-refresh
+  refreshInterval: 60000, // 1 minute auto-refresh
 });
 ```
 
 **Performance Targets:**
+
 - Dashboard load: <500ms (p95)
 - Formulation detail: <300ms (p95)
 - Handoff validation: <2s
@@ -1326,30 +1396,42 @@ useSWR('/npd/projects', NPDProjectsAPI.getAll, {
 ### Database Optimization
 
 **Indexes:**
+
 - All foreign keys indexed
 - Status columns indexed (filtered queries)
 - Composite index on `(org_id, status)` for dashboard queries
 
 **Query Optimization:**
+
 ```typescript
 // ✅ Efficient (single query with join)
 const projectWithFormulations = await supabase
   .from('npd_projects')
-  .select(`
+  .select(
+    `
     *,
     formulations:npd_formulations(*)
-  `)
+  `
+  )
   .eq('id', projectId)
   .single();
 
 // ❌ Inefficient (N+1 queries)
-const project = await supabase.from('npd_projects').select('*').eq('id', projectId).single();
-const formulations = await supabase.from('npd_formulations').select('*').eq('npd_project_id', projectId);
+const project = await supabase
+  .from('npd_projects')
+  .select('*')
+  .eq('id', projectId)
+  .single();
+const formulations = await supabase
+  .from('npd_formulations')
+  .select('*')
+  .eq('npd_project_id', projectId);
 ```
 
 ### Event Processing Optimization
 
 **Batch Processing (for high-volume events):**
+
 ```typescript
 // Process events in batches of 10
 const pendingEvents = await supabase
@@ -1358,9 +1440,7 @@ const pendingEvents = await supabase
   .eq('status', 'pending')
   .limit(10);
 
-await Promise.all(
-  pendingEvents.map(event => processEvent(event))
-);
+await Promise.all(pendingEvents.map(event => processEvent(event)));
 ```
 
 ## Deployment Architecture
@@ -1368,12 +1448,14 @@ await Promise.all(
 ### Infrastructure
 
 **Supabase (Managed):**
+
 - PostgreSQL database (primary + read replicas)
 - Edge Functions (Deno runtime)
 - Storage (documents)
 - Realtime (pg_notify subscriptions)
 
 **Vercel (Frontend):**
+
 - Next.js app deployment
 - Edge runtime for middleware
 - Serverless functions for API routes
@@ -1381,6 +1463,7 @@ await Promise.all(
 ### Environment Configuration
 
 **Environment Variables:**
+
 ```bash
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
@@ -1394,6 +1477,7 @@ FEATURE_NPD_MODULE_DEFAULT=false
 ### Deployment Strategy
 
 **Migrations:**
+
 1. Run migrations on staging (test data)
 2. Run E2E tests
 3. Run migrations on production
@@ -1401,6 +1485,7 @@ FEATURE_NPD_MODULE_DEFAULT=false
 5. Deploy Next.js app (zero-downtime)
 
 **Rollback Plan:**
+
 - Database: Rollback migrations (113 → 099)
 - Edge Function: Redeploy previous version
 - Next.js: Revert deployment (Vercel instant rollback)
@@ -1457,12 +1542,14 @@ pnpm test:e2e:npd
 **Decision:** Implement NPD as bounded context within monolith (separate `npd_*` tables, optional integration).
 
 **Rationale:**
+
 - Simpler deployment (single codebase)
 - Suitable for SME customers (no distributed systems complexity)
 - Can evolve to microservices later if needed
 - Event-driven integration provides loose coupling
 
 **Consequences:**
+
 - ✅ Easier development/testing
 - ✅ Lower infrastructure costs
 - ⚠️ Requires discipline (clear module boundaries)
@@ -1474,12 +1561,14 @@ pnpm test:e2e:npd
 **Decision:** Implement outbox pattern with `npd_events` table + Edge Function processor.
 
 **Rationale:**
+
 - Transactional safety (event logged atomically with handoff session)
 - Audit trail (compliance requirement: FSMA 204)
 - Retry mechanism (failed handoffs don't require manual re-entry)
 - Loose coupling (NPD doesn't call Production APIs directly)
 
 **Consequences:**
+
 - ✅ Reliable integration
 - ✅ Full audit trail
 - ⚠️ Async (user waits for event processing)
@@ -1492,11 +1581,13 @@ pnpm test:e2e:npd
 **Decision:** PostgreSQL functions (triggers) + TypeScript wrapper.
 
 **Rationale:**
+
 - Database enforcement = cannot bypass (compliance critical)
 - TypeScript wrapper = instant validation (UX)
 - Shared functions = reusable (NPD + BOM use same logic)
 
 **Consequences:**
+
 - ✅ Strong guarantees (DB-enforced)
 - ✅ Good UX (instant feedback)
 - ⚠️ Logic in 2 places (but acceptable for validation)
@@ -1508,11 +1599,13 @@ pnpm test:e2e:npd
 **Decision:** Store wizard state in `npd_handoff_sessions` table.
 
 **Rationale:**
+
 - Resumable (user can refresh and continue)
 - Server-side validation (cannot skip steps)
 - Audit trail (each step recorded)
 
 **Consequences:**
+
 - ✅ Better UX (resumable)
 - ✅ Secure (server validates)
 - ⚠️ More DB writes (acceptable trade-off)
@@ -1524,12 +1617,14 @@ pnpm test:e2e:npd
 **Decision:** `org_settings.enabled_modules TEXT[]` column.
 
 **Rationale:**
+
 - Per-org control (not global)
 - Query-able (can filter in DB)
 - RLS friendly (org_id isolation)
 - Future-proof (can add more modules: quality, shipping, iot)
 
 **Consequences:**
+
 - ✅ Flexible per-org
 - ✅ No external dependency
 - ⚠️ Requires deployment for new flags (acceptable)
@@ -1543,18 +1638,20 @@ pnpm test:e2e:npd
 **Implementation:**
 
 **1. Notification Types:**
+
 ```typescript
 type NotificationType =
-  | 'gate_approval_required'     // When project reaches gate milestone
-  | 'formulation_locked'          // When formulation approved and locked
-  | 'handoff_completed'           // When handoff to Production succeeds
-  | 'handoff_failed'              // When handoff to Production fails (retry available)
-  | 'cost_variance_alert'         // When actual cost exceeds target by >10%
-  | 'risk_threshold_exceeded'     // When risk score > 8 (likelihood × impact)
+  | 'gate_approval_required' // When project reaches gate milestone
+  | 'formulation_locked' // When formulation approved and locked
+  | 'handoff_completed' // When handoff to Production succeeds
+  | 'handoff_failed' // When handoff to Production fails (retry available)
+  | 'cost_variance_alert' // When actual cost exceeds target by >10%
+  | 'risk_threshold_exceeded' // When risk score > 8 (likelihood × impact)
   | 'document_approval_required'; // When regulatory document needs review
 ```
 
 **2. Supabase Realtime Subscriptions:**
+
 ```typescript
 // lib/hooks/useNPDNotifications.ts
 import { useEffect } from 'react';
@@ -1568,85 +1665,107 @@ export function useNPDNotifications(orgId: string, userId: string) {
     // Subscribe to npd_projects changes (gate approvals)
     const projectsChannel = supabase
       .channel('npd_projects_notifications')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'npd_projects',
-        filter: `org_id=eq.${orgId}`,
-      }, (payload) => {
-        // Check if status changed to gate milestone
-        if (payload.new.status !== payload.old.status) {
-          toast({
-            title: 'Gate Milestone Reached',
-            description: `Project "${payload.new.name}" is ready for ${payload.new.status} gate review`,
-            variant: 'info',
-          });
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'npd_projects',
+          filter: `org_id=eq.${orgId}`,
+        },
+        payload => {
+          // Check if status changed to gate milestone
+          if (payload.new.status !== payload.old.status) {
+            toast({
+              title: 'Gate Milestone Reached',
+              description: `Project "${payload.new.name}" is ready for ${payload.new.status} gate review`,
+              variant: 'info',
+            });
+          }
         }
-      })
+      )
       .subscribe();
 
     // Subscribe to npd_formulations changes (lock events)
     const formulationsChannel = supabase
       .channel('npd_formulations_notifications')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'npd_formulations',
-        filter: `org_id=eq.${orgId}`,
-      }, (payload) => {
-        if (payload.new.locked_at && !payload.old.locked_at) {
-          toast({
-            title: 'Formulation Locked',
-            description: `Formulation v${payload.new.version} has been approved and locked`,
-            variant: 'success',
-          });
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'npd_formulations',
+          filter: `org_id=eq.${orgId}`,
+        },
+        payload => {
+          if (payload.new.locked_at && !payload.old.locked_at) {
+            toast({
+              title: 'Formulation Locked',
+              description: `Formulation v${payload.new.version} has been approved and locked`,
+              variant: 'success',
+            });
+          }
         }
-      })
+      )
       .subscribe();
 
     // Subscribe to npd_events (handoff completion)
     const eventsChannel = supabase
       .channel('npd_events_notifications')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'npd_events',
-        filter: `org_id=eq.${orgId}`,
-      }, (payload) => {
-        if (payload.new.status === 'completed' && payload.new.type === 'handoff_to_production') {
-          toast({
-            title: 'Handoff Completed',
-            description: 'NPD project successfully handed off to Production',
-            variant: 'success',
-          });
-        } else if (payload.new.status === 'failed' && payload.new.retry_count < 3) {
-          toast({
-            title: 'Handoff Failed',
-            description: `Handoff failed. Retry ${payload.new.retry_count}/3 will occur automatically`,
-            variant: 'warning',
-          });
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'npd_events',
+          filter: `org_id=eq.${orgId}`,
+        },
+        payload => {
+          if (
+            payload.new.status === 'completed' &&
+            payload.new.type === 'handoff_to_production'
+          ) {
+            toast({
+              title: 'Handoff Completed',
+              description: 'NPD project successfully handed off to Production',
+              variant: 'success',
+            });
+          } else if (
+            payload.new.status === 'failed' &&
+            payload.new.retry_count < 3
+          ) {
+            toast({
+              title: 'Handoff Failed',
+              description: `Handoff failed. Retry ${payload.new.retry_count}/3 will occur automatically`,
+              variant: 'warning',
+            });
+          }
         }
-      })
+      )
       .subscribe();
 
     // Subscribe to npd_costing (variance alerts)
     const costingChannel = supabase
       .channel('npd_costing_notifications')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'npd_costing',
-        filter: `org_id=eq.${orgId}`,
-      }, (payload) => {
-        // variance_pct is GENERATED column: (actual_cost - target_cost) / target_cost * 100
-        if (payload.new.variance_pct > 10) {
-          toast({
-            title: 'Cost Variance Alert',
-            description: `Project cost variance: ${payload.new.variance_pct.toFixed(1)}% over target`,
-            variant: 'destructive',
-          });
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'npd_costing',
+          filter: `org_id=eq.${orgId}`,
+        },
+        payload => {
+          // variance_pct is GENERATED column: (actual_cost - target_cost) / target_cost * 100
+          if (payload.new.variance_pct > 10) {
+            toast({
+              title: 'Cost Variance Alert',
+              description: `Project cost variance: ${payload.new.variance_pct.toFixed(1)}% over target`,
+              variant: 'destructive',
+            });
+          }
         }
-      })
+      )
       .subscribe();
 
     return () => {
@@ -1660,6 +1779,7 @@ export function useNPDNotifications(orgId: string, userId: string) {
 ```
 
 **3. Toast Component Usage (shadcn/ui):**
+
 ```typescript
 // components/ui/use-toast.ts (already exists in MonoPilot)
 // Variants: default, success, info, warning, destructive
@@ -1667,11 +1787,12 @@ toast({
   title: 'Notification Title',
   description: 'Notification message',
   variant: 'info', // blue
-  duration: 5000,  // 5 seconds
+  duration: 5000, // 5 seconds
 });
 ```
 
 **4. Notification Persistence (audit_log integration):**
+
 ```sql
 -- Trigger to persist notifications to audit_log
 CREATE OR REPLACE FUNCTION log_npd_notification()
@@ -1715,6 +1836,7 @@ CREATE TRIGGER npd_formulations_notification_trigger
 ```
 
 **5. NotificationsAPI Class:**
+
 ```typescript
 // lib/api/NotificationsAPI.ts
 export class NotificationsAPI {
@@ -1762,6 +1884,7 @@ export class NotificationsAPI {
 ```
 
 **Rationale:**
+
 - **Leverages existing infrastructure:** Supabase Realtime already used in MonoPilot, no new dependencies
 - **Consistent UX:** shadcn/ui Toast component already used in MonoPilot core (same visual style)
 - **Compliance-friendly:** Notification persistence in audit_log table provides audit trail for FSMA 204
@@ -1769,6 +1892,7 @@ export class NotificationsAPI {
 - **Low latency:** Realtime subscriptions provide <1s notification delivery (vs polling)
 
 **Consequences:**
+
 - ✅ Real-time notifications without polling overhead
 - ✅ Full audit trail (compliance requirement)
 - ✅ Consistent with MonoPilot patterns (shadcn/ui Toast)
@@ -1777,17 +1901,19 @@ export class NotificationsAPI {
 - ⚠️ Requires cleanup job for old audit_log notifications (delete after 90 days)
 
 **Database Migrations:**
+
 - Migration 114: Add notification triggers (log_npd_notification function + 4 triggers)
 - Migration 115: Add audit_log cleanup job (delete notifications >90 days old)
 
 **RLS Policies:**
+
 ```sql
 -- audit_log RLS policy (already exists, covers notifications)
 CREATE POLICY audit_log_select_own_org ON audit_log
   FOR SELECT USING (org_id = current_setting('app.org_id')::UUID);
 ```
 
----
+## --- tylko koment
 
 _Generated by BMAD Decision Architecture Workflow v1.0_
 _Date: 2025-11-15_
