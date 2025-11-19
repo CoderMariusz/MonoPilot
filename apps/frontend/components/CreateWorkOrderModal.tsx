@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useMachines, useProducts, useTransferOrders } from '@/lib/clientState';
 import { supabase } from '@/lib/supabase/client-browser';
-import type { Product, WorkOrder } from '@/lib/types';
+import type { Product, WorkOrder, WorkOrderStatus } from '@/lib/types';
 import OrderFlagsSelector from './OrderFlagsSelector';
 
 interface CreateWorkOrderModalProps {
@@ -28,16 +28,16 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
   const [formData, setFormData] = useState({
     product_id: '',
     quantity: '',
-    due_date: '',
-    scheduled_start: '',
-    scheduled_end: '',
+    scheduled_date: '',
+    start_date: '',
+    end_date: '',
     machine_id: '',
     line_id: '',  // NEW: Production line FK
-    status: 'planned' as WorkOrder['status'],
+    status: 'planned' as WorkOrderStatus,
     source_demand_type: 'Manual' as 'Manual' | 'TO' | 'PO' | 'SO',
     source_demand_id: '',
     bom_id: '',
-    order_flags: [] as string[],  // EPIC-001 Phase 4: Conditional Components
+    order_flags: [] as string[],
   });
 
   const selectedProduct = products.find(p => p.id === Number(formData.product_id));
@@ -148,9 +148,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
       setFormData({
         product_id: editingWorkOrder.product_id?.toString() || '',
         quantity: editingWorkOrder.quantity?.toString() || '',
-        due_date: editingWorkOrder.scheduled_date || '',
-        scheduled_start: editingWorkOrder.start_date || '',
-        scheduled_end: editingWorkOrder.end_date || '',
+        scheduled_date: editingWorkOrder.scheduled_date || '',
+        start_date: editingWorkOrder.start_date || '',
+        end_date: editingWorkOrder.end_date || '',
         machine_id: editingWorkOrder.machine_id?.toString() || '',
         line_id: (editingWorkOrder as any).line_id?.toString() || '',
         status: editingWorkOrder.status || 'planned',
@@ -163,9 +163,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
       setFormData({
         product_id: '',
         quantity: '',
-        due_date: '',
-        scheduled_start: '',
-        scheduled_end: '',
+        scheduled_date: '',
+        start_date: '',
+        end_date: '',
         machine_id: '',
         line_id: '',
         status: 'planned',
@@ -200,9 +200,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
           product,
           quantity: parseFloat(formData.quantity),
           status: formData.status,
-          due_date: formData.scheduled_date || null,
-          scheduled_start: formData.start_date || null,
-          scheduled_end: formData.end_date || null,
+          scheduled_date: formData.scheduled_date || null,
+          start_date: formData.start_date || null,
+          end_date: formData.end_date || null,
           machine_id: formData.machine_id || null,
           machine,
           line_id: Number(formData.line_id),  // NEW: Production line FK
@@ -217,9 +217,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
           product,
           quantity: parseFloat(formData.quantity),
           status: formData.status,
-          due_date: formData.scheduled_date || null,
-          scheduled_start: formData.start_date || null,
-          scheduled_end: formData.end_date || null,
+          scheduled_date: formData.scheduled_date || null,
+          start_date: formData.start_date || null,
+          end_date: formData.end_date || null,
           machine_id: formData.machine_id || null,
           machine,
           line_id: Number(formData.line_id),  // NEW: Production line FK (required)
@@ -234,9 +234,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
       setFormData({
         product_id: '',
         quantity: '',
-        due_date: '',
-        scheduled_start: '',
-        scheduled_end: '',
+        scheduled_date: '',
+        start_date: '',
+        end_date: '',
         machine_id: '',
         line_id: '',
         status: 'planned',
@@ -415,7 +415,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
               <input
                 type="date"
                 value={formData.scheduled_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               />
             </div>
@@ -427,7 +427,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
               <input
                 type="datetime-local"
                 value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, scheduled_start: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               />
             </div>
@@ -439,7 +439,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
               <input
                 type="datetime-local"
                 value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, scheduled_end: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               />
             </div>

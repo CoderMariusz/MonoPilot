@@ -93,11 +93,11 @@ class ClientState {
   }
 
   getWoProductionStats(woId: number): { madeQty: number; plannedQty: number; progressPct: number } {
-    const wo = this.workOrders.find(w => w.id === woId.toString());
+    const wo = this.workOrders.find(w => w.id === woId);
     if (!wo) return { madeQty: 0, plannedQty: 0, progressPct: 0 };
-    
+
     const outputs = this.productionOutputs.filter(o => o.wo_id === woId);
-    const madeQty = outputs.reduce((sum, o) => sum + parseFloat(o.planned_qty.toString()), 0);
+    const madeQty = outputs.reduce((sum, o) => sum + parseFloat(String(o.quantity || 0)), 0);
     const plannedQty = parseFloat(wo.planned_qty.toString());
     const progressPct = plannedQty > 0 ? Math.round((madeQty / plannedQty) * 100) : 0;
     
@@ -739,7 +739,7 @@ class ClientState {
         });
       });
 
-      const quantityOrdered = parseFloat(poItem.planned_qty_ordered.toString());
+      const quantityOrdered = parseFloat(poItem.quantity.toString());
       const remainingQty = quantityOrdered - totalReceived;
       const quantityToReceive = remainingQty > 0 ? remainingQty : 0;
 
@@ -747,7 +747,7 @@ class ClientState {
         id: Date.now() + poItem.id,
         grn_id: 0,
         product_id: poItem.product_id,
-        quantity_ordered: poItem.planned_qty_ordered,
+        quantity_ordered: poItem.quantity,
         quantity_received: quantityToReceive.toString(),
         location_id: po.warehouse_id || 1,
         lp_number: null,
