@@ -1,0 +1,134 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    SZYBKIE PODSUMOWANIE RAPORTU ZGODNOŚCI                      ║
+║                          Story 0-13 do 0-19 (Epic 0)                          ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+📊 OGÓLNY STAN: 60% ZGODNOŚCI ⚠️ WYMAGA NATYCHMIASTOWEGO DZIAŁANIA
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CO DZIAŁA:
+   ✓ Wszystkie 5 migracji baz danych (086-090) zostało utworzonych
+   ✓ TypeScript types.ts zaktualizowany do 90% wymaganych zmian
+   ✓ WorkOrder, LicensePlate, TOHeader, POHeader w porządku
+   ✓ Struktura story'ów i planning jest logiczny
+
+❌ KRYTYCZNE PROBLEMY:
+
+1️⃣  FIELD NAME: `part_number` vs `sku` [26 LOKALIZACJI] ⚠️⚠️⚠️
+   Problema: DB ma `sku`, ale API wybiera `part_number`
+   Plik: /apps/frontend/lib/types.ts (2 miejsca)
+          /apps/frontend/lib/api/products.ts (1)
+          /apps/frontend/lib/api/asns.ts (5)
+          /apps/frontend/lib/api/bomHistory.ts (1)
+          /apps/frontend/lib/api/consume.ts (6)
+          /apps/frontend/lib/api/licensePlates.ts (4)
+          /apps/frontend/lib/api/products.createComposite.ts (2)
+   Wpływ: Wszystkie Product queries zwrócą undefined dla part_number
+   Czas: ~2 godziny
+   
+2️⃣  FIELD NAME: `scrap_percent` vs `scrap_std_pct` [3 LOKALIZACJE]
+   Problema: DB ma `scrap_percent`, API używa `scrap_std_pct`
+   Plik: /apps/frontend/lib/types.ts (1 duplikat!)
+          /apps/frontend/lib/api/boms.ts (2)
+   Wpływ: BOM calculations będą zawodzić
+   Czas: ~30 minut
+
+3️⃣  TYPE MISMATCH: BOM version string vs number
+   Problema: BomVersionHelper parsuje string, DB zwraca number
+   Plik: /apps/frontend/lib/types.ts (BomVersionHelper)
+   Wpływ: Błędy przy versioning logice
+   Czas: ~1 godzina
+
+4️⃣  EMPTY FILE: generated.types.ts zawiera tylko komentarz
+   Problema: Brak auto-generated typów z Supabase
+   Wpływ: Typy mogą być niezsynchronizowane
+   Czas: ~30 minut (pnpm gen-types)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 TABELA ZMIAN PRZYTOCZONYCH W STORY'ACH:
+
+Story 0-15 (PO): 12 kolumn dodane do po_header, 4 do po_line ✓
+Story 0-16 (TO): 7 kolumn dodane do to_header, 6 do to_line ✓
+Story 0-17 (LP): 9 kolumn dodane do license_plates ✓
+Story 0-18 (WO): 4 kolumny dodane do work_orders ✓
+Story 0-19 (Products/BOMs): ~32 kolumny dodane razem ✓
+
+Wszystkie MIGRACJE DATABAZY są GOTOWE, ale APLIKACJA nie używa poprawnych nazw!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 HARMONO NAPRAWY:
+
+FAZA 1 (KRYTYCZNE) - 1 dzień:
+  [ ] Godzina 1-2: part_number → sku (26 lokalizacji, regex search/replace)
+  [ ] Godzina 3: scrap_std_pct → scrap_percent (3 lokalizacje)
+  [ ] Godzina 4: BomVersionHelper string → number fix
+  [ ] Godzina 5-6: pnpm gen-types + pnpm type-check
+
+FAZA 2 (WAŻNE) - 1/2 dnia:
+  [ ] Godzina 7-8: Audit FK names w SELECT queries
+  [ ] Godzina 8: Full type checking i build
+
+FAZA 3 (TESTY) - 1 dzień:
+  [ ] Product CRUD E2E tests
+  [ ] BOM management E2E tests
+  [ ] PO/TO/WO/LP operations tests
+
+RAZEM CZAS: 8-10 godzin pracy
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 NATYCHMIASTOWE DZIAŁANIA:
+
+1. Przeczytaj pełny raport: /docs/sprint-artifacts/CONSISTENCY_REPORT_0-13-0-19.md
+
+2. Zaaz Search/Replace dla `part_number` → `sku` w wszystkich plikach:
+   
+   ```bash
+   # Backup first!
+   git checkout -b fix/consistency-0-13-0-19
+   
+   # Find all part_number references
+   grep -r "part_number" apps/frontend/lib --include="*.ts"
+   
+   # Do atomic replacements per file
+   ```
+
+3. Sprawdź czy DB migrations były faktycznie wykonane:
+   ```bash
+   pnpm gen-types  # Regenerate types
+   pnpm type-check  # Check for errors
+   ```
+
+4. Uruchom testy po każdej zmianie:
+   ```bash
+   pnpm test:unit
+   pnpm test:e2e:ui
+   ```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  WAŻNE RYZYKA:
+
+HIGH: part_number rename może być pominięte w jakiś miejscach → runtime errors
+HIGH: Duplikat scrap_std_pct pola w types.ts powoduje zamieszanie
+MEDIUM: FK names w Supabase select mogą być niespójne
+MEDIUM: Some fields mogą nie być backfilled dla old records
+
+MITIGATION: Atomic commits, full test suite, staging environment first!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+REKOMENDACJA: 
+
+  ⛔ STOP - Nie tworzyć nowych story'e zanim nie będą naprawione problemy Tier 1!
+  
+  💯 Priorytet: Naprawić 26 lokalizacji `part_number` → `sku` DZISIAJ
+  
+  📝 Śledzić wszystkie zmiany w atomic commits
+  
+  ✅ Uruchomić full test suite przed merge'em do main
+
+╚════════════════════════════════════════════════════════════════════════════════╝
