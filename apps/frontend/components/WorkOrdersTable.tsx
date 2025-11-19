@@ -400,7 +400,7 @@ export function WorkOrdersTable() {
                   </td>
                   <td className="py-3 px-4 text-sm">
                     {(() => {
-                      const stats = getWoProductionStats(parseInt(wo.id));
+                      const stats = getWoProductionStats(wo.id);
                       return (
                         <div>
                           <div className="font-medium">{stats.madeQty.toFixed(2)} {wo.product?.uom || ''}</div>
@@ -410,7 +410,7 @@ export function WorkOrdersTable() {
                   </td>
                   <td className="py-3 px-4 text-sm">
                     {(() => {
-                      const stats = getWoProductionStats(parseInt(wo.id));
+                      const stats = getWoProductionStats(wo.id);
                       return (
                         <div className="flex items-center gap-2">
                           <div className="flex-1 bg-slate-200 rounded-full h-2">
@@ -430,18 +430,18 @@ export function WorkOrdersTable() {
                   <td className="py-3 px-4 text-sm">
                     <div className="relative">
                       <button
-                        onClick={() => setActionsMenuOpen(actionsMenuOpen === parseInt(wo.id) ? null : parseInt(wo.id))}
+                        onClick={() => setActionsMenuOpen(actionsMenuOpen === wo.id ? null : wo.id)}
                         className="p-1 hover:bg-slate-100 rounded transition-colors"
                         title="Actions"
                       >
                         <MoreVertical className="w-4 h-4 text-slate-600" />
                       </button>
                       
-                      {actionsMenuOpen === parseInt(wo.id) && (
+                      {actionsMenuOpen === wo.id && (
                         <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-slate-200 py-1 z-50">
                           <button
                             onClick={() => {
-                              handleViewDetails(parseInt(wo.id));
+                              handleViewDetails(wo.id);
                               setActionsMenuOpen(null);
                             }}
                             className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -478,7 +478,7 @@ export function WorkOrdersTable() {
                               }
                               
                               const reason = prompt('Cancellation reason (optional):');
-                              const success = cancelWorkOrder(parseInt(wo.id), reason);
+                              const success = cancelWorkOrder(wo.id, reason);
                               
                               if (success) {
                                 toast.success(`Work Order ${wo.wo_number} cancelled`);
@@ -501,7 +501,7 @@ export function WorkOrdersTable() {
                           {canDelete(wo.status) && (
                             <button
                               onClick={() => {
-                                setDeleteConfirmId(parseInt(wo.id));
+                                setDeleteConfirmId(wo.id);
                                 setActionsMenuOpen(null);
                               }}
                               className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50"

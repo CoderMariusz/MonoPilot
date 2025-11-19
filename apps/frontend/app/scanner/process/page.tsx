@@ -104,11 +104,11 @@ export default function ProcessTerminalPage() {
     if (selectedWOId && selectedLine && selectedWO) {
       saveOrderProgress(selectedWOId, {
         id: `progress-${selectedWOId}`,
-        order_id: selectedWOId.toString(),
+        order_id: String(selectedWOId),
         order_type: 'work_order',
         status: 'in_progress',
         progress_percentage: 0,
-        wo_id: selectedWOId.toString(),
+        wo_id: String(selectedWOId),
         staged_lps: stagedLPsForCurrentOrder,
         boxes_created: createdItemsCount,
         line: selectedLine,
@@ -141,7 +141,7 @@ export default function ProcessTerminalPage() {
 
   const getAlreadyStagedFromLP = (lpId: number): number => {
     return stagedLPsForCurrentOrder
-      .filter(staged => staged.lp.id === lpId.toString())
+      .filter(staged => staged.lp.id === lpId)
       .reduce((sum, staged) => sum + staged.quantity, 0);
   };
 
@@ -187,7 +187,7 @@ export default function ProcessTerminalPage() {
 
     const qty = parseFloat(stageQuantity);
     const lpTotalQty = currentScannedLP.quantity;
-    const alreadyStaged = getAlreadyStagedFromLP(parseInt(currentScannedLP.id));
+    const alreadyStaged = getAlreadyStagedFromLP(currentScannedLP.id);
     const availableQty = lpTotalQty - alreadyStaged;
 
     if (qty <= 0) {
@@ -311,7 +311,7 @@ export default function ProcessTerminalPage() {
           
           const currentLPQty = staged.lp.quantity;
           const newLPQty = currentLPQty - toConsume;
-          updateLicensePlate(parseInt(staged.lp.id), { quantity: newLPQty });
+          updateLicensePlate(parseInt(staged.lp.id), { planned_qty: newLPQty });
           
           addStockMove({
             move_number: `SM-CONSUME-${Date.now()}-${staged.lp.lp_number}`,
@@ -431,13 +431,13 @@ export default function ProcessTerminalPage() {
     const remainingQty = woQty - qtyToCreate;
     
     if (remainingQty <= 0) {
-      updateWorkOrder(parseInt(selectedWO.id), { 
+      updateWorkOrder(selectedWO.id, { 
         status: 'completed',
         quantity: 0
       });
       toast.success(`Work Order ${selectedWO.wo_number} completed!`);
     } else {
-      updateWorkOrder(parseInt(selectedWO.id), { 
+      updateWorkOrder(selectedWO.id, { 
         quantity: remainingQty
       });
     }
@@ -463,7 +463,7 @@ export default function ProcessTerminalPage() {
 
     const currentLPQty = lp.quantity;
     const newLPQty = currentLPQty - quantity;
-    updateLicensePlate(parseInt(lp.id), { quantity: newLPQty });
+    updateLicensePlate(parseInt(lp.id), { planned_qty: newLPQty });
 
     const updatedStaging = stagedLPsForCurrentOrder.map(staged => {
       if (staged.lp.id === lp.id.toString()) {
@@ -622,8 +622,8 @@ export default function ProcessTerminalPage() {
 
     const yieldReport: YieldReportDetail = {
       id: Date.now(),
-      wo_id: parseInt(selectedWO.id),
-      work_order_id: parseInt(selectedWO.id),
+      wo_id: selectedWO.id,
+      work_order_id: selectedWO.id,
       material_id: 0, // This will be set per material in materials_used
       planned_qty: targetQty,
       actual_qty: createdItemsCount,
@@ -679,7 +679,7 @@ export default function ProcessTerminalPage() {
   const handleStartWorkOrder = () => {
     if (!selectedWO) return;
     
-    updateWorkOrder(parseInt(selectedWO.id), { status: 'in_progress' });
+    updateWorkOrder(selectedWO.id, { status: 'in_progress' });
     toast.success(`Work Order ${selectedWO.wo_number} started successfully`);
   };
 
@@ -906,9 +906,9 @@ export default function ProcessTerminalPage() {
                       <p><span className="font-medium">Location:</span> {currentScannedLP.location?.code} - {currentScannedLP.location?.name}</p>
                       <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
                         <p><span className="font-medium">Original LP Quantity:</span> {currentScannedLP.quantity} {currentScannedLP.product?.uom}</p>
-                        <p><span className="font-medium">Already Staged:</span> {getAlreadyStagedFromLP(parseInt(currentScannedLP.id))} {currentScannedLP.product?.uom}</p>
+                        <p><span className="font-medium">Already Staged:</span> {getAlreadyStagedFromLP(currentScannedLP.id)} {currentScannedLP.product?.uom}</p>
                         <p className="font-bold text-blue-700">
-                          <span className="font-medium">Available to Stage:</span> {currentScannedLP.quantity - getAlreadyStagedFromLP(parseInt(currentScannedLP.id))} {currentScannedLP.product?.uom}
+                          <span className="font-medium">Available to Stage:</span> {currentScannedLP.quantity - getAlreadyStagedFromLP(currentScannedLP.id)} {currentScannedLP.product?.uom}
                         </p>
                       </div>
                     </div>
@@ -924,7 +924,7 @@ export default function ProcessTerminalPage() {
                           value={stageQuantity}
                           onChange={(e) => setStageQuantity(e.target.value)}
                           onKeyPress={(e) => e.key === 'Enter' && handleConfirmStaging()}
-                          placeholder={`Max: ${currentScannedLP.quantity - getAlreadyStagedFromLP(parseInt(currentScannedLP.id))}`}
+                          placeholder={`Max: ${currentScannedLP.quantity - getAlreadyStagedFromLP(currentScannedLP.id)}`}
                           className="w-full px-4 py-3 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
                         />
                       </div>

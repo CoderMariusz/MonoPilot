@@ -396,7 +396,7 @@ class ClientState {
   addWorkOrder(workOrder: Omit<WorkOrder, 'id' | 'created_at' | 'updated_at'>): WorkOrder {
     const newWorkOrder: WorkOrder = {
       ...workOrder,
-      id: (Math.max(...this.workOrders.map(wo => parseInt(wo.id)), 0) + 1).toString(),
+      id: (Math.max(...this.workOrders.map(wo => wo.id), 0) + 1).toString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -790,7 +790,7 @@ class ClientState {
   addLicensePlate(lp: Omit<LicensePlate, 'id' | 'created_at' | 'updated_at'>): LicensePlate {
     const newLP: LicensePlate = {
       ...lp,
-      id: (Math.max(...this.licensePlates.map(lp => parseInt(lp.id)), 0) + 1).toString(),
+      id: (Math.max(...this.licensePlates.map(lp => lp.id), 0) + 1).toString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

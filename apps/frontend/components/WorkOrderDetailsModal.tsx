@@ -25,14 +25,12 @@ interface WorkOrderDetails {
     product_id: number;
     product_name: string;
     product_part_number: string;
-    quantity: number;
+    planned_qty: number;
     uom: string;
     status: string;
-    due_date: string | null;
-    scheduled_start?: string;
-    scheduled_end?: string;
-    actual_start?: string;
-    actual_end?: string;
+    scheduled_date: string | null;
+    start_date?: string;
+    end_date?: string;
     source_demand_type?: string;
     source_demand_id?: number;
     bom_id?: string | number;
@@ -69,7 +67,7 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
     setLoading(true);
     setError(null);
     try {
-      const workOrder = workOrders.find(wo => wo.id === workOrderId?.toString());
+      const workOrder = workOrders.find(wo => wo.id === workOrderId);
       if (!workOrder || !workOrder.product) {
         throw new Error('Work order not found');
       }
@@ -80,32 +78,30 @@ export function WorkOrderDetailsModal({ isOpen, onClose, workOrderId }: WorkOrde
       
       const data = {
         work_order: {
-          id: parseInt(workOrder.id),
+          id: workOrder.id,
           wo_number: workOrder.wo_number,
-          product_id: parseInt(workOrder.product_id),
+          product_id: workOrder.product_id,
           product_name: workOrder.product?.description || '',
           product_part_number: workOrder.product?.sku || '',
-          quantity: woQuantity || 0,
+          planned_qty: woQuantity || 0,
           uom: workOrder.product?.uom || '',
           status: workOrder.status,
-          due_date: workOrder.scheduled_date,
-          scheduled_start: workOrder.start_date,
-          scheduled_end: workOrder.end_date,
-          actual_start: workOrder.start_date,
-          actual_end: workOrder.end_date,
+          scheduled_date: workOrder.scheduled_date,
+          start_date: workOrder.start_date,
+          end_date: workOrder.end_date,
           source_demand_type: workOrder.source_demand_type,
           source_demand_id: workOrder.source_demand_id,
           bom_id: workOrder.bom_id,
           bom_version: workOrder.bom?.version,
           bom_status: workOrder.bom?.status,
           created_by: workOrder.created_by,
-          machine_id: parseInt(workOrder.machine_id || '0'),
+          machine_id: workOrder.machine_id || null,
           machine_name: workOrder.machine?.name || null,
         },
         bom_components: bomItems.map(bomItem => {
-          const bomQty = typeof bomItem.planned_qty === 'string' ? parseFloat(bomItem.planned_qty) : bomItem.planned_qty;
+          const bomQty = typeof bomItem.quantity === 'number' ? bomItem.quantity : parseFloat(String(bomItem.quantity || 0));
           return {
-            material_id: parseInt(bomItem.material_id.toString()),
+            material_id: bomItem.material_id,
             part_number: bomItem.material?.sku || '',
             description: bomItem.material?.description || '',
             uom: bomItem.uom,

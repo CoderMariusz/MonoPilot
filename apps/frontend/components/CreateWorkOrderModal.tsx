@@ -92,7 +92,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
       // Auto-select latest active BOM if available
       const activeBom = data?.find(b => b.status === 'active');
       if (activeBom) {
-        setFormData(prev => ({ ...prev, bom_id: activeBom.id.toString() }));
+        setFormData(prev => ({ ...prev, bom_id: activeBom.id }));
         
         // Auto-select first compatible line if BOM has restrictions
         if (activeBom.line_id && activeBom.line_id.length > 0) {
@@ -100,7 +100,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
         }
       } else if (data && data.length > 0) {
         // Or select latest BOM if no active
-        setFormData(prev => ({ ...prev, bom_id: data[0].id.toString() }));
+        setFormData(prev => ({ ...prev, bom_id: data[0].id }));
         
         if (data[0].line_id && data[0].line_id.length > 0) {
           setFormData(prev => ({ ...prev, line_id: data[0].line_id![0].toString() }));
