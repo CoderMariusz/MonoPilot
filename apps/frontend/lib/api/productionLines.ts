@@ -81,6 +81,22 @@ export const ProductionLinesAPI = {
    * Create new production line
    */
   async create(data: CreateProductionLineData): Promise<ProductionLine> {
+    // Get user's org_id
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user.id)
+      .single();
+
+    if (userError || !userData?.org_id) {
+      throw new Error('Failed to get user organization');
+    }
+
     const { data: newLine, error } = await supabase
       .from('production_lines')
       .insert([{
@@ -89,6 +105,7 @@ export const ProductionLinesAPI = {
         status: data.status || 'active',
         warehouse_id: data.warehouse_id || null,
         is_active: data.is_active !== undefined ? data.is_active : true,
+        org_id: userData.org_id,
       }])
       .select()
       .single();

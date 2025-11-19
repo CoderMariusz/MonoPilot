@@ -1,9 +1,9 @@
 // API Configuration for database-first operation
 export const API_CONFIG = {
-  // Supabase configuration
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://pgroxddbtaevdegnidaz.supabase.co',
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncm94ZGRidGFldmRlZ25pZGF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5NTgzNzMsImV4cCI6MjA3NTUzNDM3M30.ZeNq9j3n6JZ1dVgnfZ8rjxsIu9kC7tk07DKspEoqEnU',
-  
+  // Supabase configuration - MUST be set via environment variables
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+
   // API endpoints (for future use)
   endpoints: {
     workOrders: '/api/work-orders',
@@ -21,3 +21,11 @@ export const API_CONFIG = {
     allergens: '/api/allergens',
   }
 };
+
+// Validate required environment variables at module load
+if (!API_CONFIG.supabaseUrl || !API_CONFIG.supabaseAnonKey) {
+  throw new Error(
+    'Missing required Supabase environment variables. ' +
+    'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in .env.local'
+  );
+}

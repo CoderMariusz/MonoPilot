@@ -4,220 +4,259 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { toast } from '@/lib/toast';
-import { getRoleBasedRoute } from '@/lib/auth/roleRedirect';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
-
-const roles = ['Operator', 'Planner', 'Technical', 'Purchasing', 'Warehouse', 'QC', 'Admin'];
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function SignupPage() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: 'Operator',
-  });
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signUp, user, profile, loading: authLoading } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const { signUp, user } = useAuth();
   const router = useRouter();
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user) {
+      router.push('/');
+    }
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setLoading(true);
 
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
+    // Validation
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
       setLoading(false);
       return;
     }
 
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
+    if (name.trim().length < 2) {
+      setError('Name must be at least 2 characters');
       setLoading(false);
       return;
     }
 
     try {
-      const { error } = await signUp(formData.email, formData.password, formData.name, formData.role);
-      
-      if (error) {
-        toast.error(error.message || 'Failed to create account');
+      const { error: signUpError } = await signUp(email, password, name);
+
+      if (signUpError) {
+        // Provide user-friendly error messages
+        let errorMessage = 'Failed to create account';
+
+        if (signUpError.message?.includes('already registered')) {
+          errorMessage = 'This email is already registered';
+        } else if (signUpError.message?.includes('invalid email')) {
+          errorMessage = 'Please enter a valid email address';
+        } else if (signUpError.message?.includes('weak password')) {
+          errorMessage = 'Password is too weak. Use a stronger password';
+        } else if (signUpError.message) {
+          errorMessage = signUpError.message;
+        }
+
+        setError(errorMessage);
+        setLoading(false);
         return;
       }
 
-      toast.success('Account created successfully! Please sign in.');
-      router.push('/login');
-    } catch (error) {
-      toast.error('An unexpected error occurred');
-    } finally {
+      // Success - show message and redirect to login
+      setSuccess(true);
+      setTimeout(() => {
+        router.push('/login');
+      }, 2000);
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError('An unexpected error occurred. Please try again');
       setLoading(false);
     }
   };
 
-  // Show loading if checking authentication
-  if (authLoading) {
+  // Show loading if already authenticated and redirecting
+  if (user) {
     return (
-      <div className="bg-white py-8 px-6 shadow rounded-lg">
-        <div className="flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
-          <span className="ml-2 text-slate-600">Checking authentication...</span>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+          <p className="mt-4 text-sm text-slate-600">Redirecting...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white py-8 px-6 shadow rounded-lg">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Sign up</h1>
-        <h2 className="mt-2 text-xl text-slate-600">Create your account</h2>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 px-4">
+      <div className="max-w-md w-full">
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Create Account</h1>
+            <p className="text-slate-600">Sign up for MonoPilot MES</p>
+          </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-slate-700">
-            Full Name
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            autoComplete="name"
-            required
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-slate-500 focus:border-slate-500"
-            placeholder="Enter your full name"
-          />
-        </div>
+          {/* Success Message */}
+          {success && (
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-sm text-green-800">Account created successfully! Redirecting to login...</p>
+            </div>
+          )}
 
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-            Email address
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-slate-500 focus:border-slate-500"
-            placeholder="Enter your email"
-          />
-        </div>
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
 
-        <div>
-          <label htmlFor="role" className="block text-sm font-medium text-slate-700">
-            Role
-          </label>
-          <select
-            id="role"
-            name="role"
-            required
-            value={formData.role}
-            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-slate-500 focus:border-slate-500"
-          >
-            {roles.map((role) => (
-              <option key={role} value={role}>
-                {role}
-              </option>
-            ))}
-          </select>
-        </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Name */}
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
+                Full Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoComplete="name"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="John Doe"
+                disabled={loading || success}
+              />
+            </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-            Password
-          </label>
-          <div className="mt-1 relative">
-            <input
-              id="password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="new-password"
-              required
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="block w-full px-3 py-2 pr-10 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-slate-500 focus:border-slate-500"
-              placeholder="Enter your password"
-            />
+            {/* Email */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="you@example.com"
+                disabled={loading || success}
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  name="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="••••••••"
+                  disabled={loading || success}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Must be at least 6 characters</p>
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-2">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="••••••••"
+                  disabled={loading || success}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
             <button
-              type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              onClick={() => setShowPassword(!showPassword)}
+              type="submit"
+              disabled={loading || success}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
-              {showPassword ? (
-                <EyeOff className="h-5 w-5 text-slate-400" />
+              {loading ? (
+                <>
+                  <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-solid border-white border-r-transparent mr-2"></div>
+                  Creating account...
+                </>
+              ) : success ? (
+                'Account created!'
               ) : (
-                <Eye className="h-5 w-5 text-slate-400" />
+                'Create Account'
               )}
             </button>
+          </form>
+
+          {/* Footer */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-slate-600">
+              Already have an account?{' '}
+              <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+                Sign in
+              </Link>
+            </p>
           </div>
         </div>
 
-        <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700">
-            Confirm Password
-          </label>
-          <div className="mt-1 relative">
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type={showConfirmPassword ? 'text' : 'password'}
-              autoComplete="new-password"
-              required
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              className="block w-full px-3 py-2 pr-10 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-slate-500 focus:border-slate-500"
-              placeholder="Confirm your password"
-            />
-            <button
-              type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              {showConfirmPassword ? (
-                <EyeOff className="h-5 w-5 text-slate-400" />
-              ) : (
-                <Eye className="h-5 w-5 text-slate-400" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating account...
-              </>
-            ) : (
-              'Create account'
-            )}
-          </button>
-        </div>
-
-        <div className="text-center">
-          <p className="text-sm text-slate-600">
-            Already have an account?{' '}
-            <Link href="/login" className="font-medium text-slate-900 hover:text-slate-700">
-              Sign in
-            </Link>
+        {/* Info Note */}
+        <div className="mt-4 bg-slate-100 border border-slate-200 rounded-lg p-4">
+          <p className="text-xs text-slate-600 text-center">
+            New accounts are created with Operator role by default. Contact your administrator to change roles.
           </p>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

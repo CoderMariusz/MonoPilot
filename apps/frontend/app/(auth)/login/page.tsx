@@ -4,207 +4,185 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { toast } from '@/lib/toast';
-import { getRoleBasedRoute } from '@/lib/auth/roleRedirect';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signIn, profile, user, loading: authLoading } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const { signIn, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo');
 
-  // Show session expired message if redirected from middleware
+  // Redirect if already authenticated
   useEffect(() => {
-    if (returnTo) {
-      toast.error('Your session has expired. Please sign in again to continue.');
-    }
-  }, [returnTo]);
-
-  // LOG AUTH STATE CHANGES
-  useEffect(() => {
-    console.log('=== LOGIN PAGE - Auth State Changed ===');
-    console.log('Auth Loading:', authLoading);
-    console.log('Has User:', !!user);
-    console.log('Has Profile:', !!profile);
-    console.log('User Email:', user?.email);
-    console.log('Profile Name:', profile?.name);
-    console.log('Profile Role:', profile?.role);
-    console.log('Current Path:', typeof window !== 'undefined' ? window.location.pathname : 'unknown');
-    console.log('======================================');
-
-    // Enable redirect after login
-    if (!authLoading && user && profile) {
+    if (user) {
       const redirectPath = returnTo || '/';
-      console.log('>>> REDIRECT: User is authenticated, redirecting to', redirectPath);
       router.push(redirectPath);
     }
-  }, [user, profile, authLoading, router]);
+  }, [user, returnTo, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return; // Prevent multiple submissions
+    setError(null);
     setLoading(true);
 
-    console.log('=== LOGIN ATTEMPT ===');
-    console.log('Email:', email);
-    console.log('=====================');
-
     try {
-      const { error } = await signIn(email, password);
-      
-      if (error) {
-        console.log('=== LOGIN ERROR ===');
-        console.log('Error:', error);
-        console.log('===================');
+      const { error: signInError } = await signIn(email, password);
 
-        // Provide more specific error messages
+      if (signInError) {
+        // Provide user-friendly error messages
         let errorMessage = 'Failed to sign in';
-        
-        if (error.message?.includes('Invalid login credentials')) {
-          errorMessage = 'Invalid email or password. Please check your credentials.';
-        } else if (error.message?.includes('Email not confirmed')) {
-          errorMessage = 'Please check your email and click the confirmation link before signing in.';
-        } else if (error.message?.includes('Too many requests')) {
-          errorMessage = 'Too many login attempts. Please wait a moment and try again.';
-        } else if (error.message) {
-          errorMessage = error.message;
+
+        if (signInError.message?.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password';
+        } else if (signInError.message?.includes('Email not confirmed')) {
+          errorMessage = 'Please confirm your email before signing in';
+        } else if (signInError.message?.includes('Too many requests')) {
+          errorMessage = 'Too many login attempts. Please wait and try again';
+        } else if (signInError.message) {
+          errorMessage = signInError.message;
         }
-        
-        toast.error(errorMessage);
-        setLoading(false); // Important: Reset loading on error
+
+        setError(errorMessage);
+        setLoading(false);
         return;
       }
 
-      console.log('=== LOGIN SUCCESS ===');
-      console.log('User object:', user);
-      console.log('=====================');
-
-      toast.success('Signed in successfully');
-      
-      // REDIRECT CODE - Uncomment below to enable redirect after successful login
-      /*
-      console.log('>>> REDIRECT: Navigating to /');
-      window.location.href = '/';
-      */
-
-      // For now, just reset loading so you can see the state
+      // Success - redirect will happen via useEffect when user state updates
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('An unexpected error occurred. Please try again');
       setLoading(false);
-    } catch (error) {
-      console.error('=== UNEXPECTED LOGIN ERROR ===');
-      console.error('Error:', error);
-      console.error('==============================');
-      toast.error('An unexpected error occurred. Please try again.');
-      setLoading(false); // Important: Reset loading on error
     }
-    // Don't use finally block - it will set loading to false too early
   };
 
-  useEffect(() => {
-    if (user) {
-      router.push('/');
-    }
-  }, [loading, user, router ]);
-
-
-
-  // Show loading if checking authentication
-  if (authLoading) {
+  // Show loading if already authenticated and redirecting
+  if (user) {
     return (
-      <div className="bg-white py-8 px-6 shadow rounded-lg">
-        <div className="flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
-          <span className="ml-2 text-slate-600">Checking authentication...</span>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+          <p className="mt-4 text-sm text-slate-600">Redirecting...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white py-8 px-6 shadow rounded-lg">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Sign in</h1>
-        <h2 className="mt-2 text-xl text-slate-600">Sign in to your account</h2>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 px-4">
+      <div className="max-w-md w-full">
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h1>
+            <p className="text-slate-600">Sign in to MonoPilot MES</p>
+          </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-            Email address
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-slate-500 focus:border-slate-500"
-            placeholder="Enter your email"
-          />
-        </div>
+          {/* Session Expired Notice */}
+          {returnTo && (
+            <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm text-yellow-800">Your session has expired. Please sign in again.</p>
+            </div>
+          )}
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-            Password
-          </label>
-          <div className="mt-1 relative">
-            <input
-              id="password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="block w-full px-3 py-2 pr-10 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-slate-500 focus:border-slate-500"
-              placeholder="Enter your password"
-            />
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Email */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="you@example.com"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  name="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="••••••••"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
             <button
-              type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              onClick={() => setShowPassword(!showPassword)}
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
-              {showPassword ? (
-                <EyeOff className="h-5 w-5 text-slate-400" />
+              {loading ? (
+                <>
+                  <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-solid border-white border-r-transparent mr-2"></div>
+                  Signing in...
+                </>
               ) : (
-                <Eye className="h-5 w-5 text-slate-400" />
+                'Sign In'
               )}
             </button>
+          </form>
+
+          {/* Footer */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-slate-600">
+              Don't have an account?{' '}
+              <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+                Sign up
+              </Link>
+            </p>
           </div>
         </div>
 
-        <div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Signing in...
-              </>
-            ) : (
-              'Sign in'
-            )}
-          </button>
-        </div>
-
-        <div className="text-center">
-          <p className="text-sm text-slate-600">
-            Don't have an account?{' '}
-            <Link href="/signup" className="font-medium text-slate-900 hover:text-slate-700">
-              Sign up
-            </Link>
-          </p>
-        </div>
-      </form>
+        {/* Test Account Info (Development Only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 bg-slate-100 border border-slate-200 rounded-lg p-4">
+            <p className="text-xs font-mono text-slate-600 mb-2">Test Account:</p>
+            <p className="text-xs font-mono text-slate-800">test@monopilot.com / test123</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

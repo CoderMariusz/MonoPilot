@@ -8,9 +8,38 @@ import { LocationsAPI } from '@/lib/api/locations';
 import type { Location, Settings } from '@/lib/types';
 import { toast } from '@/lib/toast';
 
+const defaultSettings: Settings = {
+  id: '',
+  key: '',
+  value: '',
+  general: {
+    company_name: '',
+    timezone: 'Europe/Warsaw',
+    date_format: 'DD/MM/YYYY',
+    currency: 'PLN'
+  },
+  production: {
+    default_lp_prefix: 'LP',
+    wo_number_format: 'WO-{YYYY}-{SEQ}',
+    auto_complete_wos: false
+  },
+  warehouse: {
+    default_location_id: null,
+    qa_required: true,
+    lp_split_allowed: true
+  },
+  notifications: {
+    email_notifications: false,
+    low_stock_alerts: true,
+    threshold_quantity: 10
+  },
+  created_at: '',
+  updated_at: ''
+};
+
 export function SettingsForm() {
   const { user } = useAuth();
-  const [formData, setFormData] = useState<Settings>({} as Settings);
+  const [formData, setFormData] = useState<Settings>(defaultSettings);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,9 +59,17 @@ export function SettingsForm() {
         .single();
 
       if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
-      
+
       if (data) {
-        setFormData(data);
+        // Merge with defaults to ensure all fields exist
+        setFormData({
+          ...defaultSettings,
+          ...data,
+          general: { ...defaultSettings.general, ...data.general },
+          production: { ...defaultSettings.production, ...data.production },
+          warehouse: { ...defaultSettings.warehouse, ...data.warehouse },
+          notifications: { ...defaultSettings.notifications, ...data.notifications }
+        });
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -73,6 +110,15 @@ export function SettingsForm() {
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
+        <span className="ml-3 text-sm text-slate-600">Loading settings...</span>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

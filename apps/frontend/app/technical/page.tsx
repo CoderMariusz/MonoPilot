@@ -43,7 +43,7 @@ export default function TechnicalPage() {
   }
 
   // Filter products by group
-  const rawMaterialsTypes: ProductType[] = ['RM_MEAT', 'DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_ING', 'DG_SAUCE'];
+  const rawMaterialsTypes: ProductType[] = ['RM_MEAT', 'DG_WEB', 'DG_LABEL', 'DG_BOX', 'DG_ING', 'DG_SAUCE', 'DG_OTHER'];
   const finishedProductsTypes: ProductType[] = ['FG', 'PR'];
 
   const rawMaterials = products.filter(p => rawMaterialsTypes.includes(p.product_type));

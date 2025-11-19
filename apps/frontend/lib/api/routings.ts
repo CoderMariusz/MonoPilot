@@ -13,10 +13,7 @@ export class RoutingsAPI {
   static async getAll(): Promise<Routing[]> {
     const { data, error } = await supabase
       .from('routings')
-      .select(`
-        *,
-        products(id, part_number, description)
-      `)
+      .select('*')
       .order('name');
 
     if (error) {
@@ -24,52 +21,40 @@ export class RoutingsAPI {
       throw new Error('Failed to fetch routings');
     }
 
-    // Try to fetch routing operations separately if the table exists
     let routingOperations: any[] = [];
     try {
-      const { data: operationsData, error: operationsError } = await supabase
+      const { data: operationsData } = await supabase
         .from('routing_operations')
         .select('*');
-      
-      if (operationsError) {
-        console.warn('Routing operations table not available:', operationsError.message);
-      } else {
-        routingOperations = operationsData || [];
-      }
-    } catch (operationsError) {
-      console.warn('Routing operations table not available:', operationsError);
+      routingOperations = operationsData || [];
+    } catch (e) {
+      console.warn('Routing operations not available');
     }
 
-    // Manually join the data and map to RoutingOperation format
-    const routingsWithOperations = (data || []).map(routing => ({
+    return (data || []).map(routing => ({
       ...routing,
       operations: routingOperations
         .filter(op => op.routing_id === routing.id)
         .map(op => ({
           id: op.id,
           routing_id: op.routing_id,
-          seq_no: op.sequence_number,
-          name: op.operation_name,
-          code: op.code || undefined,
-          description: op.description || undefined,
-          requirements: op.requirements || [],
-          machine_id: op.machine_id || undefined,
-          expected_yield_pct: op.expected_yield_pct || undefined,
+          sequence: op.sequence,
+          operation_name: op.operation_name,
+          machine_id: op.machine_id,
+          run_time_mins: op.run_time_mins,
+          setup_time_mins: op.setup_time_mins,
+          work_center: op.work_center,
+          notes: op.notes,
           created_at: op.created_at,
           updated_at: op.updated_at,
         }))
     }));
-
-    return routingsWithOperations;
   }
 
   static async getById(id: number): Promise<Routing> {
     const { data, error } = await supabase
       .from('routings')
-      .select(`
-        *,
-        products(id, part_number, description)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -78,30 +63,28 @@ export class RoutingsAPI {
       throw new Error('Failed to fetch routing');
     }
 
-    // Try to fetch routing operations separately if the table exists
-    let routingOperations: any[] = [];
+    let operations: any[] = [];
     try {
-      const { data: operationsData } = await supabase
+      const { data: ops } = await supabase
         .from('routing_operations')
         .select('*')
-        .eq('routing_id', id);
-      routingOperations = operationsData || [];
-    } catch (operationsError) {
-      console.warn('Routing operations table not available:', operationsError);
-    }
+        .eq('routing_id', id)
+        .order('sequence');
+      operations = ops || [];
+    } catch (e) {}
 
     return {
       ...data,
-      operations: routingOperations.map(op => ({
+      operations: operations.map(op => ({
         id: op.id,
         routing_id: op.routing_id,
-        seq_no: op.sequence_number,
-        name: op.operation_name,
-        code: op.code || undefined,
-        description: op.description || undefined,
-        requirements: op.requirements || [],
-        machine_id: op.machine_id || undefined,
-        expected_yield_pct: op.expected_yield_pct || undefined,
+        sequence: op.sequence,
+        operation_name: op.operation_name,
+        machine_id: op.machine_id,
+        run_time_mins: op.run_time_mins,
+        setup_time_mins: op.setup_time_mins,
+        work_center: op.work_center,
+        notes: op.notes,
         created_at: op.created_at,
         updated_at: op.updated_at,
       }))
@@ -109,88 +92,75 @@ export class RoutingsAPI {
   }
 
   static async create(data: CreateRoutingDTO): Promise<Routing> {
-    const { data: routing, error: routingError } = await supabase
+    // Get user's org_id
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Get user's org_id from users table
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user.id)
+      .single();
+
+    if (userError || !userData?.org_id) {
+      console.error('Error getting user org_id:', userError);
+      throw new Error('Failed to get user organization');
+    }
+
+    const { data: routing, error } = await supabase
       .from('routings')
       .insert({
         name: data.name,
-        product_id: data.product_id,
+        product_id: data.product_id || null,
         is_active: data.is_active ?? true,
-        notes: data.notes
+        notes: data.notes || null,
+        org_id: userData.org_id
       })
       .select('*')
       .single();
 
-    if (routingError) {
-      console.error('Error creating routing:', routingError);
+    if (error) {
+      console.error('Error creating routing:', error);
       throw new Error('Failed to create routing');
     }
 
-    // Create routing operations if provided
     if (data.operations && data.operations.length > 0) {
-      // Validate sequence numbers are unique and ascending
-      const seqNumbers = data.operations.map(op => op.seq_no);
-      const uniqueSeqNumbers = new Set(seqNumbers);
-      if (seqNumbers.length !== uniqueSeqNumbers.size) {
-        throw new Error('Sequence numbers must be unique');
-      }
-      
-      const operations = data.operations.map(op => ({
+      const ops = data.operations.map(op => ({
         routing_id: routing.id,
-        sequence_number: op.seq_no,
-        operation_name: op.name,
-        code: op.code || null,
-        description: op.description || null,
-        requirements: op.requirements && op.requirements.length > 0 ? op.requirements : [],
+        sequence: op.sequence,
+        operation_name: op.operation_name,
         machine_id: op.machine_id || null,
-        expected_yield_pct: op.expected_yield_pct || null
+        run_time_mins: op.run_time_mins || null,
+        setup_time_mins: op.setup_time_mins || null,
+        work_center: op.work_center || null,
+        notes: op.notes || null
       }));
 
-      const { error: operationsError, data: insertedOperations } = await supabase
+      const { data: insertedOps, error: opsError } = await supabase
         .from('routing_operations')
-        .insert(operations)
+        .insert(ops)
         .select();
 
-      if (operationsError) {
-        console.error('Error creating routing operations:', operationsError);
-        throw new Error(`Failed to create routing operations: ${operationsError.message}`);
+      if (opsError) {
+        console.error('Error creating operations:', opsError);
+        throw new Error('Failed to create routing operations');
       }
 
-      // Map inserted operations to RoutingOperation format
-      const mappedOperations = (insertedOperations || []).map(op => ({
-        id: op.id,
-        routing_id: op.routing_id,
-        seq_no: op.sequence_number,
-        name: op.operation_name,
-        code: op.code || undefined,
-        description: op.description || undefined,
-        requirements: op.requirements || [],
-        machine_id: op.machine_id || undefined,
-        expected_yield_pct: op.expected_yield_pct || undefined,
-        created_at: op.created_at,
-        updated_at: op.updated_at,
-      }));
-
-      return {
-        ...routing,
-        operations: mappedOperations
-      };
+      return { ...routing, operations: insertedOps || [] };
     }
 
-    return {
-      ...routing,
-      operations: []
-    };
+    return { ...routing, operations: [] };
   }
 
-  static async update(id: number, data: Partial<Omit<Routing, 'id' | 'created_at' | 'updated_at' | 'operations'>> & { operations?: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>[] }): Promise<Routing> {
+  static async update(id: number, data: any): Promise<Routing> {
     const { operations, ...routingData } = data;
-    
+
     const { data: result, error } = await supabase
       .from('routings')
-      .update({
-        ...routingData,
-        updated_at: new Date().toISOString()
-      })
+      .update({ ...routingData, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single();
@@ -200,162 +170,42 @@ export class RoutingsAPI {
       throw new Error('Failed to update routing');
     }
 
-    // Handle operations if provided
     if (operations !== undefined) {
-      // Delete existing operations
-      const { error: deleteError } = await supabase
-        .from('routing_operations')
-        .delete()
-        .eq('routing_id', id);
+      await supabase.from('routing_operations').delete().eq('routing_id', id);
 
-      if (deleteError) {
-        console.error('Error deleting old routing operations:', deleteError);
-        throw new Error('Failed to delete old routing operations');
-      }
-
-      // Insert new operations if any
       if (operations.length > 0) {
-        // Validate sequence numbers are unique and ascending
-        const seqNumbers = operations.map(op => op.seq_no);
-        const uniqueSeqNumbers = new Set(seqNumbers);
-        if (seqNumbers.length !== uniqueSeqNumbers.size) {
-          throw new Error('Sequence numbers must be unique');
-        }
-        
-        const operationsToInsert = operations.map(op => ({
+        const ops = operations.map((op: any) => ({
           routing_id: id,
-          sequence_number: op.seq_no,
-          operation_name: op.name,
-          code: op.code || null,
-          description: op.description || null,
-          requirements: op.requirements && op.requirements.length > 0 ? op.requirements : [],
+          sequence: op.sequence,
+          operation_name: op.operation_name,
           machine_id: op.machine_id || null,
-          expected_yield_pct: op.expected_yield_pct || null
+          run_time_mins: op.run_time_mins || null,
+          setup_time_mins: op.setup_time_mins || null,
+          work_center: op.work_center || null,
+          notes: op.notes || null
         }));
 
-        const { error: insertError, data: insertedOperations } = await supabase
+        const { data: insertedOps } = await supabase
           .from('routing_operations')
-          .insert(operationsToInsert)
+          .insert(ops)
           .select();
 
-        if (insertError) {
-          console.error('Error creating routing operations:', insertError);
-          throw new Error('Failed to create routing operations');
-        }
-
-        // Map inserted operations to RoutingOperation format
-        const mappedOperations = (insertedOperations || []).map(op => ({
-          id: op.id,
-          routing_id: op.routing_id,
-          seq_no: op.sequence_number,
-          name: op.operation_name,
-          code: op.code || undefined,
-          description: op.description || undefined,
-          requirements: op.requirements || [],
-          machine_id: op.machine_id || undefined,
-          expected_yield_pct: op.expected_yield_pct || undefined,
-          created_at: op.created_at,
-          updated_at: op.updated_at,
-        }));
-
-        return {
-          ...result,
-          operations: mappedOperations
-        };
+        return { ...result, operations: insertedOps || [] };
       }
     }
 
-    // Fetch existing operations if no operations update was provided
-    let routingOperations: any[] = [];
-    try {
-      const { data: operationsData } = await supabase
-        .from('routing_operations')
-        .select('*')
-        .eq('routing_id', id);
-      routingOperations = operationsData || [];
-    } catch (operationsError) {
-      console.warn('Routing operations table not available:', operationsError);
-    }
+    const { data: existingOps } = await supabase
+      .from('routing_operations')
+      .select('*')
+      .eq('routing_id', id)
+      .order('sequence');
 
-    return {
-      ...result,
-      operations: routingOperations.map(op => ({
-        id: op.id,
-        routing_id: op.routing_id,
-        seq_no: op.sequence_number,
-        name: op.operation_name,
-        code: op.code || undefined,
-        description: op.description || undefined,
-        requirements: op.requirements || [],
-        machine_id: op.machine_id || undefined,
-        expected_yield_pct: op.expected_yield_pct || undefined,
-        created_at: op.created_at,
-        updated_at: op.updated_at,
-      }))
-    };
+    return { ...result, operations: existingOps || [] };
   }
 
   static async delete(id: number): Promise<void> {
-    const { error } = await supabase
-      .from('routings')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting routing:', error);
-      throw new Error('Failed to delete routing');
-    }
-  }
-
-  static async addOperation(routingId: number, operation: Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>): Promise<RoutingOperation> {
-    const { data, error } = await supabase
-      .from('routing_operations')
-      .insert({
-        routing_id: routingId,
-        seq_no: operation.seq_no,
-        name: operation.name,
-        code: operation.code,
-        description: operation.description
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error adding routing operation:', error);
-      throw new Error('Failed to add routing operation');
-    }
-
-    return data;
-  }
-
-  static async updateOperation(operationId: number, data: Partial<Omit<RoutingOperation, 'id' | 'routing_id' | 'created_at' | 'updated_at'>>): Promise<RoutingOperation> {
-    const { data: result, error } = await supabase
-      .from('routing_operations')
-      .update({
-        ...data,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', operationId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating routing operation:', error);
-      throw new Error('Failed to update routing operation');
-    }
-
-    return result;
-  }
-
-  static async deleteOperation(operationId: number): Promise<void> {
-    const { error } = await supabase
-      .from('routing_operations')
-      .delete()
-      .eq('id', operationId);
-
-    if (error) {
-      console.error('Error deleting routing operation:', error);
-      throw new Error('Failed to delete routing operation');
-    }
+    await supabase.from('routing_operations').delete().eq('routing_id', id);
+    const { error } = await supabase.from('routings').delete().eq('id', id);
+    if (error) throw new Error('Failed to delete routing');
   }
 }

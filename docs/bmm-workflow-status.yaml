@@ -15,7 +15,7 @@
 #   - {file-path}: File created/found (e.g., "docs/product-brief.md")
 #   - skipped: Optional/conditional workflow that was skipped
 
-generated: "2025-11-16"
+generated: "2025-11-18"
 project: "MonoPilot"
 project_type: "software"
 selected_track: "enterprise"
@@ -50,6 +50,22 @@ workflow_status:
   epic-0-audit-and-fix: docs/sprint-artifacts/epic-0-retro-2025-11-16.md  # COMPLETED - retrospective done
   epic-0-documentation: docs/P0-MODULES-AUDIT-REPORT-2025-11-14.md  # audit report with 7 critical issues (all resolved)
   epic-0-sprint-status: docs/sprint-artifacts/sprint-status.yaml  # 9 stories completed, 3 superseded
+
+  # Phase 2.6: DATABASE & API ALIGNMENT (COMPLETED 2025-11-18)
+  # Discovered during Epic 0 - critical for ensuring APIs match database schema
+  epic-0-api-alignment: docs/archive/epic-0/EPIC-0-API-AUDIT-REPORT.md  # COMPLETED - full API audit (archived)
+  epic-0-missing-columns: docs/archive/epic-0/EPIC-0-MISSING-COLUMNS.md  # documentation of all missing columns (archived)
+  epic-0-migration-109: apps/frontend/lib/supabase/migrations/109_add_missing_api_columns.sql  # APPLIED - 30+ columns added
+  # Fixed APIs: purchaseOrders, workOrders, transferOrders, bomHistory, asns
+  # New columns: wo_number, actual_start/end, kpi_scope, gross_total, vat_rate, etc.
+  #
+  # Additional fixes (2025-11-18):
+  # - Fixed 9 APIs missing org_id: warehouses, locations, machines, suppliers, productionLines, woTemplates, npdProjects, routings, allergens
+  # - Fixed Supplier type and modal: added code field (NOT NULL constraint)
+  # - Fixed SupplierModal: added optional chaining for nullable string fields
+  # - Fixed Tax Codes API: removed non-existent updated_at column
+  # - Fixed routings: made product_id nullable (can be shared across products)
+  # - Full modal audit: all forms confirmed compliant with database constraints
 
   # Phase 3: Implementation (BLOCKED until Epic 0 complete)
   sprint-planning: docs/sprint-artifacts/sprint-status.yaml  # agent: sm (completed 2025-11-14)

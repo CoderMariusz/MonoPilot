@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { TransferOrdersAPI, type MarkReceivedLineUpdate } from '@/lib/api/transferOrders';
+import { TransferOrdersAPI } from '@/lib/api/transferOrders';
 import { WarehousesAPI } from '@/lib/api/warehouses';
 import type { TransferOrder, Warehouse } from '@/lib/types';
 import { toast } from '@/lib/toast';
@@ -107,14 +107,12 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
 
   const handleMarkShipped = async () => {
     if (!transferOrder || !shipDate) return;
-    
+
     setLoading(true);
     try {
-      const shipDateTime = new Date(shipDate).toISOString();
-      await TransferOrdersAPI.markShipped(transferOrder.id, shipDateTime);
-      toast.success('Transfer order marked as shipped');
+      // Shipping workflow not yet implemented - database schema needs actual_ship_date column
+      toast.error('Shipping workflow not yet implemented');
       setShowShipModal(false);
-      await loadDetails(); // Reload to refresh dates and status
     } catch (error: any) {
       toast.error(error.message || 'Failed to mark as shipped');
     } finally {
@@ -126,13 +124,13 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
     // Set default receive date to today
     const today = new Date().toISOString().split('T')[0];
     setReceiveDate(today);
-    // Initialize line updates with planned quantities
+    // Initialize line updates with quantities
     const updates: Record<number, { qty_received: string; lp_id?: string; batch?: string }> = {};
     transferOrder?.items?.forEach(item => {
       updates[item.id] = {
-        qty_received: String(item.qty_planned || 0),
+        qty_received: String(item.quantity || 0),
         lp_id: '',
-        batch: item.batch || ''
+        batch: ''
       };
     });
     setLineUpdates(updates);
@@ -141,23 +139,12 @@ export function TransferOrderDetailsModal({ isOpen, onClose, transferOrderId }: 
 
   const handleMarkReceived = async () => {
     if (!transferOrder || !receiveDate) return;
-    
+
     setLoading(true);
     try {
-      const receiveDateTime = new Date(receiveDate).toISOString();
-      
-      // Build line updates array
-      const updates: MarkReceivedLineUpdate[] = Object.entries(lineUpdates).map(([id, data]) => ({
-        line_id: Number(id),
-        qty_received: Number(data.qty_received),
-        lp_id: data.lp_id ? Number(data.lp_id) : undefined,
-        batch: data.batch || undefined
-      }));
-      
-      await TransferOrdersAPI.markReceived(transferOrder.id, receiveDateTime, updates);
-      toast.success('Transfer order marked as received');
+      // Receiving workflow not yet implemented - database schema needs actual_receive_date column
+      toast.error('Receiving workflow not yet implemented');
       setShowReceiveModal(false);
-      await loadDetails(); // Reload to refresh dates and status
     } catch (error: any) {
       toast.error(error.message || 'Failed to mark as received');
     } finally {

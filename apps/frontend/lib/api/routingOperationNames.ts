@@ -80,10 +80,7 @@ export class RoutingOperationNamesAPI {
   static async update(id: number, data: UpdateRoutingOperationNameDTO): Promise<RoutingOperationName> {
     const { data: result, error } = await supabase
       .from('routing_operation_names')
-      .update({
-        ...data,
-        updated_at: new Date().toISOString()
-      })
+      .update(data)
       .eq('id', id)
       .select()
       .single();
@@ -121,4 +118,3 @@ export class RoutingOperationNamesAPI {
     }
   }
 }
-

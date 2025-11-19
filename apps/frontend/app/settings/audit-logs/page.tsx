@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/AuthContext';
+import { useUserProfile } from '../../../lib/hooks/useUserProfile';
 import { AuditLogsAPI, AuditLog, AuditLogFilters } from '../../../lib/api/audit';
 import { AuditLogTable } from '../../../components/AuditLogTable';
 import { AuditLogDetailModal } from '../../../components/AuditLogDetailModal';
@@ -14,7 +15,8 @@ import { AuditLogDetailModal } from '../../../components/AuditLogDetailModal';
  */
 export default function AuditLogsPage() {
   const router = useRouter();
-  const { profile, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
+  const { profile } = useUserProfile();
 
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);

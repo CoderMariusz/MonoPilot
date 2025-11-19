@@ -20,28 +20,28 @@ interface Props {
 export default function SingleProductModal({ isOpen, onClose, onSuccess, product }: Props) {
   const [form, setForm] = useState<Partial<ProductInsert>>({
     product_group: 'MEAT',
-    product_type: 'RM_MEAT',
+    product_type: 'RM_MEAT' as any, // New granular type
     uom: 'KG',
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [suppliers, setSuppliers] = useState<Array<{ id: number; name: string }>>([]);
-  const [taxCodes, setTaxCodes] = useState<Array<{ id: number; code: string; name: string }>>([]);
+  const [suppliers, setSuppliers] = useState<Array<{ id: number; name: string; default_tax_code_id: number | null }>>([]);
   const [allergens, setAllergens] = useState<Array<{ id: number; code: string; name: string }>>([]);
   const [selectedAllergens, setSelectedAllergens] = useState<number[]>([]);
   const [isActive, setIsActive] = useState<boolean>(true);
   const [productVersion, setProductVersion] = useState<string>('1.0');  // NEW: Product version
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   
-  // Normalize UoM to match dropdown values (KG, EACH, METER, LITER)
+  // Normalize UoM to match uom_master codes
   const normalizeUomForSelect = (uom: string): UoM => {
     const upper = uom.toUpperCase().trim();
-    if (upper === 'EA' || upper === 'EACH' || upper === 'PC' || upper === 'PCS') return 'EACH';
-    if (upper === 'KG' || upper === 'KGS' || upper === 'KILO' || upper === 'KILOGRAM') return 'KG';
-    if (upper === 'M' || upper === 'MTR' || upper === 'METER' || upper === 'METERS') return 'METER';
-    if (upper === 'L' || upper === 'LTR' || upper === 'LITER' || upper === 'LITERS') return 'LITER';
-    // Default fallback
-    return 'KG';
+    // Map common variations to standard codes
+    if (upper === 'EACH' || upper === 'PCS') return 'EA' as UoM;
+    if (upper === 'KGS' || upper === 'KILO' || upper === 'KILOGRAM') return 'KG' as UoM;
+    if (upper === 'MTR' || upper === 'METER' || upper === 'METERS') return 'M' as UoM;
+    if (upper === 'LTR' || upper === 'LITER' || upper === 'LITERS') return 'L' as UoM;
+    // Return as-is if it's already a valid code
+    return upper as UoM;
   };
   
   // Debug: log is_active when it changes
@@ -87,7 +87,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
     if (!product) {
       setForm({
         product_group: 'MEAT',
-        product_type: 'RM_MEAT',
+        product_type: 'RM_MEAT' as any, // New granular type
         uom: 'KG',
         part_number: '',
         description: '',
@@ -106,16 +106,32 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
     }
     
     (async () => {
-      const [{ data: sData }, { data: tData }, { data: aData }] = await Promise.all([
-        supabase.from('suppliers').select('id,name').order('name'),
-        supabase.from('settings_tax_codes').select('id,code,name').order('code'),
+      const [{ data: sData }, { data: aData }] = await Promise.all([
+        supabase.from('suppliers').select('id,name,default_tax_code_id').order('name'),
         supabase.from('allergens').select('id,code,name').order('code'),
       ]);
       setSuppliers(sData || []);
-      setTaxCodes(tData || []);
       setAllergens(aData || []);
     })();
   }, [isOpen, product]);
+
+  // Handle supplier change - auto-fill tax code from supplier's default
+  const handleSupplierChange = (supplierId: number | null) => {
+    if (supplierId) {
+      const supplier = suppliers.find(s => s.id === supplierId);
+      setForm(prev => ({
+        ...prev,
+        supplier_id: supplierId,
+        tax_code_id: supplier?.default_tax_code_id || null
+      }));
+    } else {
+      setForm(prev => ({
+        ...prev,
+        supplier_id: null,
+        tax_code_id: null
+      }));
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -288,14 +304,28 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
             <label className="block text-sm font-medium text-slate-700 mb-1">Product Type</label>
             <select
               value={form.product_type ?? ''}
-              onChange={e => handleChange('product_type', e.target.value as ProductType)}
+              onChange={e => handleChange('product_type', e.target.value)}
               disabled={!!product}
               className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
             >
               <option value="">Select…</option>
-              {(form.product_group === 'DRYGOODS' ? ['DG_ING','DG_LABEL','DG_WEB','DG_BOX','DG_SAUCE'] : ['RM_MEAT']).map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
+              <optgroup label="Raw Materials (Expiry Required)">
+                <option value="RM_MEAT">Raw Material (Meat)</option>
+              </optgroup>
+              <optgroup label="Dry Goods - Packaging (No Expiry)">
+                <option value="DG_WEB">Web</option>
+                <option value="DG_LABEL">Label</option>
+                <option value="DG_BOX">Box</option>
+                <option value="DG_OTHER">Other Packaging</option>
+              </optgroup>
+              <optgroup label="Dry Goods - Consumables (Expiry Required)">
+                <option value="DG_ING">Ingredient</option>
+                <option value="DG_SAUCE">Sauce</option>
+              </optgroup>
+              <optgroup label="Production">
+                <option value="PR">Semi-Finished</option>
+                <option value="FG">Finished Good</option>
+              </optgroup>
             </select>
             {product && (
               <p className="text-xs text-slate-500 mt-1">Product type cannot be changed after creation</p>
@@ -344,7 +374,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
             <label className="block text-sm font-medium text-slate-700 mb-1">Supplier</label>
             <select
               value={form.supplier_id ?? ''}
-              onChange={e => handleChange('supplier_id', e.target.value ? Number(e.target.value) : null)}
+              onChange={e => handleSupplierChange(e.target.value ? Number(e.target.value) : null)}
               className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
             >
               <option value="">Select…</option>
@@ -353,19 +383,7 @@ export default function SingleProductModal({ isOpen, onClose, onSuccess, product
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Tax Code</label>
-            <select
-              value={form.tax_code_id ?? ''}
-              onChange={e => handleChange('tax_code_id', e.target.value ? Number(e.target.value) : null)}
-              className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm"
-            >
-              <option value="">Select…</option>
-              {taxCodes.map(t => (
-                <option key={t.id} value={t.id}>{t.code} — {t.name}</option>
-              ))}
-            </select>
-          </div>
+          {/* Tax Code is inherited from supplier - no UI field needed */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Lead Time (days)</label>
             <input

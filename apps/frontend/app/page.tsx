@@ -4,11 +4,12 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { getRoleBasedRoute } from '@/lib/auth/roleRedirect';
+import { useUserProfile } from '@/lib/hooks/useUserProfile';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const { user, profile, loading } = useAuth();
+  const { user, loading } = useAuth();
+  const { profile, loading: profileLoading } = useUserProfile();
   const router = useRouter();
 
   // LOG AUTH STATE ON ROOT PAGE
@@ -23,9 +24,7 @@ export default function Home() {
   }, [user, profile, loading]);
 
   // Show loading while checking authentication
-  if (loading) {
-    
-
+  if (loading || profileLoading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[calc(100vh-64px)] bg-slate-50">
         <div className="flex items-center">

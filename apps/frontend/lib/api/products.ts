@@ -15,13 +15,12 @@ export class ProductsAPI {
           id,
           version,
           status,
-          archived_at,
-          deleted_at,
-          requires_routing,
-          default_routing_id,
+          name,
           notes,
           effective_from,
           effective_to,
+          yield_qty,
+          yield_uom,
           created_at,
           updated_at,
           bomItems:bom_items(
@@ -30,17 +29,9 @@ export class ProductsAPI {
             quantity,
             uom,
             sequence,
-            priority,
-            production_lines,
-            production_line_restrictions,
-            scrap_std_pct,
-            is_optional,
-            is_phantom,
+            scrap_percent,
             consume_whole_lp,
-            unit_cost_std,
-            tax_code_id,
-            lead_time_days,
-            moq,
+            notes,
             created_at,
             updated_at,
             material:products!bom_items_material_id_fkey(
@@ -113,15 +104,22 @@ export class ProductsAPI {
   static async update(id: number, data: UpdateProductData): Promise<Product> {
     // Prevent updating part_number and product_type after creation
     const { part_number, product_type, ...updateData } = data as any;
-    
+
     if (part_number !== undefined) {
       console.warn('Attempted to update part_number, which is not allowed. Ignoring.');
     }
-    
+
     if (product_type !== undefined) {
       console.warn('Attempted to update product_type, which is not allowed. Ignoring.');
     }
-    
+
+    // Get current values before update for audit log
+    const { data: oldProduct } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .single();
+
     const { data: updated, error } = await supabase
       .from('products')
       .update(updateData)
@@ -132,6 +130,20 @@ export class ProductsAPI {
     if (error) {
       console.error('Error updating product:', error);
       throw new Error('Failed to update product');
+    }
+
+    // Write to audit_log
+    if (oldProduct && updated) {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('audit_log').insert({
+        table_name: 'products',
+        record_id: id,
+        action: 'UPDATE',
+        old_values: oldProduct,
+        new_values: updated,
+        user_id: user?.id || null,
+        org_id: updated.org_id
+      });
     }
 
     return updated;

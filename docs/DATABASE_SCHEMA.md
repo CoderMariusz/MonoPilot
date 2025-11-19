@@ -4,7 +4,7 @@
 
 This document describes the complete database schema for the MonoPilot MES system, including all tables, relationships, constraints, and business rules.
 
-**Last Updated**: 2025-11-17 (auto-generated)
+**Last Updated**: 2025-11-19 (auto-generated)
 **Version**: Auto-generated from migrations
 
 ## Tables
@@ -28,11 +28,19 @@ This document describes the complete database schema for the MonoPilot MES syste
 | last_login | TIMESTAMPTZ | - |
 | created_by | UUID | REFERENCES users(id) |
 | updated_by | UUID | REFERENCES users(id) |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
 
 **Foreign Keys**:
 
 - `created_by` → `users.id`
 - `updated_by` → `users.id`
+- `org_id` → `organizations.id`
+
+**Indexes**:
+
+- idx_users_org_id ON (org_id)
+- idx_users_email ON (email)
+- idx_users_role ON (role)
 
 <details>
 <summary>SQL Definition</summary>
@@ -83,6 +91,17 @@ CREATE TABLE IF NOT EXISTS users (
 | is_active | BOOLEAN | DEFAULT true |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| code | TEXT | NOT NULL |
+| contact_name | TEXT | - |
+
+**Foreign Keys**:
+
+- `org_id` → `organizations.id`
+
+**Indexes**:
+
+- idx_suppliers_org_id ON (org_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -126,6 +145,18 @@ CREATE TABLE suppliers (
 | is_active | BOOLEAN | DEFAULT true |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| address | TEXT | - |
+| default_receipt_location_id | BIGINT | - |
+| transit_location_id | BIGINT | - |
+
+**Foreign Keys**:
+
+- `org_id` → `organizations.id`
+
+**Indexes**:
+
+- idx_warehouses_org_id ON (org_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -159,6 +190,15 @@ CREATE TABLE warehouses (
 | is_active | BOOLEAN | DEFAULT true |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+
+**Foreign Keys**:
+
+- `org_id` → `organizations.id`
+
+**Indexes**:
+
+- idx_allergens_org_id ON (org_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -269,10 +309,17 @@ CREATE TABLE routing_operation_names (
 | is_active | BOOLEAN | DEFAULT true |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
 
 **Foreign Keys**:
 
 - `warehouse_id` → `warehouses.id`
+- `org_id` → `organizations.id`
+
+**Indexes**:
+
+- idx_locations_org_id ON (org_id)
+- idx_locations_warehouse_id ON (warehouse_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -308,10 +355,20 @@ CREATE TABLE locations (
 | is_active | BOOLEAN | DEFAULT true |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| production_line_id | BIGINT | REFERENCES production_lines(id) |
+| machine_type | TEXT | - |
 
 **Foreign Keys**:
 
 - `location_id` → `locations.id`
+- `org_id` → `organizations.id`
+- `production_line_id` → `production_lines.id`
+
+**Indexes**:
+
+- idx_machines_org_id ON (org_id)
+- idx_machines_production_line_id ON (production_line_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -349,12 +406,19 @@ CREATE TABLE machines (
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 | created_by | UUID | REFERENCES users(id) |
 | updated_by | UUID | REFERENCES users(id) |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| description | TEXT | - |
 
 **Foreign Keys**:
 
 - `warehouse_id` → `warehouses.id`
 - `created_by` → `users.id`
 - `updated_by` → `users.id`
+- `org_id` → `organizations.id`
+
+**Indexes**:
+
+- idx_production_lines_org_id ON (org_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -493,6 +557,9 @@ CREATE TABLE warehouse_settings (
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 | created_by | UUID | REFERENCES users(id) |
 | updated_by | UUID | REFERENCES users(id) |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| sku | TEXT | NOT NULL |
+| name | TEXT | NOT NULL |
 
 **Foreign Keys**:
 
@@ -500,11 +567,16 @@ CREATE TABLE warehouse_settings (
 - `tax_code_id` → `settings_tax_codes.id`
 - `created_by` → `users.id`
 - `updated_by` → `users.id`
+- `org_id` → `organizations.id`
 
 **Indexes**:
 
+- idx_products_org_id ON (org_id)
+- idx_products_supplier_id ON (supplier_id)
+- idx_products_product_type ON (product_type)
 - idx_products_npd_project_id ON (npd_project_id)
 - idx_products_source ON (source)
+- idx_products_product_version ON (product_version)
 
 <details>
 <summary>SQL Definition</summary>
@@ -575,12 +647,19 @@ CREATE TABLE products (
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
 | created_by | UUID | REFERENCES users(id) |
 | updated_by | UUID | REFERENCES users(id) |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
 
 **Foreign Keys**:
 
 - `product_id` → `products.id`
 - `created_by` → `users.id`
 - `updated_by` → `users.id`
+- `org_id` → `organizations.id`
+
+**Indexes**:
+
+- idx_routings_org_id ON (org_id)
+- idx_routings_product_id ON (product_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -617,10 +696,25 @@ CREATE TABLE routings (
 | after | JSONB | - |
 | actor_id | UUID | REFERENCES users(id) |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | REFERENCES organizations(id) |
+| user_id | UUID | REFERENCES users(id) |
+| table_name | TEXT | NOT NULL |
+| record_id | BIGINT | - |
+| old_values | JSONB | - |
+| new_values | JSONB | - |
+| ip_address | TEXT | - |
 
 **Foreign Keys**:
 
 - `actor_id` → `users.id`
+- `org_id` → `organizations.id`
+- `user_id` → `users.id`
+
+**Indexes**:
+
+- idx_audit_log_org_id ON (org_id)
+- idx_audit_log_table_name ON (table_name)
+- idx_audit_log_created_at ON (created_at)
 
 <details>
 <summary>SQL Definition</summary>
@@ -654,11 +748,18 @@ CREATE TABLE audit_log (
 | contains | BOOLEAN | NOT NULL, DEFAULT true |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| is_contains | BOOLEAN | DEFAULT true |
+| is_may_contain | BOOLEAN | DEFAULT false |
 
 **Foreign Keys**:
 
 - `product_id` → `products.id`
 - `allergen_id` → `allergens.id`
+
+**Indexes**:
+
+- idx_product_allergens_product_id ON (product_id)
+- idx_product_allergens_allergen_id ON (allergen_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -699,13 +800,25 @@ CREATE TABLE product_allergens (
 | line_id | INTEGER | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| name | TEXT | NOT NULL |
+| yield_qty | DECIMAL(15,4) | NOT NULL, DEFAULT 1 |
+| yield_uom | TEXT | NOT NULL, DEFAULT 'kg' |
+| created_by | UUID | REFERENCES users(id) |
+| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
 - `product_id` → `products.id`
+- `org_id` → `organizations.id`
+- `created_by` → `users.id`
+- `updated_by` → `users.id`
 
 **Indexes**:
 
+- idx_boms_org_id ON (org_id)
+- idx_boms_product_id ON (product_id)
+- idx_boms_status ON (status)
 - idx_boms_npd_formulation_id ON (npd_formulation_id)
 - idx_boms_source ON (source)
 
@@ -764,11 +877,19 @@ CREATE TABLE boms (
 | status_to | VARCHAR(20) | - |
 | changes | JSONB | NOT NULL |
 | description | TEXT | - |
+| change_type | TEXT | NOT NULL |
+| old_values | JSONB | - |
+| new_values | JSONB | - |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
 
 **Foreign Keys**:
 
 - `bom_id` → `boms.id`
 - `changed_by` → `users.id`
+
+**Indexes**:
+
+- idx_bom_history_bom_id ON (bom_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -811,11 +932,20 @@ CREATE TABLE bom_history (
 | code | VARCHAR(50) | - |
 | description | TEXT | - |
 | expected_yield_pct | NUMERIC(5,2) | DEFAULT 100.0 CHECK (expected_yield_pct >= 0 AND expected_yield_pct <= 100) |
+| sequence | INTEGER | NOT NULL |
+| work_center | TEXT | - |
+| setup_time_mins | INTEGER | DEFAULT 0 |
+| run_time_mins | INTEGER | DEFAULT 0 |
+| notes | TEXT | - |
 
 **Foreign Keys**:
 
 - `routing_id` → `routings.id`
 - `machine_id` → `machines.id`
+
+**Indexes**:
+
+- idx_routing_operations_routing_id ON (routing_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -870,12 +1000,19 @@ CREATE TABLE routing_operations (
 | line_id | INTEGER | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| scrap_percent | DECIMAL(5,2) | DEFAULT 0 |
+| notes | TEXT | - |
 
 **Foreign Keys**:
 
 - `bom_id` → `boms.id`
 - `material_id` → `products.id`
 - `tax_code_id` → `settings_tax_codes.id`
+
+**Indexes**:
+
+- idx_bom_items_bom_id ON (bom_id)
+- idx_bom_items_material_id ON (material_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1091,6 +1228,17 @@ CREATE TABLE IF NOT EXISTS product_prices (
 | approved_by | INTEGER | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| routing_id | BIGINT | REFERENCES routings(id) |
+| warehouse_id | BIGINT | NOT NULL, REFERENCES warehouses(id) |
+| production_line_id | BIGINT | REFERENCES production_lines(id) |
+| planned_qty | DECIMAL(15,4) | NOT NULL |
+| completed_qty | DECIMAL(15,4) | DEFAULT 0 |
+| scheduled_date | DATE | - |
+| start_date | TIMESTAMPTZ | - |
+| end_date | TIMESTAMPTZ | - |
+| notes | TEXT | - |
+| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
@@ -1098,11 +1246,25 @@ CREATE TABLE IF NOT EXISTS product_prices (
 - `bom_id` → `boms.id`
 - `machine_id` → `machines.id`
 - `line_id` → `production_lines.id`
+- `org_id` → `organizations.id`
+- `routing_id` → `routings.id`
+- `warehouse_id` → `warehouses.id`
+- `production_line_id` → `production_lines.id`
+- `created_by` → `users.id`
+- `updated_by` → `users.id`
 
 **Indexes**:
 
+- idx_work_orders_org_id ON (org_id)
+- idx_work_orders_product_id ON (product_id)
+- idx_work_orders_status ON (status)
+- idx_work_orders_scheduled_date ON (scheduled_date)
 - idx_work_orders_npd_project_id ON (npd_project_id)
 - idx_work_orders_type ON (type)
+- idx_work_orders_wo_number_org ON (org_id, wo_number)
+- idx_work_orders_actual_start ON (actual_start)
+- idx_work_orders_machine_id ON (machine_id)
+- idx_work_orders_kpi_scope ON (kpi_scope)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1226,12 +1388,28 @@ CREATE TABLE IF NOT EXISTS bom_costs (
 | approved_by | UUID | REFERENCES users(id) |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| po_number | TEXT | NOT NULL |
+| warehouse_id | BIGINT | NOT NULL, REFERENCES warehouses(id) |
+| expected_date | DATE | - |
+| notes | TEXT | - |
+| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
 - `supplier_id` → `suppliers.id`
 - `created_by` → `users.id`
 - `approved_by` → `users.id`
+- `org_id` → `organizations.id`
+- `warehouse_id` → `warehouses.id`
+- `updated_by` → `users.id`
+
+**Indexes**:
+
+- idx_po_header_org_id ON (org_id)
+- idx_po_header_supplier_id ON (supplier_id)
+- idx_po_header_status ON (status)
+- idx_po_header_promised_delivery ON (promised_delivery_date)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1295,6 +1473,12 @@ CREATE TABLE po_header (
 | approved_by | UUID | REFERENCES users(id) |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| to_number | TEXT | NOT NULL |
+| from_warehouse_id | BIGINT | NOT NULL, REFERENCES warehouses(id) |
+| to_warehouse_id | BIGINT | NOT NULL, REFERENCES warehouses(id) |
+| scheduled_date | DATE | - |
+| updated_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
@@ -1302,6 +1486,17 @@ CREATE TABLE po_header (
 - `to_wh_id` → `warehouses.id`
 - `created_by` → `users.id`
 - `approved_by` → `users.id`
+- `org_id` → `organizations.id`
+- `from_warehouse_id` → `warehouses.id`
+- `to_warehouse_id` → `warehouses.id`
+- `updated_by` → `users.id`
+
+**Indexes**:
+
+- idx_to_header_org_id ON (org_id)
+- idx_to_header_status ON (status)
+- idx_to_header_actual_ship_date ON (actual_ship_date)
+- idx_to_header_actual_receive_date ON (actual_receive_date)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1345,11 +1540,25 @@ CREATE TABLE to_header (
 | attachments | JSONB | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| warehouse_id | BIGINT | NOT NULL, REFERENCES warehouses(id) |
+| expected_date | DATE | - |
+| notes | TEXT | - |
+| created_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
 - `supplier_id` → `suppliers.id`
 - `po_id` → `po_header.id`
+- `org_id` → `organizations.id`
+- `warehouse_id` → `warehouses.id`
+- `created_by` → `users.id`
+
+**Indexes**:
+
+- idx_asns_org_id ON (org_id)
+- idx_asns_po_id ON (po_id)
+- idx_asns_status ON (status)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1388,11 +1597,25 @@ CREATE TABLE asns (
 | notes | TEXT | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| asn_id | BIGINT | REFERENCES asns(id) |
+| warehouse_id | BIGINT | NOT NULL, REFERENCES warehouses(id) |
+| created_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
 - `po_id` → `po_header.id`
 - `supplier_id` → `suppliers.id`
+- `org_id` → `organizations.id`
+- `asn_id` → `asns.id`
+- `warehouse_id` → `warehouses.id`
+- `created_by` → `users.id`
+
+**Indexes**:
+
+- idx_grns_org_id ON (org_id)
+- idx_grns_asn_id ON (asn_id)
+- idx_grns_po_id ON (po_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1431,11 +1654,21 @@ CREATE TABLE grns (
 | production_line_restrictions | TEXT | DEFAULT '{}' |
 | consume_whole_lp | BOOLEAN | DEFAULT false |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| planned_qty | DECIMAL(15,4) | NOT NULL |
+| consumed_qty | DECIMAL(15,4) | DEFAULT 0 |
+| scrap_percent | DECIMAL(5,2) | DEFAULT 0 |
+| sequence | INTEGER | DEFAULT 0 |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
 
 **Foreign Keys**:
 
 - `wo_id` → `work_orders.id`
 - `material_id` → `products.id`
+
+**Indexes**:
+
+- idx_wo_materials_wo_id ON (wo_id)
+- idx_wo_materials_material_id ON (material_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1474,12 +1707,24 @@ CREATE TABLE wo_materials (
 | started_at | TIMESTAMPTZ | - |
 | finished_at | TIMESTAMPTZ | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| sequence | INTEGER | NOT NULL |
+| operation_name | TEXT | NOT NULL |
+| machine_id | BIGINT | REFERENCES machines(id) |
+| planned_start | TIMESTAMPTZ | - |
+| actual_start | TIMESTAMPTZ | - |
+| actual_end | TIMESTAMPTZ | - |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
 
 **Foreign Keys**:
 
 - `wo_id` → `work_orders.id`
 - `routing_operation_id` → `routing_operations.id`
 - `operator_id` → `users.id`
+- `machine_id` → `machines.id`
+
+**Indexes**:
+
+- idx_wo_operations_wo_id ON (wo_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1519,12 +1764,18 @@ CREATE TABLE wo_operations (
 | notes | TEXT | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| planned_qty | DECIMAL(15,4) | NOT NULL |
+| actual_qty | DECIMAL(15,4) | DEFAULT 0 |
 
 **Foreign Keys**:
 
 - `wo_id` → `work_orders.id`
 - `product_id` → `products.id`
 - `lp_id` → `license_plates.id`
+
+**Indexes**:
+
+- idx_wo_by_products_wo_id ON (wo_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1697,14 +1948,23 @@ CREATE TABLE IF NOT EXISTS wo_costs (
 | lp_id | INTEGER | - |
 | created_by | INTEGER | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| is_by_product | BOOLEAN | DEFAULT false |
+| produced_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
+| produced_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
 - `wo_id` → `work_orders.id`
 - `product_id` → `products.id`
+- `org_id` → `organizations.id`
+- `lp_id` → `license_plates.id`
+- `produced_by` → `users.id`
 
 **Indexes**:
 
+- idx_production_outputs_org_id ON (org_id)
+- idx_production_outputs_wo_id ON (wo_id)
 - idx_production_outputs_type ON (type)
 
 <details>
@@ -1748,12 +2008,25 @@ CREATE TABLE production_outputs (
 | note | TEXT | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| line_number | INTEGER | NOT NULL |
+| product_id | BIGINT | NOT NULL, REFERENCES products(id) |
+| quantity | DECIMAL(15,4) | NOT NULL |
+| received_qty | DECIMAL(15,4) | DEFAULT 0 |
+| tax_code_id | BIGINT | REFERENCES tax_codes(id) |
+| notes | TEXT | - |
 
 **Foreign Keys**:
 
 - `po_id` → `po_header.id`
 - `item_id` → `products.id`
 - `default_location_id` → `locations.id`
+- `product_id` → `products.id`
+- `tax_code_id` → `tax_codes.id`
+
+**Indexes**:
+
+- idx_po_line_po_id ON (po_id)
+- idx_po_line_product_id ON (product_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1840,11 +2113,22 @@ CREATE TABLE po_correction (
 | notes | TEXT | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| line_number | INTEGER | NOT NULL |
+| product_id | BIGINT | NOT NULL, REFERENCES products(id) |
+| quantity | DECIMAL(15,4) | NOT NULL |
+| transferred_qty | DECIMAL(15,4) | DEFAULT 0 |
 
 **Foreign Keys**:
 
 - `to_id` → `to_header.id`
 - `item_id` → `products.id`
+- `product_id` → `products.id`
+
+**Indexes**:
+
+- idx_to_line_to_id ON (to_id)
+- idx_to_line_product_id ON (product_id)
+- idx_to_line_lp_id ON (lp_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1887,11 +2171,22 @@ CREATE TABLE to_line (
 | pallet | JSONB | - |
 | notes | TEXT | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| po_line_id | BIGINT | REFERENCES po_line(id) |
+| expected_qty | DECIMAL(15,4) | NOT NULL |
+| received_qty | DECIMAL(15,4) | DEFAULT 0 |
+| batch_number | TEXT | - |
+| expiry_date | DATE | - |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
 
 **Foreign Keys**:
 
 - `asn_id` → `asns.id`
 - `product_id` → `products.id`
+- `po_line_id` → `po_line.id`
+
+**Indexes**:
+
+- idx_asn_items_asn_id ON (asn_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1935,12 +2230,20 @@ CREATE TABLE asn_items (
 | expiry_date | TIMESTAMPTZ | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| asn_item_id | BIGINT | REFERENCES asn_items(id) |
+| quantity | DECIMAL(15,4) | NOT NULL |
+| uom | TEXT | NOT NULL |
 
 **Foreign Keys**:
 
 - `grn_id` → `grns.id`
 - `product_id` → `products.id`
 - `location_id` → `locations.id`
+- `asn_item_id` → `asn_items.id`
+
+**Indexes**:
+
+- idx_grn_items_grn_id ON (grn_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -1982,10 +2285,24 @@ CREATE TABLE grn_items (
 | actual_boxes | INTEGER | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | created_by | VARCHAR(50) | - |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| pallet_number | TEXT | NOT NULL |
+| location_id | BIGINT | REFERENCES locations(id) |
+| warehouse_id | BIGINT | NOT NULL, REFERENCES warehouses(id) |
+| status | TEXT | DEFAULT 'Open' |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
 
 **Foreign Keys**:
 
 - `wo_id` → `work_orders.id`
+- `org_id` → `organizations.id`
+- `location_id` → `locations.id`
+- `warehouse_id` → `warehouses.id`
+- `created_by` → `users.id`
+
+**Indexes**:
+
+- idx_pallets_org_id ON (org_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -2019,10 +2336,17 @@ CREATE TABLE pallets (
 | material_snapshot | JSONB | - |
 | sequence | INTEGER | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| lp_id | BIGINT | NOT NULL, REFERENCES license_plates(id) |
 
 **Foreign Keys**:
 
 - `pallet_id` → `pallets.id`
+- `lp_id` → `license_plates.id`
+
+**Indexes**:
+
+- idx_pallet_items_pallet_id ON (pallet_id)
+- idx_pallet_items_lp_id ON (lp_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -2068,6 +2392,15 @@ CREATE TABLE pallet_items (
 | created_by | VARCHAR(50) | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| warehouse_id | BIGINT | NOT NULL, REFERENCES warehouses(id) |
+| supplier_batch_number | TEXT | - |
+| manufacture_date | DATE | - |
+| expiry_date | DATE | - |
+| po_id | BIGINT | REFERENCES po_header(id) |
+| po_number | TEXT | - |
+| grn_id | BIGINT | REFERENCES grns(id) |
+| wo_id | BIGINT | REFERENCES work_orders(id) |
 
 **Foreign Keys**:
 
@@ -2075,6 +2408,22 @@ CREATE TABLE pallet_items (
 - `location_id` → `locations.id`
 - `consumed_by_wo_id` → `work_orders.id`
 - `parent_lp_id` → `license_plates.id`
+- `org_id` → `organizations.id`
+- `warehouse_id` → `warehouses.id`
+- `po_id` → `po_header.id`
+- `grn_id` → `grns.id`
+- `wo_id` → `work_orders.id`
+- `created_by` → `users.id`
+
+**Indexes**:
+
+- idx_license_plates_org_id ON (org_id)
+- idx_license_plates_product_id ON (product_id)
+- idx_license_plates_status ON (status)
+- idx_license_plates_location_id ON (location_id)
+- idx_license_plates_warehouse_id ON (warehouse_id)
+- idx_license_plates_batch_number ON (batch_number)
+- idx_license_plates_expiry_date ON (expiry_date)
 
 <details>
 <summary>SQL Definition</summary>
@@ -2126,11 +2475,22 @@ CREATE TABLE license_plates (
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
 | expires_at | TIMESTAMPTZ | - |
 | created_by | VARCHAR(50) | - |
+| to_id | BIGINT | REFERENCES to_header(id) |
+| reserved_qty | DECIMAL(15,4) | NOT NULL |
+| reserved_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
+| reserved_by | UUID | REFERENCES users(id) |
 
 **Foreign Keys**:
 
 - `lp_id` → `license_plates.id`
 - `wo_id` → `work_orders.id`
+- `to_id` → `to_header.id`
+- `reserved_by` → `users.id`
+
+**Indexes**:
+
+- idx_lp_reservations_lp_id ON (lp_id)
+- idx_lp_reservations_wo_id ON (wo_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -2165,11 +2525,15 @@ CREATE TABLE lp_reservations (
 | uom | VARCHAR(50) | NOT NULL |
 | op_seq | INTEGER | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| parent_lp_id | BIGINT | NOT NULL, REFERENCES license_plates(id) |
+| child_lp_id | BIGINT | NOT NULL, REFERENCES license_plates(id) |
 
 **Foreign Keys**:
 
 - `output_lp_id` → `license_plates.id`
 - `input_lp_id` → `license_plates.id`
+- `parent_lp_id` → `license_plates.id`
+- `child_lp_id` → `license_plates.id`
 
 <details>
 <summary>SQL Definition</summary>
@@ -2204,12 +2568,20 @@ CREATE TABLE lp_compositions (
 | wo_id | INTEGER | REFERENCES work_orders(id) |
 | operation_sequence | INTEGER | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| relationship_type | TEXT | NOT NULL, DEFAULT 'produced_from' |
+| quantity_used | DECIMAL(15,4) | - |
 
 **Foreign Keys**:
 
 - `child_lp_id` → `license_plates.id`
 - `parent_lp_id` → `license_plates.id`
 - `wo_id` → `work_orders.id`
+
+**Indexes**:
+
+- idx_lp_genealogy_parent ON (parent_lp_id)
+- idx_lp_genealogy_child ON (child_lp_id)
+- idx_lp_genealogy_wo ON (wo_id)
 
 <details>
 <summary>SQL Definition</summary>
@@ -2251,12 +2623,26 @@ CREATE TABLE lp_genealogy (
 | reference_id | INTEGER | - |
 | created_by | VARCHAR(50) | - |
 | created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| lp_id | BIGINT | REFERENCES license_plates(id) |
+| notes | TEXT | - |
+| moved_by | UUID | REFERENCES users(id) |
+| moved_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
 
 **Foreign Keys**:
 
 - `product_id` → `products.id`
 - `from_location_id` → `locations.id`
 - `to_location_id` → `locations.id`
+- `org_id` → `organizations.id`
+- `lp_id` → `license_plates.id`
+- `moved_by` → `users.id`
+
+**Indexes**:
+
+- idx_stock_moves_org_id ON (org_id)
+- idx_stock_moves_lp_id ON (lp_id)
+- idx_stock_moves_moved_at ON (moved_at)
 
 <details>
 <summary>SQL Definition</summary>
@@ -2277,6 +2663,82 @@ CREATE TABLE stock_moves (
   reference_id INTEGER,
   created_by VARCHAR(50),
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+</details>
+
+---
+
+### organizations
+
+**Columns**:
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| name | TEXT | NOT NULL |
+| slug | TEXT | NOT NULL, UNIQUE |
+| settings | JSONB | DEFAULT '{}' |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
+
+<details>
+<summary>SQL Definition</summary>
+
+```sql
+CREATE TABLE organizations (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  settings JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+</details>
+
+---
+
+### tax_codes
+
+**Columns**:
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | BIGSERIAL | PRIMARY KEY |
+| org_id | INTEGER | NOT NULL, REFERENCES organizations(id) |
+| code | TEXT | NOT NULL |
+| name | TEXT | NOT NULL |
+| rate | DECIMAL(5,2) | NOT NULL |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
+
+**Foreign Keys**:
+
+- `org_id` → `organizations.id`
+
+**Indexes**:
+
+- idx_tax_codes_org_id ON (org_id)
+
+<details>
+<summary>SQL Definition</summary>
+
+```sql
+CREATE TABLE tax_codes (
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
+  name TEXT NOT NULL,
+  rate DECIMAL(5,2) NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT tax_codes_unique_code_per_org UNIQUE (org_id, code)
 );
 ```
 
@@ -2829,6 +3291,46 @@ CREATE TABLE IF NOT EXISTS npd_events (
   sequence_number BIGSERIAL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   processed_at TIMESTAMPTZ
+);
+```
+
+</details>
+
+---
+
+### uom_master
+
+**Columns**:
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | SERIAL | PRIMARY KEY |
+| code | VARCHAR(10) | NOT NULL, UNIQUE |
+| display_name | VARCHAR(50) | NOT NULL |
+| category | VARCHAR(20) | NOT NULL |
+| system | VARCHAR(10) | DEFAULT 'metric' |
+| is_active | BOOLEAN | DEFAULT true |
+| created_at | TIMESTAMPTZ | DEFAULT now() |
+| updated_at | TIMESTAMPTZ | DEFAULT now() |
+
+**Indexes**:
+
+- idx_uom_master_code ON (code)
+- idx_uom_master_category ON (category)
+
+<details>
+<summary>SQL Definition</summary>
+
+```sql
+CREATE TABLE IF NOT EXISTS uom_master (
+  id SERIAL PRIMARY KEY,
+  code VARCHAR(10) NOT NULL UNIQUE,
+  display_name VARCHAR(50) NOT NULL,
+  category VARCHAR(20) NOT NULL,
+  system VARCHAR(10) DEFAULT 'metric', -- 'metric', 'imperial', 'universal'
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
 ```
 

@@ -40,7 +40,7 @@ export const ASNsAPI = {
           purchase_order:po_id(id, number, status),
           asn_items(
             *,
-            product:product_id(id, code, name, uom)
+            product:product_id(id, part_number, name, description, uom)
           )
         `)
         .order('expected_arrival', { ascending: false });
@@ -99,7 +99,7 @@ export const ASNsAPI = {
           purchase_order:po_id(id, number, status, order_date),
           asn_items(
             *,
-            product:product_id(id, code, name, uom, product_type, product_group)
+            product:product_id(id, part_number, name, description, uom, product_type, product_group)
           )
         `)
         .eq('id', id)
@@ -134,7 +134,7 @@ export const ASNsAPI = {
           supplier:supplier_id(id, name, code),
           asn_items(
             *,
-            product:product_id(id, code, name, uom)
+            product:product_id(id, part_number, name, description, uom)
           )
         `)
         .eq('asn_number', asnNumber)
@@ -416,7 +416,7 @@ export const ASNsAPI = {
         })
         .select(`
           *,
-          product:product_id(id, code, name, uom)
+          product:product_id(id, part_number, name, description, uom)
         `)
         .single();
 
@@ -453,7 +453,7 @@ export const ASNsAPI = {
         .eq('id', itemId)
         .select(`
           *,
-          product:product_id(id, code, name, uom)
+          product:product_id(id, part_number, name, description, uom)
         `)
         .single();
 

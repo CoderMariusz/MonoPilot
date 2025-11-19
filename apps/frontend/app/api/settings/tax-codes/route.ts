@@ -96,12 +96,12 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
+    // Remove any fields that shouldn't be updated
+    const { id: _id, created_at: _created, ...updateData } = body;
+
     const { data, error } = await supabase
       .from('settings_tax_codes')
-      .update({
-        ...body,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', parseInt(id))
       .select()
       .single();

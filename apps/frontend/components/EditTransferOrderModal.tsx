@@ -125,21 +125,18 @@ export function EditTransferOrderModal({ isOpen, onClose, transferOrderId, onSuc
           throw new Error(`Line ${index + 1}: quantity must be greater than zero`);
         }
         return {
-          item_id: Number(item.product_id),
+          product_id: Number(item.product_id),
           uom: product.uom || 'EA',
-          qty_planned: quantityNum,
-          qty_shipped: 0,
-          qty_received: 0,
+          quantity: quantityNum,
+          transferred_qty: 0,
         };
       });
-      
+
       await TransferOrdersAPI.update(transferOrderId, {
-        from_wh_id: Number(formData.from_warehouse_id),
-        to_wh_id: Number(formData.to_warehouse_id),
+        from_warehouse_id: Number(formData.from_warehouse_id),
+        to_warehouse_id: Number(formData.to_warehouse_id),
         status: formData.status,
-        planned_ship_date: formData.planned_ship_date || null,
-        planned_receive_date: formData.planned_receive_date || null,
-        requested_date: formData.planned_ship_date || null,
+        scheduled_date: formData.planned_ship_date || null,
         lines,
       });
       

@@ -314,3 +314,20 @@ This project uses **BMAD Method** (Build-Measure-Adapt-Deploy) for AI-assisted d
 - Supabase project ID must be set in `.env.local` for `pnpm gen-types`
 - Port 5000 is default for frontend dev server
 - All dates stored in UTC, displayed in user's timezone
+- dalej 
+Failed to load resource: the server responded with a status of 401 ()
+C:\Users\Mariusz K\D…essionsTable.tsx:32 Error loading sessions: 
+Object
+pgroxddbtaevdegnidaz…r=login_time.desc:1 
+ Failed to load resource: the server responded with a status of 401 ()
+C:\Users\Mariusz K\D…essionsTable.tsx:32 Error loading sessions: 
+Object
+error-boundary-callbacks.js:68 TypeError: Cannot read properties of undefined (reading 'company_name')
+    at SettingsForm (C:\Users\Mariusz K\D…tingsForm.tsx:88:39)
+
+
+The above error occurred in the <SettingsForm> component. It was handled by the <ErrorBoundaryHandler> error boundary.
+C:\Users\Mariusz K\D…nd\app\error.tsx:14 Application error: TypeError: Cannot read properties of undefined (reading 'company_name')
+    at SettingsForm (C:\Users\Mariusz K\D…tingsForm.tsx:88:39)
+C:\Users\Mariusz K\D…nd\app\error.tsx:14 Application error: TypeError: Cannot read properties of undefined (reading 'company_name')
+    at SettingsForm (C:\Users\Mariusz K\D…tingsForm.tsx:88:39)

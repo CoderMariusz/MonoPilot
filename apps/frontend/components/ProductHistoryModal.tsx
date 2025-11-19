@@ -6,12 +6,12 @@ import { supabase } from '@/lib/supabase/client-browser';
 
 interface AuditEvent {
   id: number;
-  entity: string;
-  entity_id: number;
+  table_name: string;
+  record_id: number;
   action: string;
-  before: any;
-  after: any;
-  actor_id: string | null;
+  old_values: any;
+  new_values: any;
+  user_id: string | null;
   created_at: string;
 }
 
@@ -40,8 +40,8 @@ export function ProductHistoryModal({ isOpen, onClose, productId }: ProductHisto
       const { data, error } = await supabase
         .from('audit_log')
         .select('*')
-        .eq('entity', 'products')
-        .eq('entity_id', productId)
+        .eq('table_name', 'products')
+        .eq('record_id', productId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -52,12 +52,12 @@ export function ProductHistoryModal({ isOpen, onClose, productId }: ProductHisto
 
       console.log('Loaded product history:', data?.length || 0, 'entries');
       
-      // Deduplicate entries - remove duplicates based on entity_id, action, and created_at (within 1 second)
+      // Deduplicate entries - remove duplicates based on record_id, action, and created_at (within 1 second)
       if (data && data.length > 0) {
         const deduplicated = data.reduce((acc: AuditEvent[], current: AuditEvent) => {
-          // Check if there's already an entry with same entity_id, action, and similar timestamp (within 1 second)
-          const duplicate = acc.find(entry => 
-            entry.entity_id === current.entity_id &&
+          // Check if there's already an entry with same record_id, action, and similar timestamp (within 1 second)
+          const duplicate = acc.find(entry =>
+            entry.record_id === current.record_id &&
             entry.action === current.action &&
             Math.abs(new Date(entry.created_at).getTime() - new Date(current.created_at).getTime()) < 1000
           );
@@ -167,10 +167,10 @@ export function ProductHistoryModal({ isOpen, onClose, productId }: ProductHisto
                         {formatEventType(entry.action)}
                       </span>
                       {/* Show changed fields in header for UPDATE actions */}
-                      {entry.action?.toUpperCase() === 'UPDATE' && entry.before && entry.after && (() => {
+                      {entry.action?.toUpperCase() === 'UPDATE' && entry.old_values && entry.new_values && (() => {
                         const changedFields: string[] = [];
-                        const oldVal = entry.before;
-                        const newVal = entry.after;
+                        const oldVal = entry.old_values;
+                        const newVal = entry.new_values;
                         
                         for (const key in newVal) {
                           if (JSON.stringify(oldVal[key]) !== JSON.stringify(newVal[key])) {
@@ -193,10 +193,10 @@ export function ProductHistoryModal({ isOpen, onClose, productId }: ProductHisto
                   {selectedEntry?.id === entry.id && entry.action?.toUpperCase() === 'UPDATE' && (
                     <div className="mt-4 pt-4 border-t border-slate-200">
                       <div className="space-y-3">
-                        {entry.before && entry.after && (() => {
+                        {entry.old_values && entry.new_values && (() => {
                           const changes: { [key: string]: { old: any; new: any } } = {};
-                          const oldVal = entry.before;
-                          const newVal = entry.after;
+                          const oldVal = entry.old_values;
+                          const newVal = entry.new_values;
                           
                           // Find changed fields
                           for (const key in newVal) {
@@ -227,11 +227,11 @@ export function ProductHistoryModal({ isOpen, onClose, productId }: ProductHisto
                     </div>
                   )}
 
-                  {selectedEntry?.id === entry.id && entry.action?.toUpperCase() === 'CREATE' && entry.after && (
+                  {selectedEntry?.id === entry.id && entry.action?.toUpperCase() === 'CREATE' && entry.new_values && (
                     <div className="mt-4 pt-4 border-t border-slate-200">
                       <h4 className="text-sm font-medium text-slate-900 mb-2">Initial Values:</h4>
                       <div className="bg-slate-50 rounded p-3 space-y-1 text-sm text-slate-700">
-                        {Object.entries(entry.after)
+                        {Object.entries(entry.new_values)
                           .filter(([key]) => !['id', 'created_at', 'updated_at', 'created_by', 'updated_by'].includes(key))
                           .map(([key, value]) => (
                             <div key={key}>
