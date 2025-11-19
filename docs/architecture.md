@@ -6930,36 +6930,42 @@ CREATE TABLE IF NOT EXISTS wo_reservations (
 
 ```sql
 CREATE TABLE boms (
-  id SERIAL PRIMARY KEY,
-  product_id INTEGER REFERENCES products(id),
-  version VARCHAR(50) NOT NULL,
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL DEFAULT 1,  -- Note: INTEGER not VARCHAR
+  name TEXT NOT NULL,
+  status bom_status NOT NULL DEFAULT 'Draft',
+  effective_from DATE,
+  effective_to DATE,
+  yield_qty DECIMAL(15,4) NOT NULL DEFAULT 1,
+  yield_uom TEXT NOT NULL DEFAULT 'kg',
+  notes TEXT,
 
-  -- BOM Lifecycle
-  status bom_status NOT NULL DEFAULT 'draft',
+  -- BOM Configuration (expanded)
+  requires_routing BOOLEAN DEFAULT false,
+  default_routing_id BIGINT REFERENCES routings(id),
+  line_id BIGINT[],
+  boxes_per_pallet INTEGER,
+  is_active BOOLEAN DEFAULT true,
   archived_at TIMESTAMPTZ,
   deleted_at TIMESTAMPTZ,
 
-  -- BOM Configuration
-  requires_routing BOOLEAN DEFAULT false,
-  default_routing_id INTEGER,
-  notes TEXT,
-  effective_from TIMESTAMPTZ,
-  effective_to TIMESTAMPTZ,
-
-  -- Packaging
-  boxes_per_pallet INTEGER,
-
-  -- Line restrictions
-  line_id INTEGER[],
-
   -- Audit
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  -- Constraint: Single active BOM per product
-  CONSTRAINT boms_single_active UNIQUE (product_id) WHERE status = 'active'
+  CONSTRAINT boms_unique_version_per_product UNIQUE (product_id, version)
 );
 ```
+
+**Column Naming Note:**
+- `version` is INTEGER (not VARCHAR/string) - types must use `number`
+- Use `yield_qty` and `yield_uom` for BOM output quantity
+
+All API routes and types must use these actual DB column names with correct types.
 
 #### bom_history
 
@@ -7530,41 +7536,42 @@ CREATE TABLE IF NOT EXISTS wo_costs (
 
 ```sql
 CREATE TABLE bom_items (
-  id SERIAL PRIMARY KEY,
-  bom_id INTEGER REFERENCES boms(id),
-  material_id INTEGER REFERENCES products(id),
-  uom VARCHAR(20) NOT NULL CHECK (uom IN ('KG', 'EACH', 'METER', 'LITER')),
-  quantity NUMERIC(12,4) NOT NULL,
-  production_line_restrictions TEXT[] DEFAULT '{}',
-  sequence INTEGER NOT NULL,
-  priority INTEGER,
+  id BIGSERIAL PRIMARY KEY,
+  bom_id BIGINT NOT NULL REFERENCES boms(id) ON DELETE CASCADE,
+  material_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  quantity DECIMAL(15,4) NOT NULL,
+  uom TEXT NOT NULL,
+  scrap_percent DECIMAL(5,2) DEFAULT 0,  -- Note: use scrap_percent, not scrap_std_pct
+  consume_whole_lp BOOLEAN DEFAULT false,
+  sequence INTEGER DEFAULT 0,
+  notes TEXT,
 
-  -- Costing
-  unit_cost_std NUMERIC(12,4),
-  scrap_std_pct NUMERIC(5,2) DEFAULT 0,
-
-  -- Flags
+  -- Flags (expanded)
   is_optional BOOLEAN DEFAULT false,
   is_phantom BOOLEAN DEFAULT false,
-  consume_whole_lp BOOLEAN DEFAULT false,
+  is_by_product BOOLEAN DEFAULT false,
 
-  -- Planning
+  -- Planning (expanded)
+  priority INTEGER,
   production_lines TEXT[],
-  tax_code_id INTEGER REFERENCES settings_tax_codes(id),
-  lead_time_days INTEGER CHECK (lead_time_days IS NULL OR lead_time_days > 0),
-  moq NUMERIC(12,4) CHECK (moq IS NULL OR moq > 0),
+  production_line_restrictions TEXT[] DEFAULT '{}',
+  tax_code_id BIGINT REFERENCES tax_codes(id),
+  lead_time_days INTEGER,
+  moq DECIMAL(12,4),
 
-  -- Packaging
-  packages_per_box NUMERIC(10,4) NOT NULL DEFAULT 1 CHECK (packages_per_box > 0),
+  -- Costing
+  unit_cost_std DECIMAL(12,4),
 
-  -- Line-specific materials
-  line_id INTEGER[],
-
-  -- Audit
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
+
+**Column Naming Note:**
+- `scrap_percent` (not `scrap_std_pct`) - types must use correct name
+- Use `notes` field for item-level comments
+
+All API routes and types must use these actual DB column names.
 
 #### license_plates
 
@@ -7703,35 +7710,32 @@ CREATE TABLE production_outputs (
 
 ```sql
 CREATE TABLE products (
-  id SERIAL PRIMARY KEY,
-  part_number VARCHAR(100) UNIQUE NOT NULL,
-  description TEXT NOT NULL,
-  type VARCHAR(10) NOT NULL CHECK (type IN ('RM', 'DG', 'PR', 'FG', 'WIP')),
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  sku TEXT NOT NULL,  -- Note: DB uses 'sku', not 'part_number'
+  name TEXT NOT NULL,
+  description TEXT,
+  product_type product_type NOT NULL DEFAULT 'Raw Material',
+  type VARCHAR(10) CHECK (type IN ('RM', 'DG', 'PR', 'FG', 'WIP')),
   subtype VARCHAR(100),
-  uom VARCHAR(20) NOT NULL,
-  expiry_policy VARCHAR(50) CHECK (expiry_policy IN ('DAYS_STATIC', 'FROM_MFG_DATE', 'FROM_DELIVERY_DATE', 'FROM_CREATION_DATE')),
-  shelf_life_days INTEGER,
-  production_lines TEXT[],
+  category VARCHAR(100),
+  uom TEXT NOT NULL DEFAULT 'kg',
   is_active BOOLEAN DEFAULT true,
 
-  -- App taxonomy (using ENUMs)
-  product_group product_group NOT NULL DEFAULT 'COMPOSITE',
-  product_type product_type NOT NULL DEFAULT 'FG',
-
   -- Planning & commercial
-  supplier_id INTEGER REFERENCES suppliers(id),
-  tax_code_id INTEGER REFERENCES settings_tax_codes(id),
-  lead_time_days INTEGER,
-  moq NUMERIC(12,4),
-  std_price NUMERIC(12,4),
+  supplier_id BIGINT REFERENCES suppliers(id) ON DELETE SET NULL,
+  lead_time_days INTEGER DEFAULT 0,
+  shelf_life_days INTEGER,
+  moq DECIMAL(12,4),
+  tax_code_id BIGINT REFERENCES tax_codes(id),
+  std_price DECIMAL(12,4),
+  expiry_policy VARCHAR(50) CHECK (expiry_policy IN ('DAYS_STATIC', 'FROM_MFG_DATE', 'FROM_DELIVERY_DATE', 'FROM_CREATION_DATE')),
+  rate DECIMAL(12,4),
 
-  -- Routing
+  -- Production
+  production_lines TEXT[],
+  default_routing_id BIGINT REFERENCES routings(id),
   requires_routing BOOLEAN DEFAULT false,
-  default_routing_id INTEGER,
-
-  -- Metadata
-  notes TEXT,
-  allergen_ids INTEGER[],
 
   -- Packaging
   boxes_per_pallet INTEGER,
@@ -7739,14 +7743,23 @@ CREATE TABLE products (
 
   -- Versioning
   product_version VARCHAR(20) DEFAULT '1.0',
+  notes TEXT,
 
   -- Audit
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_by UUID REFERENCES users(id),
-  updated_by UUID REFERENCES users(id)
+  updated_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT products_unique_sku_per_org UNIQUE (org_id, sku)
 );
 ```
+
+**Column Naming Note:**
+- `sku` (not `part_number`) - types and API must use `sku`
+- `name` is separate from `description`
+
+All API routes and types must use these actual DB column names.
 
 #### users
 
