@@ -143,30 +143,54 @@ export interface WOByProduct {
 }
 
 export interface LicensePlate {
-  id: string;
-  lp_code: string;
-  lp_number?: string;
-  item_id: string;
-  product_id?: string;
-  product?: any;
+  id: number;  // Fixed: was string
+  org_id?: number;
+  lp_number: string;  // Fixed: was optional, removed lp_code
+  product_id: number;  // Fixed: was item_id and string
   quantity: number;
-  uom?: UoM;
-  location_id?: string;
-  location?: any;
+  uom: string;  // Fixed: was optional UoM
   status: LicensePlateStatus;
-  qa_status?: QAStatus;
-  stage_suffix?: string;
-  origin_type?: string;
-  origin_ref?: any;
-  parent_lp_id?: string | number | null;
-  parent_lp_number?: string | null;
-  batch?: string | null;
+  location_id?: number | null;  // Fixed: was string
+  warehouse_id: number;  // Added: was missing
+
+  // Batch & Dates
+  batch_number?: string | null;  // Fixed: was batch
+  supplier_batch_number?: string | null;  // Added: was missing
+  manufacture_date?: string | null;  // Added: was missing
   expiry_date?: string | null;
-  is_consumed?: boolean;
-  pallet_code?: string | null;
-  grn_id?: number;
+
+  // QA
+  qa_status?: QAStatus;
+  stage_suffix?: string | null;
+  lp_type?: 'PR' | 'FG' | 'PALLET' | 'RM' | 'WIP';
+
+  // Traceability
+  po_id?: number | null;  // Added: was missing
+  po_number?: string | null;  // Added: was missing
+  grn_id?: number | null;
+  wo_id?: number | null;  // Added: was missing
+  parent_lp_id?: number | null;  // Fixed: was string | number
+  parent_lp_number?: string | null;
+  consumed_by_wo_id?: number | null;  // Added: was missing
+  consumed_at?: string | null;
+
+  // Origin
+  origin_type?: 'GRN' | 'PRODUCTION' | 'SPLIT' | 'MANUAL';
+  origin_ref?: Record<string, any>;
+
+  // Pallet
+  pallet_id?: number | null;  // Fixed: was pallet_code
+
+  // Audit
+  created_by?: string | null;
+  updated_by?: string | null;
   created_at: string;
   updated_at: string;
+
+  // Relationships (computed)
+  product?: Product;
+  location?: Location;
+  warehouse?: Warehouse;
 }
 
 /**

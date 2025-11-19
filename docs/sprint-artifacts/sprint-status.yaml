@@ -124,7 +124,7 @@ development_status:
 
   # Story 0.17: LP Database & API Alignment (CRITICAL - Data layer mismatch)
   # Note: 13 SP. Missing QA fields, wrong types (string→number), wrong names (item_id→product_id)
-  0-17-lp-database-api-alignment: ready-for-dev
+  0-17-lp-database-api-alignment: review
 
   # Story 0.18: WO Database & API Alignment (CRITICAL - Data layer mismatch)
   # Note: Wrong types (string→number), wrong names (quantity→planned_qty, due_date→scheduled_date)

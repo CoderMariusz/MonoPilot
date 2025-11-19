@@ -109,6 +109,9 @@ export async function POST(
         quantity,
         qa_status,
         location_id,
+        warehouse_id,
+        uom,
+        batch_number,
         product:products(part_number, description, uom)
       `)
       .eq('id', lpId)
@@ -153,7 +156,10 @@ export async function POST(
           lp_number: childLPNumber,
           product_id: licensePlate.product_id,
           location_id: licensePlate.location_id,
+          warehouse_id: licensePlate.warehouse_id,
           quantity: split.quantity,
+          uom: licensePlate.uom,
+          batch_number: licensePlate.batch_number,
           qa_status: licensePlate.qa_status,
           parent_lp_id: lpId,
           parent_lp_number: licensePlate.lp_number,
@@ -163,7 +169,7 @@ export async function POST(
             split_reason: split.reason || 'Split operation'
           }
         })
-        .select('id, lp_number')
+        .select('id, lp_number, quantity')
         .single();
 
       if (childError) {
@@ -392,9 +398,9 @@ export async function PATCH(
       );
     }
 
-    if (!['Passed', 'Failed', 'Pending', 'Quarantine'].includes(status)) {
+    if (!['passed', 'failed', 'pending', 'on_hold'].includes(status)) {
       return NextResponse.json(
-        { error: 'Invalid QA status' },
+        { error: 'Invalid QA status. Must be one of: passed, failed, pending, on_hold' },
         { status: 400 }
       );
     }
