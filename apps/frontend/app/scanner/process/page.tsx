@@ -632,7 +632,7 @@ export default function ProcessTerminalPage() {
       materials_used: materialsUsed,
       work_order_number: selectedWO.wo_number,
       product_name: `${selectedWO.product?.sku} - ${selectedWO.product?.description}`,
-      line_number: selectedWO.line_number || '',
+      line_number: selectedWO.production_line_id || '',
       target_quantity: targetQty,
       actual_quantity: createdItemsCount,
       efficiency_percentage: efficiency,
@@ -1112,7 +1112,7 @@ export default function ProcessTerminalPage() {
                         </div>
                         <div>
                           <p className="text-sm text-slate-600">Line</p>
-                          <p className="text-lg font-semibold text-slate-900">{latestReport.line_number}</p>
+                          <p className="text-lg font-semibold text-slate-900">{latestReport.production_line_id}</p>
                         </div>
                         <div>
                           <p className="text-sm text-slate-600">Efficiency</p>

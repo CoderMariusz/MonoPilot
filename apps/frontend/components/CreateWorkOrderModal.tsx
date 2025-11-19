@@ -148,9 +148,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
       setFormData({
         product_id: editingWorkOrder.product_id?.toString() || '',
         quantity: editingWorkOrder.quantity?.toString() || '',
-        due_date: editingWorkOrder.due_date || '',
-        scheduled_start: editingWorkOrder.scheduled_start || '',
-        scheduled_end: editingWorkOrder.scheduled_end || '',
+        due_date: editingWorkOrder.scheduled_date || '',
+        scheduled_start: editingWorkOrder.start_date || '',
+        scheduled_end: editingWorkOrder.end_date || '',
         machine_id: editingWorkOrder.machine_id?.toString() || '',
         line_id: (editingWorkOrder as any).line_id?.toString() || '',
         status: editingWorkOrder.status || 'planned',
@@ -200,9 +200,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
           product,
           quantity: parseFloat(formData.quantity),
           status: formData.status,
-          due_date: formData.due_date || null,
-          scheduled_start: formData.scheduled_start || null,
-          scheduled_end: formData.scheduled_end || null,
+          due_date: formData.scheduled_date || null,
+          scheduled_start: formData.start_date || null,
+          scheduled_end: formData.end_date || null,
           machine_id: formData.machine_id || null,
           machine,
           line_id: Number(formData.line_id),  // NEW: Production line FK
@@ -217,9 +217,9 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
           product,
           quantity: parseFloat(formData.quantity),
           status: formData.status,
-          due_date: formData.due_date || null,
-          scheduled_start: formData.scheduled_start || null,
-          scheduled_end: formData.scheduled_end || null,
+          due_date: formData.scheduled_date || null,
+          scheduled_start: formData.start_date || null,
+          scheduled_end: formData.end_date || null,
           machine_id: formData.machine_id || null,
           machine,
           line_id: Number(formData.line_id),  // NEW: Production line FK (required)
@@ -414,7 +414,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
               </label>
               <input
                 type="date"
-                value={formData.due_date}
+                value={formData.scheduled_date}
                 onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               />
@@ -426,7 +426,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
               </label>
               <input
                 type="datetime-local"
-                value={formData.scheduled_start}
+                value={formData.start_date}
                 onChange={(e) => setFormData({ ...formData, scheduled_start: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               />
@@ -438,7 +438,7 @@ export function CreateWorkOrderModal({ isOpen, onClose, onSuccess, editingWorkOr
               </label>
               <input
                 type="datetime-local"
-                value={formData.scheduled_end}
+                value={formData.end_date}
                 onChange={(e) => setFormData({ ...formData, scheduled_end: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               />
