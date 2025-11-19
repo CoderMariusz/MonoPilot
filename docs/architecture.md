@@ -6744,11 +6744,14 @@ CREATE TABLE po_correction (
 
 ```sql
 CREATE TABLE to_header (
-  id SERIAL PRIMARY KEY,
-  number VARCHAR(50) UNIQUE NOT NULL,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('draft', 'submitted', 'in_transit', 'received', 'closed', 'cancelled')),
-  from_wh_id INTEGER REFERENCES warehouses(id),
-  to_wh_id INTEGER REFERENCES warehouses(id),
+  id BIGSERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  to_number TEXT NOT NULL,  -- Note: DB uses to_number, not number
+  from_warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,  -- Note: not from_wh_id
+  to_warehouse_id BIGINT NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,    -- Note: not to_wh_id
+  status to_status NOT NULL DEFAULT 'Draft',
+  scheduled_date DATE,
+  transfer_date TIMESTAMPTZ,
   requested_date TIMESTAMPTZ,
   planned_ship_date TIMESTAMPTZ,
   actual_ship_date TIMESTAMPTZ,
@@ -6756,31 +6759,54 @@ CREATE TABLE to_header (
   actual_receive_date TIMESTAMPTZ,
   notes TEXT,
   created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
   approved_by UUID REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT to_header_unique_number_per_org UNIQUE (org_id, to_number)
 );
 ```
+
+**Column Naming Note:** DB column names differ from some legacy code:
+- `to_number` (not `number`)
+- `from_warehouse_id` (not `from_wh_id`)
+- `to_warehouse_id` (not `to_wh_id`)
+
+All API routes and types must use these actual DB column names.
 
 #### to_line
 
 ```sql
 CREATE TABLE to_line (
-  id SERIAL PRIMARY KEY,
-  to_id INTEGER REFERENCES to_header(id),
-  line_no INTEGER NOT NULL,
-  item_id INTEGER REFERENCES products(id),
-  uom VARCHAR(20) NOT NULL,
-  qty_planned NUMERIC(12,4) NOT NULL,
-  qty_shipped NUMERIC(12,4) DEFAULT 0,
-  qty_received NUMERIC(12,4) DEFAULT 0,
-  lp_id INTEGER,
+  id BIGSERIAL PRIMARY KEY,
+  to_id BIGINT NOT NULL REFERENCES to_header(id) ON DELETE CASCADE,
+  line_number INTEGER NOT NULL,  -- Note: DB uses line_number, not line_no
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,  -- Note: not item_id
+  quantity DECIMAL(15,4) NOT NULL,  -- Note: DB uses quantity, not qty_planned
+  qty_shipped DECIMAL(15,4) DEFAULT 0,
+  transferred_qty DECIMAL(15,4) DEFAULT 0,  -- Note: not qty_received
+  uom TEXT NOT NULL,
+  lp_id BIGINT REFERENCES license_plates(id),
   batch VARCHAR(100),
+  from_location_id BIGINT REFERENCES locations(id),
+  to_location_id BIGINT REFERENCES locations(id),
+  scan_required BOOLEAN DEFAULT false,
   notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT to_line_unique_number UNIQUE (to_id, line_number)
 );
 ```
+
+**Column Naming Note:** DB column names differ from some legacy code:
+- `line_number` (not `line_no`)
+- `product_id` (not `item_id`)
+- `quantity` (not `qty_planned`)
+- `transferred_qty` (not `qty_received`)
+
+All API routes and types must use these actual DB column names.
 
 #### work_orders
 
