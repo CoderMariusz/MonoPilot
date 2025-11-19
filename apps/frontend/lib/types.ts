@@ -125,8 +125,8 @@ export interface WorkOrder {
   bom?: Bom;
   machine?: Machine;
   production_line?: ProductionLine;
-  wo_materials?: WOMaterial[];
-  wo_operations?: WOOperation[];
+  wo_materials?: WoMaterial[];
+  wo_operations?: WoOperation[];
   wo_by_products?: WOByProduct[];
 }
 
@@ -170,6 +170,7 @@ export interface LicensePlate {
 
   // Batch & Dates
   batch_number?: string | null;  // Fixed: was batch
+  batch?: string | null;  // Alias for batch_number (backward compatibility)
   supplier_batch_number?: string | null;  // Added: was missing
   manufacture_date?: string | null;  // Added: was missing
   expiry_date?: string | null;
@@ -827,6 +828,7 @@ export interface Product {
   sku: string;  // Match DB: was 'part_number'
   name: string;  // Match DB: was missing
   description?: string;
+  product_group?: ProductGroup;  // Added for DB alignment
   product_type: ProductType;
   type?: 'RM' | 'DG' | 'PR' | 'FG' | 'WIP';
   subtype?: string;
@@ -870,6 +872,7 @@ export type ExpiryPolicy =
 export interface ProductInsert {
   type: DbType;
   part_number: string;
+  sku?: string;  // Alias for part_number (DB field name)
   description: string;
   uom: UoM;
   product_group?: ProductGroup;

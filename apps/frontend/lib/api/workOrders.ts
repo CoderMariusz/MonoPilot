@@ -64,22 +64,22 @@ export class WorkOrdersAPI {
       if (error) throw error;
       
       return (data || []).map(wo => ({
-        id: wo.id.toString(),
+        id: wo.id,
         wo_number: wo.wo_number,
         product_id: wo.product_id,
         bom_id: wo.bom_id,
-        quantity: parseFloat(wo.planned_qty), // Database uses planned_qty
+        warehouse_id: wo.warehouse_id || 1,
+        planned_qty: parseFloat(wo.planned_qty || 0),
+        completed_qty: parseFloat(wo.completed_qty || 0),
         uom: wo.uom,
         priority: wo.priority,
         status: wo.status,
-        scheduled_start: wo.start_date, // Database uses start_date
-        scheduled_end: wo.end_date, // Database uses end_date
-        due_date: wo.end_date, // Use end_date as due_date
-        actual_start: wo.actual_start,
-        actual_end: wo.actual_end,
+        scheduled_date: wo.scheduled_date,
+        start_date: wo.start_date,
+        end_date: wo.end_date,
         actual_output_qty: wo.actual_output_qty ? parseFloat(wo.actual_output_qty) : null,
         machine_id: wo.machine_id,
-        line_number: wo.line_number,
+        production_line_id: wo.production_line_id,
         routing_id: wo.routing_id,
         kpi_scope: wo.kpi_scope,
         planned_boxes: wo.planned_boxes,
@@ -99,18 +99,23 @@ export class WorkOrdersAPI {
         created_at: wo.created_at,
         updated_at: wo.updated_at,
         product: wo.product ? {
-          id: wo.product.id.toString(),
+          id: wo.product.id,
           sku: wo.product.sku,
+          name: wo.product.name || wo.product.description || '',
           description: wo.product.description,
+          product_group: wo.product.product_group,
+          product_type: wo.product.product_type,
           type: wo.product.type,
           uom: wo.product.uom,
           expiry_policy: wo.product.expiry_policy,
           shelf_life_days: wo.product.shelf_life_days,
           production_lines: wo.product.production_lines,
-          is_active: wo.product.is_active
+          is_active: wo.product.is_active,
+          created_at: wo.product.created_at,
+          updated_at: wo.product.updated_at
         } : undefined,
         bom: wo.bom ? {
-          id: wo.bom.id.toString(),
+          id: wo.bom.id,
           version: wo.bom.version,
           status: wo.bom.status,
           effective_from: wo.bom.effective_from,
