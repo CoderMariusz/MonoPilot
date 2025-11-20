@@ -62,16 +62,21 @@ development_status:
     # - Story 0.1.4: External Service Resilience Tests
     # - Story 0.1.5: Redis Cache Fallback Test
 
-  # Gap 2: LP Genealogy Integrity Not Fully Specified (1 day)
+  # Gap 2: LP Genealogy Integrity Not Fully Specified (1 day) ✅ DONE
   # Issue: Story 5.7 lacks error handling, transaction atomicity, trace verification ACs
   # Impact: Compliance failure if genealogy breaks (FDA traceability)
   # Owner: Product Manager + Architect
-  0-2-update-story-5-7-genealogy: backlog
-    # Actions:
-    # - Add AC: Transaction rollback if genealogy fails
-    # - Add AC: FK validation for parent_lp_id
-    # - Add AC: Forward/backward trace verification
-    # - Add test story: "Verify LP Genealogy Integrity E2E"
+  # Completed: 2025-11-20
+  0-2-update-story-5-7-genealogy: done
+    # Actions COMPLETED:
+    # ✅ Add AC: Transaction rollback if genealogy fails
+    # ✅ Add AC: FK validation for parent_lp_id
+    # ✅ Add AC: Forward/backward trace verification
+    # ✅ Add recall simulation SQL examples (forward + backward trace)
+    # ✅ Add orphan detection logic
+    # ✅ Add circular dependency prevention
+    # ✅ Add FDA 21 CFR Part 117 compliance reference
+    # Commit: feat(sprint-0): add comprehensive LP Genealogy Integrity ACs to Story 5.7
 
   # Gap 3: BOM Snapshot Immutability Not Tested (2 days)
   # Issue: No story verifies WO materials unchanged when BOM updated
@@ -107,35 +112,53 @@ development_status:
     # - AC: Sync on reconnect within 2s
     # - E2E test: 100 offline ops → sync → verify all saved
 
-  # Gap 6: Transaction Atomicity Not Specified (1 day)
+  # Gap 6: Transaction Atomicity Not Specified (1 day) ✅ DONE
   # Issue: Multi-record operations (GRN + LP, Consumption + Genealogy) lack rollback ACs
   # Impact: Partial success → data inconsistency
   # Owner: Product Manager
-  0-6-transaction-atomicity-acs: backlog
-    # Actions:
-    # - Update Story 5.11 AC: "GRN + LP creation atomic (rollback if any fails)"
-    # - Update Story 4.6 AC: "Consumption + genealogy atomic"
-    # - Update Story 4.11 AC: "Output LP + genealogy atomic"
+  # Completed: 2025-11-20
+  0-6-transaction-atomicity-acs: done
+    # Actions COMPLETED:
+    # ✅ Update Story 5.11 AC: "GRN + LP creation atomic (7-step transaction flow, rollback scenarios)"
+    # ✅ Update Story 4.6 AC: "WO Complete atomic (9-step transaction, genealogy creation)"
+    # ✅ Update Story 4.11 AC: "Material Consumption atomic (11-step transaction, over-consumption validation)"
+    # ✅ Add FK validation, concurrency handling, data integrity guarantees
+    # ✅ Add user-friendly error messages for all failure points
+    # Commit: feat(sprint-0): add Transaction Atomicity ACs to Stories 4.6, 4.11, 5.11
 
-  # Gap 7: Error Handling Pattern Missing (1 day)
+  # Gap 7: Error Handling Pattern Missing (1 day) ✅ DONE
   # Issue: Many stories lack ACs for database constraints, external service failures
   # Impact: Poor user experience, debugging difficulty
   # Owner: Product Manager
-  0-7-ac-template-checklist: backlog
-    # Actions:
-    # - Create AC Template Checklist for all stories
-    # - Include: FK violations, duplicates, service failures, transaction rollback
-    # - Document in .bmad/templates/ for future use
+  # Completed: 2025-11-20
+  0-7-ac-template-checklist: done
+    # Actions COMPLETED:
+    # ✅ Create AC Template Checklist (.bmad/templates/ac-template-checklist.md)
+    # ✅ 8 mandatory categories: happy path, field validations, duplicates, FK, external services, transactions, edge cases, error messages
+    # ✅ 4 optional enhancements: performance, accessibility, audit trail, RLS
+    # ✅ Story review checklist for PM approval
+    # ✅ Examples by story type (CRUD, Integration)
+    # Commit: feat(sprint-0): create AC Template Checklist for comprehensive story acceptance criteria
 
-  # Gap 8: FR → Story Traceability Matrix Not Documented (2 days)
+  # Gap 8: FR → Story Traceability Matrix Not Documented (2 days) ✅ DONE
   # Issue: Epic files don't include FR coverage matrix
   # Impact: Cannot verify all FRs implemented
   # Owner: Product Manager
-  0-8-fr-story-traceability: backlog
-    # Actions:
-    # - Add FR Coverage Matrix section to each epic file (Epic 1-8)
-    # - Format: FR-XXX-YYY → Story Z.N
-    # - Verify 100% FR coverage across all epics
+  # Completed: 2025-11-20
+  0-8-fr-story-traceability: done
+    # Actions COMPLETED:
+    # ✅ Add FR Coverage Matrix section to all 8 epic files
+    # ✅ Epic 1: 11 FRs → 12 stories (100% P0 coverage)
+    # ✅ Epic 2: 18 FRs → 24 stories (100% P0 coverage)
+    # ✅ Epic 3: 16 FRs → 22 stories (100% P0, 3 Phase 2)
+    # ✅ Epic 4: 15 FRs → 20 stories (100% P0 coverage)
+    # ✅ Epic 5: 30 FRs → 35 stories (100% P0 coverage)
+    # ✅ Epic 6: 26 FRs → 28 stories (100% P0 coverage)
+    # ✅ Epic 7: 25 FRs → 28 stories (100% P0 coverage)
+    # ✅ Epic 8: 74 FRs → 68 stories (Phase 2, deferred)
+    # ✅ Format: FR ID → Story IDs with forward + reverse traceability
+    # ✅ Verified: 215 FRs, 237 stories, 100% P0 traceability
+    # Commit: feat(sprint-0): add FR→Story Traceability Matrix to all 8 epic files
 
   sprint-0-retrospective: optional
     # Review Sprint 0 effectiveness:
@@ -159,21 +182,38 @@ development_status:
 # Sprint 0 Summary
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Total Tasks: 8
-# Estimated Effort: 8-10 days
+# Completed Tasks (Quick Wins): 4 ✅
+# Remaining Tasks: 4 (scheduled for new session)
+# Estimated Effort: 8-10 days total (4 days completed)
 # Critical Priority: ALL tasks must be completed before Epic 1
-# Success Criteria:
-#   - All 8 gaps addressed and verified
-#   - Epic files updated with FR traceability matrices
-#   - AC template checklist created
-#   - Integration test stories added
-#   - RLS policy test suite implemented
-#   - Transaction atomicity specified in relevant stories
-#   - Scanner offline queue management specified
-#   - BOM snapshot immutability verified
 #
-# Next Steps After Sprint 0:
-# 1. Mark all sprint-0 stories as 'done'
-# 2. Run retrospective (optional but recommended)
-# 3. Re-run /bmad:bmm:workflows:sprint-planning to add Epic 1-8
-# 4. Begin Epic 1 implementation with /bmad:bmm:workflows:create-story
+# COMPLETED (Quick Wins Session - 2025-11-20):
+#   ✅ Gap 7: AC Template Checklist created
+#   ✅ Gap 8: FR→Story Traceability Matrix added to all 8 epics
+#   ✅ Gap 6: Transaction Atomicity ACs added (Stories 4.6, 4.11, 5.11)
+#   ✅ Gap 2: LP Genealogy Integrity ACs added (Story 5.7)
+#
+# PENDING (New Session after PR merge):
+#   - Gap 1: Integration Test Stories (5-7 days)
+#   - Gap 4: RLS Policy Test Suite (3-4 days)
+#   - Gap 3: BOM Snapshot Immutability (2 days)
+#   - Gap 5: Scanner Offline Queue Management (2-3 days)
+#
+# Success Criteria (4/8 COMPLETE):
+#   ✅ Epic files updated with FR traceability matrices (215 FRs, 237 stories, 100% P0 coverage)
+#   ✅ AC template checklist created (.bmad/templates/ac-template-checklist.md)
+#   ✅ Transaction atomicity specified in 3 critical stories (5.11, 4.6, 4.11)
+#   ✅ LP Genealogy integrity specified with FDA compliance (Story 5.7)
+#   ⏳ Integration test stories added (Gap 1)
+#   ⏳ RLS policy test suite implemented (Gap 4)
+#   ⏳ Scanner offline queue management specified (Gap 5)
+#   ⏳ BOM snapshot immutability verified (Gap 3)
+#
+# Next Steps After Quick Wins Session:
+# 1. Push commits to remote (4 commits ready)
+# 2. Create PR for review
+# 3. After PR merge: Start new session for remaining 4 tasks (Gap 1, 3, 4, 5)
+# 4. After all 8 tasks complete: Run retrospective (optional but recommended)
+# 5. Re-run /bmad:bmm:workflows:sprint-planning to add Epic 1-8
+# 6. Begin Epic 1 implementation with /bmad:bmm:workflows:create-story
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
