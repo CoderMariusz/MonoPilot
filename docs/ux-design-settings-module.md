@@ -1641,7 +1641,9 @@ export default function SettingsPage() {
 
 - `apps/frontend/app/settings/page.tsx` - Current Settings Module implementation
 - `apps/frontend/components/WarehousesTable.tsx` - Current CRUD table pattern
-- `docs/architecture.md` - System architecture
+- `docs/prd/modules/settings.md` - Settings PRD
+- `docs/architecture/modules/settings.md` - Settings architecture
+- `docs/architecture/index.md` - Architecture index
 - `docs/01_SYSTEM_OVERVIEW.md` - High-level overview
 - `docs/11_PROJECT_STRUCTURE.md` - File organization
 - `docs/DATABASE_SCHEMA.md` - Database schema reference

@@ -122,7 +122,16 @@
       "Bash(then grep -E \"SUPABASE_URL|SUPABASE_ANON|SERVICE_ROLE\" apps/frontend/.env.local)",
       "Bash(then grep -E \"DATABASE_URL|SUPABASE_URL|SUPABASE_SERVICE\" \"C:/Users/Mariusz K/Documents/Programowanie/MonoPilot/apps/frontend/.env.local\")",
       "Bash(else echo \"No .env.local found\")",
-      "Bash(SUPABASE_PROJECT_ID=pgroxddbtaevdegnidaz pnpm gen-types:*)"
+      "Bash(SUPABASE_PROJECT_ID=pgroxddbtaevdegnidaz pnpm gen-types:*)",
+      "Bash(git fetch:*)",
+      "SlashCommand(/bmad:bmm:workflows:workflow-status)",
+      "SlashCommand(/bmad:bmm:workflows:create-epics-and-stories)",
+      "SlashCommand(/bmad:bmm:workflows:workflow-init)",
+      "Bash(npx create-next-app@latest:*)",
+      "Bash(tree:*)",
+      "Bash(pnpm install:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []
