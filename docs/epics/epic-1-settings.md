@@ -10,6 +10,51 @@
 
 ---
 
+### Story 1.0: Authentication UI
+
+As a **User**,
+I want to log in, log out, and reset my password,
+so that I can securely access the MonoPilot system.
+
+**Acceptance Criteria:**
+
+**Given** the user is not authenticated
+**When** they navigate to any protected route
+**Then** they are redirected to `/login?redirect={original_url}`
+**And** after successful login, redirected back to original URL
+
+**When** user accesses `/login`
+**Then** they see a login form with:
+- Email + password inputs
+- "Remember me" checkbox (30-day session)
+- "Forgot password?" link
+- Submit button with loading state
+
+**When** user enters invalid credentials
+**Then** error toast is shown: "Invalid email or password"
+
+**When** user clicks "Forgot password?"
+**Then** they navigate to `/forgot-password`
+**And** can enter email to receive reset link
+**And** reset link leads to `/reset-password?token={token}`
+
+**When** user is logged in
+**Then** they can logout via user menu (top-right)
+**And** optional "Logout All Devices" terminates all sessions
+
+**Prerequisites:** None (first user interaction)
+
+**Technical Notes:**
+- Supabase Auth (email/password)
+- Session: 1h default, 30 days with "remember me"
+- Middleware: route protection, redirect to `/login?redirect=`
+- Pages: `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`
+- Components: LoginForm, ForgotPasswordForm, ResetPasswordForm, UserMenu
+- Zod schemas: LoginSchema, ResetPasswordSchema
+- **Decision**: Invitation-only (no public `/signup` - use Story 1.3 instead)
+
+---
+
 ### Story 1.1: Organization Configuration
 
 As an **Admin**,
@@ -421,12 +466,67 @@ So that I don't miss any important configuration.
 
 ---
 
+### Story 1.13: Main Dashboard
+
+As a **User**,
+I want to see a main dashboard after login,
+so that I can quickly access key information and navigate to different modules.
+
+**Acceptance Criteria:**
+
+**Given** user successfully logs in
+**When** they land on the dashboard at `/dashboard`
+**Then** they see:
+- Top navigation bar (logo, module links, search, user menu)
+- Sidebar navigation (collapsible, module icons)
+- Main content: grid of module overview cards (2-4 columns)
+- Right sidebar: recent activity feed (last 10 activities)
+
+**When** viewing module cards
+**Then** each enabled module shows:
+- Module icon and name (color-coded)
+- Quick stats (e.g., "5 Active WOs", "12 Pending POs")
+- Primary action button (e.g., "Create WO")
+- "View Details" link → module dashboard
+
+**When** viewing activity feed
+**Then** they see recent activities:
+- "WO-2024-001 started by John Doe" (2 minutes ago)
+- Click activity → navigate to entity detail page
+- Activities from all enabled modules
+
+**When** using quick actions
+**Then** they can:
+- Click "Create" dropdown → create PO, WO, NCR, TO (based on enabled modules)
+- Use global search bar → search WO/PO/LP/Product by code/name
+- View notifications (future: bell icon with badge)
+
+**Given** new user (setup_completed = false)
+**Then** they see welcome banner: "Welcome to MonoPilot! Let's set up your organization."
+**And** "Start Setup Wizard" button → launches Story 1.12
+
+**Given** no modules are enabled
+**Then** empty state: "Enable modules in Settings" with CTA
+
+**Prerequisites:** Story 1.0 (Auth UI), Story 1.11 (Module Activation)
+
+**Technical Notes:**
+- API: GET /api/dashboard/overview, /api/dashboard/activity, /api/dashboard/search
+- Tables: activity_logs (org_id, user_id, type, entity_type, entity_id, description, created_at)
+- Activity logging: centralized utility `logActivity()` called from all modules
+- Caching: module stats cached in Redis (5 min TTL)
+- Responsive: desktop (sidebar + cards + feed), mobile (bottom nav + cards)
+- Optional: user preferences (card order, pinned modules, drag-and-drop)
+
+---
+
 ## FR Coverage Matrix
 
 This section maps all Functional Requirements from the Settings Module (PRD) to their implementing stories, ensuring 100% traceability.
 
 | FR ID | FR Title | Story IDs | Status | Notes |
 |-------|----------|-----------|--------|-------|
+| FR-SET-000 | Authentication UI | 1.0 | ✅ Covered | Login, logout, forgot password, session management |
 | FR-SET-001 | Organization Configuration | 1.1 | ✅ Covered | Company settings, logo, regional config |
 | FR-SET-002 | User Management | 1.2, 1.3 | ✅ Covered | CRUD + Invitations (email/QR) |
 | FR-SET-003 | Session Management | 1.4 | ✅ Covered | Active sessions, device tracking, logout |
@@ -438,12 +538,13 @@ This section maps all Functional Requirements from the Settings Module (PRD) to 
 | FR-SET-009 | Tax Code Configuration | 1.10 | ✅ Covered | VAT rates, tax categories |
 | FR-SET-010 | Module Activation | 1.11 | ✅ Covered | Enable/disable modules (Planning, Production, Warehouse, etc.) |
 | FR-SET-011 | Subscription Management | _(Phase 2)_ | ⏸️ Deferred | Stripe integration, billing (not P0) |
+| FR-SET-012 | Main Dashboard | 1.13 | ✅ Covered | Landing page, module overview, activity feed, quick actions |
 
 **Coverage Summary:**
-- **Total FRs:** 11 (10 P0 + 1 Phase 2)
-- **P0 FRs Covered:** 10/10 (100%)
+- **Total FRs:** 13 (12 P0 + 1 Phase 2)
+- **P0 FRs Covered:** 12/12 (100%)
 - **Phase 2 FRs:** 1 (FR-SET-011 deferred to Growth phase)
-- **Total Stories:** 12 (includes UX enhancement Story 1.12)
+- **Total Stories:** 14 (includes Story 1.0 Auth UI, Story 1.12 Wizard, Story 1.13 Dashboard)
 
 **Validation:**
 - ✅ All P0 functional requirements have at least one implementing story
@@ -451,18 +552,20 @@ This section maps all Functional Requirements from the Settings Module (PRD) to 
 - ✅ FR-SET-002 appropriately split into 2 stories (CRUD vs Invitations)
 
 **Reverse Traceability (Story → FR):**
-- Story 1.1 → FR-SET-001
-- Story 1.2 → FR-SET-002
-- Story 1.3 → FR-SET-002
-- Story 1.4 → FR-SET-003
-- Story 1.5 → FR-SET-004
-- Story 1.6 → FR-SET-005
-- Story 1.7 → FR-SET-006
-- Story 1.8 → FR-SET-007
-- Story 1.9 → FR-SET-008
-- Story 1.10 → FR-SET-009
-- Story 1.11 → FR-SET-010
+- Story 1.0 → FR-SET-000 (Authentication UI)
+- Story 1.1 → FR-SET-001 (Organization Configuration)
+- Story 1.2 → FR-SET-002 (User Management CRUD)
+- Story 1.3 → FR-SET-002 (User Invitations)
+- Story 1.4 → FR-SET-003 (Session Management)
+- Story 1.5 → FR-SET-004 (Warehouse Configuration)
+- Story 1.6 → FR-SET-005 (Location Management)
+- Story 1.7 → FR-SET-006 (Machine Configuration)
+- Story 1.8 → FR-SET-007 (Production Line Configuration)
+- Story 1.9 → FR-SET-008 (Allergen Management)
+- Story 1.10 → FR-SET-009 (Tax Code Configuration)
+- Story 1.11 → FR-SET-010 (Module Activation)
 - Story 1.12 → UX Design (Wizard Mode enhancement, no direct FR)
+- Story 1.13 → FR-SET-012 (Main Dashboard)
 
 ---
 
