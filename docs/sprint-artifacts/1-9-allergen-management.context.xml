@@ -1,0 +1,352 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.9</storyId>
+    <title>Allergen Management</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-20</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-9-allergen-management.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Admin</asA>
+    <iWant>manage the allergen library</iWant>
+    <soThat>products can have proper allergen declarations</soThat>
+    <tasks>
+      - Task 1: Database Schema - Allergens Table (with RLS, is_major, is_custom flags)
+      - Task 2: Allergen Seed Script (14 EU major allergens based on country)
+      - Task 3: Allergen Service - Core Logic (seed, create, update, get, delete with constraints)
+      - Task 4: Zod Validation Schemas (CreateAllergenSchema)
+      - Task 5: API Endpoints (GET, POST, PUT, DELETE for /api/settings/allergens)
+      - Task 6: Frontend Allergens List Page (/settings/production → Allergens tab)
+      - Task 7: Allergen Form Modal (with is_major toggle, delete protection for preloaded)
+      - Task 8: Organization Creation Hook (seed allergens on org creation)
+      - Task 9: Cache Invalidation & Events (allergen.updated for Epic 2, 8)
+      - Task 10: Integration & Testing (Unit, Integration, E2E tests, seed idempotency)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-008.1">
+      <title>14 EU major allergens preloaded</title>
+      <details>
+        - On organization creation: seed 14 EU major allergens
+        - List: Milk, Eggs, Fish, Shellfish, Tree Nuts, Peanuts, Wheat, Soybeans, Sesame, Mustard, Celery, Lupin, Sulphites, Molluscs
+        - Fields: code (e.g., MILK, EGGS), name (localized: "Mleko", "Jaja"), is_major = true, is_custom = false
+        - Preloaded allergens cannot be deleted (FK constraints, UI disabled)
+        - Can be edited (e.g., change name translation)
+      </details>
+    </criterion>
+
+    <criterion id="AC-008.2">
+      <title>Preloaded allergens non-deletable</title>
+      <details>
+        - Delete button disabled for is_custom = false allergens
+        - Tooltip: "Cannot delete EU major allergen"
+        - FK constraint: allergens used in product_allergens table (Epic 2)
+        - If deletion attempted: error "This allergen is in use by X products"
+      </details>
+    </criterion>
+
+    <criterion id="AC-008.3">
+      <title>Admin może dodać custom allergens</title>
+      <details>
+        - Navigate to /settings/production → "Allergens" tab
+        - Click "Add Allergen" button
+        - Form fields: code (required, unique per org, uppercase), name (required, max 100 chars), is_major (toggle, default false for custom)
+        - On save: allergen created with is_custom = true
+        - Custom allergens appear in product allergen assignment (Epic 2)
+      </details>
+    </criterion>
+
+    <criterion id="AC-008.4">
+      <title>Custom allergens editable and deletable</title>
+      <details>
+        - Edit: all fields (code, name, is_major)
+        - Delete: only if not used in products (FK constraint check)
+        - Delete confirmation: "Delete custom allergen? This cannot be undone."
+        - If used in products: error "Cannot delete - used by X products"
+      </details>
+    </criterion>
+
+    <criterion id="AC-008.5">
+      <title>Allergens list view</title>
+      <details>
+        - Table columns: Code, Name, Is Major (badge), Is Custom (badge), Products (count), Actions
+        - Is Major badge: Yes (orange) or No (gray)
+        - Is Custom badge: Custom (blue) or Standard (gray)
+        - Products column: count of products using this allergen (Epic 2 JOIN)
+        - Search by code or name
+        - Filter: All, Major only, Custom only
+        - Sort by code, name, is_major
+      </details>
+    </criterion>
+
+    <criterion id="AC-008.6">
+      <title>Allergen localization (optional - Phase 2)</title>
+      <details>
+        - Store name in multiple languages: name_pl, name_en
+        - Default: use English names for preload
+        - Admin can edit translations
+        - Display based on organization.default_language
+      </details>
+    </criterion>
+
+    <criterion id="AC-008.7">
+      <title>Allergen seed migration</title>
+      <details>
+        - Run on organization creation (trigger or manual seed)
+        - Idempotent: ON CONFLICT DO NOTHING (safe to re-run)
+        - Seed script includes all 14 EU allergens with codes and names
+      </details>
+    </criterion>
+
+    <criterion id="AC-008.8">
+      <title>Cache invalidation events</title>
+      <details>
+        - On allergen create/update/delete: emit 'allergen.updated' event
+        - Epic 2, 8 refetch allergen list on event
+        - Redis cache TTL: 10 min (master data, rarely changes)
+        - Cache key: `allergens:{org_id}`
+      </details>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-1.md</path>
+        <title>Technical Specification - Epic 1 (Foundation & Settings)</title>
+        <section>FR-SET-008: Allergen Management</section>
+        <snippet>14 EU major allergens preloaded on org creation, custom allergen support, FK protection for in-use allergens.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/epics/epic-1-settings.md</path>
+        <title>Epic 1: Foundation & Settings</title>
+        <section>Story 1.9: Allergen Management</section>
+        <snippet>Allergen library with 14 EU major allergens preloaded and support for custom allergen additions.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/lib/supabase/server.ts</path>
+        <kind>lib</kind>
+        <symbol>createClient</symbol>
+        <lines>all</lines>
+        <reason>Supabase server client for database operations</reason>
+      </artifact>
+
+      <artifact>
+        <path>app/lib/types.ts</path>
+        <kind>types</kind>
+        <symbol>Database types</symbol>
+        <lines>all</lines>
+        <reason>TypeScript types for database tables - will be updated after allergens table migration</reason>
+      </artifact>
+
+      <artifact>
+        <path>packages/shared/schemas.ts</path>
+        <kind>schemas</kind>
+        <symbol>Zod schemas</symbol>
+        <lines>all</lines>
+        <reason>Shared validation schemas - add CreateAllergenSchema</reason>
+      </artifact>
+
+      <artifact>
+        <path>packages/shared/types.ts</path>
+        <kind>types</kind>
+        <symbol>Shared types</symbol>
+        <lines>all</lines>
+        <reason>Shared TypeScript types - add Allergen interface</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@supabase/supabase-js" version="latest">Supabase client for database</package>
+        <package name="zod" version="latest">Schema validation (CreateAllergenSchema)</package>
+        <package name="react-hook-form" version="latest">Form state management</package>
+        <package name="swr" version="latest">Data fetching and caching</package>
+        <package name="ioredis" version="latest">Redis client for caching</package>
+      </ecosystem>
+
+      <ecosystem name="shadcn">
+        <component name="table">Allergens table component</component>
+        <component name="dialog">Allergen form modal, delete confirmation</component>
+        <component name="badge">Is Major, Is Custom badges</component>
+        <component name="toast">Success/error notifications</component>
+        <component name="switch">is_major toggle</component>
+        <component name="input">Form fields</component>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">
+      <rule>Multi-tenancy: RLS policy on allergens table (org_id isolation)</rule>
+      <rule>Preloaded Allergens: 14 EU major allergens seeded on org creation, is_custom = false</rule>
+      <rule>Delete Protection: Preloaded allergens cannot be deleted (UI disabled + FK constraints)</rule>
+      <rule>Custom Allergens: User-added allergens with is_custom = true, deletable if not in use</rule>
+      <rule>Cache Invalidation: Events emitted on mutations, consumed by Epic 2, 8</rule>
+    </constraint>
+
+    <constraint type="security">
+      <rule>RLS Policy REQUIRED: org_id = (auth.jwt() ->> 'org_id')::uuid on allergens table</rule>
+      <rule>Admin Only: Only Admin role can create/edit/delete allergens</rule>
+      <rule>FK Protection: Allergens in use by products cannot be deleted (product_allergens table)</rule>
+    </constraint>
+
+    <constraint type="data">
+      <rule>Unique Constraint: (org_id, code) - allergen code unique per organization</rule>
+      <rule>Indexes REQUIRED: org_id, is_major, is_custom for query performance</rule>
+      <rule>14 EU Allergens: MILK, EGGS, FISH, SHELLFISH, TREENUTS, PEANUTS, WHEAT, SOYBEANS, SESAME, MUSTARD, CELERY, LUPIN, SULPHITES, MOLLUSCS</rule>
+      <rule>Seed Idempotency: ON CONFLICT (org_id, code) DO NOTHING ensures safe re-run</rule>
+    </constraint>
+
+    <constraint type="performance">
+      <rule>Allergen list load: &lt;200ms p95</rule>
+      <rule>Create allergen: &lt;200ms</rule>
+      <rule>Cache TTL: 10 min (master data, rarely changes)</rule>
+      <rule>Cache hit rate: &gt;80%</rule>
+    </constraint>
+
+    <constraint type="testing">
+      <rule>RLS Testing: MUST add to RLS test suite (Sprint 0 Gap 4)</rule>
+      <rule>Seed Testing: MUST verify idempotency and 14 allergen insertion</rule>
+      <rule>FK Testing: MUST verify deletion protection for in-use allergens</rule>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="GET /api/settings/allergens">
+      <kind>REST endpoint</kind>
+      <signature>
+        Query: { is_major?, is_custom?, search? }
+        Response: Allergen[] (with product count from product_allergens)
+        Auth: Authenticated user
+        Cache: 10 min TTL (Redis)
+      </signature>
+      <path>app/api/settings/allergens/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="POST /api/settings/allergens">
+      <kind>REST endpoint</kind>
+      <signature>
+        Body: CreateAllergenInput { code, name, is_major }
+        Response: Allergen (with is_custom = true)
+        Auth: Admin only
+        Validation: Code unique per org
+        Side effects: Insert allergen, emit allergen.created event
+      </signature>
+      <path>app/api/settings/allergens/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="PUT /api/settings/allergens/:id">
+      <kind>REST endpoint</kind>
+      <signature>
+        Params: { id: UUID }
+        Body: UpdateAllergenInput { code?, name?, is_major? }
+        Response: Allergen
+        Auth: Admin only
+        Side effects: Update allergen, emit allergen.updated event
+      </signature>
+      <path>app/api/settings/allergens/[id]/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="DELETE /api/settings/allergens/:id">
+      <kind>REST endpoint</kind>
+      <signature>
+        Params: { id: UUID }
+        Response: { success: boolean } or { error: string }
+        Auth: Admin only
+        Validation: is_custom = true (cannot delete preloaded), not used in products
+        Side effects: Delete allergen, emit allergen.deleted event
+      </signature>
+      <path>app/api/settings/allergens/[id]/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="AllergenService.seedAllergens">
+      <kind>Service method</kind>
+      <signature>
+        async seedAllergens(orgId: string): Promise&lt;void&gt;
+        Inserts: 14 EU major allergens with is_custom = false, is_major = true
+        Idempotent: ON CONFLICT (org_id, code) DO NOTHING
+      </signature>
+      <path>lib/services/AllergenService.ts (NEW)</path>
+    </interface>
+
+    <interface name="CreateAllergenSchema">
+      <kind>Zod schema</kind>
+      <signature>
+        z.object({
+          code: z.string().regex(/^[A-Z0-9-]+$/).min(2).max(50),
+          name: z.string().min(1).max(100),
+          is_major: z.boolean().default(false)
+        })
+      </signature>
+      <path>packages/shared/schemas.ts</path>
+    </interface>
+
+    <interface name="Cache Event: allergen.updated">
+      <kind>Event emitter</kind>
+      <signature>
+        Event: 'allergen.created' | 'allergen.updated' | 'allergen.deleted'
+        Payload: { type: string, org_id: string, allergen_id: string, timestamp: Date }
+        Consumers: Epic 2 (Product allergen assignment), Epic 8 (NPD formulation)
+        Action: Invalidate Redis cache key `allergens:{org_id}`, refetch allergen list
+      </signature>
+      <path>Server: AllergenService, Consumers: Epic 2/8 services</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing stack: Vitest for unit/integration tests, Playwright for E2E tests.
+      RLS tests MUST be added to tests/integration/rls/ suite (Sprint 0 Gap 4).
+      Seed idempotency tests critical for org creation flow.
+    </standards>
+
+    <locations>
+      - lib/services/AllergenService.test.ts (Allergen CRUD, seed logic)
+      - packages/shared/schemas.test.ts (Zod schema validation tests)
+      - app/api/settings/allergens/**/*.test.ts (API endpoint tests)
+      - tests/integration/allergens/ (Integration tests: seed, FK protection)
+      - tests/integration/rls/allergens-rls.test.ts (RLS policy tests)
+      - tests/e2e/settings/allergens.spec.ts (E2E allergen management flow)
+    </locations>
+
+    <ideas>
+      <test id="AC-008.1" type="integration">
+        - Seed allergens → 14 inserted with is_custom = false, is_major = true
+        - Re-run seed → idempotent (no duplicates)
+        - Preloaded allergens have correct codes and names
+      </test>
+
+      <test id="AC-008.2" type="integration">
+        - DELETE preloaded allergen → error (is_custom = false)
+        - DELETE allergen in use → FK constraint error with product count
+      </test>
+
+      <test id="AC-008.3" type="integration">
+        - POST /api/settings/allergens → custom allergen created with is_custom = true
+        - Verify unique constraint (org_id, code)
+      </test>
+
+      <test id="AC-008.4" type="integration">
+        - DELETE custom allergen not in use → succeeds
+        - PUT custom allergen → all fields updated
+      </test>
+
+      <test id="all" type="e2e">
+        - E2E: Create custom allergen → appears in list with "Custom" badge
+        - E2E: Edit custom allergen → changes saved
+        - E2E: Delete custom allergen → confirmation modal → deleted
+        - E2E: Cannot delete preloaded allergen → button disabled
+        - E2E: Filter by "Major only" → only EU allergens shown
+      </test>
+    </ideas>
+  </tests>
+</story-context>
