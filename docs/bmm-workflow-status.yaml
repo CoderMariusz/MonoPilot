@@ -59,6 +59,7 @@ workflow_status:
   # Phase 3: Implementation
   # Note: Sprint 0 tracking initialized (8 critical gaps from readiness assessment)
   sprint-planning: docs/sprint-artifacts/sprint-status.yaml  # agent: sm
+  epic-tech-context: docs/sprint-artifacts/tech-spec-epic-1.md  # agent: architect
 
   # Story implementation happens after sprint-planning creates sprint-status.yaml
   # Then use: /bmad:bmm:workflows:create-story and /bmad:bmm:workflows:dev-story
