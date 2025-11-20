@@ -86,6 +86,6 @@ test.describe('Example Test Suite', () => {
  *    ✅ Good: await expect(element).toBeVisible()
  *
  * 5. Network-First: Intercept before navigate (if mocking)
- *    await page.route('**/api/users', route => route.fulfill(...))
+ *    await page.route('** /api/users', route => route.fulfill(...))
  *    await page.goto('/dashboard')
  */

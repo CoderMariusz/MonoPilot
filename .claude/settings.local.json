@@ -131,7 +131,9 @@
       "Bash(tree:*)",
       "Bash(pnpm install:*)",
       "Bash(git rev-parse:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(tasklist:*)",
+      "Bash(timeout 30 pnpm dev:*)"
     ],
     "deny": [],
     "ask": []

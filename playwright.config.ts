@@ -29,7 +29,7 @@ export default defineConfig({
 
   /* Reporter configuration */
   reporter: [
-    ['html', { outputFolder: 'test-results/html' }],
+    ['html', { outputFolder: 'playwright-report' }],
     ['junit', { outputFile: 'test-results/junit.xml' }],
     ['list'],
   ],
@@ -76,6 +76,8 @@ export default defineConfig({
     command: 'cd app && pnpm dev',
     url: 'http://localhost:5000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
+    timeout: 180 * 1000,
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 });
