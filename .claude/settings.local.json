@@ -133,7 +133,9 @@
       "Bash(git rev-parse:*)",
       "Bash(chmod:*)",
       "Bash(tasklist:*)",
-      "Bash(timeout 30 pnpm dev:*)"
+      "Bash(timeout 30 pnpm dev:*)",
+      "Bash(rm:*)",
+      "SlashCommand(/bmad:bmm:workflows:epic-tech-context)"
     ],
     "deny": [],
     "ask": []
