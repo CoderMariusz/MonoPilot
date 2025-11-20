@@ -54,7 +54,7 @@ workflow_status:
   create-architecture: docs/architecture/index-architecture.md  # agent: architect
   test-design: docs/test-design-system.md  # agent: tea
   validate-architecture: skipped  # agent: architect (optional)
-  solutioning-gate-check: required  # agent: architect
+  solutioning-gate-check: docs/bmm-readiness-assessment-2025-11-20.md  # agent: architect
 
   # Phase 3: Implementation
   # Note: Epics created (docs/epics/index.md) but sprint tracking not yet initialized
