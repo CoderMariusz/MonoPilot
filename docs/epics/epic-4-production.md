@@ -171,6 +171,60 @@ So that I can finish production.
 **Given** auto-complete enabled
 **Then** WO completes when output_qty >= planned_qty
 
+**AC: Transaction Atomicity (Sprint 0 Gap 6)**
+
+WO completion is atomic (all-or-nothing guarantee):
+
+**Transaction Flow:**
+1. **START** database transaction
+2. **VALIDATE** pre-conditions:
+   - WO status = 'in_progress' or 'paused'
+   - All required operations completed (if enforce_operations = true)
+   - At least one output LP registered (output_qty > 0)
+   - All by-products registered (if by_products exist in BOM)
+   - No pending consumption corrections
+3. **UPDATE** work_orders.status → 'completed'
+4. **UPDATE** work_orders.completed_at → current_timestamp
+5. **UPDATE** work_orders.completed_by_user_id → current_user
+6. **UPDATE** all wo_operations.status → 'completed' (if any pending)
+7. **UPDATE** license_plates.status → 'available' for all output LPs (from 'in_production')
+8. **INSERT** genealogy_tree records linking output LPs to consumed input LPs (Story 4.19)
+9. **COMMIT** transaction
+
+**Rollback Scenarios:**
+
+**If ANY step fails** (validation error, FK violation, update conflict):
+- Transaction **ROLLBACK**
+- **No partial updates** (WO status unchanged, operations unchanged, LP status unchanged, no genealogy records)
+- **Error message** displayed to user with specific failure reason
+
+**Error Examples:**
+
+| Failure Point | Error Message |
+|---------------|---------------|
+| WO already completed | "Cannot complete WO: Work Order #1234 is already completed." |
+| Operations not done | "Cannot complete WO: 2 operations are not completed (Cut, Mix). Complete all operations first." |
+| No output registered | "Cannot complete WO: No output has been registered. Register at least one output LP before completing." |
+| Missing by-products | "Cannot complete WO: By-product 'Scrap Metal' not registered. Register all by-products per BOM." |
+| FK validation fails | "Cannot complete WO: Related operation no longer exists. Please refresh and try again." |
+| Concurrent update | "Cannot complete WO: Another user modified this WO. Please refresh and try again." |
+
+**Concurrency Handling:**
+- Use row-level lock on work_orders during completion (SELECT ... FOR UPDATE)
+- Prevent duplicate completion if multiple operators click "Complete" simultaneously
+- If concurrent completion detected: "WO #1234 is already being completed. Please refresh."
+
+**Data Integrity Guarantees:**
+- ✅ WO completed → All required operations completed
+- ✅ WO completed → At least one output LP exists
+- ✅ WO completed → All by-products registered (if BOM requires)
+- ✅ WO completed → Genealogy tree created linking outputs to inputs
+- ❌ NEVER: WO completed without output LPs
+- ❌ NEVER: WO completed with incomplete operations (if enforced)
+- ❌ NEVER: Output LPs in 'in_production' status after WO completion
+
+**Reference:** AC Template Checklist (.bmad/templates/ac-template-checklist.md § 6)
+
 **Prerequisites:** Story 4.2
 
 **Technical Notes:**
@@ -307,6 +361,77 @@ So that we don't waste materials.
 **Then** operator can consume unlimited
 
 **And** variance tracked: consumed - required
+
+**AC: Transaction Atomicity (Sprint 0 Gap 6)**
+
+Material consumption (including over-consumption validation) is atomic:
+
+**Transaction Flow:**
+1. **START** database transaction
+2. **VALIDATE** pre-conditions:
+   - WO exists and status = 'in_progress'
+   - Material exists in WO BOM snapshot
+   - LP exists and has sufficient qty
+   - LP qa_status allows consumption (not 'hold', optionally allow 'pending')
+3. **CALCULATE** total consumed for material (SUM existing consumption + new qty)
+4. **CHECK** over-consumption limit:
+   - If allow_over_consumption = false AND total_consumed > required_qty:
+     - **ROLLBACK** transaction
+     - Error: "Cannot consume: Over-consumption not allowed. Required: {required}, Already consumed: {consumed}, Requested: {new_qty}."
+   - If allow_over_consumption = true AND total_consumed > required_qty:
+     - Log warning but continue
+5. **INSERT** wo_consumption record (wo_id, material_id, lp_id, qty, user_id, timestamp)
+6. **UPDATE** license_plates.current_qty -= consumed_qty
+7. **UPDATE** license_plates.status → 'consumed' (if current_qty = 0)
+8. **INSERT** lp_movements record (type = 'consumption', wo_id, lp_id, qty, from_location → WO location)
+9. **UPDATE** wo_materials.consumed_qty += new_qty
+10. **CALCULATE** variance: wo_materials.consumed_qty - wo_materials.required_qty
+11. **COMMIT** transaction
+
+**Rollback Scenarios:**
+
+**If ANY step fails** (validation error, FK violation, insufficient stock):
+- Transaction **ROLLBACK**
+- **No partial updates** (no consumption record, LP qty unchanged, LP status unchanged, no movements, WO materials unchanged)
+- **Error message** displayed to user with specific failure reason
+
+**Error Examples:**
+
+| Failure Point | Error Message |
+|---------------|---------------|
+| WO not in progress | "Cannot consume: Work Order #1234 is not in progress (status: Completed)." |
+| Material not in BOM | "Cannot consume: Material 'Flour 50kg' is not part of WO #1234 BOM. Verify BOM snapshot." |
+| LP insufficient qty | "Cannot consume: License Plate LP-001234 has 10 kg available, requested 15 kg. Reduce quantity or select different LP." |
+| LP on QA hold | "Cannot consume: License Plate LP-001234 is on QA Hold. Release from hold before consuming." |
+| Over-consumption blocked | "Cannot consume: Over-consumption not allowed. Required: 100 kg, Already consumed: 95 kg, Requested: 10 kg (total would be 105 kg). Maximum allowed: 5 kg more." |
+| Concurrent consumption | "Cannot consume: License Plate LP-001234 was modified by another user. Please refresh and try again." |
+| FK validation fails | "Cannot consume: Work Order no longer exists. Please refresh page." |
+
+**Concurrency Handling:**
+- Use row-level locks on license_plates, wo_materials during consumption (SELECT ... FOR UPDATE)
+- Prevent negative LP quantities (CHECK constraint: current_qty >= 0)
+- Prevent duplicate consumption if multiple operators consume same LP simultaneously
+- If concurrent update detected: "LP qty changed by another user. Please refresh."
+
+**Data Integrity Guarantees:**
+- ✅ Consumption recorded → LP qty decreased
+- ✅ Consumption recorded → WO materials consumed_qty updated
+- ✅ Consumption recorded → LP movement logged
+- ✅ Over-consumption blocked → No consumption record created
+- ✅ LP qty = 0 → LP status = 'consumed'
+- ❌ NEVER: Consumption record without LP qty decrease
+- ❌ NEVER: LP qty < 0 (negative stock)
+- ❌ NEVER: Over-consumption when blocked in settings
+- ❌ NEVER: Consumption from QA Hold LP (unless explicitly allowed)
+
+**Over-Consumption Warning (when allowed):**
+- If allow_over_consumption = true AND total_consumed > required_qty:
+  - Display warning banner: "⚠️ Over-consumption detected: +{variance} kg over required amount."
+  - Log variance to wo_materials.variance field
+  - Continue with transaction (do not block)
+  - Notify supervisor via dashboard alert
+
+**Reference:** AC Template Checklist (.bmad/templates/ac-template-checklist.md § 6)
 
 **Prerequisites:** Story 4.7
 

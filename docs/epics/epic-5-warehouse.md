@@ -290,6 +290,59 @@ So that inventory is recorded.
 
 **And** GRN items linked to LPs
 
+**AC: Transaction Atomicity (Sprint 0 Gap 6)**
+
+GRN + LP creation is atomic (all-or-nothing guarantee):
+
+**Transaction Flow:**
+1. **START** database transaction
+2. **INSERT** grn record
+   - Validate FK: asn_id (if from ASN), supplier_id, warehouse_id, org_id
+   - Auto-generate grn_number (GRN-YYYYMMDD-NNNN)
+3. **INSERT** grn_items for each line
+   - Validate FK: grn_id, product_id, org_id
+4. **INSERT** license_plates for each item
+   - Validate FK: grn_id, product_id, location_id, org_id
+   - Auto-generate lp_number (per configured format)
+   - Set initial qa_status (Pending or Passed per warehouse settings)
+5. **UPDATE** asn.status → "Completed" (if GRN from ASN)
+6. **UPDATE** po_line.received_qty += grn_qty (if linked to PO)
+7. **COMMIT** transaction
+
+**Rollback Scenarios:**
+
+**If ANY step fails** (FK violation, unique constraint, validation error):
+- Transaction **ROLLBACK**
+- **No partial records created** (no GRN, no GRN items, no LPs, no ASN update, no PO update)
+- **Error message** displayed to user with specific failure reason
+
+**Error Examples:**
+
+| Failure Point | Error Message |
+|---------------|---------------|
+| ASN not found | "Cannot create GRN: ASN #12345 no longer exists. Please refresh and try again." |
+| Invalid supplier | "Cannot create GRN: Supplier is inactive or does not exist. Please select a valid supplier." |
+| Invalid location | "Cannot create LP: Location 'WH-A-01' is inactive. Please select a different location." |
+| Invalid product | "Cannot create LP: Product SKU 'ABC123' no longer exists. Please verify product catalog." |
+| Duplicate LP# | "Cannot create LP: License Plate LP-001234 already exists. System will retry with next number." |
+| PO update fails | "GRN creation aborted: Unable to update PO received quantity. Transaction rolled back." |
+
+**Concurrency Handling:**
+- Use row-level locks on ASN, PO during update (SELECT ... FOR UPDATE)
+- Prevent duplicate GRN creation for same ASN (check ASN status before insert)
+- If concurrent GRN attempt detected: "ASN #12345 is already being received. Please refresh."
+
+**Data Integrity Guarantees:**
+- ✅ GRN exists → All LPs exist
+- ✅ LP exists → Parent GRN exists
+- ✅ ASN marked Completed → GRN exists with all items
+- ✅ PO received_qty updated → GRN exists
+- ❌ NEVER: GRN without LPs
+- ❌ NEVER: LP without GRN
+- ❌ NEVER: ASN Completed without GRN
+
+**Reference:** AC Template Checklist (.bmad/templates/ac-template-checklist.md § 6)
+
 **Prerequisites:** Story 5.8
 
 **Technical Notes:**
