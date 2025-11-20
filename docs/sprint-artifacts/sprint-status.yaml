@@ -202,13 +202,335 @@ development_status:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # EPIC 1-8: Standard Implementation (27-36 weeks)
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  # Status: BLOCKED until Sprint 0 is completed
-  # Next Command: /bmad:bmm:workflows:sprint-planning (will add Epic 1-8)
+  # Status: Ready to begin (Sprint 0 completed)
+  # Total: 8 epics, 241 stories
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  # Epic 1-8 will be added here after Sprint 0 completion
-  # Use: pnpm bmad:list to see epic structure
-  # Use: /bmad:bmm:workflows:sprint-planning (with Epic 1-8 mode) to populate
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # EPIC 1: Foundation & Settings (2-3 weeks)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Priority: P0 (MVP prerequisite for all other epics)
+  # Stories: 12
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  epic-1: backlog
+  1-1-organization-configuration: backlog
+  1-2-user-management-crud: backlog
+  1-3-user-invitations: backlog
+  1-4-session-management: backlog
+  1-5-warehouse-configuration: backlog
+  1-6-location-management: backlog
+  1-7-machine-configuration: backlog
+  1-8-production-line-configuration: backlog
+  1-9-allergen-management: backlog
+  1-10-tax-code-configuration: backlog
+  1-11-module-activation: backlog
+  1-12-settings-wizard-ux-design: backlog
+  epic-1-retrospective: optional
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # EPIC 2: Technical Core (3-4 weeks)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Priority: P0 (MVP - Products, BOMs, Routings, Traceability)
+  # Dependencies: Epic 1
+  # Stories: 24
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  epic-2: backlog
+  2-1-product-crud: backlog
+  2-2-product-edit-with-versioning: backlog
+  2-3-product-version-history: backlog
+  2-4-product-allergen-assignment: backlog
+  2-5-product-types-configuration: backlog
+  2-6-bom-crud: backlog
+  2-7-bom-items-management: backlog
+  2-8-bom-date-overlap-validation: backlog
+  2-9-bom-timeline-visualization: backlog
+  2-10-bom-clone: backlog
+  2-11-bom-compare: backlog
+  2-12-conditional-bom-items: backlog
+  2-13-by-products-in-bom: backlog
+  2-14-allergen-inheritance: backlog
+  2-15-routing-crud: backlog
+  2-16-routing-operations: backlog
+  2-17-routing-product-assignment: backlog
+  2-18-forward-traceability: backlog
+  2-19-backward-traceability: backlog
+  2-20-recall-simulation: backlog
+  2-21-genealogy-tree-view: backlog
+  2-22-technical-settings-configuration: backlog
+  2-23-grouped-product-dashboard: backlog
+  2-24-allergen-matrix-visualization: backlog
+  epic-2-retrospective: optional
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # EPIC 3: Planning Operations (3-4 weeks)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Priority: P0 (MVP - Purchase Orders, Transfer Orders, Work Orders)
+  # Dependencies: Epic 1, Epic 2
+  # Stories: 23 (includes Sprint 0 Gap 3: Story 3.23)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  epic-3: backlog
+  3-1-purchase-order-crud: backlog
+  3-2-po-line-management: backlog
+  3-3-bulk-po-creation: backlog
+  3-4-po-approval-workflow: backlog
+  3-5-configurable-po-statuses: backlog
+  3-6-transfer-order-crud: backlog
+  3-7-to-line-management: backlog
+  3-8-partial-to-shipments: backlog
+  3-9-lp-selection-for-to: backlog
+  3-10-work-order-crud: backlog
+  3-11-bom-auto-selection-for-wo: backlog
+  3-12-wo-materials-snapshot: backlog
+  3-13-material-availability-check: backlog
+  3-14-routing-copy-to-wo: backlog
+  3-15-configurable-wo-statuses: backlog
+  3-16-wo-source-of-demand: backlog
+  3-17-supplier-management: backlog
+  3-18-supplier-product-assignments: backlog
+  3-19-po-status-lifecycle: backlog
+  3-20-to-status-lifecycle: backlog
+  3-21-wo-gantt-view: backlog
+  3-22-planning-settings-configuration: backlog
+  3-23-verify-bom-snapshot-immutability-sprint-0-gap-3: backlog
+  epic-3-retrospective: optional
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # EPIC 4: Production Execution (3-4 weeks)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Priority: P0 (MVP - Work Order execution, Material consumption, Output registration)
+  # Dependencies: Epic 1, Epic 2, Epic 3, Epic 5
+  # Stories: 20
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  epic-4: backlog
+  4-1-production-dashboard: backlog
+  4-2-wo-start: backlog
+  4-3-wo-pause-resume: backlog
+  4-4-operation-start: backlog
+  4-5-operation-complete: backlog
+  4-6-wo-complete: backlog
+  4-7-material-consumption-desktop: backlog
+  4-8-material-consumption-scanner: backlog
+  4-9-1-1-consumption-enforcement: backlog
+  4-10-consumption-correction: backlog
+  4-11-over-consumption-control: backlog
+  4-12-output-registration-desktop: backlog
+  4-13-output-registration-scanner: backlog
+  4-14-by-product-registration: backlog
+  4-15-yield-tracking: backlog
+  4-16-multiple-outputs-per-wo: backlog
+  4-17-production-settings-configuration: backlog
+  4-18-lp-updates-after-consumption: backlog
+  4-19-genealogy-record-creation: backlog
+  4-20-operation-timeline-view: backlog
+  epic-4-retrospective: optional
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # EPIC 5: Warehouse & Scanner (4-5 weeks)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Priority: P0 (MVP - License Plates, Receiving, Scanner workflows)
+  # Dependencies: Epic 1, Epic 3
+  # Stories: 36 (includes Sprint 0 Gap 5: Story 5.36)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  epic-5: backlog
+  5-1-license-plate-creation: backlog
+  5-2-lp-status-tracking: backlog
+  5-3-lp-batch-expiry-tracking: backlog
+  5-4-lp-number-generation: backlog
+  5-5-lp-split: backlog
+  5-6-lp-merge: backlog
+  5-7-lp-genealogy-tracking: backlog
+  5-8-asn-creation: backlog
+  5-9-asn-item-management: backlog
+  5-10-over-receipt-validation: backlog
+  5-11-grn-and-lp-creation: backlog
+  5-12-auto-print-labels: backlog
+  5-13-update-po-to-received-qty: backlog
+  5-14-lp-location-move: backlog
+  5-15-movement-audit-trail: backlog
+  5-16-partial-move-split-on-move: backlog
+  5-17-destination-validation: backlog
+  5-18-movement-types: backlog
+  5-19-pallet-creation: backlog
+  5-20-pallet-lp-management: backlog
+  5-21-pallet-move: backlog
+  5-22-pallet-status: backlog
+  5-23-scanner-guided-workflows: backlog
+  5-24-scanner-barcode-validation: backlog
+  5-25-scanner-feedback: backlog
+  5-26-scanner-operations-menu: backlog
+  5-27-scanner-session-timeout: backlog
+  5-28-forward-backward-traceability: backlog
+  5-29-genealogy-recording: backlog
+  5-30-source-document-linking: backlog
+  5-31-warehouse-settings-configuration: backlog
+  5-32-receive-from-po-desktop: backlog
+  5-33-receive-from-to-desktop: backlog
+  5-34-scanner-receive-workflow: backlog
+  5-35-inventory-count: backlog
+  5-36-scanner-offline-queue-management-sprint-0-gap-5: backlog
+  epic-5-retrospective: optional
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # EPIC 6: Quality Control & Compliance (3-4 weeks)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Priority: P1 (Growth - QA status, Quality holds, NCRs, CoAs)
+  # Dependencies: Epic 1, Epic 5
+  # Stories: 28
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  epic-6: backlog
+  6-1-lp-qa-status-management: backlog
+  6-2-qa-status-transition-rules: backlog
+  6-3-prevent-shipping-non-passed-lps: backlog
+  6-4-control-consumption-of-pending-lps: backlog
+  6-5-qa-change-audit-trail: backlog
+  6-6-quality-hold-creation: backlog
+  6-7-quality-hold-notifications: backlog
+  6-8-quality-hold-release-approval: backlog
+  6-9-hold-investigation-tracking: backlog
+  6-10-product-specification-management: backlog
+  6-11-auto-calculate-pass-fail-for-numeric-tests: backlog
+  6-12-record-test-results-against-lps: backlog
+  6-13-test-history-per-lp: backlog
+  6-14-compare-results-to-specifications: backlog
+  6-15-ncr-creation: backlog
+  6-16-ncr-lifecycle-tracking: backlog
+  6-17-link-ncrs-to-source-documents: backlog
+  6-18-root-cause-and-corrective-actions: backlog
+  6-19-certificate-of-analysis-coa-upload: backlog
+  6-20-require-coa-on-receipt: backlog
+  6-21-coa-verification-tracking: backlog
+  6-22-quality-dashboard: backlog
+  6-23-quality-reports-generation: backlog
+  6-24-export-reports-to-pdf-excel: backlog
+  6-25-quality-settings-configuration: backlog
+  6-26-quality-hold-workflow: backlog
+  6-27-ncr-workflow: backlog
+  6-28-quality-test-templates: backlog
+  epic-6-retrospective: optional
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # EPIC 7: Shipping & Order Fulfillment (3-4 weeks)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Priority: P1 (Growth - Sales orders, Picking, Packing, Shipments)
+  # Dependencies: Epic 1, Epic 5, Epic 6
+  # Stories: 28
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  epic-7: backlog
+  7-1-sales-order-crud: backlog
+  7-2-so-status-tracking: backlog
+  7-3-so-line-management: backlog
+  7-4-calculate-available-inventory-for-so: backlog
+  7-5-create-shipment-from-so: backlog
+  7-6-consolidate-multiple-sos-into-shipment: backlog
+  7-7-shipment-status-tracking: backlog
+  7-8-record-carrier-and-tracking: backlog
+  7-9-generate-pick-lists: backlog
+  7-10-lp-picking-strategy-fifo-fefo: backlog
+  7-11-picker-assignment: backlog
+  7-12-handle-pick-shorts: backlog
+  7-13-update-so-picked-quantity: backlog
+  7-14-only-allow-picking-qa-passed-lps: backlog
+  7-15-create-packages-for-shipment: backlog
+  7-16-track-items-in-each-package: backlog
+  7-17-record-package-weight: backlog
+  7-18-generate-pick-lists: backlog
+  7-19-generate-packing-slips: backlog
+  7-20-generate-shipping-labels: backlog
+  7-21-print-label-support: backlog
+  7-22-scanner-picking-workflow: backlog
+  7-23-scanner-packing-workflow: backlog
+  7-24-scanner-item-validation: backlog
+  7-25-open-orders-report: backlog
+  7-26-shipping-performance-report: backlog
+  7-27-shipping-settings-configuration: backlog
+  7-28-shipping-dashboard: backlog
+  epic-7-retrospective: optional
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # EPIC 8: New Product Development (NPD) (6-8 weeks)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Priority: P1 (Growth - Stage-gate workflow, Formulation, Compliance, Handoff)
+  # Dependencies: Epic 1, Epic 2
+  # Stories: 68
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  epic-8: backlog
+  8-1-npd-project-crud: backlog
+  8-2-stage-gate-workflow: backlog
+  8-3-gate-entry-criteria-enforcement: backlog
+  8-4-kanban-pipeline-view: backlog
+  8-5-dashboard-filters: backlog
+  8-6-timeline-view: backlog
+  8-7-export-project-list-to-csv: backlog
+  8-8-formulation-crud-with-versioning: backlog
+  8-9-add-formulation-items-with-product-search: backlog
+  8-10-auto-aggregate-allergens: backlog
+  8-11-effective-date-support: backlog
+  8-12-prevent-overlapping-versions: backlog
+  8-13-lock-formulation-on-approval: backlog
+  8-14-track-formulation-lineage: backlog
+  8-15-compare-formulation-versions: backlog
+  8-16-clone-formulations: backlog
+  8-17-display-gate-checklists: backlog
+  8-18-mark-checklist-items-complete: backlog
+  8-19-support-gate-approvals: backlog
+  8-20-block-advancement-for-incomplete-items: backlog
+  8-21-log-approvals: backlog
+  8-22-show-approval-history: backlog
+  8-23-enter-target-cost: backlog
+  8-24-calculate-estimated-cost: backlog
+  8-25-record-actual-cost-from-pilot-wo: backlog
+  8-26-calculate-cost-variance: backlog
+  8-27-display-variance-alerts: backlog
+  8-28-show-cost-history: backlog
+  8-29-finance-approve-costing: backlog
+  8-30-display-allergen-declaration: backlog
+  8-31-upload-compliance-documents: backlog
+  8-32-categorize-documents-by-type: backlog
+  8-33-track-document-metadata: backlog
+  8-34-show-document-history: backlog
+  8-35-validate-doc-completeness-for-handoff: backlog
+  8-36-generate-compliance-checklist: backlog
+  8-37-initiate-handoff-wizard: backlog
+  8-38-validate-handoff-eligibility: backlog
+  8-39-display-validation-checklist: backlog
+  8-40-choose-create-new-or-update-existing-product: backlog
+  8-41-transfer-formulation-to-bom: backlog
+  8-42-create-pilot-wo-optionally: backlog
+  8-43-display-handoff-summary: backlog
+  8-44-execute-handoff-transactionally: backlog
+  8-45-log-handoff-event: backlog
+  8-46-update-status-to-launched: backlog
+  8-47-npd-only-mode-export: backlog
+  8-48-add-risks-with-likelihood-impact: backlog
+  8-49-calculate-risk-score: backlog
+  8-50-enter-mitigation-plan: backlog
+  8-51-update-risk-status: backlog
+  8-52-sort-risks-by-score: backlog
+  8-53-log-critical-events: backlog
+  8-54-retry-failed-events: backlog
+  8-55-view-event-log: backlog
+  8-56-replay-failed-events: backlog
+  8-57-support-pilot-wo-type: backlog
+  8-58-track-npd-origin-on-products: backlog
+  8-59-track-formulation-origin-on-bom: backlog
+  8-60-support-trial-outputs: backlog
+  8-61-reuse-allergens-table: backlog
+  8-62-reuse-approvals-table: backlog
+  8-63-npd-lead-role-permissions: backlog
+  8-64-r-d-role-permissions: backlog
+  8-65-regulatory-role-permissions: backlog
+  8-66-finance-role-permissions: backlog
+  8-67-production-role-visibility: backlog
+  8-68-rls-on-npd-tables: backlog
+  epic-8-retrospective: optional
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Sprint 0 Summary
