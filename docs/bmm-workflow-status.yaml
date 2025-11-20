@@ -57,8 +57,8 @@ workflow_status:
   solutioning-gate-check: docs/bmm-readiness-assessment-2025-11-20.md  # agent: architect
 
   # Phase 3: Implementation
-  # Note: Epics created (docs/epics/index.md) but sprint tracking not yet initialized
-  sprint-planning: required  # agent: sm
+  # Note: Sprint 0 tracking initialized (8 critical gaps from readiness assessment)
+  sprint-planning: docs/sprint-artifacts/sprint-status.yaml  # agent: sm
 
   # Story implementation happens after sprint-planning creates sprint-status.yaml
   # Then use: /bmad:bmm:workflows:create-story and /bmad:bmm:workflows:dev-story

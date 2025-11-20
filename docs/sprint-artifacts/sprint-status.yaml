@@ -1,0 +1,179 @@
+# Sprint Status - MonoPilot
+# Generated: 2025-11-20
+# Project: MonoPilot
+# Project Key: monopilot
+# Tracking System: sprint-status.yaml
+# Story Location: docs/sprint-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic exists but not contexted
+#   - contexted: Epic tech context created (required before drafting stories)
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - drafted: Story file created in stories folder
+#   - ready-for-dev: Draft approved and story context created
+#   - in-progress: Developer actively working on implementation
+#   - review: Under SM review (via code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - completed: Retrospective has been done
+#
+# WORKFLOW NOTES:
+# ===============
+# - Sprint 0 is CRITICAL prerequisite before Epic 1-8 implementation
+# - Sprint 0 addresses 8 gaps identified in Solutioning Gate Check
+# - Epics should be 'contexted' before stories can be 'drafted'
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically drafts next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', SM reviews, then Dev moves to 'done'
+
+generated: 2025-11-20
+project: MonoPilot
+project_key: monopilot
+tracking_system: sprint-status.yaml
+story_location: docs/sprint-artifacts
+
+development_status:
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # SPRINT 0: Readiness Assessment Critical Gaps
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Duration: 8-10 days
+  # Purpose: Fix 8 critical gaps before Epic 1-8 implementation
+  # Source: docs/readiness-assessment/3-gaps-and-risks.md
+  # Status: REQUIRED before proceeding to Epic 1
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  sprint-0: backlog
+
+  # Gap 1: Missing Integration Test Stories (5-7 days)
+  # Issue: 5 cross-epic integration points lack dedicated test stories
+  # Impact: Integration failures discovered late in testing
+  # Owner: Test Engineer + Senior Dev
+  0-1-integration-test-stories: backlog
+    # Subtasks:
+    # - Story 0.1.1: PO → ASN → GRN → LP Integration Test
+    # - Story 0.1.2: WO → Consumption → Genealogy Integration Test
+    # - Story 0.1.3: QA Hold Blocks Consumption Integration Test
+    # - Story 0.1.4: External Service Resilience Tests
+    # - Story 0.1.5: Redis Cache Fallback Test
+
+  # Gap 2: LP Genealogy Integrity Not Fully Specified (1 day)
+  # Issue: Story 5.7 lacks error handling, transaction atomicity, trace verification ACs
+  # Impact: Compliance failure if genealogy breaks (FDA traceability)
+  # Owner: Product Manager + Architect
+  0-2-update-story-5-7-genealogy: backlog
+    # Actions:
+    # - Add AC: Transaction rollback if genealogy fails
+    # - Add AC: FK validation for parent_lp_id
+    # - Add AC: Forward/backward trace verification
+    # - Add test story: "Verify LP Genealogy Integrity E2E"
+
+  # Gap 3: BOM Snapshot Immutability Not Tested (2 days)
+  # Issue: No story verifies WO materials unchanged when BOM updated
+  # Impact: Wrong materials consumed → batch rejection
+  # Owner: Senior Dev
+  0-3-bom-snapshot-immutability: backlog
+    # Actions:
+    # - Add Story to Epic 3: "Verify BOM Snapshot Immutability"
+    # - AC: Update BOM → Verify WO wo_materials unchanged
+    # - AC: WO UI shows snapshot BOM version + effective date
+    # - E2E test: Create WO → Update BOM → Verify immutability
+
+  # Gap 4: RLS Policy Test Suite Missing (3-4 days)
+  # Issue: No automated tests for RLS policies on 40+ tables
+  # Impact: Data leakage between tenants
+  # Owner: Senior Dev + Security
+  0-4-rls-policy-test-suite: backlog
+    # Actions:
+    # - Create RLS Policy Test Suite story
+    # - SQL unit test for every table's RLS policy
+    # - AC: Tenant A cannot read Tenant B data
+    # - AC: CI/CD fails if new table lacks RLS test
+
+  # Gap 5: Scanner Offline Queue Management Not Specified (2-3 days)
+  # Issue: No story defines max offline operations, sync strategy
+  # Impact: Cache overflow → data loss
+  # Owner: Frontend Dev
+  0-5-scanner-offline-queue: backlog
+    # Actions:
+    # - Add Story to Epic 5: "Scanner Offline Queue Management"
+    # - AC: Max 100 offline operations, warning at 80
+    # - AC: UI shows queue size + sync status
+    # - AC: Sync on reconnect within 2s
+    # - E2E test: 100 offline ops → sync → verify all saved
+
+  # Gap 6: Transaction Atomicity Not Specified (1 day)
+  # Issue: Multi-record operations (GRN + LP, Consumption + Genealogy) lack rollback ACs
+  # Impact: Partial success → data inconsistency
+  # Owner: Product Manager
+  0-6-transaction-atomicity-acs: backlog
+    # Actions:
+    # - Update Story 5.11 AC: "GRN + LP creation atomic (rollback if any fails)"
+    # - Update Story 4.6 AC: "Consumption + genealogy atomic"
+    # - Update Story 4.11 AC: "Output LP + genealogy atomic"
+
+  # Gap 7: Error Handling Pattern Missing (1 day)
+  # Issue: Many stories lack ACs for database constraints, external service failures
+  # Impact: Poor user experience, debugging difficulty
+  # Owner: Product Manager
+  0-7-ac-template-checklist: backlog
+    # Actions:
+    # - Create AC Template Checklist for all stories
+    # - Include: FK violations, duplicates, service failures, transaction rollback
+    # - Document in .bmad/templates/ for future use
+
+  # Gap 8: FR → Story Traceability Matrix Not Documented (2 days)
+  # Issue: Epic files don't include FR coverage matrix
+  # Impact: Cannot verify all FRs implemented
+  # Owner: Product Manager
+  0-8-fr-story-traceability: backlog
+    # Actions:
+    # - Add FR Coverage Matrix section to each epic file (Epic 1-8)
+    # - Format: FR-XXX-YYY → Story Z.N
+    # - Verify 100% FR coverage across all epics
+
+  sprint-0-retrospective: optional
+    # Review Sprint 0 effectiveness:
+    # - Were all 8 gaps addressed?
+    # - Did we discover additional gaps?
+    # - Are we ready for Epic 1 implementation?
+    # - What did we learn about the readiness assessment process?
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # EPIC 1-8: Standard Implementation (27-36 weeks)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Status: BLOCKED until Sprint 0 is completed
+  # Next Command: /bmad:bmm:workflows:sprint-planning (will add Epic 1-8)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  # Epic 1-8 will be added here after Sprint 0 completion
+  # Use: pnpm bmad:list to see epic structure
+  # Use: /bmad:bmm:workflows:sprint-planning (with Epic 1-8 mode) to populate
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Sprint 0 Summary
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Total Tasks: 8
+# Estimated Effort: 8-10 days
+# Critical Priority: ALL tasks must be completed before Epic 1
+# Success Criteria:
+#   - All 8 gaps addressed and verified
+#   - Epic files updated with FR traceability matrices
+#   - AC template checklist created
+#   - Integration test stories added
+#   - RLS policy test suite implemented
+#   - Transaction atomicity specified in relevant stories
+#   - Scanner offline queue management specified
+#   - BOM snapshot immutability verified
+#
+# Next Steps After Sprint 0:
+# 1. Mark all sprint-0 stories as 'done'
+# 2. Run retrospective (optional but recommended)
+# 3. Re-run /bmad:bmm:workflows:sprint-planning to add Epic 1-8
+# 4. Begin Epic 1 implementation with /bmad:bmm:workflows:create-story
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
