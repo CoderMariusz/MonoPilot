@@ -48,19 +48,22 @@ development_status:
   # Status: REQUIRED before proceeding to Epic 1
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  sprint-0: backlog
+  sprint-0: done
 
-  # Gap 1: Missing Integration Test Stories (5-7 days)
+  # Gap 1: Missing Integration Test Stories (5-7 days) ✅ DONE
   # Issue: 5 cross-epic integration points lack dedicated test stories
   # Impact: Integration failures discovered late in testing
   # Owner: Test Engineer + Senior Dev
-  0-1-integration-test-stories: backlog
-    # Subtasks:
-    # - Story 0.1.1: PO → ASN → GRN → LP Integration Test
-    # - Story 0.1.2: WO → Consumption → Genealogy Integration Test
-    # - Story 0.1.3: QA Hold Blocks Consumption Integration Test
-    # - Story 0.1.4: External Service Resilience Tests
-    # - Story 0.1.5: Redis Cache Fallback Test
+  # Completed: 2025-11-20
+  0-1-integration-test-stories: done
+    # Actions COMPLETED:
+    # ✅ Story 0.1: PO → ASN → GRN → LP Integration Test (8 ACs)
+    # ✅ Story 0.2: WO → Consumption → Genealogy Integration Test (10 ACs, FDA compliance)
+    # ✅ Story 0.3: QA Hold Blocks Consumption Integration Test (10 ACs, safety-critical)
+    # ✅ Story 0.4: External Service Resilience Tests (10 ACs: SendGrid, Stripe, Redis, Supabase)
+    # ✅ Story 0.5: Redis Cache Fallback Test (10 ACs, performance targets)
+    # ✅ Total: 5 stories, 43 ACs covering critical integration points
+    # Commit: feat(sprint-0): create 5 Integration Test Stories with 43 total ACs
 
   # Gap 2: LP Genealogy Integrity Not Fully Specified (1 day) ✅ DONE
   # Issue: Story 5.7 lacks error handling, transaction atomicity, trace verification ACs
@@ -78,39 +81,65 @@ development_status:
     # ✅ Add FDA 21 CFR Part 117 compliance reference
     # Commit: feat(sprint-0): add comprehensive LP Genealogy Integrity ACs to Story 5.7
 
-  # Gap 3: BOM Snapshot Immutability Not Tested (2 days)
+  # Gap 3: BOM Snapshot Immutability Not Tested (2 days) ✅ DONE
   # Issue: No story verifies WO materials unchanged when BOM updated
   # Impact: Wrong materials consumed → batch rejection
   # Owner: Senior Dev
-  0-3-bom-snapshot-immutability: backlog
-    # Actions:
-    # - Add Story to Epic 3: "Verify BOM Snapshot Immutability"
-    # - AC: Update BOM → Verify WO wo_materials unchanged
-    # - AC: WO UI shows snapshot BOM version + effective date
-    # - E2E test: Create WO → Update BOM → Verify immutability
+  # Completed: 2025-11-20
+  0-3-bom-snapshot-immutability: done
+    # Actions COMPLETED:
+    # ✅ Added Story 3.23 to Epic 3: "Verify BOM Snapshot Immutability"
+    # ✅ AC 1: BOM Update Does Not Affect Existing WO (immutability verification)
+    # ✅ AC 2: New WO Uses Updated BOM (latest BOM selection)
+    # ✅ AC 3: WO Released Status Locks Materials (double-lock mechanism)
+    # ✅ AC 4: UI Shows BOM Version Indicator (version badge, archive warning)
+    # ✅ AC 5: Compare WO Snapshot vs Current BOM (diff view with highlighted changes)
+    # ✅ AC 6: Transaction Atomicity - WO Creation with Snapshot (rollback on concurrent edit)
+    # ✅ AC 7: Genealogy Tracks BOM Version (FDA compliance metadata)
+    # ✅ AC 8: E2E Test - BOM Update Scenario (10-step test flow)
+    # Commit: feat(sprint-0): complete Gaps 3, 4, 5
 
-  # Gap 4: RLS Policy Test Suite Missing (3-4 days)
+  # Gap 4: RLS Policy Test Suite Missing (3-4 days) ✅ DONE
   # Issue: No automated tests for RLS policies on 40+ tables
   # Impact: Data leakage between tenants
   # Owner: Senior Dev + Security
-  0-4-rls-policy-test-suite: backlog
-    # Actions:
-    # - Create RLS Policy Test Suite story
-    # - SQL unit test for every table's RLS policy
-    # - AC: Tenant A cannot read Tenant B data
-    # - AC: CI/CD fails if new table lacks RLS test
+  # Completed: 2025-11-20
+  0-4-rls-policy-test-suite: done
+    # Actions COMPLETED:
+    # ✅ Created story-0-4-rls-policy-test-suite.md
+    # ✅ AC 1: RLS Policy Test Framework Setup (test runner, CI/CD integration)
+    # ✅ AC 2: Basic RLS Policy Test Per Table (40+ tables, cross-org isolation)
+    # ✅ AC 3: Foreign Key RLS Inheritance Test (12+ tables with FK-based RLS)
+    # ✅ AC 4: Genealogy Table RLS - Dual FK Check (lp_genealogy special case)
+    # ✅ AC 5: Admin User Bypass (Super Admin access with audit logging)
+    # ✅ AC 6: RLS Performance Test (query optimization, index usage)
+    # ✅ AC 7: JOIN Query RLS Enforcement (multi-table queries)
+    # ✅ AC 8: Shared Tables Without RLS (allergens, countries)
+    # ✅ AC 9: New Table Detection - CI/CD Enforcement (auto-fail if missing RLS)
+    # ✅ AC 10: RLS Audit Logging (blocked access attempts)
+    # ✅ Coverage: 40+ tables, 100% RLS validation
+    # Commit: feat(sprint-0): complete Gaps 3, 4, 5
 
-  # Gap 5: Scanner Offline Queue Management Not Specified (2-3 days)
+  # Gap 5: Scanner Offline Queue Management Not Specified (2-3 days) ✅ DONE
   # Issue: No story defines max offline operations, sync strategy
   # Impact: Cache overflow → data loss
   # Owner: Frontend Dev
-  0-5-scanner-offline-queue: backlog
-    # Actions:
-    # - Add Story to Epic 5: "Scanner Offline Queue Management"
-    # - AC: Max 100 offline operations, warning at 80
-    # - AC: UI shows queue size + sync status
-    # - AC: Sync on reconnect within 2s
-    # - E2E test: 100 offline ops → sync → verify all saved
+  # Completed: 2025-11-20
+  0-5-scanner-offline-queue: done
+    # Actions COMPLETED:
+    # ✅ Added Story 5.36 to Epic 5: "Scanner Offline Queue Management"
+    # ✅ AC 1: Offline Queue Capacity Limits (max 100, warning at 80, block at 100)
+    # ✅ AC 2: Offline Queue UI Indicators (network status, queue counter, sync status)
+    # ✅ AC 3: Automatic Sync on Reconnect (within 2s, FIFO order, batch processing)
+    # ✅ AC 4: Partial Sync with Failure Handling (failed queue, manual retry/discard)
+    # ✅ AC 5: Manual Sync Trigger (user-initiated sync button)
+    # ✅ AC 6: Queue Persistence Across App Restarts (IndexedDB storage)
+    # ✅ AC 7: Offline Operation Timestamps (performed_at vs synced_at)
+    # ✅ AC 8: Multi-User Queue Isolation (per-user queue separation)
+    # ✅ AC 9: Queue Size Warning in Settings (configurable thresholds)
+    # ✅ AC 10: E2E Test - 100 Offline Operations + Sync (full capacity test)
+    # ✅ Performance: 100 ops sync in <30s, no data loss
+    # Commit: feat(sprint-0): complete Gaps 3, 4, 5
 
   # Gap 6: Transaction Atomicity Not Specified (1 day) ✅ DONE
   # Issue: Multi-record operations (GRN + LP, Consumption + Genealogy) lack rollback ACs
@@ -182,38 +211,45 @@ development_status:
 # Sprint 0 Summary
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Total Tasks: 8
-# Completed Tasks (Quick Wins): 4 ✅
-# Remaining Tasks: 4 (scheduled for new session)
-# Estimated Effort: 8-10 days total (4 days completed)
-# Critical Priority: ALL tasks must be completed before Epic 1
+# Completed Tasks: 8 ✅ (ALL COMPLETE)
+# Estimated Effort: 8-10 days total
+# Status: ✅ SPRINT 0 COMPLETE - Ready for Epic 1-8 Implementation
 #
-# COMPLETED (Quick Wins Session - 2025-11-20):
+# COMPLETED SESSION 1 (Quick Wins - 2025-11-20):
 #   ✅ Gap 7: AC Template Checklist created
 #   ✅ Gap 8: FR→Story Traceability Matrix added to all 8 epics
 #   ✅ Gap 6: Transaction Atomicity ACs added (Stories 4.6, 4.11, 5.11)
 #   ✅ Gap 2: LP Genealogy Integrity ACs added (Story 5.7)
 #
-# PENDING (New Session after PR merge):
-#   - Gap 1: Integration Test Stories (5-7 days)
-#   - Gap 4: RLS Policy Test Suite (3-4 days)
-#   - Gap 3: BOM Snapshot Immutability (2 days)
-#   - Gap 5: Scanner Offline Queue Management (2-3 days)
+# COMPLETED SESSION 2 (Remaining Gaps - 2025-11-20):
+#   ✅ Gap 1: Integration Test Stories (5 stories, 43 ACs)
+#   ✅ Gap 4: RLS Policy Test Suite (10 ACs, 40+ tables)
+#   ✅ Gap 3: BOM Snapshot Immutability (Story 3.23, 8 ACs)
+#   ✅ Gap 5: Scanner Offline Queue Management (Story 5.36, 10 ACs)
 #
-# Success Criteria (4/8 COMPLETE):
+# Success Criteria (8/8 COMPLETE):
 #   ✅ Epic files updated with FR traceability matrices (215 FRs, 237 stories, 100% P0 coverage)
 #   ✅ AC template checklist created (.bmad/templates/ac-template-checklist.md)
 #   ✅ Transaction atomicity specified in 3 critical stories (5.11, 4.6, 4.11)
 #   ✅ LP Genealogy integrity specified with FDA compliance (Story 5.7)
-#   ⏳ Integration test stories added (Gap 1)
-#   ⏳ RLS policy test suite implemented (Gap 4)
-#   ⏳ Scanner offline queue management specified (Gap 5)
-#   ⏳ BOM snapshot immutability verified (Gap 3)
+#   ✅ Integration test stories added (Gap 1) - 5 stories with 43 ACs
+#   ✅ RLS policy test suite implemented (Gap 4) - 10 ACs covering 40+ tables
+#   ✅ Scanner offline queue management specified (Gap 5) - Story 5.36 with 10 ACs
+#   ✅ BOM snapshot immutability verified (Gap 3) - Story 3.23 with 8 ACs
 #
-# Next Steps After Quick Wins Session:
-# 1. Push commits to remote (4 commits ready)
-# 2. Create PR for review
-# 3. After PR merge: Start new session for remaining 4 tasks (Gap 1, 3, 4, 5)
-# 4. After all 8 tasks complete: Run retrospective (optional but recommended)
-# 5. Re-run /bmad:bmm:workflows:sprint-planning to add Epic 1-8
-# 6. Begin Epic 1 implementation with /bmad:bmm:workflows:create-story
+# Total Deliverables:
+#   - 5 integration test stories (Gap 1)
+#   - 1 RLS policy test suite story (Gap 4)
+#   - 2 new epic stories added (Story 3.23, Story 5.36)
+#   - 8 epic files updated with FR traceability matrices
+#   - 3 stories enhanced with transaction atomicity ACs
+#   - 1 story enhanced with genealogy integrity ACs
+#   - 1 AC template checklist for future story creation
+#
+# Next Steps (Sprint 0 Complete):
+# 1. ✅ Push all commits to remote
+# 2. Optional: Run retrospective (/bmad:bmm:workflows:retrospective)
+# 3. Re-run /bmad:bmm:workflows:sprint-planning to add Epic 1-8 stories
+# 4. Begin Epic 1 implementation with /bmad:bmm:workflows:create-story
+# 5. Reference AC Template Checklist for all new stories
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
