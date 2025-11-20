@@ -1,107 +1,427 @@
-# NPD Module Test Suite
+# MonoPilot Test Suite
 
-This directory contains test scripts for Epic NPD-6 retrospective action items.
+Production-ready test framework for MonoPilot MES using Playwright with TypeScript.
 
-## Action Item #2: RLS Policy Verification
+## 📋 Table of Contents
 
-**File:** `npd-rls-verification.sql`
-**Owner:** Dana (QA Engineer)
-**Purpose:** Verify multi-tenant isolation for NPD tables
-**Duration:** ~2 minutes to execute
+- [Setup Instructions](#setup-instructions)
+- [Running Tests](#running-tests)
+- [Architecture Overview](#architecture-overview)
+- [Best Practices](#best-practices)
+- [CI Integration](#ci-integration)
+- [Troubleshooting](#troubleshooting)
 
-### How to Run
+## 🚀 Setup Instructions
 
-1. Open **Supabase Dashboard** → SQL Editor
-2. Copy contents of `tests/npd-rls-verification.sql`
-3. Paste into SQL Editor
-4. Click **Run**
-5. Review results - all tests should show `PASS ✅`
+### Prerequisites
 
-### Expected Results
+- Node.js 20.11.0+ (see `.nvmrc`)
+- pnpm 8.15.0+
+
+### Installation
+
+1. **Install dependencies:**
+
+   ```bash
+   pnpm install
+   ```
+
+2. **Install Playwright browsers:**
+
+   ```bash
+   npx playwright install
+   ```
+
+3. **Configure environment:**
+
+   ```bash
+   cp .env.test.example .env.test
+   ```
+
+   Edit `.env.test` and fill in your test environment values:
+   - `BASE_URL` - Your application URL (default: http://localhost:3000)
+   - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
+   - `TEST_USER_EMAIL` - Test user credentials
+   - `TEST_USER_PASSWORD` - Test user password
+
+## ▶️ Running Tests
+
+### Basic Commands
+
+```bash
+# Run all tests
+pnpm test:e2e
+
+# Run tests in headed mode (see browser)
+pnpm test:e2e:headed
+
+# Run tests in UI mode (interactive)
+pnpm test:e2e:ui
+
+# Run tests in debug mode
+pnpm test:e2e:debug
+
+# Run specific test file
+npx playwright test tests/e2e/example.spec.ts
+
+# Run tests matching a title
+npx playwright test -g "should login"
+```
+
+### Advanced Commands
+
+```bash
+# Run on specific browser
+npx playwright test --project=chromium
+npx playwright test --project=firefox
+npx playwright test --project=webkit
+
+# Update snapshots
+npx playwright test --update-snapshots
+
+# Show HTML report
+npx playwright show-report test-results/html
+```
+
+## 🏗️ Architecture Overview
+
+### Directory Structure
 
 ```
-TEST 1A: Org A SELECT → 1 row → PASS ✅
-TEST 1B: Org A Data Integrity → org_id=9001 → PASS ✅
-TEST 2A: Org B SELECT → 1 row → PASS ✅
-TEST 2B: Org B Data Integrity → org_id=9002 → PASS ✅
-TEST 3: Cross-org INSERT blocked → PASS ✅
-TEST 4: Cross-org UPDATE blocked → 0 rows → PASS ✅
-TEST 5: Cross-org DELETE blocked → 0 rows → PASS ✅
-TEST 6: Child table RLS (npd_formulations) → 0 rows → PASS ✅
+tests/
+├── e2e/                          # Test files
+│   └── example.spec.ts
+├── support/                      # Test infrastructure (key pattern)
+│   ├── fixtures/                 # Custom fixtures
+│   │   ├── index.ts              # Fixture composition
+│   │   └── factories/            # Data factories
+│   │       └── user-factory.ts
+│   ├── helpers/                  # Utility functions
+│   │   └── auth-helper.ts
+│   └── page-objects/             # Page Object Models (optional)
+└── README.md
 ```
 
-### What It Tests
+**Key Pattern**: The `support/` directory contains all test infrastructure (fixtures, factories, helpers) that is shared across test files.
 
-- ✅ Org A can only see Org A data (SELECT isolation)
-- ✅ Org B can only see Org B data (SELECT isolation)
-- ✅ Org A cannot INSERT with Org B's org_id (INSERT protection)
-- ✅ Org A cannot UPDATE Org B's data (UPDATE protection)
-- ✅ Org A cannot DELETE Org B's data (DELETE protection)
-- ✅ Child tables (npd_formulations) inherit RLS via FK (child table isolation)
+### Fixture Architecture
 
-## Action Item #3: Temporal Versioning Smoke Test
+Tests use **extended fixtures** for automatic setup and cleanup:
 
-**File:** `npd-temporal-versioning-test.sql`
-**Owner:** Charlie (Senior Dev)
-**Purpose:** Validate EXCLUDE constraints and immutability triggers
-**Duration:** ~2 minutes to execute
+```typescript
+import { test, expect } from '../support/fixtures';
 
-### How to Run
-
-1. Open **Supabase Dashboard** → SQL Editor
-2. Copy contents of `tests/npd-temporal-versioning-test.sql`
-3. Paste into SQL Editor
-4. Click **Run**
-5. Review results - all tests should show `PASS ✅`
-
-### Expected Results
-
-```
-TEST 1 PASSED ✅: Non-overlapping formulations created successfully
-TEST 2 PASSED ✅: EXCLUDE constraint blocked overlapping formulation
-TEST 3 PASSED ✅: EXCLUDE constraint blocked exact date overlap
-TEST 4 PASSED ✅: Superseded formulation with overlapping dates allowed
-TEST 5 SETUP: Formulation v1.0 locked
-TEST 6 PASSED ✅: Immutability trigger blocked update to locked formulation
-TEST 7 PASSED ✅: Exactly 1 current version found (is_current_version = TRUE)
-TEST 8 PASSED ✅: Cannot manually assign to GENERATED column
+test('example test', async ({ page, userFactory, authHelper }) => {
+  // userFactory and authHelper are custom fixtures
+  const user = await userFactory.createUser();
+  await authHelper.login(page, user.email, user.password);
+  // ... test continues ...
+  // Auto-cleanup: userFactory.cleanup() called after test
+});
 ```
 
-### What It Tests
+**Pattern**: Pure function → fixture → `mergeTests` composition with auto-cleanup
 
-- ✅ Non-overlapping dates allowed (v1.0: 2025-01-01 to 2025-06-30, v2.0: 2025-07-01 to NULL)
-- ✅ EXCLUDE constraint prevents overlapping dates (v3.0: 2025-06-01 to 2025-08-31 → BLOCKED)
-- ✅ EXCLUDE constraint prevents exact overlap (v4.0: same dates as v1.0 → BLOCKED)
-- ✅ Superseded formulations excluded from overlap check (v1.0-OLD with status='superseded' → ALLOWED)
-- ✅ Locked formulations cannot be edited (UPDATE blocked by trigger)
-- ✅ GENERATED column `is_current_version` auto-calculated correctly
-- ✅ GENERATED column cannot be manually set (database enforced)
+**Benefits**:
+- Automatic resource cleanup
+- Reusable test utilities
+- Type-safe fixture dependencies
+- No manual cleanup in tests
 
-## Test Data Cleanup
+### Data Factories
 
-Both scripts include automatic cleanup at the end. Test projects are deleted after tests complete.
+**UserFactory** creates test users with realistic fake data:
 
-**Test org_id Values:**
-- 9001: Test Org A (RLS test)
-- 9002: Test Org B (RLS test)
-- 9003: Temporal Test Org (temporal test)
+```typescript
+const factory = new UserFactory();
 
-**Note:** `org_id` is an INTEGER column (no organizations table exists). Test values 9001-9003 are hardcoded for testing purposes.
+// Create single user
+const user = await factory.createUser({ role: 'admin' });
 
-## Success Criteria
+// Create multiple users
+const users = await factory.createUsers(5);
 
-**Action Item #2 Complete:** All 6 RLS tests pass (multi-tenant isolation confirmed)
-**Action Item #3 Complete:** All 8 temporal tests pass (EXCLUDE constraints + triggers work correctly)
+// Create admin user
+const admin = await factory.createAdmin();
 
-## Next Steps After Testing
+// Cleanup happens automatically via fixture
+```
 
-Once both action items are verified:
-1. Update Epic NPD-6 retrospective document with test results
-2. Mark action items as complete in sprint-status.yaml
-3. Start Epic NPD-1 Story 1 (NPDProjectsAPI CRUD operations)
+**Features**:
+- Uses `@faker-js/faker` for realistic data
+- Tracks created entities for cleanup
+- Supports field overrides
+- Integrates with API/Supabase
+
+**Pattern**: Faker-based factories with auto-cleanup
+
+### Authentication Helper
+
+**AuthHelper** provides login/logout utilities:
+
+```typescript
+const authHelper = new AuthHelper();
+
+await authHelper.login(page, email, password);
+await authHelper.logout(page);
+const isLoggedIn = await authHelper.isLoggedIn(page);
+```
+
+## ✅ Best Practices
+
+### 1. Selector Strategy
+
+**Always use `data-testid` attributes:**
+
+```typescript
+// ❌ Bad: Brittle CSS selectors
+await page.click('.btn-primary.login-btn');
+
+// ✅ Good: Stable data-testid selectors
+await page.click('[data-testid="login-button"]');
+```
+
+**Add to your components:**
+
+```tsx
+<button data-testid="login-button">Login</button>
+<input data-testid="email-input" type="email" />
+```
+
+### 2. Test Isolation
+
+**Each test must be independent:**
+
+```typescript
+// ✅ Good: Fresh data per test via factory
+test('should update user', async ({ userFactory }) => {
+  const user = await userFactory.createUser();
+  // Test uses fresh user, cleanup automatic
+});
+
+// ❌ Bad: Shared state between tests
+let sharedUser;
+test.beforeAll(async () => {
+  sharedUser = await createUser(); // Pollutes other tests
+});
+```
+
+### 3. Given-When-Then Structure
+
+```typescript
+test('should login successfully', async ({ page, authHelper }) => {
+  // Given: user navigates to login page
+  await page.goto('/login');
+
+  // When: user submits valid credentials
+  await authHelper.login(page, 'user@test.com', 'password');
+
+  // Then: user should see dashboard
+  await expect(page).toHaveURL('/dashboard');
+});
+```
+
+### 4. Deterministic Waiting
+
+**Use Playwright's built-in waiting:**
+
+```typescript
+// ❌ Bad: Hard-coded timeout
+await page.waitForTimeout(5000);
+
+// ✅ Good: Wait for specific condition
+await expect(page.locator('[data-testid="user-menu"]')).toBeVisible();
+await page.waitForURL('/dashboard');
+await page.waitForLoadState('networkidle');
+```
+
+### 5. Network-First Testing
+
+**Intercept network before navigation:**
+
+```typescript
+// ✅ Good: Route setup before goto
+await page.route('**/api/users', route =>
+  route.fulfill({ status: 200, body: JSON.stringify(mockUsers) })
+);
+await page.goto('/users'); // Now intercept is active
+
+// ❌ Bad: goto before route
+await page.goto('/users');
+await page.route('**/api/users', ...); // Too late!
+```
+
+### 6. Failure Artifacts
+
+**Configured to capture only on failure:**
+
+- Screenshots: `only-on-failure`
+- Videos: `retain-on-failure`
+- Traces: `retain-on-failure`
+
+This reduces storage while maintaining debugging capability.
+
+### 7. Test Quality Standards
+
+- **Length**: Max 50 lines per test
+- **Time**: Max 60 seconds timeout
+- **Assertions**: Explicit expectations (no implicit waits)
+- **Cleanup**: Automatic via fixtures
+
+## 🔄 CI Integration
+
+### GitHub Actions Configuration
+
+Tests run automatically on:
+- Pull requests
+- Pushes to `main`/`develop`
+
+**Configuration** (`.github/workflows/test.yml`):
+
+```yaml
+- name: Run Playwright tests
+  run: pnpm test:e2e
+  env:
+    CI: true
+    BASE_URL: ${{ secrets.TEST_BASE_URL }}
+```
+
+**CI-specific settings** (from `playwright.config.ts`):
+- Retries: 2 (only on CI)
+- Workers: 1 (sequential execution)
+- `forbidOnly: true` (prevents accidental `.only()`)
+
+### Test Reports
+
+- **HTML Report**: `test-results/html/index.html`
+- **JUnit XML**: `test-results/junit.xml` (for CI dashboards)
+- **Console**: Real-time output
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### Issue: Tests fail with "Cannot find module"
+
+**Solution**: Install dependencies and Playwright browsers
+
+```bash
+pnpm install
+npx playwright install
+```
+
+#### Issue: Tests timeout waiting for app
+
+**Solution**: Check `BASE_URL` in `.env.test` and ensure app is running
+
+```bash
+# Start app in separate terminal
+pnpm dev
+
+# Or enable webServer in playwright.config.ts
+```
+
+#### Issue: Fixture cleanup not working
+
+**Solution**: Ensure fixture is used in test and cleanup logic is correct
+
+```typescript
+// ✅ Fixture is used (cleanup happens)
+test('example', async ({ userFactory }) => {
+  await userFactory.createUser();
+});
+
+// ❌ Fixture not used (no cleanup)
+test('example', async ({ page }) => {
+  const factory = new UserFactory(); // Manual creation, no auto-cleanup
+});
+```
+
+#### Issue: Network interception not working
+
+**Solution**: Setup route **before** navigation
+
+```typescript
+// ✅ Correct order
+await page.route('**/api/**', ...);
+await page.goto('/dashboard');
+
+// ❌ Wrong order
+await page.goto('/dashboard');
+await page.route('**/api/**', ...); // Too late
+```
+
+### Debug Mode
+
+**Run single test with debugger:**
+
+```bash
+npx playwright test example.spec.ts --debug
+```
+
+**Trace viewer for failed tests:**
+
+```bash
+npx playwright show-trace test-results/.../trace.zip
+```
+
+## 📚 Knowledge Base References
+
+This framework follows patterns from:
+
+- **Fixture Architecture** (`.bmad/bmm/testarch/knowledge/fixture-architecture.md`)
+  - Pure function → fixture → mergeTests composition
+  - Auto-cleanup pattern
+
+- **Data Factories** (`.bmad/bmm/testarch/knowledge/data-factories.md`)
+  - Faker-based with overrides
+  - Nested factories and API seeding
+
+- **Network-First Testing** (`.bmad/bmm/testarch/knowledge/network-first.md`)
+  - Intercept before navigate
+  - HAR capture and deterministic waiting
+
+- **Playwright Config** (`.bmad/bmm/testarch/knowledge/playwright-config.md`)
+  - Environment-based configuration
+  - Timeout standards and parallelization
+
+- **Test Quality** (`.bmad/bmm/testarch/knowledge/test-quality.md`)
+  - Deterministic, isolated tests
+  - Explicit assertions and length limits
+
+## 📝 Next Steps
+
+1. **Implement Real API Integration**
+   - Replace mock API calls in `UserFactory`
+   - Connect to Supabase for user creation/deletion
+
+2. **Add Page Objects** (optional)
+   - Create page objects for complex flows
+   - Place in `tests/support/page-objects/`
+
+3. **Expand Factories**
+   - Create factories for other entities (Products, Orders, etc.)
+   - Add nested factory support
+
+4. **Add More Helpers**
+   - API helper for direct API testing
+   - Database helper for seeding/cleanup
+   - Network helper for mocking
+
+5. **Setup CI Pipeline**
+   - Run `testarch:ci` workflow for GitHub Actions setup
+   - Configure test reporting and artifacts
+
+## 📞 Support
+
+For questions or issues:
+- Check `.bmad/bmm/testarch/knowledge/` for patterns
+- Review Playwright docs: https://playwright.dev
+- See `CLAUDE.md` for project-specific guidance
 
 ---
 
-**Created:** 2025-11-16
-**Epic:** NPD-6 (Database Schema & Infrastructure)
-**Retrospective:** docs/sprint-artifacts/epic-npd-6-retro-2025-11-16.md
+**Generated by**: BMAD Test Architect v6.0
+**Framework**: Playwright + TypeScript
+**Date**: 2025-11-20

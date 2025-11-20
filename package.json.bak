@@ -1,0 +1,52 @@
+{
+  "name": "forza-mes",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --parallel dev",
+    "build": "pnpm --recursive build",
+    "frontend:dev": "cd apps/frontend && pnpm dev",
+    "frontend:build": "cd apps/frontend && pnpm build",
+    "frontend:start": "cd apps/frontend && pnpm start",
+    "lint": "pnpm --recursive lint",
+    "lint:fix": "pnpm --recursive lint:fix",
+    "format": "pnpm --recursive format",
+    "format:check": "pnpm --recursive format:check",
+    "type-check": "pnpm --recursive type-check",
+    "clean": "pnpm --recursive clean && rm -rf node_modules",
+    "install:all": "pnpm install",
+    "prepare": "husky || true",
+    "docs:update": "cd apps/frontend && pnpm docs:update",
+    "gen-types": "cd apps/frontend && pnpm gen-types",
+    "test": "pnpm test:unit && pnpm test:e2e:critical",
+    "test:unit": "pnpm --recursive test:unit",
+    "test:e2e:critical": "node scripts/run-e2e-critical.mjs",
+    "pre-commit": "pnpm type-check && pnpm docs:update && (pnpm gen-types || echo '⚠️ Supabase CLI not available - skipping type generation') && (npx lint-staged || echo '⚠️ Lint-staged skipped - format code manually if needed')",
+    "pre-push": "pnpm test",
+    "bmad": "npx bmad-method@alpha",
+    "bmad:status": "npx bmad-method@alpha status",
+    "bmad:list": "npx bmad-method@alpha list",
+    "bmad:update": "npx bmad-method@alpha update"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "npx prettier --write",
+      "npx eslint --fix"
+    ],
+    "*.{json,md}": [
+      "npx prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "devDependencies": {
+    "supabase": "^2.58.5"
+  }
+}
