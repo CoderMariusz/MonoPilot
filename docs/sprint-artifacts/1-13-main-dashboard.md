@@ -1,6 +1,6 @@
 # Story 1.13: Main Dashboard
 
-Status: backlog
+Status: ready-for-dev
 
 ## Story
 
@@ -410,7 +410,7 @@ supabase/
 
 ### Context Reference
 
-- [Story Context XML](./1-13-main-dashboard.context.xml) - To be generated
+- [Story Context XML](./1-13-main-dashboard.context.xml) - Generated 2025-11-20
 
 ### Agent Model Used
 

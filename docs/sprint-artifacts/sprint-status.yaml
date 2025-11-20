@@ -214,7 +214,7 @@ development_status:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   epic-1: contexted
-  1-0-authentication-ui: backlog  # NEW: Login/logout/forgot-password pages
+  1-0-authentication-ui: ready-for-dev  # NEW: Login/logout/forgot-password pages
   1-1-organization-configuration: ready-for-dev
   1-2-user-management-crud: review
   1-3-user-invitations: ready-for-dev
@@ -227,7 +227,7 @@ development_status:
   1-10-tax-code-configuration: ready-for-dev
   1-11-module-activation: ready-for-dev
   1-12-settings-wizard-ux-design: ready-for-dev
-  1-13-main-dashboard: backlog  # NEW: Landing page after login with module overview
+  1-13-main-dashboard: ready-for-dev  # NEW: Landing page after login with module overview
   epic-1-retrospective: optional
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

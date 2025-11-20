@@ -1,6 +1,6 @@
 # Story 1.0: Authentication UI
 
-Status: backlog
+Status: ready-for-dev
 
 ## Story
 
@@ -317,7 +317,7 @@ middleware.ts             # Route protection middleware
 
 ### Context Reference
 
-- [Story Context XML](./1-0-authentication-ui.context.xml) - To be generated
+- [Story Context XML](./1-0-authentication-ui.context.xml) - Generated 2025-11-20
 
 ### Agent Model Used
 

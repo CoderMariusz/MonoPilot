@@ -1,0 +1,346 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/1-0-authentication-ui" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>0</storyId>
+    <title>Authentication UI</title>
+    <status>backlog</status>
+    <generatedAt>2025-11-20</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-0-authentication-ui.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>User</asA>
+    <iWant>to log in, log out, and reset my password</iWant>
+    <soThat>I can securely access the MonoPilot system</soThat>
+    <tasks>
+      <task id="1" ac="000.1,000.2,000.3,000.4">Supabase Auth Configuration - Enable email/password, configure email templates, set session durations</task>
+      <task id="2" ac="000.1,000.2,000.4,000.5">Zod Validation Schemas - LoginSchema, ForgotPasswordSchema, ResetPasswordSchema, SignupSchema</task>
+      <task id="3" ac="000.1,000.2,000.3,000.4">Auth API Utilities - signIn, signOut, signOutAllDevices, resetPassword, updatePassword, signUp</task>
+      <task id="4" ac="000.1,000.5">Login Page UI - Centered card with form, email/password inputs, remember me, forgot password link</task>
+      <task id="5" ac="000.2,000.5">Forgot Password & Reset Password Pages - Email input, password strength indicator, token validation</task>
+      <task id="6" ac="000.3,000.5">Logout Component - UserMenu dropdown with logout and logout all devices options</task>
+      <task id="7" ac="000.4,000.5">Signup Page (OPTIONAL) - Public signup vs invitation-only decision needed</task>
+      <task id="8" ac="000.1">Middleware & Route Protection - Check session, redirect to /login, support ?redirect param</task>
+      <task id="9" ac="000.1,000.2,000.4">Auth Callback Route - Handle Supabase callbacks, magic links, OAuth, email confirmations</task>
+      <task id="10" ac="ALL">Integration & Testing - Unit tests (Zod, auth utilities), integration tests (middleware), E2E tests (login flow)</task>
+      <task id="11">UX Design & Documentation - Mockups for login/forgot/reset pages, user menu, design specifications</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-000.1">Login page with email/password form at /login, remember me checkbox (30-day session), forgot password link, client validation, error messages, redirect to dashboard on success, redirect to /login?redirect={url} for protected routes</criterion>
+    <criterion id="AC-000.2">Forgot password flow: /forgot-password page with email input, sends reset email via Supabase, magic link to /reset-password?token={token}, password strength indicator (weak/medium/strong), validation min 8 chars + 1 uppercase + 1 number</criterion>
+    <criterion id="AC-000.3">Logout functionality: logout button in user menu (top-right dropdown), clears session and redirects to /login, optional logout from all devices (terminates all sessions via API)</criterion>
+    <criterion id="AC-000.4">Signup flow (OPTIONAL): public signup at /signup or invitation-only at /signup?token={token}, redirect to Settings Wizard (Admin) or Main Dashboard (non-Admin) on success</criterion>
+    <criterion id="AC-000.5">UX/UI requirements: centered card layout (max-w-md) on gradient background, MonoPilot logo at top, Shadcn/UI components (Input, Button, Card, Toast), loading states, responsive mobile-friendly design</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture/patterns/security.md</path>
+        <title>Security Architecture</title>
+        <section>Authentication - Supabase Auth</section>
+        <snippet>Complete Supabase Auth implementation with createBrowserClient and createServerClient utilities. JWT sessions with refresh token rotation (1h access, 7d refresh). Middleware pattern for session refresh and route protection. MFA support with TOTP enrollment. Example code for lib/supabase/client.ts and middleware.ts.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture/patterns/security.md</path>
+        <title>Security Architecture</title>
+        <section>Session Management</section>
+        <snippet>JWT with refresh token rotation config. Middleware session refresh pattern with redirect to /login for unauthenticated users on protected routes. Session config: access_token_lifetime 1h, refresh_token_lifetime 7d, refresh_token_rotation true.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture/patterns/security.md</path>
+        <title>Security Architecture</title>
+        <section>Input Validation</section>
+        <snippet>All inputs validated with Zod schemas. Example createUserSchema with email validation, name min/max length, role enum. SQL injection prevention handled by Supabase, XSS prevention by React + CSP.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture/patterns/security.md</path>
+        <title>Security Architecture</title>
+        <section>Content Security Policy</section>
+        <snippet>Security headers configuration in next.config.js: CSP with default-src 'self', script/style/img/font sources, connect-src to Supabase. X-Frame-Options DENY, X-Content-Type-Options nosniff.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-auth-and-dashboard.md</path>
+        <title>UX Design: Authentication & Main Dashboard</title>
+        <section>Authentication UI Design - Login Page</section>
+        <snippet>Login page layout: centered card (max-w-md) on gradient background (bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50). MonoPilot logo 64px at top. Form with email/password inputs (h-12, full width), remember me checkbox, submit button (Shadcn/UI Button variant=default size=lg), forgot password link. Interaction states: focused (blue ring), error (red border + toast), loading (spinner + disabled), success (redirect + toast).</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-auth-and-dashboard.md</path>
+        <title>UX Design: Authentication & Main Dashboard</title>
+        <section>Authentication UI Design - Forgot Password Page</section>
+        <snippet>Forgot password layout: heading "Reset Your Password" (text-2xl font-bold), subtext with instructions, email input, submit button "Send Reset Link", back to login link. Success state replaces form with check icon + message "Check your email for reset link". Security note: always show success even if email doesn't exist (prevent enumeration).</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-auth-and-dashboard.md</path>
+        <title>UX Design: Authentication & Main Dashboard</title>
+        <section>Authentication UI Design - Reset Password Page</section>
+        <snippet>Reset password layout: new password + confirm password inputs, password strength indicator component with 3 levels (weak: red, medium: yellow, strong: green). Requirements checklist: 8+ chars, 1 uppercase, 1 number. Submit calls updatePassword(token, newPassword), success redirects to /login with toast.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-auth-and-dashboard.md</path>
+        <title>UX Design: Authentication & Main Dashboard</title>
+        <section>Authentication UI Design - User Menu Dropdown</section>
+        <snippet>User menu layout: trigger button with avatar (32px circle with initials if no pic), name (text-sm font-medium), chevron down icon. Dropdown with user info section (name + email), menu items (Profile, Settings), separator, logout items (Logout, Logout All Devices with confirmation modal). Shadcn/UI DropdownMenu component, min-w-[200px], shadow-lg.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-auth-and-dashboard.md</path>
+        <title>UX Design: Authentication & Main Dashboard</title>
+        <section>Design Tokens</section>
+        <snippet>Color palette: Primary Blue 500 #3b82f6, 600 #2563eb (hover), 700 #1d4ed8 (active). Semantic colors: Success green-600, Error red-600, Info blue-600. Typography: Inter font family, sizes xs 12px to 3xl 30px, weights 400-700. Spacing base unit 4px, border-radius sm 4px to 2xl 24px, shadows sm to 2xl.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-auth-and-dashboard.md</path>
+        <title>UX Design: Authentication & Main Dashboard</title>
+        <section>Accessibility</section>
+        <snippet>WCAG 2.1 AA compliance: color contrast 4.5:1 minimum for text, 3:1 for large text and interactive elements. Keyboard navigation: Tab to focus, Enter to activate, Arrow keys for dropdowns, Esc to close. Screen reader support: semantic HTML (nav, main, aside, button, a), ARIA labels (aria-label, aria-labelledby, aria-describedby), visible focus indicators (focus:ring-2 focus:ring-blue-500).</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-auth-and-dashboard.md</path>
+        <title>UX Design: Authentication & Main Dashboard</title>
+        <section>Validation & Error States</section>
+        <snippet>Inline validation on blur: email format check, password min 8 chars + uppercase + number, required fields non-empty. Visual indicators: valid (green border + checkmark), invalid (red border + error message below), neutral (gray border). Error message format with warning triangle icon, text-red-600 text-sm, 4px margin below input.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd/modules/settings.md</path>
+        <title>Settings Module - PRD Specification</title>
+        <section>Sekcja 2: Users & Roles</section>
+        <snippet>User fields: email (required, login), first_name, last_name, role (10 roles: admin, manager, operator, viewer, planner, technical, purchasing, warehouse, qc, finance), status (Active, Inactive, Invited). Route /settings/users for user management CRUD.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-1-settings.md</path>
+        <title>Epic 1: Foundation & Settings</title>
+        <section>Story 1.0: Authentication UI</section>
+        <snippet>Complete authentication UI story with login/logout/forgot-reset password flows. Supabase Auth integration, middleware route protection, Zod validation schemas, Shadcn/UI components. Decision: recommendation for invitation-only (no public signup), use Story 1.3 for user invitations. Prerequisites: None (first user interaction).</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/login</path>
+        <kind>directory</kind>
+        <symbol>Login page location</symbol>
+        <reason>Story requires creating page.tsx for login UI at /login route</reason>
+      </artifact>
+      <artifact>
+        <path>app/forgot-password</path>
+        <kind>directory</kind>
+        <symbol>Forgot password page location</symbol>
+        <reason>Story requires creating page.tsx for forgot password flow at /forgot-password route</reason>
+      </artifact>
+      <artifact>
+        <path>app/reset-password</path>
+        <kind>directory</kind>
+        <symbol>Reset password page location</symbol>
+        <reason>Story requires creating page.tsx for password reset with token at /reset-password route</reason>
+      </artifact>
+      <artifact>
+        <path>app/auth/callback</path>
+        <kind>directory</kind>
+        <symbol>Auth callback route location</symbol>
+        <reason>Story requires creating route.ts for Supabase Auth callbacks (magic links, OAuth)</reason>
+      </artifact>
+      <artifact>
+        <path>lib/auth/auth-client.ts</path>
+        <kind>file</kind>
+        <symbol>Auth utilities</symbol>
+        <reason>Story requires creating auth utility functions: signIn, signOut, resetPassword, updatePassword</reason>
+      </artifact>
+      <artifact>
+        <path>lib/validation/auth-schemas.ts</path>
+        <kind>file</kind>
+        <symbol>Zod validation schemas</symbol>
+        <reason>Story requires creating LoginSchema, ForgotPasswordSchema, ResetPasswordSchema, SignupSchema</reason>
+      </artifact>
+      <artifact>
+        <path>components/auth/LoginForm.tsx</path>
+        <kind>component</kind>
+        <symbol>LoginForm</symbol>
+        <reason>Story requires creating login form component with react-hook-form + Zod integration</reason>
+      </artifact>
+      <artifact>
+        <path>components/auth/ForgotPasswordForm.tsx</path>
+        <kind>component</kind>
+        <symbol>ForgotPasswordForm</symbol>
+        <reason>Story requires creating forgot password form component</reason>
+      </artifact>
+      <artifact>
+        <path>components/auth/ResetPasswordForm.tsx</path>
+        <kind>component</kind>
+        <symbol>ResetPasswordForm</symbol>
+        <reason>Story requires creating reset password form with strength indicator</reason>
+      </artifact>
+      <artifact>
+        <path>components/auth/UserMenu.tsx</path>
+        <kind>component</kind>
+        <symbol>UserMenu</symbol>
+        <reason>Story requires creating user dropdown menu with logout options</reason>
+      </artifact>
+      <artifact>
+        <path>components/auth/PasswordStrength.tsx</path>
+        <kind>component</kind>
+        <symbol>PasswordStrength</symbol>
+        <reason>Story requires creating password strength indicator (weak/medium/strong) for reset flow</reason>
+      </artifact>
+      <artifact>
+        <path>middleware.ts</path>
+        <kind>file</kind>
+        <symbol>Next.js middleware</symbol>
+        <reason>Story requires updating middleware for route protection, session refresh, redirect logic</reason>
+      </artifact>
+      <artifact>
+        <path>lib/supabase/client.ts</path>
+        <kind>file</kind>
+        <symbol>Supabase browser client</symbol>
+        <reason>Referenced in security.md - createBrowserClient utility for client-side auth</reason>
+      </artifact>
+      <artifact>
+        <path>lib/supabase/server.ts</path>
+        <kind>file</kind>
+        <symbol>Supabase server client</symbol>
+        <reason>Referenced in security.md - createServerClient utility for server-side auth with cookies</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.x" usage="Supabase client for authentication (signIn, signOut, resetPassword)" />
+        <package name="@supabase/ssr" version="^0.x" usage="SSR helpers for Next.js (createBrowserClient, createServerClient)" />
+        <package name="react-hook-form" version="^7.x" usage="Form state management for login, forgot password, reset password forms" />
+        <package name="zod" version="^3.x" usage="Validation schemas (LoginSchema, ResetPasswordSchema, ForgotPasswordSchema)" />
+        <package name="@hookform/resolvers" version="^3.x" usage="Zod resolver for react-hook-form integration" />
+        <package name="next" version="^15.x" usage="Next.js framework with App Router, middleware for route protection" />
+        <package name="react" version="^19.x" usage="React 19 for UI components" />
+        <package name="shadcn/ui" version="latest" usage="UI components (Card, Form, Input, Button, Toast, DropdownMenu, Checkbox)" />
+        <package name="lucide-react" version="latest" usage="Icons for user menu, password visibility toggle, loading spinner" />
+        <package name="tailwindcss" version="^3.4" usage="Utility-first CSS framework for styling" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Next.js 15 App Router - use app/ directory structure, server components by default, client components with 'use client' directive for interactive auth forms</constraint>
+    <constraint type="architecture">Supabase Auth - use built-in email/password provider, JWT sessions stored in HttpOnly cookies, refresh token rotation enabled</constraint>
+    <constraint type="security">Session security - HttpOnly cookies with SameSite=Lax, CSRF protection handled by Supabase, XSS prevention via React + CSP headers</constraint>
+    <constraint type="security">Password requirements - min 8 chars, 1 uppercase, 1 number (align with Supabase Auth policies)</constraint>
+    <constraint type="security">Rate limiting - enable Supabase Auth rate limiting to prevent brute force attacks</constraint>
+    <constraint type="security">Password reset security - always show success message even if email doesn't exist (prevent email enumeration)</constraint>
+    <constraint type="validation">Zod validation - required on BOTH client and server for all auth forms (LoginSchema, ResetPasswordSchema, ForgotPasswordSchema)</constraint>
+    <constraint type="middleware">Route protection - middleware checks session for all routes except /login, /signup, /forgot-password, /reset-password, /auth/callback. Redirect to /login?redirect={path} for unauthenticated access to protected routes</constraint>
+    <constraint type="ux">Shadcn/UI components - use existing design system for consistency (Card, Form, Input, Button, Toast, DropdownMenu, Checkbox)</constraint>
+    <constraint type="ux">Responsive design - mobile-first approach, centered card layout works on all viewport sizes, gradient background, accessible keyboard navigation</constraint>
+    <constraint type="testing">Test pyramid - 95% unit coverage for Zod schemas and auth utilities (mock Supabase), 70% integration coverage for middleware and callbacks, 100% E2E coverage for complete auth flows (Playwright)</constraint>
+    <constraint type="decision">Invitation-only signup (RECOMMENDED) - skip public /signup page (Task 7), use Story 1.3 (User Invitations) for better security and onboarding control. If public signup needed later, add email confirmation + CAPTCHA</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>LoginSchema</name>
+      <kind>Zod schema</kind>
+      <signature>z.object({ email: z.string().email("Invalid email format"), password: z.string().min(8, "Password must be at least 8 characters"), rememberMe: z.boolean().optional() })</signature>
+      <path>lib/validation/auth-schemas.ts</path>
+    </interface>
+    <interface>
+      <name>ForgotPasswordSchema</name>
+      <kind>Zod schema</kind>
+      <signature>z.object({ email: z.string().email("Invalid email format") })</signature>
+      <path>lib/validation/auth-schemas.ts</path>
+    </interface>
+    <interface>
+      <name>ResetPasswordSchema</name>
+      <kind>Zod schema</kind>
+      <signature>z.object({ password: z.string().min(8).regex(/[A-Z]/, "Must contain uppercase").regex(/[0-9]/, "Must contain number"), confirmPassword: z.string() }).refine(data => data.password === data.confirmPassword, { message: "Passwords don't match", path: ["confirmPassword"] })</signature>
+      <path>lib/validation/auth-schemas.ts</path>
+    </interface>
+    <interface>
+      <name>signIn</name>
+      <kind>function</kind>
+      <signature>async function signIn(email: string, password: string, rememberMe?: boolean): Promise&lt;{ session: Session | null; error: Error | null }&gt;</signature>
+      <path>lib/auth/auth-client.ts</path>
+    </interface>
+    <interface>
+      <name>signOut</name>
+      <kind>function</kind>
+      <signature>async function signOut(): Promise&lt;void&gt; - Clears session, redirects to /login</signature>
+      <path>lib/auth/auth-client.ts</path>
+    </interface>
+    <interface>
+      <name>resetPassword</name>
+      <kind>function</kind>
+      <signature>async function resetPassword(email: string): Promise&lt;{ error: Error | null }&gt; - Sends password reset email via Supabase</signature>
+      <path>lib/auth/auth-client.ts</path>
+    </interface>
+    <interface>
+      <name>updatePassword</name>
+      <kind>function</kind>
+      <signature>async function updatePassword(token: string, newPassword: string): Promise&lt;{ error: Error | null }&gt;</signature>
+      <path>lib/auth/auth-client.ts</path>
+    </interface>
+    <interface>
+      <name>LoginForm</name>
+      <kind>React component</kind>
+      <signature>LoginForm: FC - Uses react-hook-form + Zod, renders email/password inputs, remember me checkbox, submit button with loading state, error toast on failure</signature>
+      <path>components/auth/LoginForm.tsx</path>
+    </interface>
+    <interface>
+      <name>UserMenu</name>
+      <kind>React component</kind>
+      <signature>UserMenu: FC - Dropdown menu with user avatar, name, logout options (Logout, Logout All Devices with confirmation modal), uses Shadcn/UI DropdownMenu</signature>
+      <path>components/auth/UserMenu.tsx</path>
+    </interface>
+    <interface>
+      <name>PasswordStrength</name>
+      <kind>React component</kind>
+      <signature>PasswordStrength: FC&lt;{ password: string }&gt; - Displays strength indicator (weak/medium/strong) with color-coded bars and requirements checklist</signature>
+      <path>components/auth/PasswordStrength.tsx</path>
+    </interface>
+    <interface>
+      <name>middleware</name>
+      <kind>Next.js middleware</kind>
+      <signature>export async function middleware(request: NextRequest): Promise&lt;NextResponse&gt; - Checks session, redirects to /login for unauthenticated users on protected routes, supports ?redirect={path} param</signature>
+      <path>middleware.ts</path>
+    </interface>
+    <interface>
+      <name>POST /auth/callback</name>
+      <kind>API route</kind>
+      <signature>POST /auth/callback - Handles Supabase Auth callbacks (magic links, OAuth, email confirmations), exchanges code for session, redirects to dashboard or ?redirect param</signature>
+      <path>app/auth/callback/route.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing strategy follows Test Pyramid: unit tests for Zod schemas and auth utilities (95% coverage, mock Supabase client with vitest), integration tests for middleware redirect logic and auth callback route (70% coverage, Vitest + Supabase Test Client), E2E tests for complete authentication flows (100% user flows, Playwright). All tests in __tests__ directories colocated with source. Test files follow pattern: ComponentName.spec.tsx (unit), api-route.test.ts (integration), auth-flow.e2e.ts (E2E). Fixtures in __fixtures__. Mock Supabase Auth in unit tests.
+    </standards>
+    <locations>
+      <location>lib/validation/__tests__/auth-schemas.spec.ts (Zod schema unit tests)</location>
+      <location>lib/auth/__tests__/auth-client.spec.ts (Auth utilities unit tests with mocked Supabase)</location>
+      <location>app/auth/callback/__tests__/route.test.ts (Auth callback integration tests)</location>
+      <location>middleware.spec.ts (Middleware redirect logic unit tests)</location>
+      <location>components/auth/__tests__/LoginForm.spec.tsx (LoginForm component unit tests)</location>
+      <location>components/auth/__tests__/PasswordStrength.spec.tsx (PasswordStrength component unit tests)</location>
+      <location>e2e/auth/login-flow.e2e.ts (Complete login flow E2E tests)</location>
+      <location>e2e/auth/forgot-password-flow.e2e.ts (Forgot/reset password flow E2E tests)</location>
+      <location>e2e/auth/protected-routes.e2e.ts (Route protection and redirect flow E2E tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-000.1">Unit test: LoginSchema validates email format (reject invalid emails), password min length (reject <8 chars), rememberMe optional</idea>
+      <idea ac="AC-000.2">Unit test: ResetPasswordSchema validates password requirements (min 8 chars, 1 uppercase, 1 number), confirmPassword matches password</idea>
+      <idea ac="AC-000.1">Unit test: signIn function calls Supabase auth.signInWithPassword, returns session on success, handles errors gracefully</idea>
+      <idea ac="AC-000.3">Unit test: signOut function clears Supabase session, mock redirect to /login</idea>
+      <idea ac="AC-000.2">Integration test: POST /auth/callback with valid token exchanges code for session, redirects to /dashboard or ?redirect param</idea>
+      <idea ac="AC-000.1">Integration test: middleware checks session for protected route, redirects unauthenticated user to /login?redirect={path}</idea>
+      <idea ac="AC-000.1">E2E test: Navigate to /login, enter valid credentials, click "Sign In", redirected to /dashboard, success toast shown</idea>
+      <idea ac="AC-000.1">E2E test: Navigate to /login, enter invalid credentials, submit form, error toast "Invalid email or password" shown, password field cleared</idea>
+      <idea ac="AC-000.2">E2E test: Navigate to /forgot-password, enter email, submit, success message shown (even if email doesn't exist)</idea>
+      <idea ac="AC-000.2">E2E test: Click password reset link with valid token, enter new password (8+ chars, 1 uppercase, 1 number), submit, redirected to /login with success toast</idea>
+      <idea ac="AC-000.3">E2E test: Login, click user menu, click "Logout", redirected to /login, session cleared</idea>
+      <idea ac="AC-000.1">E2E test: Navigate to protected route /settings without auth, redirected to /login?redirect=/settings, login, redirected back to /settings</idea>
+      <idea ac="AC-000.5">Unit test: LoginForm renders email/password inputs, remember me checkbox, submit button, error messages on validation failure</idea>
+      <idea ac="AC-000.5">Unit test: PasswordStrength component displays correct strength level (weak/medium/strong) based on password criteria</idea>
+    </ideas>
+  </tests>
+</story-context>
