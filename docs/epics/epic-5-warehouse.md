@@ -190,6 +190,147 @@ So that traceability is complete.
 - operation_type (split, merge, consume, produce)
 - timestamp
 
+**AC: Genealogy Integrity & Atomicity (Sprint 0 Gap 2)**
+
+LP genealogy tracking ensures **FDA-compliant traceability** with guaranteed data integrity:
+
+**Transaction Flow (Atomic Genealogy Creation):**
+
+1. **START** database transaction
+2. **VALIDATE** pre-conditions:
+   - parent_lp_id exists in license_plates table (FK validation)
+   - child_lp_id exists in license_plates table (FK validation)
+   - Both LPs belong to same org_id (multi-tenant isolation)
+   - wo_id exists if provided (FK validation)
+   - operation_type is valid enum: 'split', 'merge', 'consume', 'produce'
+   - No duplicate genealogy link (parent → child already exists)
+3. **CHECK** for circular dependencies:
+   - child_lp_id cannot be ancestor of parent_lp_id (prevent cycles)
+   - Use recursive CTE to validate genealogy tree integrity
+4. **INSERT** lp_genealogy record:
+   - parent_lp_id, child_lp_id, wo_id, operation_type, created_at, created_by_user_id
+5. **VERIFY** trace integrity:
+   - Forward trace: parent → all descendants reachable
+   - Backward trace: child → all ancestors reachable
+6. **COMMIT** transaction
+
+**Rollback Scenarios:**
+
+**If ANY step fails** (FK violation, circular dependency, duplicate link):
+- Transaction **ROLLBACK**
+- **No genealogy record created** (maintain clean traceability tree)
+- **Error message** displayed with specific failure reason
+
+**Error Examples:**
+
+| Failure Point | Error Message |
+|---------------|---------------|
+| Parent LP not exists | "Cannot create genealogy: Parent License Plate LP-001234 does not exist. Verify LP number." |
+| Child LP not exists | "Cannot create genealogy: Child License Plate LP-005678 does not exist. Verify LP number." |
+| Different orgs | "Cannot create genealogy: Parent and child LPs belong to different organizations. Cross-org genealogy not allowed." |
+| Circular dependency | "Cannot create genealogy: Circular dependency detected. LP-001234 is already a descendant of LP-005678." |
+| Duplicate link | "Cannot create genealogy: Link already exists between Parent LP-001234 and Child LP-005678." |
+| Invalid WO | "Cannot create genealogy: Work Order #9999 does not exist or is not related to these LPs." |
+| Invalid operation type | "Cannot create genealogy: Operation type 'transform' is invalid. Use: split, merge, consume, or produce." |
+
+**FK Validation Rules (Gap 2 Critical):**
+
+- ✅ parent_lp_id → license_plates.id (CASCADE DELETE blocked, must orphan children explicitly)
+- ✅ child_lp_id → license_plates.id (CASCADE DELETE blocked)
+- ✅ wo_id → work_orders.id (CASCADE DELETE blocked, genealogy is immutable audit trail)
+- ✅ org_id → organizations.id (both parent and child must match)
+
+**Trace Verification Integrity (Gap 2):**
+
+After every genealogy insert, system verifies:
+
+1. **Forward Traceability:**
+   - FROM parent_lp → trace all descendants (children, grandchildren, etc.)
+   - Verify no broken links (all descendants reachable via recursive query)
+   - Use: `WITH RECURSIVE descendants AS (SELECT * FROM lp_genealogy WHERE parent_lp_id = X UNION...)`
+
+2. **Backward Traceability:**
+   - FROM child_lp → trace all ancestors (parents, grandparents, etc.)
+   - Verify no broken links (all ancestors reachable via recursive query)
+   - Use: `WITH RECURSIVE ancestors AS (SELECT * FROM lp_genealogy WHERE child_lp_id = X UNION...)`
+
+3. **Orphan Detection:**
+   - If parent LP is deleted → children become orphans
+   - System flags orphaned LPs in UI: "⚠️ LP-005678: Parent LP-001234 no longer exists (orphaned)"
+   - Orphaned LPs still tracked for audit purposes (do not cascade delete genealogy)
+
+**Operation Type Semantics:**
+
+| Operation Type | Parent LP | Child LP | WO Required | Use Case |
+|----------------|-----------|----------|-------------|----------|
+| **split** | Original LP | New split LPs | No | Split 100kg pallet → 2x 50kg pallets |
+| **merge** | Multiple source LPs | New merged LP | No | Merge 2x 50kg pallets → 1x 100kg pallet |
+| **consume** | Input material LP | Output finished good LP | Yes | WO consumes Flour LP → produces Bread LP |
+| **produce** | Input material LP | Output finished good LP | Yes | Same as consume (legacy alias) |
+
+**Data Integrity Guarantees (FDA Compliance):**
+
+- ✅ Every consumed LP → linked to output LP via genealogy (full traceability)
+- ✅ Every output LP → linked to all input LPs (backward trace)
+- ✅ LP split → all child LPs linked to parent (forward trace)
+- ✅ LP merge → all parent LPs linked to merged child (backward trace)
+- ✅ Genealogy records immutable (no DELETE, no UPDATE, only INSERT)
+- ✅ No circular dependencies (tree structure enforced)
+- ✅ No cross-org genealogy (multi-tenant isolation)
+- ❌ NEVER: Output LP without input LP genealogy (consumption)
+- ❌ NEVER: Genealogy link without valid parent AND child LPs
+- ❌ NEVER: Circular dependencies (A → B → C → A)
+- ❌ NEVER: Broken traces (missing intermediate links)
+
+**Recall Simulation (Forward + Backward Trace):**
+
+**Scenario:** Recall all products affected by contaminated Flour batch LP-001234
+
+1. **Forward Trace (Impact Analysis):**
+   ```sql
+   WITH RECURSIVE descendants AS (
+     SELECT child_lp_id, operation_type, wo_id, 1 AS depth
+     FROM lp_genealogy WHERE parent_lp_id = 'LP-001234'
+     UNION ALL
+     SELECT g.child_lp_id, g.operation_type, g.wo_id, d.depth + 1
+     FROM lp_genealogy g
+     JOIN descendants d ON g.parent_lp_id = d.child_lp_id
+     WHERE d.depth < 10 -- prevent infinite loops
+   )
+   SELECT DISTINCT child_lp_id FROM descendants;
+   ```
+   **Result:** All downstream LPs (Bread, Pastry, etc.) that used contaminated Flour
+
+2. **Backward Trace (Root Cause Analysis):**
+   ```sql
+   WITH RECURSIVE ancestors AS (
+     SELECT parent_lp_id, operation_type, wo_id, 1 AS depth
+     FROM lp_genealogy WHERE child_lp_id = 'LP-009876' -- contaminated Bread LP
+     UNION ALL
+     SELECT g.parent_lp_id, g.operation_type, g.wo_id, a.depth + 1
+     FROM lp_genealogy g
+     JOIN ancestors a ON g.child_lp_id = a.parent_lp_id
+     WHERE a.depth < 10
+   )
+   SELECT DISTINCT parent_lp_id FROM ancestors;
+   ```
+   **Result:** All upstream LPs (Flour, Yeast, etc.) that contributed to contaminated Bread
+
+**Concurrency Handling:**
+- Use unique constraint on (parent_lp_id, child_lp_id) to prevent duplicate links
+- Row-level locks not required (INSERT-only operation, no UPDATEs)
+- If duplicate insert attempt: Silently succeed (link already exists, idempotent)
+
+**Audit Trail:**
+- All genealogy records include created_at timestamp and created_by_user_id
+- Genealogy records are NEVER deleted (immutable audit trail for FDA inspections)
+- If LP is deleted, genealogy records remain (with orphan flag for broken trace detection)
+
+**Reference:**
+- AC Template Checklist (.bmad/templates/ac-template-checklist.md § 4, § 6)
+- Gap 2: LP Genealogy Integrity (docs/readiness-assessment/3-gaps-and-risks.md)
+- FDA 21 CFR Part 117 (Food Safety Modernization Act - traceability requirements)
+
 **Prerequisites:** Stories 5.5, 5.6
 
 **Technical Notes:**
