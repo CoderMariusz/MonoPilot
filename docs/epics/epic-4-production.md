@@ -558,24 +558,63 @@ So that I can track progress at a glance.
 
 ---
 
-## FR Coverage
+## FR Coverage Matrix
 
-| FR ID | Requirement | Stories |
-|-------|-------------|---------|
-| FR-PROD-001 | Production Dashboard | 4.1 |
-| FR-PROD-002 | WO Start | 4.2 |
-| FR-PROD-003 | WO Pause/Resume | 4.3 |
-| FR-PROD-004 | Operation Execution | 4.4, 4.5 |
-| FR-PROD-005 | WO Complete | 4.6 |
-| FR-PROD-006 | Material Consumption (Desktop) | 4.7 |
-| FR-PROD-007 | Material Consumption (Scanner) | 4.8 |
-| FR-PROD-008 | 1:1 Consumption Enforcement | 4.9 |
-| FR-PROD-009 | Consumption Correction | 4.10 |
-| FR-PROD-010 | Over-Consumption Control | 4.11 |
-| FR-PROD-011 | Output Registration (Desktop) | 4.12 |
-| FR-PROD-012 | Output Registration (Scanner) | 4.13 |
-| FR-PROD-013 | By-Product Registration | 4.14 |
-| FR-PROD-014 | Yield Tracking | 4.15 |
-| FR-PROD-015 | Multiple Outputs per WO | 4.16 |
+This section maps all Functional Requirements from the Production Module (PRD) to their implementing stories, ensuring 100% traceability.
 
-**Coverage:** 15 of 15 FRs (100%)
+| FR ID | FR Title | Story IDs | Status | Notes |
+|-------|----------|-----------|--------|-------|
+| FR-PROD-001 | Production Dashboard | 4.1 | ✅ Covered | Real-time WO status, OEE metrics |
+| FR-PROD-002 | WO Start | 4.2 | ✅ Covered | Start production, assign operators |
+| FR-PROD-003 | WO Pause/Resume | 4.3 | ✅ Covered | Pause/resume with reason codes |
+| FR-PROD-004 | Operation Execution | 4.4, 4.5 | ✅ Covered | Start/complete operations |
+| FR-PROD-005 | WO Complete | 4.6 | ✅ Covered | Complete WO (Sprint 0 Gap 6: Atomicity AC) |
+| FR-PROD-006 | Material Consumption (Desktop) | 4.7 | ✅ Covered | Desktop UI for material consumption |
+| FR-PROD-007 | Material Consumption (Scanner) | 4.8 | ✅ Covered | Scanner PWA for barcode scanning |
+| FR-PROD-008 | 1:1 Consumption Enforcement | 4.9 | ✅ Covered | Enforce 1:1 LP consumption |
+| FR-PROD-009 | Consumption Correction | 4.10 | ✅ Covered | Correct consumption errors |
+| FR-PROD-010 | Over-Consumption Control | 4.11 | ✅ Covered | Prevent over-consumption (Sprint 0 Gap 6: Atomicity AC) |
+| FR-PROD-011 | Output Registration (Desktop) | 4.12 | ✅ Covered | Desktop UI for output registration |
+| FR-PROD-012 | Output Registration (Scanner) | 4.13 | ✅ Covered | Scanner PWA for output LPs |
+| FR-PROD-013 | By-Product Registration | 4.14 | ✅ Covered | Register by-products |
+| FR-PROD-014 | Yield Tracking | 4.15 | ✅ Covered | Calculate yield % |
+| FR-PROD-015 | Multiple Outputs per WO | 4.16 | ✅ Covered | Multiple output LPs per WO |
+
+**Coverage Summary:**
+- **Total FRs:** 15 (all P0)
+- **P0 FRs Covered:** 15/15 (100%)
+- **Total Stories:** 20 (includes technical stories: 4.17-4.19, UX: 4.20)
+
+**Validation:**
+- ✅ All P0 functional requirements have at least one implementing story
+- ✅ No orphaned stories (all stories trace back to FRs or technical requirements)
+- ✅ FR-PROD-004 split into 2 stories (Operation Start vs Complete)
+- ✅ Stories 4.6, 4.11 flagged for Sprint 0 Gap 6 (Transaction Atomicity ACs)
+- ✅ Story 4.19 (Genealogy) critical for FDA compliance
+
+**Reverse Traceability (Story → FR):**
+- Story 4.1 → FR-PROD-001
+- Story 4.2 → FR-PROD-002
+- Story 4.3 → FR-PROD-003
+- Story 4.4 → FR-PROD-004
+- Story 4.5 → FR-PROD-004
+- Story 4.6 → FR-PROD-005 (Sprint 0 Gap 6: Add Transaction Atomicity AC)
+- Story 4.7 → FR-PROD-006
+- Story 4.8 → FR-PROD-007
+- Story 4.9 → FR-PROD-008
+- Story 4.10 → FR-PROD-009
+- Story 4.11 → FR-PROD-010 (Sprint 0 Gap 6: Add Transaction Atomicity AC)
+- Story 4.12 → FR-PROD-011
+- Story 4.13 → FR-PROD-012
+- Story 4.14 → FR-PROD-013
+- Story 4.15 → FR-PROD-014
+- Story 4.16 → FR-PROD-015
+- Story 4.17 → Technical (Production Settings Configuration)
+- Story 4.18 → Technical (LP stock updates after consumption)
+- Story 4.19 → Technical (Genealogy tree creation - FDA compliance)
+- Story 4.20 → UX Design (Operation Timeline View)
+
+**Sprint 0 Gap References:**
+- **Gap 6 (Transaction Atomicity):** Stories 4.6, 4.11 require enhanced ACs for rollback handling
+
+---

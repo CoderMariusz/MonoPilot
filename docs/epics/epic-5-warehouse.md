@@ -893,39 +893,94 @@ So that I can verify accuracy.
 
 ---
 
-## FR Coverage
+## FR Coverage Matrix
 
-| FR ID | Requirement | Stories |
-|-------|-------------|---------|
-| WH-FR-01 | LP Creation with unique number | 5.1, 5.4 |
-| WH-FR-02 | LP Status Tracking | 5.2 |
-| WH-FR-03 | LP Batch/Expiry Tracking | 5.3 |
-| WH-FR-04 | LP Number Generation | 5.4 |
-| WH-FR-05 | LP Split with Genealogy | 5.5 |
-| WH-FR-06 | LP Merge | 5.6 |
-| WH-FR-07 | LP Genealogy Tracking | 5.7, 5.29 |
-| WH-FR-08 | Receive from PO/TO | 5.11, 5.32, 5.33 |
-| WH-FR-09 | ASN Pre-fill | 5.8, 5.9 |
-| WH-FR-10 | Over-receipt Validation | 5.10 |
-| WH-FR-11 | GRN and LP Creation | 5.11 |
-| WH-FR-12 | Auto-print Labels | 5.12 |
-| WH-FR-13 | Update PO/TO Received Qty | 5.13 |
-| WH-FR-14 | LP Location Move | 5.14 |
-| WH-FR-15 | Movement Audit Trail | 5.15 |
-| WH-FR-16 | Partial Move (Split) | 5.16 |
-| WH-FR-17 | Destination Validation | 5.17 |
-| WH-FR-18 | Movement Types | 5.18 |
-| WH-FR-19 | Pallet Creation | 5.19 |
-| WH-FR-20 | Pallet LP Management | 5.20 |
-| WH-FR-21 | Pallet Move | 5.21 |
-| WH-FR-22 | Pallet Status | 5.22 |
-| WH-FR-23 | Scanner Guided Workflows | 5.23 |
-| WH-FR-24 | Scanner Barcode Validation | 5.24 |
-| WH-FR-25 | Scanner Feedback | 5.25 |
-| WH-FR-26 | Scanner Operations | 5.26 |
-| WH-FR-27 | Scanner Session Timeout | 5.27 |
-| WH-FR-28 | Forward/Backward Traceability | 5.28 |
-| WH-FR-29 | Genealogy Recording | 5.29 |
-| WH-FR-30 | Source Document Linking | 5.30 |
+This section maps all Functional Requirements from the Warehouse Module (PRD) to their implementing stories, ensuring 100% traceability.
 
-**Coverage:** 30 of 30 FRs (100%)
+| FR ID | FR Title | Story IDs | Status | Notes |
+|-------|----------|-----------|--------|-------|
+| WH-FR-01 | LP Creation with unique number | 5.1, 5.4 | ✅ Covered | License Plate creation + auto-numbering |
+| WH-FR-02 | LP Status Tracking | 5.2 | ✅ Covered | Available, Reserved, QA Hold, Consumed |
+| WH-FR-03 | LP Batch/Expiry Tracking | 5.3 | ✅ Covered | Batch number, MFG/EXP dates |
+| WH-FR-04 | LP Number Generation | 5.4 | ✅ Covered | Configurable LP# format |
+| WH-FR-05 | LP Split with Genealogy | 5.5 | ✅ Covered | Split LP with parent-child link |
+| WH-FR-06 | LP Merge | 5.6 | ✅ Covered | Merge multiple LPs |
+| WH-FR-07 | LP Genealogy Tracking | 5.7, 5.29 | ✅ Covered | FDA traceability (Sprint 0 Gap 2: ACs update) |
+| WH-FR-08 | Receive from PO/TO | 5.11, 5.32, 5.33, 5.34 | ✅ Covered | Desktop + Scanner receiving workflows |
+| WH-FR-09 | ASN Pre-fill | 5.8, 5.9 | ✅ Covered | ASN creation + item management |
+| WH-FR-10 | Over-receipt Validation | 5.10 | ✅ Covered | Prevent over-receiving |
+| WH-FR-11 | GRN and LP Creation | 5.11 | ✅ Covered | Atomic GRN+LP (Sprint 0 Gap 6: Atomicity AC) |
+| WH-FR-12 | Auto-print Labels | 5.12 | ✅ Covered | Print LP labels on creation |
+| WH-FR-13 | Update PO/TO Received Qty | 5.13 | ✅ Covered | Update source document qty |
+| WH-FR-14 | LP Location Move | 5.14 | ✅ Covered | Move LP between locations |
+| WH-FR-15 | Movement Audit Trail | 5.15 | ✅ Covered | Track all LP movements |
+| WH-FR-16 | Partial Move (Split) | 5.16 | ✅ Covered | Split LP during move |
+| WH-FR-17 | Destination Validation | 5.17 | ✅ Covered | Validate target location |
+| WH-FR-18 | Movement Types | 5.18 | ✅ Covered | Putaway, Pick, Transfer, Adjust |
+| WH-FR-19 | Pallet Creation | 5.19 | ✅ Covered | Create pallets (containers) |
+| WH-FR-20 | Pallet LP Management | 5.20 | ✅ Covered | Add/remove LPs from pallet |
+| WH-FR-21 | Pallet Move | 5.21 | ✅ Covered | Move entire pallet |
+| WH-FR-22 | Pallet Status | 5.22 | ✅ Covered | Pallet status tracking |
+| WH-FR-23 | Scanner Guided Workflows | 5.23 | ✅ Covered | Step-by-step scanner UX |
+| WH-FR-24 | Scanner Barcode Validation | 5.24 | ✅ Covered | Real-time barcode validation |
+| WH-FR-25 | Scanner Feedback | 5.25 | ✅ Covered | Visual/audio feedback |
+| WH-FR-26 | Scanner Operations | 5.26 | ✅ Covered | Scanner menu for all operations |
+| WH-FR-27 | Scanner Session Timeout | 5.27 | ✅ Covered | Auto-logout, offline support |
+| WH-FR-28 | Forward/Backward Traceability | 5.28 | ✅ Covered | Trace LP usage (forward/backward) |
+| WH-FR-29 | Genealogy Recording | 5.29 | ✅ Covered | Record parent-child relationships |
+| WH-FR-30 | Source Document Linking | 5.30 | ✅ Covered | Link LP to PO/TO/WO |
+
+**Coverage Summary:**
+- **Total FRs:** 30 (all P0)
+- **P0 FRs Covered:** 30/30 (100%)
+- **Total Stories:** 35 (includes technical/UX stories: 5.31, 5.34, 5.35)
+
+**Validation:**
+- ✅ All P0 functional requirements have at least one implementing story
+- ✅ No orphaned stories (all stories trace back to FRs or technical requirements)
+- ✅ WH-FR-07 flagged for Sprint 0 Gap 2 (LP Genealogy Integrity ACs)
+- ✅ WH-FR-11 flagged for Sprint 0 Gap 6 (GRN+LP Transaction Atomicity)
+- ✅ Story 5.7 critical for FDA compliance (genealogy tracking)
+
+**Reverse Traceability (Story → FR):**
+- Story 5.1 → WH-FR-01
+- Story 5.2 → WH-FR-02
+- Story 5.3 → WH-FR-03
+- Story 5.4 → WH-FR-01, WH-FR-04
+- Story 5.5 → WH-FR-05
+- Story 5.6 → WH-FR-06
+- Story 5.7 → WH-FR-07 (Sprint 0 Gap 2: Update ACs for error handling, atomicity, FK validation)
+- Story 5.8 → WH-FR-09
+- Story 5.9 → WH-FR-09
+- Story 5.10 → WH-FR-10
+- Story 5.11 → WH-FR-08, WH-FR-11 (Sprint 0 Gap 6: Add Transaction Atomicity AC)
+- Story 5.12 → WH-FR-12
+- Story 5.13 → WH-FR-13
+- Story 5.14 → WH-FR-14
+- Story 5.15 → WH-FR-15
+- Story 5.16 → WH-FR-16
+- Story 5.17 → WH-FR-17
+- Story 5.18 → WH-FR-18
+- Story 5.19 → WH-FR-19
+- Story 5.20 → WH-FR-20
+- Story 5.21 → WH-FR-21
+- Story 5.22 → WH-FR-22
+- Story 5.23 → WH-FR-23
+- Story 5.24 → WH-FR-24
+- Story 5.25 → WH-FR-25
+- Story 5.26 → WH-FR-26
+- Story 5.27 → WH-FR-27
+- Story 5.28 → WH-FR-28
+- Story 5.29 → WH-FR-07, WH-FR-29
+- Story 5.30 → WH-FR-30
+- Story 5.31 → Technical (Warehouse Settings Configuration)
+- Story 5.32 → WH-FR-08 (Desktop Receive from PO)
+- Story 5.33 → WH-FR-08 (Desktop Receive from TO)
+- Story 5.34 → WH-FR-08 (Scanner Receive Workflow)
+- Story 5.35 → Technical (Inventory Count - future cycle counting)
+
+**Sprint 0 Gap References:**
+- **Gap 2 (LP Genealogy Integrity):** Story 5.7 requires enhanced ACs for transaction rollback, FK validation, trace verification
+- **Gap 6 (Transaction Atomicity):** Story 5.11 (GRN+LP) requires atomic creation with rollback on failure
+
+---

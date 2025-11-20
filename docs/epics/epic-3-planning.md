@@ -641,25 +641,66 @@ So that PO/TO/WO behavior matches our process.
 
 ---
 
-## FR Coverage
+## FR Coverage Matrix
 
-| FR ID | Requirement | Stories |
-|-------|-------------|---------|
-| FR-PLAN-001 | PO CRUD | 3.1, 3.2 |
-| FR-PLAN-002 | Bulk PO Creation | 3.3 |
-| FR-PLAN-003 | PO Approval Workflow | 3.4 |
-| FR-PLAN-004 | Configurable PO Statuses | 3.5, 3.19 |
-| FR-PLAN-005 | TO CRUD | 3.6, 3.7 |
-| FR-PLAN-006 | Partial Shipments | 3.8 |
-| FR-PLAN-007 | LP Selection for TO | 3.9 |
-| FR-PLAN-008 | WO CRUD | 3.10 |
-| FR-PLAN-009 | BOM Auto-Selection | 3.11 |
-| FR-PLAN-010 | Material Availability Check | 3.13 |
-| FR-PLAN-011 | Routing Copy to WO | 3.14 |
-| FR-PLAN-012 | Configurable WO Statuses | 3.15 |
-| FR-PLAN-013 | Supplier Management | 3.17, 3.18 |
-| FR-PLAN-014 | Demand Forecasting | Phase 2 |
-| FR-PLAN-015 | Auto-Generate PO | Phase 2 |
-| FR-PLAN-016 | Auto-Schedule WO | Phase 2 |
+This section maps all Functional Requirements from the Planning Module (PRD) to their implementing stories, ensuring 100% traceability.
 
-**Coverage:** 13 of 16 FRs (3 deferred to Phase 2)
+| FR ID | FR Title | Story IDs | Status | Notes |
+|-------|----------|-----------|--------|-------|
+| FR-PLAN-001 | PO CRUD | 3.1, 3.2 | ✅ Covered | Purchase Order header + line items |
+| FR-PLAN-002 | Bulk PO Creation | 3.3 | ✅ Covered | CSV/Excel import, spreadsheet mode |
+| FR-PLAN-003 | PO Approval Workflow | 3.4 | ✅ Covered | Multi-level approval, notifications |
+| FR-PLAN-004 | Configurable PO Statuses | 3.5, 3.19 | ✅ Covered | Custom statuses + lifecycle UX |
+| FR-PLAN-005 | TO CRUD | 3.6, 3.7 | ✅ Covered | Transfer Order header + line items |
+| FR-PLAN-006 | Partial Shipments | 3.8 | ✅ Covered | Split TO, multiple shipments |
+| FR-PLAN-007 | LP Selection for TO | 3.9 | ✅ Covered | Select specific LPs for transfer |
+| FR-PLAN-008 | WO CRUD | 3.10 | ✅ Covered | Work Order creation |
+| FR-PLAN-009 | BOM Auto-Selection | 3.11, 3.12 | ✅ Covered | Auto-select BOM + snapshot immutability |
+| FR-PLAN-010 | Material Availability Check | 3.13 | ✅ Covered | Check stock before WO creation |
+| FR-PLAN-011 | Routing Copy to WO | 3.14 | ✅ Covered | Copy routing operations to WO |
+| FR-PLAN-012 | Configurable WO Statuses | 3.15 | ✅ Covered | Custom WO statuses |
+| FR-PLAN-013 | Supplier Management | 3.17, 3.18 | ✅ Covered | Supplier CRUD + product assignments |
+| FR-PLAN-014 | Demand Forecasting | _(Phase 2)_ | ⏸️ Deferred | AI-based forecasting (not P0) |
+| FR-PLAN-015 | Auto-Generate PO | _(Phase 2)_ | ⏸️ Deferred | Auto PO from forecast (not P0) |
+| FR-PLAN-016 | Auto-Schedule WO | _(Phase 2)_ | ⏸️ Deferred | Auto WO scheduling (not P0) |
+
+**Coverage Summary:**
+- **Total FRs:** 16 (13 P0 + 3 Phase 2)
+- **P0 FRs Covered:** 13/13 (100%)
+- **Phase 2 FRs:** 3 (FR-PLAN-014, 015, 016 deferred to Growth phase)
+- **Total Stories:** 22 (includes UX enhancements: 3.16, 3.20, 3.21, 3.22)
+
+**Validation:**
+- ✅ All P0 functional requirements have at least one implementing story
+- ✅ No orphaned stories (all stories trace back to FRs or UX requirements)
+- ✅ FR-PLAN-001 split into 2 stories (PO header vs line items)
+- ✅ FR-PLAN-004 has UX enhancement (3.19 Status Lifecycle)
+- ✅ FR-PLAN-005 split into 2 stories (TO header vs line items)
+- ✅ FR-PLAN-009 enhanced with 3.12 (BOM snapshot immutability - Gap 3 fix)
+- ✅ FR-PLAN-013 split into 2 stories (Supplier CRUD vs Product assignments)
+
+**Reverse Traceability (Story → FR):**
+- Story 3.1 → FR-PLAN-001
+- Story 3.2 → FR-PLAN-001
+- Story 3.3 → FR-PLAN-002
+- Story 3.4 → FR-PLAN-003
+- Story 3.5 → FR-PLAN-004
+- Story 3.6 → FR-PLAN-005
+- Story 3.7 → FR-PLAN-005
+- Story 3.8 → FR-PLAN-006
+- Story 3.9 → FR-PLAN-007
+- Story 3.10 → FR-PLAN-008
+- Story 3.11 → FR-PLAN-009
+- Story 3.12 → FR-PLAN-009 (Sprint 0 Gap 3: BOM Snapshot Immutability)
+- Story 3.13 → FR-PLAN-010
+- Story 3.14 → FR-PLAN-011
+- Story 3.15 → FR-PLAN-012
+- Story 3.16 → UX Design (WO Source of Demand)
+- Story 3.17 → FR-PLAN-013
+- Story 3.18 → FR-PLAN-013
+- Story 3.19 → FR-PLAN-004 (UX: PO Status Lifecycle)
+- Story 3.20 → UX Design (TO Status Lifecycle)
+- Story 3.21 → UX Design (WO Gantt View)
+- Story 3.22 → UX Design (Planning Settings)
+
+---

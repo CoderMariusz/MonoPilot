@@ -772,35 +772,78 @@ So that I monitor daily operations.
 
 ---
 
-## FR Coverage
+## FR Coverage Matrix
 
-| FR ID | Requirement | Stories |
-|-------|-------------|---------|
-| SH-FR-01 | Create Sales Orders | 7.1, 7.3 |
-| SH-FR-02 | Track SO Status | 7.2 |
-| SH-FR-03 | SO Line-Level Status | 7.3 |
-| SH-FR-04 | Calculate Available Inventory | 7.4 |
-| SH-FR-05 | Create Shipments | 7.5 |
-| SH-FR-06 | Consolidate SOs | 7.6 |
-| SH-FR-07 | Track Shipment Status | 7.7 |
-| SH-FR-08 | Record Carrier & Tracking | 7.8 |
-| SH-FR-09 | Generate Pick Lists | 7.9 |
-| SH-FR-10 | LP Picking Strategy | 7.10 |
-| SH-FR-11 | Picker Assignment | 7.11 |
-| SH-FR-12 | Handle Pick Shorts | 7.12 |
-| SH-FR-13 | Update SO Picked Qty | 7.13 |
-| SH-FR-14 | Only Pick QA Passed LPs | 7.14 |
-| SH-FR-15 | Create Packages | 7.15 |
-| SH-FR-16 | Track Package Items | 7.16 |
-| SH-FR-17 | Record Package Weight | 7.17 |
-| SH-FR-18 | Generate Pick Lists | 7.18 |
-| SH-FR-19 | Generate Packing Slips | 7.19 |
-| SH-FR-20 | Generate Shipping Labels | 7.20 |
-| SH-FR-21 | Print Label Support | 7.21 |
-| SH-FR-22 | Scanner Picking Workflow | 7.22 |
-| SH-FR-23 | Scanner Packing Workflow | 7.23 |
-| SH-FR-24 | Scanner Item Validation | 7.24 |
-| SH-FR-25 | Open Orders Report | 7.25 |
-| SH-FR-26 | Shipping Performance Report | 7.26 |
+This section maps all Functional Requirements from the Shipping Module (PRD) to their implementing stories, ensuring 100% traceability.
 
-**Coverage:** 26 of 26 FRs (100%)
+| FR ID | FR Title | Story IDs | Status | Notes |
+|-------|----------|-----------|--------|-------|
+| SH-FR-01 | Create Sales Orders | 7.1, 7.3 | ✅ Covered | SO header + line items |
+| SH-FR-02 | Track SO Status | 7.2 | ✅ Covered | Draft, Confirmed, Picking, Packed, Shipped, Delivered |
+| SH-FR-03 | SO Line-Level Status | 7.3 | ✅ Covered | Track status per line item |
+| SH-FR-04 | Calculate Available Inventory | 7.4 | ✅ Covered | Real-time stock availability check |
+| SH-FR-05 | Create Shipments | 7.5 | ✅ Covered | Create shipment from SO |
+| SH-FR-06 | Consolidate SOs | 7.6 | ✅ Covered | Combine multiple SOs into single shipment |
+| SH-FR-07 | Track Shipment Status | 7.7 | ✅ Covered | Created, Picking, Packed, Dispatched, Delivered |
+| SH-FR-08 | Record Carrier & Tracking | 7.8 | ✅ Covered | Carrier, tracking number, dispatch date |
+| SH-FR-09 | Generate Pick Lists | 7.9, 7.18 | ✅ Covered | Desktop + Scanner pick list generation |
+| SH-FR-10 | LP Picking Strategy | 7.10 | ✅ Covered | FIFO, FEFO, LIFO, Manual |
+| SH-FR-11 | Picker Assignment | 7.11 | ✅ Covered | Assign pickers to pick lists |
+| SH-FR-12 | Handle Pick Shorts | 7.12 | ✅ Covered | Partial pick, backorder, substitute |
+| SH-FR-13 | Update SO Picked Qty | 7.13 | ✅ Covered | Update SO with picked quantities |
+| SH-FR-14 | Only Pick QA Passed LPs | 7.14 | ✅ Covered | Block picking of non-Passed LPs (integration with QA module) |
+| SH-FR-15 | Create Packages | 7.15 | ✅ Covered | Create shipping packages |
+| SH-FR-16 | Track Package Items | 7.16 | ✅ Covered | Track items in each package |
+| SH-FR-17 | Record Package Weight | 7.17 | ✅ Covered | Weight, dimensions for shipping |
+| SH-FR-18 | Generate Packing Slips | 7.19 | ✅ Covered | PDF packing slip generation |
+| SH-FR-19 | Generate Shipping Labels | 7.20 | ✅ Covered | PDF/ZPL shipping label generation |
+| SH-FR-20 | Print Label Support | 7.21 | ✅ Covered | Print to thermal/desktop printers |
+| SH-FR-21 | Scanner Picking Workflow | 7.22 | ✅ Covered | Mobile picking with barcode scanning |
+| SH-FR-22 | Scanner Packing Workflow | 7.23 | ✅ Covered | Mobile packing with barcode scanning |
+| SH-FR-23 | Scanner Item Validation | 7.24 | ✅ Covered | Validate scanned items vs pick list |
+| SH-FR-24 | Open Orders Report | 7.25 | ✅ Covered | Report of open SOs |
+| SH-FR-25 | Shipping Performance Report | 7.26 | ✅ Covered | On-time delivery, pick accuracy |
+
+**Coverage Summary:**
+- **Total FRs:** 25 (all P0)
+- **P0 FRs Covered:** 25/25 (100%)
+- **Total Stories:** 28 (includes technical/UX stories: 7.27, 7.28)
+
+**Validation:**
+- ✅ All P0 functional requirements have at least one implementing story
+- ✅ No orphaned stories (all stories trace back to FRs or technical requirements)
+- ✅ SH-FR-01 split into 2 stories (SO header vs line items)
+- ✅ SH-FR-09 has desktop (7.9) and scanner (7.18) implementations
+- ✅ Story 7.14 critical integration with Quality module (QA status blocking)
+
+**Reverse Traceability (Story → FR):**
+- Story 7.1 → SH-FR-01
+- Story 7.2 → SH-FR-02
+- Story 7.3 → SH-FR-01, SH-FR-03
+- Story 7.4 → SH-FR-04
+- Story 7.5 → SH-FR-05
+- Story 7.6 → SH-FR-06
+- Story 7.7 → SH-FR-07
+- Story 7.8 → SH-FR-08
+- Story 7.9 → SH-FR-09
+- Story 7.10 → SH-FR-10
+- Story 7.11 → SH-FR-11
+- Story 7.12 → SH-FR-12
+- Story 7.13 → SH-FR-13
+- Story 7.14 → SH-FR-14 (Integration with Quality module)
+- Story 7.15 → SH-FR-15
+- Story 7.16 → SH-FR-16
+- Story 7.17 → SH-FR-17
+- Story 7.18 → SH-FR-09 (Scanner variant)
+- Story 7.19 → SH-FR-18
+- Story 7.20 → SH-FR-19
+- Story 7.21 → SH-FR-20
+- Story 7.22 → SH-FR-21
+- Story 7.23 → SH-FR-22
+- Story 7.24 → SH-FR-23
+- Story 7.25 → SH-FR-24
+- Story 7.26 → SH-FR-25
+- Story 7.27 → Technical (Shipping Settings Configuration)
+- Story 7.28 → UX Design (Shipping Dashboard)
+
+---
