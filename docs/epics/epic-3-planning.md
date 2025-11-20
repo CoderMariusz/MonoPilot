@@ -641,25 +641,205 @@ So that PO/TO/WO behavior matches our process.
 
 ---
 
-## FR Coverage
+## Story 3.23: Verify BOM Snapshot Immutability (Sprint 0 - Gap 3)
 
-| FR ID | Requirement | Stories |
-|-------|-------------|---------|
-| FR-PLAN-001 | PO CRUD | 3.1, 3.2 |
-| FR-PLAN-002 | Bulk PO Creation | 3.3 |
-| FR-PLAN-003 | PO Approval Workflow | 3.4 |
-| FR-PLAN-004 | Configurable PO Statuses | 3.5, 3.19 |
-| FR-PLAN-005 | TO CRUD | 3.6, 3.7 |
-| FR-PLAN-006 | Partial Shipments | 3.8 |
-| FR-PLAN-007 | LP Selection for TO | 3.9 |
-| FR-PLAN-008 | WO CRUD | 3.10 |
-| FR-PLAN-009 | BOM Auto-Selection | 3.11 |
-| FR-PLAN-010 | Material Availability Check | 3.13 |
-| FR-PLAN-011 | Routing Copy to WO | 3.14 |
-| FR-PLAN-012 | Configurable WO Statuses | 3.15 |
-| FR-PLAN-013 | Supplier Management | 3.17, 3.18 |
-| FR-PLAN-014 | Demand Forecasting | Phase 2 |
-| FR-PLAN-015 | Auto-Generate PO | Phase 2 |
-| FR-PLAN-016 | Auto-Schedule WO | Phase 2 |
+As a **QA Engineer**,
+I want to verify that WO materials remain unchanged when BOM is updated,
+So that production uses the correct recipe snapshot.
 
-**Coverage:** 13 of 16 FRs (3 deferred to Phase 2)
+**Acceptance Criteria:**
+
+**AC 1: BOM Update Does Not Affect Existing WO**
+
+**Given** BOM for "Chocolate Bar 100g":
+- Version 1 (effective 2025-01-01): Cocoa 0.5kg, Sugar 0.3kg per bar
+- Status: Active
+
+**And** WO #1234 created on 2025-01-15:
+- Product: Chocolate Bar
+- BOM Snapshot: Version 1 (locked at WO creation)
+- WO Status: "Draft"
+- wo_materials table:
+  - Cocoa: 5kg (for 10 bars × 0.5kg)
+  - Sugar: 3kg (for 10 bars × 0.3kg)
+
+**When** BOM is updated on 2025-01-20:
+- Version 2 created (effective 2025-01-20): Cocoa 0.6kg, Sugar 0.2kg per bar
+- Version 1 archived (effective_to = 2025-01-19)
+
+**Then** verify WO materials unchanged:
+- ✅ WO #1234 `wo_materials` still shows:
+  - Cocoa: 5kg (NOT 6kg from new BOM)
+  - Sugar: 3kg (NOT 2kg from new BOM)
+- ✅ WO UI displays: "⚠️ BOM Snapshot: Version 1 (2025-01-01 to 2025-01-19) - Original BOM archived, WO using snapshot."
+- ✅ WO can still be produced with old recipe (snapshot immutable)
+- ✅ Database integrity: `wo_materials` table has NO CASCADE UPDATE from BOM changes
+
+**AC 2: New WO Uses Updated BOM**
+
+**Given** Same scenario (BOM Version 2 active from 2025-01-20)
+**When** creating NEW WO on 2025-01-21:
+- Product: Chocolate Bar
+- Quantity: 10 bars
+
+**Then** verify new WO uses latest BOM:
+- ✅ BOM Auto-Selection picks Version 2 (active on 2025-01-21)
+- ✅ `wo_materials` table:
+  - Cocoa: 6kg (10 bars × 0.6kg - NEW recipe)
+  - Sugar: 2kg (10 bars × 0.2kg - NEW recipe)
+- ✅ WO UI displays: "BOM Snapshot: Version 2 (active from 2025-01-20)"
+
+**AC 3: WO Released Status Locks Materials**
+
+**Given** WO #1234 with materials from BOM Version 1
+**When** WO status changes to "Released" (ready for production)
+**Then** verify materials locked:
+- ✅ `wo_materials` becomes READ-ONLY (no UPDATE allowed)
+- ❌ Attempting to edit `wo_materials.qty` fails with error: "Cannot modify materials: WO is Released. Materials are locked."
+- ✅ Even if BOM updates, `wo_materials` cannot change (double lock: snapshot + status)
+
+**AC 4: UI Shows BOM Version Indicator**
+
+**Given** WO #1234 (using BOM Version 1)
+**When** viewing WO details page
+**Then** verify UI indicators:
+- ✅ BOM Version badge: "BOM v1 (2025-01-01)"
+- ✅ Effective date range: "Valid: 2025-01-01 to 2025-01-19"
+- ✅ Archive warning (if BOM archived): "⚠️ Original BOM archived. WO using snapshot. View archived BOM →"
+- ✅ Click "View archived BOM" opens modal with BOM Version 1 details
+
+**AC 5: Compare WO Snapshot vs Current BOM**
+
+**Given** WO #1234 (BOM v1) and current BOM (v2)
+**When** clicking "Compare to Current BOM"
+**Then** verify diff view:
+- ✅ Side-by-side comparison:
+  - **WO Snapshot (v1)**: Cocoa 0.5kg, Sugar 0.3kg
+  - **Current BOM (v2)**: Cocoa 0.6kg, Sugar 0.2kg
+- ✅ Differences highlighted:
+  - Cocoa: 0.5kg → 0.6kg (+20% change) - RED
+  - Sugar: 0.3kg → 0.2kg (-33% change) - YELLOW
+- ⚠️ Warning: "WO materials differ from current BOM. Production will use WO snapshot (v1)."
+
+**AC 6: Transaction Atomicity - WO Creation with Snapshot**
+
+**Given** WO creation in progress
+**When** BOM snapshot is being copied to `wo_materials`:
+1. START transaction
+2. INSERT WO record
+3. INSERT wo_materials (copy all bom_items)
+4. COMMIT transaction
+
+**If** bom_items are deleted/modified mid-transaction (concurrent BOM edit)
+**Then** verify rollback:
+- ❌ WO creation fails with error: "BOM was modified during WO creation. Please retry."
+- ✅ No WO record created
+- ✅ No wo_materials records created
+- ✅ User can retry with latest BOM
+
+**AC 7: Genealogy Tracks BOM Version**
+
+**Given** WO #1234 completed (used BOM v1)
+**And** Output LP created: LP-003 (Chocolate Bar)
+**When** querying genealogy for LP-003
+**Then** verify BOM version metadata:
+- ✅ `lp_genealogy.metadata` includes: `bom_version: 'v1'`
+- ✅ Can trace back to exact BOM used in production
+- ✅ FDA compliance: Full auditability of recipe version
+
+**AC 8: E2E Test - BOM Update Scenario**
+
+**Test Flow:**
+1. Create BOM v1 for Chocolate Bar (Cocoa 0.5kg, Sugar 0.3kg)
+2. Create WO #1234 (10 bars) → Snapshot BOM v1
+3. Start WO (status = "In Progress")
+4. Update BOM → Create v2 (Cocoa 0.6kg, Sugar 0.2kg)
+5. Archive BOM v1
+6. Verify WO #1234 still shows v1 materials (5kg Cocoa, 3kg Sugar)
+7. Complete WO #1234 with v1 materials
+8. Create NEW WO #1235 (10 bars) → Snapshot BOM v2
+9. Verify WO #1235 shows v2 materials (6kg Cocoa, 2kg Sugar)
+10. Both WOs produce correctly with their respective snapshots
+
+**Success Criteria:**
+- ✅ Both WOs complete successfully
+- ✅ WO #1234 uses v1 materials (snapshot immutable)
+- ✅ WO #1235 uses v2 materials (latest BOM)
+- ✅ No data corruption or cross-contamination
+
+**Prerequisites:** Stories 3.10, 3.11, 3.12, Story 2.6 (BOM CRUD)
+
+**Technical Notes:**
+- Test type: E2E Integration Test (Playwright)
+- Test file: `e2e/integration/bom-snapshot-immutability.spec.ts`
+- Database check: `wo_materials` table has NO FK CASCADE UPDATE to `bom_items`
+- UI Component: BOM Version Indicator (displays version badge + diff view)
+- Gap Resolution: Addresses Gap 3 from Solutioning Gate Check
+
+**Reference:** docs/readiness-assessment/3-gaps-and-risks.md (Gap 3)
+
+---
+
+## FR Coverage Matrix
+
+This section maps all Functional Requirements from the Planning Module (PRD) to their implementing stories, ensuring 100% traceability.
+
+| FR ID | FR Title | Story IDs | Status | Notes |
+|-------|----------|-----------|--------|-------|
+| FR-PLAN-001 | PO CRUD | 3.1, 3.2 | ✅ Covered | Purchase Order header + line items |
+| FR-PLAN-002 | Bulk PO Creation | 3.3 | ✅ Covered | CSV/Excel import, spreadsheet mode |
+| FR-PLAN-003 | PO Approval Workflow | 3.4 | ✅ Covered | Multi-level approval, notifications |
+| FR-PLAN-004 | Configurable PO Statuses | 3.5, 3.19 | ✅ Covered | Custom statuses + lifecycle UX |
+| FR-PLAN-005 | TO CRUD | 3.6, 3.7 | ✅ Covered | Transfer Order header + line items |
+| FR-PLAN-006 | Partial Shipments | 3.8 | ✅ Covered | Split TO, multiple shipments |
+| FR-PLAN-007 | LP Selection for TO | 3.9 | ✅ Covered | Select specific LPs for transfer |
+| FR-PLAN-008 | WO CRUD | 3.10 | ✅ Covered | Work Order creation |
+| FR-PLAN-009 | BOM Auto-Selection | 3.11, 3.12 | ✅ Covered | Auto-select BOM + snapshot immutability |
+| FR-PLAN-010 | Material Availability Check | 3.13 | ✅ Covered | Check stock before WO creation |
+| FR-PLAN-011 | Routing Copy to WO | 3.14 | ✅ Covered | Copy routing operations to WO |
+| FR-PLAN-012 | Configurable WO Statuses | 3.15 | ✅ Covered | Custom WO statuses |
+| FR-PLAN-013 | Supplier Management | 3.17, 3.18 | ✅ Covered | Supplier CRUD + product assignments |
+| FR-PLAN-014 | Demand Forecasting | _(Phase 2)_ | ⏸️ Deferred | AI-based forecasting (not P0) |
+| FR-PLAN-015 | Auto-Generate PO | _(Phase 2)_ | ⏸️ Deferred | Auto PO from forecast (not P0) |
+| FR-PLAN-016 | Auto-Schedule WO | _(Phase 2)_ | ⏸️ Deferred | Auto WO scheduling (not P0) |
+
+**Coverage Summary:**
+- **Total FRs:** 16 (13 P0 + 3 Phase 2)
+- **P0 FRs Covered:** 13/13 (100%)
+- **Phase 2 FRs:** 3 (FR-PLAN-014, 015, 016 deferred to Growth phase)
+- **Total Stories:** 22 (includes UX enhancements: 3.16, 3.20, 3.21, 3.22)
+
+**Validation:**
+- ✅ All P0 functional requirements have at least one implementing story
+- ✅ No orphaned stories (all stories trace back to FRs or UX requirements)
+- ✅ FR-PLAN-001 split into 2 stories (PO header vs line items)
+- ✅ FR-PLAN-004 has UX enhancement (3.19 Status Lifecycle)
+- ✅ FR-PLAN-005 split into 2 stories (TO header vs line items)
+- ✅ FR-PLAN-009 enhanced with 3.12 (BOM snapshot immutability - Gap 3 fix)
+- ✅ FR-PLAN-013 split into 2 stories (Supplier CRUD vs Product assignments)
+
+**Reverse Traceability (Story → FR):**
+- Story 3.1 → FR-PLAN-001
+- Story 3.2 → FR-PLAN-001
+- Story 3.3 → FR-PLAN-002
+- Story 3.4 → FR-PLAN-003
+- Story 3.5 → FR-PLAN-004
+- Story 3.6 → FR-PLAN-005
+- Story 3.7 → FR-PLAN-005
+- Story 3.8 → FR-PLAN-006
+- Story 3.9 → FR-PLAN-007
+- Story 3.10 → FR-PLAN-008
+- Story 3.11 → FR-PLAN-009
+- Story 3.12 → FR-PLAN-009 (Sprint 0 Gap 3: BOM Snapshot Immutability)
+- Story 3.13 → FR-PLAN-010
+- Story 3.14 → FR-PLAN-011
+- Story 3.15 → FR-PLAN-012
+- Story 3.16 → UX Design (WO Source of Demand)
+- Story 3.17 → FR-PLAN-013
+- Story 3.18 → FR-PLAN-013
+- Story 3.19 → FR-PLAN-004 (UX: PO Status Lifecycle)
+- Story 3.20 → UX Design (TO Status Lifecycle)
+- Story 3.21 → UX Design (WO Gantt View)
+- Story 3.22 → UX Design (Planning Settings)
+
+---

@@ -796,35 +796,78 @@ So that common tests are reusable.
 
 ---
 
-## FR Coverage
+## FR Coverage Matrix
 
-| FR ID | Requirement | Stories |
-|-------|-------------|---------|
-| QC-FR-01 | LP QA Status Tracking | 6.1 |
-| QC-FR-02 | Status Transition Enforcement | 6.2 |
-| QC-FR-03 | Prevent Shipping Non-Passed LPs | 6.3 |
-| QC-FR-04 | Control Consumption of Pending | 6.4 |
-| QC-FR-05 | QA Change Audit Trail | 6.5 |
-| QC-FR-06 | Create Quality Holds | 6.6 |
-| QC-FR-07 | Move to Quarantine | 6.6 |
-| QC-FR-08 | Hold Notifications | 6.7 |
-| QC-FR-09 | Hold Release Approval | 6.8 |
-| QC-FR-10 | Hold Investigation Tracking | 6.9 |
-| QC-FR-11 | Define Product Specifications | 6.10 |
-| QC-FR-12 | Support Multiple Spec Types | 6.10 |
-| QC-FR-13 | Auto-Calculate Pass/Fail | 6.11 |
-| QC-FR-14 | Record Test Results | 6.12 |
-| QC-FR-15 | Test History Per LP | 6.13 |
-| QC-FR-16 | Compare Results to Specs | 6.14 |
-| QC-FR-17 | Create NCRs | 6.15 |
-| QC-FR-18 | NCR Lifecycle Tracking | 6.16 |
-| QC-FR-19 | Link NCRs to Documents | 6.17 |
-| QC-FR-20 | Root Cause & Corrective Actions | 6.18 |
-| QC-FR-21 | Upload and Store CoAs | 6.19 |
-| QC-FR-22 | Require CoA on Receipt | 6.20 |
-| QC-FR-23 | CoA Verification Tracking | 6.21 |
-| QC-FR-24 | Quality Dashboard | 6.22 |
-| QC-FR-25 | Generate Quality Reports | 6.23 |
-| QC-FR-26 | Export Reports to PDF/Excel | 6.24 |
+This section maps all Functional Requirements from the Quality Module (PRD) to their implementing stories, ensuring 100% traceability.
 
-**Coverage:** 26 of 26 FRs (100%)
+| FR ID | FR Title | Story IDs | Status | Notes |
+|-------|----------|-----------|--------|-------|
+| QC-FR-01 | LP QA Status Tracking | 6.1 | ✅ Covered | Pending, Passed, Failed, Hold |
+| QC-FR-02 | Status Transition Enforcement | 6.2 | ✅ Covered | State machine for QA status |
+| QC-FR-03 | Prevent Shipping Non-Passed LPs | 6.3 | ✅ Covered | Block consumption/shipping if not Passed |
+| QC-FR-04 | Control Consumption of Pending | 6.4 | ✅ Covered | Configurable: allow/block Pending consumption |
+| QC-FR-05 | QA Change Audit Trail | 6.5 | ✅ Covered | Track all QA status changes |
+| QC-FR-06 | Create Quality Holds | 6.6 | ✅ Covered | Hold creation + move to quarantine |
+| QC-FR-07 | Move to Quarantine | 6.6 | ✅ Covered | Auto-move held LPs to quarantine location |
+| QC-FR-08 | Hold Notifications | 6.7 | ✅ Covered | Email/in-app notifications for holds |
+| QC-FR-09 | Hold Release Approval | 6.8 | ✅ Covered | Approval workflow for hold release |
+| QC-FR-10 | Hold Investigation Tracking | 6.9 | ✅ Covered | Investigation notes, evidence |
+| QC-FR-11 | Define Product Specifications | 6.10 | ✅ Covered | Create product specs (tests, limits) |
+| QC-FR-12 | Support Multiple Spec Types | 6.10 | ✅ Covered | Numeric, text, pass/fail, visual |
+| QC-FR-13 | Auto-Calculate Pass/Fail | 6.11 | ✅ Covered | Auto pass/fail for numeric tests |
+| QC-FR-14 | Record Test Results | 6.12 | ✅ Covered | Record test results against LPs |
+| QC-FR-15 | Test History Per LP | 6.13 | ✅ Covered | Full test history timeline |
+| QC-FR-16 | Compare Results to Specs | 6.14 | ✅ Covered | Compare actual vs spec limits |
+| QC-FR-17 | Create NCRs | 6.15 | ✅ Covered | Non-Conformance Report creation |
+| QC-FR-18 | NCR Lifecycle Tracking | 6.16 | ✅ Covered | NCR statuses, lifecycle |
+| QC-FR-19 | Link NCRs to Documents | 6.17 | ✅ Covered | Link NCR to LP/PO/WO/Supplier |
+| QC-FR-20 | Root Cause & Corrective Actions | 6.18 | ✅ Covered | Root cause analysis, CAPA tracking |
+| QC-FR-21 | Upload and Store CoAs | 6.19 | ✅ Covered | Upload CoA PDFs, store in Supabase |
+| QC-FR-22 | Require CoA on Receipt | 6.20 | ✅ Covered | Configurable: require CoA for GRN |
+| QC-FR-23 | CoA Verification Tracking | 6.21 | ✅ Covered | Track CoA verification status |
+| QC-FR-24 | Quality Dashboard | 6.22 | ✅ Covered | Real-time QA metrics, charts |
+| QC-FR-25 | Generate Quality Reports | 6.23 | ✅ Covered | NCR reports, CoA reports, hold reports |
+| QC-FR-26 | Export Reports to PDF/Excel | 6.24 | ✅ Covered | Export quality reports |
+
+**Coverage Summary:**
+- **Total FRs:** 26 (all P0)
+- **P0 FRs Covered:** 26/26 (100%)
+- **Total Stories:** 28 (includes technical/UX stories: 6.25-6.28)
+
+**Validation:**
+- ✅ All P0 functional requirements have at least one implementing story
+- ✅ No orphaned stories (all stories trace back to FRs or technical requirements)
+- ✅ QC-FR-06 and QC-FR-07 merged into single Story 6.6 (Hold Creation + Quarantine)
+- ✅ Story 6.3 critical integration point with Warehouse module (blocks consumption/shipping)
+
+**Reverse Traceability (Story → FR):**
+- Story 6.1 → QC-FR-01
+- Story 6.2 → QC-FR-02
+- Story 6.3 → QC-FR-03
+- Story 6.4 → QC-FR-04
+- Story 6.5 → QC-FR-05
+- Story 6.6 → QC-FR-06, QC-FR-07
+- Story 6.7 → QC-FR-08
+- Story 6.8 → QC-FR-09
+- Story 6.9 → QC-FR-10
+- Story 6.10 → QC-FR-11, QC-FR-12
+- Story 6.11 → QC-FR-13
+- Story 6.12 → QC-FR-14
+- Story 6.13 → QC-FR-15
+- Story 6.14 → QC-FR-16
+- Story 6.15 → QC-FR-17
+- Story 6.16 → QC-FR-18
+- Story 6.17 → QC-FR-19
+- Story 6.18 → QC-FR-20
+- Story 6.19 → QC-FR-21
+- Story 6.20 → QC-FR-22
+- Story 6.21 → QC-FR-23
+- Story 6.22 → QC-FR-24
+- Story 6.23 → QC-FR-25
+- Story 6.24 → QC-FR-26
+- Story 6.25 → Technical (Quality Settings Configuration)
+- Story 6.26 → UX Design (Quality Hold Workflow visualization)
+- Story 6.27 → UX Design (NCR Workflow visualization)
+- Story 6.28 → UX Design (Quality Test Templates)
+
+---

@@ -421,3 +421,48 @@ So that I don't miss any important configuration.
 
 ---
 
+## FR Coverage Matrix
+
+This section maps all Functional Requirements from the Settings Module (PRD) to their implementing stories, ensuring 100% traceability.
+
+| FR ID | FR Title | Story IDs | Status | Notes |
+|-------|----------|-----------|--------|-------|
+| FR-SET-001 | Organization Configuration | 1.1 | ✅ Covered | Company settings, logo, regional config |
+| FR-SET-002 | User Management | 1.2, 1.3 | ✅ Covered | CRUD + Invitations (email/QR) |
+| FR-SET-003 | Session Management | 1.4 | ✅ Covered | Active sessions, device tracking, logout |
+| FR-SET-004 | Warehouse Configuration | 1.5 | ✅ Covered | Multi-warehouse support |
+| FR-SET-005 | Location Management | 1.6 | ✅ Covered | Hierarchical locations, QR codes |
+| FR-SET-006 | Machine Configuration | 1.7 | ✅ Covered | Machine CRUD, production line assignment |
+| FR-SET-007 | Production Line Configuration | 1.8 | ✅ Covered | Production lines, machine groups |
+| FR-SET-008 | Allergen Management | 1.9 | ✅ Covered | 14 EU allergens, custom allergens |
+| FR-SET-009 | Tax Code Configuration | 1.10 | ✅ Covered | VAT rates, tax categories |
+| FR-SET-010 | Module Activation | 1.11 | ✅ Covered | Enable/disable modules (Planning, Production, Warehouse, etc.) |
+| FR-SET-011 | Subscription Management | _(Phase 2)_ | ⏸️ Deferred | Stripe integration, billing (not P0) |
+
+**Coverage Summary:**
+- **Total FRs:** 11 (10 P0 + 1 Phase 2)
+- **P0 FRs Covered:** 10/10 (100%)
+- **Phase 2 FRs:** 1 (FR-SET-011 deferred to Growth phase)
+- **Total Stories:** 12 (includes UX enhancement Story 1.12)
+
+**Validation:**
+- ✅ All P0 functional requirements have at least one implementing story
+- ✅ No orphaned stories (all stories trace back to FRs or UX requirements)
+- ✅ FR-SET-002 appropriately split into 2 stories (CRUD vs Invitations)
+
+**Reverse Traceability (Story → FR):**
+- Story 1.1 → FR-SET-001
+- Story 1.2 → FR-SET-002
+- Story 1.3 → FR-SET-002
+- Story 1.4 → FR-SET-003
+- Story 1.5 → FR-SET-004
+- Story 1.6 → FR-SET-005
+- Story 1.7 → FR-SET-006
+- Story 1.8 → FR-SET-007
+- Story 1.9 → FR-SET-008
+- Story 1.10 → FR-SET-009
+- Story 1.11 → FR-SET-010
+- Story 1.12 → UX Design (Wizard Mode enhancement, no direct FR)
+
+---
+

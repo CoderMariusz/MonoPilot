@@ -666,3 +666,71 @@ So that I can quickly identify cross-contamination risks.
 - Reference: ux-design-technical-module.md (Allergen Matrix)
 - Performance: paginate for large catalogs
 
+---
+
+## FR Coverage Matrix
+
+This section maps all Functional Requirements from the Technical Module (PRD) to their implementing stories, ensuring 100% traceability.
+
+| FR ID | FR Title | Story IDs | Status | Notes |
+|-------|----------|-----------|--------|-------|
+| FR-TECH-001 | Product CRUD with Versioning | 2.1, 2.2 | ✅ Covered | Create/Read + Edit with versioning |
+| FR-TECH-002 | Product Types Configuration | 2.5 | ✅ Covered | Custom product types |
+| FR-TECH-003 | Product Field Configuration | 2.22 | ✅ Covered | Technical settings, custom fields |
+| FR-TECH-004 | Product Allergen Management | 2.4 | ✅ Covered | Assign allergens (Contains/May Contain) |
+| FR-TECH-005 | Product Version History | 2.3 | ✅ Covered | Version timeline, diff view |
+| FR-TECH-006 | BOM CRUD with Items | 2.6, 2.7 | ✅ Covered | BOM creation + Items management |
+| FR-TECH-007 | BOM Versioning with Date Overlap Validation | 2.8, 2.9 | ✅ Covered | Date validation + Timeline UX |
+| FR-TECH-008 | BOM Clone and Compare | 2.10, 2.11 | ✅ Covered | Clone + Compare versions |
+| FR-TECH-009 | Conditional BOM Items | 2.12 | ✅ Covered | Optional items, conditions |
+| FR-TECH-010 | By-Products in BOM | 2.13 | ✅ Covered | Multiple outputs |
+| FR-TECH-011 | Allergen Inheritance | 2.14 | ✅ Covered | Auto-calculate from BOM |
+| FR-TECH-012 | Routing CRUD | 2.15 | ✅ Covered | Routing creation |
+| FR-TECH-013 | Routing Operations | 2.16 | ✅ Covered | Operations, sequence, duration |
+| FR-TECH-014 | Routing-Product Assignment | 2.17 | ✅ Covered | Link routing to product |
+| FR-TECH-015 | Forward Traceability | 2.18 | ✅ Covered | LP → Usage (WO, TO) |
+| FR-TECH-016 | Backward Traceability | 2.19 | ✅ Covered | Output → Inputs (genealogy) |
+| FR-TECH-017 | Recall Simulation | 2.20 | ✅ Covered | What-if recall analysis |
+| FR-TECH-018 | Genealogy Tree View | 2.21 | ✅ Covered | Visual tree, forward/backward |
+
+**Coverage Summary:**
+- **Total FRs:** 18 (all P0)
+- **P0 FRs Covered:** 18/18 (100%)
+- **Total Stories:** 24 (includes 3 UX enhancements: 2.9, 2.23, 2.24)
+
+**Validation:**
+- ✅ All P0 functional requirements have at least one implementing story
+- ✅ No orphaned stories (all stories trace back to FRs or UX requirements)
+- ✅ FR-TECH-001 split into 2 stories (Create vs Edit/Versioning)
+- ✅ FR-TECH-006 split into 2 stories (BOM CRUD vs Items Management)
+- ✅ FR-TECH-007 has UX enhancement (2.9 Timeline Visualization)
+- ✅ FR-TECH-008 split into 2 stories (Clone vs Compare)
+
+**Reverse Traceability (Story → FR):**
+- Story 2.1 → FR-TECH-001
+- Story 2.2 → FR-TECH-001
+- Story 2.3 → FR-TECH-005
+- Story 2.4 → FR-TECH-004
+- Story 2.5 → FR-TECH-002
+- Story 2.6 → FR-TECH-006
+- Story 2.7 → FR-TECH-006
+- Story 2.8 → FR-TECH-007
+- Story 2.9 → FR-TECH-007 (UX enhancement)
+- Story 2.10 → FR-TECH-008
+- Story 2.11 → FR-TECH-008
+- Story 2.12 → FR-TECH-009
+- Story 2.13 → FR-TECH-010
+- Story 2.14 → FR-TECH-011
+- Story 2.15 → FR-TECH-012
+- Story 2.16 → FR-TECH-013
+- Story 2.17 → FR-TECH-014
+- Story 2.18 → FR-TECH-015
+- Story 2.19 → FR-TECH-016
+- Story 2.20 → FR-TECH-017
+- Story 2.21 → FR-TECH-018
+- Story 2.22 → FR-TECH-003
+- Story 2.23 → UX Design (Grouped Dashboard)
+- Story 2.24 → UX Design (Allergen Matrix)
+
+---
+

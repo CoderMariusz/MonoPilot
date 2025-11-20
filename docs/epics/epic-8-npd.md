@@ -1792,22 +1792,167 @@ So that multi-tenant isolation is enforced.
 
 ---
 
-## FR Coverage
+## FR Coverage Matrix
 
-Total: 74 FRs mapped to 68 stories (some stories cover multiple FRs)
+This section maps all Functional Requirements from the NPD Module (PRD) to their implementing stories, ensuring 100% traceability.
 
-| FR Range | Coverage | Stories |
-|----------|----------|---------|
-| NPD-FR-01 to 07 | Project CRUD, Kanban, Timeline | 8.1-8.7 |
-| NPD-FR-08 to 16 | Formulation Management | 8.8-8.16 |
-| NPD-FR-17 to 22 | Gate Checklists & Approvals | 8.17-8.22 |
-| NPD-FR-23 to 29 | Costing | 8.23-8.29 |
-| NPD-FR-30 | Allergen Declaration | 8.30 |
-| NPD-FR-31 to 36 | Compliance Docs | 8.31-8.36 |
-| NPD-FR-37 to 47 | Handoff Wizard | 8.37-8.47 |
-| NPD-FR-48 to 52 | Risk Management | 8.48-8.52 |
-| NPD-FR-53 to 56 | Event Logging | 8.53-8.56 |
-| NPD-FR-57 to 62 | Integration & Reuse | 8.57-8.62 |
-| NPD-FR-63 to 74 | RBAC & Security | 8.63-8.68 |
+**Summary:** 74 FRs mapped to 68 stories (some RBAC stories cover multiple FRs)
 
-**Coverage:** 74 of 74 FRs (100%)
+### Project Management (7 FRs → 7 Stories)
+
+| FR ID | FR Title | Story IDs | Status |
+|-------|----------|-----------|--------|
+| NPD-FR-01 | NPD Project CRUD | 8.1 | ✅ Covered |
+| NPD-FR-02 | Stage-Gate Workflow (7 stages) | 8.2 | ✅ Covered |
+| NPD-FR-03 | Gate Entry Criteria Enforcement | 8.3 | ✅ Covered |
+| NPD-FR-04 | Kanban Pipeline View | 8.4 | ✅ Covered |
+| NPD-FR-05 | Dashboard Filters | 8.5 | ✅ Covered |
+| NPD-FR-06 | Timeline View (Gantt) | 8.6 | ✅ Covered |
+| NPD-FR-07 | Export Project List | 8.7 | ✅ Covered |
+
+### Formulation Management (9 FRs → 9 Stories)
+
+| FR ID | FR Title | Story IDs | Status |
+|-------|----------|-----------|--------|
+| NPD-FR-08 | Formulation CRUD with Versioning | 8.8 | ✅ Covered |
+| NPD-FR-09 | Add Formulation Items | 8.9 | ✅ Covered |
+| NPD-FR-10 | Auto-Aggregate Allergens | 8.10 | ✅ Covered |
+| NPD-FR-11 | Effective Date Support | 8.11 | ✅ Covered |
+| NPD-FR-12 | Prevent Overlapping Versions | 8.12 | ✅ Covered |
+| NPD-FR-13 | Lock Formulation on Approval | 8.13 | ✅ Covered |
+| NPD-FR-14 | Track Formulation Lineage | 8.14 | ✅ Covered |
+| NPD-FR-15 | Compare Formulation Versions | 8.15 | ✅ Covered |
+| NPD-FR-16 | Clone Formulations | 8.16 | ✅ Covered |
+
+### Gate Checklists & Approvals (6 FRs → 6 Stories)
+
+| FR ID | FR Title | Story IDs | Status |
+|-------|----------|-----------|--------|
+| NPD-FR-17 | Display Gate Checklists | 8.17 | ✅ Covered |
+| NPD-FR-18 | Mark Checklist Items Complete | 8.18 | ✅ Covered |
+| NPD-FR-19 | Support Gate Approvals | 8.19 | ✅ Covered |
+| NPD-FR-20 | Block Advancement for Incomplete | 8.20 | ✅ Covered |
+| NPD-FR-21 | Log Approvals | 8.21 | ✅ Covered |
+| NPD-FR-22 | Show Approval History | 8.22 | ✅ Covered |
+
+### Costing (7 FRs → 7 Stories)
+
+| FR ID | FR Title | Story IDs | Status |
+|-------|----------|-----------|--------|
+| NPD-FR-23 | Enter Target Cost | 8.23 | ✅ Covered |
+| NPD-FR-24 | Calculate Estimated Cost | 8.24 | ✅ Covered |
+| NPD-FR-25 | Record Actual Cost from Pilot WO | 8.25 | ✅ Covered |
+| NPD-FR-26 | Calculate Cost Variance | 8.26 | ✅ Covered |
+| NPD-FR-27 | Display Variance Alerts | 8.27 | ✅ Covered |
+| NPD-FR-28 | Show Cost History | 8.28 | ✅ Covered |
+| NPD-FR-29 | Finance Approve Costing | 8.29 | ✅ Covered |
+
+### Allergen & Compliance (7 FRs → 7 Stories)
+
+| FR ID | FR Title | Story IDs | Status |
+|-------|----------|-----------|--------|
+| NPD-FR-30 | Display Allergen Declaration | 8.30 | ✅ Covered |
+| NPD-FR-31 | Upload Compliance Documents | 8.31 | ✅ Covered |
+| NPD-FR-32 | Categorize Documents by Type | 8.32 | ✅ Covered |
+| NPD-FR-33 | Track Document Metadata | 8.33 | ✅ Covered |
+| NPD-FR-34 | Show Document History | 8.34 | ✅ Covered |
+| NPD-FR-35 | Validate Doc Completeness | 8.35 | ✅ Covered |
+| NPD-FR-36 | Generate Compliance Checklist | 8.36 | ✅ Covered |
+
+### Handoff Wizard (11 FRs → 11 Stories)
+
+| FR ID | FR Title | Story IDs | Status |
+|-------|----------|-----------|--------|
+| NPD-FR-37 | Initiate Handoff Wizard | 8.37 | ✅ Covered |
+| NPD-FR-38 | Validate Handoff Eligibility | 8.38 | ✅ Covered |
+| NPD-FR-39 | Display Validation Checklist | 8.39 | ✅ Covered |
+| NPD-FR-40 | Choose Create New or Update | 8.40 | ✅ Covered |
+| NPD-FR-41 | Transfer Formulation to BOM | 8.41 | ✅ Covered |
+| NPD-FR-42 | Create Pilot WO Optionally | 8.42 | ✅ Covered |
+| NPD-FR-43 | Display Handoff Summary | 8.43 | ✅ Covered |
+| NPD-FR-44 | Execute Handoff Transactionally | 8.44 | ✅ Covered |
+| NPD-FR-45 | Log Handoff Event | 8.45 | ✅ Covered |
+| NPD-FR-46 | Update Status to Launched | 8.46 | ✅ Covered |
+| NPD-FR-47 | NPD-Only Mode Export | 8.47 | ✅ Covered |
+
+### Risk Management (5 FRs → 5 Stories)
+
+| FR ID | FR Title | Story IDs | Status |
+|-------|----------|-----------|--------|
+| NPD-FR-48 | Add Risks with Likelihood/Impact | 8.48 | ✅ Covered |
+| NPD-FR-49 | Calculate Risk Score | 8.49 | ✅ Covered |
+| NPD-FR-50 | Enter Mitigation Plan | 8.50 | ✅ Covered |
+| NPD-FR-51 | Update Risk Status | 8.51 | ✅ Covered |
+| NPD-FR-52 | Sort Risks by Score | 8.52 | ✅ Covered |
+
+### Event Logging (4 FRs → 4 Stories)
+
+| FR ID | FR Title | Story IDs | Status |
+|-------|----------|-----------|--------|
+| NPD-FR-53 | Log Critical Events | 8.53 | ✅ Covered |
+| NPD-FR-54 | Retry Failed Events | 8.54 | ✅ Covered |
+| NPD-FR-55 | View Event Log | 8.55 | ✅ Covered |
+| NPD-FR-56 | Replay Failed Events | 8.56 | ✅ Covered |
+
+### Integration & Reuse (6 FRs → 6 Stories)
+
+| FR ID | FR Title | Story IDs | Status |
+|-------|----------|-----------|--------|
+| NPD-FR-57 | Support Pilot WO Type | 8.57 | ✅ Covered |
+| NPD-FR-58 | Track NPD Origin on Products | 8.58 | ✅ Covered |
+| NPD-FR-59 | Track Formulation Origin on BOM | 8.59 | ✅ Covered |
+| NPD-FR-60 | Support Trial Outputs | 8.60 | ✅ Covered |
+| NPD-FR-61 | Reuse Allergens Table | 8.61 | ✅ Covered |
+| NPD-FR-62 | Reuse Approvals Table | 8.62 | ✅ Covered |
+
+### RBAC & Security (12 FRs → 6 Stories)
+
+| FR ID | FR Title | Story IDs | Status | Notes |
+|-------|----------|-----------|--------|-------|
+| NPD-FR-63 | NPD Lead - Full CRUD | 8.63 | ✅ Covered | NPD Lead role permissions |
+| NPD-FR-64 | NPD Lead - Stage Advancement | 8.63 | ✅ Covered | (Same story) |
+| NPD-FR-65 | R&D - Formulation Edit | 8.64 | ✅ Covered | R&D role permissions |
+| NPD-FR-66 | R&D - Read-Only Others | 8.64 | ✅ Covered | (Same story) |
+| NPD-FR-67 | Regulatory - Compliance Docs | 8.65 | ✅ Covered | Regulatory role permissions |
+| NPD-FR-68 | Regulatory - Approvals | 8.65 | ✅ Covered | (Same story) |
+| NPD-FR-69 | Finance - Costing Approval | 8.66 | ✅ Covered | Finance role permissions |
+| NPD-FR-70 | Finance - Cost Visibility | 8.66 | ✅ Covered | (Same story) |
+| NPD-FR-71 | Production - Read-Only Post-Handoff | 8.67 | ✅ Covered | Production role visibility |
+| NPD-FR-72 | Production - No Edit Rights | 8.67 | ✅ Covered | (Same story) |
+| NPD-FR-73 | RLS - Multi-Tenant Isolation | 8.68 | ✅ Covered | RLS on NPD tables |
+| NPD-FR-74 | RLS - Org-Level Filtering | 8.68 | ✅ Covered | (Same story) |
+
+**Coverage Summary:**
+- **Total FRs:** 74 (all Phase 2 / Growth)
+- **Total Stories:** 68 (6 RBAC stories cover 12 FRs)
+- **P0 FRs Covered:** N/A (NPD is Phase 2, not P0)
+- **Phase 2 Coverage:** 74/74 (100%)
+
+**Validation:**
+- ✅ All 74 functional requirements have implementing stories
+- ✅ No orphaned stories (all stories trace back to FRs)
+- ✅ RBAC section efficiently groups related permissions (2 FRs per story avg)
+- ✅ Critical integration: Story 8.41 (Formulation → BOM), 8.44 (Atomic handoff)
+- ✅ Phase 2 priority - deferred until Epic 1-7 complete
+
+**Reverse Traceability (Story → FR):**
+- Stories 8.1-8.7 → NPD-FR-01 to 07 (1:1 mapping)
+- Stories 8.8-8.16 → NPD-FR-08 to 16 (1:1 mapping)
+- Stories 8.17-8.22 → NPD-FR-17 to 22 (1:1 mapping)
+- Stories 8.23-8.29 → NPD-FR-23 to 29 (1:1 mapping)
+- Story 8.30 → NPD-FR-30
+- Stories 8.31-8.36 → NPD-FR-31 to 36 (1:1 mapping)
+- Stories 8.37-8.47 → NPD-FR-37 to 47 (1:1 mapping)
+- Stories 8.48-8.52 → NPD-FR-48 to 52 (1:1 mapping)
+- Stories 8.53-8.56 → NPD-FR-53 to 56 (1:1 mapping)
+- Stories 8.57-8.62 → NPD-FR-57 to 62 (1:1 mapping)
+- Story 8.63 → NPD-FR-63, 64 (NPD Lead permissions)
+- Story 8.64 → NPD-FR-65, 66 (R&D permissions)
+- Story 8.65 → NPD-FR-67, 68 (Regulatory permissions)
+- Story 8.66 → NPD-FR-69, 70 (Finance permissions)
+- Story 8.67 → NPD-FR-71, 72 (Production permissions)
+- Story 8.68 → NPD-FR-73, 74 (RLS multi-tenant)
+
+**Note:** NPD Module is marked as "Should Have" (Phase 2) and will be implemented after Epic 1-7 are completed and validated in production.
+
+---
