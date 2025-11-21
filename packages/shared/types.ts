@@ -267,17 +267,37 @@ export interface GRN {
   updated_at: string;
 }
 
+// Enhanced Warehouse interface (Story 1.5: Warehouse Configuration)
 export interface Warehouse {
-  id: number;
-  code: string;
-  name: string;
-  is_active: boolean;
+  id: string; // UUID
+  org_id: string; // UUID FK → organizations
+  code: string; // Unique per org, e.g., "WH-01"
+  name: string; // Display name
+  address?: string | null; // Physical address (optional)
+
+  // Default locations (AC-004.2: nullable initially, set after locations created)
+  default_receiving_location_id?: string | null; // UUID FK → locations
+  default_shipping_location_id?: string | null; // UUID FK → locations
+  transit_location_id?: string | null; // UUID FK → locations
+
+  is_active: boolean; // Soft disable flag
+
+  // Audit trail
+  created_by?: string | null; // UUID FK → users
+  updated_by?: string | null; // UUID FK → users
   created_at: string;
   updated_at: string;
+
+  // Optional populated relationships
+  default_receiving_location?: Location;
+  default_shipping_location?: Location;
+  transit_location?: Location;
 }
 
-export type CreateWarehouseData = Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>;
-export type UpdateWarehouseData = Partial<CreateWarehouseData>;
+export type CreateWarehouseData = Omit<Warehouse, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'created_by' | 'updated_by'>;
+export type UpdateWarehouseData = Partial<Omit<CreateWarehouseData, 'code'>> & {
+  code?: string; // Allow code updates during edit (AC-004.5)
+};
 
 export type TransferOrderStatus = 'draft' | 'sent' | 'in_transit' | 'received' | 'cancelled';
 
