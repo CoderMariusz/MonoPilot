@@ -227,7 +227,7 @@ development_status:
   1-10-tax-code-configuration: ready-for-dev
   1-11-module-activation: ready-for-dev
   1-12-settings-wizard-ux-design: ready-for-dev
-  1-13-main-dashboard: ready-for-dev  # NEW: Landing page after login with module overview
+  1-13-main-dashboard: review  # NEW: Landing page after login with module overview
   epic-1-retrospective: optional
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
