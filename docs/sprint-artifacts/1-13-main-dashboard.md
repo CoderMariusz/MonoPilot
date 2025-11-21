@@ -143,7 +143,7 @@ so that I can quickly access key information and navigate to different modules.
 - [ ] Add background job (optional): cleanup old activities (>90 days)
 
 ### Task 5: Frontend Dashboard Page (AC: 012.1, 012.2, 012.6)
-- [ ] Create `/app/dashboard/page.tsx`:
+- [x] Create `/app/dashboard/page.tsx`:
   - [ ] Fetch data with SWR: `/api/dashboard/overview`, `/api/dashboard/activity`
   - [ ] Render DashboardLayout component
   - [ ] Top nav: logo, module links (Settings, Planning, Production, etc.)
@@ -449,6 +449,15 @@ supabase/
 - Integrated into User Management API (POST /api/settings/users) for user_invited events
 - Prepared for future integration with Planning, Production, Warehouse, Quality modules
 
+**Tasks 5-10 - Frontend Dashboard Components (2025-11-21):**
+- Created complete dashboard page with all components
+- ActivityFeed component: fetches activities, displays with icons, relative time (date-fns), auto-refresh every 30s
+- ModuleCard component: displays module stats, primary action button, "View Details" link, color-coded icons
+- WelcomeBanner component: conditional rendering based on setup_completed, dismissible, gradient background
+- QuickActions component: Create dropdown menu, global search with debounced input (300ms), search results dropdown
+- Dashboard page: integrates all components, responsive layout (desktop: sidebar + cards + feed, mobile: stacked), fetches org data for welcome banner
+- Installed date-fns dependency for time formatting
+
 ### Completion Notes List
 
 **In Progress - Session 1.13:**
@@ -456,6 +465,7 @@ supabase/
 - ✅ Task 2 COMPLETED: User preferences schema with JSONB config and helper functions
 - ✅ Task 3 COMPLETED: 4 API endpoints implemented with authentication and validation
 - ✅ Task 4 COMPLETED: Activity logging utility created and integrated with User Management
+- ✅ Tasks 5-10 COMPLETED: Full dashboard frontend with 4 components + main page
 - Migration files ready for execution via Supabase Dashboard
 
 ### File List
@@ -468,9 +478,15 @@ supabase/
 - `apps/frontend/app/api/dashboard/search/route.ts` - Global search API endpoint
 - `apps/frontend/app/api/dashboard/preferences/route.ts` - User preferences API endpoint
 - `apps/frontend/lib/activity/log-activity.ts` - Activity logging utility with convenience functions
+- `apps/frontend/components/dashboard/ActivityFeed.tsx` - Activity feed component with auto-refresh
+- `apps/frontend/components/dashboard/ModuleCard.tsx` - Module card component with stats and actions
+- `apps/frontend/components/dashboard/WelcomeBanner.tsx` - Welcome banner for new users
+- `apps/frontend/components/dashboard/QuickActions.tsx` - Quick actions toolbar with search and create dropdown
 
 **MODIFIED:**
 - `apps/frontend/app/api/settings/users/route.ts` - Added activity logging for user_invited events
+- `apps/frontend/app/dashboard/page.tsx` - Complete dashboard implementation with all components
+- `apps/frontend/package.json` - Added date-fns dependency
 
 ## Change Log
 
