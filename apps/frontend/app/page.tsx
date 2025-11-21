@@ -1,10 +1,17 @@
-export default function Home() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">MonoPilot2</h1>
-        <p className="text-xl text-gray-600">Welcome to MonoPilot2 - Your First Deploy!</p>
-      </div>
-    </main>
-  );
+import { redirect } from 'next/navigation'
+import { createServerSupabase } from '@/lib/supabase/server'
+
+export default async function Home() {
+  const supabase = await createServerSupabase()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  // If authenticated, redirect to dashboard
+  if (session) {
+    redirect('/dashboard')
+  }
+
+  // If not authenticated, redirect to login
+  redirect('/login')
 }

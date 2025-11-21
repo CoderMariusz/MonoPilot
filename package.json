@@ -11,6 +11,7 @@
     "clean": "rm -rf node_modules app/node_modules app/.next",
     "install:all": "pnpm install && cd app && pnpm install",
     "prepare": "husky || true",
+    "seed:admin": "node scripts/seed-first-admin.mjs",
     "test": "pnpm test:e2e",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@faker-js/faker": "^9.3.0",
     "@playwright/test": "^1.49.0",
+    "@supabase/supabase-js": "^2.84.0",
     "supabase": "^2.58.5"
   }
 }

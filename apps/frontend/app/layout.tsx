@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
 
 export const metadata: Metadata = {
-  title: "MonoPilot2",
-  description: "MonoPilot2 Application",
+  title: "MonoPilot - Manufacturing Operations Platform",
+  description: "Comprehensive MES/MOM system for food manufacturing",
 };
 
 export default function RootLayout({
@@ -13,7 +20,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={`${inter.variable} font-sans antialiased`}>
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }
