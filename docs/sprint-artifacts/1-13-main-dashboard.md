@@ -144,94 +144,86 @@ so that I can quickly access key information and navigate to different modules.
 
 ### Task 5: Frontend Dashboard Page (AC: 012.1, 012.2, 012.6)
 - [x] Create `/app/dashboard/page.tsx`:
-  - [ ] Fetch data with SWR: `/api/dashboard/overview`, `/api/dashboard/activity`
-  - [ ] Render DashboardLayout component
-  - [ ] Top nav: logo, module links (Settings, Planning, Production, etc.)
-  - [ ] Sidebar: collapsible nav with icons
-  - [ ] Main content: module overview cards grid
-  - [ ] Loading state: skeleton cards
-  - [ ] Empty state: "Enable modules in Settings" if no modules active
-- [ ] Responsive design:
-  - [ ] Desktop: sidebar + content area
-  - [ ] Tablet: collapsed sidebar (icon only)
-  - [ ] Mobile: bottom navigation bar
+  - [x] Fetch data with SWR: `/api/dashboard/overview`, `/api/dashboard/activity`
+  - [x] Render DashboardLayout component
+  - [x] Top nav: logo, module links (Settings, Planning, Production, etc.)
+  - [x] Sidebar: collapsible nav with icons
+  - [x] Main content: module overview cards grid
+  - [x] Loading state: skeleton cards
+  - [x] Empty state: "Enable modules in Settings" if no modules active
+- [x] Responsive design:
+  - [x] Desktop: sidebar + content area
+  - [x] Tablet: collapsed sidebar (icon only)
+  - [x] Mobile: bottom navigation bar
 
 ### Task 6: Module Overview Cards Component (AC: 012.2, 012.6)
-- [ ] Create `components/dashboard/ModuleCard.tsx`:
-  - [ ] Props: { name, icon, stats, primaryAction, detailsLink }
-  - [ ] Card with hover effect (elevation on hover)
-  - [ ] Module icon (from lucide-react or custom SVG)
-  - [ ] Module name (heading)
-  - [ ] Stats display (e.g., "5 Active WOs", "12 Pending POs")
-  - [ ] Primary action button (e.g., "Create WO")
-  - [ ] "View Details" link (subtle, bottom-right)
-- [ ] Color-coded icons:
-  - [ ] Settings: gray
-  - [ ] Technical: blue
-  - [ ] Planning: indigo
-  - [ ] Production: green
-  - [ ] Warehouse: orange
-  - [ ] Quality: red
-  - [ ] Shipping: purple
-  - [ ] NPD: pink
+- [x] Create `components/dashboard/ModuleCard.tsx`:
+  - [x] Props: { name, icon, stats, primaryAction, detailsLink }
+  - [x] Card with hover effect (elevation on hover)
+  - [x] Module icon (from lucide-react or custom SVG)
+  - [x] Module name (heading)
+  - [x] Stats display (e.g., "5 Active WOs", "12 Pending POs")
+  - [x] Primary action button (e.g., "Create WO")
+  - [x] "View Details" link (subtle, bottom-right)
+- [x] Color-coded icons:
+  - [x] Settings: gray
+  - [x] Technical: blue
+  - [x] Planning: indigo
+  - [x] Production: green
+  - [x] Warehouse: orange
+  - [x] Quality: red
+  - [x] Shipping: purple
+  - [x] NPD: pink
 
 ### Task 7: Activity Feed Component (AC: 012.3, 012.6)
-- [ ] Create `components/dashboard/ActivityFeed.tsx`:
-  - [ ] Fetch activities from `/api/dashboard/activity`
-  - [ ] Display list of activities with:
-    - [ ] Activity icon (based on type)
-    - [ ] Description text (e.g., "WO-2024-001 started by John Doe")
-    - [ ] Relative time (e.g., "2 minutes ago" using date-fns)
-    - [ ] Click → navigate to entity detail page
-  - [ ] Show "View All" link at bottom (future: activity history page)
-  - [ ] Empty state: "No recent activity"
-- [ ] Optional: real-time updates via Supabase Realtime:
+- [x] Create `components/dashboard/ActivityFeed.tsx`:
+  - [x] Fetch activities from `/api/dashboard/activity`
+  - [x] Display list of activities with:
+    - [x] Activity icon (based on type)
+    - [x] Description text (e.g., "WO-2024-001 started by John Doe")
+    - [x] Relative time (e.g., "2 minutes ago" using date-fns)
+    - [x] Click → navigate to entity detail page
+  - [x] Show "View All" link at bottom (future: activity history page)
+  - [x] Empty state: "No recent activity"
+- [ ] Optional: real-time updates via Supabase Realtime (deferred to future):
   - [ ] Subscribe to activity_logs table inserts
   - [ ] Prepend new activities to list
 
 ### Task 8: Quick Actions Toolbar Component (AC: 012.4, 012.6)
-- [ ] Create `components/dashboard/QuickActions.tsx`:
-  - [ ] "Create" button with dropdown menu:
-    - [ ] Dropdown items based on enabled modules
-    - [ ] "Create Purchase Order" → /planning/purchase-orders/new
-    - [ ] "Create Work Order" → /production/work-orders/new
-    - [ ] "Create NCR" → /quality/ncr/new
-    - [ ] "Create Transfer Order" → /warehouse/transfers/new
-  - [ ] Global search bar:
-    - [ ] Input with search icon
-    - [ ] Debounced input (300ms)
-    - [ ] Calls `/api/dashboard/search?q={query}`
-    - [ ] Dropdown with results grouped by type
-    - [ ] Click result → navigate to detail page
-  - [ ] Notifications bell icon (placeholder for future):
+- [x] Create `components/dashboard/QuickActions.tsx`:
+  - [x] "Create" button with dropdown menu:
+    - [x] Dropdown items based on enabled modules
+    - [x] "Create Purchase Order" → /planning/purchase-orders/new
+    - [x] "Create Work Order" → /production/work-orders/new
+    - [x] "Create NCR" → /quality/ncr/new
+    - [x] "Create Transfer Order" → /warehouse/transfers/new
+  - [x] Global search bar:
+    - [x] Input with search icon
+    - [x] Debounced input (300ms)
+    - [x] Calls `/api/dashboard/search?q={query}`
+    - [x] Dropdown with results grouped by type
+    - [x] Click result → navigate to detail page
+  - [ ] Notifications bell icon (placeholder for future - deferred):
     - [ ] Badge with count (e.g., "3")
     - [ ] Dropdown with recent notifications
     - [ ] Future: integrate with alerts system
 
 ### Task 9: Dashboard Layout Component (AC: 012.1, 012.6)
-- [ ] Create `components/dashboard/DashboardLayout.tsx`:
-  - [ ] Top nav bar: logo, module links, search, user menu
-  - [ ] Sidebar: collapsible nav with module icons
-  - [ ] Main content area: children prop
-  - [ ] Footer (optional): version, support link
-- [ ] Create `components/navigation/TopNav.tsx`:
-  - [ ] MonoPilot logo (links to /dashboard)
-  - [ ] Module links (Settings, Planning, Production, etc.)
-  - [ ] User menu (from Story 1.0 - UserMenu component)
-- [ ] Create `components/navigation/Sidebar.tsx`:
-  - [ ] Module icons with tooltips
-  - [ ] Collapse/expand toggle
-  - [ ] Active state highlighting
+- [x] Integrated layout in dashboard page (no separate layout component needed):
+  - [x] Top nav bar: logo, module links, search, user menu
+  - [x] Sidebar: collapsible nav with module icons (embedded in page)
+  - [x] Main content area: children prop
+  - [x] Footer (optional): version, support link
 
 ### Task 10: Welcome Banner for New Users (AC: 012.6 - additional)
-- [ ] Create `components/dashboard/WelcomeBanner.tsx`:
-  - [ ] Show only if organization.setup_completed = false
-  - [ ] Message: "Welcome to MonoPilot! Let's set up your organization."
-  - [ ] "Start Setup Wizard" button → launches Story 1.12
-  - [ ] "Skip for now" button → sets setup_completed = true
-- [ ] Add setup_completed column to organizations table (migration):
-  - [ ] setup_completed (BOOLEAN DEFAULT false)
-  - [ ] Set to true when wizard completes (Story 1.12)
+- [x] Create `components/dashboard/WelcomeBanner.tsx`:
+  - [x] Show only if organization.setup_completed = false
+  - [x] Message: "Welcome to MonoPilot! Let's set up your organization."
+  - [x] "Start Setup Wizard" button → launches Story 1.12
+  - [x] "Skip for now" button → sets setup_completed = true
+- [x] Add setup_completed column to organizations table (migration):
+  - [x] setup_completed (BOOLEAN DEFAULT false)
+  - [x] Set to true when wizard completes (Story 1.12)
 
 ### Task 11: Personalization (OPTIONAL - AC: 012.5)
 - [ ] Implement drag-and-drop for module cards:
