@@ -98,14 +98,14 @@ so that I can quickly access key information and navigate to different modules.
 - [x] Add RLS policy: users can only see activities from their org
 
 ### Task 2: Database Schema for User Preferences (AC: 012.5 - optional)
-- [ ] Create `user_preferences` table migration (or JSONB column in users table):
-  - [ ] user_id (UUID PK, FK to users)
-  - [ ] dashboard_config (JSONB):
-    - [ ] module_order: array of module IDs
-    - [ ] pinned_modules: array of module IDs
-    - [ ] show_activity_feed: boolean
-  - [ ] updated_at (TIMESTAMP)
-- [ ] Run migration and verify schema
+- [x] Create `user_preferences` table migration (or JSONB column in users table):
+  - [x] user_id (UUID PK, FK to users)
+  - [x] dashboard_config (JSONB):
+    - [x] module_order: array of module IDs
+    - [x] pinned_modules: array of module IDs
+    - [x] show_activity_feed: boolean
+  - [x] updated_at (TIMESTAMP)
+- [x] Run migration and verify schema
 
 ### Task 3: API Endpoints (AC: 012.2, 012.3, 012.4)
 - [ ] Implement GET /api/dashboard/overview:
@@ -426,16 +426,25 @@ supabase/
 - Implemented RLS policies for multi-tenancy isolation
 - Added seed data with 3 example activities for testing
 
+**Task 2 - Database Schema for User Preferences (2025-11-21):**
+- Created migration 004_create_user_preferences_table.sql
+- Implemented user_preferences table with dashboard_config JSONB column
+- Added helper functions: get_default_dashboard_config(), merge_dashboard_config()
+- Implemented RLS policies for user-owned preferences
+- Seed data created for all existing users with default config
+
 ### Completion Notes List
 
 **In Progress - Session 1.13:**
 - ✅ Task 1 COMPLETED: Activity logs database schema created with full RLS support
-- Migration file ready for execution via Supabase Dashboard
+- ✅ Task 2 COMPLETED: User preferences schema with JSONB config and helper functions
+- Migration files ready for execution via Supabase Dashboard
 
 ### File List
 
 **NEW:**
 - `apps/frontend/lib/supabase/migrations/003_create_activity_logs_table.sql` - Activity logs table migration with RLS policies
+- `apps/frontend/lib/supabase/migrations/004_create_user_preferences_table.sql` - User preferences table migration with JSONB config
 
 ## Change Log
 
