@@ -27,7 +27,7 @@ export function WelcomeBanner({ show, onDismiss }: WelcomeBannerProps) {
             Welcome to MonoPilot!
           </h2>
           <p className="text-base opacity-90">
-            Let's set up your organization to get started.
+            Let&apos;s set up your organization to get started.
           </p>
         </div>
         <button

@@ -118,7 +118,7 @@ export function QuickActions() {
               </div>
             ) : searchResults.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground">
-                No results found for "{searchQuery}"
+                No results found for &quot;{searchQuery}&quot;
               </div>
             ) : (
               <div className="p-2">
