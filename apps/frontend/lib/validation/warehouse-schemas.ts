@@ -24,18 +24,28 @@ export const createWarehouseSchema = z.object({
   is_active: z.boolean().default(true),
 })
 
-// Update Warehouse Schema (code is not editable)
+// Update Warehouse Schema
 export const updateWarehouseSchema = z.object({
+  code: z
+    .string()
+    .min(1, 'Warehouse code is required')
+    .max(20, 'Code must be 20 characters or less')
+    .regex(/^[A-Z0-9_-]+$/, 'Code must contain only uppercase letters, numbers, underscores, and hyphens')
+    .optional(),
   name: z
     .string()
     .min(1, 'Warehouse name is required')
-    .max(100, 'Name must be 100 characters or less'),
+    .max(100, 'Name must be 100 characters or less')
+    .optional(),
   address: z
     .string()
     .max(255, 'Address must be 255 characters or less')
     .optional()
     .or(z.literal('')),
-  is_active: z.boolean(),
+  is_active: z.boolean().optional(),
+  default_receiving_location_id: z.string().uuid().nullable().optional(),
+  default_shipping_location_id: z.string().uuid().nullable().optional(),
+  transit_location_id: z.string().uuid().nullable().optional(),
 })
 
 // TypeScript types
@@ -61,7 +71,14 @@ export interface Warehouse {
   name: string
   address: string | null
   is_active: boolean
+  default_receiving_location_id: string | null
+  default_shipping_location_id: string | null
+  transit_location_id: string | null
   created_at: string
   updated_at: string
   org_id: string
+  // Joined location objects (when queried with joins)
+  default_receiving_location?: { code: string } | null
+  default_shipping_location?: { code: string } | null
+  transit_location?: { code: string } | null
 }

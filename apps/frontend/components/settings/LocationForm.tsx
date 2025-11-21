@@ -44,6 +44,7 @@ import {
   UpdateLocationSchema,
   LocationTypeEnum,
   type CreateLocationInput,
+  type UpdateLocationInput,
 } from '@/lib/validation/location-schemas'
 
 interface Warehouse {
@@ -86,8 +87,8 @@ export function LocationForm({
 
   const isEditMode = !!location
 
-  const form = useForm<CreateLocationInput>({
-    resolver: zodResolver(isEditMode ? UpdateLocationSchema : CreateLocationSchema),
+  const form = useForm<CreateLocationInput | UpdateLocationInput>({
+    resolver: zodResolver(isEditMode ? UpdateLocationSchema : CreateLocationSchema) as any,
     defaultValues: {
       warehouse_id: location?.warehouse_id || '',
       code: location?.code || '',
@@ -167,7 +168,7 @@ export function LocationForm({
     }
   }, [location, form])
 
-  const onSubmit = async (data: CreateLocationInput) => {
+  const onSubmit = async (data: CreateLocationInput | UpdateLocationInput) => {
     try {
       setLoading(true)
 

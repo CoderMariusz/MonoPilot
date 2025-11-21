@@ -1,3 +1,5 @@
-# Pre-commit hook disabled - no pre-commit script configured
-exit 0
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
 
+# Run lint-staged to check TypeScript files
+pnpm lint-staged

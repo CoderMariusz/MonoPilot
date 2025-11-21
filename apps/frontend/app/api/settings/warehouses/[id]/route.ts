@@ -33,8 +33,6 @@ export async function GET(
     const supabase = await createServerSupabase()
     const params = await context.params
     const { id } = params
-    const params = await context.params
-    const { id } = params
 
     // Check authentication
     const {
@@ -104,7 +102,6 @@ export async function PATCH(
     const supabase = await createServerSupabase()
     const params = await context.params
     const { id } = params
-    const params = await context.params
 
     // Check authentication
     const {
@@ -207,7 +204,6 @@ export async function DELETE(
     const supabase = await createServerSupabase()
     const params = await context.params
     const { id } = params
-    const params = await context.params
 
     // Check authentication
     const {

@@ -33,6 +33,7 @@ import { LocationDetailModal } from '@/components/settings/LocationDetailModal'
 
 interface Location {
   id: string
+  warehouse_id: string
   code: string
   name: string
   type: string

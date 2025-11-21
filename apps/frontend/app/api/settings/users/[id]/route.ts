@@ -25,8 +25,6 @@ export async function PUT(
   try {
     const supabase = await createServerSupabase()
     const params = await context.params
-    const { id } = params
-    const params = await context.params
     const userId = params.id
 
     // Check authentication
@@ -157,8 +155,6 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createServerSupabase()
-    const params = await context.params
-    const { id } = params
     const params = await context.params
     const userId = params.id
 

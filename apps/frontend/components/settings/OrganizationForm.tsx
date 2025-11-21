@@ -28,7 +28,7 @@ export function OrganizationForm() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<OrganizationInput>({
-    resolver: zodResolver(OrganizationSchema),
+    resolver: zodResolver(OrganizationSchema) as any,
     defaultValues: {
       company_name: '',
       address: '',

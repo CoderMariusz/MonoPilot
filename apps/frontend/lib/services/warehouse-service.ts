@@ -1,6 +1,5 @@
 import { createServerSupabase } from '../supabase/server'
-import { type Warehouse, type CreateWarehouseData, type UpdateWarehouseData } from '@/lib/validation/warehouse-schemas'
-import { type CreateWarehouseInput, type UpdateWarehouseInput, type WarehouseFilters } from '@/lib/validation/warehouse-schemas'
+import { type Warehouse, type CreateWarehouseInput, type UpdateWarehouseInput, type WarehouseFilters } from '@/lib/validation/warehouse-schemas'
 
 /**
  * Warehouse Service

@@ -142,7 +142,13 @@
       "Bash(pnpm exec tsc:*)",
       "Bash(pnpm seed:admin:*)",
       "Bash(SUPABASE_ACCESS_TOKEN=sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac SUPABASE_PROJECT_ID=pgroxddbtaevdegnidaz npx supabase:*)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(timeout 180 pnpm build:*)",
+      "Bash(timeout 60 pnpm build:*)",
+      "Bash(git reset:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []
