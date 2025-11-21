@@ -6,6 +6,7 @@ import {
   type User,
 } from '@/lib/validation/user-schemas'
 import { ZodError } from 'zod'
+import { logUserActivity } from '@/lib/activity/log-activity'
 
 /**
  * User Management API Routes
@@ -241,6 +242,18 @@ export async function POST(request: NextRequest) {
 
     // TODO (Story 1.3): Send invitation email with magic link
     // await sendInvitationEmail(createdUser.email, invitationToken)
+
+    // Log activity (Story 1.13: Main Dashboard)
+    await logUserActivity(
+      currentUser.org_id,
+      session.user.id,
+      'user_invited',
+      createdUser.id,
+      createdUser.email,
+      {
+        role: createdUser.role,
+      }
+    )
 
     return NextResponse.json(
       {
