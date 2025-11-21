@@ -130,15 +130,16 @@ so that I can quickly access key information and navigate to different modules.
   - [x] Validate with Zod schema
 
 ### Task 4: Activity Logging Utility (AC: 012.3)
-- [ ] Create `lib/activity/log-activity.ts` utility:
-  - [ ] `logActivity(userId, type, entityType, entityId, entityCode, description, metadata?)`
-  - [ ] Inserts row into activity_logs table
-  - [ ] Called from other modules when key events occur
-- [ ] Integrate into existing modules:
-  - [ ] Planning: log PO approval, WO creation
-  - [ ] Production: log WO start, WO completion, yield entry
-  - [ ] Warehouse: log LP received, stock move
-  - [ ] Quality: log NCR created, NCR resolved
+- [x] Create `lib/activity/log-activity.ts` utility:
+  - [x] `logActivity(userId, type, entityType, entityId, entityCode, description, metadata?)`
+  - [x] Inserts row into activity_logs table
+  - [x] Called from other modules when key events occur
+- [x] Integrate into existing modules:
+  - [x] Settings: log user_invited in POST /api/settings/users
+  - [ ] Planning: log PO approval, WO creation (Epic 3 - not yet implemented)
+  - [ ] Production: log WO start, WO completion, yield entry (Epic 4 - not yet implemented)
+  - [ ] Warehouse: log LP received, stock move (Epic 5 - not yet implemented)
+  - [ ] Quality: log NCR created, NCR resolved (Epic 6 - not yet implemented)
 - [ ] Add background job (optional): cleanup old activities (>90 days)
 
 ### Task 5: Frontend Dashboard Page (AC: 012.1, 012.2, 012.6)
@@ -441,12 +442,20 @@ supabase/
 - PUT /api/dashboard/preferences - Update user preferences with Zod validation
 - All endpoints implement authentication, authorization, and error handling
 
+**Task 4 - Activity Logging Utility (2025-11-21):**
+- Created lib/activity/log-activity.ts with logActivity() function
+- Convenience functions: logWorkOrderActivity(), logPurchaseOrderActivity(), logLicensePlateActivity(), logUserActivity()
+- Uses Supabase service role key for server-side logging
+- Integrated into User Management API (POST /api/settings/users) for user_invited events
+- Prepared for future integration with Planning, Production, Warehouse, Quality modules
+
 ### Completion Notes List
 
 **In Progress - Session 1.13:**
 - ✅ Task 1 COMPLETED: Activity logs database schema created with full RLS support
 - ✅ Task 2 COMPLETED: User preferences schema with JSONB config and helper functions
 - ✅ Task 3 COMPLETED: 4 API endpoints implemented with authentication and validation
+- ✅ Task 4 COMPLETED: Activity logging utility created and integrated with User Management
 - Migration files ready for execution via Supabase Dashboard
 
 ### File List
@@ -458,6 +467,10 @@ supabase/
 - `apps/frontend/app/api/dashboard/activity/route.ts` - Activity feed API endpoint
 - `apps/frontend/app/api/dashboard/search/route.ts` - Global search API endpoint
 - `apps/frontend/app/api/dashboard/preferences/route.ts` - User preferences API endpoint
+- `apps/frontend/lib/activity/log-activity.ts` - Activity logging utility with convenience functions
+
+**MODIFIED:**
+- `apps/frontend/app/api/settings/users/route.ts` - Added activity logging for user_invited events
 
 ## Change Log
 
