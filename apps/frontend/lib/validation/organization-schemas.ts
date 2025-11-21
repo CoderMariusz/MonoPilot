@@ -25,7 +25,7 @@ export const OrganizationSchema = z.object({
   default_language: z.enum(['PL', 'EN']).default('EN'),
 })
 
-export type OrganizationInput = z.infer<typeof OrganizationSchema>
+export type OrganizationInput = z.output<typeof OrganizationSchema>
 
 // Organization response from API
 export interface Organization extends OrganizationInput {
