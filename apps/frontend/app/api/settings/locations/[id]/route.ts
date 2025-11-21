@@ -24,10 +24,13 @@ import { ZodError } from 'zod'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
+    const params = await context.params
+    const { id } = params
+    const params = await context.params
     const locationId = params.id
 
     // Check authentication
@@ -78,10 +81,13 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
+    const params = await context.params
+    const { id } = params
+    const params = await context.params
     const locationId = params.id
 
     // Check authentication
@@ -171,10 +177,13 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createServerSupabase()
+    const params = await context.params
+    const { id } = params
+    const params = await context.params
     const locationId = params.id
 
     // Check authentication

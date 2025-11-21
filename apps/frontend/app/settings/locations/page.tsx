@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { MapPin, Search, Edit, Trash2, Archive, QrCode } from 'lucide-react'
-import { useToast } from '@/components/ui/use-toast'
+import { useToast } from '@/hooks/use-toast'
 import { LocationForm } from '@/components/settings/LocationForm'
 import { LocationDetailModal } from '@/components/settings/LocationDetailModal'
 

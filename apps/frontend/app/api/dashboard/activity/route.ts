@@ -116,9 +116,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Prepare response
+    // Prepare response - map user array to single object
+    const mappedActivities: ActivityLog[] = (activities || []).map((activity: any) => ({
+      ...activity,
+      user: Array.isArray(activity.user) ? activity.user[0] : activity.user
+    }))
+
     const response: ActivityFeedResponse = {
-      activities: (activities || []) as ActivityLog[],
+      activities: mappedActivities,
       total_count: count || 0,
     }
 

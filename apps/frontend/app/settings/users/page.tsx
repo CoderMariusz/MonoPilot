@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { UserPlus, Search, Edit, Trash2 } from 'lucide-react'
-import { useToast } from '@/components/ui/use-toast'
+import { useToast } from '@/hooks/use-toast'
 import type { User } from '@/lib/validation/user-schemas'
 import { getRoleLabel, getStatusLabel } from '@/lib/validation/user-schemas'
 import { UserForm } from '@/components/settings/UserForm'

@@ -3,7 +3,7 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import {
   updateWarehouseSchema,
   type UpdateWarehouseInput,
-} from '@/packages/shared/schemas'
+} from '@/lib/validation/warehouse-schemas'
 import {
   getWarehouseById,
   updateWarehouse,
@@ -27,11 +27,14 @@ import { ZodError } from 'zod'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
     const supabase = await createServerSupabase()
+    const params = await context.params
+    const { id } = params
+    const params = await context.params
+    const { id } = params
 
     // Check authentication
     const {
@@ -95,11 +98,13 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
     const supabase = await createServerSupabase()
+    const params = await context.params
+    const { id } = params
+    const params = await context.params
 
     // Check authentication
     const {
@@ -196,11 +201,13 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
     const supabase = await createServerSupabase()
+    const params = await context.params
+    const { id } = params
+    const params = await context.params
 
     // Check authentication
     const {

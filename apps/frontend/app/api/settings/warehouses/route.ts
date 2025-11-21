@@ -5,7 +5,7 @@ import {
   warehouseFiltersSchema,
   type CreateWarehouseInput,
   type WarehouseFilters,
-} from '@/packages/shared/schemas'
+} from '@/lib/validation/warehouse-schemas'
 import {
   createWarehouse,
   listWarehouses,

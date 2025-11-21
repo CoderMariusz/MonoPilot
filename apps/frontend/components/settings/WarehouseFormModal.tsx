@@ -11,9 +11,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useToast } from '@/components/ui/use-toast'
-import type { Warehouse } from '@/packages/shared/types'
-import { createWarehouseSchema, updateWarehouseSchema } from '@/packages/shared/schemas'
+import { useToast } from '@/hooks/use-toast'
+import type { Warehouse } from '@/lib/validation/warehouse-schemas'
+import { createWarehouseSchema, updateWarehouseSchema } from '@/lib/validation/warehouse-schemas'
 import { ZodError } from 'zod'
 
 interface WarehouseFormModalProps {

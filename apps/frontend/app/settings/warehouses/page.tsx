@@ -27,8 +27,8 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Warehouse as WarehouseIcon, Search, Edit, Archive, CheckCircle } from 'lucide-react'
-import { useToast } from '@/components/ui/use-toast'
-import type { Warehouse } from '@/packages/shared/types'
+import { useToast } from '@/hooks/use-toast'
+import type { Warehouse } from '@/lib/validation/warehouse-schemas'
 import { WarehouseFormModal } from '@/components/settings/WarehouseFormModal'
 
 export default function WarehousesPage() {
