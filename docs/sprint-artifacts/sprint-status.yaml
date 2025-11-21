@@ -216,7 +216,7 @@ development_status:
   epic-1: contexted
   1-0-authentication-ui: in-progress  # NEW: Login/logout/forgot-password pages - CHANGES REQUESTED (missing tests, story file not updated)
   1-1-organization-configuration: done  # Organization settings with logo upload - COMPLETED
-  1-2-user-management-crud: in-progress  # Implementing user management CRUD
+  1-2-user-management-crud: review  # User management CRUD - 86 unit tests passing, E2E infrastructure ready
   1-3-user-invitations: ready-for-dev
   1-4-session-management: ready-for-dev
   1-5-warehouse-configuration: ready-for-dev
