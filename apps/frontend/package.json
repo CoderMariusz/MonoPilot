@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "node ../../node_modules/.pnpm/vitest@4.0.12*/node_modules/vitest/vitest.mjs run",
+    "test:watch": "node ../../node_modules/.pnpm/vitest@4.0.12*/node_modules/vitest/vitest.mjs",
+    "test:ui": "node ../../node_modules/.pnpm/vitest@4.0.12*/node_modules/vitest/vitest.mjs --ui",
+    "test:coverage": "node ../../node_modules/.pnpm/vitest@4.0.12*/node_modules/vitest/vitest.mjs run --coverage"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -31,14 +35,20 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/ui": "^4.0.12",
     "autoprefixer": "^10.4.20",
     "eslint": "^9",
     "eslint-config-next": "^15.1.4",
+    "jsdom": "^27.2.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.12"
   }
 }
