@@ -338,3 +338,226 @@ middleware.ts             # Route protection middleware
 ## Change Log
 
 - 2025-11-20: Story created by Mariusz (missing authentication UI in Epic 1)
+- 2025-11-21: Senior Developer Review notes appended
+
+---
+
+# Senior Developer Review (AI)
+
+**Reviewer:** Mariusz
+**Date:** 2025-11-21
+**Review Outcome:** ⚠️ **CHANGES REQUESTED**
+
+## Summary
+
+Story 1.0 (Authentication UI) has been **fully implemented** with high-quality code for login, logout, forgot password, and reset password flows. The implementation includes proper form validation (Zod), user-friendly UI (Shadcn), auth utilities, middleware route protection, and an auth callback handler.
+
+**CRITICAL PROCEDURAL ISSUE:** The story file was **NOT UPDATED** after implementation. All tasks remain unchecked `[ ]`, File List is empty, Completion Notes are empty, and status in story file says "ready-for-dev" (inconsistent with sprint-status.yaml "review").
+
+**MAIN TECHNICAL ISSUE:** Task 10 (Integration & Testing) was **COMPLETELY SKIPPED** - no unit tests, integration tests, or E2E tests exist for the authentication flow.
+
+## Key Findings
+
+### 🔴 HIGH SEVERITY
+
+**1. Missing Tests (Task 10) - CRITICAL GAP**
+- **Issue:** Task 10 requires unit tests, integration tests, and E2E tests. NONE exist.
+- **Impact:** No automated verification of auth flows. Regressions can slip through.
+- **Evidence:** No test files found for auth in `apps/frontend/`
+- **Required Actions:**
+  - Unit tests for Zod schemas (LoginSchema, ForgotPasswordSchema, ResetPasswordSchema)
+  - Unit tests for auth-client utilities (signIn, signOut, resetPassword, updatePassword - with mocked Supabase)
+  - Integration test for auth callback route
+  - Integration test for middleware redirect logic
+  - E2E tests for complete login/logout/password-reset flows
+
+**2. Story File NOT UPDATED - PROCEDURAL VIOLATION**
+- **Issue:** Implementation exists, but story file shows all tasks as incomplete `[ ]`
+- **Impact:** Sprint tracking is broken. Next developer cannot trust story status.
+- **Evidence:**
+  - Story file status: "ready-for-dev"
+  - Sprint-status.yaml status: "review" (MISMATCH)
+  - All 11 tasks marked `[ ]` despite code existing
+  - File List section: EMPTY
+  - Completion Notes section: EMPTY
+- **Required Action:** Update story file with completed tasks, file list, and completion notes
+
+### 🟡 MEDIUM SEVERITY
+
+**3. Remember Me Functionality Incomplete (AC-000.1)**
+- **Issue:** AC-000.1 requires "Remember me" extends session to 30 days. Current implementation has TODO comment.
+- **Evidence:** `lib/auth/auth-client.ts:31-32` - Comment says "would be handled via Supabase Auth settings"
+- **Impact:** Remember me checkbox does nothing currently
+- **Suggested Fix:**
+  - Option A: Configure Supabase Auth settings for session duration
+  - Option B: Pass session ttl parameter to Supabase signInWithPassword() based on rememberMe flag
+
+**4. Password Strength Indicator Missing Optional Security Feature**
+- **Issue:** PasswordStrength component checks weak/medium/strong but doesn't check for special characters
+- **Evidence:** `components/auth/PasswordStrength.tsx:18` - Only checks uppercase, number, length
+- **Impact:** Users might create slightly weaker passwords
+- **Suggested Enhancement:** Add check for special characters to reach "strong" level
+
+## Acceptance Criteria Coverage
+
+| AC # | Description | Status | Evidence |
+|------|-------------|--------|----------|
+| **AC-000.1** | Login page functionality | ✅ IMPLEMENTED (partial) | `app/login/page.tsx:6-26`<br>`components/auth/LoginForm.tsx:24-183`<br>⚠️ Remember me incomplete |
+| **AC-000.2** | Forgot password flow | ✅ IMPLEMENTED | `app/forgot-password/page.tsx:10-29`<br>`components/auth/ForgotPasswordForm.tsx:25-131`<br>`lib/auth/auth-client.ts:73-87` |
+| **AC-000.3** | Logout functionality | ✅ IMPLEMENTED | `components/auth/UserMenu.tsx:32-70`<br>`lib/auth/auth-client.ts:41-67`<br>Used in `app/dashboard/page.tsx:27-34` |
+| **AC-000.4** | Signup flow (OPTIONAL) | ⏭️ SKIPPED | Intentionally skipped (invitation-only system per dev notes) |
+| **AC-000.5** | UX/UI requirements | ✅ IMPLEMENTED | All pages use centered card layout, gradient background, Shadcn components, loading states, toast notifications |
+
+**Summary:** 4 of 4 required ACs implemented (AC-000.4 optional and intentionally skipped). 1 partial issue (remember me).
+
+## Task Completion Validation
+
+| Task | Marked As | Verified As | Evidence |
+|------|-----------|-------------|----------|
+| **Task 1:** Supabase Auth Configuration | `[ ]` incomplete | ⚠️ **ASSUMED COMPLETE** | Cannot verify dashboard config. Code uses Supabase Auth correctly. |
+| **Task 2:** Zod Validation Schemas | `[ ]` incomplete | ✅ **COMPLETE** | `lib/validation/auth-schemas.ts:1-47` - All 4 schemas implemented |
+| **Task 3:** Auth API Utilities | `[ ]` incomplete | ✅ **COMPLETE** | `lib/auth/auth-client.ts:1-165` - All functions implemented with error mapping |
+| **Task 4:** Login Page UI | `[ ]` incomplete | ✅ **COMPLETE** | `app/login/page.tsx` + `components/auth/LoginForm.tsx` |
+| **Task 5:** Forgot/Reset Password Pages | `[ ]` incomplete | ✅ **COMPLETE** | `app/forgot-password/page.tsx`<br>`app/reset-password/page.tsx`<br>`components/auth/ForgotPasswordForm.tsx`<br>`components/auth/ResetPasswordForm.tsx`<br>`components/auth/PasswordStrength.tsx` |
+| **Task 6:** Logout Component | `[ ]` incomplete | ✅ **COMPLETE** | `components/auth/UserMenu.tsx` used in `app/dashboard/page.tsx:27-34` |
+| **Task 7:** Signup Page (OPTIONAL) | `[ ]` incomplete | ⏭️ **INTENTIONALLY SKIPPED** | Dev notes: invitation-only system (Story 1.3) |
+| **Task 8:** Middleware & Route Protection | `[ ]` incomplete | ✅ **COMPLETE** | `apps/frontend/middleware.ts:1-69` - Full implementation with redirect logic |
+| **Task 9:** Auth Callback Route | `[ ]` incomplete | ✅ **COMPLETE** | `app/auth/callback/route.ts:1-28` - Code exchange and redirect |
+| **Task 10:** Integration & Testing | `[ ]` incomplete | ❌ **NOT DONE** | **CRITICAL:** No test files exist. Task marked incomplete is ACCURATE. |
+| **Task 11:** UX Design & Documentation | `[ ]` incomplete | ✅ **COMPLETE** | `docs/ux-design-auth-and-dashboard.md` exists (modified 2025-11-21) |
+
+**Critical Finding:** 8 tasks were COMPLETED but marked as `[ ]` incomplete in story file. This is a PROCEDURAL VIOLATION - developer must update story file after implementation.
+
+**Summary:** 9 of 11 tasks verified complete (Task 7 intentionally skipped, Task 10 NOT DONE - missing tests).
+
+## Test Coverage and Gaps
+
+**Current Test Coverage:** ❌ **0%** - NO TESTS EXIST
+
+**Missing Tests (Task 10):**
+
+### Unit Tests (Vitest) - MISSING
+- ❌ Zod schema validation tests
+  - LoginSchema: valid/invalid email, password min length, rememberMe optional
+  - ForgotPasswordSchema: valid/invalid email
+  - ResetPasswordSchema: password requirements (uppercase, number), confirm password match
+- ❌ Auth utilities tests (with mocked Supabase client)
+  - signIn(): success, invalid credentials, error mapping
+  - signOut(): clears session, redirects
+  - resetPassword(): sends email
+  - updatePassword(): success, error handling
+
+### Integration Tests (Vitest) - MISSING
+- ❌ Auth callback route: token exchange, redirect logic, error handling
+- ❌ Middleware: protected route redirect, public route access, authenticated redirect
+
+### E2E Tests (Playwright) - MISSING
+- ❌ Login flow: enter credentials → submit → redirect to dashboard
+- ❌ Login with invalid credentials → error toast shown
+- ❌ Forgot password flow: enter email → success message
+- ❌ Reset password flow: click link → enter new password → success → login
+- ❌ Logout flow: click logout → redirect to /login
+- ❌ Protected route redirect: visit /settings → redirect to /login → login → back to /settings
+
+**Impact:** HIGH - No automated safety net. Manual testing required for every change.
+
+## Architectural Alignment
+
+✅ **Architecture Compliance:** Implementation aligns with Next.js 15 App Router patterns and Supabase Auth best practices.
+
+**Strengths:**
+- Clean separation: pages → components → lib utilities
+- Proper use of Supabase SSR helpers (`createServerSupabase`, `createClient`)
+- Middleware correctly handles session refresh and route protection
+- Error mapping provides user-friendly messages
+- Form validation with Zod prevents invalid submissions
+
+**Minor Observations:**
+- UserMenu component has inline modal instead of using Dialog component from Shadcn (acceptable, but inconsistent with design system)
+- Auth utilities return custom `AuthResult` interface - good pattern for error handling
+
+## Security Notes
+
+✅ **Security Posture:** GOOD - No critical vulnerabilities found.
+
+**Security Strengths:**
+1. ✅ Password reset always shows success message (doesn't reveal if email exists) - `ForgotPasswordForm.tsx:52`
+2. ✅ Zod validation prevents injection attacks
+3. ✅ Supabase handles CSRF tokens in cookies
+4. ✅ HttpOnly cookies with SameSite=Lax (handled by Supabase)
+5. ✅ Password requirements enforced (min 8 chars, uppercase, number)
+6. ✅ Middleware properly checks session before allowing access
+7. ✅ Auth callback validates code before exchange
+
+**Security Recommendations:**
+- Consider adding rate limiting for login attempts (Supabase Auth has this built-in, verify enabled)
+- Consider adding CAPTCHA for password reset form (prevent email enumeration attacks)
+- Document session expiration policy in user-facing docs
+
+## Best-Practices and References
+
+**Stack Detected:**
+- Next.js 15.1.0 (App Router)
+- React 19.0.0
+- TypeScript 5.7.2 (strict mode)
+- Supabase Auth (@supabase/supabase-js, @supabase/ssr)
+- Shadcn/UI + Tailwind CSS
+- React Hook Form + Zod validation
+
+**Best-Practices Followed:**
+- ✅ Server Components for auth checks (`app/dashboard/page.tsx`)
+- ✅ Client Components for interactive forms (`'use client'`)
+- ✅ Form validation with react-hook-form + Zod
+- ✅ Error boundaries with try/catch + toast notifications
+- ✅ Loading states during async operations
+- ✅ Accessible forms (proper labels, autocomplete attributes)
+- ✅ Responsive design with Tailwind utility classes
+
+**References:**
+- [Supabase Auth Docs](https://supabase.com/docs/guides/auth)
+- [Next.js Middleware Docs](https://nextjs.org/docs/app/building-your-application/routing/middleware)
+- [React Hook Form Docs](https://react-hook-form.com/)
+- [Zod Docs](https://zod.dev/)
+
+## Action Items
+
+### 🔴 Code Changes Required (HIGH PRIORITY)
+
+- [ ] [High] **Add complete test suite (Task 10)** - Create unit tests, integration tests, and E2E tests for auth flows [No file yet - needs creation]
+  - Create `lib/validation/__tests__/auth-schemas.test.ts` - Test all Zod schemas
+  - Create `lib/auth/__tests__/auth-client.test.ts` - Test auth utilities with mocked Supabase
+  - Create `app/auth/callback/__tests__/route.test.ts` - Test callback handler
+  - Create `e2e/auth.spec.ts` - Test complete auth flows end-to-end
+
+- [ ] [High] **Update story file with implementation details** - Mark completed tasks, add File List, add Completion Notes [file: docs/sprint-artifacts/1-0-authentication-ui.md]
+  - Mark Tasks 2,3,4,5,6,8,9,11 as `[x]` complete
+  - Add File List section with all created files
+  - Add Completion Notes with summary of implementation
+  - Update Status to "review" in story file (match sprint-status.yaml)
+
+- [ ] [Medium] **Implement Remember Me session extension (AC-000.1)** [file: lib/auth/auth-client.ts:19-34]
+  - Research Supabase Auth session TTL configuration
+  - Either: Configure Supabase dashboard for 30-day sessions with remember me
+  - Or: Pass session config to `signInWithPassword()` based on rememberMe flag
+
+### 📋 Advisory Notes (NO ACTION REQUIRED)
+
+- Note: Consider migrating UserMenu modal to use Shadcn Dialog component for consistency with design system
+- Note: Consider adding password strength requirement for special characters (currently only checks uppercase + number)
+- Note: Document Supabase Auth rate limiting configuration in security docs
+- Note: Task 1 (Supabase Auth Configuration) cannot be verified via code review - ensure dashboard settings are configured correctly
+
+---
+
+## Review Completion Summary
+
+**Implementation Quality:** ✅ EXCELLENT - Clean, maintainable, follows best practices
+**Procedural Compliance:** ❌ POOR - Story file not updated
+**Test Coverage:** ❌ MISSING - 0% test coverage
+
+**Next Steps:**
+1. **Developer:** Address HIGH priority action items (tests, story file update, remember me)
+2. **Developer:** Mark tasks complete in story file and add File List + Completion Notes
+3. **Developer:** Re-run `/bmad:bmm:workflows:dev-story 1-0-authentication-ui` or manually update story
+4. **Senior Dev:** Re-review after changes (can be quick check of tests + story file)
+5. **SM:** Update sprint-status.yaml to "done" after re-review passes
