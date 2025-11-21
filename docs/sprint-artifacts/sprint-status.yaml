@@ -215,7 +215,7 @@ development_status:
 
   epic-1: contexted
   1-0-authentication-ui: review  # NEW: Login/logout/forgot-password pages - READY FOR REVIEW
-  1-1-organization-configuration: ready-for-dev
+  1-1-organization-configuration: done  # Organization settings with logo upload - COMPLETED
   1-2-user-management-crud: review
   1-3-user-invitations: ready-for-dev
   1-4-session-management: ready-for-dev

@@ -13,9 +13,12 @@
  *   NEXT_PUBLIC_SUPABASE_URL
  *   SUPABASE_SERVICE_ROLE_KEY
  *
- * Default credentials (can be overridden):
- *   Email: admin@monopilot.local
- *   Password: Admin123!@#
+ * Optional environment variables:
+ *   ADMIN_EMAIL (default: admin@monopilot.local)
+ *   ADMIN_PASSWORD (default: Admin123!@#)
+ *   ADMIN_FIRST_NAME (default: Admin)
+ *   ADMIN_LAST_NAME (default: User)
+ *   ORG_NAME (default: MonoPilot)
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -128,7 +131,61 @@ async function main() {
     console.log('   User ID:', newUser.user.id);
     console.log('   Email confirmed:', newUser.user.email_confirmed_at ? 'Yes' : 'No');
 
-    // Step 3: Display credentials
+    // Step 3: Create organization
+    console.log('\n📋 Step 3: Creating organization...');
+    const { data: organization, error: orgError } = await supabase
+      .from('organizations')
+      .insert({
+        company_name: process.env.ORG_NAME || 'MonoPilot',
+        date_format: 'DD/MM/YYYY',
+        number_format: '1,234.56',
+        unit_system: 'metric',
+        timezone: 'UTC',
+        default_currency: 'EUR',
+        default_language: 'EN'
+      })
+      .select()
+      .single();
+
+    if (orgError) {
+      console.error('❌ Error creating organization:', orgError.message);
+      console.error('   Rolling back - deleting auth user...');
+      await supabase.auth.admin.deleteUser(newUser.user.id);
+      process.exit(1);
+    }
+
+    console.log('✓ Organization created successfully');
+    console.log('   Organization ID:', organization.id);
+    console.log('   Company Name:', organization.company_name);
+
+    // Step 4: Create user record in public.users table
+    console.log('\n📋 Step 4: Creating user record...');
+    const { data: userRecord, error: userRecordError } = await supabase
+      .from('users')
+      .insert({
+        id: newUser.user.id,
+        org_id: organization.id,
+        email: adminEmail,
+        first_name: adminFirstName,
+        last_name: adminLastName,
+        role: 'admin',
+        status: 'active'
+      })
+      .select()
+      .single();
+
+    if (userRecordError) {
+      console.error('❌ Error creating user record:', userRecordError.message);
+      console.error('   Rolling back - deleting organization and auth user...');
+      await supabase.from('organizations').delete().eq('id', organization.id);
+      await supabase.auth.admin.deleteUser(newUser.user.id);
+      process.exit(1);
+    }
+
+    console.log('✓ User record created successfully');
+    console.log('   Linked to organization:', organization.id);
+
+    // Step 5: Display credentials
     console.log('\n' + '='.repeat(60));
     console.log('✅ FIRST ADMIN USER CREATED SUCCESSFULLY');
     console.log('='.repeat(60));
@@ -143,8 +200,8 @@ async function main() {
     console.log('   - Keep these credentials secure');
     console.log('\n' + '='.repeat(60) + '\n');
 
-    // Step 4: Verify user can be retrieved
-    console.log('📋 Step 3: Verifying user...');
+    // Step 6: Verify user can be retrieved
+    console.log('\n📋 Step 6: Verifying user...');
     const { data: userData, error: getError } = await supabase.auth.admin.getUserById(newUser.user.id);
 
     if (getError) {
