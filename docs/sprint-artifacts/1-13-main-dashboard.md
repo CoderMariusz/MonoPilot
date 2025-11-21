@@ -108,26 +108,26 @@ so that I can quickly access key information and navigate to different modules.
 - [x] Run migration and verify schema
 
 ### Task 3: API Endpoints (AC: 012.2, 012.3, 012.4)
-- [ ] Implement GET /api/dashboard/overview:
-  - [ ] Returns module stats (active WOs, pending POs, stock alerts, etc.)
-  - [ ] Query each module's table for counts
-  - [ ] Filter by enabled modules (from organizations.modules_enabled)
-  - [ ] Cache results (Redis, 5 min TTL)
-  - [ ] Response: { modules: [{ name, icon, stats, primaryAction }] }
-- [ ] Implement GET /api/dashboard/activity:
-  - [ ] Fetch last 10 activities from activity_logs table
-  - [ ] Filter by org_id (from JWT)
-  - [ ] Order by created_at DESC
-  - [ ] Include user name (JOIN users table)
-  - [ ] Response: [{ id, type, description, user, createdAt, entityLink }]
-- [ ] Implement GET /api/dashboard/search?q={query}:
-  - [ ] Search across: work_orders, purchase_orders, license_plates, products, suppliers
-  - [ ] Use PostgreSQL full-text search (tsquery) or ILIKE for MVP
-  - [ ] Limit 20 results, grouped by entity type
-  - [ ] Response: { workOrders: [], purchaseOrders: [], licensePlates: [], products: [] }
-- [ ] Implement PUT /api/dashboard/preferences (optional):
-  - [ ] Update user_preferences.dashboard_config
-  - [ ] Validate with Zod schema
+- [x] Implement GET /api/dashboard/overview:
+  - [x] Returns module stats (active WOs, pending POs, stock alerts, etc.)
+  - [x] Query each module's table for counts
+  - [x] Filter by enabled modules (from organizations.modules_enabled)
+  - [x] Cache results (Redis, 5 min TTL)
+  - [x] Response: { modules: [{ name, icon, stats, primaryAction }] }
+- [x] Implement GET /api/dashboard/activity:
+  - [x] Fetch last 10 activities from activity_logs table
+  - [x] Filter by org_id (from JWT)
+  - [x] Order by created_at DESC
+  - [x] Include user name (JOIN users table)
+  - [x] Response: [{ id, type, description, user, createdAt, entityLink }]
+- [x] Implement GET /api/dashboard/search?q={query}:
+  - [x] Search across: work_orders, purchase_orders, license_plates, products, suppliers
+  - [x] Use PostgreSQL full-text search (tsquery) or ILIKE for MVP
+  - [x] Limit 20 results, grouped by entity type
+  - [x] Response: { workOrders: [], purchaseOrders: [], licensePlates: [], products: [] }
+- [x] Implement PUT /api/dashboard/preferences (optional):
+  - [x] Update user_preferences.dashboard_config
+  - [x] Validate with Zod schema
 
 ### Task 4: Activity Logging Utility (AC: 012.3)
 - [ ] Create `lib/activity/log-activity.ts` utility:
@@ -433,11 +433,20 @@ supabase/
 - Implemented RLS policies for user-owned preferences
 - Seed data created for all existing users with default config
 
+**Task 3 - API Endpoints (2025-11-21):**
+- Created 4 API route handlers in Next.js 15 App Router
+- GET /api/dashboard/overview - Module statistics with graceful degradation
+- GET /api/dashboard/activity - Activity feed with user JOIN and pagination
+- GET /api/dashboard/search - Global search across entities (ILIKE pattern matching)
+- PUT /api/dashboard/preferences - Update user preferences with Zod validation
+- All endpoints implement authentication, authorization, and error handling
+
 ### Completion Notes List
 
 **In Progress - Session 1.13:**
 - ✅ Task 1 COMPLETED: Activity logs database schema created with full RLS support
 - ✅ Task 2 COMPLETED: User preferences schema with JSONB config and helper functions
+- ✅ Task 3 COMPLETED: 4 API endpoints implemented with authentication and validation
 - Migration files ready for execution via Supabase Dashboard
 
 ### File List
@@ -445,6 +454,10 @@ supabase/
 **NEW:**
 - `apps/frontend/lib/supabase/migrations/003_create_activity_logs_table.sql` - Activity logs table migration with RLS policies
 - `apps/frontend/lib/supabase/migrations/004_create_user_preferences_table.sql` - User preferences table migration with JSONB config
+- `apps/frontend/app/api/dashboard/overview/route.ts` - Dashboard overview API endpoint
+- `apps/frontend/app/api/dashboard/activity/route.ts` - Activity feed API endpoint
+- `apps/frontend/app/api/dashboard/search/route.ts` - Global search API endpoint
+- `apps/frontend/app/api/dashboard/preferences/route.ts` - User preferences API endpoint
 
 ## Change Log
 
