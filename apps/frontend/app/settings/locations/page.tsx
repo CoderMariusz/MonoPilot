@@ -28,6 +28,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { MapPin, Search, Edit, Trash2, Archive, QrCode } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
+import { LocationForm } from '@/components/settings/LocationForm'
+import { LocationDetailModal } from '@/components/settings/LocationDetailModal'
 
 interface Location {
   id: string
@@ -52,6 +54,9 @@ export default function LocationsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [activeFilter, setActiveFilter] = useState<string>('active')
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null)
+  const [viewingLocationId, setViewingLocationId] = useState<string | null>(null)
   const { toast } = useToast()
 
   // Fetch locations
@@ -193,7 +198,7 @@ export default function LocationsPage() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Location Management</CardTitle>
-            <Button onClick={() => alert('TODO: Create Location Modal (Task 7)')}>
+            <Button onClick={() => setShowCreateForm(true)}>
               <MapPin className="mr-2 h-4 w-4" />
               Add Location
             </Button>
@@ -298,9 +303,7 @@ export default function LocationsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() =>
-                            alert('TODO: Show QR Code Modal (Task 8)')
-                          }
+                          onClick={() => setViewingLocationId(location.id)}
                           title="View QR Code"
                         >
                           <QrCode className="h-4 w-4" />
@@ -310,7 +313,7 @@ export default function LocationsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => alert('TODO: Edit Location Modal (Task 7)')}
+                          onClick={() => setEditingLocation(location)}
                           title="Edit"
                         >
                           <Edit className="h-4 w-4" />
@@ -345,8 +348,29 @@ export default function LocationsPage() {
         </CardContent>
       </Card>
 
-      {/* TODO: Task 7 - Location Form Modal */}
-      {/* TODO: Task 8 - Location Detail/QR Code Modal */}
+      {/* Location Form Modal (Create) */}
+      <LocationForm
+        open={showCreateForm}
+        onOpenChange={setShowCreateForm}
+        onSuccess={fetchLocations}
+      />
+
+      {/* Location Form Modal (Edit) */}
+      {editingLocation && (
+        <LocationForm
+          open={!!editingLocation}
+          onOpenChange={(open) => !open && setEditingLocation(null)}
+          onSuccess={fetchLocations}
+          location={editingLocation}
+        />
+      )}
+
+      {/* Location Detail/QR Code Modal */}
+      <LocationDetailModal
+        open={!!viewingLocationId}
+        onOpenChange={(open) => !open && setViewingLocationId(null)}
+        locationId={viewingLocationId}
+      />
     </div>
   )
 }
