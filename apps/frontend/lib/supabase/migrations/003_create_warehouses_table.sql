@@ -1,4 +1,5 @@
 -- Migration 003: Create warehouses table with RLS
+-- Story: 1.5 Warehouse Configuration (prerequisite for 1.6 Locations)
 -- Story: 1.5 Warehouse Configuration
 -- Date: 2025-11-21
 
@@ -15,6 +16,14 @@ CREATE TABLE IF NOT EXISTS public.warehouses (
   name VARCHAR(100) NOT NULL,
   address TEXT,
 
+  -- Default locations (nullable initially, updated after locations created)
+  default_receiving_location_id UUID REFERENCES public.locations(id) ON DELETE RESTRICT,
+  default_shipping_location_id UUID REFERENCES public.locations(id) ON DELETE RESTRICT,
+  transit_location_id UUID REFERENCES public.locations(id) ON DELETE RESTRICT,
+
+  is_active BOOLEAN NOT NULL DEFAULT true,
+
+  -- Audit fields
   -- Default Locations (nullable initially, circular dependency resolution)
   -- These are set after locations are created (Story 1.6)
   default_receiving_location_id UUID,
@@ -31,6 +40,7 @@ CREATE TABLE IF NOT EXISTS public.warehouses (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 
   -- Constraints
+  CONSTRAINT warehouses_org_code_unique UNIQUE (org_id, code)
   CONSTRAINT warehouses_code_org_unique UNIQUE (org_id, code),
   CONSTRAINT warehouses_code_format_check CHECK (code ~ '^[A-Z0-9-]+$'),
   CONSTRAINT warehouses_code_length_check CHECK (char_length(code) >= 2 AND char_length(code) <= 50),
@@ -43,6 +53,9 @@ CREATE TABLE IF NOT EXISTS public.warehouses (
 
 -- Performance indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_warehouses_org_id ON public.warehouses(org_id);
+CREATE INDEX IF NOT EXISTS idx_warehouses_code ON public.warehouses(code);
+CREATE INDEX IF NOT EXISTS idx_warehouses_is_active ON public.warehouses(is_active);
+CREATE INDEX IF NOT EXISTS idx_warehouses_org_active ON public.warehouses(org_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_warehouses_code ON public.warehouses(org_id, code); -- Composite for unique lookups
 CREATE INDEX IF NOT EXISTS idx_warehouses_active ON public.warehouses(org_id, is_active); -- For filtering active warehouses
 CREATE INDEX IF NOT EXISTS idx_warehouses_default_receiving ON public.warehouses(default_receiving_location_id) WHERE default_receiving_location_id IS NOT NULL;
@@ -108,6 +121,7 @@ CREATE POLICY warehouses_delete_policy ON public.warehouses
 -- CREATE UPDATED_AT TRIGGER
 -- ============================================================================
 
+-- Trigger to call function on UPDATE (reuse existing function)
 -- Trigger to call function on UPDATE (function already created in migration 000)
 CREATE TRIGGER warehouses_updated_at_trigger
   BEFORE UPDATE ON public.warehouses
@@ -118,6 +132,7 @@ CREATE TRIGGER warehouses_updated_at_trigger
 -- GRANT PERMISSIONS
 -- ============================================================================
 
+-- Grant permissions to authenticated users
 -- Grant permissions to authenticated users (RLS enforces org isolation)
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.warehouses TO authenticated;
 GRANT SELECT ON public.warehouses TO anon;
@@ -126,6 +141,13 @@ GRANT SELECT ON public.warehouses TO anon;
 -- COMMENTS
 -- ============================================================================
 
+COMMENT ON TABLE public.warehouses IS 'Warehouse configuration with default location assignments and multi-tenancy';
+COMMENT ON COLUMN public.warehouses.org_id IS 'Organization FK for multi-tenancy isolation';
+COMMENT ON COLUMN public.warehouses.code IS 'Unique warehouse code per organization (e.g., WH-01, MAIN)';
+COMMENT ON COLUMN public.warehouses.default_receiving_location_id IS 'Default location for PO receiving (nullable initially, set after locations created)';
+COMMENT ON COLUMN public.warehouses.default_shipping_location_id IS 'Default location for shipping operations (nullable initially)';
+COMMENT ON COLUMN public.warehouses.transit_location_id IS 'Default location for transit/staging operations (nullable initially)';
+COMMENT ON COLUMN public.warehouses.is_active IS 'Soft delete flag - inactive warehouses hidden from UI';
 COMMENT ON TABLE public.warehouses IS 'Warehouse configuration with default locations (Story 1.5)';
 COMMENT ON COLUMN public.warehouses.id IS 'Primary key (UUID)';
 COMMENT ON COLUMN public.warehouses.org_id IS 'Organization FK for multi-tenancy isolation';
