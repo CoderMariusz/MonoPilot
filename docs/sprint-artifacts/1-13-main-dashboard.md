@@ -83,19 +83,19 @@ so that I can quickly access key information and navigate to different modules.
 ## Tasks / Subtasks
 
 ### Task 1: Database Schema for Activity Feed (AC: 012.3)
-- [ ] Create `activity_logs` table migration:
-  - [ ] id (UUID PK)
-  - [ ] org_id (UUID, FK to organizations)
-  - [ ] user_id (UUID, FK to users) - who performed the action
-  - [ ] activity_type (enum: wo_status_change, po_approved, lp_received, ncr_created, etc.)
-  - [ ] entity_type (enum: work_order, purchase_order, license_plate, ncr, etc.)
-  - [ ] entity_id (UUID) - polymorphic reference
-  - [ ] entity_code (TEXT) - display code (e.g., "WO-2024-001")
-  - [ ] description (TEXT) - human-readable message
-  - [ ] metadata (JSONB) - additional context
-  - [ ] created_at (TIMESTAMP)
-- [ ] Create indexes: (org_id, created_at DESC), (entity_type, entity_id)
-- [ ] Add RLS policy: users can only see activities from their org
+- [x] Create `activity_logs` table migration:
+  - [x] id (UUID PK)
+  - [x] org_id (UUID, FK to organizations)
+  - [x] user_id (UUID, FK to users) - who performed the action
+  - [x] activity_type (enum: wo_status_change, po_approved, lp_received, ncr_created, etc.)
+  - [x] entity_type (enum: work_order, purchase_order, license_plate, ncr, etc.)
+  - [x] entity_id (UUID) - polymorphic reference
+  - [x] entity_code (TEXT) - display code (e.g., "WO-2024-001")
+  - [x] description (TEXT) - human-readable message
+  - [x] metadata (JSONB) - additional context
+  - [x] created_at (TIMESTAMP)
+- [x] Create indexes: (org_id, created_at DESC), (entity_type, entity_id)
+- [x] Add RLS policy: users can only see activities from their org
 
 ### Task 2: Database Schema for User Preferences (AC: 012.5 - optional)
 - [ ] Create `user_preferences` table migration (or JSONB column in users table):
@@ -414,19 +414,28 @@ supabase/
 
 ### Agent Model Used
 
-<!-- Will be filled during implementation -->
+- Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
+- Session Date: 2025-11-21
 
 ### Debug Log References
 
-<!-- Will be added during implementation -->
+**Task 1 - Database Schema for Activity Feed (2025-11-21):**
+- Created migration 003_create_activity_logs_table.sql
+- Implemented activity_logs table with 27 activity types and 9 entity types
+- Added 4 performance indexes for dashboard queries
+- Implemented RLS policies for multi-tenancy isolation
+- Added seed data with 3 example activities for testing
 
 ### Completion Notes List
 
-<!-- Will be added after story completion -->
+**In Progress - Session 1.13:**
+- ✅ Task 1 COMPLETED: Activity logs database schema created with full RLS support
+- Migration file ready for execution via Supabase Dashboard
 
 ### File List
 
-<!-- NEW/MODIFIED/DELETED files will be listed here after implementation -->
+**NEW:**
+- `apps/frontend/lib/supabase/migrations/003_create_activity_logs_table.sql` - Activity logs table migration with RLS policies
 
 ## Change Log
 
