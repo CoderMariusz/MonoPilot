@@ -30,6 +30,8 @@ import { UserPlus, Search, Edit, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import type { User } from '@/lib/validation/user-schemas'
 import { getRoleLabel, getStatusLabel } from '@/lib/validation/user-schemas'
+import { UserForm } from '@/components/settings/UserForm'
+import { EditUserDrawer } from '@/components/settings/EditUserDrawer'
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
@@ -37,6 +39,8 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
   const { toast } = useToast()
 
   // Fetch users
@@ -135,7 +139,7 @@ export default function UsersPage() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>User Management</CardTitle>
-            <Button>
+            <Button onClick={() => setShowCreateForm(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
               Add User
             </Button>
@@ -234,12 +238,7 @@ export default function UsersPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              toast({
-                                title: 'Edit User',
-                                description: 'Edit functionality coming soon',
-                              })
-                            }}
+                            onClick={() => setEditingUser(user)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -261,6 +260,21 @@ export default function UsersPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Create User Modal */}
+      <UserForm
+        open={showCreateForm}
+        onOpenChange={setShowCreateForm}
+        onSuccess={fetchUsers}
+      />
+
+      {/* Edit User Drawer */}
+      <EditUserDrawer
+        user={editingUser}
+        open={!!editingUser}
+        onOpenChange={(open) => !open && setEditingUser(null)}
+        onSuccess={fetchUsers}
+      />
     </div>
   )
 }
