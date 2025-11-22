@@ -1,6 +1,7 @@
 /**
  * User Form Component
  * Story: 1.2 User Management - CRUD
+ * Story: 1.14 (Batch 2) - AC-1.2: Invitation Modal Integration
  * Task 4: Frontend User Management Page (AC-002.1)
  *
  * Modal form for creating new users
@@ -48,9 +49,10 @@ interface UserFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
+  onInvitationCreated?: (data: { email: string; token: string; expiresAt: string }) => void
 }
 
-export function UserForm({ open, onOpenChange, onSuccess }: UserFormProps) {
+export function UserForm({ open, onOpenChange, onSuccess, onInvitationCreated }: UserFormProps) {
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
@@ -83,13 +85,25 @@ export function UserForm({ open, onOpenChange, onSuccess }: UserFormProps) {
 
       const result = await response.json()
 
-      toast({
-        title: 'Success',
-        description: `User ${data.first_name} ${data.last_name} created successfully`,
-      })
-
+      // Close the form
       form.reset()
       onOpenChange(false)
+
+      // Trigger invitation modal if callback provided (Story 1.14)
+      if (result.invitation && onInvitationCreated) {
+        onInvitationCreated({
+          email: data.email,
+          token: result.invitation.token,
+          expiresAt: result.invitation.expiresAt,
+        })
+      } else {
+        // Fallback to toast if no modal callback
+        toast({
+          title: 'Success',
+          description: `User ${data.first_name} ${data.last_name} created successfully`,
+        })
+      }
+
       onSuccess?.()
     } catch (error) {
       console.error('Error creating user:', error)

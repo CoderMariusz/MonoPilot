@@ -35,6 +35,7 @@ import { getRoleLabel, getStatusLabel } from '@/lib/validation/user-schemas'
 import { UserForm } from '@/components/settings/UserForm'
 import { EditUserDrawer } from '@/components/settings/EditUserDrawer'
 import { InvitationsTable } from '@/components/settings/InvitationsTable'
+import { InvitationModal } from '@/components/settings/InvitationModal'
 
 export default function UsersPage() {
   const [activeTab, setActiveTab] = useState('users')
@@ -45,6 +46,12 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [showInvitationModal, setShowInvitationModal] = useState(false)
+  const [invitationData, setInvitationData] = useState<{
+    email: string
+    token: string
+    expiresAt: string
+  } | null>(null)
   const { toast } = useToast()
 
   // Fetch users
@@ -90,6 +97,17 @@ export default function UsersPage() {
 
     return () => clearTimeout(timer)
   }, [searchTerm])
+
+  // Invitation created handler (AC-1.2: Show invitation modal)
+  const handleInvitationCreated = (data: { email: string; token: string; expiresAt: string }) => {
+    setInvitationData(data)
+    setShowInvitationModal(true)
+  }
+
+  // Send another invitation handler
+  const handleSendAnother = () => {
+    setShowCreateForm(true)
+  }
 
   // Delete user handler
   const handleDeactivate = async (user: User) => {
@@ -283,6 +301,15 @@ export default function UsersPage() {
         open={showCreateForm}
         onOpenChange={setShowCreateForm}
         onSuccess={fetchUsers}
+        onInvitationCreated={handleInvitationCreated}
+      />
+
+      {/* Invitation Success Modal (AC-1.2) */}
+      <InvitationModal
+        open={showInvitationModal}
+        onOpenChange={setShowInvitationModal}
+        invitationData={invitationData}
+        onSendAnother={handleSendAnother}
       />
 
       {/* Edit User Drawer */}

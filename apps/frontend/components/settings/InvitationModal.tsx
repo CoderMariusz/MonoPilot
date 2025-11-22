@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
-import { CheckCircle2, Copy, Mail, ExternalLink } from 'lucide-react'
+import { CheckCircle2, Copy, Mail, ExternalLink, UserPlus } from 'lucide-react'
 import QRCode from 'qrcode'
 
 interface InvitationModalProps {
@@ -240,6 +240,3 @@ export function InvitationModal({
     </Dialog>
   )
 }
-
-// Missing import
-import { UserPlus } from 'lucide-react'
