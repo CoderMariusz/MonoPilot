@@ -14,7 +14,11 @@
       "Bash(NEXT_PUBLIC_SUPABASE_URL=\"https://pgroxddbtaevdegnidaz.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncm94ZGRidGFldmRlZ25pZGF6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTk1ODM3MywiZXhwIjoyMDc1NTM0MzczfQ.ZdMzCB9SPMuPLvM5pq1g6s7p-8qvYdyf6WfCoDIPVDg\" pnpm test __tests__/api/settings/modules.test.ts)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(pnpm type-check:*)"
+      "Bash(pnpm type-check:*)",
+      "Bash(SUPABASE_URL=https://pgroxddbtaevdegnidaz.supabase.co SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncm94ZGRidGFldmRlZ25pZGF6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTk1ODM3MywiZXhwIjoyMDc1NTM0MzczfQ.ZdMzCB9SPMuPLvM5pq1g6s7p-8qvYdyf6WfCoDIPVDg node:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac curl -s \"https://api.supabase.com/v1/projects/pgroxddbtaevdegnidaz/database/query\" -H \"Authorization: Bearer sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac\" -H \"Content-Type: application/json\" -d \"{\"\"query\"\": \"\"SELECT tablename FROM pg_tables WHERE schemaname = ''''public'''' AND tablename IN (''''warehouses'''', ''''locations'''', ''''machines'''', ''''production_lines'''', ''''allergens'''', ''''tax_codes'''', ''''user_invitations'''') ORDER BY tablename;\"\"}\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac curl -s \"https://api.supabase.com/v1/projects/pgroxddbtaevdegnidaz/database/query\" -H \"Authorization: Bearer sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac\" -H \"Content-Type: application/json\" -d \"{\"\"query\"\": \"\"SELECT trigger_name, event_manipulation, event_object_table, action_statement FROM information_schema.triggers WHERE trigger_name = ''''trigger_auto_activate_user'''';\"\"}\")",
+      "Bash(npx shadcn@latest add:*)"
     ],
     "deny": [],
     "ask": []

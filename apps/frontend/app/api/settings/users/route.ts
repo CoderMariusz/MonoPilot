@@ -251,6 +251,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Story 1.3: Send invitation email with magic link
+    let invitationData = null
     try {
       // Get organization name for email template
       const { data: org } = await supabase
@@ -266,6 +267,12 @@ export async function POST(request: NextRequest) {
         role: createdUser.role,
         invitedBy: user.id,
       })
+
+      // Store invitation data for response (Story 1.14: InvitationModal)
+      invitationData = {
+        token: invitation.token,
+        expiresAt: invitation.expires_at,
+      }
 
       // Generate QR code for invitation
       const qrCode = await generateInvitationQRCode(
@@ -302,6 +309,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         user: createdUser,
+        invitation: invitationData,
         message: 'User created successfully',
       },
       { status: 201 }

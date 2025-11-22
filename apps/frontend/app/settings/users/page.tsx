@@ -1,6 +1,7 @@
 /**
  * User Management Page
  * Story: 1.2 User Management - CRUD
+ * Story: 1.14 (Batch 2) - AC-1.1: Invitations Tab UI
  * Task 4: Frontend User Management Page (AC-002.2, AC-002.3, AC-002.4)
  */
 
@@ -17,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
   TableBody,
@@ -32,8 +34,10 @@ import type { User } from '@/lib/validation/user-schemas'
 import { getRoleLabel, getStatusLabel } from '@/lib/validation/user-schemas'
 import { UserForm } from '@/components/settings/UserForm'
 import { EditUserDrawer } from '@/components/settings/EditUserDrawer'
+import { InvitationsTable } from '@/components/settings/InvitationsTable'
 
 export default function UsersPage() {
+  const [activeTab, setActiveTab] = useState('users')
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -147,6 +151,13 @@ export default function UsersPage() {
         </CardHeader>
 
         <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="mb-6">
+              <TabsTrigger value="users">Users</TabsTrigger>
+              <TabsTrigger value="invitations">Invitations</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="users" className="space-y-4">
           {/* Filters */}
           <div className="flex gap-4 mb-6">
             <div className="flex-1">
@@ -258,6 +269,12 @@ export default function UsersPage() {
               </TableBody>
             </Table>
           </div>
+            </TabsContent>
+
+            <TabsContent value="invitations">
+              <InvitationsTable />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
