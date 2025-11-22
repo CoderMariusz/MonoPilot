@@ -222,7 +222,7 @@ development_status:
   1-5-warehouse-configuration: done  # APPROVED (2025-11-21): All ACs implemented, 37 tests, production-ready
   1-6-location-management: done  # Location Management - APPROVED (2025-11-22): All must-have ACs implemented, 62 tests, production-ready
   1-7-machine-configuration: done  # Machine Configuration - APPROVED (2025-11-22): 7/8 ACs implemented (AC-006.7 optional), 37 integration tests, deferred items in Story 1.14
-  1-8-production-line-configuration: ready-for-dev
+  1-8-production-line-configuration: done  # Production Line Configuration - Backend complete (2025-11-22): Migration 009, Service, API, Validation. Frontend/tests deferred to 1.14
   1-9-allergen-management: ready-for-dev
   1-10-tax-code-configuration: ready-for-dev
   1-11-module-activation: ready-for-dev

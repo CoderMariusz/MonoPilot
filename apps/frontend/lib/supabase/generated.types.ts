@@ -175,6 +175,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "machine_line_assignments_line_fk"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "production_lines"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "machine_line_assignments_machine_id_fkey"
             columns: ["machine_id"]
             isOneToOne: false
@@ -304,6 +311,81 @@ export type Database = {
         }
         Relationships: []
       }
+      production_lines: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          default_output_location_id: string | null
+          id: string
+          name: string
+          org_id: string
+          updated_at: string
+          updated_by: string | null
+          warehouse_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          default_output_location_id?: string | null
+          id?: string
+          name: string
+          org_id: string
+          updated_at?: string
+          updated_by?: string | null
+          warehouse_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          default_output_location_id?: string | null
+          id?: string
+          name?: string
+          org_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_lines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_lines_default_output_location_id_fkey"
+            columns: ["default_output_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_lines_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_lines_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_lines_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_invitations: {
         Row: {
           accepted_at: string | null
@@ -385,6 +467,56 @@ export type Database = {
             foreignKeyName: "user_preferences_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_sessions: {
+        Row: {
+          created_at: string
+          device_info: string | null
+          id: string
+          ip_address: string | null
+          is_active: boolean
+          last_activity: string
+          location: string | null
+          logged_out_at: string | null
+          login_time: string
+          token_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean
+          last_activity?: string
+          location?: string | null
+          logged_out_at?: string | null
+          login_time?: string
+          token_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean
+          last_activity?: string
+          location?: string | null
+          logged_out_at?: string | null
+          login_time?: string
+          token_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
