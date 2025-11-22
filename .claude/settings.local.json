@@ -169,7 +169,8 @@
       "Bash(then grep -E \"SUPABASE_URL|SERVICE_ROLE\" apps/frontend/.env.local)",
       "Bash(then grep -E \"DATABASE_URL|DB_PASSWORD|POSTGRES\" \"apps/frontend/.env.local\")",
       "Bash(then grep -E \"SUPABASE.*TOKEN|SUPABASE.*KEY\" apps/frontend/.env.local)",
-      "Bash(pnpm --filter monopilot2 type-check:*)"
+      "Bash(pnpm --filter monopilot2 type-check:*)",
+      "Bash(then grep -E \"SUPABASE_URL|SUPABASE.*KEY\" apps/frontend/.env.local)"
     ],
     "deny": [],
     "ask": []
