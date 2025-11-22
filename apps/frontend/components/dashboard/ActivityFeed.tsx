@@ -3,10 +3,13 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDistanceToNow } from 'date-fns'
+import Link from 'next/link'
 
 interface ActivityLog {
   id: string
   activity_type: string
+  entity_type: string
+  entity_id: string
   entity_code: string
   description: string
   created_at: string
@@ -56,6 +59,33 @@ export function ActivityFeed({ limit = 10 }: ActivityFeedProps) {
     return '📌'
   }
 
+  const getEntityLink = (activity: ActivityLog): string => {
+    const { entity_type, entity_id } = activity
+
+    switch (entity_type) {
+      case 'work_order':
+        return `/production/work-orders/${entity_id}`
+      case 'purchase_order':
+        return `/planning/purchase-orders/${entity_id}`
+      case 'transfer_order':
+        return `/warehouse/transfers/${entity_id}`
+      case 'license_plate':
+        return `/warehouse/license-plates/${entity_id}`
+      case 'ncr':
+        return `/quality/ncr/${entity_id}`
+      case 'shipment':
+        return `/shipping/shipments/${entity_id}`
+      case 'user':
+        return `/settings/users/${entity_id}`
+      case 'organization':
+        return `/settings`
+      case 'module':
+        return `/settings/modules`
+      default:
+        return '#'
+    }
+  }
+
   if (loading) {
     return (
       <Card className="w-full lg:w-80">
@@ -100,9 +130,10 @@ export function ActivityFeed({ limit = 10 }: ActivityFeedProps) {
         ) : (
           <div className="space-y-3">
             {activities.map((activity) => (
-              <div
+              <Link
                 key={activity.id}
-                className="flex items-start gap-3 rounded-lg p-2 hover:bg-gray-50 transition-colors cursor-pointer"
+                href={getEntityLink(activity)}
+                className="flex items-start gap-3 rounded-lg p-2 hover:bg-gray-50 transition-colors cursor-pointer block"
               >
                 <div className="text-2xl flex-shrink-0">
                   {getActivityIcon(activity.activity_type)}
@@ -120,7 +151,7 @@ export function ActivityFeed({ limit = 10 }: ActivityFeedProps) {
                     })}
                   </p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

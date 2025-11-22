@@ -5,6 +5,7 @@ import { ModuleCard, type ModuleCardProps } from '@/components/dashboard/ModuleC
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { WelcomeBanner } from '@/components/dashboard/WelcomeBanner'
 import { QuickActions } from '@/components/dashboard/QuickActions'
+import { Sidebar } from '@/components/navigation/Sidebar'
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabase()
@@ -28,20 +29,22 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Get organization to check setup status
+  // Get organization to check setup status and enabled modules
   const { data: organization } = await supabase
     .from('organizations')
-    .select('setup_completed')
+    .select('setup_completed, enabled_modules')
     .eq('id', currentUser.org_id)
     .single()
 
   const showWelcomeBanner = !organization?.setup_completed
+  const enabledModules = organization?.enabled_modules || []
 
   const user = session.user
 
-  // Define module cards (hardcoded for MVP, will be dynamic in future)
-  const modules: ModuleCardProps[] = [
+  // Define all available module cards
+  const allModules: ModuleCardProps[] = [
     {
+      moduleKey: 'settings',
       name: 'Settings',
       icon: '⚙️',
       color: 'gray',
@@ -54,6 +57,7 @@ export default async function DashboardPage() {
       detailsHref: '/settings',
     },
     {
+      moduleKey: 'technical',
       name: 'Technical',
       icon: '🔧',
       color: 'blue',
@@ -66,6 +70,7 @@ export default async function DashboardPage() {
       detailsHref: '/technical',
     },
     {
+      moduleKey: 'planning',
       name: 'Planning',
       icon: '📋',
       color: 'indigo',
@@ -78,6 +83,7 @@ export default async function DashboardPage() {
       detailsHref: '/planning',
     },
     {
+      moduleKey: 'production',
       name: 'Production',
       icon: '🏭',
       color: 'green',
@@ -90,6 +96,7 @@ export default async function DashboardPage() {
       detailsHref: '/production',
     },
     {
+      moduleKey: 'warehouse',
       name: 'Warehouse',
       icon: '📦',
       color: 'orange',
@@ -102,6 +109,7 @@ export default async function DashboardPage() {
       detailsHref: '/warehouse',
     },
     {
+      moduleKey: 'quality',
       name: 'Quality',
       icon: '✅',
       color: 'red',
@@ -114,6 +122,7 @@ export default async function DashboardPage() {
       detailsHref: '/quality',
     },
     {
+      moduleKey: 'shipping',
       name: 'Shipping',
       icon: '🚚',
       color: 'purple',
@@ -126,6 +135,7 @@ export default async function DashboardPage() {
       detailsHref: '/shipping',
     },
     {
+      moduleKey: 'npd',
       name: 'NPD',
       icon: '💡',
       color: 'pink',
@@ -139,11 +149,18 @@ export default async function DashboardPage() {
     },
   ]
 
+  // Filter modules based on organization's enabled_modules
+  // Settings is always shown (required for configuration)
+  const modules = allModules.filter(
+    (module) =>
+      module.moduleKey === 'settings' || enabledModules.includes(module.moduleKey)
+  )
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header with User Menu */}
-      <header className="border-b bg-white">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      <header className="border-b bg-white z-10">
+        <div className="flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-primary">MonoPilot</h1>
           </div>
@@ -158,41 +175,49 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto p-4">
-        <div className="space-y-6">
-          {/* Welcome Banner (conditionally rendered) */}
-          {showWelcomeBanner && <WelcomeBanner show={true} />}
+      {/* Body: Sidebar + Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar Navigation */}
+        <Sidebar enabledModules={enabledModules} />
 
-          {/* Page Title */}
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-            <p className="text-muted-foreground">
-              Welcome back, {user.user_metadata?.first_name || 'User'}!
-            </p>
-          </div>
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="container mx-auto p-4">
+            <div className="space-y-6">
+              {/* Welcome Banner (conditionally rendered) */}
+              {showWelcomeBanner && <WelcomeBanner show={true} />}
 
-          {/* Quick Actions */}
-          <QuickActions />
+              {/* Page Title */}
+              <div>
+                <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+                <p className="text-muted-foreground">
+                  Welcome back, {user.user_metadata?.first_name || 'User'}!
+                </p>
+              </div>
 
-          {/* Main Layout: Module Cards + Activity Feed */}
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Module Cards Grid */}
-            <div className="flex-1">
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {modules.map((module) => (
-                  <ModuleCard key={module.name} {...module} />
-                ))}
+              {/* Quick Actions */}
+              <QuickActions />
+
+              {/* Main Layout: Module Cards + Activity Feed */}
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Module Cards Grid */}
+                <div className="flex-1">
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
+                    {modules.map((module) => (
+                      <ModuleCard key={`module-${module.moduleKey}`} {...module} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Activity Feed (Right Sidebar on Desktop) */}
+                <aside className="lg:w-80">
+                  <ActivityFeed limit={10} />
+                </aside>
               </div>
             </div>
-
-            {/* Activity Feed (Right Sidebar on Desktop) */}
-            <aside className="lg:w-80">
-              <ActivityFeed limit={10} />
-            </aside>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

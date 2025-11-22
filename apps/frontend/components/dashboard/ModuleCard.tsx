@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
 export interface ModuleCardProps {
+  moduleKey: string // Module key for filtering (e.g., 'settings', 'technical', 'planning')
   name: string
   icon: string
   stats: { label: string; value: number }[]
