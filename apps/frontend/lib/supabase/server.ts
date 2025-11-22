@@ -34,9 +34,25 @@ export async function createServerSupabase() {
  * WARNING: Only use this in API routes, never in client components!
  */
 export function createServerSupabaseAdmin() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+  // Debug logging
+  console.log('🔑 Creating admin client...')
+  console.log('   URL:', supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING')
+  console.log('   Service Role Key:', serviceRoleKey ? `${serviceRoleKey.substring(0, 30)}... (length: ${serviceRoleKey.length})` : 'MISSING')
+
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set!')
+  }
+
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set!')
+  }
+
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    supabaseUrl,
+    serviceRoleKey,
     {
       auth: {
         autoRefreshToken: false,
