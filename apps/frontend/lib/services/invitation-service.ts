@@ -31,16 +31,19 @@ export interface InvitationRecord {
   updated_at: string
 }
 
-// JWT secret from environment
-// CRITICAL: Must be set in production - no fallback to public keys
-const JWT_SECRET = process.env.JWT_SECRET || ''
+// JWT secret helper function - retrieves at runtime to avoid build-time errors
+function getJWTSecret(): string {
+  const JWT_SECRET = process.env.JWT_SECRET || ''
 
-if (!JWT_SECRET) {
-  const errorMsg = '⚠️  JWT_SECRET not set. This is REQUIRED for invitation tokens.'
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('SECURITY ERROR: JWT_SECRET must be set in production. Invitation tokens cannot be generated securely without it.')
+  if (!JWT_SECRET) {
+    const errorMsg = '⚠️  JWT_SECRET not set. This is REQUIRED for invitation tokens.'
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SECURITY ERROR: JWT_SECRET must be set in production. Invitation tokens cannot be generated securely without it.')
+    }
+    console.warn(errorMsg + ' Using empty secret in development only.')
   }
-  console.warn(errorMsg + ' Using empty secret in development only.')
+
+  return JWT_SECRET
 }
 
 /**
@@ -69,7 +72,7 @@ export function generateInvitationToken(
   }
 
   // Generate JWT with 7-day expiry
-  const token = jwt.sign(payload, JWT_SECRET, {
+  const token = jwt.sign(payload, getJWTSecret(), {
     algorithm: 'HS256',
     expiresIn: expiresInSeconds,
   })
@@ -88,7 +91,7 @@ export function generateInvitationToken(
  */
 export function validateInvitationToken(token: string): InvitationTokenPayload {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    const decoded = jwt.verify(token, getJWTSecret(), {
       algorithms: ['HS256'],
     }) as InvitationTokenPayload
 
