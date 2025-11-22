@@ -11,16 +11,35 @@ import { Redis } from '@upstash/redis'
 // Initialize Redis client (Upstash)
 // NOTE: Requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in .env
 let redis: Redis | null = null
+let redisInitialized = false
 
-if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  })
-} else {
-  console.warn(
-    '⚠️  Redis not configured. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for session termination.'
-  )
+function getRedis(): Redis | null {
+  if (redisInitialized) {
+    return redis
+  }
+
+  redisInitialized = true
+
+  const url = process.env.UPSTASH_REDIS_REST_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+
+  if (!url || !token || url.trim() === '' || token.trim() === '') {
+    console.warn(
+      '⚠️  Redis not configured. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for session termination.'
+    )
+    return null
+  }
+
+  try {
+    redis = new Redis({
+      url: url.trim(),
+      token: token.trim(),
+    })
+    return redis
+  } catch (error) {
+    console.error('Failed to initialize Redis:', error)
+    return null
+  }
 }
 
 /**
@@ -41,6 +60,7 @@ export async function addToBlacklist(
   tokenId: string,
   expiresAt: number
 ): Promise<boolean> {
+  const redis = getRedis()
   if (!redis) {
     console.error('Redis not configured, cannot blacklist token')
     return false
