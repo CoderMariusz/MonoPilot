@@ -18,8 +18,9 @@ import { createServerSupabase } from '@/lib/supabase/server'
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     // Check authentication
     const supabase = await createServerSupabase()
@@ -58,7 +59,7 @@ export async function PUT(
     }
 
     // Update tax code
-    const result = await updateTaxCode(params.id, validationResult.data)
+    const result = await updateTaxCode(id, validationResult.data)
 
     if (!result.success) {
       // Handle specific error codes
@@ -112,8 +113,9 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     // Check authentication
     const supabase = await createServerSupabase()
@@ -141,7 +143,7 @@ export async function DELETE(
     }
 
     // Delete tax code
-    const result = await deleteTaxCode(params.id)
+    const result = await deleteTaxCode(id)
 
     if (!result.success) {
       // Handle specific error codes
