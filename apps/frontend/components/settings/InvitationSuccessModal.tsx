@@ -157,7 +157,7 @@ export function InvitationSuccessModal({
               <strong>Expires in {getDaysUntilExpiry()} days</strong>
             </p>
             <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-              The invitation will expire on {new Date(expiresAt).toLocaleDateString()}. After that, you'll need to resend the invitation.
+              The invitation will expire on {new Date(expiresAt).toLocaleDateString()}. After that, you&apos;ll need to resend the invitation.
             </p>
           </div>
         </div>
