@@ -4,6 +4,5 @@
   "devCommand": "cd apps/frontend && pnpm dev",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "outputDirectory": "apps/frontend/.next",
-  "framework": "nextjs",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./apps/frontend"
+  "framework": "nextjs"
 }
