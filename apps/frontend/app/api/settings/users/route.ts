@@ -25,13 +25,13 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabase()
 
-    // Check authentication
+    // Check authentication - use getUser() for security
     const {
-      data: { session },
+      data: { user },
       error: authError,
-    } = await supabase.auth.getSession()
+    } = await supabase.auth.getUser()
 
-    if (authError || !session) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const { data: currentUser, error: userError } = await supabase
       .from('users')
       .select('role, org_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single()
 
     if (userError || !currentUser) {
@@ -132,13 +132,13 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabase()
 
-    // Check authentication
+    // Check authentication - use getUser() for security
     const {
-      data: { session },
+      data: { user },
       error: authError,
-    } = await supabase.auth.getSession()
+    } = await supabase.auth.getUser()
 
-    if (authError || !session) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     const { data: currentUser, error: userError } = await supabase
       .from('users')
       .select('role, org_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single()
 
     if (userError || !currentUser) {
@@ -217,8 +217,8 @@ export async function POST(request: NextRequest) {
       last_name: validatedData.last_name,
       role: validatedData.role,
       status: 'invited', // AC-002.1: Default status
-      created_by: session.user.id, // AC-002.8: Audit trail
-      updated_by: session.user.id,
+      created_by: user.id, // AC-002.8: Audit trail
+      updated_by: user.id,
     }
 
     const { data: createdUser, error: insertError } = await supabase
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
     // Log activity (Story 1.13: Main Dashboard)
     await logUserActivity(
       currentUser.org_id,
-      session.user.id,
+      user.id,
       'user_invited',
       createdUser.id,
       createdUser.email,
