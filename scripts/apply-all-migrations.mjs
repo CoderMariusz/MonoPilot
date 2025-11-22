@@ -11,7 +11,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { execSync } from 'child_process';
 
-const SUPABASE_ACCESS_TOKEN = 'sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac';
+const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || 'sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac';
 const PROJECT_REF = 'pgroxddbtaevdegnidaz';
 
 const MIGRATIONS = [
