@@ -42,12 +42,15 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - Resend button enabled for expired invitations
 - Cancel button disabled for expired invitations
 
-**AC-1.4**: Signup Status Automation (from Story 1.3 AC-002.8 - HIGH PRIORITY)
-- Supabase Auth webhook configured for `auth.users.created` event
-- Webhook handler calls `acceptInvitation(token)` automatically
-- Updates `users.status = 'active'` after successful signup
-- Updates `user_invitations.status = 'accepted', accepted_at = NOW()`
-- Invalidates invitation token (one-time use enforced)
+**AC-1.4**: Signup Status Automation (from Story 1.3 AC-002.8 - HIGH PRIORITY) ✅ COMPLETED
+- ✅ Database trigger `trigger_auto_activate_user` deployed (Migration 015)
+- ✅ Trigger fires on `auth.users INSERT` event automatically
+- ✅ Validates invitation token from `raw_user_meta_data.invitation_token`
+- ✅ Updates `users.status = 'active'` after successful signup
+- ✅ Updates `user_invitations.status = 'accepted', accepted_at = NOW()`
+- ✅ Logs activity in `activity_logs` table
+- ✅ Graceful handling if invitation not found/expired
+- 💰 **Cost Savings**: FREE database trigger replaces $20/month Vercel webhook
 
 **AC-1.5**: Auto-Cleanup Cron Job (from Story 1.3 Task 9, AC-003.4)
 - Weekly cron job configured (Sunday 2am UTC)
@@ -198,12 +201,13 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - [ ] Update .env.example with all required vars
   - [x] JWT_SECRET documentation
   - [x] SendGrid configuration
-  - [ ] Webhook secret
+  - [x] ~~Webhook secret~~ (NOT NEEDED - using database trigger instead)
 - [ ] Document setup instructions
-  - [ ] Supabase webhook configuration
-  - [ ] Vercel cron setup
+  - [x] ~~Supabase webhook configuration~~ (NOT NEEDED - Migration 015 deployed)
+  - [ ] Vercel cron setup (for auto-cleanup)
   - [ ] SendGrid API key setup
 - [ ] Update README with invitation flow
+- [x] Migration 015: Auto-activate users trigger deployed ✅
 
 ### Task 7: Story 1.7 - E2E Tests for Machine CRUD (AC-2.1)
 - [ ] Create tests/e2e/machines.spec.ts
