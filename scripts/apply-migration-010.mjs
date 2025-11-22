@@ -6,15 +6,26 @@
  */
 
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || 'sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac';
-const PROJECT_REF = 'pgroxddbtaevdegnidaz';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
+const PROJECT_REF = process.env.SUPABASE_PROJECT_ID || 'pgroxddbtaevdegnidaz';
+
+if (!SUPABASE_ACCESS_TOKEN) {
+  console.error('❌ SECURITY ERROR: SUPABASE_ACCESS_TOKEN environment variable is required');
+  console.error('   Usage: SUPABASE_ACCESS_TOKEN=<your-token> node scripts/apply-migration-010.mjs');
+  console.error('   Or add to .env file (make sure .env is in .gitignore!)');
+  process.exit(1);
+}
 
 console.log('🔄 Applying migration 010 (Allergens table) via Management API...\n');
 
-// Read migration file
-const migrationPath = resolve(process.cwd(), 'apps/frontend/lib/supabase/migrations/010_create_allergens_table.sql');
+// Read migration file (relative to script location for portability)
+const migrationPath = join(__dirname, '..', 'apps', 'frontend', 'lib', 'supabase', 'migrations', '010_create_allergens_table.sql');
 const migrationSQL = readFileSync(migrationPath, 'utf-8');
 
 async function main() {
