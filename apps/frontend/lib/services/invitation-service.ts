@@ -317,6 +317,7 @@ export async function cancelInvitation(
  * Mark invitation as accepted after successful signup
  *
  * AC-002.8: Signup with invitation link
+ * AC-1.4 (Story 1.14): Auto-activate user status after signup
  *
  * @param token - JWT token from signup link
  */
@@ -342,6 +343,17 @@ export async function acceptInvitation(token: string): Promise<void> {
   // Check if already accepted (one-time use)
   if (invitation.status === 'accepted') {
     throw new Error('This invitation has already been used')
+  }
+
+  // Update user status to 'active' (Story 1.14, AC-1.4: Signup Status Automation)
+  const { error: userUpdateError } = await supabase
+    .from('users')
+    .update({ status: 'active' })
+    .eq('email', invitation.email)
+    .eq('org_id', invitation.org_id)
+
+  if (userUpdateError) {
+    throw new Error(`Failed to activate user: ${userUpdateError.message}`)
   }
 
   // Update invitation status
