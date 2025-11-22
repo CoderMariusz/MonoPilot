@@ -1,5 +1,6 @@
 import { createServerSupabase } from '../supabase/server'
 import { type Warehouse, type CreateWarehouseInput, type UpdateWarehouseInput, type WarehouseFilters } from '@/lib/validation/warehouse-schemas'
+import { getCachedWarehouses, setCachedWarehouses, invalidateWarehouseCache } from '@/lib/cache/warehouse-cache'
 
 /**
  * Warehouse Service
@@ -10,6 +11,7 @@ import { type Warehouse, type CreateWarehouseInput, type UpdateWarehouseInput, t
  * - Unique code validation per org (AC-004.1)
  * - Circular dependency resolution (AC-004.2)
  * - Archive/activate functionality (AC-004.4)
+ * - Redis caching layer with 5-min TTL (AC-004.8)
  * - Cache invalidation events (AC-004.8)
  */
 
@@ -61,6 +63,8 @@ async function getCurrentOrgId(): Promise<string | null> {
  * - Code format: uppercase alphanumeric + hyphens
  * - Name required (1-100 chars)
  * - default_*_location_id initially NULL (circular dependency, AC-004.2)
+ *
+ * Cache invalidation: Invalidates cache after successful creation (AC-004.8)
  *
  * @param input - CreateWarehouseInput (validated by Zod schema)
  * @returns WarehouseServiceResult with created warehouse or error
@@ -133,6 +137,9 @@ export async function createWarehouse(
       }
     }
 
+    // Invalidate cache after successful creation (AC-004.8)
+    await invalidateWarehouseCache(orgId)
+
     // Emit cache invalidation event (AC-004.8)
     await emitWarehouseUpdatedEvent(orgId, 'created', warehouse.id)
 
@@ -160,6 +167,8 @@ export async function createWarehouse(
  * - Code still unique per org (if changed)
  * - Default locations must belong to this warehouse (checked via FK)
  * - Can update default locations after locations created (AC-004.2)
+ *
+ * Cache invalidation: Invalidates cache after successful update (AC-004.8)
  *
  * @param id - Warehouse UUID
  * @param input - UpdateWarehouseInput (validated by Zod schema)
@@ -275,6 +284,9 @@ export async function updateWarehouse(
       }
     }
 
+    // Invalidate cache after successful update (AC-004.8)
+    await invalidateWarehouseCache(orgId)
+
     // Emit cache invalidation event (AC-004.8)
     await emitWarehouseUpdatedEvent(orgId, 'updated', warehouse.id)
 
@@ -351,13 +363,19 @@ export async function getWarehouseById(id: string): Promise<WarehouseServiceResu
 
 /**
  * List warehouses with filters
- * AC-004.3: Warehouses list view
+ * AC-004.3: Warehouses list view with dynamic sorting
+ * AC-004.8: Cache warehouse list with 5-min TTL
  *
  * Filters:
  * - is_active: true/false/undefined (all)
  * - search: filter by code or name (case-insensitive)
+ * - sort_by: code/name/created_at (default: code)
+ * - sort_direction: asc/desc (default: asc)
  *
- * Sorting: by code, name, created_at (default: code ASC)
+ * Sorting: Dynamic sorting by code, name, or created_at
+ *
+ * Caching: Only caches unfiltered results (filters=undefined or no filters applied)
+ * Filtered queries always query DB directly for freshness.
  *
  * @param filters - WarehouseFilters (optional)
  * @returns WarehouseListResult with warehouses array or error
@@ -377,6 +395,27 @@ export async function listWarehouses(
       }
     }
 
+    // Check if query is cacheable (no filters or only default sort parameters)
+    const isCacheable = !filters || (
+      filters.is_active === undefined &&
+      !filters.search &&
+      (!filters.sort_by || filters.sort_by === 'code') &&
+      (!filters.sort_direction || filters.sort_direction === 'asc')
+    )
+
+    // Try to get from cache if cacheable (AC-004.8)
+    if (isCacheable) {
+      const cachedWarehouses = await getCachedWarehouses(orgId)
+      if (cachedWarehouses) {
+        return {
+          success: true,
+          data: cachedWarehouses,
+          total: cachedWarehouses.length,
+        }
+      }
+    }
+
+    // Cache miss or filtered query - fetch from DB
     let query = supabase
       .from('warehouses')
       .select(`
@@ -393,12 +432,20 @@ export async function listWarehouses(
     }
 
     // Search filter (AC-004.3: Search by code or name)
+    // SECURITY: Escape special SQL characters to prevent SQL injection
     if (filters?.search) {
-      query = query.or(`code.ilike.%${filters.search}%,name.ilike.%${filters.search}%`)
+      const escapedSearch = filters.search
+        .replace(/\\/g, '\\\\')  // Escape backslashes first
+        .replace(/%/g, '\\%')    // Escape SQL wildcards
+        .replace(/_/g, '\\_')    // Escape single char wildcards
+
+      query = query.or(`code.ilike.%${escapedSearch}%,name.ilike.%${escapedSearch}%`)
     }
 
-    // Sort by code (default)
-    query = query.order('code', { ascending: true })
+    // Dynamic sorting (AC-004.3: Sort by code, name, or created_at)
+    const sortBy = filters?.sort_by || 'code'
+    const sortDirection = filters?.sort_direction || 'asc'
+    query = query.order(sortBy, { ascending: sortDirection === 'asc' })
 
     const { data: warehouses, error, count } = await query
 
@@ -409,6 +456,11 @@ export async function listWarehouses(
         error: `Database error: ${error.message}`,
         total: 0,
       }
+    }
+
+    // Set cache if this was a cacheable query (AC-004.8)
+    if (isCacheable && warehouses) {
+      await setCachedWarehouses(orgId, warehouses)
     }
 
     return {
@@ -433,6 +485,8 @@ export async function listWarehouses(
  * Sets is_active = false instead of hard delete.
  * This is the recommended approach to prevent FK constraint violations.
  *
+ * Cache invalidation: Handled by updateWarehouse (AC-004.8)
+ *
  * @param id - Warehouse UUID
  * @returns WarehouseServiceResult with success status or error
  */
@@ -445,6 +499,8 @@ export async function archiveWarehouse(id: string): Promise<WarehouseServiceResu
  * AC-004.7: Warehouse card/list view toggle (Archive/Activate action)
  *
  * Sets is_active = true to restore archived warehouse.
+ *
+ * Cache invalidation: Handled by updateWarehouse (AC-004.8)
  *
  * @param id - Warehouse UUID
  * @returns WarehouseServiceResult with success status or error
@@ -463,6 +519,8 @@ export async function activateWarehouse(id: string): Promise<WarehouseServiceRes
  * - Active locations (Story 1.6)
  *
  * Error handling returns user-friendly message with constraint details.
+ *
+ * Cache invalidation: Invalidates cache after successful deletion (AC-004.8)
  *
  * @param id - Warehouse UUID
  * @returns WarehouseServiceResult with success status or error
@@ -506,6 +564,9 @@ export async function deleteWarehouse(id: string): Promise<WarehouseServiceResul
       }
     }
 
+    // Invalidate cache after successful deletion (AC-004.8)
+    await invalidateWarehouseCache(orgId)
+
     // Emit cache invalidation event (AC-004.8)
     await emitWarehouseUpdatedEvent(orgId, 'deleted', id)
 
@@ -531,6 +592,8 @@ export async function deleteWarehouse(id: string): Promise<WarehouseServiceResul
  * Publishes a broadcast event to notify other modules (Epic 3, 5, 7)
  * to invalidate their warehouse cache.
  *
+ * Also directly invalidates the Redis cache for this org.
+ *
  * Redis cache key: `warehouses:{org_id}`
  * Redis cache TTL: 5 min
  *
@@ -544,6 +607,9 @@ async function emitWarehouseUpdatedEvent(
   warehouseId: string
 ): Promise<void> {
   try {
+    // Invalidate Redis cache (AC-004.8)
+    await invalidateWarehouseCache(orgId)
+
     const supabase = await createServerSupabase()
 
     // Publish to org-specific channel

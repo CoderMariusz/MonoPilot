@@ -43,6 +43,7 @@ export async function middleware(request: NextRequest) {
     '/forgot-password',
     '/reset-password',
     '/auth/callback',
+    '/api/test-sendgrid', // SendGrid test endpoint (TODO: remove in production)
   ]
 
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))

@@ -9,9 +9,9 @@ import { z } from 'zod'
 export const createWarehouseSchema = z.object({
   code: z
     .string()
-    .min(1, 'Warehouse code is required')
-    .max(20, 'Code must be 20 characters or less')
-    .regex(/^[A-Z0-9_-]+$/, 'Code must contain only uppercase letters, numbers, underscores, and hyphens'),
+    .min(2, 'Warehouse code must be at least 2 characters')
+    .max(50, 'Code must be 50 characters or less')
+    .regex(/^[A-Z0-9-]+$/, 'Code must contain only uppercase letters, numbers, and hyphens'),
   name: z
     .string()
     .min(1, 'Warehouse name is required')
@@ -28,9 +28,9 @@ export const createWarehouseSchema = z.object({
 export const updateWarehouseSchema = z.object({
   code: z
     .string()
-    .min(1, 'Warehouse code is required')
-    .max(20, 'Code must be 20 characters or less')
-    .regex(/^[A-Z0-9_-]+$/, 'Code must contain only uppercase letters, numbers, underscores, and hyphens')
+    .min(2, 'Warehouse code must be at least 2 characters')
+    .max(50, 'Code must be 50 characters or less')
+    .regex(/^[A-Z0-9-]+$/, 'Code must contain only uppercase letters, numbers, and hyphens')
     .optional(),
   name: z
     .string()
@@ -52,16 +52,20 @@ export const updateWarehouseSchema = z.object({
 export type CreateWarehouseInput = z.infer<typeof createWarehouseSchema>
 export type UpdateWarehouseInput = z.infer<typeof updateWarehouseSchema>
 
-// Warehouse Filters Schema
+// Warehouse Filters Schema (AC-004.3: Dynamic sorting)
 export const warehouseFiltersSchema = z.object({
   search: z.string().optional(),
   is_active: z.boolean().optional(),
+  sort_by: z.enum(['code', 'name', 'created_at']).optional(),
+  sort_direction: z.enum(['asc', 'desc']).optional(),
 })
 
 // Warehouse Filters (for list page)
 export interface WarehouseFilters {
   search?: string
   is_active?: boolean
+  sort_by?: 'code' | 'name' | 'created_at'
+  sort_direction?: 'asc' | 'desc'
 }
 
 // Warehouse Type

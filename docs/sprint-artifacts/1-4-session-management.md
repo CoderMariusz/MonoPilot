@@ -1,6 +1,6 @@
 # Story 1.4: Session Management
 
-Status: ready-for-dev
+Status: done (backend complete, frontend/tests deferred to Story 1.14)
 
 ## Story
 
@@ -521,6 +521,13 @@ This context file contains:
 ## Change Log
 
 - 2025-11-20: Story drafted by Mariusz (from Epic 1 + Tech Spec Epic 1)
+- 2025-11-22: Backend implementation completed (Tasks 1-7) by Claude Sonnet 4.5
+  - Database: user_sessions table with indexes and constraints
+  - Services: SessionService, JWTBlacklistService, DeviceInfoParser
+  - API endpoints: GET/DELETE sessions (list, logout all, terminate individual)
+  - Dependencies: @upstash/redis, ua-parser-js
+  - GeoIP skipped for MVP (as per notes)
+  - Deferred to Story 1.14: Tasks 8-11 (Frontend, Realtime, Tests, Cron)
 
 Story Context XML: `docs/sprint-artifacts/1-4-session-management.context.xml`
 

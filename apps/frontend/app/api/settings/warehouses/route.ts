@@ -58,15 +58,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Parse query parameters for filtering (AC-004.3)
+    // Parse query parameters for filtering and sorting (AC-004.3)
     const searchParams = request.nextUrl.searchParams
     const isActive = searchParams.get('is_active')
     const search = searchParams.get('search')
+    const sortBy = searchParams.get('sort_by')
+    const sortDirection = searchParams.get('sort_direction')
 
     // Validate filters
     const filters: WarehouseFilters = warehouseFiltersSchema.parse({
       is_active: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
       search: search || undefined,
+      sort_by: sortBy || undefined,
+      sort_direction: sortDirection || undefined,
     })
 
     // Call service method

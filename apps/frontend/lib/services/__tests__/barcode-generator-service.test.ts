@@ -55,7 +55,7 @@ describe('generateLocationBarcode - Barcode Generation (AC-005.3)', () => {
 
       // Mock: no existing locations (first location)
       const { createServerSupabase } = await import('@/lib/supabase/server')
-      const mockSupabase = createServerSupabase()
+      const mockSupabase = await createServerSupabase()
       ;(mockSupabase.from as any)().select().eq().order().limit().maybeSingle.mockResolvedValue({
         data: null, // No existing locations
         error: null,
@@ -73,7 +73,7 @@ describe('generateLocationBarcode - Barcode Generation (AC-005.3)', () => {
 
       // Mock: highest existing barcode is LOC-WH-01-005
       const { createServerSupabase } = await import('@/lib/supabase/server')
-      const mockSupabase = createServerSupabase()
+      const mockSupabase = await createServerSupabase()
       ;(mockSupabase.from as any)().select().eq().order().limit().maybeSingle.mockResolvedValue({
         data: { barcode: 'LOC-WH-01-005' },
         error: null,
@@ -91,7 +91,7 @@ describe('generateLocationBarcode - Barcode Generation (AC-005.3)', () => {
 
       // Mock: no existing locations
       const { createServerSupabase } = await import('@/lib/supabase/server')
-      const mockSupabase = createServerSupabase()
+      const mockSupabase = await createServerSupabase()
       ;(mockSupabase.from as any)().select().eq().order().limit().maybeSingle.mockResolvedValue({
         data: null,
         error: null,
@@ -110,7 +110,7 @@ describe('generateLocationBarcode - Barcode Generation (AC-005.3)', () => {
 
       // Mock: highest existing is 1500
       const { createServerSupabase } = await import('@/lib/supabase/server')
-      const mockSupabase = createServerSupabase()
+      const mockSupabase = await createServerSupabase()
       ;(mockSupabase.from as any)().select().eq().order().limit().maybeSingle.mockResolvedValue({
         data: { barcode: 'LOC-WH-01-1500' },
         error: null,
@@ -127,7 +127,7 @@ describe('generateLocationBarcode - Barcode Generation (AC-005.3)', () => {
       const orgId = 'org-123'
 
       const { createServerSupabase } = await import('@/lib/supabase/server')
-      const mockSupabase = createServerSupabase()
+      const mockSupabase = await createServerSupabase()
       ;(mockSupabase.from as any)().select().eq().order().limit().maybeSingle.mockResolvedValue({
         data: null,
         error: null,
@@ -147,7 +147,7 @@ describe('generateLocationBarcode - Barcode Generation (AC-005.3)', () => {
 
       // Mock database error
       const { createServerSupabase } = await import('@/lib/supabase/server')
-      const mockSupabase = createServerSupabase()
+      const mockSupabase = await createServerSupabase()
       ;(mockSupabase.from as any)().select().eq().order().limit().maybeSingle.mockResolvedValue({
         data: null,
         error: { message: 'Database connection failed' },
@@ -178,7 +178,7 @@ describe('generateLocationBarcode - Barcode Generation (AC-005.3)', () => {
 
       const orgId = 'org-123'
       const { createServerSupabase } = await import('@/lib/supabase/server')
-      const mockSupabase = createServerSupabase()
+      const mockSupabase = await createServerSupabase()
 
       // Warehouse 1 - has 3 locations
       ;(mockSupabase.from as any)().select().eq().order().limit().maybeSingle.mockResolvedValue({
@@ -211,7 +211,7 @@ describe('validateBarcodeUniqueness - Global Uniqueness (AC-005.3)', () => {
 
     // Mock: no existing location with this barcode
     const { createServerSupabase } = await import('@/lib/supabase/server')
-    const mockSupabase = createServerSupabase()
+    const mockSupabase = await createServerSupabase()
     ;(mockSupabase.from as any)().select().eq().single.mockResolvedValue({
       data: null,
       error: { code: 'PGRST116' }, // Not found error
@@ -227,7 +227,7 @@ describe('validateBarcodeUniqueness - Global Uniqueness (AC-005.3)', () => {
 
     // Mock: barcode already exists
     const { createServerSupabase } = await import('@/lib/supabase/server')
-    const mockSupabase = createServerSupabase()
+    const mockSupabase = await createServerSupabase()
     ;(mockSupabase.from as any)().select().eq().single.mockResolvedValue({
       data: { id: 'loc-123', barcode: 'LOC-WH-01-001' },
       error: null,
@@ -243,7 +243,7 @@ describe('validateBarcodeUniqueness - Global Uniqueness (AC-005.3)', () => {
 
     // Mock database error
     const { createServerSupabase } = await import('@/lib/supabase/server')
-    const mockSupabase = createServerSupabase()
+    const mockSupabase = await createServerSupabase()
     ;(mockSupabase.from as any)().select().eq().single.mockResolvedValue({
       data: null,
       error: { message: 'Connection timeout' },
@@ -267,8 +267,8 @@ describe('generateQRCode - QR Code Display (AC-005.6)', () => {
     const result = await generateQRCode(barcode)
 
     expect(result.success).toBe(true)
-    expect(result.qrCodeUrl).toContain('data:image/png;base64')
-    expect(result.qrCodeUrl).toContain('300') // Width in mock
+    expect(result.dataUrl).toContain('data:image/png;base64')
+    expect(result.dataUrl).toContain('300') // Width in mock
   })
 
   it('should use Medium error correction level for display', async () => {
@@ -311,7 +311,7 @@ describe('generatePrintableQRCode - QR Code Printing (AC-005.6)', () => {
     const result = await generatePrintableQRCode(barcode)
 
     expect(result.success).toBe(true)
-    expect(result.qrCodeUrl).toContain('600') // Higher resolution
+    expect(result.dataUrl).toContain('600') // Higher resolution
   })
 
   it('should use High error correction level for printing', async () => {

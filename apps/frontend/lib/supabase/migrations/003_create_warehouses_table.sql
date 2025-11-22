@@ -17,15 +17,8 @@ CREATE TABLE IF NOT EXISTS public.warehouses (
   address TEXT,
 
   -- Default locations (nullable initially, updated after locations created)
-  default_receiving_location_id UUID REFERENCES public.locations(id) ON DELETE RESTRICT,
-  default_shipping_location_id UUID REFERENCES public.locations(id) ON DELETE RESTRICT,
-  transit_location_id UUID REFERENCES public.locations(id) ON DELETE RESTRICT,
-
-  is_active BOOLEAN NOT NULL DEFAULT true,
-
-  -- Audit fields
-  -- Default Locations (nullable initially, circular dependency resolution)
-  -- These are set after locations are created (Story 1.6)
+  -- Note: Foreign key constraints for default locations will be added in migration 004
+  -- after the locations table is created to avoid circular dependency issues
   default_receiving_location_id UUID,
   default_shipping_location_id UUID,
   transit_location_id UUID,
@@ -40,8 +33,7 @@ CREATE TABLE IF NOT EXISTS public.warehouses (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 
   -- Constraints
-  CONSTRAINT warehouses_org_code_unique UNIQUE (org_id, code)
-  CONSTRAINT warehouses_code_org_unique UNIQUE (org_id, code),
+  CONSTRAINT warehouses_org_code_unique UNIQUE (org_id, code),
   CONSTRAINT warehouses_code_format_check CHECK (code ~ '^[A-Z0-9-]+$'),
   CONSTRAINT warehouses_code_length_check CHECK (char_length(code) >= 2 AND char_length(code) <= 50),
   CONSTRAINT warehouses_name_length_check CHECK (char_length(name) >= 1 AND char_length(name) <= 100)
@@ -53,11 +45,9 @@ CREATE TABLE IF NOT EXISTS public.warehouses (
 
 -- Performance indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_warehouses_org_id ON public.warehouses(org_id);
-CREATE INDEX IF NOT EXISTS idx_warehouses_code ON public.warehouses(code);
+CREATE INDEX IF NOT EXISTS idx_warehouses_code ON public.warehouses(org_id, code);
 CREATE INDEX IF NOT EXISTS idx_warehouses_is_active ON public.warehouses(is_active);
 CREATE INDEX IF NOT EXISTS idx_warehouses_org_active ON public.warehouses(org_id, is_active);
-CREATE INDEX IF NOT EXISTS idx_warehouses_code ON public.warehouses(org_id, code); -- Composite for unique lookups
-CREATE INDEX IF NOT EXISTS idx_warehouses_active ON public.warehouses(org_id, is_active); -- For filtering active warehouses
 CREATE INDEX IF NOT EXISTS idx_warehouses_default_receiving ON public.warehouses(default_receiving_location_id) WHERE default_receiving_location_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_warehouses_default_shipping ON public.warehouses(default_shipping_location_id) WHERE default_shipping_location_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_warehouses_transit ON public.warehouses(transit_location_id) WHERE transit_location_id IS NOT NULL;

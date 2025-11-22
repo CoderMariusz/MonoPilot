@@ -1,7 +1,7 @@
 /**
  * Warehouse Form Modal Component
  * Story: 1.5 Warehouse Configuration
- * Task 6: Warehouse Form Modal (AC-004.1, AC-004.5)
+ * Task 6: Warehouse Form Modal (AC-004.1, AC-004.5, AC-004.6)
  */
 
 'use client'
@@ -11,10 +11,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import type { Warehouse } from '@/lib/validation/warehouse-schemas'
 import { createWarehouseSchema, updateWarehouseSchema } from '@/lib/validation/warehouse-schemas'
 import { ZodError } from 'zod'
+import { LocationFormModal } from './LocationFormModal'
+import type { Location } from '@/lib/services/location-service'
 
 interface WarehouseFormModalProps {
   warehouse?: Warehouse | null // undefined = create, Warehouse = edit
@@ -28,15 +37,53 @@ export function WarehouseFormModal({ warehouse, onClose, onSuccess }: WarehouseF
     name: warehouse?.name || '',
     address: warehouse?.address || '',
     is_active: warehouse?.is_active ?? true,
+    default_receiving_location_id: warehouse?.default_receiving_location_id || null,
+    default_shipping_location_id: warehouse?.default_shipping_location_id || null,
+    transit_location_id: warehouse?.transit_location_id || null,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+  const [locations, setLocations] = useState<Location[]>([])
+  const [loadingLocations, setLoadingLocations] = useState(false)
+  const [showLocationModal, setShowLocationModal] = useState(false)
   const { toast } = useToast()
 
   const isEditMode = !!warehouse
 
+  // Fetch locations when in edit mode (AC-004.5)
+  useEffect(() => {
+    if (isEditMode && warehouse?.id) {
+      fetchLocations()
+    }
+  }, [isEditMode, warehouse?.id])
+
+  const fetchLocations = async () => {
+    if (!warehouse?.id) return
+
+    setLoadingLocations(true)
+    try {
+      const response = await fetch(`/api/settings/locations?warehouse_id=${warehouse.id}`)
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch locations')
+      }
+
+      const data = await response.json()
+      setLocations(data.locations || [])
+    } catch (error) {
+      console.error('Error fetching locations:', error)
+      toast({
+        title: 'Warning',
+        description: 'Failed to load locations',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingLocations(false)
+    }
+  }
+
   // Handle input change
-  const handleChange = (field: string, value: string | boolean) => {
+  const handleChange = (field: string, value: string | boolean | null) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     // Clear error for this field
     if (errors[field]) {
@@ -46,6 +93,39 @@ export function WarehouseFormModal({ warehouse, onClose, onSuccess }: WarehouseF
         return newErrors
       })
     }
+  }
+
+  // Handle location creation success (AC-004.6)
+  const handleLocationCreated = (locationId: string, locationCode: string, locationName: string) => {
+    // Add new location to the list
+    const newLocation: Location = {
+      id: locationId,
+      code: locationCode,
+      name: locationName,
+      org_id: '',
+      warehouse_id: warehouse?.id || '',
+      type: 'storage',
+      zone: null,
+      zone_enabled: false,
+      capacity: null,
+      capacity_enabled: false,
+      barcode: '',
+      is_active: true,
+      created_by: null,
+      updated_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    setLocations((prev) => [...prev, newLocation])
+    setShowLocationModal(false)
+
+    // Note: User can manually select the location from the dropdown
+    // We don't auto-select to avoid confusion about which field to populate
+    toast({
+      title: 'Location Created',
+      description: `Location ${locationCode} has been created. You can now select it from the dropdown.`,
+    })
   }
 
   // Validate form
@@ -91,6 +171,13 @@ export function WarehouseFormModal({ warehouse, onClose, onSuccess }: WarehouseF
         name: formData.name,
         address: formData.address || undefined,
         is_active: formData.is_active,
+      }
+
+      // Include location IDs in edit mode (AC-004.5)
+      if (isEditMode) {
+        payload.default_receiving_location_id = formData.default_receiving_location_id || null
+        payload.default_shipping_location_id = formData.default_shipping_location_id || null
+        payload.transit_location_id = formData.transit_location_id || null
       }
 
       // Call API
@@ -210,6 +297,123 @@ export function WarehouseFormModal({ warehouse, onClose, onSuccess }: WarehouseF
             </Label>
           </div>
 
+          {/* Location Selects - Only in Edit Mode (AC-004.5, AC-004.6) */}
+          {isEditMode && warehouse?.id && (
+            <>
+              <div className="pt-4 border-t">
+                <h3 className="text-sm font-semibold mb-3">Default Locations</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Configure default locations for warehouse operations
+                </p>
+              </div>
+
+              {/* Default Receiving Location */}
+              <div className="space-y-2">
+                <Label htmlFor="default_receiving_location_id">
+                  Default Receiving Location
+                </Label>
+                <Select
+                  value={formData.default_receiving_location_id || 'none'}
+                  onValueChange={(value) => {
+                    if (value === 'create') {
+                      setShowLocationModal(true)
+                    } else {
+                      handleChange('default_receiving_location_id', value === 'none' ? null : value)
+                    }
+                  }}
+                  disabled={loadingLocations}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingLocations ? 'Loading...' : 'Select location'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-gray-500">None</span>
+                    </SelectItem>
+                    {locations.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.code} - {loc.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="create" className="text-blue-600 font-medium">
+                      + Create Location
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Default Shipping Location */}
+              <div className="space-y-2">
+                <Label htmlFor="default_shipping_location_id">
+                  Default Shipping Location
+                </Label>
+                <Select
+                  value={formData.default_shipping_location_id || 'none'}
+                  onValueChange={(value) => {
+                    if (value === 'create') {
+                      setShowLocationModal(true)
+                    } else {
+                      handleChange('default_shipping_location_id', value === 'none' ? null : value)
+                    }
+                  }}
+                  disabled={loadingLocations}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingLocations ? 'Loading...' : 'Select location'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-gray-500">None</span>
+                    </SelectItem>
+                    {locations.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.code} - {loc.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="create" className="text-blue-600 font-medium">
+                      + Create Location
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Transit Location */}
+              <div className="space-y-2">
+                <Label htmlFor="transit_location_id">
+                  Transit Location
+                </Label>
+                <Select
+                  value={formData.transit_location_id || 'none'}
+                  onValueChange={(value) => {
+                    if (value === 'create') {
+                      setShowLocationModal(true)
+                    } else {
+                      handleChange('transit_location_id', value === 'none' ? null : value)
+                    }
+                  }}
+                  disabled={loadingLocations}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingLocations ? 'Loading...' : 'Select location'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-gray-500">None</span>
+                    </SelectItem>
+                    {locations.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.code} - {loc.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="create" className="text-blue-600 font-medium">
+                      + Create Location
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+
           {/* Note about default locations (AC-004.2) */}
           {!isEditMode && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
@@ -237,6 +441,15 @@ export function WarehouseFormModal({ warehouse, onClose, onSuccess }: WarehouseF
           </Button>
         </div>
       </div>
+
+      {/* Location Creation Modal (AC-004.6) */}
+      {showLocationModal && warehouse?.id && (
+        <LocationFormModal
+          warehouseId={warehouse.id}
+          onClose={() => setShowLocationModal(false)}
+          onSuccess={handleLocationCreated}
+        />
+      )}
     </div>
   )
 }

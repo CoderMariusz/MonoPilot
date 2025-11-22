@@ -26,10 +26,13 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Warehouse as WarehouseIcon, Search, Edit, Archive, CheckCircle } from 'lucide-react'
+import { Warehouse as WarehouseIcon, Search, Edit, Archive, CheckCircle, LayoutGrid, Table as TableIcon, ArrowUpDown } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { Warehouse } from '@/lib/validation/warehouse-schemas'
 import { WarehouseFormModal } from '@/components/settings/WarehouseFormModal'
+import { WarehouseCard } from '@/components/settings/WarehouseCard'
+
+type ViewMode = 'table' | 'card'
 
 export default function WarehousesPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
@@ -38,9 +41,31 @@ export default function WarehousesPage() {
   const [activeFilter, setActiveFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null)
+
+  // AC-004.7: View toggle (Table/Card) with localStorage persistence
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
+
+  // AC-004.3: Dynamic sorting
+  const [sortBy, setSortBy] = useState<'code' | 'name' | 'created_at'>('code')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
   const { toast } = useToast()
 
-  // Fetch warehouses (AC-004.3)
+  // AC-004.7: Load view preference from localStorage on mount
+  useEffect(() => {
+    const savedView = localStorage.getItem('warehouse-view-preference')
+    if (savedView === 'table' || savedView === 'card') {
+      setViewMode(savedView)
+    }
+  }, [])
+
+  // AC-004.7: Save view preference to localStorage when changed
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode)
+    localStorage.setItem('warehouse-view-preference', mode)
+  }
+
+  // Fetch warehouses (AC-004.3, AC-004.3 with dynamic sorting)
   const fetchWarehouses = async () => {
     try {
       setLoading(true)
@@ -51,6 +76,9 @@ export default function WarehousesPage() {
       if (activeFilter !== 'all') {
         params.append('is_active', activeFilter === 'active' ? 'true' : 'false')
       }
+      // AC-004.3: Add sorting parameters
+      params.append('sort_by', sortBy)
+      params.append('sort_direction', sortDirection)
 
       const response = await fetch(`/api/settings/warehouses?${params.toString()}`)
 
@@ -74,7 +102,7 @@ export default function WarehousesPage() {
 
   useEffect(() => {
     fetchWarehouses()
-  }, [activeFilter])
+  }, [activeFilter, sortBy, sortDirection])
 
   // Debounced search (AC-004.3)
   useEffect(() => {
@@ -158,42 +186,88 @@ export default function WarehousesPage() {
         </CardHeader>
 
         <CardContent>
-          {/* Filters (AC-004.3) */}
-          <div className="flex gap-4 mb-6">
-            {/* Search by code or name */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by code or name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+          {/* Filters and Controls (AC-004.3, AC-004.7) */}
+          <div className="space-y-4 mb-6">
+            {/* Top Row: Search, Active Filter, Sort, View Toggle */}
+            <div className="flex gap-4">
+              {/* Search by code or name */}
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search by code or name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Active filter */}
+              <Select value={activeFilter} onValueChange={setActiveFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Warehouses</SelectItem>
+                  <SelectItem value="active">Active Only</SelectItem>
+                  <SelectItem value="inactive">Inactive Only</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Sort By (AC-004.3) */}
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as 'code' | 'name' | 'created_at')}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="code">Sort by Code</SelectItem>
+                  <SelectItem value="name">Sort by Name</SelectItem>
+                  <SelectItem value="created_at">Sort by Date</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Sort Direction (AC-004.3) */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+              >
+                <ArrowUpDown className={`h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
+              </Button>
+
+              {/* View Toggle (AC-004.7) */}
+              <div className="flex gap-1 border rounded-md p-1">
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleViewModeChange('table')}
+                  title="Table View"
+                >
+                  <TableIcon className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'card' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleViewModeChange('card')}
+                  title="Card View"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-
-            {/* Active filter */}
-            <Select value={activeFilter} onValueChange={setActiveFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Warehouses</SelectItem>
-                <SelectItem value="active">Active Only</SelectItem>
-                <SelectItem value="inactive">Inactive Only</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
-          {/* Warehouses Table (AC-004.3) */}
+          {/* Warehouses Display - Table or Card View (AC-004.3, AC-004.7) */}
           {loading ? (
             <div className="text-center py-8 text-gray-500">Loading warehouses...</div>
           ) : warehouses.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               No warehouses found. Create your first warehouse to get started.
             </div>
-          ) : (
+          ) : viewMode === 'table' ? (
+            // Table View (AC-004.3)
             <Table>
               <TableHeader>
                 <TableRow>
@@ -251,6 +325,18 @@ export default function WarehousesPage() {
                 ))}
               </TableBody>
             </Table>
+          ) : (
+            // Card View (AC-004.7)
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {warehouses.map((warehouse) => (
+                <WarehouseCard
+                  key={warehouse.id}
+                  warehouse={warehouse}
+                  onEdit={handleEdit}
+                  onToggleActive={handleToggleActive}
+                />
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

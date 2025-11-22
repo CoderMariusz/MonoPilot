@@ -7,6 +7,9 @@ import {
 } from '@/lib/validation/user-schemas'
 import { ZodError } from 'zod'
 import { logUserActivity } from '@/lib/activity/log-activity'
+import { createInvitation } from '@/lib/services/invitation-service'
+import { generateInvitationQRCode } from '@/lib/utils/qr-code-generator'
+import { sendInvitationEmail } from '@/lib/services/email-service'
 
 /**
  * User Management API Routes
@@ -247,8 +250,42 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // TODO (Story 1.3): Send invitation email with magic link
-    // await sendInvitationEmail(createdUser.email, invitationToken)
+    // Story 1.3: Send invitation email with magic link
+    try {
+      // Get organization name for email template
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('company_name')
+        .eq('id', currentUser.org_id)
+        .single()
+
+      // Create invitation record
+      const invitation = await createInvitation({
+        orgId: currentUser.org_id,
+        email: createdUser.email,
+        role: createdUser.role,
+        invitedBy: user.id,
+      })
+
+      // Generate QR code for invitation
+      const qrCode = await generateInvitationQRCode(
+        invitation.token,
+        createdUser.email
+      )
+
+      // Send invitation email via SendGrid
+      await sendInvitationEmail({
+        email: createdUser.email,
+        token: invitation.token,
+        qrCodeDataUrl: qrCode,
+        orgName: org?.company_name || 'MonoPilot',
+        role: createdUser.role,
+        expiresAt: new Date(invitation.expires_at),
+      })
+    } catch (emailError) {
+      console.error('Failed to send invitation email:', emailError)
+      // Don't fail user creation if email fails - user is created, invitation can be resent
+    }
 
     // Log activity (Story 1.13: Main Dashboard)
     await logUserActivity(
