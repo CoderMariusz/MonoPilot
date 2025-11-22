@@ -10,7 +10,7 @@
     "type-check": "cd apps/frontend && pnpm type-check",
     "clean": "rm -rf node_modules apps/frontend/node_modules apps/frontend/.next",
     "install:all": "pnpm install && cd apps/frontend && pnpm install",
-    "prepare": "husky || true",
+    "prepare": "husky install || true",
     "pre-push": "pnpm lint",
     "seed:admin": "node scripts/seed-first-admin.mjs",
     "test": "pnpm test:unit && pnpm test:e2e",
