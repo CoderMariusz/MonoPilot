@@ -257,7 +257,7 @@ export default function AllergensPage() {
                 ) : allergens.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No allergens found. Click "Add Allergen" to create one.
+                      No allergens found. Click &ldquo;Add Allergen&rdquo; to create one.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -349,7 +349,7 @@ export default function AllergensPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete custom allergen?</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{deletingAllergen.name}"? This action cannot be undone.
+                Are you sure you want to delete &ldquo;{deletingAllergen.name}&rdquo;? This action cannot be undone.
                 {deletingAllergen.product_count && deletingAllergen.product_count > 0 && (
                   <span className="block mt-2 text-destructive font-semibold">
                     Warning: This allergen is used by {deletingAllergen.product_count} product(s).
