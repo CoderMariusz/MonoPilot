@@ -160,6 +160,7 @@ export async function PUT(
       {
         line: result.data,
         message: 'Production line updated successfully',
+        warning: result.warning, // Pass through warning from service (e.g., warehouse change)
       },
       { status: 200 }
     )

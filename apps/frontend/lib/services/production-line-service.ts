@@ -15,6 +15,9 @@ import { createServerSupabase } from '../supabase/server'
  * - Cache invalidation events (AC-007.8)
  */
 
+// Type alias for Supabase client (inferred from createServerSupabase return type)
+type SupabaseClient = Awaited<ReturnType<typeof createServerSupabase>>
+
 export interface ProductionLine {
   id: string
   org_id: string
@@ -73,6 +76,7 @@ export interface ProductionLineServiceResult<T = ProductionLine> {
   success: boolean
   data?: T
   error?: string
+  warning?: string  // Non-blocking warnings (e.g., warehouse change requires output location update)
   code?: 'DUPLICATE_CODE' | 'NOT_FOUND' | 'FOREIGN_KEY_CONSTRAINT' | 'INVALID_INPUT' | 'DATABASE_ERROR' | 'ACTIVE_WOS' | 'LOCATION_WAREHOUSE_MISMATCH'
 }
 
@@ -120,7 +124,7 @@ async function getCurrentOrgId(): Promise<string | null> {
  * @returns { valid: boolean; error?: string }
  */
 async function validateOutputLocation(
-  supabase: any,
+  supabase: SupabaseClient,
   warehouseId: string,
   locationId: string
 ): Promise<{ valid: boolean; error?: string }> {
@@ -166,17 +170,25 @@ async function validateOutputLocation(
  *
  * Bidirectional: Can assign from line side (this story) or machine side (Story 1.7)
  *
+ * TRANSACTION SAFETY NOTE:
+ * - Supabase client uses implicit transactions for single operations
+ * - Delete + Insert are separate operations (potential for data loss if insert fails)
+ * - Risk mitigation: FK constraints ensure referential integrity
+ * - If insert fails, delete still succeeded → assignments are cleared (acceptable UX)
+ * - Caller should handle insert failure and retry or rollback parent operation
+ * - For stricter atomicity, consider using Supabase RPC with explicit transaction
+ *
  * @param supabase - Supabase client
  * @param lineId - Production line UUID
  * @param machineIds - Array of machine UUIDs
  */
 async function updateLineMachineAssignments(
-  supabase: any,
+  supabase: SupabaseClient,
   lineId: string,
   machineIds?: string[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Delete existing assignments
+    // Delete existing assignments (Step 1 of 2)
     const { error: deleteError } = await supabase
       .from('machine_line_assignments')
       .delete()
@@ -316,6 +328,8 @@ export async function createProductionLine(
 
     if (error) {
       console.error('Failed to create production line:', error)
+      // TODO Story 1.14: In production, use generic error message to prevent information disclosure
+      // error: process.env.NODE_ENV === 'production' ? 'Internal server error' : `Database error: ${error.message}`
       return {
         success: false,
         error: `Database error: ${error.message}`,
@@ -324,6 +338,7 @@ export async function createProductionLine(
     }
 
     // Create machine assignments if machine_ids provided (AC-007.3)
+    // TRANSACTION ROLLBACK: If assignments fail, delete the created line to maintain consistency
     if (input.machine_ids && input.machine_ids.length > 0) {
       const assignmentResult = await updateLineMachineAssignments(
         supabase,
@@ -332,13 +347,28 @@ export async function createProductionLine(
       )
 
       if (!assignmentResult.success) {
-        // Line created but machine assignments failed
-        // Return success but log the error
-        console.error('Line created but machine assignments failed:', assignmentResult.error)
+        // ROLLBACK: Delete the created line since machine assignments failed
+        console.error('Machine assignments failed, rolling back line creation:', assignmentResult.error)
+
+        const { error: deleteError } = await supabase
+          .from('production_lines')
+          .delete()
+          .eq('id', line.id)
+          .eq('org_id', orgId)
+
+        if (deleteError) {
+          console.error('CRITICAL: Failed to rollback line creation:', deleteError)
+          return {
+            success: false,
+            error: `Line created but assignments failed, and rollback also failed. Manual cleanup required for line ${line.id}. Original error: ${assignmentResult.error}`,
+            code: 'DATABASE_ERROR',
+          }
+        }
+
         return {
-          success: true,
-          data: line,
-          error: `Line created but machine assignments failed: ${assignmentResult.error}`,
+          success: false,
+          error: `Failed to create machine assignments: ${assignmentResult.error}. Line creation rolled back.`,
+          code: 'DATABASE_ERROR',
         }
       }
     }
@@ -406,9 +436,10 @@ export async function updateProductionLine(
     }
 
     // Check if line exists and belongs to org
+    // Fetch full state for potential rollback if machine assignments fail
     const { data: existingLine, error: fetchError } = await supabase
       .from('production_lines')
-      .select('id, code, warehouse_id, default_output_location_id')
+      .select('id, code, name, warehouse_id, default_output_location_id')
       .eq('id', id)
       .eq('org_id', orgId)
       .single()
@@ -441,9 +472,11 @@ export async function updateProductionLine(
     }
 
     // AC-007.6: If warehouse changing, check for active WOs
+    let warehouseChangeWarning: string | undefined
     if (input.warehouse_id && input.warehouse_id !== existingLine.warehouse_id) {
       // TODO Epic 3: Query work_orders table to check for active WOs
-      // For now, log a warning
+      // For now, return warning to user
+      warehouseChangeWarning = 'Warning: Warehouse has been changed. Please verify the output location is within the new warehouse. In Epic 3, this will check for active work orders.'
       console.warn(`Warehouse changing for line ${id}. Check for active WOs in Epic 3. Output location must be updated.`)
     }
 
@@ -471,7 +504,13 @@ export async function updateProductionLine(
     }
 
     // Build update payload
-    const updatePayload: any = {
+    const updatePayload: {
+      updated_by: string
+      code?: string
+      name?: string
+      warehouse_id?: string
+      default_output_location_id?: string | null
+    } = {
       updated_by: user.id,
     }
 
@@ -501,6 +540,7 @@ export async function updateProductionLine(
     }
 
     // Update machine assignments if machine_ids provided (AC-007.6)
+    // TRANSACTION ROLLBACK: If assignments fail, revert the line update
     if (input.machine_ids !== undefined) {
       const assignmentResult = await updateLineMachineAssignments(
         supabase,
@@ -509,12 +549,42 @@ export async function updateProductionLine(
       )
 
       if (!assignmentResult.success) {
-        // Line updated but machine assignments failed
-        console.error('Line updated but machine assignments failed:', assignmentResult.error)
+        // ROLLBACK: Revert line update since machine assignments failed
+        console.error('Machine assignments failed, rolling back line update:', assignmentResult.error)
+
+        const rollbackPayload: {
+          code: string
+          name: string
+          warehouse_id: string
+          default_output_location_id: string | null
+          updated_by: string
+        } = {
+          code: existingLine.code,
+          name: existingLine.name,
+          warehouse_id: existingLine.warehouse_id,
+          default_output_location_id: existingLine.default_output_location_id,
+          updated_by: user.id,
+        }
+
+        const { error: rollbackError } = await supabase
+          .from('production_lines')
+          .update(rollbackPayload)
+          .eq('id', id)
+          .eq('org_id', orgId)
+
+        if (rollbackError) {
+          console.error('CRITICAL: Failed to rollback line update:', rollbackError)
+          return {
+            success: false,
+            error: `Line updated but assignments failed, and rollback also failed. Manual verification required for line ${id}. Original error: ${assignmentResult.error}`,
+            code: 'DATABASE_ERROR',
+          }
+        }
+
         return {
-          success: true,
-          data: line,
-          error: `Line updated but machine assignments failed: ${assignmentResult.error}`,
+          success: false,
+          error: `Failed to update machine assignments: ${assignmentResult.error}. Line update rolled back.`,
+          code: 'DATABASE_ERROR',
         }
       }
     }
@@ -527,6 +597,7 @@ export async function updateProductionLine(
     return {
       success: true,
       data: line,
+      warning: warehouseChangeWarning, // Return warehouse change warning to user
     }
   } catch (error) {
     console.error('Error in updateProductionLine:', error)
@@ -646,13 +717,16 @@ export async function listProductionLines(
       }
     }
 
-    // Build query with JOINs
+    // Build query with JOINs (optimized: single query with machine assignments)
     let query = supabase
       .from('production_lines')
       .select(`
         *,
         warehouse:warehouses(id, code, name),
-        default_output_location:locations(id, code, name, type)
+        default_output_location:locations(id, code, name, type),
+        machine_line_assignments(
+          machine:machines(id, code, name, status)
+        )
       `, { count: 'exact' })
       .eq('org_id', orgId)
 
@@ -663,6 +737,9 @@ export async function listProductionLines(
 
     // Search filter (AC-007.4: Search by code or name)
     if (filters?.search) {
+      // NOTE: Escaping is for LIKE semantics (%, _), NOT for SQL injection prevention
+      // Supabase uses parameterized queries which prevent SQL injection
+      // Story 1.14 TODO: Add comment to clarify this is LIKE escaping, not security escaping
       const escapedSearch = filters.search
         .replace(/\\/g, '\\\\')
         .replace(/%/g, '\\%')
@@ -694,35 +771,20 @@ export async function listProductionLines(
       }
     }
 
-    // Fetch machine assignments for all lines (AC-007.4: Machines column)
-    if (lines && lines.length > 0) {
-      const lineIds = lines.map(l => l.id)
-      const { data: assignments } = await supabase
-        .from('machine_line_assignments')
-        .select(`
-          line_id,
-          machine:machines(id, code, name, status)
-        `)
-        .in('line_id', lineIds)
-
-      // Attach assigned machines to each line
-      const linesWithMachines = lines.map(line => ({
-        ...line,
-        assigned_machines: assignments
-          ?.filter(a => a.line_id === line.id)
-          .map(a => a.machine) || [],
-      }))
-
-      return {
-        success: true,
-        data: linesWithMachines,
-        total: count ?? 0,
-      }
-    }
+    // Transform machine_line_assignments to assigned_machines array
+    // (Extract nested machine data from junction table)
+    const linesWithMachines = (lines || []).map(line => ({
+      ...line,
+      assigned_machines: (line.machine_line_assignments || [])
+        .map((assignment: any) => assignment.machine)
+        .filter(Boolean),
+      // Remove the junction table data (not needed in response)
+      machine_line_assignments: undefined,
+    }))
 
     return {
       success: true,
-      data: lines || [],
+      data: linesWithMachines,
       total: count ?? 0,
     }
   } catch (error) {

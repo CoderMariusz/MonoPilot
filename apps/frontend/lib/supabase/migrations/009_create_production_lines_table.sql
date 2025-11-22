@@ -39,9 +39,19 @@ CREATE TABLE IF NOT EXISTS public.production_lines (
 -- ============================================================================
 
 -- This adds the missing FK constraint on line_id (noted in migration 007)
-ALTER TABLE public.machine_line_assignments
-  ADD CONSTRAINT machine_line_assignments_line_fk
-  FOREIGN KEY (line_id) REFERENCES public.production_lines(id) ON DELETE CASCADE;
+-- Only add if it doesn't already exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'machine_line_assignments_line_fk'
+    AND conrelid = 'public.machine_line_assignments'::regclass
+  ) THEN
+    ALTER TABLE public.machine_line_assignments
+      ADD CONSTRAINT machine_line_assignments_line_fk
+      FOREIGN KEY (line_id) REFERENCES public.production_lines(id) ON DELETE CASCADE;
+  END IF;
+END $$;
 
 -- ============================================================================
 -- CREATE INDEXES FOR PRODUCTION_LINES
@@ -63,13 +73,27 @@ ALTER TABLE public.production_lines ENABLE ROW LEVEL SECURITY;
 -- ============================================================================
 -- CREATE RLS POLICIES FOR PRODUCTION_LINES
 -- ============================================================================
+--
+-- PERFORMANCE NOTE: RLS policies use subqueries (EXISTS) to check admin role
+-- This may cause N+1 query patterns on large datasets
+-- MONITOR: Query response times in Story 1.14 testing
+-- OPTIMIZATION: If query time > 100ms, consider:
+--   1. Denormalizing 'role' into JWT custom claims
+--   2. Caching role lookup in session
+--   3. Using materialized views for complex policies
+--
+-- Current implementation prioritizes security and correctness over performance
+-- (Acceptable for MVP with <1000 lines per org)
+-- ============================================================================
 
 -- Policy: Users can only see production lines from their own organization
+DROP POLICY IF EXISTS production_lines_select_policy ON public.production_lines;
 CREATE POLICY production_lines_select_policy ON public.production_lines
   FOR SELECT
   USING (org_id = (auth.jwt() ->> 'org_id')::uuid);
 
 -- Policy: Admin can insert production lines in their organization
+DROP POLICY IF EXISTS production_lines_insert_policy ON public.production_lines;
 CREATE POLICY production_lines_insert_policy ON public.production_lines
   FOR INSERT
   WITH CHECK (
@@ -83,6 +107,7 @@ CREATE POLICY production_lines_insert_policy ON public.production_lines
   );
 
 -- Policy: Admin can update production lines in their organization
+DROP POLICY IF EXISTS production_lines_update_policy ON public.production_lines;
 CREATE POLICY production_lines_update_policy ON public.production_lines
   FOR UPDATE
   USING (
@@ -98,6 +123,7 @@ CREATE POLICY production_lines_update_policy ON public.production_lines
 
 -- Policy: Admin can delete production lines in their organization
 -- Note: FK constraint ON DELETE RESTRICT prevents deletion if line has active WOs
+DROP POLICY IF EXISTS production_lines_delete_policy ON public.production_lines;
 CREATE POLICY production_lines_delete_policy ON public.production_lines
   FOR DELETE
   USING (
@@ -115,6 +141,7 @@ CREATE POLICY production_lines_delete_policy ON public.production_lines
 -- ============================================================================
 
 -- Trigger to call function on UPDATE (function already created in migration 000)
+DROP TRIGGER IF EXISTS production_lines_updated_at_trigger ON public.production_lines;
 CREATE TRIGGER production_lines_updated_at_trigger
   BEFORE UPDATE ON public.production_lines
   FOR EACH ROW
@@ -143,20 +170,47 @@ COMMENT ON COLUMN public.production_lines.created_by IS 'FK to users - user who 
 COMMENT ON COLUMN public.production_lines.updated_by IS 'FK to users - user who last updated the line';
 
 -- ============================================================================
--- NOTE: Output Location Validation (AC-007.2, AC-011)
+-- DATABASE CONSTRAINT: Output Location Warehouse Validation (AC-007.2, AC-011)
 -- ============================================================================
 --
 -- Business Rule: default_output_location_id must belong to same warehouse as the line
--- This validation is enforced at application layer (ProductionLineService) since
--- SQL CHECK constraints cannot reference other tables.
+-- Defense-in-depth: Application layer validation + database constraint
 --
--- Validation logic:
--- 1. When creating/updating line with default_output_location_id:
---    SELECT warehouse_id FROM locations WHERE id = default_output_location_id
--- 2. If location.warehouse_id != line.warehouse_id → reject with error
--- 3. Return error: "Output location must be within the line's warehouse"
+-- This prevents race conditions where:
+-- 1. App validates location L1 is in warehouse W1
+-- 2. Another transaction updates location L1 to warehouse W2
+-- 3. App inserts line with inconsistent state
 --
--- Alternative: Database trigger (more complex, not needed for MVP)
+CREATE OR REPLACE FUNCTION validate_production_line_output_location()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Only validate if default_output_location_id is set
+  IF NEW.default_output_location_id IS NOT NULL THEN
+    -- Check that location's warehouse matches line's warehouse
+    IF NOT EXISTS (
+      SELECT 1 FROM public.locations
+      WHERE id = NEW.default_output_location_id
+      AND warehouse_id = NEW.warehouse_id
+    ) THEN
+      RAISE EXCEPTION 'Output location must belong to the same warehouse as the production line (location: %, line warehouse: %)',
+        NEW.default_output_location_id, NEW.warehouse_id
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to enforce constraint on INSERT and UPDATE
+DROP TRIGGER IF EXISTS production_lines_validate_output_location ON public.production_lines;
+CREATE TRIGGER production_lines_validate_output_location
+  BEFORE INSERT OR UPDATE ON public.production_lines
+  FOR EACH ROW
+  EXECUTE FUNCTION validate_production_line_output_location();
+
+-- NOTE: Application layer still validates for better UX (immediate feedback)
+-- Database constraint is the final safety net against race conditions
 -- ============================================================================
 
 -- ============================================================================

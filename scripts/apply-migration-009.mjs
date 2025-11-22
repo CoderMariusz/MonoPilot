@@ -1,77 +1,100 @@
 #!/usr/bin/env node
 
 /**
- * Apply migration 009: Create production_lines table
- * Story: 1.8 Production Line Configuration
+ * Apply migration 009 (Production Lines table) via Supabase Management API
+ * Story: 1.8 - Production Line Configuration
  */
 
-import { readFileSync } from 'fs'
-import { resolve } from 'path'
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
-const SUPABASE_ACCESS_TOKEN = 'sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac'
-const PROJECT_REF = 'pgroxddbtaevdegnidaz'
+// ⚠️ SECURITY: NEVER HARDCODE TOKENS! Always load from environment variables
+// This token was exposed in git history and should be rotated immediately
+// Use: SUPABASE_ACCESS_TOKEN=<token> node scripts/apply-migration-009.mjs
+const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
+const PROJECT_REF = process.env.SUPABASE_PROJECT_ID || 'pgroxddbtaevdegnidaz';
+
+if (!SUPABASE_ACCESS_TOKEN) {
+  console.error('❌ SECURITY ERROR: SUPABASE_ACCESS_TOKEN environment variable is required');
+  console.error('   Usage: SUPABASE_ACCESS_TOKEN=<your-token> node scripts/apply-migration-009.mjs');
+  console.error('   Or add to .env file (make sure .env is in .gitignore!)');
+  process.exit(1);
+}
+
+console.log('🔄 Applying migration 009 (Production Lines table) via Management API...\n');
+
+// Read migration file
+const migrationPath = resolve(process.cwd(), 'apps/frontend/lib/supabase/migrations/009_create_production_lines_table.sql');
+const migrationSQL = readFileSync(migrationPath, 'utf-8');
 
 async function main() {
-  console.log('🔄 Applying migration 009: Create production_lines table...\n')
-
   try {
-    // Read migration file
-    const migrationPath = resolve(
-      process.cwd(),
-      'apps/frontend/lib/supabase/migrations/009_create_production_lines_table.sql'
-    )
-    const migrationSQL = readFileSync(migrationPath, 'utf-8')
-
-    // Apply migration via Supabase Management API
-    const response = await fetch(
-      `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${SUPABASE_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: migrationSQL,
-        }),
-      }
-    )
-
-    const responseText = await response.text()
+    // Use Supabase Management API to execute SQL
+    const response = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: migrationSQL
+      })
+    });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Migration failed:', response.status, response.statusText);
+      console.error('Response:', errorText);
+      
       // Check if it's an "already exists" error
-      if (
-        responseText.includes('already exists') ||
-        responseText.includes('duplicate') ||
-        responseText.includes('42P07')
-      ) {
-        console.log('⚠️  Table already exists (migration already applied)')
-        console.log('✅ Migration 009 is already up to date!\n')
-        return
+      if (errorText.includes('already exists') || 
+          errorText.includes('duplicate') ||
+          errorText.includes('42710')) {
+        console.log('\n⚠️  Migration 009 already applied (some objects may already exist)');
+        console.log('   This is normal if migration was partially applied before.');
       }
-
-      console.error('❌ Migration failed:', response.status)
-      console.error('Response:', responseText)
-      process.exit(1)
+      
+      process.exit(1);
     }
 
-    console.log('✅ Migration 009 applied successfully!')
-    console.log('\n📋 Created:')
-    console.log('   - production_lines table with columns:')
-    console.log('     • id, org_id, warehouse_id (FK to warehouses)')
-    console.log('     • code (unique per org), name')
-    console.log('     • default_output_location_id (FK to locations, nullable)')
-    console.log('     • created_by, updated_by, created_at, updated_at')
-    console.log('   - FK constraint added: machine_line_assignments.line_id → production_lines.id')
-    console.log('   - Indexes: org_id, code, warehouse_id, org+warehouse composite')
-    console.log('   - RLS policies: Admin-only insert/update/delete, org isolation')
-    console.log('   - Constraints: unique (org_id, code), code format ^[A-Z0-9-]+$')
-    console.log('\n💡 Production lines ready for WO creation (Epic 3, 4)!\n')
+    const result = await response.json();
+    console.log('✅ Migration 009 applied successfully!');
+    console.log('\n📋 Created:');
+    console.log('   - public.production_lines table');
+    console.log('   - Foreign key constraint on machine_line_assignments.line_id');
+    console.log('   - RLS policies (select, insert, update, delete)');
+    console.log('   - Indexes:');
+    console.log('     • idx_production_lines_org_id');
+    console.log('     • idx_production_lines_code (org_id, code)');
+    console.log('     • idx_production_lines_warehouse_id');
+    console.log('     • idx_production_lines_org_warehouse');
+    console.log('     • idx_production_lines_default_output_location');
+    console.log('   - Triggers:');
+    console.log('     • production_lines_updated_at_trigger');
+    console.log('     • production_lines_validate_output_location (validates output location warehouse)');
+    console.log('   - Functions:');
+    console.log('     • validate_production_line_output_location()');
+    console.log('   - Constraints:');
+    console.log('     • Unique: (org_id, code)');
+    console.log('     • Check: code format (uppercase alphanumeric + hyphens)');
+    console.log('     • Check: code length (2-50 chars)');
+    console.log('     • Check: name length (1-100 chars)');
+    console.log('\n🎯 Key Features:');
+    console.log('   - Multi-tenancy via org_id RLS');
+    console.log('   - Warehouse assignment (line belongs to warehouse)');
+    console.log('   - Default output location (optional, must be in same warehouse)');
+    console.log('   - Database constraint validates output location warehouse');
+    console.log('   - FK to machine_line_assignments for machine assignments');
+    console.log('   - Ready for WO assignments (Epic 3)\n');
+
+    if (result && Object.keys(result).length > 0) {
+      console.log('API Response:', JSON.stringify(result, null, 2));
+    }
+
   } catch (error) {
-    console.error('❌ Error applying migration:', error.message)
-    process.exit(1)
+    console.error('❌ Error:', error.message);
+    process.exit(1);
   }
 }
 
-main()
+main();

@@ -18,6 +18,28 @@ import { ZodError } from 'zod'
  *
  * GET /api/settings/lines - List production lines with filters
  * POST /api/settings/lines - Create new production line
+ *
+ * TODO (Story 1.14): Add rate limiting to prevent API abuse
+ * - Implement using @upstash/ratelimit with Redis
+ * - Recommended limits:
+ *   • GET /api/settings/lines: 60 req/min per user
+ *   • POST /api/settings/lines: 10 req/min per user (admin only)
+ * - Handle rate limit errors with 429 Too Many Requests
+ * - Include Retry-After header in response
+ *
+ * Example implementation:
+ * ```typescript
+ * import { Ratelimit } from "@upstash/ratelimit"
+ * import { Redis } from "@upstash/redis"
+ *
+ * const ratelimit = new Ratelimit({
+ *   redis: Redis.fromEnv(),
+ *   limiter: Ratelimit.slidingWindow(10, "1 m"),
+ * })
+ *
+ * const { success } = await ratelimit.limit(userId)
+ * if (!success) return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+ * ```
  */
 
 // ============================================================================
