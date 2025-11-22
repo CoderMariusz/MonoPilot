@@ -193,8 +193,13 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // Return detailed error for debugging
       return NextResponse.json(
-        { error: 'Failed to create user in authentication system' },
+        {
+          error: 'Failed to create user in authentication system',
+          details: authCreateError?.message || 'Unknown error',
+          code: authCreateError?.code
+        },
         { status: 500 }
       )
     }
