@@ -244,7 +244,7 @@ describe('Module Activation API Integration Tests', () => {
         .single()
 
       // Remove shipping module
-      const newModules = (current?.modules_enabled || []).filter(m => m !== 'shipping')
+      const newModules = (current?.modules_enabled || []).filter((m: string) => m !== 'shipping')
 
       const { error } = await supabase
         .from('organizations')
