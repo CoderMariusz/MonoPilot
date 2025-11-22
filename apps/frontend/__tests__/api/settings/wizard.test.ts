@@ -13,6 +13,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
+import { randomUUID } from 'crypto'
 
 // Test configuration
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -20,8 +21,8 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-// Test data
-const testOrgId = 'test-org-wizard-' + Date.now()
+// Test data - use proper UUIDs
+const testOrgId = randomUUID()
 
 // Cleanup test data
 async function cleanup() {
@@ -415,7 +416,7 @@ describe('Settings Wizard API Integration Tests', () => {
 
   describe('Default values', () => {
     it('should have wizard_completed = false by default', async () => {
-      const newOrgId = 'test-org-default-' + Date.now()
+      const newOrgId = randomUUID()
 
       // Create org without specifying wizard fields
       await supabase

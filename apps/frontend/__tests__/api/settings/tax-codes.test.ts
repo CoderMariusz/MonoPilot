@@ -14,6 +14,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
+import { randomUUID } from 'crypto'
 
 // Test configuration
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -21,9 +22,9 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-// Test data
-const testOrgId = 'test-org-taxcodes-' + Date.now()
-const testUserId = 'test-user-taxcodes-' + Date.now()
+// Test data - use proper UUIDs
+const testOrgId = randomUUID()
+const testUserId = randomUUID()
 
 // Cleanup test data
 async function cleanup() {
@@ -328,7 +329,7 @@ describe('Tax Codes API Integration Tests', () => {
   describe('RLS: Organization isolation', () => {
     it('should only see tax codes from own organization', async () => {
       // Create another org
-      const otherOrgId = 'test-org-other-' + Date.now()
+      const otherOrgId = randomUUID()
       await supabase
         .from('organizations')
         .insert({
@@ -359,7 +360,7 @@ describe('Tax Codes API Integration Tests', () => {
 
   describe('Seed function: UK vs Poland', () => {
     it('should seed different codes for UK', async () => {
-      const ukOrgId = 'test-org-uk-' + Date.now()
+      const ukOrgId = randomUUID()
 
       // Create UK org
       await supabase
