@@ -164,7 +164,8 @@
       "Bash(apps/frontend/lib/supabase/generated.types.ts)",
       "Bash(then grep -i SENDGRID \"C:/Users/Mariusz K/Documents/Programowanie/MonoPilot/apps/frontend/.env.local\")",
       "Bash(then grep -E \"SENDGRID\" \"C:/Users/Mariusz K/Documents/Programowanie/MonoPilot/apps/frontend/.env.local\")",
-      "Bash(python -m json.tool:*)"
+      "Bash(python -m json.tool:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []
