@@ -224,9 +224,9 @@ development_status:
   1-7-machine-configuration: done  # Machine Configuration - APPROVED (2025-11-22): 7/8 ACs implemented (AC-006.7 optional), 37 integration tests, deferred items in Story 1.14
   1-8-production-line-configuration: done  # APPROVED (2025-11-22): Backend complete (Migration 009, Service, API, Validation). Review fixes: type safety, transaction rollback, query optimization. Frontend/tests deferred to 1.14
   1-9-allergen-management: done  # COMPLETE (2025-11-22): Backend (Migrations 010+011, Service, API, Validation) + Frontend (List Page, Form Modal). Tests deferred to 1.14
-  1-10-tax-code-configuration: ready-for-dev
-  1-11-module-activation: ready-for-dev
-  1-12-settings-wizard-ux-design: ready-for-dev
+  1-10-tax-code-configuration: done  # Backend complete (2025-11-22): Migration 012, TaxCodeService, API, Validation, country-based seeding (PL/UK). Frontend/tests deferred to 1.14
+  1-11-module-activation: done  # Backend complete (2025-11-22): Migration 013, ModuleService, module config, API endpoints. Frontend (modules page, toggle modal, navigation rebuild) deferred to 1.14
+  1-12-settings-wizard-ux-design: done  # Backend complete (2025-11-22): Migration 014, WizardService (progress tracking, completion). Full 6-step wizard UI deferred to 1.14
   1-13-main-dashboard: done  # ✅ Code review APPROVED - All HIGH issues fixed (Migration 005, Sidebar, Module filtering, Activity click)
   1-14-epic-polish-and-cleanup: ready-for-dev  # Collects all Epic 1 deferred items (primarily Story 1.3: UI, tests, automation)
   epic-1-retrospective: optional
