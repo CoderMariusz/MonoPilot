@@ -228,7 +228,7 @@ development_status:
   1-11-module-activation: done  # Backend complete (2025-11-22): Migration 013, ModuleService, module config, API endpoints. Frontend (modules page, toggle modal, navigation rebuild) deferred to 1.14
   1-12-settings-wizard-ux-design: done  # Backend complete (2025-11-22): Migration 014, WizardService (progress tracking, completion). Full 6-step wizard UI deferred to 1.14
   1-13-main-dashboard: done  # ✅ Code review APPROVED - All HIGH issues fixed (Migration 005, Sidebar, Module filtering, Activity click)
-  1-14-epic-polish-and-cleanup: ready-for-dev  # Collects all Epic 1 deferred items (primarily Story 1.3: UI, tests, automation)
+  1-14-epic-polish-and-cleanup: in-progress  # AC-1.1 through AC-1.6 COMPLETED (Invitations Tab, Modal, Tests, Cron, DB Trigger). Remaining: AC-2.1 (E2E Tests), AC-2.2 (Redis Cache), AC-2.3 (Line Assignment UI), AC-2.4 (Machine Detail Page - optional)
   1-15-settings-dashboard: done  # ✅ Settings landing page at /settings with 10 module cards (Organization, Users, Warehouses, Locations, Machines, Production Lines, Allergens, Tax Codes, Modules, Wizard). Responsive grid layout. Story doc: docs/sprint-artifacts/stories/story-1-15-settings-dashboard.md
   epic-1-retrospective: optional
 

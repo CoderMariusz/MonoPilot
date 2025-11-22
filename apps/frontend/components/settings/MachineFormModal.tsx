@@ -1,15 +1,17 @@
 /**
  * Machine Form Modal Component
  * Story: 1.7 Machine Configuration
+ * Story: 1.14 (AC-2.3) Line Assignment UI
  * Task 6: Machine Form Modal (AC-006.1, AC-006.6)
  */
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -18,7 +20,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
+import { X } from 'lucide-react'
 import type { Machine } from '@/lib/validation/machine-schemas'
+import type { ProductionLine } from '@/lib/validation/production-line-schemas'
 import { createMachineSchema, updateMachineSchema } from '@/lib/validation/machine-schemas'
 import { ZodError } from 'zod'
 
@@ -38,9 +42,40 @@ export function MachineFormModal({ machine, onClose, onSuccess }: MachineFormMod
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+  const [productionLines, setProductionLines] = useState<ProductionLine[]>([])
+  const [loadingLines, setLoadingLines] = useState(true)
   const { toast } = useToast()
 
   const isEditMode = !!machine
+
+  // Fetch production lines on mount (AC-2.3)
+  useEffect(() => {
+    const fetchProductionLines = async () => {
+      try {
+        setLoadingLines(true)
+        const response = await fetch('/api/settings/lines')
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch production lines')
+        }
+
+        const data = await response.json()
+        setProductionLines(data.lines || [])
+      } catch (error) {
+        console.error('Error fetching production lines:', error)
+        toast({
+          title: 'Warning',
+          description: 'Failed to load production lines. Line assignment will be unavailable.',
+          variant: 'destructive',
+        })
+        setProductionLines([])
+      } finally {
+        setLoadingLines(false)
+      }
+    }
+
+    fetchProductionLines()
+  }, [])
 
   // Handle input change
   const handleChange = (field: string, value: string | string[]) => {
@@ -54,6 +89,34 @@ export function MachineFormModal({ machine, onClose, onSuccess }: MachineFormMod
       })
     }
   }
+
+  // Handle adding production line (AC-2.3)
+  const handleAddLine = (lineId: string) => {
+    if (!formData.line_ids.includes(lineId)) {
+      setFormData((prev) => ({
+        ...prev,
+        line_ids: [...prev.line_ids, lineId],
+      }))
+    }
+  }
+
+  // Handle removing production line (AC-2.3)
+  const handleRemoveLine = (lineId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      line_ids: prev.line_ids.filter((id) => id !== lineId),
+    }))
+  }
+
+  // Get selected lines details
+  const selectedLines = productionLines.filter((line) =>
+    formData.line_ids.includes(line.id)
+  )
+
+  // Get available lines for dropdown (not already selected)
+  const availableLines = productionLines.filter(
+    (line) => !formData.line_ids.includes(line.id)
+  )
 
   // Validate form
   const validateForm = () => {
@@ -289,14 +352,78 @@ export function MachineFormModal({ machine, onClose, onSuccess }: MachineFormMod
             </p>
           </div>
 
-          {/* Line Assignments Placeholder (AC-006.3, AC-006.6) */}
+          {/* Line Assignments (AC-006.3, AC-006.6, Story 1.14 AC-2.3) */}
           <div className="space-y-2">
             <Label>Production Lines</Label>
-            <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-              <p className="text-sm text-gray-600">
-                Line assignments will be available after Story 1.8 (Production Line Configuration) is complete.
-              </p>
-            </div>
+
+            {loadingLines ? (
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                <p className="text-sm text-gray-600">Loading production lines...</p>
+              </div>
+            ) : productionLines.length === 0 ? (
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                <p className="text-sm text-gray-600">
+                  No production lines available. Create production lines first.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Line selection dropdown */}
+                {availableLines.length > 0 && (
+                  <Select
+                    value=""
+                    onValueChange={(lineId) => {
+                      handleAddLine(lineId)
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Add production line..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableLines.map((line) => (
+                        <SelectItem key={line.id} value={line.id}>
+                          {line.code} - {line.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {/* Selected lines as removable badges */}
+                {selectedLines.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedLines.map((line) => (
+                      <Badge
+                        key={line.id}
+                        variant="secondary"
+                        className="pl-3 pr-1 py-1 flex items-center gap-2"
+                      >
+                        <span>
+                          {line.code} - {line.name}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-4 w-4 p-0 hover:bg-gray-300 rounded-full"
+                          onClick={() => handleRemoveLine(line.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    No production lines assigned. Select from dropdown above.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <p className="text-sm text-gray-500">
+              Optional. Assign this machine to one or more production lines.
+            </p>
           </div>
 
           {/* Actions */}

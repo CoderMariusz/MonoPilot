@@ -173,8 +173,9 @@ describe('Invitation API Integration Tests', () => {
         .eq('id', invitationId)
         .single()
 
-      expect(oldTokenInvitation.token).not.toBe(oldToken)
-      expect(oldTokenInvitation.token).toBe(newToken)
+      expect(oldTokenInvitation).toBeDefined()
+      expect(oldTokenInvitation!.token).not.toBe(oldToken)
+      expect(oldTokenInvitation!.token).toBe(newToken)
 
       // Update token for next tests
       invitationToken = newToken
@@ -229,7 +230,8 @@ describe('Invitation API Integration Tests', () => {
         .eq('id', testUserId)
         .single()
 
-      expect(activatedUser.status).toBe('active')
+      expect(activatedUser).toBeDefined()
+      expect(activatedUser!.status).toBe('active')
 
       // Verify invitation is accepted
       const { data: acceptedInvitation } = await supabase
@@ -238,8 +240,9 @@ describe('Invitation API Integration Tests', () => {
         .eq('id', invitationId)
         .single()
 
-      expect(acceptedInvitation.status).toBe('accepted')
-      expect(acceptedInvitation.accepted_at).toBeDefined()
+      expect(acceptedInvitation).toBeDefined()
+      expect(acceptedInvitation!.status).toBe('accepted')
+      expect(acceptedInvitation!.accepted_at).toBeDefined()
     })
   })
 
@@ -277,7 +280,8 @@ describe('Invitation API Integration Tests', () => {
         .eq('id', statusInvitation.id)
         .single()
 
-      expect(cancelledInvitation.status).toBe('cancelled')
+      expect(cancelledInvitation).toBeDefined()
+      expect(cancelledInvitation!.status).toBe('cancelled')
     })
   })
 
@@ -316,7 +320,7 @@ describe('Invitation API Integration Tests', () => {
         .select('id')
 
       expect(deletedInvitations).toBeDefined()
-      expect(deletedInvitations.length).toBeGreaterThanOrEqual(1)
+      expect(deletedInvitations!.length).toBeGreaterThanOrEqual(1)
 
       // Verify old invitation is deleted
       const { data: checkDeleted } = await supabase

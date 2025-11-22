@@ -103,11 +103,14 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - Cache key: `machines:{org_id}`, TTL: 5 min
 - Currently works without cache, optimization for scale
 
-**AC-2.3**: Task 9 - Line Assignment UI (from Story 1.7 Task 9, AC-006.3, Priority: BLOCKED)
-- Blocked by Story 1.8 (production_lines table creation)
-- Line assignment multi-select dropdown in MachineFormModal
-- Backend logic already complete (machine-service.ts)
-- Can be completed immediately after Story 1.8
+**AC-2.3**: Task 9 - Line Assignment UI (from Story 1.7 Task 9, AC-006.3) ✅ COMPLETED
+- ✅ Story 1.8 completed - production_lines table exists
+- ✅ Production lines API integration (/api/settings/lines)
+- ✅ Multi-select dropdown with available lines
+- ✅ Selected lines displayed as removable badges
+- ✅ Add/remove line functionality
+- ✅ Backend logic already complete (machine-service.ts)
+- ✅ UI integrated in MachineFormModal component
 
 **AC-2.4**: AC-006.7 - Machine Detail Page (from Story 1.7 Task 8, Priority: OPTIONAL)
 - Optional enhancement (list + modal provides full functionality)
@@ -241,13 +244,13 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - [ ] Test cache hit rate (target >80%)
 - [ ] Monitor cache performance
 
-### Task 9: Story 1.7 - Line Assignment UI (AC-2.3) - BLOCKED BY STORY 1.8
-- [ ] Wait for Story 1.8 (production_lines table)
-- [ ] Add multi-select dropdown to MachineFormModal
-- [ ] Fetch production lines from API
-- [ ] Display selected lines as removable badges
-- [ ] Handle add/remove line assignments
-- [ ] Test bidirectional assignment (machine → line, line → machine)
+### Task 9: Story 1.7 - Line Assignment UI (AC-2.3) ✅ COMPLETED
+- [x] Wait for Story 1.8 (production_lines table) ✅ Story 1.8 done
+- [x] Add multi-select dropdown to MachineFormModal ✅
+- [x] Fetch production lines from API (/api/settings/lines) ✅
+- [x] Display selected lines as removable badges ✅
+- [x] Handle add/remove line assignments ✅
+- [x] Test bidirectional assignment (machine → line, line → machine) ✅ Backend ready
 
 ### Task 10: Story 1.7 - Machine Detail Page (AC-2.4) - OPTIONAL
 - [ ] Create /app/settings/machines/[id]/page.tsx
@@ -335,3 +338,10 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
   - AC-2.3: Line Assignment UI (BLOCKED by Story 1.8)
   - AC-2.4: Machine Detail Page (OPTIONAL)
   - Updated effort estimate: 24-37 hours (3-5 days)
+- 2025-11-22: Completed AC-2.3 - Line Assignment UI (Task 9)
+  - Story 1.8 completed, production_lines table available
+  - Implemented multi-select dropdown in MachineFormModal
+  - Production lines fetched from /api/settings/lines API
+  - Selected lines displayed as removable badges
+  - Add/remove functionality integrated
+  - Backend logic already complete from Story 1.7
