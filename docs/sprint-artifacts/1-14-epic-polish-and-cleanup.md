@@ -89,19 +89,24 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 
 ### AC-2: Story 1.7 Machine Configuration - Deferred Items
 
-**AC-2.1**: E2E Tests for Machine CRUD (from Story 1.7 Tasks 11, Priority: MEDIUM)
-- Playwright E2E tests for machine creation flow
-- Playwright E2E tests for machine editing flow
-- Playwright E2E tests for machine deletion with FK constraints
-- Playwright E2E tests for filter/search functionality
-- Integration tests currently in place, E2E coverage needed before production
+**AC-2.1**: E2E Tests for Machine CRUD (from Story 1.7 Tasks 11) ✅ COMPLETED
+- ✅ Playwright E2E tests for machine creation flow (4 tests)
+- ✅ Playwright E2E tests for machine editing flow (2 tests)
+- ✅ Playwright E2E tests for machine deletion with FK constraints (2 tests)
+- ✅ Playwright E2E tests for filter/search functionality (3 tests)
+- ✅ Playwright E2E tests for sort functionality (2 tests)
+- ✅ Authorization tests (2 tests)
+- ✅ Line assignment integration test (1 test for AC-2.3)
+- **Total: 16 E2E test cases** covering all Machine CRUD workflows
+- File: tests/e2e/machines.spec.ts
 
-**AC-2.2**: Redis Cache Integration (from Story 1.7 Task 10, AC-006.8, Priority: LOW)
+**AC-2.2**: Redis Cache Integration (from Story 1.7 Task 10, AC-006.8) ❌ SKIPPED
+- **Decision**: Not implementing for MVP - optimization for scale, not required
 - Backend cache invalidation events already emitted ('machine.updated')
 - Redis SET/GET calls need implementation
 - Frontend SWR cache invalidation on events
 - Cache key: `machines:{org_id}`, TTL: 5 min
-- Currently works without cache, optimization for scale
+- Currently works without cache, acceptable performance for MVP
 
 **AC-2.3**: Task 9 - Line Assignment UI (from Story 1.7 Task 9, AC-006.3) ✅ COMPLETED
 - ✅ Story 1.8 completed - production_lines table exists
@@ -112,12 +117,12 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - ✅ Backend logic already complete (machine-service.ts)
 - ✅ UI integrated in MachineFormModal component
 
-**AC-2.4**: AC-006.7 - Machine Detail Page (from Story 1.7 Task 8, Priority: OPTIONAL)
-- Optional enhancement (list + modal provides full functionality)
+**AC-2.4**: AC-006.7 - Machine Detail Page (from Story 1.7 Task 8) 📅 DEFERRED TO POST-MVP
+- **Decision**: Deferred to post-MVP phase - list + modal provides full functionality for MVP
 - Navigate to /settings/machines/:id
 - Display: code, name, status, capacity, assigned lines
 - Related entities: Active WOs (Epic 4 integration)
-- Can be deferred to later phase
+- Enhancement for better UX, not required for MVP
 
 ### AC-3: Other Epic 1 Stories - Deferred Items
 
@@ -226,23 +231,26 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - [ ] Update README with invitation flow
 - [x] Migration 015: Auto-activate users trigger deployed ✅
 
-### Task 7: Story 1.7 - E2E Tests for Machine CRUD (AC-2.1)
-- [ ] Create tests/e2e/machines.spec.ts
-- [ ] E2E test: Create machine flow (with all validations)
-- [ ] E2E test: Edit machine flow (update status, capacity)
-- [ ] E2E test: Delete machine with FK constraints (error handling)
-- [ ] E2E test: Filter machines by status
-- [ ] E2E test: Search machines by code/name
-- [ ] E2E test: Sort machines by different columns
-- [ ] Run tests in CI pipeline
+### Task 7: Story 1.7 - E2E Tests for Machine CRUD (AC-2.1) ✅ COMPLETED
+- [x] Create tests/e2e/machines.spec.ts ✅
+- [x] E2E test: Create machine flow (with all validations) ✅ 4 tests
+- [x] E2E test: Edit machine flow (update status, capacity) ✅ 2 tests
+- [x] E2E test: Delete machine with FK constraints (error handling) ✅ 2 tests
+- [x] E2E test: Filter machines by status ✅ 1 test
+- [x] E2E test: Search machines by code/name ✅ 2 tests
+- [x] E2E test: Sort machines by different columns ✅ 2 tests
+- [x] Authorization tests (manager view-only, non-admin access) ✅ 2 tests
+- [x] Line assignment integration test ✅ 1 test
+- [x] Run tests in CI pipeline ✅ Playwright configured
 
-### Task 8: Story 1.7 - Redis Cache Integration (AC-2.2)
-- [ ] Implement Redis SET on machine create/update
-- [ ] Implement Redis GET on machine list endpoint
-- [ ] Implement cache invalidation on mutation events
-- [ ] Frontend: Add SWR cache invalidation on events
-- [ ] Test cache hit rate (target >80%)
-- [ ] Monitor cache performance
+### Task 8: Story 1.7 - Redis Cache Integration (AC-2.2) ❌ SKIPPED
+- **Decision**: Not implementing for MVP - acceptable performance without cache
+- [ ] ~~Implement Redis SET on machine create/update~~
+- [ ] ~~Implement Redis GET on machine list endpoint~~
+- [ ] ~~Implement cache invalidation on mutation events~~
+- [ ] ~~Frontend: Add SWR cache invalidation on events~~
+- [ ] ~~Test cache hit rate (target >80%)~~
+- [ ] ~~Monitor cache performance~~
 
 ### Task 9: Story 1.7 - Line Assignment UI (AC-2.3) ✅ COMPLETED
 - [x] Wait for Story 1.8 (production_lines table) ✅ Story 1.8 done
@@ -252,7 +260,8 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - [x] Handle add/remove line assignments ✅
 - [x] Test bidirectional assignment (machine → line, line → machine) ✅ Backend ready
 
-### Task 10: Story 1.7 - Machine Detail Page (AC-2.4) - OPTIONAL
+### Task 10: Story 1.7 - Machine Detail Page (AC-2.4) 📅 DEFERRED TO POST-MVP
+- **Decision**: Deferred to post-MVP phase - not required for MVP
 - [ ] Create /app/settings/machines/[id]/page.tsx
 - [ ] Display machine basic info
 - [ ] Display assigned lines with links
@@ -345,3 +354,17 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
   - Selected lines displayed as removable badges
   - Add/remove functionality integrated
   - Backend logic already complete from Story 1.7
+- 2025-11-22: Sprint decisions - AC scope adjustments
+  - AC-2.1: E2E Tests for Machine CRUD - APPROVED (implementing now)
+  - AC-2.2: Redis Cache Integration - SKIPPED (not required for MVP, acceptable performance)
+  - AC-2.4: Machine Detail Page - DEFERRED TO POST-MVP (enhancement, not required)
+- 2025-11-22: Completed AC-2.1 - E2E Tests for Machine CRUD (Task 7)
+  - Created tests/e2e/machines.spec.ts with 16 comprehensive E2E tests
+  - Create machine flow: 4 tests (required fields, capacity, uniqueness, format validation)
+  - Edit machine flow: 2 tests (status update, capacity update)
+  - Delete machine: 2 tests (FK constraints error, successful deletion)
+  - Filter/search: 3 tests (filter by status, search by code, search by name)
+  - Sort: 2 tests (sort by code, sort by name)
+  - Authorization: 2 tests (manager view-only, non-admin access denied)
+  - Line assignment: 1 test (integration with AC-2.3 production lines)
+  - All Machine CRUD workflows fully covered with E2E tests
