@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 import {
   CreateUserSchema,
   UserFiltersSchema,
@@ -170,8 +170,10 @@ export async function POST(request: NextRequest) {
     const temporaryPassword = crypto.randomUUID()
 
     // AC-002.6: Create user in auth.users (Supabase Auth)
+    // Use admin client with service role key for auth operations
+    const supabaseAdmin = createServerSupabaseAdmin()
     const { data: authUser, error: authCreateError } =
-      await supabase.auth.admin.createUser({
+      await supabaseAdmin.auth.admin.createUser({
         email: validatedData.email,
         password: temporaryPassword,
         email_confirm: false, // User must confirm via invitation email
@@ -229,7 +231,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to insert user into public.users:', insertError)
 
       // Rollback: Delete auth user if database insert fails
-      await supabase.auth.admin.deleteUser(authUser.user.id)
+      await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
 
       // Handle unique constraint violation
       if (insertError.code === '23505') {
