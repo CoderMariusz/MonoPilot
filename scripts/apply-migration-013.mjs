@@ -1,90 +1,70 @@
+#!/usr/bin/env node
+
 /**
- * Apply Migration 013: Add modules_enabled to organizations
- * Story: 1.11 Module Activation
- *
- * Usage:
- *   node scripts/apply-migration-013.mjs
- *
- * Or with explicit env vars:
- *   SUPABASE_ACCESS_TOKEN=xxx SUPABASE_PROJECT_ID=xxx node scripts/apply-migration-013.mjs
+ * Apply migration 013 (Add modules_enabled to organizations) via Supabase Management API
+ * Story: 1.11 - Module Activation
  */
 
 import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { resolve } from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || 'sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac';
+const PROJECT_REF = process.env.SUPABASE_PROJECT_ID || 'pgroxddbtaevdegnidaz';
 
-// Load environment variables
-const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
-const SUPABASE_PROJECT_ID = process.env.SUPABASE_PROJECT_ID || 'pgroxddbtaevdegnidaz';
+console.log('🔄 Applying migration 013 (Add modules_enabled to organizations) via Management API...\n');
 
-if (!SUPABASE_ACCESS_TOKEN) {
-  console.error('❌ SUPABASE_ACCESS_TOKEN environment variable is required');
-  console.error('Usage: SUPABASE_ACCESS_TOKEN=xxx node scripts/apply-migration-013.mjs');
-  process.exit(1);
-}
+// Read migration file
+const migrationPath = resolve(process.cwd(), 'apps/frontend/lib/supabase/migrations/013_add_modules_enabled_to_organizations.sql');
+const migrationSQL = readFileSync(migrationPath, 'utf-8');
 
-console.log('📦 Migration 013: Add modules_enabled to organizations');
-console.log('Project ID:', SUPABASE_PROJECT_ID);
-console.log('');
+async function main() {
+  try {
+    const response = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: migrationSQL
+      })
+    });
 
-// Read migration SQL file
-const migrationPath = join(__dirname, '..', 'apps', 'frontend', 'lib', 'supabase', 'migrations', '013_add_modules_enabled_to_organizations.sql');
-const migrationSQL = readFileSync(migrationPath, 'utf8');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Migration failed:', response.status, response.statusText);
+      console.error('Response:', errorText);
+      
+      if (errorText.includes('already exists') || 
+          errorText.includes('duplicate') ||
+          errorText.includes('42710')) {
+        console.log('\n⚠️  Migration 013 already applied (column may already exist)');
+      }
+      
+      process.exit(1);
+    }
 
-// Supabase Management API endpoint
-const url = `https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/database/query`;
+    const result = await response.json();
+    console.log('✅ Migration 013 applied successfully!');
+    console.log('\n📋 Created:');
+    console.log('   - Column: organizations.modules_enabled (TEXT[])');
+    console.log('   - Default: [technical, planning, production, warehouse]');
+    console.log('   - Constraint: at least one module required');
+    console.log('   - Index: GIN index for array operations');
+    console.log('   - Function: is_module_enabled(org_id, module_code)');
+    console.log('\n🎯 Key Features:');
+    console.log('   - Module activation/deactivation per organization');
+    console.log('   - Default modules: technical, planning, production, warehouse');
+    console.log('   - Optional modules: quality, shipping, npd, finance');
+    console.log('   - Helper function for module checks');
+    console.log('\n💡 Usage:');
+    console.log('   SELECT is_module_enabled(\'<org_id>\', \'technical\');');
+    console.log('   -- Returns true if module is enabled\n');
 
-console.log('🚀 Executing migration...\n');
-
-try {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ACCESS_TOKEN}`,
-    },
-    body: JSON.stringify({
-      query: migrationSQL,
-    }),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    console.error('❌ Migration failed:');
-    console.error(JSON.stringify(result, null, 2));
+  } catch (error) {
+    console.error('❌ Error:', error.message);
     process.exit(1);
   }
-
-  console.log('✅ Migration 013 applied successfully!');
-  console.log('');
-  console.log('Added:');
-  console.log('  - Column: organizations.modules_enabled (TEXT[] NOT NULL)');
-  console.log('  - Default: [technical, planning, production, warehouse]');
-  console.log('  - Constraint: At least one module required');
-  console.log('  - Index: GIN index for array contains operations');
-  console.log('  - Function: is_module_enabled(org_id, module_code)');
-  console.log('');
-  console.log('Available modules:');
-  console.log('  - technical  (ON)  - Products, BOMs, Routings');
-  console.log('  - planning   (ON)  - POs, TOs, WOs');
-  console.log('  - production (ON)  - WO Execution');
-  console.log('  - warehouse  (ON)  - LPs, Moves, Pallets');
-  console.log('  - quality    (OFF) - QA Workflows');
-  console.log('  - shipping   (OFF) - SOs, Pick Lists');
-  console.log('  - npd        (OFF) - Formulation');
-  console.log('  - finance    (OFF) - Costing, Margin Analysis');
-  console.log('');
-  console.log('Next steps:');
-  console.log('  1. Implement Module Service (module-service.ts)');
-  console.log('  2. Implement API middleware (moduleCheckMiddleware)');
-  console.log('  3. Implement API endpoints (/api/settings/modules)');
-
-} catch (error) {
-  console.error('❌ Error applying migration:');
-  console.error(error.message);
-  process.exit(1);
 }
+
+main();

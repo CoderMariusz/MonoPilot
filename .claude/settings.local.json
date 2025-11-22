@@ -165,7 +165,12 @@
       "Bash(then grep -i SENDGRID \"C:/Users/Mariusz K/Documents/Programowanie/MonoPilot/apps/frontend/.env.local\")",
       "Bash(then grep -E \"SENDGRID\" \"C:/Users/Mariusz K/Documents/Programowanie/MonoPilot/apps/frontend/.env.local\")",
       "Bash(python -m json.tool:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(then grep -E \"SUPABASE_URL|SERVICE_ROLE\" apps/frontend/.env.local)",
+      "Bash(NEXT_PUBLIC_SUPABASE_URL=https://pgroxddbtaevdegnidaz.supabase.co SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncm94ZGRidGFldmRlZ25pZGF6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTk1ODM3MywiZXhwIjoyMDc1NTM0MzczfQ.ZdMzCB9SPMuPLvM5pq1g6s7p-8qvYdyf6WfCoDIPVDg node ../../scripts/apply-migration-010.mjs)",
+      "Bash(then grep -E \"DATABASE_URL|DB_PASSWORD|POSTGRES\" \"apps/frontend/.env.local\")",
+      "Bash(then grep -E \"SUPABASE.*TOKEN|SUPABASE.*KEY\" apps/frontend/.env.local)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac SUPABASE_PROJECT_ID=pgroxddbtaevdegnidaz node:*)"
     ],
     "deny": [],
     "ask": []

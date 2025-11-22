@@ -15,6 +15,8 @@ ALTER TABLE public.organizations
 
 -- Add check constraint: at least one module must be enabled
 ALTER TABLE public.organizations
+  DROP CONSTRAINT IF EXISTS organizations_modules_enabled_not_empty_check;
+ALTER TABLE public.organizations
   ADD CONSTRAINT organizations_modules_enabled_not_empty_check
   CHECK (array_length(modules_enabled, 1) > 0);
 

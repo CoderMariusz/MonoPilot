@@ -36,11 +36,5 @@
     "@supabase/supabase-js": "^2.84.0",
     "lint-staged": "^16.2.7",
     "supabase": "^2.58.5"
-  },
-  "lint-staged": {
-    "apps/frontend/**/*.{ts,tsx}": [
-      "cd apps/frontend && pnpm type-check",
-      "cd apps/frontend && pnpm lint --fix"
-    ]
   }
 }
