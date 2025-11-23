@@ -24,21 +24,24 @@ export async function getProductDashboard(
 
   if (error) throw new Error(`Dashboard query failed: ${error.message}`)
 
+  // Handle empty or null data
+  const products = data || []
+
   // Group products by type
   const groups = [
     { category: 'RM' as const, label: 'Raw Materials', type: 'RM' },
     { category: 'WIP' as const, label: 'Work in Progress', type: 'WIP' },
     { category: 'FG' as const, label: 'Finished Goods', type: 'FG' }
   ].map(group => {
-    const products = data
+    const groupProducts = products
       .filter((p: any) => p.type === group.type)
       .slice(0, limit)
 
     return {
       category: group.category,
       label: group.label,
-      count: data.filter((p: any) => p.type === group.type).length,
-      products: products.map((p: any) => ({
+      count: products.filter((p: any) => p.type === group.type).length,
+      products: groupProducts.map((p: any) => ({
         id: p.id,
         code: p.code,
         name: p.name,
@@ -54,9 +57,9 @@ export async function getProductDashboard(
   return {
     groups,
     overall_stats: {
-      total_products: data.length,
-      active_products: data.length,
-      recent_updates: data.filter((p: any) =>
+      total_products: products.length,
+      active_products: products.length,
+      recent_updates: products.filter((p: any) =>
         new Date(p.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       ).length
     }

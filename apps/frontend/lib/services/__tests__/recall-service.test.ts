@@ -143,7 +143,7 @@ describe('Recall Service - Regulatory Compliance', () => {
     })
 
     it('should not mark raw materials as FDA reportable', () => {
-      const productType = 'RM'
+      const productType: string = 'RM'
       const isReportable = productType === 'FG'
 
       expect(isReportable).toBe(false)
@@ -234,13 +234,13 @@ describe('Recall Service - Tree Collection', () => {
         lp: { ...mockLicensePlate, id: '1' },
         product_code: 'P1',
         product_name: 'Product 1',
-        relationship_type: null,
+        relationship_type: null as 'split' | 'combine' | 'transform' | null,
         children: [
           {
             lp: { ...mockLicensePlate, id: '2' },
             product_code: 'P2',
             product_name: 'Product 2',
-            relationship_type: 'split' as const,
+            relationship_type: 'split' as 'split' | 'combine' | 'transform' | null,
             children: [],
             depth: 2
           }
