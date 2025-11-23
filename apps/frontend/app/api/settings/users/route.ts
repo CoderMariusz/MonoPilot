@@ -27,6 +27,7 @@ import { sendInvitationEmail } from '@/lib/services/email-service'
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
     // Check authentication - use getUser() for security
     const {
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get current user to check role and org_id
-    const { data: currentUser, error: userError } = await supabase
+    const { data: currentUser, error: userError } = await supabaseAdmin
       .from('users')
       .select('role, org_id')
       .eq('id', user.id)
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Build query - filter by org_id (RLS handles this too, but explicit for clarity)
-    let query = supabase
+    let query = supabaseAdmin
       .from('users')
       .select('*')
       .eq('org_id', currentUser.org_id)
@@ -134,6 +135,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
     // Check authentication - use getUser() for security
     const {
@@ -146,7 +148,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get current user to check role and org_id
-    const { data: currentUser, error: userError } = await supabase
+    const { data: currentUser, error: userError } = await supabaseAdmin
       .from('users')
       .select('role, org_id')
       .eq('id', user.id)
@@ -174,7 +176,6 @@ export async function POST(request: NextRequest) {
 
     // AC-002.6: Create user in auth.users (Supabase Auth)
     // Use admin client with service role key for auth operations
-    const supabaseAdmin = createServerSupabaseAdmin()
     const { data: authUser, error: authCreateError } =
       await supabaseAdmin.auth.admin.createUser({
         email: validatedData.email,
@@ -224,7 +225,7 @@ export async function POST(request: NextRequest) {
       updated_by: user.id,
     }
 
-    const { data: createdUser, error: insertError } = await supabase
+    const { data: createdUser, error: insertError } = await supabaseAdmin
       .from('users')
       .insert(newUser)
       .select()
@@ -254,7 +255,7 @@ export async function POST(request: NextRequest) {
     let invitationData = null
     try {
       // Get organization name for email template
-      const { data: org } = await supabase
+      const { data: org } = await supabaseAdmin
         .from('organizations')
         .select('company_name')
         .eq('id', currentUser.org_id)

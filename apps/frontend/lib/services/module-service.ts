@@ -1,4 +1,4 @@
-import { createServerSupabase } from '../supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 import { MODULES } from '../config/modules'
 
 /**
@@ -17,6 +17,7 @@ export interface ModuleServiceResult {
 
 async function getCurrentOrgId(): Promise<string | null> {
   const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
@@ -36,13 +37,14 @@ async function getCurrentOrgId(): Promise<string | null> {
 export async function getEnabledModules(): Promise<ModuleServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
       return { success: false, error: 'Organization ID not found' }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('organizations')
       .select('modules_enabled')
       .eq('id', orgId)
@@ -75,6 +77,7 @@ export async function toggleModule(
 ): Promise<ModuleServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -82,7 +85,7 @@ export async function toggleModule(
     }
 
     // Get current modules
-    const { data: org } = await supabase
+    const { data: org } = await supabaseAdmin
       .from('organizations')
       .select('modules_enabled')
       .eq('id', orgId)
@@ -110,7 +113,7 @@ export async function toggleModule(
     }
 
     // Update organization
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('organizations')
       .update({ modules_enabled: newModules })
       .eq('id', orgId)
@@ -134,6 +137,7 @@ export async function toggleModule(
 export async function checkModuleActive(moduleCode: string): Promise<boolean> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) return false

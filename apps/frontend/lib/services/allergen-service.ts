@@ -1,4 +1,4 @@
-import { createServerSupabase } from '../supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 
 /**
  * Allergen Service
@@ -165,7 +165,7 @@ export async function createAllergen(
   input: CreateAllergenInput
 ): Promise<AllergenServiceResult> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -177,7 +177,7 @@ export async function createAllergen(
     }
 
     // Check if code already exists for this org (AC-008.3)
-    const { data: existingAllergen } = await supabase
+    const { data: existingAllergen } = await supabaseAdmin
       .from('allergens')
       .select('id')
       .eq('org_id', orgId)
@@ -192,8 +192,8 @@ export async function createAllergen(
       }
     }
 
-    // Create custom allergen
-    const { data: allergen, error } = await supabase
+    // Create custom allergen - use admin client to bypass RLS
+    const { data: allergen, error } = await supabaseAdmin
       .from('allergens')
       .insert({
         org_id: orgId,
@@ -354,7 +354,7 @@ export async function updateAllergen(
  */
 export async function getAllergenById(id: string): Promise<AllergenServiceResult> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -365,8 +365,8 @@ export async function getAllergenById(id: string): Promise<AllergenServiceResult
       }
     }
 
-    // Fetch allergen
-    const { data: allergen, error } = await supabase
+    // Fetch allergen - use admin client
+    const { data: allergen, error } = await supabaseAdmin
       .from('allergens')
       .select('*')
       .eq('id', id)
@@ -423,7 +423,7 @@ export async function listAllergens(
   filters?: AllergenFilters
 ): Promise<AllergenListResult> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -434,8 +434,8 @@ export async function listAllergens(
       }
     }
 
-    // Build query
-    let query = supabase
+    // Build query - use admin client
+    let query = supabaseAdmin
       .from('allergens')
       .select('*', { count: 'exact' })
       .eq('org_id', orgId)

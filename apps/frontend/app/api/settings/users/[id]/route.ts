@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
 import { UpdateUserSchema } from '@/lib/validation/user-schemas'
 import { canModifyUser } from '@/lib/services/user-validation'
 import { terminateAllSessions } from '@/lib/services/session-service'
@@ -24,6 +24,7 @@ export async function PUT(
 ) {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const params = await context.params
     const userId = params.id
 
@@ -38,7 +39,7 @@ export async function PUT(
     }
 
     // Get current user to check role and org_id
-    const { data: currentUser, error: userError } = await supabase
+    const { data: currentUser, error: userError } = await supabaseAdmin
       .from('users')
       .select('role, org_id')
       .eq('id', session.user.id)
@@ -61,7 +62,7 @@ export async function PUT(
     const validatedData = UpdateUserSchema.parse(body)
 
     // Verify user exists and belongs to same org
-    const { data: targetUser, error: targetError } = await supabase
+    const { data: targetUser, error: targetError } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('id', userId)
@@ -100,7 +101,7 @@ export async function PUT(
     }
 
     // Update user in database
-    const { data: updatedUser, error: updateError } = await supabase
+    const { data: updatedUser, error: updateError } = await supabaseAdmin
       .from('users')
       .update(updateData)
       .eq('id', userId)
@@ -155,6 +156,7 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const params = await context.params
     const userId = params.id
 
@@ -169,7 +171,7 @@ export async function DELETE(
     }
 
     // Get current user to check role and org_id
-    const { data: currentUser, error: userError } = await supabase
+    const { data: currentUser, error: userError } = await supabaseAdmin
       .from('users')
       .select('role, org_id')
       .eq('id', session.user.id)
@@ -188,7 +190,7 @@ export async function DELETE(
     }
 
     // Verify user exists and belongs to same org
-    const { data: targetUser, error: targetError } = await supabase
+    const { data: targetUser, error: targetError } = await supabaseAdmin
       .from('users')
       .select('role, status, first_name, last_name')
       .eq('id', userId)
@@ -219,7 +221,7 @@ export async function DELETE(
 
     // AC-002.4: Set status = 'inactive'
     // AC-002.8: Set updated_by = current user
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({
         status: 'inactive',

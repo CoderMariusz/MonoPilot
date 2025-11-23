@@ -1,4 +1,4 @@
-import { createServerSupabase } from '../supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 
 /**
  * Machine Service
@@ -77,6 +77,7 @@ export interface MachineListResult {
  */
 async function getCurrentOrgId(): Promise<string | null> {
   const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return null
@@ -183,6 +184,7 @@ export async function createMachine(
 ): Promise<MachineServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -203,8 +205,8 @@ export async function createMachine(
       }
     }
 
-    // Check if code already exists for this org (AC-006.1)
-    const { data: existingMachine } = await supabase
+    // Check if code already exists for this org (AC-006.1) - use admin client
+    const { data: existingMachine } = await supabaseAdmin
       .from('machines')
       .select('id')
       .eq('org_id', orgId)
@@ -219,8 +221,8 @@ export async function createMachine(
       }
     }
 
-    // Create machine
-    const { data: machine, error } = await supabase
+    // Create machine - use admin client to bypass RLS
+    const { data: machine, error } = await supabaseAdmin
       .from('machines')
       .insert({
         org_id: orgId,
@@ -304,6 +306,7 @@ export async function updateMachine(
 ): Promise<MachineServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -447,6 +450,7 @@ export async function updateMachine(
 export async function getMachineById(id: string): Promise<MachineServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -526,6 +530,7 @@ export async function listMachines(
 ): Promise<MachineListResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -634,6 +639,7 @@ export async function listMachines(
 export async function deleteMachine(id: string): Promise<MachineServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -713,6 +719,7 @@ async function emitMachineUpdatedEvent(
 ): Promise<void> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
     // Publish to org-specific channel
     const channel = supabase.channel(`org:${orgId}`)

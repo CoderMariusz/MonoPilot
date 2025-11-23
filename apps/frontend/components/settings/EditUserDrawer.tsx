@@ -27,6 +27,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -138,14 +139,14 @@ export function EditUserDrawer({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-6">
             {/* Email - Read-only (AC-002.3) */}
-            <div>
-              <FormLabel>Email</FormLabel>
+            <div className="space-y-2">
+              <Label>Email</Label>
               <Input
                 value={user.email}
                 disabled
                 className="bg-gray-100 cursor-not-allowed"
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-gray-500">
                 Email cannot be changed
               </p>
             </div>

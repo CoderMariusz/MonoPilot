@@ -1,45 +1,35 @@
 import { createServerSupabase } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { UserMenu } from '@/components/auth/UserMenu'
 import { ModuleCard, type ModuleCardProps } from '@/components/dashboard/ModuleCard'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { WelcomeBanner } from '@/components/dashboard/WelcomeBanner'
 import { QuickActions } from '@/components/dashboard/QuickActions'
-import { Sidebar } from '@/components/navigation/Sidebar'
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabase()
 
+  // Authentication is handled by parent layout
   const {
     data: { session },
   } = await supabase.auth.getSession()
-
-  if (!session) {
-    redirect('/login')
-  }
 
   // Get current user to check org_id
   const { data: currentUser } = await supabase
     .from('users')
     .select('org_id, role')
-    .eq('id', session.user.id)
+    .eq('id', session!.user.id)
     .single()
-
-  if (!currentUser) {
-    redirect('/login')
-  }
 
   // Get organization to check setup status and enabled modules
   const { data: organization } = await supabase
     .from('organizations')
     .select('setup_completed, enabled_modules')
-    .eq('id', currentUser.org_id)
+    .eq('id', currentUser!.org_id)
     .single()
 
   const showWelcomeBanner = !organization?.setup_completed
   const enabledModules = organization?.enabled_modules || []
 
-  const user = session.user
+  const user = session!.user
 
   // Define all available module cards
   const allModules: ModuleCardProps[] = [
@@ -157,66 +147,38 @@ export default async function DashboardPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header with User Menu */}
-      <header className="border-b bg-white z-10">
-        <div className="flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-primary">MonoPilot</h1>
-          </div>
-          <UserMenu
-            user={{
-              email: user.email || '',
-              name: user.user_metadata?.first_name
-                ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim()
-                : undefined,
-            }}
-          />
+    <div className="container mx-auto p-4">
+      <div className="space-y-6">
+        {/* Welcome Banner (conditionally rendered) */}
+        {showWelcomeBanner && <WelcomeBanner show={true} />}
+
+        {/* Page Title */}
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground">
+            Welcome back, {user.user_metadata?.first_name || 'User'}!
+          </p>
         </div>
-      </header>
 
-      {/* Body: Sidebar + Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar Navigation */}
-        <Sidebar enabledModules={enabledModules} />
+        {/* Quick Actions */}
+        <QuickActions />
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="container mx-auto p-4">
-            <div className="space-y-6">
-              {/* Welcome Banner (conditionally rendered) */}
-              {showWelcomeBanner && <WelcomeBanner show={true} />}
-
-              {/* Page Title */}
-              <div>
-                <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-                <p className="text-muted-foreground">
-                  Welcome back, {user.user_metadata?.first_name || 'User'}!
-                </p>
-              </div>
-
-              {/* Quick Actions */}
-              <QuickActions />
-
-              {/* Main Layout: Module Cards + Activity Feed */}
-              <div className="flex flex-col lg:flex-row gap-6">
-                {/* Module Cards Grid */}
-                <div className="flex-1">
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-                    {modules.map((module) => (
-                      <ModuleCard key={`module-${module.moduleKey}`} {...module} />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Activity Feed (Right Sidebar on Desktop) */}
-                <aside className="lg:w-80">
-                  <ActivityFeed limit={10} />
-                </aside>
-              </div>
+        {/* Main Layout: Module Cards + Activity Feed */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Module Cards Grid */}
+          <div className="flex-1">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
+              {modules.map((module) => (
+                <ModuleCard key={`module-${module.moduleKey}`} {...module} />
+              ))}
             </div>
           </div>
-        </main>
+
+          {/* Activity Feed (Right Sidebar on Desktop) */}
+          <aside className="lg:w-80">
+            <ActivityFeed limit={10} />
+          </aside>
+        </div>
       </div>
     </div>
   )

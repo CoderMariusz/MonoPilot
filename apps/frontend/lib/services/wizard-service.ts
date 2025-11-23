@@ -1,4 +1,4 @@
-import { createServerSupabase } from '../supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 
 /**
  * Wizard Service
@@ -18,6 +18,7 @@ export interface WizardServiceResult {
 
 async function getCurrentOrgId(): Promise<string | null> {
   const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
@@ -40,6 +41,7 @@ export async function saveWizardProgress(
 ): Promise<WizardServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -48,7 +50,7 @@ export async function saveWizardProgress(
 
     const progress: WizardProgress = { step, data }
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('organizations')
       .update({ wizard_progress: progress })
       .eq('id', orgId)
@@ -70,13 +72,14 @@ export async function saveWizardProgress(
 export async function getWizardProgress(): Promise<WizardServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
       return { success: false, error: 'Organization ID not found' }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('organizations')
       .select('wizard_progress, wizard_completed')
       .eq('id', orgId)
@@ -108,13 +111,14 @@ export async function getWizardProgress(): Promise<WizardServiceResult> {
 export async function completeWizard(): Promise<WizardServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
       return { success: false, error: 'Organization ID not found' }
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('organizations')
       .update({ wizard_completed: true })
       .eq('id', orgId)

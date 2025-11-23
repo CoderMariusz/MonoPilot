@@ -1,4 +1,4 @@
-import { createServerSupabase } from '../supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 import type {
   CreateLocationInput,
   UpdateLocationInput,
@@ -78,10 +78,10 @@ export async function createLocation(
   orgId: string
 ): Promise<LocationServiceResult> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
     // Step 1: Validate code uniqueness within warehouse
-    const { data: existing, error: checkError } = await supabase
+    const { data: existing, error: checkError } = await supabaseAdmin
       .from('locations')
       .select('id')
       .eq('org_id', orgId)
@@ -105,7 +105,7 @@ export async function createLocation(
     }
 
     // Step 2: Get warehouse code for barcode generation
-    const { data: warehouse, error: warehouseError } = await supabase
+    const { data: warehouse, error: warehouseError } = await supabaseAdmin
       .from('warehouses')
       .select('code')
       .eq('id', input.warehouse_id)
@@ -146,8 +146,8 @@ export async function createLocation(
       }
     }
 
-    // Step 4: Insert location record
-    const { data: location, error: insertError } = await supabase
+    // Step 4: Insert location record - use admin client to bypass RLS
+    const { data: location, error: insertError } = await supabaseAdmin
       .from('locations')
       .insert({
         org_id: orgId,
@@ -339,9 +339,9 @@ export async function getLocations(
   orgId: string
 ): Promise<LocationsListResult> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
-    let query = supabase
+    let query = supabaseAdmin
       .from('locations')
       .select(
         `
@@ -409,9 +409,9 @@ export async function getLocationById(
   orgId: string
 ): Promise<LocationServiceResult> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('locations')
       .select(
         `

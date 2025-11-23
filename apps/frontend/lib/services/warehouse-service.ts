@@ -1,4 +1,4 @@
-import { createServerSupabase } from '../supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 import { type Warehouse, type CreateWarehouseInput, type UpdateWarehouseInput, type WarehouseFilters } from '@/lib/validation/warehouse-schemas'
 import { getCachedWarehouses, setCachedWarehouses, invalidateWarehouseCache } from '@/lib/cache/warehouse-cache'
 
@@ -74,6 +74,7 @@ export async function createWarehouse(
 ): Promise<WarehouseServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -95,7 +96,7 @@ export async function createWarehouse(
     }
 
     // Check if code already exists for this org (AC-004.1)
-    const { data: existingWarehouse } = await supabase
+    const { data: existingWarehouse } = await supabaseAdmin
       .from('warehouses')
       .select('id')
       .eq('org_id', orgId)
@@ -111,7 +112,8 @@ export async function createWarehouse(
     }
 
     // Create warehouse with default_*_location_id = NULL initially (AC-004.2)
-    const { data: warehouse, error } = await supabase
+    // Use admin client to bypass RLS
+    const { data: warehouse, error } = await supabaseAdmin
       .from('warehouses')
       .insert({
         org_id: orgId,
@@ -315,7 +317,7 @@ export async function updateWarehouse(
  */
 export async function getWarehouseById(id: string): Promise<WarehouseServiceResult> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -326,7 +328,7 @@ export async function getWarehouseById(id: string): Promise<WarehouseServiceResu
       }
     }
 
-    const { data: warehouse, error } = await supabase
+    const { data: warehouse, error } = await supabaseAdmin
       .from('warehouses')
       .select(`
         *,
@@ -384,7 +386,7 @@ export async function listWarehouses(
   filters?: WarehouseFilters
 ): Promise<WarehouseListResult> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -415,8 +417,8 @@ export async function listWarehouses(
       }
     }
 
-    // Cache miss or filtered query - fetch from DB
-    let query = supabase
+    // Cache miss or filtered query - fetch from DB - use admin client
+    let query = supabaseAdmin
       .from('warehouses')
       .select(`
         *,

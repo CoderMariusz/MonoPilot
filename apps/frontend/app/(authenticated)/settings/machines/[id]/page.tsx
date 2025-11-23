@@ -191,7 +191,6 @@ export default function MachineDetailPage() {
                     <p className="font-medium">{line.code}</p>
                     <p className="text-sm text-gray-500">{line.name}</p>
                   </div>
-                  <Badge variant="secondary">{line.status}</Badge>
                 </div>
               ))}
             </div>

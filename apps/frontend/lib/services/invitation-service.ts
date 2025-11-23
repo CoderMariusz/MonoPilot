@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import { createServerSupabase } from '../supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 
 /**
  * Invitation Service
@@ -122,6 +122,7 @@ export async function createInvitation(params: {
   invitedBy: string
 }): Promise<InvitationRecord> {
   const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
   // Generate token and expiry date
   const token = generateInvitationToken(params.email, params.role, params.orgId)
@@ -129,7 +130,7 @@ export async function createInvitation(params: {
   expiresAt.setDate(expiresAt.getDate() + 7) // 7 days from now
 
   // Insert invitation record
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('user_invitations')
     .insert({
       org_id: params.orgId,
@@ -167,8 +168,9 @@ export async function getInvitations(
   }
 ): Promise<(InvitationRecord & { invited_by_name?: string })[]> {
   const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
-  let query = supabase
+  let query = supabaseAdmin
     .from('user_invitations')
     .select(
       `
@@ -218,9 +220,10 @@ export async function resendInvitation(
   orgId: string
 ): Promise<InvitationRecord> {
   const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
   // Get current invitation
-  const { data: invitation, error: fetchError } = await supabase
+  const { data: invitation, error: fetchError } = await supabaseAdmin
     .from('user_invitations')
     .select('*')
     .eq('id', invitationId)
@@ -241,7 +244,7 @@ export async function resendInvitation(
   newExpiresAt.setDate(newExpiresAt.getDate() + 7)
 
   // Update invitation
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('user_invitations')
     .update({
       token: newToken,
@@ -274,9 +277,10 @@ export async function cancelInvitation(
   orgId: string
 ): Promise<void> {
   const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
   // Get invitation
-  const { data: invitation, error: fetchError } = await supabase
+  const { data: invitation, error: fetchError } = await supabaseAdmin
     .from('user_invitations')
     .select('*')
     .eq('id', invitationId)
@@ -288,7 +292,7 @@ export async function cancelInvitation(
   }
 
   // Update status to cancelled
-  const { error: updateError } = await supabase
+  const { error: updateError } = await supabaseAdmin
     .from('user_invitations')
     .update({ status: 'cancelled' })
     .eq('id', invitationId)
@@ -300,7 +304,7 @@ export async function cancelInvitation(
 
   // If user is still in 'invited' status, deactivate them
   // (They haven't completed signup yet, so we can remove their placeholder record)
-  const { error: userDeleteError } = await supabase
+  const { error: userDeleteError } = await supabaseAdmin
     .from('users')
     .update({ status: 'inactive' })
     .eq('email', invitation.email)
@@ -323,12 +327,13 @@ export async function cancelInvitation(
  */
 export async function acceptInvitation(token: string): Promise<void> {
   const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
   // Validate token
   const payload = validateInvitationToken(token)
 
   // Find invitation by token
-  const { data: invitation, error: fetchError } = await supabase
+  const { data: invitation, error: fetchError } = await supabaseAdmin
     .from('user_invitations')
     .select('*')
     .eq('token', token)
@@ -346,7 +351,7 @@ export async function acceptInvitation(token: string): Promise<void> {
   }
 
   // Update user status to 'active' (Story 1.14, AC-1.4: Signup Status Automation)
-  const { error: userUpdateError } = await supabase
+  const { error: userUpdateError } = await supabaseAdmin
     .from('users')
     .update({ status: 'active' })
     .eq('email', invitation.email)
@@ -357,7 +362,7 @@ export async function acceptInvitation(token: string): Promise<void> {
   }
 
   // Update invitation status
-  const { error: updateError } = await supabase
+  const { error: updateError } = await supabaseAdmin
     .from('user_invitations')
     .update({
       status: 'accepted',

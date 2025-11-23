@@ -8,53 +8,46 @@
  */
 
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname, join, resolve } from 'path';
 import { execSync } from 'child_process';
 
-const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || 'sbp_746ebb84f490d20073c38c4d1fdb503b2267a2ac';
-const PROJECT_REF = 'pgroxddbtaevdegnidaz';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
+const PROJECT_REF = process.env.SUPABASE_PROJECT_ID || 'pgroxddbtaevdegnidaz';
+
+if (!SUPABASE_ACCESS_TOKEN) {
+  console.error('❌ SECURITY ERROR: SUPABASE_ACCESS_TOKEN environment variable is required');
+  console.error('   Usage: SUPABASE_ACCESS_TOKEN=<your-token> node scripts/apply-all-migrations.mjs');
+  console.error('   Or add to .env file (make sure .env is in .gitignore!)');
+  process.exit(1);
+}
 
 const MIGRATIONS = [
-  {
-    name: '000 - Create organizations table',
-    path: 'apps/frontend/lib/supabase/migrations/000_create_organizations_table_no_rls.sql',
-    script: 'apply-migration-via-api.mjs'
-  },
-  {
-    name: '001 - Create users table',
-    path: 'apps/frontend/lib/supabase/migrations/001_create_users_table_minimal.sql',
-    script: 'apply-migration-001.mjs'
-  },
-  {
-    name: '002 - Fix RLS policies',
-    path: 'apps/frontend/lib/supabase/migrations/002_fix_rls_policies.sql',
-    script: 'apply-migration-002.mjs'
-  },
-  {
-    name: '003 - Create warehouses table',
-    path: 'apps/frontend/lib/supabase/migrations/003_create_warehouses_table.sql',
-    script: 'apply-migration-003.mjs'
-  },
-  {
-    name: '004 - Create locations table',
-    path: 'apps/frontend/lib/supabase/migrations/004_create_locations_table.sql',
-    script: 'apply-migration-004.mjs'
-  },
-  {
-    name: '003 - Create activity logs table',
-    path: 'apps/frontend/lib/supabase/migrations/003_create_activity_logs_table.sql',
-    script: null // Apply directly
-  },
-  {
-    name: '004 - Create user preferences table',
-    path: 'apps/frontend/lib/supabase/migrations/004_create_user_preferences_table.sql',
-    script: null // Apply directly
-  }
+  { name: '000 - Create organizations table', script: 'apply-migration-via-api.mjs' },
+  { name: '001 - Create users table', script: 'apply-migration-001.mjs' },
+  { name: '002 - Fix RLS policies', script: 'apply-migration-002.mjs' },
+  { name: '003 - Create warehouses table', script: 'apply-migration-003.mjs' },
+  { name: '004 - Create locations table', script: 'apply-migration-004.mjs' },
+  { name: '005 - Upgrade users table', script: 'apply-migration-005.mjs' },
+  { name: '006 - Create user invitations table', script: 'apply-migration-006.mjs' },
+  { name: '007 - Create machines table', script: 'apply-migration-007.mjs' },
+  { name: '008 - Create user sessions table', script: 'apply-migration-008.mjs' },
+  { name: '009 - Create production lines table', script: 'apply-migration-009.mjs' },
+  { name: '010 - Create allergens table', script: 'apply-migration-010.mjs' },
+  { name: '011 - Seed EU allergens function', script: 'apply-migration-011.mjs' },
+  { name: '012 - Create tax codes table', script: 'apply-migration-012.mjs' },
+  { name: '013 - Add modules_enabled to organizations', script: 'apply-migration-013.mjs' },
+  { name: '014 - Add wizard fields to organizations', script: 'apply-migration-014.mjs' },
+  { name: '015 - Auto activate users trigger', script: 'apply-migration-015.mjs' },
+  { name: '016 - Comprehensive RLS fix for all Settings tables', script: 'apply-migration-016.mjs' }
 ];
 
 async function applyMigration(migration) {
   try {
-    const migrationPath = resolve(process.cwd(), migration.path);
+    const migrationPath = join(__dirname, '..', migration.path);
     const migrationSQL = readFileSync(migrationPath, 'utf-8');
 
     console.log(`\n🔄 Applying ${migration.name}...`);
@@ -105,36 +98,25 @@ async function main() {
 
   // Apply all migrations
   for (const migration of MIGRATIONS) {
-    if (migration.script) {
-      // Use existing script if available
-      try {
-        console.log(`\n🔄 Running ${migration.script}...`);
-        execSync(`node scripts/${migration.script}`, { 
-          stdio: 'inherit',
-          cwd: process.cwd()
-        });
-        successCount++;
-      } catch (error) {
-        // Check if it's an "already exists" error
-        if (error.stdout?.toString().includes('already exists') ||
-            error.stderr?.toString().includes('already exists')) {
-          console.log(`   ⚠️  ${migration.name} already applied (skipping)`);
-          skippedCount++;
-        } else {
-          console.error(`   ❌ ${migration.name} failed`);
-          errorCount++;
-        }
-      }
-    } else {
-      // Apply migration directly
-      const result = await applyMigration(migration);
-      if (result.success) {
-        if (result.skipped) {
-          skippedCount++;
-        } else {
-          successCount++;
-        }
+    try {
+      console.log(`\n🔄 Running ${migration.script}...`);
+      execSync(`node scripts/${migration.script}`, { 
+        stdio: 'inherit',
+        cwd: process.cwd(),
+        env: { ...process.env, SUPABASE_ACCESS_TOKEN, SUPABASE_PROJECT_ID: PROJECT_REF }
+      });
+      successCount++;
+    } catch (error) {
+      // Check if it's an "already exists" error
+      const errorOutput = (error.stdout?.toString() || '') + (error.stderr?.toString() || '');
+      if (errorOutput.includes('already exists') ||
+          errorOutput.includes('already applied') ||
+          errorOutput.includes('duplicate') ||
+          errorOutput.includes('42710')) {
+        console.log(`   ⚠️  ${migration.name} already applied (skipping)`);
+        skippedCount++;
       } else {
+        console.error(`   ❌ ${migration.name} failed`);
         errorCount++;
       }
     }

@@ -1,4 +1,4 @@
-import { createServerSupabase } from '../supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 
 /**
  * Production Line Service
@@ -93,6 +93,7 @@ export interface ProductionLineListResult {
  */
 async function getCurrentOrgId(): Promise<string | null> {
   const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return null
@@ -258,6 +259,7 @@ export async function createProductionLine(
 ): Promise<ProductionLineServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -415,6 +417,7 @@ export async function updateProductionLine(
 ): Promise<ProductionLineServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -624,6 +627,7 @@ export async function updateProductionLine(
 export async function getProductionLineById(id: string): Promise<ProductionLineServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -707,6 +711,7 @@ export async function listProductionLines(
 ): Promise<ProductionLineListResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -816,6 +821,7 @@ export async function listProductionLines(
 export async function deleteProductionLine(id: string): Promise<ProductionLineServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -896,6 +902,7 @@ async function emitLineUpdatedEvent(
 ): Promise<void> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
     // Publish to org-specific channel
     const channel = supabase.channel(`org:${orgId}`)

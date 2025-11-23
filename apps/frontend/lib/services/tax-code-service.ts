@@ -1,4 +1,4 @@
-import { createServerSupabase } from '../supabase/server'
+import { createServerSupabase, createServerSupabaseAdmin } from '../supabase/server'
 
 /**
  * Tax Code Service
@@ -66,6 +66,7 @@ export interface TaxCodeListResult {
  */
 async function getCurrentOrgId(): Promise<string | null> {
   const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return null
@@ -105,6 +106,7 @@ export async function seedTaxCodesForOrganization(
 ): Promise<TaxCodeServiceResult<{ count: number }>> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
     // Call database function to seed tax codes
     const { data, error } = await supabase.rpc('seed_tax_codes_for_organization', {
@@ -155,6 +157,7 @@ export async function createTaxCode(
 ): Promise<TaxCodeServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -166,7 +169,7 @@ export async function createTaxCode(
     }
 
     // Check if code already exists for this org
-    const { data: existingCode } = await supabase
+    const { data: existingCode } = await supabaseAdmin
       .from('tax_codes')
       .select('id')
       .eq('org_id', orgId)
@@ -182,7 +185,7 @@ export async function createTaxCode(
     }
 
     // Create tax code
-    const { data: taxCode, error } = await supabase
+    const { data: taxCode, error } = await supabaseAdmin
       .from('tax_codes')
       .insert({
         org_id: orgId,
@@ -240,6 +243,7 @@ export async function updateTaxCode(
 ): Promise<TaxCodeServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -251,7 +255,7 @@ export async function updateTaxCode(
     }
 
     // Check if tax code exists and belongs to org
-    const { data: existingTaxCode, error: fetchError } = await supabase
+    const { data: existingTaxCode, error: fetchError } = await supabaseAdmin
       .from('tax_codes')
       .select('id, code, rate')
       .eq('id', id)
@@ -268,7 +272,7 @@ export async function updateTaxCode(
 
     // If code is being changed, check uniqueness
     if (input.code && input.code.toUpperCase() !== existingTaxCode.code) {
-      const { data: duplicateCode } = await supabase
+      const { data: duplicateCode } = await supabaseAdmin
         .from('tax_codes')
         .select('id')
         .eq('org_id', orgId)
@@ -309,7 +313,7 @@ export async function updateTaxCode(
     if (input.rate !== undefined) updatePayload.rate = input.rate
 
     // Update tax code
-    const { data: taxCode, error } = await supabase
+    const { data: taxCode, error } = await supabaseAdmin
       .from('tax_codes')
       .update(updatePayload)
       .eq('id', id)
@@ -367,6 +371,7 @@ export async function listTaxCodes(
 ): Promise<TaxCodeListResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -378,7 +383,7 @@ export async function listTaxCodes(
     }
 
     // Build query
-    let query = supabase
+    let query = supabaseAdmin
       .from('tax_codes')
       .select('*', { count: 'exact' })
       .eq('org_id', orgId)
@@ -449,6 +454,7 @@ export async function listTaxCodes(
 export async function deleteTaxCode(id: string): Promise<TaxCodeServiceResult> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -464,7 +470,7 @@ export async function deleteTaxCode(id: string): Promise<TaxCodeServiceResult> {
     console.warn(`Attempting to delete tax code ${id}. Check for PO usage in Epic 3.`)
 
     // Attempt delete
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('tax_codes')
       .delete()
       .eq('id', id)
@@ -530,6 +536,7 @@ async function emitTaxCodeUpdatedEvent(
 ): Promise<void> {
   try {
     const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
     // Publish to org-specific channel
     const channel = supabase.channel(`org:${orgId}`)
