@@ -54,7 +54,8 @@
       "Bash(node scripts/fix-services-step2.mjs:*)",
       "Bash(mkdir:*)",
       "Bash(ls:*)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "Bash(node scripts/seed-epic1-data.mjs:*)"
     ],
     "deny": [],
     "ask": []

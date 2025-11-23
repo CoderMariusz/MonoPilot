@@ -8,6 +8,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
+import { randomUUID } from 'crypto'
 
 // Test configuration
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -15,14 +16,24 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-// Test data
-const testOrgId = 'test-org-' + Date.now()
-const testUserId = 'test-user-' + Date.now()
+// Test data - use proper UUIDs
+const testOrgId = randomUUID()
+const testUserId = randomUUID()
+let testWarehouseId: string
+let testLineId: string
 
 // Cleanup test data
 async function cleanup() {
-  // Delete test machines
+  // Delete test machines (this will cascade to machine_line_assignments)
   await supabase.from('machines').delete().eq('org_id', testOrgId)
+  // Delete test production line
+  if (testLineId) {
+    await supabase.from('production_lines').delete().eq('id', testLineId)
+  }
+  // Delete test warehouse
+  if (testWarehouseId) {
+    await supabase.from('warehouses').delete().eq('id', testWarehouseId)
+  }
   // Delete test user
   await supabase.from('users').delete().eq('id', testUserId)
   // Delete test org
@@ -61,6 +72,44 @@ describe('Machines API Integration Tests', () => {
 
     if (userError) {
       console.error('Failed to create test user:', userError)
+    }
+
+    // Create test warehouse (required for production line)
+    const { data: warehouse, error: warehouseError } = await supabase
+      .from('warehouses')
+      .insert({
+        org_id: testOrgId,
+        code: 'TEST-WH',
+        name: 'Test Warehouse',
+        is_active: true,
+        created_by: testUserId,
+      })
+      .select()
+      .single()
+
+    if (warehouseError) {
+      console.error('Failed to create test warehouse:', warehouseError)
+    } else {
+      testWarehouseId = warehouse.id
+    }
+
+    // Create test production line (for machine-line assignments)
+    const { data: line, error: lineError } = await supabase
+      .from('production_lines')
+      .insert({
+        org_id: testOrgId,
+        warehouse_id: testWarehouseId,
+        code: 'TEST-LINE',
+        name: 'Test Production Line',
+        created_by: testUserId,
+      })
+      .select()
+      .single()
+
+    if (lineError) {
+      console.error('Failed to create test production line:', lineError)
+    } else {
+      testLineId = line.id
     }
   })
 
@@ -193,10 +242,7 @@ describe('Machines API Integration Tests', () => {
         .select()
         .single()
 
-      // Note: production_lines table doesn't exist yet (Story 1.8)
-      // So we'll create assignment with a placeholder line_id
-      const testLineId = crypto.randomUUID()
-
+      // Use the production line created in beforeAll
       const { data: assignment, error } = await supabase
         .from('machine_line_assignments')
         .insert({
@@ -209,6 +255,7 @@ describe('Machines API Integration Tests', () => {
       expect(error).toBeNull()
       expect(assignment).toBeDefined()
       expect(assignment?.machine_id).toBe(machine!.id)
+      expect(assignment?.line_id).toBe(testLineId)
     })
 
     it('should prevent duplicate assignments (unique constraint)', async () => {
@@ -225,9 +272,7 @@ describe('Machines API Integration Tests', () => {
         .select()
         .single()
 
-      const testLineId = crypto.randomUUID()
-
-      // First assignment
+      // First assignment - use the production line created in beforeAll
       await supabase
         .from('machine_line_assignments')
         .insert({
