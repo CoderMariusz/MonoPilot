@@ -26,12 +26,14 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Settings, Search, Edit, Trash2, ArrowUpDown } from 'lucide-react'
+import { Settings, Search, Edit, Trash2, ArrowUpDown, Eye } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useRouter } from 'next/navigation'
 import type { Machine } from '@/lib/validation/machine-schemas'
 import { MachineFormModal } from '@/components/settings/MachineFormModal'
 
 export default function MachinesPage() {
+  const router = useRouter()
   const [machines, setMachines] = useState<Machine[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -281,7 +283,16 @@ export default function MachinesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => router.push(`/settings/machines/${machine.id}`)}
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleEdit(machine)}
+                          title="Edit"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -289,6 +300,7 @@ export default function MachinesPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDelete(machine)}
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>

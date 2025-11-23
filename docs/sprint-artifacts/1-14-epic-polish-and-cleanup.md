@@ -100,12 +100,11 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - **Total: 16 E2E test cases** covering all Machine CRUD workflows
 - File: tests/e2e/machines.spec.ts
 
-**AC-2.2**: Redis Cache Integration (from Story 1.7 Task 10, AC-006.8) ❌ SKIPPED
-- **Decision**: Not implementing for MVP - optimization for scale, not required
+**AC-2.2**: Redis Cache Integration (from Story 1.7 Task 10, AC-006.8) 🔄 MOVED TO FUTURE EPIC
+- **Decision**: Moved to Epic 9 "Performance & Optimization" - not required for MVP
 - Backend cache invalidation events already emitted ('machine.updated')
-- Redis SET/GET calls need implementation
-- Frontend SWR cache invalidation on events
-- Cache key: `machines:{org_id}`, TTL: 5 min
+- This and similar performance optimizations will be evaluated post-MVP
+- Epic 9 will collect all performance enhancements and prioritize based on actual usage data
 - Currently works without cache, acceptable performance for MVP
 
 **AC-2.3**: Task 9 - Line Assignment UI (from Story 1.7 Task 9, AC-006.3) ✅ COMPLETED
@@ -117,12 +116,15 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - ✅ Backend logic already complete (machine-service.ts)
 - ✅ UI integrated in MachineFormModal component
 
-**AC-2.4**: AC-006.7 - Machine Detail Page (from Story 1.7 Task 8) 📅 DEFERRED TO POST-MVP
-- **Decision**: Deferred to post-MVP phase - list + modal provides full functionality for MVP
-- Navigate to /settings/machines/:id
-- Display: code, name, status, capacity, assigned lines
-- Related entities: Active WOs (Epic 4 integration)
-- Enhancement for better UX, not required for MVP
+**AC-2.4**: AC-006.7 - Machine Detail Page (from Story 1.7 Task 8) ✅ COMPLETED
+- ✅ Created /settings/machines/[id]/page.tsx - Machine detail page
+- ✅ Display machine basic info (code, name, status, capacity)
+- ✅ Display assigned production lines with navigation links
+- ✅ Show metadata (created_at, updated_at)
+- ✅ Added View button (Eye icon) to machines list table
+- ✅ Back navigation to machines list
+- ✅ Edit button redirects to machines list with edit modal
+- 📅 Future: Active WOs section (Epic 4 integration placeholder)
 
 ### AC-3: Other Epic 1 Stories - Deferred Items
 
@@ -243,14 +245,15 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - [x] Line assignment integration test ✅ 1 test
 - [x] Run tests in CI pipeline ✅ Playwright configured
 
-### Task 8: Story 1.7 - Redis Cache Integration (AC-2.2) ❌ SKIPPED
-- **Decision**: Not implementing for MVP - acceptable performance without cache
-- [ ] ~~Implement Redis SET on machine create/update~~
-- [ ] ~~Implement Redis GET on machine list endpoint~~
-- [ ] ~~Implement cache invalidation on mutation events~~
-- [ ] ~~Frontend: Add SWR cache invalidation on events~~
-- [ ] ~~Test cache hit rate (target >80%)~~
-- [ ] ~~Monitor cache performance~~
+### Task 8: Story 1.7 - Redis Cache Integration (AC-2.2) 🔄 MOVED TO EPIC 9
+- **Decision**: Moved to Epic 9 "Performance & Optimization" - will evaluate post-MVP
+- [ ] ~~Implement Redis SET on machine create/update~~ → Epic 9
+- [ ] ~~Implement Redis GET on machine list endpoint~~ → Epic 9
+- [ ] ~~Implement cache invalidation on mutation events~~ → Epic 9
+- [ ] ~~Frontend: Add SWR cache invalidation on events~~ → Epic 9
+- [ ] ~~Test cache hit rate (target >80%)~~ → Epic 9
+- [ ] ~~Monitor cache performance~~ → Epic 9
+- **Note**: Epic 9 will collect all performance optimizations and prioritize based on real usage data
 
 ### Task 9: Story 1.7 - Line Assignment UI (AC-2.3) ✅ COMPLETED
 - [x] Wait for Story 1.8 (production_lines table) ✅ Story 1.8 done
@@ -260,14 +263,16 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
 - [x] Handle add/remove line assignments ✅
 - [x] Test bidirectional assignment (machine → line, line → machine) ✅ Backend ready
 
-### Task 10: Story 1.7 - Machine Detail Page (AC-2.4) 📅 DEFERRED TO POST-MVP
-- **Decision**: Deferred to post-MVP phase - not required for MVP
-- [ ] Create /app/settings/machines/[id]/page.tsx
-- [ ] Display machine basic info
-- [ ] Display assigned lines with links
-- [ ] Add Edit/Change Status actions
-- [ ] Epic 4 integration: Active WOs using machine
-- [ ] Historical usage stats
+### Task 10: Story 1.7 - Machine Detail Page (AC-2.4) ✅ COMPLETED
+- [x] Create /app/settings/machines/[id]/page.tsx ✅
+- [x] Display machine basic info (code, name, status, capacity) ✅
+- [x] Display assigned lines with clickable navigation ✅
+- [x] Add Edit action (redirects to list with edit modal) ✅
+- [x] Add Back navigation to machines list ✅
+- [x] Show metadata (created_at, updated_at) ✅
+- [x] Add View button (Eye icon) to machines list table ✅
+- [ ] Epic 4 integration: Active WOs using machine (placeholder added, future work)
+- [ ] Historical usage stats (future enhancement)
 
 ### Task 11: Review Other Epic 1 Stories for Deferred Items
 - [x] Story 1.7 deferred items collected (Tasks 7-10 above)
@@ -368,3 +373,16 @@ This story collects all deferred tasks, missing UI components, test gaps, and te
   - Authorization: 2 tests (manager view-only, non-admin access denied)
   - Line assignment: 1 test (integration with AC-2.3 production lines)
   - All Machine CRUD workflows fully covered with E2E tests
+- 2025-11-22: Completed AC-2.4 - Machine Detail Page (Task 10)
+  - Created /settings/machines/[id]/page.tsx - Machine detail page
+  - Displays machine basic info (code, name, status, capacity)
+  - Shows assigned production lines with clickable navigation
+  - Added View button (Eye icon) to machines list table
+  - Includes metadata display (created_at, updated_at)
+  - Back navigation and edit functionality integrated
+  - Active WOs placeholder for Epic 4 integration
+- 2025-11-22: Moved AC-2.2 Redis Cache to Epic 9 "Performance & Optimization"
+  - Decision: Performance optimizations should be evaluated post-MVP with real usage data
+  - Epic 9 will collect all performance enhancements (Redis, query optimization, etc.)
+  - Backend events already emit cache invalidation hooks for future implementation
+  - Current performance acceptable for MVP without caching
