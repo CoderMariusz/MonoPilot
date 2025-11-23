@@ -21,10 +21,11 @@ import { ZodError } from 'zod'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; operationId: string }> }) {
+  { params }: { params: Promise<{ id: string; operationId: string }> }
+) {
   try {
-    const { id, operationId } = await params {
-  try {
+    const { id, operationId } = await params
+
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -114,10 +115,11 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string; operationId: string }> }) {
+  { params }: { params: Promise<{ id: string; operationId: string }> }
+) {
   try {
-    const { id, operationId } = await params {
-  try {
+    const { id, operationId } = await params
+
     const supabase = await createServerSupabase()
 
     // Check authentication

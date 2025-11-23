@@ -17,10 +17,11 @@ import { ZodError } from 'zod'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }) {
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { id } = await params {
-  try {
+    const { id } = await params
+
     const supabase = await createServerSupabase()
 
     // Check authentication

@@ -281,10 +281,10 @@ development_status:
   3-3-bulk-po-creation: backlog
   3-4-po-approval-workflow: backlog
   3-5-configurable-po-statuses: backlog
-  3-6-transfer-order-crud: backlog
-  3-7-to-line-management: backlog
-  3-8-partial-to-shipments: backlog
-  3-9-lp-selection-for-to: backlog
+  3-6-transfer-order-crud: review
+  3-7-to-line-management: review
+  3-8-partial-to-shipments: review
+  3-9-lp-selection-for-to: review
   3-10-work-order-crud: backlog
   3-11-bom-auto-selection-for-wo: backlog
   3-12-wo-materials-snapshot: backlog

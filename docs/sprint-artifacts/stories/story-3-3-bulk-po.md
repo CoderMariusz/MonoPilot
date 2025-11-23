@@ -2,9 +2,9 @@
 
 **Epic:** 3 - Planning Operations (Batch 3A)
 **Story ID:** 3.3
-**Priority:** P1
+**Priority:** P2 (Post-MVP)
 **Effort:** 8 points
-**Status:** Ready for Development
+**Status:** Deferred - Coming Soon feature added to UI
 
 ---
 
