@@ -55,7 +55,13 @@
       "Bash(mkdir:*)",
       "Bash(ls:*)",
       "Bash(tee:*)",
-      "Bash(node scripts/seed-epic1-data.mjs:*)"
+      "Bash(node scripts/seed-epic1-data.mjs:*)",
+      "Bash(node scripts/seed-batch2a-products.mjs:*)",
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm add:*)",
+      "Bash(node fix-api-routes.mjs:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
