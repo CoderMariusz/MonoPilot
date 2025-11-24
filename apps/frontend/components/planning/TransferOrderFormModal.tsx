@@ -41,7 +41,7 @@ interface TransferOrder {
   to_warehouse_id: string
   planned_ship_date: string
   planned_receive_date: string
-  notes?: string
+  notes?: string | null
 }
 
 interface TransferOrderFormModalProps {
