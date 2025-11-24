@@ -38,7 +38,7 @@ export const createTransferOrderSchema = z
     }
   )
 
-export type CreateTransferOrderInput = z.infer<typeof createTransferOrderSchema>
+export type CreateTransferOrderInput = z.input<typeof createTransferOrderSchema>
 
 export const updateTransferOrderSchema = z
   .object({
@@ -77,7 +77,7 @@ export const updateTransferOrderSchema = z
     }
   )
 
-export type UpdateTransferOrderInput = z.infer<typeof updateTransferOrderSchema>
+export type UpdateTransferOrderInput = z.input<typeof updateTransferOrderSchema>
 
 // ===== TO Line Schemas (Story 3.7) =====
 
@@ -87,14 +87,14 @@ export const createToLineSchema = z.object({
   notes: z.string().max(500, 'Notes cannot exceed 500 characters').optional().nullable(),
 })
 
-export type CreateToLineInput = z.infer<typeof createToLineSchema>
+export type CreateToLineInput = z.input<typeof createToLineSchema>
 
 export const updateToLineSchema = z.object({
   quantity: z.number().positive('Quantity must be greater than 0').optional(),
   notes: z.string().max(500, 'Notes cannot exceed 500 characters').optional().nullable(),
 })
 
-export type UpdateToLineInput = z.infer<typeof updateToLineSchema>
+export type UpdateToLineInput = z.input<typeof updateToLineSchema>
 
 // ===== Partial Shipment Schemas (Story 3.8) =====
 
@@ -118,7 +118,7 @@ export const shipToSchema = z
     }
   )
 
-export type ShipToInput = z.infer<typeof shipToSchema>
+export type ShipToInput = z.input<typeof shipToSchema>
 
 // ===== LP Selection Schemas (Story 3.9) =====
 
@@ -146,7 +146,7 @@ export const selectLpsSchema = z
     }
   )
 
-export type SelectLpsInput = z.infer<typeof selectLpsSchema>
+export type SelectLpsInput = z.input<typeof selectLpsSchema>
 
 // ===== Transfer Order Filters =====
 

@@ -65,7 +65,7 @@ export const updateRoutingSchema = z.object({
   is_reusable: z.boolean().optional(),
 })
 
-export type UpdateRoutingInput = z.infer<typeof updateRoutingSchema>
+export type UpdateRoutingInput = z.input<typeof updateRoutingSchema>
 
 /**
  * Routing Filters Schema
@@ -177,7 +177,7 @@ export const updateOperationSchema = z.object({
     .nullable(),
 })
 
-export type UpdateOperationInput = z.infer<typeof updateOperationSchema>
+export type UpdateOperationInput = z.input<typeof updateOperationSchema>
 
 /**
  * Reorder Operations Schema
@@ -192,7 +192,7 @@ export const reorderOperationsSchema = z.object({
   ),
 })
 
-export type ReorderOperationsInput = z.infer<typeof reorderOperationsSchema>
+export type ReorderOperationsInput = z.input<typeof reorderOperationsSchema>
 
 // ============================================================================
 // PRODUCT-ROUTING ASSIGNMENT SCHEMAS (Story 2.17)
@@ -207,7 +207,7 @@ export const assignProductsSchema = z.object({
   default_product_id: z.string().uuid('Invalid product ID').optional(),
 })
 
-export type AssignProductsInput = z.infer<typeof assignProductsSchema>
+export type AssignProductsInput = z.input<typeof assignProductsSchema>
 
 /**
  * Assign Routings to Product Schema
@@ -218,4 +218,4 @@ export const assignRoutingsSchema = z.object({
   default_routing_id: z.string().uuid('Invalid routing ID').optional(),
 })
 
-export type AssignRoutingsInput = z.infer<typeof assignRoutingsSchema>
+export type AssignRoutingsInput = z.input<typeof assignRoutingsSchema>

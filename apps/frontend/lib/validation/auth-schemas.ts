@@ -6,13 +6,13 @@ export const LoginSchema = z.object({
   rememberMe: z.boolean().optional(),
 })
 
-export type LoginInput = z.infer<typeof LoginSchema>
+export type LoginInput = z.input<typeof LoginSchema>
 
 export const ForgotPasswordSchema = z.object({
   email: z.string().email('Invalid email format'),
 })
 
-export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>
+export type ForgotPasswordInput = z.input<typeof ForgotPasswordSchema>
 
 export const ResetPasswordSchema = z
   .object({
@@ -28,7 +28,7 @@ export const ResetPasswordSchema = z
     path: ['confirmPassword'],
   })
 
-export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>
+export type ResetPasswordInput = z.input<typeof ResetPasswordSchema>
 
 // Note: SignupSchema is reserved for Story 1.3 (User Invitations)
 // MonoPilot is an invitation-only system - no public signup
@@ -43,4 +43,4 @@ export const SignupSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
 })
 
-export type SignupInput = z.infer<typeof SignupSchema>
+export type SignupInput = z.input<typeof SignupSchema>

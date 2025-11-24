@@ -182,7 +182,7 @@ export const UpdateLocationSchema = z
     }
   )
 
-export type UpdateLocationInput = z.infer<typeof UpdateLocationSchema>
+export type UpdateLocationInput = z.input<typeof UpdateLocationSchema>
 
 // ============================================================================
 // LOCATION FILTERS SCHEMA (AC-005.4)

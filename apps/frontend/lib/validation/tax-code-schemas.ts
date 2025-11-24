@@ -46,8 +46,8 @@ export const updateTaxCodeSchema = z.object({
 })
 
 // TypeScript types
-export type CreateTaxCodeInput = z.infer<typeof createTaxCodeSchema>
-export type UpdateTaxCodeInput = z.infer<typeof updateTaxCodeSchema>
+export type CreateTaxCodeInput = z.input<typeof createTaxCodeSchema>
+export type UpdateTaxCodeInput = z.input<typeof updateTaxCodeSchema>
 
 // Tax Code Filters Schema
 // AC-009.3: Tax codes list view with filters

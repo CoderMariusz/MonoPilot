@@ -21,7 +21,7 @@ export const createWarehouseSchema = z.object({
     .max(255, 'Address must be 255 characters or less')
     .optional()
     .or(z.literal('')),
-  is_active: z.boolean().default(true),
+  is_active: z.boolean().optional().default(true),
 })
 
 // Update Warehouse Schema
@@ -49,8 +49,8 @@ export const updateWarehouseSchema = z.object({
 })
 
 // TypeScript types
-export type CreateWarehouseInput = z.infer<typeof createWarehouseSchema>
-export type UpdateWarehouseInput = z.infer<typeof updateWarehouseSchema>
+export type CreateWarehouseInput = z.input<typeof createWarehouseSchema>
+export type UpdateWarehouseInput = z.input<typeof updateWarehouseSchema>
 
 // Warehouse Filters Schema (AC-004.3: Dynamic sorting)
 export const warehouseFiltersSchema = z.object({

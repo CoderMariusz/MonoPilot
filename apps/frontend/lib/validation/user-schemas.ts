@@ -56,7 +56,7 @@ export const CreateUserSchema = z.object({
   role: UserRoleEnum,
 })
 
-export type CreateUserInput = z.infer<typeof CreateUserSchema>
+export type CreateUserInput = z.input<typeof CreateUserSchema>
 
 // ============================================================================
 // UPDATE USER SCHEMA (AC-002.3)
@@ -84,7 +84,7 @@ export const UpdateUserSchema = z.object({
   // Email is explicitly excluded - cannot be updated (security requirement)
 })
 
-export type UpdateUserInput = z.infer<typeof UpdateUserSchema>
+export type UpdateUserInput = z.input<typeof UpdateUserSchema>
 
 // ============================================================================
 // USER FILTERS SCHEMA (AC-002.2)
