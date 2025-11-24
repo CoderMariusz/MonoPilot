@@ -238,36 +238,36 @@ development_status:
   # Priority: P0 (MVP - Products, BOMs, Routings, Traceability)
   # Dependencies: Epic 1
   # Stories: 24
-  # Status: ✅ ALL 24 STORIES IMPLEMENTED (verified 2025-11-24)
+  # Status: ✅ ALL 24 STORIES IMPLEMENTED - IN CODE REVIEW (verified 2025-11-24)
   # WARNING: 23/24 stories have ZERO test coverage (only products.test.ts exists)
-  # Next Actions: Add test suites (~200-300 tests), Code review Batches 2B-2E
+  # Next Actions: Code review all batches, then add test suites (~200-300 tests)
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   epic-2: contexted
-  2-1-product-crud: done  # ✅ BATCH 2A - Migration 024, API, Service, UI (Products list + form modal). TEST COVERAGE: 4% (only products.test.ts)
-  2-2-product-edit-with-versioning: done  # ✅ BATCH 2A - Product versioning in Migration 024 (version field, effective dates). NO TESTS
-  2-3-product-version-history: done  # ✅ BATCH 2A - Product history API (/api/technical/products/[id]/history). NO TESTS
-  2-4-product-allergen-assignment: done  # ✅ BATCH 2A - Product allergens API + UI (allergens tab in product form). NO TESTS
-  2-5-product-types-configuration: done  # ✅ BATCH 2A - Product types in Migration 024 (RAW, WIP, FG, PACKAGING). NO TESTS
-  2-6-bom-crud: done  # ✅ BATCH 2B - Migration 023, BOM Service, API (/api/technical/boms), UI page. NO TESTS
-  2-7-bom-items-management: done  # ✅ BATCH 2B - Migration 025 (bom_items table), API (/api/technical/boms/items). NO TESTS
-  2-8-bom-date-overlap-validation: done  # ✅ BATCH 2B - Migration 026 (check_bom_date_overlap function). NO TESTS
-  2-9-bom-timeline-visualization: done  # ✅ BATCH 2B - API endpoint /api/technical/boms/timeline. MISSING: Full UI visualization component
-  2-10-bom-clone: done  # ✅ BATCH 2B - API endpoint /api/technical/boms/clone. NO TESTS
-  2-11-bom-compare: done  # ✅ BATCH 2B - API endpoint /api/technical/boms/compare. NO TESTS
-  2-12-conditional-bom-items: done  # ✅ BATCH 2B - Migration 025 (condition_flags, condition_logic). NO TESTS. MISSING: Full UI for conditional logic
-  2-13-by-products-in-bom: done  # ✅ BATCH 2B - Migration 025 (is_by_product, yield_percent). NO TESTS. MISSING: Full UI for by-products
-  2-14-allergen-inheritance: done  # ✅ BATCH 2B - API endpoint /api/technical/boms/allergens with inheritance logic. NO TESTS
-  2-15-routing-crud: done  # ✅ BATCH 2C - Migration 021, Routing Service, API (/api/technical/routings), UI page. NO TESTS
-  2-16-routing-operations: done  # ✅ BATCH 2C - Migration 022 (routing_operations table), API (/api/technical/routings/operations). NO TESTS
-  2-17-routing-product-assignment: done  # ✅ BATCH 2C - Migration 021 (product_id FK in routings), API endpoint. NO TESTS
-  2-18-forward-traceability: done  # ✅ BATCH 2D - Migration 030+031 (lp_genealogy), API (/api/technical/tracing/forward). NO TESTS
-  2-19-backward-traceability: done  # ✅ BATCH 2D - Migration 030+031 (lp_genealogy), API (/api/technical/tracing/backward). NO TESTS
-  2-20-recall-simulation: done  # ✅ BATCH 2D - API endpoint /api/technical/tracing/recall (forward + backward simulation). NO TESTS
-  2-21-genealogy-tree-view: done  # ✅ BATCH 2D - Migration 030 (genealogy_trees view), service methods. NO TESTS
-  2-22-technical-settings-configuration: done  # ✅ BATCH 2D - Migration 032 (technical_settings table), service, API. NO TESTS
-  2-23-grouped-product-dashboard: done  # ✅ BATCH 2E - API endpoint /api/technical/dashboard/products with grouping logic. NO TESTS
-  2-24-allergen-matrix-visualization: done  # ✅ BATCH 2E - API endpoint /api/technical/dashboard/allergen-matrix. NO TESTS
+  2-1-product-crud: review  # ✅ BATCH 2A - Migration 024, API, Service, UI (Products list + form modal). TEST COVERAGE: 4% (only products.test.ts)
+  2-2-product-edit-with-versioning: review  # ✅ BATCH 2A - Product versioning in Migration 024 (version field, effective dates). NO TESTS
+  2-3-product-version-history: review  # ✅ BATCH 2A - Product history API (/api/technical/products/[id]/history). NO TESTS
+  2-4-product-allergen-assignment: review  # ✅ BATCH 2A - Product allergens API + UI (allergens tab in product form). NO TESTS
+  2-5-product-types-configuration: review  # ✅ BATCH 2A - Product types in Migration 024 (RAW, WIP, FG, PACKAGING). NO TESTS
+  2-6-bom-crud: review  # ✅ BATCH 2B - Migration 023, BOM Service, API (/api/technical/boms), UI page. NO TESTS
+  2-7-bom-items-management: review  # ✅ BATCH 2B - Migration 025 (bom_items table), API (/api/technical/boms/items). NO TESTS
+  2-8-bom-date-overlap-validation: review  # ✅ BATCH 2B - Migration 026 (check_bom_date_overlap function). NO TESTS
+  2-9-bom-timeline-visualization: review  # ✅ BATCH 2B - API endpoint /api/technical/boms/timeline. MISSING: Full UI visualization component
+  2-10-bom-clone: review  # ✅ BATCH 2B - API endpoint /api/technical/boms/clone. NO TESTS
+  2-11-bom-compare: review  # ✅ BATCH 2B - API endpoint /api/technical/boms/compare. NO TESTS
+  2-12-conditional-bom-items: review  # ✅ BATCH 2B - Migration 025 (condition_flags, condition_logic). NO TESTS. MISSING: Full UI for conditional logic
+  2-13-by-products-in-bom: review  # ✅ BATCH 2B - Migration 025 (is_by_product, yield_percent). NO TESTS. MISSING: Full UI for by-products
+  2-14-allergen-inheritance: review  # ✅ BATCH 2B - API endpoint /api/technical/boms/allergens with inheritance logic. NO TESTS
+  2-15-routing-crud: review  # ✅ BATCH 2C - Migration 021, Routing Service, API (/api/technical/routings), UI page. NO TESTS
+  2-16-routing-operations: review  # ✅ BATCH 2C - Migration 022 (routing_operations table), API (/api/technical/routings/operations). NO TESTS
+  2-17-routing-product-assignment: review  # ✅ BATCH 2C - Migration 021 (product_id FK in routings), API endpoint. NO TESTS
+  2-18-forward-traceability: review  # ✅ BATCH 2D - Migration 030+031 (lp_genealogy), API (/api/technical/tracing/forward). NO TESTS
+  2-19-backward-traceability: review  # ✅ BATCH 2D - Migration 030+031 (lp_genealogy), API (/api/technical/tracing/backward). NO TESTS
+  2-20-recall-simulation: review  # ✅ BATCH 2D - API endpoint /api/technical/tracing/recall (forward + backward simulation). NO TESTS
+  2-21-genealogy-tree-view: review  # ✅ BATCH 2D - Migration 030 (genealogy_trees view), service methods. NO TESTS
+  2-22-technical-settings-configuration: review  # ✅ BATCH 2D - Migration 032 (technical_settings table), service, API. NO TESTS
+  2-23-grouped-product-dashboard: review  # ✅ BATCH 2E - API endpoint /api/technical/dashboard/products with grouping logic. NO TESTS
+  2-24-allergen-matrix-visualization: review  # ✅ BATCH 2E - API endpoint /api/technical/dashboard/allergen-matrix. NO TESTS
   epic-2-retrospective: optional
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -276,32 +276,36 @@ development_status:
   # Priority: P0 (MVP - Purchase Orders, Transfer Orders, Work Orders)
   # Dependencies: Epic 1, Epic 2
   # Stories: 23 (includes Sprint 0 Gap 3: Story 3.23)
+  # Status: ⚠️ 14/23 STORIES IMPLEMENTED (61%) - IN CODE REVIEW (verified 2025-11-24)
+  # WARNING: All 14 implemented stories have ZERO test coverage
+  # BLOCKING: Work Orders are STUB ONLY (blocks Stories 3.11-3.16, 3.23)
+  # Next Actions: Code review Batches 3A & 3B, Complete WO implementation, Add tests
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  epic-3: backlog
-  3-1-purchase-order-crud: backlog
-  3-2-po-line-management: backlog
-  3-3-bulk-po-creation: backlog
-  3-4-po-approval-workflow: backlog
-  3-5-configurable-po-statuses: backlog
-  3-6-transfer-order-crud: review
-  3-7-to-line-management: review
-  3-8-partial-to-shipments: review
-  3-9-lp-selection-for-to: review
-  3-10-work-order-crud: backlog
-  3-11-bom-auto-selection-for-wo: backlog
-  3-12-wo-materials-snapshot: backlog
-  3-13-material-availability-check: backlog
-  3-14-routing-copy-to-wo: backlog
-  3-15-configurable-wo-statuses: backlog
-  3-16-wo-source-of-demand: backlog
-  3-17-supplier-management: backlog
-  3-18-supplier-product-assignments: backlog
-  3-19-po-status-lifecycle: backlog
-  3-20-to-status-lifecycle: backlog
-  3-21-wo-gantt-view: backlog
-  3-22-planning-settings-configuration: backlog
-  3-23-verify-bom-snapshot-immutability-sprint-0-gap-3: backlog
+  epic-3: contexted
+  3-1-purchase-order-crud: review  # ✅ BATCH 3A - Migration 027, PO Service, API, UI. NO TESTS
+  3-2-po-line-management: review  # ✅ BATCH 3A - Migration 028, API (/api/planning/purchase-orders/[id]/lines), auto-calc totals trigger. NO TESTS
+  3-3-bulk-po-creation: backlog  # ❌ NOT IMPLEMENTED - No bulk endpoint
+  3-4-po-approval-workflow: review  # ✅ BATCH 3A - Migration 027 (approval fields), Migration 029 (po_approvals), API. NO TESTS
+  3-5-configurable-po-statuses: review  # ✅ BATCH 3A - Migration 029 (planning_settings), API (/api/planning/settings). NO TESTS
+  3-6-transfer-order-crud: review  # ✅ BATCH 3B - Migration 020, TO Service, API, UI. NO TESTS
+  3-7-to-line-management: review  # ✅ BATCH 3B - Migration 021, API (/api/planning/transfer-orders/[id]/lines). NO TESTS
+  3-8-partial-to-shipments: review  # ✅ BATCH 3B - API (/api/planning/transfer-orders/[id]/ship). NO TESTS
+  3-9-lp-selection-for-to: review  # ✅ BATCH 3B - Migration 022 (to_line_lps), API (/api/planning/transfer-orders/[id]/lines/[lineId]/lps). NO TESTS
+  3-10-work-order-crud: review  # ⚠️ BATCH 3C - Migration 028 (STUB ONLY), WO Service, API, UI. NO bom_id, NO snapshot, NO source fields. NO TESTS
+  3-11-bom-auto-selection-for-wo: backlog  # ❌ BLOCKED by Story 3.10 (WO is STUB) - No bom_id field
+  3-12-wo-materials-snapshot: backlog  # ❌ BLOCKED by Story 3.10 (WO is STUB) - No snapshot table
+  3-13-material-availability-check: backlog  # ❌ BLOCKED by Story 3.10 (WO is STUB) - No availability check logic
+  3-14-routing-copy-to-wo: backlog  # ⚠️ BLOCKED by Story 3.10 (WO is STUB) - routing_id field exists but no copy logic
+  3-15-configurable-wo-statuses: backlog  # ⚠️ BLOCKED by Story 3.10 (WO is STUB) - Status hard-coded, not configurable
+  3-16-wo-source-of-demand: backlog  # ❌ BLOCKED by Story 3.10 (WO is STUB) - No source tracking fields
+  3-17-supplier-management: review  # ✅ BATCH 3A - Migration 025, API (/api/planning/suppliers). NO UI PAGE. NO TESTS
+  3-18-supplier-product-assignments: review  # ✅ BATCH 3A - Migration 026 (supplier_products), API (/api/planning/suppliers/[id]/products). NO TESTS
+  3-19-po-status-lifecycle: backlog  # ❌ NOT IMPLEMENTED - Status field exists but no lifecycle logic
+  3-20-to-status-lifecycle: review  # ⚠️ BATCH 3B - API (/api/planning/transfer-orders/[id]/status) EXISTS. Need to verify transition logic. NO TESTS
+  3-21-wo-gantt-view: backlog  # ❌ NOT IMPLEMENTED - No Gantt component
+  3-22-planning-settings-configuration: review  # ✅ BATCH 3A - Migration 029 (planning_settings), API (/api/planning/settings). NO TESTS
+  3-23-verify-bom-snapshot-immutability-sprint-0-gap-3: backlog  # ❌ BLOCKED by Story 3.12 (WO Materials Snapshot) - Test story, no implementation yet
   epic-3-retrospective: optional
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
