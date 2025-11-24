@@ -1,0 +1,53 @@
+graph TB
+    subgraph "LEVEL 0: CORE CONTEXT (ZAWSZE ŁADOWANY)"
+        CORE["🏗️ Batch 0: Core Architecture<br/>📄 CODE_ARCHITECTURE_DOCUMENTATION.md<br/>📊 1,556 lines (~31K tokens)<br/><br/>✓ Service Layer Pattern<br/>✓ Component Architecture<br/>✓ Validation Strategy<br/>✓ Auth & RLS<br/>✓ Caching Strategy"]
+    end
+
+    subgraph "LEVEL 1: EPIC CONTEXT (JEDEN NA RAZ)"
+        EPIC1["📦 Epic 1: Settings<br/>633 lines (~12.6K tokens)<br/>14 stories"]
+        EPIC2["📦 Epic 2: Technical<br/>736 lines (~14.7K tokens)<br/>24 stories"]
+        EPIC3["📦 Epic 3: Planning<br/>846 lines (~16.9K tokens)<br/>22 stories"]
+        EPIC4["📦 Epic 4: Production<br/>~800 lines (~16K tokens)<br/>~20 stories"]
+        EPIC5["📦 Epic 5: Warehouse<br/>~1000 lines (~20K tokens)<br/>~35 stories"]
+        EPIC6["📦 Epic 6: Quality<br/>~700 lines (~14K tokens)<br/>~28 stories"]
+        EPIC7["📦 Epic 7: Shipping<br/>~700 lines (~14K tokens)<br/>~28 stories"]
+        EPIC8["📦 Epic 8: NPD<br/>~1000 lines (~20K tokens)<br/>~68 stories"]
+    end
+
+    subgraph "LEVEL 2: STORY CONTEXT (JEDNA NA RAZ)"
+        STORY_EXAMPLE["📝 Story 2.6: BOM CRUD<br/>500 lines (~10K tokens)<br/><br/>✓ Detailed AC<br/>✓ Technical notes<br/>✓ Prerequisites<br/>✓ Templates Required"]
+    end
+
+    subgraph "LEVEL 3: TEMPLATES (AUTO-DETECTED)"
+        TMPL_A["📋 Template A: CRUD Pattern<br/>200 lines (~4K tokens)<br/><br/>✓ API Route Pattern<br/>✓ Service Layer<br/>✓ Component (Modal)<br/>✓ Validation Schema"]
+        TMPL_B["📋 Template B: Line Items<br/>150 lines (~3K tokens)<br/><br/>✓ Parent-Child Pattern<br/>✓ Nested API Routes<br/>✓ Table Component"]
+        TMPL_C["📋 Template C: Settings<br/>100 lines (~2K tokens)<br/><br/>✓ JSONB Config<br/>✓ Accordion UI<br/>✓ Toggle Fields"]
+        TMPL_D["📋 Template D: Versioning<br/>120 lines (~2.4K tokens)<br/><br/>✓ Auto-increment<br/>✓ History Tracking<br/>✓ Comparison View"]
+        TMPL_E["📋 Template E: Traceability<br/>180 lines (~3.6K tokens)<br/><br/>✓ Recursive Queries<br/>✓ Tree Visualization<br/>✓ React Flow"]
+    end
+
+    subgraph "FINAL CONTEXT (Example: Story 2.6)"
+        FINAL["🎯 Combined Context<br/>3,142 lines (~62.8K tokens)<br/><br/>88.6% REDUCTION vs. full load<br/>✅ Fits in 200K token limit<br/>✅ 137K tokens for code generation"]
+    end
+
+    CORE --> EPIC2
+    EPIC2 --> STORY_EXAMPLE
+    STORY_EXAMPLE --> TMPL_A
+    STORY_EXAMPLE --> TMPL_B
+    TMPL_A --> FINAL
+    TMPL_B --> FINAL
+    CORE --> FINAL
+    EPIC2 --> FINAL
+
+    style CORE fill:#4CAF50,stroke:#2E7D32,color:#fff
+    style EPIC2 fill:#2196F3,stroke:#1565C0,color:#fff
+    style STORY_EXAMPLE fill:#FF9800,stroke:#E65100,color:#fff
+    style TMPL_A fill:#9C27B0,stroke:#4A148C,color:#fff
+    style TMPL_B fill:#9C27B0,stroke:#4A148C,color:#fff
+    style FINAL fill:#F44336,stroke:#B71C1C,color:#fff
+
+    classDef epicClass fill:#2196F3,stroke:#1565C0,color:#fff,stroke-width:2px
+    classDef tmplClass fill:#9C27B0,stroke:#4A148C,color:#fff,stroke-width:2px
+
+    class EPIC1,EPIC3,EPIC4,EPIC5,EPIC6,EPIC7,EPIC8 epicClass
+    class TMPL_C,TMPL_D,TMPL_E tmplClass

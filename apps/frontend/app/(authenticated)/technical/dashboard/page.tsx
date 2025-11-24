@@ -17,6 +17,16 @@ export default function TechnicalDashboardPage() {
 
   if (loading) return <div className="p-8">Loading dashboard...</div>
 
+  if (!data) {
+    return (
+      <div className="p-8">
+        <div className="text-center text-gray-500">
+          Failed to load dashboard data. Please try again.
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-8">
       <div className="mb-6">
@@ -28,17 +38,17 @@ export default function TechnicalDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <StatCard
           title="Total Products"
-          value={data?.overall_stats.total_products || 0}
+          value={data?.overall_stats?.total_products || 0}
           icon="📦"
         />
         <StatCard
           title="Active Products"
-          value={data?.overall_stats.active_products || 0}
+          value={data?.overall_stats?.active_products || 0}
           icon="✅"
         />
         <StatCard
           title="Recent Updates"
-          value={data?.overall_stats.recent_updates || 0}
+          value={data?.overall_stats?.recent_updates || 0}
           subtitle="Last 7 days"
           icon="📝"
         />
@@ -46,7 +56,7 @@ export default function TechnicalDashboardPage() {
 
       {/* Product Groups */}
       <div className="space-y-6">
-        {data?.groups.map(group => (
+        {data?.groups?.map(group => (
           <ProductGroupSection key={group.category} group={group} />
         ))}
       </div>

@@ -65,7 +65,11 @@
       "Bash(node scripts/apply-batch-3b-migrations.mjs:*)",
       "Bash(cd:*)",
       "Bash(NEXT_PUBLIC_SUPABASE_URL=\"https://pgroxddbtaevdegnidaz.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncm94ZGRidGFldmRlZ25pZGF6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTk1ODM3MywiZXhwIjoyMDc1NTM0MzczfQ.ZdMzCB9SPMuPLvM5pq1g6s7p-8qvYdyf6WfCoDIPVDg\" node:*)",
-      "SlashCommand(/bmad:bmm:workflows:code-review)"
+      "SlashCommand(/bmad:bmm:workflows:code-review)",
+      "SlashCommand(/bmad:bmm:workflows:document-project)",
+      "SlashCommand(/bmad:bmm:workflows:sprint-planning)",
+      "SlashCommand(/bmad:bmm:workflows:workflow-status)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []
