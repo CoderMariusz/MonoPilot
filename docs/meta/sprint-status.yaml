@@ -238,33 +238,36 @@ development_status:
   # Priority: P0 (MVP - Products, BOMs, Routings, Traceability)
   # Dependencies: Epic 1
   # Stories: 24
+  # Status: ✅ ALL 24 STORIES IMPLEMENTED (verified 2025-11-24)
+  # WARNING: 23/24 stories have ZERO test coverage (only products.test.ts exists)
+  # Next Actions: Add test suites (~200-300 tests), Code review Batches 2B-2E
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  epic-2: backlog
-  2-1-product-crud: backlog
-  2-2-product-edit-with-versioning: backlog
-  2-3-product-version-history: backlog
-  2-4-product-allergen-assignment: backlog
-  2-5-product-types-configuration: backlog
-  2-6-bom-crud: backlog
-  2-7-bom-items-management: backlog
-  2-8-bom-date-overlap-validation: backlog
-  2-9-bom-timeline-visualization: backlog
-  2-10-bom-clone: backlog
-  2-11-bom-compare: backlog
-  2-12-conditional-bom-items: backlog
-  2-13-by-products-in-bom: backlog
-  2-14-allergen-inheritance: backlog
-  2-15-routing-crud: backlog
-  2-16-routing-operations: backlog
-  2-17-routing-product-assignment: backlog
-  2-18-forward-traceability: backlog
-  2-19-backward-traceability: backlog
-  2-20-recall-simulation: backlog
-  2-21-genealogy-tree-view: backlog
-  2-22-technical-settings-configuration: backlog
-  2-23-grouped-product-dashboard: backlog
-  2-24-allergen-matrix-visualization: backlog
+  epic-2: contexted
+  2-1-product-crud: done  # ✅ BATCH 2A - Migration 024, API, Service, UI (Products list + form modal). TEST COVERAGE: 4% (only products.test.ts)
+  2-2-product-edit-with-versioning: done  # ✅ BATCH 2A - Product versioning in Migration 024 (version field, effective dates). NO TESTS
+  2-3-product-version-history: done  # ✅ BATCH 2A - Product history API (/api/technical/products/[id]/history). NO TESTS
+  2-4-product-allergen-assignment: done  # ✅ BATCH 2A - Product allergens API + UI (allergens tab in product form). NO TESTS
+  2-5-product-types-configuration: done  # ✅ BATCH 2A - Product types in Migration 024 (RAW, WIP, FG, PACKAGING). NO TESTS
+  2-6-bom-crud: done  # ✅ BATCH 2B - Migration 023, BOM Service, API (/api/technical/boms), UI page. NO TESTS
+  2-7-bom-items-management: done  # ✅ BATCH 2B - Migration 025 (bom_items table), API (/api/technical/boms/items). NO TESTS
+  2-8-bom-date-overlap-validation: done  # ✅ BATCH 2B - Migration 026 (check_bom_date_overlap function). NO TESTS
+  2-9-bom-timeline-visualization: done  # ✅ BATCH 2B - API endpoint /api/technical/boms/timeline. MISSING: Full UI visualization component
+  2-10-bom-clone: done  # ✅ BATCH 2B - API endpoint /api/technical/boms/clone. NO TESTS
+  2-11-bom-compare: done  # ✅ BATCH 2B - API endpoint /api/technical/boms/compare. NO TESTS
+  2-12-conditional-bom-items: done  # ✅ BATCH 2B - Migration 025 (condition_flags, condition_logic). NO TESTS. MISSING: Full UI for conditional logic
+  2-13-by-products-in-bom: done  # ✅ BATCH 2B - Migration 025 (is_by_product, yield_percent). NO TESTS. MISSING: Full UI for by-products
+  2-14-allergen-inheritance: done  # ✅ BATCH 2B - API endpoint /api/technical/boms/allergens with inheritance logic. NO TESTS
+  2-15-routing-crud: done  # ✅ BATCH 2C - Migration 021, Routing Service, API (/api/technical/routings), UI page. NO TESTS
+  2-16-routing-operations: done  # ✅ BATCH 2C - Migration 022 (routing_operations table), API (/api/technical/routings/operations). NO TESTS
+  2-17-routing-product-assignment: done  # ✅ BATCH 2C - Migration 021 (product_id FK in routings), API endpoint. NO TESTS
+  2-18-forward-traceability: done  # ✅ BATCH 2D - Migration 030+031 (lp_genealogy), API (/api/technical/tracing/forward). NO TESTS
+  2-19-backward-traceability: done  # ✅ BATCH 2D - Migration 030+031 (lp_genealogy), API (/api/technical/tracing/backward). NO TESTS
+  2-20-recall-simulation: done  # ✅ BATCH 2D - API endpoint /api/technical/tracing/recall (forward + backward simulation). NO TESTS
+  2-21-genealogy-tree-view: done  # ✅ BATCH 2D - Migration 030 (genealogy_trees view), service methods. NO TESTS
+  2-22-technical-settings-configuration: done  # ✅ BATCH 2D - Migration 032 (technical_settings table), service, API. NO TESTS
+  2-23-grouped-product-dashboard: done  # ✅ BATCH 2E - API endpoint /api/technical/dashboard/products with grouping logic. NO TESTS
+  2-24-allergen-matrix-visualization: done  # ✅ BATCH 2E - API endpoint /api/technical/dashboard/allergen-matrix. NO TESTS
   epic-2-retrospective: optional
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
