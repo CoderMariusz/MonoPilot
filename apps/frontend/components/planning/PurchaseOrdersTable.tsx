@@ -12,6 +12,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -79,6 +80,7 @@ export function PurchaseOrdersTable() {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null)
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null)
+  const router = useRouter()
   const { toast } = useToast()
 
   // Fetch purchase orders
@@ -275,7 +277,11 @@ export function PurchaseOrdersTable() {
               </TableRow>
             ) : (
               purchaseOrders.map((po) => (
-                <TableRow key={po.id}>
+                <TableRow
+                  key={po.id}
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => router.push(`/planning/purchase-orders/${po.id}`)}
+                >
                   <TableCell className="font-medium">{po.po_number}</TableCell>
                   <TableCell>
                     {po.suppliers?.name || 'N/A'}
@@ -303,14 +309,20 @@ export function PurchaseOrdersTable() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => openEditModal(po)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openEditModal(po)
+                        }}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => openDeleteDialog(po)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openDeleteDialog(po)
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
