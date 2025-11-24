@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -36,18 +36,26 @@ interface TransferOrder {
   updated_at: string
 }
 
-export default function TransferOrderDetailsPage({ params }: { params: { id: string } }) {
+export default function TransferOrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const [to, setTO] = useState<TransferOrder | null>(null)
   const [loading, setLoading] = useState(true)
+  const [paramsId, setParamsId] = useState<string>('')
   const router = useRouter()
   const { toast } = useToast()
 
+  // Unwrap params
+  useEffect(() => {
+    params.then((p) => setParamsId(p.id))
+  }, [params])
+
   // Fetch TO details
-  const fetchTO = async () => {
+  const fetchTO = useCallback(async () => {
+    if (!paramsId) return
+
     try {
       setLoading(true)
 
-      const response = await fetch(`/api/planning/transfer-orders/${params.id}`)
+      const response = await fetch(`/api/planning/transfer-orders/${paramsId}`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch transfer order')
@@ -66,11 +74,11 @@ export default function TransferOrderDetailsPage({ params }: { params: { id: str
     } finally {
       setLoading(false)
     }
-  }
+  }, [paramsId, toast, router])
 
   useEffect(() => {
     fetchTO()
-  }, [params.id])
+  }, [fetchTO])
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -201,7 +209,7 @@ export default function TransferOrderDetailsPage({ params }: { params: { id: str
       </div>
 
       {/* TO Lines Table */}
-      <TOLinesTable transferOrderId={params.id} onLinesUpdate={fetchTO} />
+      <TOLinesTable transferOrderId={paramsId} onLinesUpdate={fetchTO} />
     </div>
   )
 }
