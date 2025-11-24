@@ -39,7 +39,7 @@ interface TOLine {
   id: string
   product_id: string
   quantity: number
-  notes?: string
+  notes?: string | null
 }
 
 interface TOLineFormModalProps {
