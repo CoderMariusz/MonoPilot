@@ -11,9 +11,10 @@ import { ZodError } from 'zod'
 // GET /api/planning/purchase-orders/:id/lines - Get all PO lines
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -43,7 +44,7 @@ export async function GET(
     const { data: po } = await supabaseAdmin
       .from('purchase_orders')
       .select('id, org_id')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', currentUser.org_id)
       .single()
 
@@ -58,7 +59,7 @@ export async function GET(
         *,
         products(id, code, name, uom)
       `)
-      .eq('po_id', params.id)
+      .eq('po_id', id)
       .eq('org_id', currentUser.org_id)
       .order('sequence', { ascending: true })
 
@@ -80,9 +81,10 @@ export async function GET(
 // POST /api/planning/purchase-orders/:id/lines - Add new PO line
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -124,7 +126,7 @@ export async function POST(
     const { data: po, error: poError } = await supabaseAdmin
       .from('purchase_orders')
       .select('status, org_id, supplier_id, currency')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (poError || !po) {
@@ -173,7 +175,7 @@ export async function POST(
     const { count } = await supabaseAdmin
       .from('po_lines')
       .select('*', { count: 'exact', head: true })
-      .eq('po_id', params.id)
+      .eq('po_id', id)
 
     const sequence = (count || 0) + 1
 
@@ -187,7 +189,7 @@ export async function POST(
     // Prepare line data
     const lineData = {
       org_id: currentUser.org_id,
-      po_id: params.id,
+      po_id: id,
       product_id: validatedData.product_id,
       sequence,
       quantity: validatedData.quantity,

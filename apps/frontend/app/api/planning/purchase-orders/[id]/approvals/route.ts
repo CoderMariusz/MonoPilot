@@ -11,9 +11,10 @@ import { ZodError } from 'zod'
 // GET /api/planning/purchase-orders/:id/approvals - Get approval history
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -43,7 +44,7 @@ export async function GET(
     const { data: po } = await supabaseAdmin
       .from('purchase_orders')
       .select('id, org_id')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', currentUser.org_id)
       .single()
 
@@ -58,7 +59,7 @@ export async function GET(
         *,
         users:approved_by(id, email, full_name)
       `)
-      .eq('po_id', params.id)
+      .eq('po_id', id)
       .eq('org_id', currentUser.org_id)
       .order('approved_at', { ascending: false })
 
@@ -80,9 +81,10 @@ export async function GET(
 // POST /api/planning/purchase-orders/:id/approvals - Approve or reject PO
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -124,7 +126,7 @@ export async function POST(
     const { data: po, error: poError } = await supabaseAdmin
       .from('purchase_orders')
       .select('id, org_id, approval_status')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (poError || !po) {
@@ -150,7 +152,7 @@ export async function POST(
     // Create approval record
     const approvalData = {
       org_id: currentUser.org_id,
-      po_id: params.id,
+      po_id: id,
       status: newApprovalStatus,
       approved_by: session.user.id,
       approved_at: now,
@@ -181,7 +183,7 @@ export async function POST(
     const { error: updateError } = await supabaseAdmin
       .from('purchase_orders')
       .update(poUpdateData)
-      .eq('id', params.id)
+      .eq('id', id)
 
     if (updateError) {
       console.error('Error updating PO approval status:', updateError)

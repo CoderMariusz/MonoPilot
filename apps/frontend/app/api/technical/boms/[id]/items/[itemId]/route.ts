@@ -17,9 +17,10 @@ import { ZodError } from 'zod';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; itemId: string } }
+  { params }: { params: Promise<{ id: string; itemId: string }> }
 ) {
   try {
+    const { id, itemId } = await params
     const supabase = await createServerSupabase();
 
     // Check authentication
@@ -52,8 +53,8 @@ export async function PUT(
     const { data: existingItem, error: itemError } = await supabase
       .from('bom_items')
       .select('id, bom_id')
-      .eq('id', params.itemId)
-      .eq('bom_id', params.id)
+      .eq('id', itemId)
+      .eq('bom_id', id)
       .single();
 
     if (itemError || !existingItem) {
@@ -68,7 +69,7 @@ export async function PUT(
     const { data: item, error: updateError } = await supabase
       .from('bom_items')
       .update(validatedData)
-      .eq('id', params.itemId)
+      .eq('id', itemId)
       .select(`
         *,
         product:products!product_id (
@@ -116,9 +117,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; itemId: string } }
+  { params }: { params: Promise<{ id: string; itemId: string }> }
 ) {
   try {
+    const { id, itemId } = await params
     const supabase = await createServerSupabase();
 
     // Check authentication
@@ -151,8 +153,8 @@ export async function DELETE(
     const { data: existingItem, error: itemError } = await supabase
       .from('bom_items')
       .select('id, bom_id')
-      .eq('id', params.itemId)
-      .eq('bom_id', params.id)
+      .eq('id', itemId)
+      .eq('bom_id', id)
       .single();
 
     if (itemError || !existingItem) {
@@ -163,7 +165,7 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from('bom_items')
       .delete()
-      .eq('id', params.itemId);
+      .eq('id', itemId);
 
     if (deleteError) {
       console.error('Error deleting BOM item:', deleteError);

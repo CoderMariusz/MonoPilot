@@ -12,9 +12,10 @@ import { ZodError } from 'zod'
 // GET /api/planning/purchase-orders/:id - Get PO details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -52,7 +53,7 @@ export async function GET(
           products(id, code, name, uom)
         )
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', currentUser.org_id)
       .single()
 
@@ -70,9 +71,10 @@ export async function GET(
 // PUT /api/planning/purchase-orders/:id - Update PO
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -110,7 +112,7 @@ export async function PUT(
     const { data: currentPO, error: fetchError } = await supabaseAdmin
       .from('purchase_orders')
       .select('status, org_id')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (fetchError || !currentPO) {
@@ -157,7 +159,7 @@ export async function PUT(
     const { data, error: updateError } = await supabaseAdmin
       .from('purchase_orders')
       .update(updateData)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', currentUser.org_id)
       .select(`
         *,
@@ -192,9 +194,10 @@ export async function PUT(
 // DELETE /api/planning/purchase-orders/:id - Delete PO
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -232,7 +235,7 @@ export async function DELETE(
     const { count: lineCount } = await supabaseAdmin
       .from('po_lines')
       .select('*', { count: 'exact', head: true })
-      .eq('po_id', params.id)
+      .eq('po_id', id)
       .eq('org_id', currentUser.org_id)
 
     if (lineCount && lineCount > 0) {
@@ -246,7 +249,7 @@ export async function DELETE(
     const { data: po } = await supabaseAdmin
       .from('purchase_orders')
       .select('status, org_id')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (!po) {
@@ -270,7 +273,7 @@ export async function DELETE(
     const { error: deleteError } = await supabaseAdmin
       .from('purchase_orders')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', currentUser.org_id)
 
     if (deleteError) {
