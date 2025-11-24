@@ -12,13 +12,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -26,6 +19,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { Check, ChevronsUpDown } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 
 interface Product {
@@ -66,6 +74,7 @@ export function TOLineFormModal({
   const [submitting, setSubmitting] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
+  const [productSearchOpen, setProductSearchOpen] = useState(false)
   const { toast } = useToast()
 
   const isEditMode = !!line
@@ -198,28 +207,61 @@ export function TOLineFormModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Product Selection */}
+          {/* Product Selection - AC-3.7.2: Searchable dropdown */}
           {!isEditMode && (
             <div className="space-y-2">
               <Label htmlFor="product_id">
                 Product <span className="text-red-500">*</span>
               </Label>
-              <Select
-                value={formData.product_id}
-                onValueChange={(value) => handleChange('product_id', value)}
-                disabled={loadingProducts}
-              >
-                <SelectTrigger id="product_id">
-                  <SelectValue placeholder={loadingProducts ? 'Loading...' : 'Select product'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.code} - {product.name} ({product.uom})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={productSearchOpen}
+                    className="w-full justify-between"
+                    disabled={loadingProducts}
+                  >
+                    {loadingProducts
+                      ? 'Loading products...'
+                      : formData.product_id
+                      ? (() => {
+                          const product = products.find((p) => p.id === formData.product_id)
+                          return product ? `${product.code} - ${product.name}` : 'Select product'
+                        })()
+                      : 'Select product...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search products by code or name..." />
+                    <CommandList>
+                      <CommandEmpty>No product found.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map((product) => (
+                          <CommandItem
+                            key={product.id}
+                            value={`${product.code} ${product.name}`}
+                            onSelect={() => {
+                              handleChange('product_id', product.id)
+                              setProductSearchOpen(false)
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-4 w-4',
+                                formData.product_id === product.id ? 'opacity-100' : 'opacity-0'
+                              )}
+                            />
+                            {product.code} - {product.name} ({product.uom})
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               {errors.product_id && <p className="text-sm text-red-500">{errors.product_id}</p>}
               {selectedProduct && (
                 <p className="text-sm text-gray-500">UoM: {selectedProduct.uom}</p>
