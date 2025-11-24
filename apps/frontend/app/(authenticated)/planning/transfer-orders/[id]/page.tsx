@@ -39,7 +39,8 @@ interface TransferOrder {
 export default function TransferOrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const [to, setTO] = useState<TransferOrder | null>(null)
   const [loading, setLoading] = useState(true)
-  const [paramsId, setParamsId] = useState<string>('')
+  const [changingStatus, setChangingStatus] = useState(false)
+  const [lineCount, setLineCount] = useState(0)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -79,6 +80,47 @@ export default function TransferOrderDetailsPage({ params }: { params: Promise<{
   useEffect(() => {
     fetchTO()
   }, [fetchTO])
+
+  // Handle line count update (callback from TOLinesTable)
+  const handleLinesUpdate = async () => {
+    await fetchTO()
+  }
+
+  // Handle status change
+  const handleStatusChange = async (newStatus: 'planned' | 'cancelled') => {
+    if (!to) return
+
+    try {
+      setChangingStatus(true)
+
+      const response = await fetch(`/api/planning/transfer-orders/${params.id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to change status')
+      }
+
+      toast({
+        title: 'Success',
+        description: `Transfer Order ${newStatus === 'planned' ? 'planned' : 'cancelled'} successfully`,
+      })
+
+      await fetchTO()
+    } catch (error) {
+      console.error('Error changing status:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to change status',
+        variant: 'destructive',
+      })
+    } finally {
+      setChangingStatus(false)
+    }
+  }
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -130,19 +172,42 @@ export default function TransferOrderDetailsPage({ params }: { params: Promise<{
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push('/planning/transfer-orders')}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <h1 className="text-3xl font-bold">{to.to_number}</h1>
-        <Badge variant={getStatusVariant(to.status)}>
-          {to.status.replace('_', ' ')}
-        </Badge>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/planning/transfer-orders')}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          <h1 className="text-3xl font-bold">{to.to_number}</h1>
+          <Badge variant={getStatusVariant(to.status)}>
+            {to.status.replace('_', ' ')}
+          </Badge>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          {to.status === 'draft' && (
+            <Button
+              onClick={() => handleStatusChange('planned')}
+              disabled={changingStatus}
+            >
+              {changingStatus ? 'Planning...' : 'Plan Transfer Order'}
+            </Button>
+          )}
+          {to.status !== 'cancelled' && to.status !== 'received' && (
+            <Button
+              variant="destructive"
+              onClick={() => handleStatusChange('cancelled')}
+              disabled={changingStatus}
+            >
+              Cancel Transfer
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* TO Details Card */}
@@ -209,7 +274,11 @@ export default function TransferOrderDetailsPage({ params }: { params: Promise<{
       </div>
 
       {/* TO Lines Table */}
-      <TOLinesTable transferOrderId={paramsId} onLinesUpdate={fetchTO} />
+      <TOLinesTable
+        transferOrderId={params.id}
+        toStatus={to.status}
+        onLinesUpdate={handleLinesUpdate}
+      />
     </div>
   )
 }

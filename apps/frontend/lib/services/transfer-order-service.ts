@@ -5,6 +5,7 @@ import {
   type ToLineLp,
   type CreateTransferOrderInput,
   type UpdateTransferOrderInput,
+  type ChangeToStatusInput,
   type CreateToLineInput,
   type UpdateToLineInput,
   type ShipToInput,
@@ -48,9 +49,10 @@ export interface ListResult<T> {
 }
 
 /**
- * Get current user's org_id from JWT
+ * Get current user's org_id and role from JWT
+ * AC-3.6.7: Role-based authorization for Transfer Orders
  */
-async function getCurrentOrgId(): Promise<string | null> {
+async function getCurrentUserData(): Promise<{ orgId: string; role: string; userId: string } | null> {
   const supabase = await createServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -58,25 +60,45 @@ async function getCurrentOrgId(): Promise<string | null> {
 
   const { data: userData, error } = await supabase
     .from('users')
-    .select('org_id')
+    .select('org_id, role')
     .eq('id', user.id)
     .single()
 
   if (error || !userData) {
-    console.error('Failed to get org_id for user:', user.id, error)
+    console.error('Failed to get user data:', user.id, error)
     return null
   }
 
-  return userData.org_id
+  return {
+    orgId: userData.org_id,
+    role: userData.role,
+    userId: user.id
+  }
+}
+
+/**
+ * Get current user's org_id from JWT (legacy function, kept for backward compatibility)
+ */
+async function getCurrentOrgId(): Promise<string | null> {
+  const userData = await getCurrentUserData()
+  return userData?.orgId || null
 }
 
 /**
  * Get current user ID
  */
 async function getCurrentUserId(): Promise<string | null> {
-  const supabase = await createServerSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.id || null
+  const userData = await getCurrentUserData()
+  return userData?.userId || null
+}
+
+/**
+ * Validate user role for Transfer Order operations
+ * Allowed roles: warehouse, purchasing, technical, admin
+ */
+function validateRole(role: string): boolean {
+  const allowedRoles = ['warehouse', 'purchasing', 'technical', 'admin']
+  return allowedRoles.includes(role.toLowerCase())
 }
 
 /**
@@ -499,6 +521,111 @@ export async function deleteTransferOrder(id: string): Promise<ServiceResult<voi
     }
   } catch (error) {
     console.error('Error in deleteTransferOrder:', error)
+    return {
+      success: false,
+      error: 'Internal server error',
+      code: 'DATABASE_ERROR',
+    }
+  }
+}
+
+/**
+ * Change Transfer Order Status
+ * AC-3.6.7: Change TO status to 'planned', 'shipped', 'received', or 'cancelled'
+ *
+ * Validation Rules:
+ * - Only users with Warehouse role or higher can change status
+ * - Cannot change status to 'planned' if TO has 0 lines
+ * - Draft → Planned requires at least 1 line
+ */
+export async function changeToStatus(
+  id: string,
+  status: 'planned' | 'shipped' | 'received' | 'cancelled'
+): Promise<ServiceResult<TransferOrder>> {
+  try {
+    const userData = await getCurrentUserData()
+
+    if (!userData) {
+      return {
+        success: false,
+        error: 'User not authenticated',
+        code: 'INVALID_INPUT',
+      }
+    }
+
+    // Check role authorization (AC-3.6.7 requirement)
+    if (!validateRole(userData.role)) {
+      return {
+        success: false,
+        error: 'Forbidden: Warehouse role or higher required',
+        code: 'INVALID_STATUS',
+      }
+    }
+
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Get current TO with line count
+    const { data: existingTo, error: fetchError } = await supabaseAdmin
+      .from('transfer_orders')
+      .select(`
+        id,
+        status,
+        org_id,
+        to_lines(id)
+      `)
+      .eq('id', id)
+      .eq('org_id', userData.orgId)
+      .single()
+
+    if (fetchError || !existingTo) {
+      return {
+        success: false,
+        error: 'Transfer Order not found',
+        code: 'NOT_FOUND',
+      }
+    }
+
+    // Validate: Cannot plan TO without lines (AC-3.7.8)
+    if (status === 'planned' && (!existingTo.to_lines || existingTo.to_lines.length === 0)) {
+      return {
+        success: false,
+        error: 'Cannot plan Transfer Order without lines. Add at least one product.',
+        code: 'INVALID_STATUS',
+      }
+    }
+
+    // Update status
+    const { data: updatedTo, error: updateError } = await supabaseAdmin
+      .from('transfer_orders')
+      .update({
+        status,
+        updated_by: userData.userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('org_id', userData.orgId)
+      .select(`
+        *,
+        from_warehouse:warehouses!from_warehouse_id(code, name),
+        to_warehouse:warehouses!to_warehouse_id(code, name)
+      `)
+      .single()
+
+    if (updateError) {
+      console.error('Error changing TO status:', updateError)
+      return {
+        success: false,
+        error: 'Failed to change Transfer Order status',
+        code: 'DATABASE_ERROR',
+      }
+    }
+
+    return {
+      success: true,
+      data: updatedTo as TransferOrder,
+    }
+  } catch (error) {
+    console.error('Error in changeToStatus:', error)
     return {
       success: false,
       error: 'Internal server error',

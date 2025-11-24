@@ -96,6 +96,16 @@ export const updateToLineSchema = z.object({
 
 export type UpdateToLineInput = z.input<typeof updateToLineSchema>
 
+// ===== Status Change Schema (Story 3.6 - AC-3.6.7) =====
+
+export const changeToStatusSchema = z.object({
+  status: z.enum(['planned', 'shipped', 'received', 'cancelled'], {
+    errorMap: () => ({ message: 'Invalid status. Must be one of: planned, shipped, received, cancelled' })
+  }),
+})
+
+export type ChangeToStatusInput = z.infer<typeof changeToStatusSchema>
+
 // ===== Partial Shipment Schemas (Story 3.8) =====
 
 export const shipToLineItemSchema = z.object({

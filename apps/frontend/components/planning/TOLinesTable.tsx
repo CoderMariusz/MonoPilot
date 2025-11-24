@@ -55,10 +55,11 @@ interface TOLine {
 
 interface TOLinesTableProps {
   transferOrderId: string
+  toStatus: string
   onLinesUpdate?: () => void
 }
 
-export function TOLinesTable({ transferOrderId, onLinesUpdate }: TOLinesTableProps) {
+export function TOLinesTable({ transferOrderId, toStatus, onLinesUpdate }: TOLinesTableProps) {
   const [lines, setLines] = useState<TOLine[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -160,22 +161,68 @@ export function TOLinesTable({ transferOrderId, onLinesUpdate }: TOLinesTablePro
     }).format(num)
   }
 
+  // Calculate TO Lines Summary (AC-3.7.6)
+  const calculateSummary = () => {
+    const totalLines = lines.length
+    const fullyShipped = lines.filter((line) => line.shipped_qty >= line.quantity).length
+    const fullyReceived = lines.filter((line) => line.received_qty >= line.shipped_qty && line.shipped_qty > 0).length
+
+    const shippedPercent = totalLines > 0 ? Math.round((fullyShipped / totalLines) * 100) : 0
+    const receivedPercent = totalLines > 0 ? Math.round((fullyReceived / totalLines) * 100) : 0
+
+    return {
+      totalLines,
+      fullyShipped,
+      fullyReceived,
+      shippedPercent,
+      receivedPercent,
+    }
+  }
+
+  const summary = calculateSummary()
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">TO Lines</h3>
-        <Button
-          onClick={() => {
-            setEditingLine(null)
-            setFormModalOpen(true)
-          }}
-          size="sm"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Line
-        </Button>
+        {toStatus === 'draft' && (
+          <Button
+            onClick={() => {
+              setEditingLine(null)
+              setFormModalOpen(true)
+            }}
+            size="sm"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Line
+          </Button>
+        )}
       </div>
+
+      {/* AC-3.7.6: TO Lines Summary */}
+      {lines.length > 0 && (
+        <div className="border rounded-lg p-4 grid grid-cols-3 gap-4 bg-gray-50">
+          <div>
+            <p className="text-sm text-gray-600">Total Lines</p>
+            <p className="text-2xl font-bold">{summary.totalLines} {summary.totalLines === 1 ? 'product' : 'products'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Shipped Status</p>
+            <p className="text-2xl font-bold">{summary.shippedPercent}%</p>
+            <p className="text-xs text-gray-500">
+              ({summary.fullyShipped}/{summary.totalLines} products shipped)
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Received Status</p>
+            <p className="text-2xl font-bold">{summary.receivedPercent}%</p>
+            <p className="text-xs text-gray-500">
+              ({summary.fullyReceived}/{summary.totalLines} products received)
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="border rounded-lg">
@@ -212,25 +259,31 @@ export function TOLinesTable({ transferOrderId, onLinesUpdate }: TOLinesTablePro
                   </TableCell>
                   <TableCell className="text-right">{formatNumber(line.quantity)}</TableCell>
                   <TableCell>{line.uom}</TableCell>
-                  <TableCell className="text-right">{formatNumber(line.shipped_qty)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(line.received_qty)}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditModal(line)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openDeleteDialog(line)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {formatNumber(line.shipped_qty)} / {formatNumber(line.quantity)} {line.uom}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatNumber(line.received_qty)} / {formatNumber(line.quantity)} {line.uom}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {toStatus === 'draft' && (
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditModal(line)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openDeleteDialog(line)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
