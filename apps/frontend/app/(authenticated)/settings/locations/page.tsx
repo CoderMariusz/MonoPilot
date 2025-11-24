@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -61,7 +61,7 @@ export default function LocationsPage() {
   const { toast } = useToast()
 
   // Fetch locations
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -89,11 +89,11 @@ export default function LocationsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [searchTerm, typeFilter, activeFilter, toast])
 
   useEffect(() => {
     fetchLocations()
-  }, [typeFilter, activeFilter])
+  }, [fetchLocations])
 
   // Debounced search
   useEffect(() => {
@@ -102,7 +102,7 @@ export default function LocationsPage() {
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [searchTerm])
+  }, [fetchLocations])
 
   // Delete/Archive location handler (AC-005.5)
   const handleDelete = async (location: Location, softDelete = false) => {

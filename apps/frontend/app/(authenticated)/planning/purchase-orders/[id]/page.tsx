@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -51,19 +51,27 @@ interface PurchaseOrder {
 export default function PurchaseOrderDetailsPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
   const [po, setPO] = useState<PurchaseOrder | null>(null)
   const [loading, setLoading] = useState(true)
+  const [paramsId, setParamsId] = useState<string>('')
   const router = useRouter()
   const { toast } = useToast()
 
+  // Unwrap params
+  useEffect(() => {
+    params.then((p) => setParamsId(p.id))
+  }, [params])
+
   // Fetch PO details
-  const fetchPO = async () => {
+  const fetchPO = useCallback(async () => {
+    if (!paramsId) return
+
     try {
       setLoading(true)
 
-      const response = await fetch(`/api/planning/purchase-orders/${params.id}`)
+      const response = await fetch(`/api/planning/purchase-orders/${paramsId}`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch purchase order')
@@ -82,11 +90,11 @@ export default function PurchaseOrderDetailsPage({
     } finally {
       setLoading(false)
     }
-  }
+  }, [paramsId, toast, router])
 
   useEffect(() => {
     fetchPO()
-  }, [params.id])
+  }, [fetchPO])
 
   // Format currency
   const formatCurrency = (amount: number, currency: string) => {
@@ -242,7 +250,7 @@ export default function PurchaseOrderDetailsPage({
 
       {/* PO Lines Table */}
       <POLinesTable
-        poId={params.id}
+        poId={paramsId}
         currency={po.currency}
         onTotalsUpdate={fetchPO}
       />
