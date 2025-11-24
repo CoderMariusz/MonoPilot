@@ -129,7 +129,7 @@ export const createOperationSchema = z.object({
     .nullable(),
 })
 
-export type CreateOperationInput = z.infer<typeof createOperationSchema>
+export type CreateOperationInput = z.input<typeof createOperationSchema>
 
 /**
  * Update Operation Schema
