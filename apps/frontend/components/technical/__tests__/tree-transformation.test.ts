@@ -100,12 +100,13 @@ describe('Tree Transformation - Edge Creation', () => {
   })
 
   it('should reverse edge direction for backward trace', () => {
-    const direction = 'backward'
+    const direction = 'backward' as const
     const parentId = '001'
     const childId = '002'
 
-    const source = direction === 'forward' ? parentId : childId
-    const target = direction === 'forward' ? childId : parentId
+    // For backward trace: source is child, target is parent
+    const source = childId
+    const target = parentId
 
     expect(source).toBe('002')
     expect(target).toBe('001')
@@ -155,11 +156,10 @@ describe('Tree Transformation - Layout Calculation', () => {
 
   it('should reverse vertical direction for backward trace', () => {
     const VERTICAL_SPACING = 150
-    const direction = 'backward'
+    const direction = 'backward' as const
 
-    const positions = [0, 1, 2].map(depth =>
-      direction === 'forward' ? depth * VERTICAL_SPACING : -depth * VERTICAL_SPACING
-    )
+    // For backward trace, use negative spacing
+    const positions = [0, 1, 2].map(depth => -depth * VERTICAL_SPACING)
 
     // -0 and 0 are the same in JavaScript, so we compare without strict equality
     expect(positions[0]).toBe(-0)

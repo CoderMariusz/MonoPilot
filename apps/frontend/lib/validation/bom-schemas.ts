@@ -13,18 +13,7 @@ export const CreateBOMSchema = z.object({
     .datetime('Invalid date format')
     .or(z.date())
     .optional()
-    .nullable()
-    .refine((val, ctx) => {
-      if (!val) return true
-      const parent = ctx.parent as any
-      const effectiveFrom = parent.effective_from
-      if (!effectiveFrom) return true
-
-      const fromDate = effectiveFrom instanceof Date ? effectiveFrom : new Date(effectiveFrom)
-      const toDate = val instanceof Date ? val : new Date(val)
-
-      return toDate > fromDate
-    }, 'Effective to date must be after effective from date'),
+    .nullable(),
   status: BOMStatusEnum.default('draft'),
   output_qty: z.number().positive('Output quantity must be positive').default(1.0),
   output_uom: z.string().min(1, 'Unit of measure is required'),
