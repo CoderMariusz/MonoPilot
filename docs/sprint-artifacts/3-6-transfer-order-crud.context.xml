@@ -1,0 +1,92 @@
+<story-context id="3-6-transfer-order-crud" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>6</storyId>
+    <title>Transfer Order CRUD</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Template A - CRUD Pattern</template>
+    <estimatedTokens>5000</estimatedTokens>
+    <estimatedEffort>1 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Warehouse user</asA>
+    <iWant>to create transfer orders between warehouses</iWant>
+    <soThat>I can move inventory</soThat>
+    <tasks>
+      <task id="1" ac="AC-3.6.1">Transfer Orders Table Schema - transfer_orders table with to_number, from_warehouse_id, to_warehouse_id, planned_ship_date</task>
+      <task id="2" ac="AC-3.6.2">TO Number Generation - Auto-generate to_number (TO-YYYYMMDD-NNNN)</task>
+      <task id="3" ac="AC-3.6.3">TO CRUD Service - createTransferOrder(), updateTransferOrder(), deleteTransferOrder()</task>
+      <task id="4" ac="AC-3.6.4">API Routes - GET/POST/PUT/DELETE /api/planning/transfer-orders endpoints</task>
+      <task id="5" ac="AC-3.6.5">TO List Page - Table displaying TO Number, From WH, To WH, Status, Ship Date</task>
+      <task id="6" ac="AC-3.6.6">TO Form Modal - Modal for creating/editing TOs with from_wh, to_wh, dates</task>
+      <task id="7" ac="ALL">Unit & Integration Tests - TO CRUD tests, number generation tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-3.6.1">Given user has Warehouse role or higher, When navigate to /planning/transfer-orders, Then see table: TO Number, From WH, To WH, Status, Ship Date</criterion>
+    <criterion id="AC-3.6.2">When clicking "Add TO", Then modal opens with: from_warehouse_id (required), to_warehouse_id (required), planned_ship_date (required), planned_receive_date (required), notes (optional)</criterion>
+    <criterion id="AC-3.6.3">When saving TO, Then TO created with auto-generated to_number (TO-YYYYMMDD-NNNN) And status from configured default</criterion>
+    <criterion id="AC-3.6.4">API: POST /api/planning/transfer-orders - Request: { from_warehouse_id, to_warehouse_id, planned_ship_date, planned_receive_date, notes } - Response: { data: TransferOrder }</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-3-planning.md</path>
+        <title>Epic 3: Planning Operations</title>
+        <section>Story 3.6: Transfer Order CRUD</section>
+        <snippet>Create transfer orders between warehouses. transfer_orders table with to_number (auto-generated), from_warehouse_id, to_warehouse_id, planned_ship_date. Prerequisites: Story 1.5.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/planning/transfer-orders</path>
+        <kind>directory</kind>
+        <symbol>Transfer Orders API route</symbol>
+        <reason>Story requires route.ts for GET/POST/PUT/DELETE /api/planning/transfer-orders</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/transfer-order-service.ts</path>
+        <kind>file</kind>
+        <symbol>Transfer Order service layer</symbol>
+        <reason>Story requires createTransferOrder(), updateTransferOrder(), deleteTransferOrder()</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for TO CRUD" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Template A CRUD Pattern</constraint>
+    <constraint type="business">TO number generation - auto-generate TO-YYYYMMDD-NNNN</constraint>
+    <constraint type="testing">Test pyramid - 95% unit, 70% integration, 100% E2E</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/planning/transfer-orders</name>
+      <kind>API route</kind>
+      <signature>POST /api/planning/transfer-orders - Request: { from_warehouse_id, to_warehouse_id, planned_ship_date, planned_receive_date } - Response: { data: TransferOrder }</signature>
+      <path>app/api/planning/transfer-orders/route.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Test Pyramid: unit tests (95%), integration tests (70%), E2E tests (100%)</standards>
+    <locations>
+      <location>lib/services/__tests__/transfer-order-service.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-3.6.3">Unit test: createTransferOrder() - creates TO with auto-generated to_number</idea>
+    </ideas>
+  </tests>
+</story-context>

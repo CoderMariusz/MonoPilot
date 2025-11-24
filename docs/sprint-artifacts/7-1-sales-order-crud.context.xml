@@ -1,0 +1,166 @@
+<story-context id="7-1-sales-order-crud" v="1.0">
+  <metadata>
+    <epicId>7</epicId>
+    <storyId>1</storyId>
+    <title>Sales Order CRUD</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Template A - CRUD Pattern</template>
+    <estimatedTokens>5500</estimatedTokens>
+    <estimatedEffort>1 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Sales user</asA>
+    <iWant>to create and manage sales orders</iWant>
+    <soThat>customer orders are tracked</soThat>
+    <tasks>
+      <task id="1" ac="AC-7.1.1">Sales Orders Table Schema - sales_orders table with so_number, customer_id, ship_date, status</task>
+      <task id="2" ac="AC-7.1.2">SO Number Generation - Auto-generate so_number (SO-YYYYMMDD-NNNN)</task>
+      <task id="3" ac="AC-7.1.3">SO CRUD Service - createSalesOrder(), updateSalesOrder(), deleteSalesOrder() with validation</task>
+      <task id="4" ac="AC-7.1.4">API Routes - GET/POST/PUT/DELETE /api/shipping/sales-orders endpoints</task>
+      <task id="5" ac="AC-7.1.5">SO List Page - Table displaying SO Number, Customer, Status, Order Date, Total with filters</task>
+      <task id="6" ac="AC-7.1.6">SO Form Modal - Modal for creating/editing SOs with customer, dates, shipping info</task>
+      <task id="7" ac="AC-7.1.7">Validation - Zod schema for SO creation with required fields</task>
+      <task id="8" ac="ALL">Unit & Integration Tests - SO CRUD tests, number generation tests, API tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-7.1.1">Given user has Sales role or higher, When they navigate to /shipping/sales-orders, Then they see table with: SO Number, Customer, Status, Order Date, Total</criterion>
+    <criterion id="AC-7.1.2">When clicking "Add SO", Then modal opens with fields: customer_id (required, dropdown), order_date (default: today), requested_ship_date (required), shipping_address (from customer or override), payment_terms, shipping_method (optional)</criterion>
+    <criterion id="AC-7.1.3">When saving SO, Then SO created with auto-generated so_number (SO-YYYYMMDD-NNNN) And status = 'draft' And default order_date = today</criterion>
+    <criterion id="AC-7.1.4">SO status enum: draft (being created), confirmed (ready to pick), picking (pick in progress), picked (ready to pack), packed (ready to ship), shipped (sent to customer), delivered (confirmed delivery), cancelled (order cancelled)</criterion>
+    <criterion id="AC-7.1.5">API: POST /api/shipping/sales-orders - Request body: { customer_id: string, order_date?: date, requested_ship_date: date, shipping_address?: object, payment_terms?: string, shipping_method?: string } - Response: { data: SalesOrder } with status 201</criterion>
+    <criterion id="AC-7.1.6">Service validates customer exists and belongs to org before creating SO</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-7-shipping.md</path>
+        <title>Epic 7: Shipping & Order Fulfillment</title>
+        <section>Story 7.1: Sales Order CRUD</section>
+        <snippet>Create and manage sales orders. sales_orders table with so_number (auto-generated), customer_id, ship_date, status. Status: draft, confirmed, picking, picked, packed, shipped, delivered, cancelled. Prerequisites: Epic 1 (Customers table).</snippet>
+      </doc>
+      <doc>
+        <path>docs/TEMPLATE_LIBRARY_INDEX.md</path>
+        <title>Template Library Index</title>
+        <section>Template A: CRUD Pattern</section>
+        <snippet>Standard CRUD pattern: Component → API Route → Service Layer → Database. POST/GET/PUT/DELETE endpoints. Zod validation on client and server.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/shipping/sales-orders</path>
+        <kind>directory</kind>
+        <symbol>Sales Orders API route location</symbol>
+        <reason>Story requires creating route.ts for GET/POST/PUT/DELETE /api/shipping/sales-orders endpoints</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/sales-order-service.ts</path>
+        <kind>file</kind>
+        <symbol>Sales Order service layer</symbol>
+        <reason>Story requires createSalesOrder(), updateSalesOrder(), deleteSalesOrder() methods with customer validation</reason>
+      </artifact>
+      <artifact>
+        <path>lib/validation/sales-order-schemas.ts</path>
+        <kind>file</kind>
+        <symbol>Sales Order Zod schemas</symbol>
+        <reason>Story requires createSalesOrderSchema for validating SO creation input</reason>
+      </artifact>
+      <artifact>
+        <path>components/shipping/SalesOrdersTable.tsx</path>
+        <kind>component</kind>
+        <symbol>SalesOrdersTable</symbol>
+        <reason>Story requires table displaying SO Number, Customer, Status, Order Date, Total with filters</reason>
+      </artifact>
+      <artifact>
+        <path>components/shipping/SalesOrderFormModal.tsx</path>
+        <kind>component</kind>
+        <symbol>SalesOrderFormModal</symbol>
+        <reason>Story requires modal for creating/editing SOs with customer, dates, shipping info</reason>
+      </artifact>
+      <artifact>
+        <path>lib/utils/generate-so-number.ts</path>
+        <kind>utility</kind>
+        <symbol>SO number generation utility</symbol>
+        <reason>Story requires generateSONumber() function for auto-generating SO-YYYYMMDD-NNNN format</reason>
+      </artifact>
+      <artifact>
+        <path>app/shipping/sales-orders/page.tsx</path>
+        <kind>page</kind>
+        <symbol>Sales Orders List page</symbol>
+        <reason>Story requires page at /shipping/sales-orders with SO list table</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for sales order CRUD operations" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas for sales order creation/update" />
+        <package name="react-hook-form" version="^7.66.1" usage="Form state management for SO form modal" />
+        <package name="next" version="^15.1.4" usage="Next.js framework with App Router for API routes and pages" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Template A CRUD Pattern - Component → API Route → Service Layer → Database</constraint>
+    <constraint type="business">SO number generation - auto-generate SO-YYYYMMDD-NNNN with daily sequence reset per org</constraint>
+    <constraint type="business">Status initialization - new SOs created with status = 'draft'</constraint>
+    <constraint type="business">Multi-tenancy - all sales order operations scoped by org_id</constraint>
+    <constraint type="validation">Parent validation - validate customer exists and belongs to org before SO creation</constraint>
+    <constraint type="validation">Zod validation - required on BOTH client and server for SO input</constraint>
+    <constraint type="testing">Test pyramid - 95% unit coverage for SO service, 70% integration coverage, 100% E2E coverage</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/shipping/sales-orders</name>
+      <kind>API route</kind>
+      <signature>POST /api/shipping/sales-orders - Request body: { customer_id: string, order_date?: date, requested_ship_date: date, shipping_address?: object, payment_terms?: string, shipping_method?: string } - Response: { data: SalesOrder } or error 400</signature>
+      <path>app/api/shipping/sales-orders/route.ts</path>
+    </interface>
+    <interface>
+      <name>GET /api/shipping/sales-orders</name>
+      <kind>API route</kind>
+      <signature>GET /api/shipping/sales-orders?status=draft&customer_id=X - Response: { data: SalesOrder[] } - Supports filtering by status, customer, date range</signature>
+      <path>app/api/shipping/sales-orders/route.ts</path>
+    </interface>
+    <interface>
+      <name>createSalesOrder</name>
+      <kind>service function</kind>
+      <signature>async function createSalesOrder(input: CreateSalesOrderInput): Promise&lt;ServiceResult&lt;SalesOrder&gt;&gt; - Validates customer, generates so_number, creates SO with status='draft'</signature>
+      <path>lib/services/sales-order-service.ts</path>
+    </interface>
+    <interface>
+      <name>generateSONumber</name>
+      <kind>utility function</kind>
+      <signature>async function generateSONumber(orgId: string): Promise&lt;string&gt; - Generates unique SO number in format SO-YYYYMMDD-NNNN</signature>
+      <path>lib/utils/generate-so-number.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing strategy follows Test Pyramid: unit tests for sales order service (95% coverage), integration tests for API route (70% coverage), E2E tests for SO creation flow (100% user flows). Mock Supabase in unit tests.
+    </standards>
+    <locations>
+      <location>lib/services/__tests__/sales-order-service.test.ts (SO CRUD unit tests)</location>
+      <location>app/api/shipping/sales-orders/__tests__/route.test.ts (API route integration tests)</location>
+      <location>e2e/shipping/sales-order-crud.e2e.ts (SO CRUD flow E2E tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-7.1.6">Unit test: createSalesOrder() with invalid customer_id - returns error "Customer not found"</idea>
+      <idea ac="AC-7.1.3">Unit test: createSalesOrder() with valid input - creates SO with status='draft', auto-generated so_number</idea>
+      <idea ac="AC-7.1.2">Unit test: SO number generation follows SO-YYYYMMDD-NNNN format with daily sequence</idea>
+      <idea ac="AC-7.1.5">Integration test: POST /sales-orders with valid input - returns 201 with created SO</idea>
+      <idea ac="AC-7.1.5">Integration test: POST /sales-orders with missing required fields - returns 400 error</idea>
+      <idea ac="AC-7.1.1">E2E test: Navigate to /shipping/sales-orders, table displays SOs</idea>
+      <idea ac="AC-7.1.2">E2E test: Click "Add SO", modal opens, submit, SO created with draft status</idea>
+      <idea ac="AC-7.1.1">E2E test: Filter SOs by status, customer, date range</idea>
+    </ideas>
+  </tests>
+</story-context>

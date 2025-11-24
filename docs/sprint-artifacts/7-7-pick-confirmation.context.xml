@@ -1,0 +1,149 @@
+<story-context id="7-7-pick-confirmation" v="1.0">
+  <metadata>
+    <epicId>7</epicId>
+    <storyId>7</storyId>
+    <title>Pick Confirmation</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Custom</template>
+    <estimatedTokens>4000</estimatedTokens>
+    <estimatedEffort>1 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Picker</asA>
+    <iWant>to confirm picked LPs and update sales orders</iWant>
+    <soThat>fulfillment progress is tracked</soThat>
+    <tasks>
+      <task id="1" ac="AC-7.7.1">Pick Confirmation Service - confirmPick() with LP status update and SO line update</task>
+      <task id="2" ac="AC-7.7.2">LP Status Update - Update LP status from 'available' → 'reserved' when picked</task>
+      <task id="3" ac="AC-7.7.3">SO Line Picked Qty Update - Update so_line.picked_qty when pick confirmed</task>
+      <task id="4" ac="AC-7.7.4">SO Status Update - Auto-update SO status when all lines picked (picked_qty = ordered_qty for all lines)</task>
+      <task id="5" ac="AC-7.7.5">API Route - POST /api/shipping/pick-lists/:id/confirm endpoint</task>
+      <task id="6" ac="AC-7.7.6">Pick Confirmation UI - Scanner workflow for confirming picks with LP scan validation</task>
+      <task id="7" ac="AC-7.7.7">Short Pick Handling - Allow marking picks as 'short' with reason and actual_picked_qty</task>
+      <task id="8" ac="ALL">Unit & Integration Tests - Pick confirmation tests, status update tests, short pick tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-7.7.1">Given picker confirms pick, When LP is picked, Then pick_list_item.picked_qty updated And pick_list_item.status → 'picked' And so_line.picked_qty updated</criterion>
+    <criterion id="AC-7.7.2">When pick confirmed, Then LP status updated: 'available' → 'reserved' for picked LPs (to prevent double-picking)</criterion>
+    <criterion id="AC-7.7.3">When picked_qty = ordered_qty for SO line, Then so_line.status → 'picked'</criterion>
+    <criterion id="AC-7.7.4">When all SO lines have status = 'picked', Then SO.status → 'picked' (ready for packing)</criterion>
+    <criterion id="AC-7.7.5">API: POST /api/shipping/pick-lists/:id/confirm - Request body: { pick_list_item_id: string, lp_id: string, picked_qty: number, is_short?: boolean, short_reason?: string } - Response: { data: PickListItem } with status 200</criterion>
+    <criterion id="AC-7.7.6">Short pick handling: When LP qty < required, picker can mark as 'short', enter actual_picked_qty, short_reason (Out of Stock, Damaged, Wrong Product, Other), notes; Then pick_list_item.status → 'short' And short recorded in pick_shorts table</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-7-shipping.md</path>
+        <title>Epic 7: Shipping & Order Fulfillment</title>
+        <section>Story 7.13: Update SO Picked Quantity</section>
+        <snippet>Update SO with picked qty. When LP picked, so_line.picked_qty updated. When picked_qty = ordered_qty, so_line.status → picked. When all lines picked, SO.status → picked. Prerequisites: Story 7.9.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-7-shipping.md</path>
+        <title>Epic 7: Shipping & Order Fulfillment</title>
+        <section>Story 7.12: Handle Pick Shorts</section>
+        <snippet>Handle short picks. When LP qty < required, mark as 'short', enter actual_picked_qty, short_reason, notes. SO line updated with picked qty. Short recorded for follow-up. Prerequisites: Story 7.9.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/shipping/pick-lists/[id]/confirm</path>
+        <kind>directory</kind>
+        <symbol>Pick Confirmation API route location</symbol>
+        <reason>Story requires creating route.ts for POST /api/shipping/pick-lists/:id/confirm endpoint</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/pick-confirmation-service.ts</path>
+        <kind>file</kind>
+        <symbol>Pick Confirmation service layer</symbol>
+        <reason>Story requires confirmPick() method with LP status update, SO line update, and SO status update</reason>
+      </artifact>
+      <artifact>
+        <path>lib/validation/pick-confirmation-schemas.ts</path>
+        <kind>file</kind>
+        <symbol>Pick Confirmation Zod schemas</symbol>
+        <reason>Story requires confirmPickSchema for validating pick confirmation input</reason>
+      </artifact>
+      <artifact>
+        <path>components/shipping/PickConfirmationModal.tsx</path>
+        <kind>component</kind>
+        <symbol>PickConfirmationModal</symbol>
+        <reason>Story requires modal/scanner UI for confirming picks with LP scan validation</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/sales-order-service.ts</path>
+        <kind>file</kind>
+        <symbol>Sales Order service</symbol>
+        <reason>Story requires updateSOStatus() method to auto-update SO status when all lines picked</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for pick confirmation and status updates" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas for pick confirmation input" />
+        <package name="next" version="^15.1.4" usage="Next.js framework with App Router for API routes" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="business">LP status update - picked LPs status updated from 'available' → 'reserved' to prevent double-picking</constraint>
+    <constraint type="business">SO line status - when picked_qty = ordered_qty, so_line.status → 'picked'</constraint>
+    <constraint type="business">SO status - when all lines picked, SO.status → 'picked' (ready for packing)</constraint>
+    <constraint type="business">Short pick handling - allow marking picks as 'short' with mandatory reason and actual_picked_qty</constraint>
+    <constraint type="business">Multi-tenancy - all pick confirmation operations scoped by org_id</constraint>
+    <constraint type="validation">LP validation - validate LP exists, belongs to org, qa_status = 'passed', status = 'available'</constraint>
+    <constraint type="testing">Test pyramid - 95% unit coverage for pick confirmation service, 70% integration coverage, 100% E2E coverage</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/shipping/pick-lists/:id/confirm</name>
+      <kind>API route</kind>
+      <signature>POST /api/shipping/pick-lists/{id}/confirm - Request body: { pick_list_item_id: string, lp_id: string, picked_qty: number, is_short?: boolean, short_reason?: string } - Response: { data: PickListItem } or error 400</signature>
+      <path>app/api/shipping/pick-lists/[id]/confirm/route.ts</path>
+    </interface>
+    <interface>
+      <name>confirmPick</name>
+      <kind>service function</kind>
+      <signature>async function confirmPick(input: ConfirmPickInput): Promise&lt;ServiceResult&lt;PickListItem&gt;&gt; - Updates pick_list_item, LP status, so_line.picked_qty, SO status if all picked</signature>
+      <path>lib/services/pick-confirmation-service.ts</path>
+    </interface>
+    <interface>
+      <name>updateSOStatus</name>
+      <kind>service function</kind>
+      <signature>async function updateSOStatus(soId: string): Promise&lt;ServiceResult&gt; - Checks if all lines picked, updates SO.status → 'picked' if complete</signature>
+      <path>lib/services/sales-order-service.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing strategy follows Test Pyramid: unit tests for pick confirmation service (95% coverage), integration tests for API route (70% coverage), E2E tests for pick confirmation flow (100% user flows). Mock Supabase in unit tests.
+    </standards>
+    <locations>
+      <location>lib/services/__tests__/pick-confirmation-service.test.ts (Pick confirmation unit tests)</location>
+      <location>app/api/shipping/pick-lists/[id]/confirm/__tests__/route.test.ts (API route integration tests)</location>
+      <location>e2e/shipping/pick-confirmation.e2e.ts (Pick confirmation E2E tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-7.7.1">Unit test: confirmPick() with valid LP - updates pick_list_item, LP status, so_line.picked_qty</idea>
+      <idea ac="AC-7.7.2">Unit test: confirmPick() - updates LP status from 'available' → 'reserved'</idea>
+      <idea ac="AC-7.7.3">Unit test: confirmPick() with picked_qty = ordered_qty - updates so_line.status → 'picked'</idea>
+      <idea ac="AC-7.7.4">Unit test: confirmPick() when all lines picked - updates SO.status → 'picked'</idea>
+      <idea ac="AC-7.7.6">Unit test: confirmPick() with is_short = true - creates pick_short record with reason</idea>
+      <idea ac="AC-7.7.5">Integration test: POST /confirm with valid pick - returns 200 with updated pick_list_item</idea>
+      <idea ac="AC-7.7.5">Integration test: POST /confirm with invalid LP - returns 400 error</idea>
+      <idea ac="AC-7.7.1">E2E test: Scan LP on pick list, confirm pick, picked_qty updated</idea>
+      <idea ac="AC-7.7.6">E2E test: Mark pick as short, enter reason, short recorded</idea>
+      <idea ac="AC-7.7.4">E2E test: Confirm all picks on SO, SO status → 'picked'</idea>
+    </ideas>
+  </tests>
+</story-context>

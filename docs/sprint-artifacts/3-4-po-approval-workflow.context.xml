@@ -1,0 +1,98 @@
+<story-context id="3-4-po-approval-workflow" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>4</storyId>
+    <title>PO Approval Workflow</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Custom</template>
+    <estimatedTokens>5000</estimatedTokens>
+    <estimatedEffort>1.5 days</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Manager</asA>
+    <iWant>to approve POs before sending to suppliers</iWant>
+    <soThat>we have control over spending</soThat>
+    <tasks>
+      <task id="1" ac="AC-3.4.1">Approvals Table Schema - approvals table with po_id, approval_status, approved_by, approved_at, rejection_reason</task>
+      <task id="2" ac="AC-3.4.2">Approval Service - approvePO(), rejectPO() with role-based authorization (only Manager/Admin)</task>
+      <task id="3" ac="AC-3.4.3">API Routes - PUT /api/planning/purchase-orders/:id/approve, PUT /api/planning/purchase-orders/:id/reject endpoints</task>
+      <task id="4" ac="AC-3.4.4">Approval UI - Approve/Reject buttons on PO detail page with rejection reason modal</task>
+      <task id="5" ac="AC-3.4.5">Settings Integration - Toggle in planning_settings.po_require_approval</task>
+      <task id="6" ac="ALL">Unit & Integration Tests - Approval workflow tests, role-based authorization tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-3.4.1">Given approval enabled in Settings (planning_settings.po_require_approval = true), When PO is submitted, Then approval_status → 'pending'</criterion>
+    <criterion id="AC-3.4.2">Given Manager reviews pending PO, When clicking Approve, Then approval_status → 'approved' And approved_by/approved_at recorded</criterion>
+    <criterion id="AC-3.4.3">When clicking Reject, Then rejection requires reason (mandatory) And approval_status → 'rejected' And rejection_reason recorded</criterion>
+    <criterion id="AC-3.4.4">Only Admin/Manager roles can approve/reject POs (role-based authorization)</criterion>
+    <criterion id="AC-3.4.5">API: PUT /api/planning/purchase-orders/:id/approve - Request: {} - Response: { data: PurchaseOrder with approval_status='approved' }</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-3-planning.md</path>
+        <title>Epic 3: Planning Operations</title>
+        <section>Story 3.4: PO Approval Workflow</section>
+        <snippet>Approve POs before sending to suppliers. approvals table. approval_status: pending/approved/rejected. approved_by/approved_at recorded. Rejection requires reason. Only Admin/Manager can approve. Toggle: planning_settings.po_require_approval. Prerequisites: Story 3.1.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/planning/purchase-orders/[id]/approve</path>
+        <kind>directory</kind>
+        <symbol>PO Approval API route</symbol>
+        <reason>Story requires route.ts for PUT /api/planning/purchase-orders/:id/approve</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/po-approval-service.ts</path>
+        <kind>file</kind>
+        <symbol>PO Approval service layer</symbol>
+        <reason>Story requires approvePO(), rejectPO() with role-based authorization</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for approval workflow" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="business">Role-based authorization - only Manager/Admin can approve/reject</constraint>
+    <constraint type="business">Rejection requires mandatory reason</constraint>
+    <constraint type="testing">Test pyramid - 95% unit, 70% integration, 100% E2E</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>PUT /api/planning/purchase-orders/:id/approve</name>
+      <kind>API route</kind>
+      <signature>PUT /api/planning/purchase-orders/{po_id}/approve - Response: { data: PurchaseOrder with approval_status='approved' }</signature>
+      <path>app/api/planning/purchase-orders/[id]/approve/route.ts</path>
+    </interface>
+    <interface>
+      <name>PUT /api/planning/purchase-orders/:id/reject</name>
+      <kind>API route</kind>
+      <signature>PUT /api/planning/purchase-orders/{po_id}/reject - Request: { rejection_reason: string } - Response: { data: PurchaseOrder with approval_status='rejected' }</signature>
+      <path>app/api/planning/purchase-orders/[id]/reject/route.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Test Pyramid: unit tests (95%), integration tests (70%), E2E tests (100%)</standards>
+    <locations>
+      <location>lib/services/__tests__/po-approval-service.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-3.4.4">Unit test: approvePO() by non-Manager role - returns error "Unauthorized"</idea>
+      <idea ac="AC-3.4.3">Unit test: rejectPO() without rejection_reason - returns error "Rejection reason required"</idea>
+    </ideas>
+  </tests>
+</story-context>

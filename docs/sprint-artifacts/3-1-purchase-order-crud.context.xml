@@ -1,0 +1,169 @@
+<story-context id="3-1-purchase-order-crud" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>1</storyId>
+    <title>Purchase Order CRUD</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Template A - CRUD Pattern</template>
+    <estimatedTokens>5500</estimatedTokens>
+    <estimatedEffort>1 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Purchasing user</asA>
+    <iWant>to create, edit, and view purchase orders</iWant>
+    <soThat>I can manage procurement</soThat>
+    <tasks>
+      <task id="1" ac="AC-3.1.1">Purchase Orders Table Schema - purchase_orders table with po_number, supplier_id, warehouse_id, status</task>
+      <task id="2" ac="AC-3.1.2">PO Number Generation - Auto-generate po_number (PO-YYYYMMDD-NNNN)</task>
+      <task id="3" ac="AC-3.1.3">PO CRUD Service - createPurchaseOrder(), updatePurchaseOrder(), deletePurchaseOrder() with validation</task>
+      <task id="4" ac="AC-3.1.4">Currency/Tax Inheritance - Inherit currency and tax_code from supplier</task>
+      <task id="5" ac="AC-3.1.5">API Routes - GET/POST/PUT/DELETE /api/planning/purchase-orders endpoints</task>
+      <task id="6" ac="AC-3.1.6">PO List Page - Table displaying PO Number, Supplier, Status, Expected Date, Total with filters</task>
+      <task id="7" ac="AC-3.1.7">PO Form Modal - Modal for creating/editing POs with supplier, warehouse, delivery date</task>
+      <task id="8" ac="ALL">Unit & Integration Tests - PO CRUD tests, number generation tests, inheritance tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-3.1.1">Given user has Purchasing role or higher, When they navigate to /planning/purchase-orders, Then they see table with: PO Number, Supplier, Status, Expected Date, Total</criterion>
+    <criterion id="AC-3.1.2">When clicking "Add PO", Then modal opens with fields: supplier_id (required, inherits currency + tax_code), warehouse_id (required), expected_delivery_date (required), payment_terms, shipping_method, notes (optional based on Settings)</criterion>
+    <criterion id="AC-3.1.3">When saving PO, Then PO created with auto-generated po_number (PO-YYYYMMDD-NNNN) And status from configured default (typically 'draft')</criterion>
+    <criterion id="AC-3.1.4">Currency and tax_code inherited from supplier: When supplier selected, PO.currency = supplier.currency And PO.tax_code_id = supplier.tax_code_id</criterion>
+    <criterion id="AC-3.1.5">API: POST /api/planning/purchase-orders - Request body: { supplier_id: string, warehouse_id: string, expected_delivery_date: date, payment_terms?: string, shipping_method?: string, notes?: string } - Response: { data: PurchaseOrder } with status 201</criterion>
+    <criterion id="AC-3.1.6">Service validates: supplier exists and belongs to org, warehouse exists and belongs to org, expected_delivery_date not in past</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-3-planning.md</path>
+        <title>Epic 3: Planning Operations</title>
+        <section>Story 3.1: Purchase Order CRUD</section>
+        <snippet>Create, edit, and view purchase orders. purchase_orders table with po_number (auto-generated), supplier_id, warehouse_id, status. Currency/tax inherited from supplier. Prerequisites: Epic 1, Epic 2.</snippet>
+      </doc>
+      <doc>
+        <path>docs/TEMPLATE_LIBRARY_INDEX.md</path>
+        <title>Template Library Index</title>
+        <section>Template A: CRUD Pattern</section>
+        <snippet>Standard CRUD pattern: Component → API Route → Service Layer → Database. POST/GET/PUT/DELETE endpoints. Zod validation on client and server.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/planning/purchase-orders</path>
+        <kind>directory</kind>
+        <symbol>Purchase Orders API route location</symbol>
+        <reason>Story requires creating route.ts for GET/POST/PUT/DELETE /api/planning/purchase-orders endpoints</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/purchase-order-service.ts</path>
+        <kind>file</kind>
+        <symbol>Purchase Order service layer</symbol>
+        <reason>Story requires createPurchaseOrder(), updatePurchaseOrder(), deletePurchaseOrder() methods with supplier/warehouse validation</reason>
+      </artifact>
+      <artifact>
+        <path>lib/validation/purchase-order-schemas.ts</path>
+        <kind>file</kind>
+        <symbol>Purchase Order Zod schemas</symbol>
+        <reason>Story requires createPurchaseOrderSchema for validating PO creation input</reason>
+      </artifact>
+      <artifact>
+        <path>components/planning/PurchaseOrdersTable.tsx</path>
+        <kind>component</kind>
+        <symbol>PurchaseOrdersTable</symbol>
+        <reason>Story requires table displaying PO Number, Supplier, Status, Expected Date, Total with filters</reason>
+      </artifact>
+      <artifact>
+        <path>components/planning/PurchaseOrderFormModal.tsx</path>
+        <kind>component</kind>
+        <symbol>PurchaseOrderFormModal</symbol>
+        <reason>Story requires modal for creating/editing POs with supplier, warehouse, delivery date</reason>
+      </artifact>
+      <artifact>
+        <path>lib/utils/generate-po-number.ts</path>
+        <kind>utility</kind>
+        <symbol>PO number generation utility</symbol>
+        <reason>Story requires generatePONumber() function for auto-generating PO-YYYYMMDD-NNNN format</reason>
+      </artifact>
+      <artifact>
+        <path>app/planning/purchase-orders/page.tsx</path>
+        <kind>page</kind>
+        <symbol>Purchase Orders List page</symbol>
+        <reason>Story requires page at /planning/purchase-orders with PO list table</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for purchase order CRUD operations" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas for purchase order creation/update" />
+        <package name="react-hook-form" version="^7.66.1" usage="Form state management for PO form modal" />
+        <package name="next" version="^15.1.4" usage="Next.js framework with App Router for API routes and pages" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Template A CRUD Pattern - Component → API Route → Service Layer → Database</constraint>
+    <constraint type="business">PO number generation - auto-generate PO-YYYYMMDD-NNNN with daily sequence reset per org</constraint>
+    <constraint type="business">Currency/tax inheritance - PO inherits currency and tax_code from supplier automatically</constraint>
+    <constraint type="business">Status initialization - new POs created with status from configured default (typically 'draft')</constraint>
+    <constraint type="business">Multi-tenancy - all purchase order operations scoped by org_id</constraint>
+    <constraint type="validation">Parent validation - validate supplier and warehouse exist and belong to org before PO creation</constraint>
+    <constraint type="validation">Zod validation - required on BOTH client and server for PO input</constraint>
+    <constraint type="testing">Test pyramid - 95% unit coverage for PO service, 70% integration coverage, 100% E2E coverage</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/planning/purchase-orders</name>
+      <kind>API route</kind>
+      <signature>POST /api/planning/purchase-orders - Request body: { supplier_id: string, warehouse_id: string, expected_delivery_date: date, payment_terms?: string, shipping_method?: string, notes?: string } - Response: { data: PurchaseOrder } or error 400</signature>
+      <path>app/api/planning/purchase-orders/route.ts</path>
+    </interface>
+    <interface>
+      <name>GET /api/planning/purchase-orders</name>
+      <kind>API route</kind>
+      <signature>GET /api/planning/purchase-orders?status=draft&supplier_id=X - Response: { data: PurchaseOrder[] } - Supports filtering by status, supplier, date range</signature>
+      <path>app/api/planning/purchase-orders/route.ts</path>
+    </interface>
+    <interface>
+      <name>createPurchaseOrder</name>
+      <kind>service function</kind>
+      <signature>async function createPurchaseOrder(input: CreatePurchaseOrderInput): Promise&lt;ServiceResult&lt;PurchaseOrder&gt;&gt; - Validates supplier and warehouse, generates po_number, inherits currency/tax, creates PO with status='draft'</signature>
+      <path>lib/services/purchase-order-service.ts</path>
+    </interface>
+    <interface>
+      <name>generatePONumber</name>
+      <kind>utility function</kind>
+      <signature>async function generatePONumber(orgId: string): Promise&lt;string&gt; - Generates unique PO number in format PO-YYYYMMDD-NNNN</signature>
+      <path>lib/utils/generate-po-number.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing strategy follows Test Pyramid: unit tests for purchase order service (95% coverage), integration tests for API route (70% coverage), E2E tests for PO creation flow (100% user flows). Mock Supabase in unit tests.
+    </standards>
+    <locations>
+      <location>lib/services/__tests__/purchase-order-service.test.ts (PO CRUD unit tests)</location>
+      <location>app/api/planning/purchase-orders/__tests__/route.test.ts (API route integration tests)</location>
+      <location>e2e/planning/purchase-order-crud.e2e.ts (PO CRUD flow E2E tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-3.1.6">Unit test: createPurchaseOrder() with invalid supplier_id - returns error "Supplier not found"</idea>
+      <idea ac="AC-3.1.6">Unit test: createPurchaseOrder() with invalid warehouse_id - returns error "Warehouse not found"</idea>
+      <idea ac="AC-3.1.3">Unit test: createPurchaseOrder() with valid input - creates PO with status='draft', auto-generated po_number</idea>
+      <idea ac="AC-3.1.4">Unit test: createPurchaseOrder() - inherits currency and tax_code from supplier</idea>
+      <idea ac="AC-3.1.2">Unit test: PO number generation follows PO-YYYYMMDD-NNNN format with daily sequence</idea>
+      <idea ac="AC-3.1.5">Integration test: POST /purchase-orders with valid input - returns 201 with created PO</idea>
+      <idea ac="AC-3.1.5">Integration test: POST /purchase-orders with missing required fields - returns 400 error</idea>
+      <idea ac="AC-3.1.1">E2E test: Navigate to /planning/purchase-orders, table displays POs</idea>
+      <idea ac="AC-3.1.2">E2E test: Click "Add PO", modal opens, submit, PO created with draft status</idea>
+      <idea ac="AC-3.1.1">E2E test: Filter POs by status, supplier, date range</idea>
+    </ideas>
+  </tests>
+</story-context>

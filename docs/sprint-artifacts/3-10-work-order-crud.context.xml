@@ -1,0 +1,118 @@
+<story-context id="3-10-work-order-crud" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>10</storyId>
+    <title>Work Order CRUD</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Template A - CRUD Pattern</template>
+    <estimatedTokens>5500</estimatedTokens>
+    <estimatedEffort>1.5 days</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Planner</asA>
+    <iWant>to create work orders</iWant>
+    <soThat>I can schedule production</soThat>
+    <tasks>
+      <task id="1" ac="AC-3.10.1">Work Orders Table Schema - work_orders table with wo_number, product_id, bom_id, quantity, scheduled_date</task>
+      <task id="2" ac="AC-3.10.2">WO Number Generation - Auto-generate wo_number (WO-YYYYMMDD-NNNN)</task>
+      <task id="3" ac="AC-3.10.3">BOM Auto-Selection - Auto-select BOM based on scheduled_date and effective dates</task>
+      <task id="4" ac="AC-3.10.4">BOM Snapshot Creation - Copy BOM items to wo_materials at WO creation (immutable)</task>
+      <task id="5" ac="AC-3.10.5">WO CRUD Service - createWorkOrder(), updateWorkOrder(), deleteWorkOrder()</task>
+      <task id="6" ac="AC-3.10.6">API Routes - GET/POST/PUT/DELETE /api/planning/work-orders endpoints</task>
+      <task id="7" ac="AC-3.10.7">WO List Page - Table displaying WO Number, Product, Qty, Status, Scheduled Date, Line</task>
+      <task id="8" ac="AC-3.10.8">WO Form Modal - Modal for creating/editing WOs with product, qty, scheduled_date, line, machine, priority</task>
+      <task id="9" ac="ALL">Unit & Integration Tests - WO CRUD tests, BOM auto-selection tests, snapshot tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-3.10.1">Given user has Planner role or higher, When navigate to /planning/work-orders, Then see table: WO Number, Product, Qty, Status, Scheduled Date, Line</criterion>
+    <criterion id="AC-3.10.2">When clicking "Add WO", Then modal opens with: product_id (required), quantity (required), scheduled_date (required, triggers BOM selection), line_id (optional), machine_id (optional), priority (Low/Medium/High/Critical)</criterion>
+    <criterion id="AC-3.10.3">When saving WO, Then WO created with auto-generated wo_number (WO-YYYYMMDD-NNNN) And BOM auto-selected based on scheduled_date (effective_from <= date <= effective_to) And BOM snapshot created in wo_materials table</criterion>
+    <criterion id="AC-3.10.4">BOM snapshot: All bom_items copied to wo_materials with quantities scaled to WO qty: wo_material.qty = bom_item.qty × (wo.qty / bom.output_qty). Snapshot immutable after WO is released.</criterion>
+    <criterion id="AC-3.10.5">API: POST /api/planning/work-orders - Request: { product_id, quantity, scheduled_date, line_id?, machine_id?, priority? } - Response: { data: WorkOrder with materials[] } with status 201</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-3-planning.md</path>
+        <title>Epic 3: Planning Operations</title>
+        <section>Story 3.10: Work Order CRUD</section>
+        <snippet>Create work orders. work_orders table with wo_number (auto-generated), product_id, bom_id, quantity, scheduled_date. BOM auto-selection based on scheduled_date. BOM snapshot in wo_materials. Prerequisites: Epic 2.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-3-planning.md</path>
+        <title>Epic 3: Planning Operations</title>
+        <section>Story 3.12: WO Materials Snapshot</section>
+        <snippet>WO captures BOM at creation time. All BOM items copied to wo_materials: product_id, quantity (scaled), uom, scrap_percent, consume_whole_lp, is_by_product, yield_percent. wo_materials cannot change after WO is released.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/planning/work-orders</path>
+        <kind>directory</kind>
+        <symbol>Work Orders API route</symbol>
+        <reason>Story requires route.ts for GET/POST/PUT/DELETE /api/planning/work-orders</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/work-order-service.ts</path>
+        <kind>file</kind>
+        <symbol>Work Order service layer</symbol>
+        <reason>Story requires createWorkOrder() with BOM auto-selection and snapshot creation</reason>
+      </artifact>
+      <artifact>
+        <path>lib/utils/select-active-bom.ts</path>
+        <kind>utility</kind>
+        <symbol>BOM auto-selection utility</symbol>
+        <reason>Story requires selectActiveBOM() for auto-selecting BOM based on scheduled_date</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for WO CRUD and BOM snapshot" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Template A CRUD Pattern</constraint>
+    <constraint type="business">WO number generation - auto-generate WO-YYYYMMDD-NNNN</constraint>
+    <constraint type="business">BOM auto-selection - SELECT * FROM boms WHERE product_id = X AND status = 'active' AND effective_from <= date AND (effective_to IS NULL OR effective_to >= date)</constraint>
+    <constraint type="business">BOM snapshot immutability - wo_materials table cannot change after WO status = 'released' (Sprint 0 Gap 3)</constraint>
+    <constraint type="testing">Test pyramid - 95% unit, 70% integration, 100% E2E</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/planning/work-orders</name>
+      <kind>API route</kind>
+      <signature>POST /api/planning/work-orders - Request: { product_id, quantity, scheduled_date, line_id?, machine_id?, priority? } - Response: { data: WorkOrder with materials[] }</signature>
+      <path>app/api/planning/work-orders/route.ts</path>
+    </interface>
+    <interface>
+      <name>selectActiveBOM</name>
+      <kind>utility function</kind>
+      <signature>async function selectActiveBOM(productId: string, scheduledDate: Date): Promise&lt;BOM | null&gt; - Auto-selects active BOM based on effective dates</signature>
+      <path>lib/utils/select-active-bom.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Test Pyramid: unit tests (95%), integration tests (70%), E2E tests (100%)</standards>
+    <locations>
+      <location>lib/services/__tests__/work-order-service.test.ts</location>
+      <location>lib/utils/__tests__/select-active-bom.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-3.10.3">Unit test: selectActiveBOM() - selects BOM with effective_from <= date <= effective_to</idea>
+      <idea ac="AC-3.10.4">Unit test: createWorkOrder() - creates BOM snapshot in wo_materials with scaled quantities</idea>
+      <idea ac="AC-3.10.3">Unit test: createWorkOrder() with no active BOM - returns error "No active BOM for this date"</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,150 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/5-2-lp-status-tracking" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>2</storyId>
+    <title>LP Status Tracking</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/epics/epic-5-warehouse.md</sourceStoryPath>
+    <template>Custom</template>
+    <estimatedTokens>3500</estimatedTokens>
+    <estimatedEffort>0.5 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Warehouse user</asA>
+    <iWant>to track LP status</iWant>
+    <soThat>I know availability and usage state</soThat>
+    <tasks>
+      <task id="1" ac="AC-5.2.1">LP Status Enum - Define status enum: available, reserved, consumed, quarantine, shipped</task>
+      <task id="2" ac="AC-5.2.2">Status Change Service - updateLPStatus() with validation and audit trail</task>
+      <task id="3" ac="AC-5.2.3">Status History Tracking - Record status changes with timestamp and user</task>
+      <task id="4" ac="AC-5.2.4">Status Validation - Validate allowed status transitions (business rules)</task>
+      <task id="5" ac="AC-5.2.5">UI Status Badge - Display color-coded status badges (green/yellow/red/gray/blue)</task>
+      <task id="6" ac="AC-5.2.6">Status Affects Availability - Filter available LPs (status = 'available') in pick/consume operations</task>
+      <task id="7" ac="ALL">Unit & Integration Tests - Status transition tests, validation tests, audit trail tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-5.2.1">Given LP exists, Then has status enum: 'available' (can be consumed/shipped), 'reserved' (reserved for WO/TO), 'consumed' (fully consumed), 'quarantine' (quality hold), 'shipped' (sent out)</criterion>
+    <criterion id="AC-5.2.2">When status changes, Then timestamp and user recorded in lp_status_history table with old_status, new_status, changed_at, changed_by, reason (optional)</criterion>
+    <criterion id="AC-5.2.3">Status transition validation: available → reserved/consumed/quarantine/shipped allowed, reserved → available/consumed/shipped allowed, consumed/shipped → no transitions (terminal states), quarantine → available/consumed allowed (after QC release)</criterion>
+    <criterion id="AC-5.2.4">UI displays status with color-coded badges: available (green), reserved (yellow), consumed (gray), quarantine (red), shipped (blue)</criterion>
+    <criterion id="AC-5.2.5">Status affects availability queries: only LPs with status = 'available' shown in LP selection for WO consumption, TO picking, shipment operations</criterion>
+    <criterion id="AC-5.2.6">API: PUT /api/warehouse/license-plates/:id/status - Request body: { status: string, reason?: string } - Response: { data: LicensePlate } or error 400</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-5-warehouse.md</path>
+        <title>Epic 5: Warehouse & Scanner</title>
+        <section>Story 5.2: LP Status Tracking</section>
+        <snippet>Track LP status: available, reserved, consumed, quarantine, shipped. Record timestamp and user on status changes. Status affects availability queries (only 'available' LPs shown for operations). Prerequisites: Story 5.1 (LP Creation).</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture/patterns/api.md</path>
+        <title>API Architecture</title>
+        <section>Error Handling</section>
+        <snippet>Structured error responses with type, title, status, detail. APIError class with toProblemDetails() method.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/warehouse/license-plates/[id]/status</path>
+        <kind>directory</kind>
+        <symbol>LP Status Update API route location</symbol>
+        <reason>Story requires creating route.ts for PUT /api/warehouse/license-plates/:id/status endpoint</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/license-plate-service.ts</path>
+        <kind>file</kind>
+        <symbol>License Plate service</symbol>
+        <reason>Story requires updateLPStatus() method with validation, transition rules, audit trail</reason>
+      </artifact>
+      <artifact>
+        <path>lib/validation/license-plate-schemas.ts</path>
+        <kind>file</kind>
+        <symbol>LP Zod schemas</symbol>
+        <reason>Story requires updateLPStatusSchema for validating status change requests</reason>
+      </artifact>
+      <artifact>
+        <path>components/warehouse/LPStatusBadge.tsx</path>
+        <kind>component</kind>
+        <symbol>LPStatusBadge</symbol>
+        <reason>Story requires status badge component with color coding (green/yellow/red/gray/blue)</reason>
+      </artifact>
+      <artifact>
+        <path>lib/types/lp-status.ts</path>
+        <kind>file</kind>
+        <symbol>LP status types</symbol>
+        <reason>Story requires LPStatus enum type and transition validation logic</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for LP status updates and history recording" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas for status change requests" />
+        <package name="next" version="^15.1.4" usage="Next.js framework with App Router for API routes" />
+        <package name="react" version="^19.0.0" usage="React 19 for UI components (status badge)" />
+        <package name="clsx" version="^2.1.1" usage="Utility for conditional className construction for status badges" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="business">Status enum - available, reserved, consumed, quarantine, shipped (5 states)</constraint>
+    <constraint type="business">Transition validation - enforce allowed transitions (available → reserved/consumed/quarantine/shipped, reserved → available/consumed/shipped, quarantine → available/consumed, consumed/shipped are terminal)</constraint>
+    <constraint type="business">Audit trail - record all status changes in lp_status_history with timestamp, user, reason</constraint>
+    <constraint type="business">Availability filtering - only status = 'available' LPs shown in pick/consume operations</constraint>
+    <constraint type="validation">Zod validation - status must be valid enum value</constraint>
+    <constraint type="ux">Color coding - available (green), reserved (yellow), consumed (gray), quarantine (red), shipped (blue)</constraint>
+    <constraint type="testing">Test pyramid - 95% unit coverage for status transitions, 70% integration coverage, 100% E2E coverage</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>PUT /api/warehouse/license-plates/:id/status</name>
+      <kind>API route</kind>
+      <signature>PUT /api/warehouse/license-plates/{lp_id}/status - Request body: { status: 'available'|'reserved'|'consumed'|'quarantine'|'shipped', reason?: string } - Response: { data: LicensePlate } or error 400</signature>
+      <path>app/api/warehouse/license-plates/[id]/status/route.ts</path>
+    </interface>
+    <interface>
+      <name>updateLPStatus</name>
+      <kind>service function</kind>
+      <signature>async function updateLPStatus(lpId: string, newStatus: LPStatus, reason?: string): Promise&lt;ServiceResult&lt;LicensePlate&gt;&gt; - Validates transition, updates status, records history</signature>
+      <path>lib/services/license-plate-service.ts</path>
+    </interface>
+    <interface>
+      <name>LPStatusBadge</name>
+      <kind>React component</kind>
+      <signature>LPStatusBadge: FC&lt;{ status: LPStatus }&gt; - Displays color-coded status badge with icon</signature>
+      <path>components/warehouse/LPStatusBadge.tsx</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing strategy follows Test Pyramid: unit tests for status transition validation (95% coverage), integration tests for API route (70% coverage), E2E tests for status change flow (100% user flows). Mock Supabase in unit tests.
+    </standards>
+    <locations>
+      <location>lib/services/__tests__/license-plate-service.test.ts (updateLPStatus unit tests)</location>
+      <location>app/api/warehouse/license-plates/[id]/status/__tests__/route.test.ts (API route integration tests)</location>
+      <location>e2e/warehouse/lp-status-change.e2e.ts (Status change flow E2E tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-5.2.3">Unit test: updateLPStatus() from available → reserved - allowed, history recorded</idea>
+      <idea ac="AC-5.2.3">Unit test: updateLPStatus() from consumed → available - blocked with error "Invalid transition"</idea>
+      <idea ac="AC-5.2.3">Unit test: updateLPStatus() from quarantine → available - allowed (QC release)</idea>
+      <idea ac="AC-5.2.2">Unit test: Status change creates lp_status_history record with timestamp, user, reason</idea>
+      <idea ac="AC-5.2.6">Integration test: PUT /status with valid transition - returns 200 with updated LP</idea>
+      <idea ac="AC-5.2.6">Integration test: PUT /status with invalid transition - returns 400 error</idea>
+      <idea ac="AC-5.2.4">E2E test: LP detail page displays status badge with correct color</idea>
+      <idea ac="AC-5.2.5">E2E test: LP selection for WO consumption shows only 'available' LPs</idea>
+    </ideas>
+  </tests>
+</story-context>

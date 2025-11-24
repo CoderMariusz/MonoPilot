@@ -1,0 +1,90 @@
+<story-context id="3-17-supplier-management" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>17</storyId>
+    <title>Supplier Management</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Template A - CRUD Pattern</template>
+    <estimatedTokens>5000</estimatedTokens>
+    <estimatedEffort>1 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Purchasing user</asA>
+    <iWant>to manage suppliers with defaults</iWant>
+    <soThat>PO creation is efficient</soThat>
+    <tasks>
+      <task id="1" ac="AC-3.17.1">Suppliers Table Schema - suppliers table with code, name, currency, tax_code_id, payment_terms, lead_time_days</task>
+      <task id="2" ac="AC-3.17.2">Supplier CRUD Service - createSupplier(), updateSupplier(), deleteSupplier() with code uniqueness validation</task>
+      <task id="3" ac="AC-3.17.3">API Routes - GET/POST/PUT/DELETE /api/planning/suppliers endpoints</task>
+      <task id="4" ac="AC-3.17.4">Suppliers List Page - Table displaying Code, Name, Currency, Lead Time, Status</task>
+      <task id="5" ac="AC-3.17.5">Supplier Form Modal - Modal for creating/editing suppliers with code, name, currency, tax_code, payment_terms</task>
+      <task id="6" ac="ALL">Unit & Integration Tests - Supplier CRUD tests, code uniqueness tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-3.17.1">Given user navigates to /planning/mrp, When viewing Suppliers tab, Then see table: Code, Name, Currency, Lead Time, Status</criterion>
+    <criterion id="AC-3.17.2">When clicking "Add Supplier", Then modal opens with: code (required, unique), name (required), contact info (optional), currency (required), tax_code_id (required), payment_terms, lead_time_days (required), moq (optional), is_active (toggle)</criterion>
+    <criterion id="AC-3.17.3">API: POST /api/planning/suppliers - Request: { code, name, currency, tax_code_id, payment_terms, lead_time_days, moq?, is_active? } - Response: { data: Supplier }</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-3-planning.md</path>
+        <title>Epic 3: Planning Operations</title>
+        <section>Story 3.17: Supplier Management</section>
+        <snippet>Manage suppliers with defaults. suppliers table with code (unique), name, currency, tax_code_id, payment_terms, lead_time_days, moq, is_active. Prerequisites: Epic 1.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/planning/suppliers</path>
+        <kind>directory</kind>
+        <symbol>Suppliers API route</symbol>
+        <reason>Story requires route.ts for GET/POST/PUT/DELETE /api/planning/suppliers</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/supplier-service.ts</path>
+        <kind>file</kind>
+        <symbol>Supplier service layer</symbol>
+        <reason>Story requires createSupplier(), updateSupplier(), deleteSupplier() with code uniqueness</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for supplier CRUD" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Template A CRUD Pattern</constraint>
+    <constraint type="business">Supplier code uniqueness - code must be unique within org</constraint>
+    <constraint type="testing">Test pyramid - 95% unit, 70% integration, 100% E2E</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/planning/suppliers</name>
+      <kind>API route</kind>
+      <signature>POST /api/planning/suppliers - Request: { code, name, currency, tax_code_id, payment_terms, lead_time_days } - Response: { data: Supplier }</signature>
+      <path>app/api/planning/suppliers/route.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Test Pyramid: unit tests (95%), integration tests (70%), E2E tests (100%)</standards>
+    <locations>
+      <location>lib/services/__tests__/supplier-service.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-3.17.2">Unit test: createSupplier() with duplicate code - returns error "Supplier code already exists"</idea>
+    </ideas>
+  </tests>
+</story-context>

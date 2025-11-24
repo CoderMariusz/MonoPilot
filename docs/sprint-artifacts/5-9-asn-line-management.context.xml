@@ -1,0 +1,150 @@
+<story-context id="5-9-asn-line-management" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>9</storyId>
+    <title>ASN Line Management</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Template B - Line Items Pattern</template>
+    <estimatedTokens>4000</estimatedTokens>
+    <estimatedEffort>1 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Warehouse user</asA>
+    <iWant>to manage ASN items</iWant>
+    <soThat>I know what's arriving and can adjust shipment details</soThat>
+    <tasks>
+      <task id="1" ac="AC-5.9.1">ASN Items Table - Display product, quantity, uom, supplier_batch, manufacture_date, expiry_date</task>
+      <task id="2" ac="AC-5.9.2">Add/Edit/Delete ASN Lines - CRUD operations for ASN items</task>
+      <task id="3" ac="AC-5.9.3">Auto-Populate from PO - Pre-fill ASN items from PO lines on ASN creation</task>
+      <task id="4" ac="AC-5.9.4">Adjust Quantities - Allow editing quantities for partial shipments</task>
+      <task id="5" ac="AC-5.9.5">Supplier Batch/Dates - Allow editing supplier_batch_number, manufacture_date, expiry_date</task>
+      <task id="6" ac="AC-5.9.6">Parent Validation - Validate ASN exists and belongs to org before adding/editing lines</task>
+      <task id="7" ac="ALL">Unit & Integration Tests - Line items CRUD tests, parent validation tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-5.9.1">Given ASN is created, Then items auto-populated from PO lines with fields: product_id, quantity (from PO ordered_qty), uom, supplier_batch_number (editable), manufacture_date (editable), expiry_date (editable)</criterion>
+    <criterion id="AC-5.9.2">User can add/edit/delete ASN items before ASN is confirmed</criterion>
+    <criterion id="AC-5.9.3">And can adjust quantities if partial shipment expected (quantity < PO ordered_qty)</criterion>
+    <criterion id="AC-5.9.4">And can edit supplier_batch_number, manufacture_date, expiry_date for each item</criterion>
+    <criterion id="AC-5.9.5">API: POST /api/warehouse/asns/:id/items - Request body: { product_id, quantity, uom, supplier_batch_number?, manufacture_date?, expiry_date? } - Response: { data: ASNItem } with status 201</criterion>
+    <criterion id="AC-5.9.6">Service validates ASN exists and belongs to org before allowing line operations</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-5-warehouse.md</path>
+        <title>Epic 5: Warehouse & Scanner</title>
+        <section>Story 5.9: ASN Item Management</section>
+        <snippet>Manage ASN items: product, quantity, uom, supplier_batch, manufacture/expiry dates. Auto-populate from PO lines. Allow adjustments for partial shipments. Prerequisites: Story 5.8 (ASN Creation).</snippet>
+      </doc>
+      <doc>
+        <path>docs/TEMPLATE_LIBRARY_INDEX.md</path>
+        <title>Template Library Index</title>
+        <section>Template B: Line Items Pattern</section>
+        <snippet>Parent-child relationship (ASN → ASN Items). API route: POST /asns/:id/items. Service: validate parent, insert line, recalculate totals. Pattern for PO Lines, BOM Items, TO Lines, ASN Items.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/warehouse/asns/[id]/items</path>
+        <kind>directory</kind>
+        <symbol>ASN Items API route location</symbol>
+        <reason>Story requires creating route.ts for POST/PUT/DELETE /api/warehouse/asns/:id/items endpoints</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/asn-service.ts</path>
+        <kind>file</kind>
+        <symbol>ASN service layer</symbol>
+        <reason>Story requires addASNItem(), updateASNItem(), deleteASNItem() methods with parent validation</reason>
+      </artifact>
+      <artifact>
+        <path>lib/validation/asn-schemas.ts</path>
+        <kind>file</kind>
+        <symbol>ASN Zod schemas</symbol>
+        <reason>Story requires createASNItemSchema for validating ASN item input</reason>
+      </artifact>
+      <artifact>
+        <path>components/warehouse/ASNItemsTable.tsx</path>
+        <kind>component</kind>
+        <symbol>ASNItemsTable</symbol>
+        <reason>Story requires table displaying ASN items with add/edit/delete actions</reason>
+      </artifact>
+      <artifact>
+        <path>components/warehouse/ASNItemFormModal.tsx</path>
+        <kind>component</kind>
+        <symbol>ASNItemFormModal</symbol>
+        <reason>Story requires modal for adding/editing ASN item with fields: product, quantity, uom, supplier_batch, dates</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for ASN items CRUD operations" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas for ASN item creation/update" />
+        <package name="react-hook-form" version="^7.66.1" usage="Form state management for ASN item modal" />
+        <package name="date-fns" version="^4.1.0" usage="Date utilities for manufacture/expiry date validation" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Template B Line Items Pattern - parent-child relationship (ASN → ASN Items)</constraint>
+    <constraint type="business">Parent validation - validate ASN exists and belongs to org before line operations</constraint>
+    <constraint type="business">Auto-populate from PO - pre-fill items from PO lines on ASN creation</constraint>
+    <constraint type="business">Partial shipment - allow quantity adjustments (quantity < PO ordered_qty)</constraint>
+    <constraint type="validation">Zod validation - required on BOTH client and server for ASN item input</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/warehouse/asns/:id/items</name>
+      <kind>API route</kind>
+      <signature>POST /api/warehouse/asns/{asn_id}/items - Request body: { product_id: string, quantity: number, uom: string, supplier_batch_number?: string, manufacture_date?: string, expiry_date?: string } - Response: { data: ASNItem } or error 400</signature>
+      <path>app/api/warehouse/asns/[id]/items/route.ts</path>
+    </interface>
+    <interface>
+      <name>addASNItem</name>
+      <kind>service function</kind>
+      <signature>async function addASNItem(asnId: string, input: CreateASNItemInput): Promise&lt;ServiceResult&lt;ASNItem&gt;&gt; - Validates ASN exists, adds item, no total recalculation needed</signature>
+      <path>lib/services/asn-service.ts</path>
+    </interface>
+    <interface>
+      <name>updateASNItem</name>
+      <kind>service function</kind>
+      <signature>async function updateASNItem(itemId: string, input: UpdateASNItemInput): Promise&lt;ServiceResult&lt;ASNItem&gt;&gt; - Updates ASN item fields (quantity, supplier_batch, dates)</signature>
+      <path>lib/services/asn-service.ts</path>
+    </interface>
+    <interface>
+      <name>deleteASNItem</name>
+      <kind>service function</kind>
+      <signature>async function deleteASNItem(itemId: string): Promise&lt;ServiceResult&gt; - Deletes ASN item</signature>
+      <path>lib/services/asn-service.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing strategy: unit tests for ASN item service (95% coverage), integration tests for API route (70% coverage), E2E tests for ASN item management flow (100% user flows).
+    </standards>
+    <locations>
+      <location>lib/services/__tests__/asn-service.test.ts (ASN item CRUD unit tests)</location>
+      <location>app/api/warehouse/asns/[id]/items/__tests__/route.test.ts (API route integration tests)</location>
+      <location>e2e/warehouse/asn-item-management.e2e.ts (ASN item management E2E tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-5.9.6">Unit test: addASNItem() with invalid asn_id - returns error "ASN not found"</idea>
+      <idea ac="AC-5.9.2">Unit test: addASNItem() with valid input - creates ASN item</idea>
+      <idea ac="AC-5.9.3">Unit test: Adjust quantity for partial shipment - allows quantity < PO ordered_qty</idea>
+      <idea ac="AC-5.9.5">Integration test: POST /asns/:id/items with valid input - returns 201 with created item</idea>
+      <idea ac="AC-5.9.1">E2E test: Create ASN, items auto-populated from PO lines</idea>
+      <idea ac="AC-5.9.4">E2E test: Edit ASN item, update supplier_batch_number and dates</idea>
+      <idea ac="AC-5.9.2">E2E test: Delete ASN item, item removed from table</idea>
+    </ideas>
+  </tests>
+</story-context>

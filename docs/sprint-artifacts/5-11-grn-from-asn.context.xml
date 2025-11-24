@@ -1,0 +1,145 @@
+<story-context id="5-11-grn-from-asn" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>11</storyId>
+    <title>GRN and LP Creation (from ASN)</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Template H - Transaction Workflow</template>
+    <estimatedTokens>6000</estimatedTokens>
+    <estimatedEffort>2 days</estimatedEffort>
+    <gapReference>Sprint 0 Gap 6 - Transaction Atomicity</gapReference>
+  </metadata>
+
+  <story>
+    <asA>Warehouse user</asA>
+    <iWant>to receive goods and create LPs atomically</iWant>
+    <soThat>inventory is recorded with transaction safety</soThat>
+    <tasks>
+      <task id="1" ac="AC-5.11.1">Receive Button - Display "Receive" button on ASN detail page</task>
+      <task id="2" ac="AC-5.11.2">Transaction Workflow - Implement multi-step GRN+LP creation using Template H pattern (Sprint 0 Gap 6)</task>
+      <task id="3" ac="AC-5.11.3">GRN Creation - Create GRN record with auto-generated grn_number</task>
+      <task id="4" ac="AC-5.11.4">GRN Items Creation - Create grn_items for each ASN item</task>
+      <task id="5" ac="AC-5.11.5">LP Creation - Create LP for each GRN item with batch, expiry, location</task>
+      <task id="6" ac="AC-5.11.6">ASN Status Update - Update ASN status to 'completed' after successful receive</task>
+      <task id="7" ac="AC-5.11.7">PO Received Qty Update - Update po_line.received_qty for linked PO lines</task>
+      <task id="8" ac="AC-5.11.8">Rollback Handlers - Implement rollback for each step on failure (all-or-nothing)</task>
+      <task id="9" ac="ALL">Unit & Integration Tests - Transaction workflow tests, rollback scenarios, atomicity tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-5.11.1">Given ASN exists (or ad-hoc receiving), When clicking "Receive", Then GRN created via atomic transaction (Sprint 0 Gap 6)</criterion>
+    <criterion id="AC-5.11.2">Transaction flow: (1) START, (2) INSERT grn, (3) INSERT grn_items, (4) INSERT license_plates, (5) UPDATE asn.status → 'completed', (6) UPDATE po_line.received_qty, (7) COMMIT</criterion>
+    <criterion id="AC-5.11.3">For each ASN item: LP created with qty, batch_number (from ASN item or manual), expiry_date, location (from warehouse default or selected), QA status (Pending/Passed per settings)</criterion>
+    <criterion id="AC-5.11.4">And GRN items linked to LPs via grn_id and lp_id</criterion>
+    <criterion id="AC-5.11.5">Rollback scenarios (Sprint 0 Gap 6): If ANY step fails (FK violation, unique constraint, validation error), Then transaction ROLLBACK with NO partial records (no GRN, no GRN items, no LPs, no ASN update, no PO update), And error message displayed with specific failure reason</criterion>
+    <criterion id="AC-5.11.6">Concurrency handling: Use row-level locks on ASN, PO during update (SELECT FOR UPDATE). Prevent duplicate GRN for same ASN.</criterion>
+    <criterion id="AC-5.11.7">Data integrity guarantees (Sprint 0 Gap 6): ✅ GRN exists → All LPs exist, ✅ LP exists → Parent GRN exists, ✅ ASN marked Completed → GRN exists, ✅ PO received_qty updated → GRN exists, ❌ NEVER: GRN without LPs, ❌ NEVER: LP without GRN, ❌ NEVER: ASN Completed without GRN</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-5-warehouse.md</path>
+        <title>Epic 5: Warehouse & Scanner</title>
+        <section>Story 5.11: GRN and LP Creation - AC: Transaction Atomicity (Sprint 0 Gap 6)</section>
+        <snippet>Receive goods and create LPs atomically. GRN + LP creation is atomic (all-or-nothing). Transaction flow: INSERT grn, grn_items, license_plates, UPDATE asn/po. Rollback scenarios, concurrency handling, data integrity guarantees. Prerequisites: Story 5.8 (ASN Creation).</snippet>
+      </doc>
+      <doc>
+        <path>docs/templates/template-h-transaction-workflow.md</path>
+        <title>Template H: Transaction Workflow Pattern</title>
+        <section>Pattern Overview</section>
+        <snippet>Multi-step business transactions with transaction safety (BEGIN/COMMIT/ROLLBACK), rollback handlers, status transitions, related record creation. TransactionStep interface with execute() and rollback() methods.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/warehouse/grns</path>
+        <kind>directory</kind>
+        <symbol>GRN Creation API route location</symbol>
+        <reason>Story requires creating route.ts for POST /api/warehouse/grns endpoint</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/transaction-executor.ts</path>
+        <kind>file</kind>
+        <symbol>Transaction executor (Template H core)</symbol>
+        <reason>Story requires using executeTransaction() from Template H for atomic GRN+LP creation</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/receiving-workflow.ts</path>
+        <kind>file</kind>
+        <symbol>Receiving workflow</symbol>
+        <reason>Story requires createGRNWorkflow() implementing Template H pattern with steps: create GRN, create GRN items, create LPs, update ASN, update PO</reason>
+      </artifact>
+      <artifact>
+        <path>lib/validation/grn-schemas.ts</path>
+        <kind>file</kind>
+        <symbol>GRN Zod schemas</symbol>
+        <reason>Story requires createGRNSchema for validating GRN creation input</reason>
+      </artifact>
+      <artifact>
+        <path>components/warehouse/ReceiveGoodsModal.tsx</path>
+        <kind>component</kind>
+        <symbol>ReceiveGoodsModal</symbol>
+        <reason>Story requires modal for receiving goods with location selection, QA status per item</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for GRN+LP transaction with row-level locking" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas for GRN creation request" />
+        <package name="next" version="^15.1.4" usage="Next.js framework with App Router for API routes" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Template H Transaction Workflow - use executeTransaction() pattern with TransactionStep[] for atomic GRN+LP creation (Sprint 0 Gap 6)</constraint>
+    <constraint type="business">Transaction atomicity (Sprint 0 Gap 6) - all steps (GRN, GRN items, LPs, ASN update, PO update) MUST be atomic (all-or-nothing)</constraint>
+    <constraint type="database">Row-level locking - use SELECT FOR UPDATE on ASN, PO during update to prevent concurrent GRN creation</constraint>
+    <constraint type="rollback">Rollback handlers required (Sprint 0 Gap 6) - each step (create GRN, items, LPs, update ASN/PO) must have rollback() method</constraint>
+    <constraint type="business">Data integrity guarantees (Sprint 0 Gap 6) - ✅ GRN → LPs exist, ✅ ASN Completed → GRN exists, ❌ NEVER: GRN without LPs</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/warehouse/grns</name>
+      <kind>API route</kind>
+      <signature>POST /api/warehouse/grns - Request body: { asn_id?: string, items: Array&lt;{ product_id, qty, batch_number?, expiry_date?, location_id }&gt; } - Response: { data: { grn: GRN, lps: LicensePlate[] } } or error 400</signature>
+      <path>app/api/warehouse/grns/route.ts</path>
+    </interface>
+    <interface>
+      <name>createGRNWorkflow</name>
+      <kind>transaction workflow function</kind>
+      <signature>async function createGRNWorkflow(input: CreateGRNInput): Promise&lt;{ success: boolean; data?: any; error?: string }&gt; - Executes Template H transaction (Sprint 0 Gap 6) with steps: create_grn, create_grn_items, create_lps, update_asn_status, update_po_received_qty. Each step has execute() and rollback().</signature>
+      <path>lib/services/receiving-workflow.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing strategy follows Test Pyramid with emphasis on Sprint 0 Gap 6 Transaction Atomicity: unit tests for transaction workflow (95% coverage, test each step's execute() and rollback()), integration tests for API route (70% coverage, test rollback scenarios with real database), E2E tests for complete receiving flow (100% user flows). Mock Supabase in unit tests.
+    </standards>
+    <locations>
+      <location>lib/services/__tests__/receiving-workflow.test.ts (Transaction workflow unit tests, Sprint 0 Gap 6 rollback scenarios)</location>
+      <location>app/api/warehouse/grns/__tests__/route.test.ts (API route integration tests, concurrency tests)</location>
+      <location>e2e/warehouse/receiving-flow.e2e.ts (Complete receiving flow E2E tests, Sprint 0 Gap 6 scenarios)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-5.11.2">Unit test: createGRNWorkflow create_grn step - creates GRN with auto-generated grn_number</idea>
+      <idea ac="AC-5.11.3">Unit test: createGRNWorkflow create_lps step - creates LP for each GRN item with batch, expiry, location</idea>
+      <idea ac="AC-5.11.5">Unit test: Rollback handler for create_grn - deletes GRN on failure (Sprint 0 Gap 6)</idea>
+      <idea ac="AC-5.11.5">Unit test: Rollback handler for create_lps - deletes all LPs on failure (Sprint 0 Gap 6)</idea>
+      <idea ac="AC-5.11.5">Unit test: Transaction fails at step 4 (create_lps) - rollback steps 1-3 executed, NO partial updates (Sprint 0 Gap 6)</idea>
+      <idea ac="AC-5.11.6">Unit test: Concurrency handling - prevent duplicate GRN for same ASN (SELECT FOR UPDATE)</idea>
+      <idea ac="AC-5.11.2">Integration test: POST /grns with valid ASN - returns 200, GRN+LPs created, ASN completed, PO updated (Sprint 0 Gap 6)</idea>
+      <idea ac="AC-5.11.5">Integration test: POST /grns with invalid location - returns 400, NO partial records (Sprint 0 Gap 6 rollback)</idea>
+      <idea ac="AC-5.11.6">Integration test: Concurrent GRN attempts - one succeeds, other gets error "ASN already being received"</idea>
+      <idea ac="AC-5.11.1">E2E test: Click "Receive" on ASN page, modal opens, submit, GRN+LPs created, ASN status = 'completed'</idea>
+      <idea ac="AC-5.11.7">E2E test: After receiving, verify data integrity: GRN exists, LPs exist, ASN completed, PO received_qty updated (Sprint 0 Gap 6 guarantees)</idea>
+    </ideas>
+  </tests>
+</story-context>

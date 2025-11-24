@@ -1,0 +1,255 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/4-10-output-registration-desktop" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>10</storyId>
+    <title>Output Registration (Desktop)</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/epics/epic-4-production.md</sourceStoryPath>
+    <template>Template H - Transaction Workflow</template>
+    <estimatedTokens>5500</estimatedTokens>
+    <estimatedEffort>1.5 days</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Operator</asA>
+    <iWant>to register production output from desktop</iWant>
+    <soThat>finished goods are tracked and linked to work order</soThat>
+    <tasks>
+      <task id="1" ac="AC-4.10.1">Register Output Modal - Display fields: quantity (required), qa_status, location_id, notes</task>
+      <task id="2" ac="AC-4.10.2">Transaction Workflow - Implement multi-step output registration using Template H pattern</task>
+      <task id="3" ac="AC-4.10.3">Output LP Creation - Generate LP with product from WO, batch_number from WO number, calculated expiry_date</task>
+      <task id="4" ac="AC-4.10.4">WO Output Qty Update - Increment wo.output_qty by registered quantity</task>
+      <task id="5" ac="AC-4.10.5">Genealogy Completion - Link consumed material LPs (parents) to output LP (child)</task>
+      <task id="6" ac="AC-4.10.6">Expiry Date Calculation - Calculate from product shelf_life if configured</task>
+      <task id="7" ac="AC-4.10.7">Default Location - Set location_id from production line if not specified</task>
+      <task id="8" ac="AC-4.10.8">Rollback Handlers - Implement rollback for LP creation, WO update, genealogy on failure</task>
+      <task id="9" ac="ALL">Unit & Integration Tests - Transaction workflow tests, rollback scenarios, expiry calculation tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-4.10.1">Given WO is In Progress, When clicking "Register Output", Then modal opens with fields: quantity (required), qa_status (if required in Settings), location_id (default from line), notes (optional)</criterion>
+    <criterion id="AC-4.10.2">When confirming output registration, Then system executes atomic transaction: (1) validate WO status = In Progress, (2) create output LP, (3) update wo.output_qty, (4) complete genealogy links (consumed LPs → output LP), (5) create movement record</criterion>
+    <criterion id="AC-4.10.3">Output LP is created with: product_id from WO.product_id, qty from input, batch_number = WO.wo_number, expiry_date calculated from product.shelf_life if configured, location_id from input or line default, status = 'available' (or 'pending' if QA required)</criterion>
+    <criterion id="AC-4.10.4">And wo.output_qty is incremented by registered quantity atomically</criterion>
+    <criterion id="AC-4.10.5">And genealogy is completed: all lp_genealogy records with wo_id = current WO have child_lp_id = new output LP (links consumed materials to output)</criterion>
+    <criterion id="AC-4.10.6">Expiry date calculation: If product.shelf_life_days is set, expiry_date = current_date + shelf_life_days. Otherwise, expiry_date = NULL.</criterion>
+    <criterion id="AC-4.10.7">Default location: If location_id not specified in input, use WO.production_line.default_location_id</criterion>
+    <criterion id="AC-4.10.8">If ANY step in transaction fails (validation error, FK violation, database error), Then entire transaction is rolled back with NO partial updates and user sees specific error message</criterion>
+    <criterion id="AC-4.10.9">Output registration follows Template H Transaction Workflow pattern with rollback handlers for each step</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-4-production.md</path>
+        <title>Epic 4: Production Execution</title>
+        <section>Story 4.12: Output Registration (Desktop)</section>
+        <snippet>Desktop UI for registering production output. Modal with quantity, qa_status, location_id, notes fields. Creates output LP with product from WO, batch_number from WO.wo_number, calculated expiry_date from shelf_life. Updates wo.output_qty. Completes genealogy by linking consumed LPs (parents) to output LP (child). Prerequisites: Story 4.6 (WO In Progress).</snippet>
+      </doc>
+      <doc>
+        <path>docs/templates/template-h-transaction-workflow.md</path>
+        <title>Template H: Transaction Workflow Pattern</title>
+        <section>Pattern Overview</section>
+        <snippet>Multi-step business transactions with transaction safety (BEGIN/COMMIT/ROLLBACK), rollback handlers, status transitions, related record creation. TransactionStep interface with execute() and rollback() methods. Transaction executor with sequential step execution and reverse-order rollback on failure.</snippet>
+      </doc>
+      <doc>
+        <path>docs/templates/template-h-transaction-workflow.md</path>
+        <title>Template H: Transaction Workflow Pattern</title>
+        <section>Transaction Executor (Core Pattern)</section>
+        <snippet>executeTransaction() function executing steps sequentially, storing results in context.results for next steps. On failure, rolls back in reverse order using step.rollback() handlers. Returns { success: boolean, data?: any, error?: string }.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture/patterns/api.md</path>
+        <title>API Architecture</title>
+        <section>Error Handling - RFC 7807 Problem Details</section>
+        <snippet>Structured error responses with type, title, status, detail, errors fields. APIError class with toProblemDetails() method. handleAPIError() function for consistent error formatting.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-4-production.md</path>
+        <title>Epic 4: Production Execution</title>
+        <section>Story 4.19: Genealogy Record Creation</section>
+        <snippet>System automatically creates genealogy links when materials consumed (parent_lp_id = consumed LP, child_lp_id = NULL, wo_id = WO). When output registered, updates genealogy: child_lp_id = output LP. Enables forward/backward tracing for compliance.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/production/work-orders/[id]/outputs</path>
+        <kind>directory</kind>
+        <symbol>Output Registration API route location</symbol>
+        <reason>Story requires creating route.ts for POST /api/production/work-orders/:id/outputs endpoint</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/transaction-executor.ts</path>
+        <kind>file</kind>
+        <symbol>Transaction executor (Template H core)</symbol>
+        <reason>Story requires using executeTransaction() from Template H for atomic output registration workflow</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/output-registration-workflow.ts</path>
+        <kind>file</kind>
+        <symbol>Output registration workflow</symbol>
+        <reason>Story requires creating registerOutputWorkflow() implementing Template H pattern with steps: validate WO, create output LP, update WO output_qty, complete genealogy, create movement</reason>
+      </artifact>
+      <artifact>
+        <path>lib/validation/output-schemas.ts</path>
+        <kind>file</kind>
+        <symbol>Output registration Zod schemas</symbol>
+        <reason>Story requires registerOutputSchema for validating output request (wo_id, qty, qa_status, location_id, notes)</reason>
+      </artifact>
+      <artifact>
+        <path>components/production/RegisterOutputModal.tsx</path>
+        <kind>component</kind>
+        <symbol>RegisterOutputModal</symbol>
+        <reason>Story requires modal with fields: quantity input, qa_status select, location_id select (default from line), notes textarea, confirm/cancel buttons</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/license-plate-service.ts</path>
+        <kind>file</kind>
+        <symbol>License Plate service</symbol>
+        <reason>Story requires createOutputLP() method to generate LP with product, batch_number, expiry_date, location</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/genealogy-service.ts</path>
+        <kind>file</kind>
+        <symbol>Genealogy service</symbol>
+        <reason>Story requires completeGenealogyLinks() method to update lp_genealogy records with child_lp_id = output LP</reason>
+      </artifact>
+      <artifact>
+        <path>lib/utils/expiry-calculator.ts</path>
+        <kind>file</kind>
+        <symbol>Expiry date calculator utility</symbol>
+        <reason>Story requires calculateExpiryDate() function to compute expiry from shelf_life_days</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for database transactions (LP creation, WO update, genealogy completion)" />
+        <package name="@supabase/ssr" version="^0.7.0" usage="SSR helpers for Next.js (createServerClient for API routes)" />
+        <package name="react-hook-form" version="^7.66.1" usage="Form state management for Register Output modal (qty, qa_status, location, notes)" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas for output registration request (registerOutputSchema)" />
+        <package name="@hookform/resolvers" version="^5.2.2" usage="Zod resolver for react-hook-form integration in modal" />
+        <package name="next" version="^15.1.4" usage="Next.js framework with App Router for API routes (outputs endpoint)" />
+        <package name="react" version="^19.0.0" usage="React 19 for UI components (modal)" />
+        <package name="date-fns" version="^4.1.0" usage="Date utilities for expiry date calculation (addDays function)" />
+        <package name="lucide-react" version="^0.554.0" usage="Icons for modal (package icon for output, calendar for expiry)" />
+        <package name="@radix-ui/react-dialog" version="^1.1.15" usage="Dialog component for Register Output modal" />
+        <package name="@radix-ui/react-select" version="^2.2.6" usage="Select component for qa_status and location_id fields" />
+        <package name="@radix-ui/react-toast" version="^1.2.15" usage="Toast notifications for success/error messages after output registration" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Template H Transaction Workflow - use executeTransaction() pattern with TransactionStep[] for atomic output registration</constraint>
+    <constraint type="architecture">Next.js 15 App Router - use app/ directory structure, server components by default, client component for modal</constraint>
+    <constraint type="business">Transaction atomicity - LP creation, WO output_qty update, genealogy completion MUST be atomic (all-or-nothing)</constraint>
+    <constraint type="business">Validation sequence - (1) WO status = In Progress, (2) quantity > 0, (3) location exists, (4) product has shelf_life (for expiry calc)</constraint>
+    <constraint type="business">Batch number convention - batch_number = WO.wo_number for traceability</constraint>
+    <constraint type="business">Expiry date calculation - If product.shelf_life_days exists, expiry_date = current_date + shelf_life_days. Otherwise NULL.</constraint>
+    <constraint type="business">Default location logic - If location_id not provided, use WO.production_line.default_location_id</constraint>
+    <constraint type="database">Genealogy completion - UPDATE lp_genealogy SET child_lp_id = output_lp.id WHERE wo_id = current_wo AND child_lp_id IS NULL</constraint>
+    <constraint type="rollback">Rollback handlers required - each step (create LP, update WO, complete genealogy, create movement) must have rollback() method</constraint>
+    <constraint type="validation">Zod validation - required on BOTH client and server for output request (registerOutputSchema)</constraint>
+    <constraint type="ux">Shadcn/UI components - use Dialog, Select, Input, Textarea, Button, Toast for consistency</constraint>
+    <constraint type="ux">Modal layout - quantity input (required, number type), qa_status select (if Settings.require_qa_on_output), location select (default from line), notes textarea (optional), calculated expiry date display (read-only)</constraint>
+    <constraint type="testing">Test pyramid - 95% unit coverage for transaction workflow (mock Supabase), 70% integration coverage for API route, 100% E2E coverage for output registration flow</constraint>
+    <constraint type="security">Authorization - verify user has Operator role or higher before allowing output registration</constraint>
+    <constraint type="security">RLS policies - ensure org_id scoping on work_orders, license_plates, lp_genealogy tables</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/production/work-orders/:id/outputs</name>
+      <kind>API route</kind>
+      <signature>POST /api/production/work-orders/{wo_id}/outputs - Request body: { qty: number, qa_status?: string, location_id?: string, notes?: string } - Response: { data: { output_lp: LicensePlate, wo: WorkOrder } } or Problem Details error</signature>
+      <path>app/api/production/work-orders/[id]/outputs/route.ts</path>
+    </interface>
+    <interface>
+      <name>registerOutputWorkflow</name>
+      <kind>transaction workflow function</kind>
+      <signature>async function registerOutputWorkflow(input: RegisterOutputInput): Promise&lt;{ success: boolean; data?: any; error?: string }&gt; - Executes Template H transaction with steps: validate_wo, create_output_lp, update_wo_output_qty, complete_genealogy, create_movement. Each step has execute() and rollback().</signature>
+      <path>lib/services/output-registration-workflow.ts</path>
+    </interface>
+    <interface>
+      <name>registerOutputSchema</name>
+      <kind>Zod schema</kind>
+      <signature>z.object({ wo_id: z.string().uuid(), qty: z.number().positive(), qa_status: z.enum(['pending', 'approved', 'rejected']).optional(), location_id: z.string().uuid().optional(), notes: z.string().max(500).optional() })</signature>
+      <path>lib/validation/output-schemas.ts</path>
+    </interface>
+    <interface>
+      <name>TransactionStep</name>
+      <kind>TypeScript interface (Template H)</kind>
+      <signature>interface TransactionStep { name: string; execute: (context: TransactionContext) =&gt; Promise&lt;StepResult&gt;; rollback?: (context: TransactionContext, result: StepResult) =&gt; Promise&lt;void&gt; }</signature>
+      <path>lib/services/transaction-executor.ts</path>
+    </interface>
+    <interface>
+      <name>executeTransaction</name>
+      <kind>function (Template H core)</kind>
+      <signature>async function executeTransaction(config: TransactionConfig): Promise&lt;{ success: boolean; data?: any; error?: string }&gt; - Executes steps sequentially, stores results, rolls back in reverse order on failure</signature>
+      <path>lib/services/transaction-executor.ts</path>
+    </interface>
+    <interface>
+      <name>RegisterOutputModal</name>
+      <kind>React component</kind>
+      <signature>RegisterOutputModal: FC&lt;{ woId: string, open: boolean, onClose: () =&gt; void, onSuccess: () =&gt; void }&gt; - Displays qty input, qa_status select, location select (default from line), notes textarea, calculated expiry display, confirm button. Calls registerOutputWorkflow API.</signature>
+      <path>components/production/RegisterOutputModal.tsx</path>
+    </interface>
+    <interface>
+      <name>createOutputLP</name>
+      <kind>service function</kind>
+      <signature>async function createOutputLP(input: CreateOutputLPInput): Promise&lt;ServiceResult&lt;LicensePlate&gt;&gt; - Creates LP with product_id, qty, batch_number = WO number, expiry_date calculated, location_id, status = 'available' or 'pending'</signature>
+      <path>lib/services/license-plate-service.ts</path>
+    </interface>
+    <interface>
+      <name>completeGenealogyLinks</name>
+      <kind>service function</kind>
+      <signature>async function completeGenealogyLinks(woId: string, outputLpId: string): Promise&lt;ServiceResult&lt;void&gt;&gt; - Updates all lp_genealogy records with wo_id = woId, sets child_lp_id = outputLpId (links consumed materials to output)</signature>
+      <path>lib/services/genealogy-service.ts</path>
+    </interface>
+    <interface>
+      <name>calculateExpiryDate</name>
+      <kind>utility function</kind>
+      <signature>function calculateExpiryDate(baseDate: Date, shelfLifeDays?: number): Date | null - Returns baseDate + shelfLifeDays if shelfLifeDays exists, otherwise null</signature>
+      <path>lib/utils/expiry-calculator.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing strategy follows Test Pyramid: unit tests for transaction workflow (95% coverage, mock Supabase client with vitest, test each step's execute() and rollback()), integration tests for API route (70% coverage, Vitest + Supabase Test Client), E2E tests for complete output registration flow (100% user flows, Playwright). All tests in __tests__ directories colocated with source. Test files follow pattern: workflow.test.ts (unit), route.test.ts (integration), output-registration-flow.e2e.ts (E2E). Fixtures in __fixtures__. Mock Supabase and transaction executor in unit tests.
+    </standards>
+    <locations>
+      <location>lib/services/__tests__/output-registration-workflow.test.ts (Transaction workflow unit tests with mocked Supabase)</location>
+      <location>app/api/production/work-orders/[id]/outputs/__tests__/route.test.ts (API route integration tests)</location>
+      <location>components/production/__tests__/RegisterOutputModal.test.tsx (Modal component unit tests)</location>
+      <location>lib/utils/__tests__/expiry-calculator.test.ts (Expiry date calculation unit tests)</location>
+      <location>e2e/production/output-registration.e2e.ts (Complete output registration flow E2E tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-4.10.2">Unit test: registerOutputWorkflow validate_wo step - validates WO status = In Progress, rejects Draft/Released/Completed</idea>
+      <idea ac="AC-4.10.3">Unit test: registerOutputWorkflow create_output_lp step - creates LP with product_id from WO, batch_number = WO.wo_number, calculated expiry_date</idea>
+      <idea ac="AC-4.10.4">Unit test: registerOutputWorkflow update_wo_output_qty step - increments wo.output_qty by registered quantity</idea>
+      <idea ac="AC-4.10.5">Unit test: registerOutputWorkflow complete_genealogy step - updates lp_genealogy records with child_lp_id = output LP</idea>
+      <idea ac="AC-4.10.6">Unit test: calculateExpiryDate() with shelf_life_days = 30 returns current_date + 30 days</idea>
+      <idea ac="AC-4.10.6">Unit test: calculateExpiryDate() with shelf_life_days = null returns null (no expiry)</idea>
+      <idea ac="AC-4.10.7">Unit test: Default location logic - if location_id not provided, uses WO.production_line.default_location_id</idea>
+      <idea ac="AC-4.10.8">Unit test: Rollback handler for create_output_lp - deletes LP on failure</idea>
+      <idea ac="AC-4.10.8">Unit test: Rollback handler for update_wo_output_qty - restores original output_qty on failure</idea>
+      <idea ac="AC-4.10.8">Unit test: Transaction fails at step 4 (complete_genealogy) - rollback steps 1-3 executed, NO partial updates</idea>
+      <idea ac="AC-4.10.2">Integration test: POST /outputs with WO not in progress - returns 400 error "Cannot register output: Work Order is not in progress"</idea>
+      <idea ac="AC-4.10.3">Integration test: POST /outputs with valid input - returns 200, output LP created, wo.output_qty updated, genealogy completed</idea>
+      <idea ac="AC-4.10.1">E2E test: Navigate to WO detail page (In Progress), click "Register Output", modal opens with qty/qa_status/location/notes fields</idea>
+      <idea ac="AC-4.10.3">E2E test: Enter qty, select qa_status, confirm output, success toast shown, output LP created with correct batch_number = WO number</idea>
+      <idea ac="AC-4.10.4">E2E test: After output registration, WO output_qty incremented correctly on WO detail page</idea>
+      <idea ac="AC-4.10.5">E2E test: After output, genealogy links completed - consumed materials (parents) linked to output LP (child) in genealogy view</idea>
+      <idea ac="AC-4.10.6">E2E test: Product with shelf_life_days = 60, output registered, expiry_date = current_date + 60 days displayed in modal</idea>
+      <idea ac="AC-4.10.7">E2E test: Location_id not provided in modal, system uses default location from production line</idea>
+      <idea ac="AC-4.10.8">E2E test: Database error during LP creation, entire transaction rolled back, NO output LP created, NO WO update, error toast shown</idea>
+    </ideas>
+  </tests>
+</story-context>
