@@ -112,12 +112,14 @@ export const createOperationSchema = z.object({
     .number()
     .min(0.01, 'Yield must be at least 0.01%')
     .max(100, 'Yield cannot exceed 100%')
+    .optional()
     .default(100.00),
 
   setup_time_minutes: z
     .number()
     .int('Setup time must be an integer')
     .nonnegative('Setup time cannot be negative')
+    .optional()
     .default(0),
 
   labor_cost: z
