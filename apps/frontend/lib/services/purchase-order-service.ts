@@ -55,17 +55,17 @@ export interface CreatePurchaseOrderInput {
   supplier_id: string
   warehouse_id: string
   expected_delivery_date: Date | string
-  payment_terms?: string
-  shipping_method?: string
-  notes?: string
+  payment_terms?: string | null
+  shipping_method?: string | null
+  notes?: string | null
 }
 
 export interface UpdatePurchaseOrderInput {
   expected_delivery_date?: Date | string
   actual_delivery_date?: Date | string | null
-  payment_terms?: string
-  shipping_method?: string
-  notes?: string
+  payment_terms?: string | null
+  shipping_method?: string | null
+  notes?: string | null
   status?: string
 }
 

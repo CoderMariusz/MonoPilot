@@ -13,12 +13,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Create Supabase client with service role (bypasses RLS)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function POST(request: NextRequest) {
   try {
     // 1. Verify webhook signature (Supabase secret)
@@ -33,6 +27,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 2. Create Supabase client with service role (bypasses RLS)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('[Webhook] Supabase credentials not configured')
+      return NextResponse.json(
+        { error: 'Supabase not configured' },
+        { status: 500 }
+      )
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
     // Simple signature verification (Supabase uses webhook secret)
     // In production, implement proper HMAC verification if needed
     if (signature !== webhookSecret) {
@@ -43,7 +51,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. Parse webhook payload
+    // 3. Parse webhook payload
     const payload = await request.json()
 
     console.log('[Webhook] Received event:', {
@@ -52,7 +60,7 @@ export async function POST(request: NextRequest) {
       record_id: payload.record?.id
     })
 
-    // 3. Handle auth.users.created event
+    // 4. Handle auth.users.created event
     if (payload.type === 'INSERT' && payload.table === 'users') {
       const newUser = payload.record
       const invitationToken = newUser.raw_user_meta_data?.invitation_token
@@ -67,7 +75,7 @@ export async function POST(request: NextRequest) {
 
       console.log('[Webhook] Processing signup for user:', newUser.email)
 
-      // 4. Find invitation by token
+      // 5. Find invitation by token
       const { data: invitation, error: invitationError } = await supabase
         .from('user_invitations')
         .select('id, email, org_id, status')
@@ -82,7 +90,7 @@ export async function POST(request: NextRequest) {
         }, { status: 404 })
       }
 
-      // 5. Validate invitation status
+      // 6. Validate invitation status
       if (invitation.status !== 'pending') {
         console.error('[Webhook] Invitation already used:', invitation.status)
         return NextResponse.json({
@@ -91,7 +99,7 @@ export async function POST(request: NextRequest) {
         }, { status: 400 })
       }
 
-      // 6. Update user status to 'active'
+      // 7. Update user status to 'active'
       const { error: userUpdateError } = await supabase
         .from('users')
         .update({ status: 'active' })
@@ -106,7 +114,7 @@ export async function POST(request: NextRequest) {
         }, { status: 500 })
       }
 
-      // 7. Update invitation status to 'accepted'
+      // 8. Update invitation status to 'accepted'
       const { error: invitationUpdateError } = await supabase
         .from('user_invitations')
         .update({

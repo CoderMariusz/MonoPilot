@@ -61,8 +61,8 @@ export const updateProductionLineSchema = z.object({
 })
 
 // TypeScript types
-export type CreateProductionLineInput = z.infer<typeof createProductionLineSchema>
-export type UpdateProductionLineInput = z.infer<typeof updateProductionLineSchema>
+export type CreateProductionLineInput = z.input<typeof createProductionLineSchema>
+export type UpdateProductionLineInput = z.input<typeof updateProductionLineSchema>
 
 // Production Line Filters Schema
 // AC-007.4: Lines list view with filters

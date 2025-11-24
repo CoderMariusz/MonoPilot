@@ -22,7 +22,7 @@ export const createMachineSchema = z.object({
     .string()
     .min(1, 'Machine name is required')
     .max(100, 'Name must be 100 characters or less'),
-  status: machineStatusEnum.default('active'),
+  status: machineStatusEnum.optional().default('active'),
   capacity_per_hour: z
     .number()
     .positive('Capacity must be a positive number')
@@ -60,8 +60,8 @@ export const updateMachineSchema = z.object({
 })
 
 // TypeScript types
-export type CreateMachineInput = z.infer<typeof createMachineSchema>
-export type UpdateMachineInput = z.infer<typeof updateMachineSchema>
+export type CreateMachineInput = z.input<typeof createMachineSchema>
+export type UpdateMachineInput = z.input<typeof updateMachineSchema>
 
 // Machine Filters Schema
 // AC-006.4: Machines list view with filters

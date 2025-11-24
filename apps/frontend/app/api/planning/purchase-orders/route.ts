@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
       subtotal: 0,
       tax_amount: 0,
       total: 0,
-      approval_status: null, // Set in AC-1.5 logic if needed
+      approval_status: null as string | null, // Set in AC-1.5 logic if needed
       created_by: session.user.id,
       updated_by: session.user.id,
     }

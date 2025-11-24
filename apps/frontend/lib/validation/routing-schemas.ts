@@ -36,12 +36,12 @@ export const createRoutingSchema = z.object({
     .max(1000, 'Description must be at most 1000 characters')
     .optional(),
 
-  status: z.enum(['active', 'inactive']).default('active'),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
 
-  is_reusable: z.boolean().default(true),
+  is_reusable: z.boolean().optional().default(true),
 })
 
-export type CreateRoutingInput = z.infer<typeof createRoutingSchema>
+export type CreateRoutingInput = z.input<typeof createRoutingSchema>
 
 /**
  * Update Routing Schema
@@ -65,7 +65,7 @@ export const updateRoutingSchema = z.object({
   is_reusable: z.boolean().optional(),
 })
 
-export type UpdateRoutingInput = z.infer<typeof updateRoutingSchema>
+export type UpdateRoutingInput = z.input<typeof updateRoutingSchema>
 
 /**
  * Routing Filters Schema
@@ -112,12 +112,14 @@ export const createOperationSchema = z.object({
     .number()
     .min(0.01, 'Yield must be at least 0.01%')
     .max(100, 'Yield cannot exceed 100%')
+    .optional()
     .default(100.00),
 
   setup_time_minutes: z
     .number()
     .int('Setup time must be an integer')
     .nonnegative('Setup time cannot be negative')
+    .optional()
     .default(0),
 
   labor_cost: z
@@ -127,7 +129,7 @@ export const createOperationSchema = z.object({
     .nullable(),
 })
 
-export type CreateOperationInput = z.infer<typeof createOperationSchema>
+export type CreateOperationInput = z.input<typeof createOperationSchema>
 
 /**
  * Update Operation Schema
@@ -175,7 +177,7 @@ export const updateOperationSchema = z.object({
     .nullable(),
 })
 
-export type UpdateOperationInput = z.infer<typeof updateOperationSchema>
+export type UpdateOperationInput = z.input<typeof updateOperationSchema>
 
 /**
  * Reorder Operations Schema
@@ -190,7 +192,7 @@ export const reorderOperationsSchema = z.object({
   ),
 })
 
-export type ReorderOperationsInput = z.infer<typeof reorderOperationsSchema>
+export type ReorderOperationsInput = z.input<typeof reorderOperationsSchema>
 
 // ============================================================================
 // PRODUCT-ROUTING ASSIGNMENT SCHEMAS (Story 2.17)
@@ -205,7 +207,7 @@ export const assignProductsSchema = z.object({
   default_product_id: z.string().uuid('Invalid product ID').optional(),
 })
 
-export type AssignProductsInput = z.infer<typeof assignProductsSchema>
+export type AssignProductsInput = z.input<typeof assignProductsSchema>
 
 /**
  * Assign Routings to Product Schema
@@ -216,4 +218,4 @@ export const assignRoutingsSchema = z.object({
   default_routing_id: z.string().uuid('Invalid routing ID').optional(),
 })
 
-export type AssignRoutingsInput = z.infer<typeof assignRoutingsSchema>
+export type AssignRoutingsInput = z.input<typeof assignRoutingsSchema>

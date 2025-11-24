@@ -11,41 +11,41 @@ export const supplierSchema = z.object({
     .min(1, 'Code is required')
     .regex(/^[A-Z0-9-]+$/, 'Code must be uppercase letters, numbers, and hyphens only'),
   name: z.string().min(1, 'Name is required').max(255),
-  contact_person: z.string().max(255).optional(),
+  contact_person: z.string().max(255).optional().nullable(),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
-  phone: z.string().max(50).optional(),
-  address: z.string().optional(),
-  city: z.string().max(100).optional(),
-  postal_code: z.string().max(20).optional(),
-  country: z.string().length(2, 'Country must be 2-letter ISO code').optional(),
+  phone: z.string().max(50).optional().nullable(),
+  address: z.string().optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  postal_code: z.string().max(20).optional().nullable(),
+  country: z.string().length(2, 'Country must be 2-letter ISO code').optional().nullable(),
   currency: z.enum(['PLN', 'EUR', 'USD', 'GBP'], {
     errorMap: () => ({ message: 'Currency must be PLN, EUR, USD, or GBP' })
   }),
   tax_code_id: z.string().uuid('Invalid tax code'),
   payment_terms: z.string().min(1, 'Payment terms required').max(100),
-  lead_time_days: z.number().int().min(0, 'Lead time must be >= 0').default(7),
+  lead_time_days: z.number().int().min(0, 'Lead time must be >= 0').optional().default(7),
   moq: z.number().positive('MOQ must be positive').optional(),
-  is_active: z.boolean().default(true),
+  is_active: z.boolean().optional().default(true),
 })
 
-export type SupplierInput = z.infer<typeof supplierSchema>
+export type SupplierInput = z.input<typeof supplierSchema>
 
 export const updateSupplierSchema = supplierSchema.omit({ code: true })
 
-export type UpdateSupplierInput = z.infer<typeof updateSupplierSchema>
+export type UpdateSupplierInput = z.input<typeof updateSupplierSchema>
 
 // ===== Supplier-Product Assignment Schemas (Story 3.17) =====
 
 export const supplierProductSchema = z.object({
   product_id: z.string().uuid('Invalid product ID'),
-  is_default: z.boolean().default(false),
+  is_default: z.boolean().optional().default(false),
   supplier_product_code: z.string().max(100).optional(),
   unit_price: z.number().nonnegative('Unit price must be >= 0').optional(),
   lead_time_days: z.number().int().min(0, 'Lead time must be >= 0').optional(),
   moq: z.number().positive('MOQ must be positive').optional(),
 })
 
-export type SupplierProductInput = z.infer<typeof supplierProductSchema>
+export type SupplierProductInput = z.input<typeof supplierProductSchema>
 
 // ===== Purchase Order Schemas (Story 3.1) =====
 
@@ -56,19 +56,19 @@ export const purchaseOrderSchema = z.object({
     (date) => date >= new Date(new Date().setHours(0, 0, 0, 0)),
     'Expected delivery date cannot be in the past'
   ),
-  payment_terms: z.string().max(100).optional(),
-  shipping_method: z.string().max(100).optional(),
-  notes: z.string().max(1000, 'Notes cannot exceed 1000 characters').optional(),
+  payment_terms: z.string().max(100).optional().nullable(),
+  shipping_method: z.string().max(100).optional().nullable(),
+  notes: z.string().max(1000, 'Notes cannot exceed 1000 characters').optional().nullable(),
 })
 
-export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>
+export type PurchaseOrderInput = z.input<typeof purchaseOrderSchema>
 
 export const updatePurchaseOrderSchema = purchaseOrderSchema.omit({
   supplier_id: true,
   warehouse_id: true
 })
 
-export type UpdatePurchaseOrderInput = z.infer<typeof updatePurchaseOrderSchema>
+export type UpdatePurchaseOrderInput = z.input<typeof updatePurchaseOrderSchema>
 
 // ===== PO Line Schemas (Story 3.2) =====
 
@@ -76,15 +76,15 @@ export const poLineSchema = z.object({
   product_id: z.string().uuid('Invalid product ID'),
   quantity: z.number().positive('Quantity must be > 0'),
   unit_price: z.number().nonnegative('Unit price must be >= 0'),
-  discount_percent: z.number().min(0).max(100, 'Discount must be 0-100%').default(0),
+  discount_percent: z.number().min(0).max(100, 'Discount must be 0-100%').optional().default(0),
   expected_delivery_date: z.coerce.date().optional(),
 })
 
-export type POLineInput = z.infer<typeof poLineSchema>
+export type POLineInput = z.input<typeof poLineSchema>
 
 export const updatePOLineSchema = poLineSchema.omit({ product_id: true })
 
-export type UpdatePOLineInput = z.infer<typeof updatePOLineSchema>
+export type UpdatePOLineInput = z.input<typeof updatePOLineSchema>
 
 // ===== Bulk PO Schemas (Story 3.3) =====
 
@@ -95,7 +95,7 @@ export const bulkPOItemSchema = z.object({
   expected_delivery_date: z.coerce.date().optional(),
 })
 
-export type BulkPOItemInput = z.infer<typeof bulkPOItemSchema>
+export type BulkPOItemInput = z.input<typeof bulkPOItemSchema>
 
 // ===== PO Approval Schemas (Story 3.4) =====
 
@@ -113,7 +113,7 @@ export const poApprovalSchema = z.object({
   path: ['rejection_reason'],
 })
 
-export type POApprovalInput = z.infer<typeof poApprovalSchema>
+export type POApprovalInput = z.input<typeof poApprovalSchema>
 
 // ===== Planning Settings Schemas (Story 3.5) =====
 
@@ -125,7 +125,7 @@ export const poStatusSchema = z.object({
   sequence: z.number().int().min(1),
 })
 
-export type POStatusInput = z.infer<typeof poStatusSchema>
+export type POStatusInput = z.input<typeof poStatusSchema>
 
 export const planningSettingsSchema = z.object({
   po_statuses: z.array(poStatusSchema).min(1).refine(statuses => {
@@ -135,9 +135,9 @@ export const planningSettingsSchema = z.object({
   po_default_status: z.string(),
   po_require_approval: z.boolean(),
   po_approval_threshold: z.number().positive().optional(),
-  po_payment_terms_visible: z.boolean().default(true),
-  po_shipping_method_visible: z.boolean().default(true),
-  po_notes_visible: z.boolean().default(true),
+  po_payment_terms_visible: z.boolean().optional().default(true),
+  po_shipping_method_visible: z.boolean().optional().default(true),
+  po_notes_visible: z.boolean().optional().default(true),
 })
 
-export type PlanningSettingsInput = z.infer<typeof planningSettingsSchema>
+export type PlanningSettingsInput = z.input<typeof planningSettingsSchema>

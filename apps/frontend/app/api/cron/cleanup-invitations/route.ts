@@ -14,12 +14,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Create Supabase client with service role (bypasses RLS)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function GET(request: NextRequest) {
   try {
     // 1. Verify cron secret (prevent unauthorized access)
@@ -34,6 +28,20 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // 2. Create Supabase client with service role (bypasses RLS)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('[Cron] Supabase credentials not configured')
+      return NextResponse.json(
+        { error: 'Supabase not configured' },
+        { status: 500 }
+      )
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
     // Check authorization header: "Bearer <CRON_SECRET>"
     if (authHeader !== `Bearer ${cronSecret}`) {
       console.error('[Cron] Invalid authorization')
@@ -45,11 +53,11 @@ export async function GET(request: NextRequest) {
 
     console.log('[Cron] Starting cleanup-invitations job...')
 
-    // 2. Calculate cutoff date (30 days ago)
+    // 3. Calculate cutoff date (30 days ago)
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-    // 3. Delete expired invitations older than 30 days
+    // 4. Delete expired invitations older than 30 days
     // AC-1.5: WHERE status = 'expired' AND expires_at < NOW() - 30 days
     const { data: deletedInvitations, error: deleteError } = await supabase
       .from('user_invitations')
@@ -68,11 +76,11 @@ export async function GET(request: NextRequest) {
 
     const deletedCount = deletedInvitations?.length || 0
 
-    // 4. Log result for monitoring
+    // 5. Log result for monitoring
     console.log(`[Cron] ✅ Cleanup completed: ${deletedCount} expired invitations deleted`)
     console.log(`[Cron] Cutoff date: ${thirtyDaysAgo.toISOString()}`)
 
-    // 5. Return success response
+    // 6. Return success response
     return NextResponse.json(
       {
         success: true,

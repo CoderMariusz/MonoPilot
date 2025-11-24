@@ -21,8 +21,8 @@ export const createAllergenSchema = z.object({
     .max(100, 'Name must be 100 characters or less'),
   is_major: z
     .boolean()
-    .default(false) // Custom allergens default to non-major
-    .optional(),
+    .optional()
+    .default(false), // Custom allergens default to non-major
 })
 
 // Update Allergen Schema
@@ -46,8 +46,8 @@ export const updateAllergenSchema = z.object({
 })
 
 // TypeScript types
-export type CreateAllergenInput = z.infer<typeof createAllergenSchema>
-export type UpdateAllergenInput = z.infer<typeof updateAllergenSchema>
+export type CreateAllergenInput = z.input<typeof createAllergenSchema>
+export type UpdateAllergenInput = z.input<typeof updateAllergenSchema>
 
 // Allergen Filters Schema
 // AC-008.5: Allergens list view with filters

@@ -28,7 +28,7 @@ const productBaseSchema = z.object({
   max_stock_qty: z.number().positive().optional(),
   reorder_point: z.number().positive().optional(),
   cost_per_unit: z.number().positive().optional(),
-  status: z.enum(['active', 'inactive', 'obsolete']).default('active')
+  status: z.enum(['active', 'inactive', 'obsolete']).optional().default('active')
 })
 
 export const productCreateSchema = productBaseSchema.refine(
@@ -47,19 +47,19 @@ export const productCreateSchema = productBaseSchema.refine(
 
 export const productUpdateSchema = productBaseSchema.omit({ code: true }).partial()
 
-export type ProductCreateInput = z.infer<typeof productCreateSchema>
-export type ProductUpdateInput = z.infer<typeof productUpdateSchema>
+export type ProductCreateInput = z.input<typeof productCreateSchema>
+export type ProductUpdateInput = z.input<typeof productUpdateSchema>
 
 // ============================================================================
 // Product Allergen Schema (Story 2.4)
 // ============================================================================
 
 export const allergenAssignmentSchema = z.object({
-  contains: z.array(z.string().uuid()).default([]),
-  may_contain: z.array(z.string().uuid()).default([])
+  contains: z.array(z.string().uuid()).optional().default([]),
+  may_contain: z.array(z.string().uuid()).optional().default([])
 })
 
-export type AllergenAssignmentInput = z.infer<typeof allergenAssignmentSchema>
+export type AllergenAssignmentInput = z.input<typeof allergenAssignmentSchema>
 
 // ============================================================================
 // Product Type Schemas (Story 2.5)
@@ -85,8 +85,8 @@ export const productTypeUpdateSchema = z.object({
   message: 'At least one field must be provided'
 })
 
-export type ProductTypeCreateInput = z.infer<typeof productTypeCreateSchema>
-export type ProductTypeUpdateInput = z.infer<typeof productTypeUpdateSchema>
+export type ProductTypeCreateInput = z.input<typeof productTypeCreateSchema>
+export type ProductTypeUpdateInput = z.input<typeof productTypeUpdateSchema>
 
 // ============================================================================
 // Technical Settings Schema (Story 2.22)
@@ -108,7 +108,7 @@ export const technicalSettingsSchema = z.object({
   )
 })
 
-export type TechnicalSettingsInput = z.infer<typeof technicalSettingsSchema>
+export type TechnicalSettingsInput = z.input<typeof technicalSettingsSchema>
 
 // ============================================================================
 // Query Parameter Schemas
@@ -119,10 +119,10 @@ export const productListQuerySchema = z.object({
   type: z.array(z.string()).or(z.string()).optional(),
   status: z.array(z.string()).or(z.string()).optional(),
   category: z.string().optional(),
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(50),
-  sort: z.string().default('code'),
-  order: z.enum(['asc', 'desc']).default('asc')
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(50),
+  sort: z.string().optional().default('code'),
+  order: z.enum(['asc', 'desc']).optional().default('asc')
 })
 
 export type ProductListQuery = z.infer<typeof productListQuerySchema>

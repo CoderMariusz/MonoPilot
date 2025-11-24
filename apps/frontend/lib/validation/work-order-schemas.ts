@@ -24,7 +24,7 @@ export const createWorkOrderSchema = z.object({
   path: ['planned_end_date'],
 })
 
-export type CreateWorkOrderInput = z.infer<typeof createWorkOrderSchema>
+export type CreateWorkOrderInput = z.input<typeof createWorkOrderSchema>
 
 export const updateWorkOrderSchema = z.object({
   planned_quantity: z.number().positive('Quantity must be > 0').optional(),
@@ -55,7 +55,7 @@ export const updateWorkOrderSchema = z.object({
   path: ['actual_end_date'],
 })
 
-export type UpdateWorkOrderInput = z.infer<typeof updateWorkOrderSchema>
+export type UpdateWorkOrderInput = z.input<typeof updateWorkOrderSchema>
 
 // ===== Work Order Filters =====
 
@@ -66,11 +66,11 @@ export const workOrderFiltersSchema = z.object({
   production_line_id: z.string().uuid().optional(),
   date_from: z.coerce.date().optional(),
   date_to: z.coerce.date().optional(),
-  sort_by: z.enum(['wo_number', 'planned_start_date', 'status', 'created_at']).default('created_at').optional(),
-  sort_direction: z.enum(['asc', 'desc']).default('desc').optional(),
+  sort_by: z.enum(['wo_number', 'planned_start_date', 'status', 'created_at']).optional().default('created_at'),
+  sort_direction: z.enum(['asc', 'desc']).optional().default('desc'),
 })
 
-export type WorkOrderFilters = z.infer<typeof workOrderFiltersSchema>
+export type WorkOrderFilters = z.input<typeof workOrderFiltersSchema>
 
 // ===== Types =====
 

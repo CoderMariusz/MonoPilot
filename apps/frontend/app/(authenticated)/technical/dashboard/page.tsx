@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { ProductDashboardResponse } from '@/lib/types/dashboard'
+import type { ProductDashboardResponse, ProductGroup, ProductSummary } from '@/lib/types/dashboard'
 
 export default function TechnicalDashboardPage() {
   const [data, setData] = useState<ProductDashboardResponse | null>(null)
@@ -64,7 +64,12 @@ export default function TechnicalDashboardPage() {
   )
 }
 
-function StatCard({ title, value, subtitle, icon }: any) {
+function StatCard({ title, value, subtitle, icon }: {
+  title: string
+  value: number
+  subtitle?: string
+  icon: string
+}) {
   return (
     <div className="bg-white border rounded-lg p-6">
       <div className="flex items-center justify-between mb-2">
@@ -77,8 +82,8 @@ function StatCard({ title, value, subtitle, icon }: any) {
   )
 }
 
-function ProductGroupSection({ group }: any) {
-  const accentColors = {
+function ProductGroupSection({ group }: { group: ProductGroup }) {
+  const accentColors: Record<ProductGroup['category'], string> = {
     RM: 'border-green-500',
     WIP: 'border-orange-500',
     FG: 'border-blue-500'
@@ -92,7 +97,7 @@ function ProductGroupSection({ group }: any) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {group.products.map((product: any) => (
+        {group.products.map((product: ProductSummary) => (
           <div key={product.id} className="border rounded p-4 hover:shadow-md transition-shadow">
             <div className="font-semibold">{product.code}</div>
             <div className="text-sm text-gray-600 truncate">{product.name}</div>
