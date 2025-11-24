@@ -64,10 +64,10 @@ async function getMaxVersion(productId: string, orgId: string): Promise<string |
  * Get all BOMs with filters
  */
 export async function getBOMs(filters: BOMFilters = {}): Promise<BOMWithProduct[]> {
-  const supabase = createServerSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createServerSupabase()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (authError || !user) {
     throw new Error('Unauthorized')
   }
 
@@ -141,7 +141,7 @@ export async function getBOMs(filters: BOMFilters = {}): Promise<BOMWithProduct[
  * Get single BOM by ID
  */
 export async function getBOMById(id: string, include_items = false): Promise<BOMWithProduct | null> {
-  const supabase = createServerSupabase()
+  const supabase = await createServerSupabase()
 
   const selectFields = include_items
     ? `
@@ -217,10 +217,10 @@ export async function getBOMById(id: string, include_items = false): Promise<BOM
  * Create new BOM (auto-assigns version)
  */
 export async function createBOM(input: CreateBOMInput): Promise<BOM> {
-  const supabase = createServerSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createServerSupabase()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (authError || !user) {
     throw new Error('Unauthorized')
   }
 
@@ -275,10 +275,10 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
  * Update existing BOM
  */
 export async function updateBOM(id: string, input: UpdateBOMInput): Promise<BOM> {
-  const supabase = createServerSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createServerSupabase()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (authError || !user) {
     throw new Error('Unauthorized')
   }
 
@@ -315,7 +315,7 @@ export async function updateBOM(id: string, input: UpdateBOMInput): Promise<BOM>
  * Delete BOM (cascades to bom_items)
  */
 export async function deleteBOM(id: string): Promise<void> {
-  const supabase = createServerSupabase()
+  const supabase = await createServerSupabase()
 
   const { error } = await supabase
     .from('boms')
@@ -332,10 +332,10 @@ export async function deleteBOM(id: string): Promise<void> {
  * Get BOM count for a product
  */
 export async function getBOMCountForProduct(productId: string): Promise<number> {
-  const supabase = createServerSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createServerSupabase()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (authError || !user) {
     throw new Error('Unauthorized')
   }
 
