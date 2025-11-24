@@ -59,7 +59,7 @@ interface POLine {
   products?: Product
 }
 
-interface POLinesTa bleProps {
+interface POLinesTableProps {
   poId: string
   currency: string
   onTotalsUpdate?: () => void
