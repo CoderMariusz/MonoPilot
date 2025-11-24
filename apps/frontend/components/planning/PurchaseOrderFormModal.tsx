@@ -48,9 +48,9 @@ interface PurchaseOrder {
   supplier_id: string
   warehouse_id: string
   expected_delivery_date: string
-  payment_terms?: string
-  shipping_method?: string
-  notes?: string
+  payment_terms?: string | null
+  shipping_method?: string | null
+  notes?: string | null
 }
 
 interface PurchaseOrderFormModalProps {

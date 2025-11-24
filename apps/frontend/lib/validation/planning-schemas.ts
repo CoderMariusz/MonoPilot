@@ -11,13 +11,13 @@ export const supplierSchema = z.object({
     .min(1, 'Code is required')
     .regex(/^[A-Z0-9-]+$/, 'Code must be uppercase letters, numbers, and hyphens only'),
   name: z.string().min(1, 'Name is required').max(255),
-  contact_person: z.string().max(255).optional(),
+  contact_person: z.string().max(255).optional().nullable(),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
-  phone: z.string().max(50).optional(),
-  address: z.string().optional(),
-  city: z.string().max(100).optional(),
-  postal_code: z.string().max(20).optional(),
-  country: z.string().length(2, 'Country must be 2-letter ISO code').optional(),
+  phone: z.string().max(50).optional().nullable(),
+  address: z.string().optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  postal_code: z.string().max(20).optional().nullable(),
+  country: z.string().length(2, 'Country must be 2-letter ISO code').optional().nullable(),
   currency: z.enum(['PLN', 'EUR', 'USD', 'GBP'], {
     errorMap: () => ({ message: 'Currency must be PLN, EUR, USD, or GBP' })
   }),
@@ -56,9 +56,9 @@ export const purchaseOrderSchema = z.object({
     (date) => date >= new Date(new Date().setHours(0, 0, 0, 0)),
     'Expected delivery date cannot be in the past'
   ),
-  payment_terms: z.string().max(100).optional(),
-  shipping_method: z.string().max(100).optional(),
-  notes: z.string().max(1000, 'Notes cannot exceed 1000 characters').optional(),
+  payment_terms: z.string().max(100).optional().nullable(),
+  shipping_method: z.string().max(100).optional().nullable(),
+  notes: z.string().max(1000, 'Notes cannot exceed 1000 characters').optional().nullable(),
 })
 
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>
