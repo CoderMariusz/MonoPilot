@@ -53,7 +53,7 @@ export const CreateLocationSchema = z
       .optional()
       .nullable(),
 
-    zone_enabled: z.boolean().default(false),
+    zone_enabled: z.boolean().optional().default(false),
 
     capacity: z
       .number()
@@ -61,7 +61,7 @@ export const CreateLocationSchema = z
       .optional()
       .nullable(),
 
-    capacity_enabled: z.boolean().default(false),
+    capacity_enabled: z.boolean().optional().default(false),
 
     // Barcode (auto-generated if not provided)
     barcode: z
@@ -69,7 +69,7 @@ export const CreateLocationSchema = z
       .max(100, 'Barcode must be less than 100 characters')
       .optional(),
 
-    is_active: z.boolean().default(true),
+    is_active: z.boolean().optional().default(true),
   })
   .refine(
     (data) => {
@@ -102,7 +102,7 @@ export const CreateLocationSchema = z
     }
   )
 
-export type CreateLocationInput = z.infer<typeof CreateLocationSchema>
+export type CreateLocationInput = z.input<typeof CreateLocationSchema>
 
 // ============================================================================
 // UPDATE LOCATION SCHEMA (AC-005.1, AC-005.2)
@@ -214,13 +214,13 @@ export const BulkLocationCreateSchema = z.object({
         name: z.string().min(1).max(100),
         type: LocationTypeEnum,
         zone: z.string().max(100).optional().nullable(),
-        zone_enabled: z.boolean().default(false),
+        zone_enabled: z.boolean().optional().default(false),
         capacity: z.number().positive().optional().nullable(),
-        capacity_enabled: z.boolean().default(false),
+        capacity_enabled: z.boolean().optional().default(false),
       })
     )
     .min(1, 'At least one location is required')
     .max(100, 'Cannot create more than 100 locations at once'),
 })
 
-export type BulkLocationCreateInput = z.infer<typeof BulkLocationCreateSchema>
+export type BulkLocationCreateInput = z.input<typeof BulkLocationCreateSchema>

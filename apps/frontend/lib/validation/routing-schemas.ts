@@ -36,12 +36,12 @@ export const createRoutingSchema = z.object({
     .max(1000, 'Description must be at most 1000 characters')
     .optional(),
 
-  status: z.enum(['active', 'inactive']).default('active'),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
 
-  is_reusable: z.boolean().default(true),
+  is_reusable: z.boolean().optional().default(true),
 })
 
-export type CreateRoutingInput = z.infer<typeof createRoutingSchema>
+export type CreateRoutingInput = z.input<typeof createRoutingSchema>
 
 /**
  * Update Routing Schema
