@@ -11,9 +11,10 @@ import { ZodError } from 'zod'
 // PUT /api/planning/purchase-orders/:id/lines/:lineId - Update PO line
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; lineId: string } }
+  { params }: { params: Promise<{ id: string; lineId: string }> }
 ) {
   try {
+    const { id, lineId } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -51,7 +52,7 @@ export async function PUT(
     const { data: currentLine, error: lineError } = await supabaseAdmin
       .from('po_lines')
       .select('po_id, org_id, product_id')
-      .eq('id', params.lineId)
+      .eq('id', lineId)
       .single()
 
     if (lineError || !currentLine) {
@@ -64,7 +65,7 @@ export async function PUT(
     }
 
     // Verify line belongs to the specified PO
-    if (currentLine.po_id !== params.id) {
+    if (currentLine.po_id !== id) {
       return NextResponse.json({ error: 'PO line does not belong to this PO' }, { status: 400 })
     }
 
@@ -72,7 +73,7 @@ export async function PUT(
     const { data: po, error: poError } = await supabaseAdmin
       .from('purchase_orders')
       .select('status, supplier_id')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (poError || !po) {
@@ -131,7 +132,7 @@ export async function PUT(
     const { data, error: updateError } = await supabaseAdmin
       .from('po_lines')
       .update(updateData)
-      .eq('id', params.lineId)
+      .eq('id', lineId)
       .eq('org_id', currentUser.org_id)
       .select(`
         *,
@@ -167,9 +168,10 @@ export async function PUT(
 // DELETE /api/planning/purchase-orders/:id/lines/:lineId - Delete PO line
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; lineId: string } }
+  { params }: { params: Promise<{ id: string; lineId: string }> }
 ) {
   try {
+    const { id, lineId } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -207,7 +209,7 @@ export async function DELETE(
     const { data: line, error: lineError } = await supabaseAdmin
       .from('po_lines')
       .select('po_id, org_id, sequence')
-      .eq('id', params.lineId)
+      .eq('id', lineId)
       .single()
 
     if (lineError || !line) {
@@ -220,7 +222,7 @@ export async function DELETE(
     }
 
     // Verify line belongs to the specified PO
-    if (line.po_id !== params.id) {
+    if (line.po_id !== id) {
       return NextResponse.json({ error: 'PO line does not belong to this PO' }, { status: 400 })
     }
 
@@ -228,7 +230,7 @@ export async function DELETE(
     const { data: po, error: poError } = await supabaseAdmin
       .from('purchase_orders')
       .select('status')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (poError || !po) {
@@ -247,7 +249,7 @@ export async function DELETE(
     const { error: deleteError } = await supabaseAdmin
       .from('po_lines')
       .delete()
-      .eq('id', params.lineId)
+      .eq('id', lineId)
       .eq('org_id', currentUser.org_id)
 
     if (deleteError) {
@@ -260,7 +262,7 @@ export async function DELETE(
     const { data: remainingLines } = await supabaseAdmin
       .from('po_lines')
       .select('id')
-      .eq('po_id', params.id)
+      .eq('po_id', id)
       .eq('org_id', currentUser.org_id)
       .order('sequence', { ascending: true })
 

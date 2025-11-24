@@ -26,9 +26,10 @@ import { ZodError } from 'zod'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -41,7 +42,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const result = await getWorkOrder(params.id)
+    const result = await getWorkOrder(id)
 
     if (!result.success) {
       if (result.code === 'NOT_FOUND') {
@@ -78,9 +79,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -98,7 +100,7 @@ export async function PUT(
     const validatedData: UpdateWorkOrderInput =
       updateWorkOrderSchema.parse(body)
 
-    const result = await updateWorkOrder(params.id, validatedData)
+    const result = await updateWorkOrder(id, validatedData)
 
     if (!result.success) {
       if (result.code === 'NOT_FOUND') {
@@ -151,9 +153,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -166,7 +169,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const result = await deleteWorkOrder(params.id)
+    const result = await deleteWorkOrder(id)
 
     if (!result.success) {
       if (result.code === 'NOT_FOUND') {

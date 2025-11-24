@@ -152,6 +152,7 @@ export function EditRoutingDrawer({ routing, open, onClose, onSuccess }: EditRou
                   <FormControl>
                     <Textarea
                       {...field}
+                      value={field.value ?? ''}
                       placeholder="Describe this routing..."
                       rows={3}
                     />

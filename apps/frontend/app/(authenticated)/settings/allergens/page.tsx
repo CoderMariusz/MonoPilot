@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -58,7 +58,7 @@ export default function AllergensPage() {
   const { toast } = useToast()
 
   // Fetch allergens (AC-008.5 with filters and sorting)
-  const fetchAllergens = async () => {
+  const fetchAllergens = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -88,11 +88,11 @@ export default function AllergensPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [searchTerm, isMajorFilter, isCustomFilter, sortBy, sortDirection, toast])
 
   useEffect(() => {
     fetchAllergens()
-  }, [isMajorFilter, isCustomFilter, sortBy, sortDirection])
+  }, [fetchAllergens])
 
   // Debounced search (AC-008.5)
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function AllergensPage() {
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [searchTerm])
+  }, [fetchAllergens])
 
   // Delete handler (AC-008.2, AC-008.4)
   const handleDelete = async (allergen: Allergen) => {

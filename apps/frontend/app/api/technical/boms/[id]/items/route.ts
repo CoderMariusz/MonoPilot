@@ -17,9 +17,10 @@ import { ZodError } from 'zod';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase();
 
     // Check authentication
@@ -33,7 +34,7 @@ export async function GET(
     const { data: bom, error: bomError } = await supabase
       .from('boms')
       .select('id')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (bomError || !bom) {
@@ -53,7 +54,7 @@ export async function GET(
           uom
         )
       `)
-      .eq('bom_id', params.id)
+      .eq('bom_id', id)
       .order('sequence', { ascending: true });
 
     if (error) {
@@ -78,9 +79,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase();
 
     // Check authentication
@@ -113,7 +115,7 @@ export async function POST(
     const { data: bom, error: bomError } = await supabase
       .from('boms')
       .select('id')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (bomError || !bom) {
@@ -144,7 +146,7 @@ export async function POST(
       const { data: maxItem } = await supabase
         .from('bom_items')
         .select('sequence')
-        .eq('bom_id', params.id)
+        .eq('bom_id', id)
         .order('sequence', { ascending: false })
         .limit(1)
         .single();
@@ -156,7 +158,7 @@ export async function POST(
     const { data: item, error: insertError } = await supabase
       .from('bom_items')
       .insert({
-        bom_id: params.id,
+        bom_id: id,
         product_id: validatedData.product_id,
         quantity: validatedData.quantity,
         uom: validatedData.uom,
@@ -216,9 +218,10 @@ export async function POST(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase();
 
     // Check authentication
@@ -257,7 +260,7 @@ export async function PUT(
         .from('bom_items')
         .update({ sequence: item.sequence })
         .eq('id', item.id)
-        .eq('bom_id', params.id)
+        .eq('bom_id', id)
     );
 
     const results = await Promise.all(updates);
@@ -281,7 +284,7 @@ export async function PUT(
           uom
         )
       `)
-      .eq('bom_id', params.id)
+      .eq('bom_id', id)
       .order('sequence', { ascending: true });
 
     if (fetchError) {

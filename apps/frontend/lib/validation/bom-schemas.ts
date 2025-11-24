@@ -13,25 +13,14 @@ export const CreateBOMSchema = z.object({
     .datetime('Invalid date format')
     .or(z.date())
     .optional()
-    .nullable()
-    .refine((val, ctx) => {
-      if (!val) return true
-      const parent = ctx.parent as any
-      const effectiveFrom = parent.effective_from
-      if (!effectiveFrom) return true
-
-      const fromDate = effectiveFrom instanceof Date ? effectiveFrom : new Date(effectiveFrom)
-      const toDate = val instanceof Date ? val : new Date(val)
-
-      return toDate > fromDate
-    }, 'Effective to date must be after effective from date'),
-  status: BOMStatusEnum.default('draft'),
-  output_qty: z.number().positive('Output quantity must be positive').default(1.0),
+    .nullable(),
+  status: BOMStatusEnum.optional().default('draft'),
+  output_qty: z.number().positive('Output quantity must be positive').optional().default(1.0),
   output_uom: z.string().min(1, 'Unit of measure is required'),
   notes: z.string().optional().nullable()
 })
 
-export type CreateBOMInput = z.infer<typeof CreateBOMSchema>
+export type CreateBOMInput = z.input<typeof CreateBOMSchema>
 
 // Update BOM Schema (cannot change product_id)
 export const UpdateBOMSchema = CreateBOMSchema.omit({ product_id: true }).partial().extend({
@@ -40,7 +29,7 @@ export const UpdateBOMSchema = CreateBOMSchema.omit({ product_id: true }).partia
   effective_to: z.string().datetime().or(z.date()).optional().nullable()
 })
 
-export type UpdateBOMInput = z.infer<typeof UpdateBOMSchema>
+export type UpdateBOMInput = z.input<typeof UpdateBOMSchema>
 
 // BOM type (matches database schema)
 export interface BOM {
@@ -110,7 +99,7 @@ export const CloneBOMSchema = z.object({
   }
 );
 
-export type CloneBOMInput = z.infer<typeof CloneBOMSchema>;
+export type CloneBOMInput = z.input<typeof CloneBOMSchema>;
 
 // ============================================================================
 // BOM ITEM SCHEMAS
@@ -129,12 +118,12 @@ export const CreateBOMItemSchema = z.object({
   product_id: z.string().uuid('Invalid product ID'),
   quantity: z.number().positive('Quantity must be positive'),
   uom: z.string().min(1, 'UoM is required'),
-  scrap_percent: z.number().min(0, 'Scrap percent cannot be negative').max(100, 'Scrap percent cannot exceed 100').default(0),
+  scrap_percent: z.number().min(0, 'Scrap percent cannot be negative').max(100, 'Scrap percent cannot exceed 100').optional().default(0),
   sequence: z.number().int().positive('Sequence must be a positive integer'),
-  consume_whole_lp: z.boolean().default(false),
+  consume_whole_lp: z.boolean().optional().default(false),
 
   // By-products (Story 2.13)
-  is_by_product: z.boolean().default(false),
+  is_by_product: z.boolean().optional().default(false),
   yield_percent: z.number().min(0, 'Yield percent cannot be negative').max(100, 'Yield percent cannot exceed 100').optional().nullable(),
 
   // Conditional items (Story 2.12)
@@ -168,7 +157,7 @@ export const CreateBOMItemSchema = z.object({
   }
 );
 
-export type CreateBOMItemInput = z.infer<typeof CreateBOMItemSchema>;
+export type CreateBOMItemInput = z.input<typeof CreateBOMItemSchema>;
 
 /**
  * Schema for updating a BOM Item
@@ -187,7 +176,7 @@ export const UpdateBOMItemSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
-export type UpdateBOMItemInput = z.infer<typeof UpdateBOMItemSchema>;
+export type UpdateBOMItemInput = z.input<typeof UpdateBOMItemSchema>;
 
 /**
  * Schema for reordering BOM items
@@ -202,7 +191,7 @@ export const ReorderBOMItemsSchema = z.object({
   ).min(1, 'At least one item is required'),
 });
 
-export type ReorderBOMItemsInput = z.infer<typeof ReorderBOMItemsSchema>;
+export type ReorderBOMItemsInput = z.input<typeof ReorderBOMItemsSchema>;
 
 // ============================================================================
 // QUERY SCHEMAS

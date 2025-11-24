@@ -15,17 +15,17 @@ export const OrganizationSchema = z.object({
 
   // Business Settings
   fiscal_year_start: z.string().optional(), // ISO date string
-  date_format: z.enum(['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']).default('DD/MM/YYYY'),
-  number_format: z.enum(['1,234.56', '1.234,56', '1 234.56']).default('1,234.56'),
-  unit_system: z.enum(['metric', 'imperial']).default('metric'),
+  date_format: z.enum(['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']).optional().default('DD/MM/YYYY'),
+  number_format: z.enum(['1,234.56', '1.234,56', '1 234.56']).optional().default('1,234.56'),
+  unit_system: z.enum(['metric', 'imperial']).optional().default('metric'),
 
   // Regional Settings
-  timezone: z.string().default('UTC'),
-  default_currency: z.enum(['PLN', 'EUR', 'USD', 'GBP']).default('EUR'),
-  default_language: z.enum(['PL', 'EN']).default('EN'),
+  timezone: z.string().optional().default('UTC'),
+  default_currency: z.enum(['PLN', 'EUR', 'USD', 'GBP']).optional().default('EUR'),
+  default_language: z.enum(['PL', 'EN']).optional().default('EN'),
 })
 
-export type OrganizationInput = z.output<typeof OrganizationSchema>
+export type OrganizationInput = z.input<typeof OrganizationSchema>
 
 // Organization response from API
 export interface Organization extends OrganizationInput {
