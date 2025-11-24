@@ -70,7 +70,7 @@ export interface CreateRoutingInput {
 
 export interface UpdateRoutingInput {
   name?: string
-  description?: string
+  description?: string | null
   status?: RoutingStatus
   is_reusable?: boolean
 }
