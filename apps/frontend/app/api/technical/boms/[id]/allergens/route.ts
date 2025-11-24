@@ -15,9 +15,10 @@ import type { BOMAllergens } from '@/lib/validation/bom-schemas';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase();
 
     // Check authentication
@@ -31,7 +32,7 @@ export async function GET(
     const { data: bom, error: bomError } = await supabase
       .from('boms')
       .select('id, product_id')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (bomError || !bom) {
@@ -42,7 +43,7 @@ export async function GET(
     const { data: items, error: itemsError } = await supabase
       .from('bom_items')
       .select('product_id')
-      .eq('bom_id', params.id)
+      .eq('bom_id', id)
       .eq('is_by_product', false); // Only input items
 
     if (itemsError) {

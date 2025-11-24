@@ -17,9 +17,10 @@ import { ZodError } from 'zod';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase();
 
     // Check authentication
@@ -56,7 +57,7 @@ export async function POST(
     const { data: sourceBOM, error: bomError } = await supabase
       .from('boms')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (bomError || !sourceBOM) {
@@ -117,7 +118,7 @@ export async function POST(
     const { data: sourceItems, error: itemsError } = await supabase
       .from('bom_items')
       .select('*')
-      .eq('bom_id', params.id)
+      .eq('bom_id', id)
       .order('sequence', { ascending: true });
 
     if (itemsError) {

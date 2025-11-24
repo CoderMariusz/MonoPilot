@@ -11,9 +11,10 @@ import { ZodError, z } from 'zod'
 // GET /api/planning/suppliers/:id/products - Get assigned products
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -46,7 +47,7 @@ export async function GET(
         *,
         products(id, code, name, uom)
       `)
-      .eq('supplier_id', params.id)
+      .eq('supplier_id', id)
       .eq('org_id', currentUser.org_id)
       .order('is_default', { ascending: false })
 
@@ -68,9 +69,10 @@ export async function GET(
 // PUT /api/planning/suppliers/:id/products - Update assignments
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -114,7 +116,7 @@ export async function PUT(
     const { data: supplier } = await supabaseAdmin
       .from('suppliers')
       .select('id')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', currentUser.org_id)
       .single()
 
@@ -127,7 +129,7 @@ export async function PUT(
     const { error: deleteError } = await supabaseAdmin
       .from('supplier_products')
       .delete()
-      .eq('supplier_id', params.id)
+      .eq('supplier_id', id)
       .eq('org_id', currentUser.org_id)
 
     if (deleteError) {
@@ -139,7 +141,7 @@ export async function PUT(
     if (assignments.length > 0) {
       const assignmentsData = assignments.map(assignment => ({
         ...assignment,
-        supplier_id: params.id,
+        supplier_id: id,
         org_id: currentUser.org_id,
       }))
 

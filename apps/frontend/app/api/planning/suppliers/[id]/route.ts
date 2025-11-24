@@ -12,9 +12,10 @@ import { ZodError } from 'zod'
 // GET /api/planning/suppliers/:id - Get supplier details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -44,7 +45,7 @@ export async function GET(
     const { data, error } = await supabaseAdmin
       .from('suppliers')
       .select('*, tax_codes(code, description, rate)')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', currentUser.org_id)
       .single()
 
@@ -62,9 +63,10 @@ export async function GET(
 // PUT /api/planning/suppliers/:id - Update supplier
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -106,7 +108,7 @@ export async function PUT(
     const { data: existingSupplier } = await supabaseAdmin
       .from('suppliers')
       .select('id')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', currentUser.org_id)
       .single()
 
@@ -122,7 +124,7 @@ export async function PUT(
         updated_by: session.user.id,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', currentUser.org_id)
       .select()
       .single()
@@ -153,9 +155,10 @@ export async function PUT(
 // DELETE /api/planning/suppliers/:id - Delete supplier
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -197,7 +200,7 @@ export async function DELETE(
     const { error: deleteError } = await supabaseAdmin
       .from('suppliers')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('org_id', currentUser.org_id)
 
     if (deleteError) {

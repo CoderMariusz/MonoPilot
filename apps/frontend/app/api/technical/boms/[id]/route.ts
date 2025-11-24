@@ -19,9 +19,10 @@ import { ZodError } from 'zod'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -50,7 +51,7 @@ export async function GET(
     const include_items = searchParams.get('include_items') === 'true'
 
     // Call service method
-    const bom = await getBOMById(params.id, include_items)
+    const bom = await getBOMById(id, include_items)
 
     if (!bom) {
       return NextResponse.json({ error: 'BOM not found' }, { status: 404 })
@@ -73,9 +74,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -112,7 +114,7 @@ export async function PUT(
     const validatedData = UpdateBOMSchema.parse(body)
 
     // Call service method
-    const bom = await updateBOM(params.id, validatedData)
+    const bom = await updateBOM(id, validatedData)
 
     return NextResponse.json(
       {
@@ -157,9 +159,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
 
     // Check authentication
@@ -192,13 +195,13 @@ export async function DELETE(
     }
 
     // Verify BOM exists before deletion
-    const bom = await getBOMById(params.id)
+    const bom = await getBOMById(id)
     if (!bom) {
       return NextResponse.json({ error: 'BOM not found' }, { status: 404 })
     }
 
     // Call service method (cascades to bom_items)
-    await deleteBOM(params.id)
+    await deleteBOM(id)
 
     return NextResponse.json(
       {
