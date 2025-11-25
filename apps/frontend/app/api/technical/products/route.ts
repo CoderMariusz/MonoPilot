@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
         {
           error: 'Product code already exists',
           code: 'PRODUCT_CODE_EXISTS',
-          details: { field: 'code', value: validated.code }
+          details: { field: 'code' }
         },
         { status: 400 }
       )
