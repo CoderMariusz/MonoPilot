@@ -8,8 +8,75 @@ import { ZodError } from 'zod'
  * Routing-Product Assignment API Routes
  * Story: 2.17 Routing-Product Assignment
  *
+ * GET /api/technical/routings/:id/products - List assigned products
  * PUT /api/technical/routings/:id/products - Assign products to routing
  */
+
+// ============================================================================
+// GET /api/technical/routings/:id/products - List Assigned Products (AC-017.4)
+// ============================================================================
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+
+    const supabase = await createServerSupabase()
+
+    // Check authentication
+    const {
+      data: { session },
+      error: authError,
+    } = await supabase.auth.getSession()
+
+    if (authError || !session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get current user's org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Fetch assigned products with product details
+    const { data: assignments, error } = await supabase
+      .from('product_routings')
+      .select(`
+        id,
+        product_id,
+        is_default,
+        created_at,
+        product:products(id, code, name, type)
+      `)
+      .eq('routing_id', id)
+
+    if (error) {
+      console.error('Error fetching product assignments:', error)
+      return NextResponse.json(
+        { error: 'Failed to fetch assigned products' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      products: assignments || [],
+    })
+  } catch (error) {
+    console.error('Error in GET /api/technical/routings/:id/products:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
 
 // ============================================================================
 // PUT /api/technical/routings/:id/products - Assign Products (AC-017)

@@ -20,9 +20,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Trash2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { AssignProductsModal } from './assign-products-modal'
 
 interface AssignedProductsTableProps {
   routingId: string
+  routingCode?: string
+  routingName?: string
   isReusable: boolean
 }
 
@@ -38,9 +41,10 @@ interface ProductAssignment {
   }
 }
 
-export function AssignedProductsTable({ routingId, isReusable }: AssignedProductsTableProps) {
+export function AssignedProductsTable({ routingId, routingCode = '', routingName = '', isReusable }: AssignedProductsTableProps) {
   const [assignments, setAssignments] = useState<ProductAssignment[]>([])
   const [loading, setLoading] = useState(true)
+  const [showAssignModal, setShowAssignModal] = useState(false)
   const { toast } = useToast()
 
   // AC-017.4: Fetch assigned products
@@ -112,7 +116,7 @@ export function AssignedProductsTable({ routingId, isReusable }: AssignedProduct
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Assigned Products ({assignments.length})</CardTitle>
-          <Button disabled={true}>
+          <Button onClick={() => setShowAssignModal(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Assign Products
           </Button>
@@ -180,6 +184,21 @@ export function AssignedProductsTable({ routingId, isReusable }: AssignedProduct
           </Table>
         )}
       </CardContent>
+
+      {/* Assign Products Modal (AC-017.1) */}
+      <AssignProductsModal
+        routingId={routingId}
+        routingCode={routingCode}
+        routingName={routingName}
+        isReusable={isReusable}
+        currentProductIds={assignments.map((a) => a.product_id)}
+        open={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        onSuccess={() => {
+          setShowAssignModal(false)
+          fetchAssignments()
+        }}
+      />
     </Card>
   )
 }
