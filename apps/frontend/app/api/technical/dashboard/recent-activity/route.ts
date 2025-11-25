@@ -1,12 +1,35 @@
 // GET /api/technical/dashboard/recent-activity - Recent Activity API (Story 2.23 AC-2.23.6)
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { recentActivityQuerySchema } from '@/lib/validation/dashboard-schemas'
 import { getRecentActivity } from '@/lib/services/dashboard-service'
 
 export async function GET(request: NextRequest) {
   try {
-    // TODO: Get org_id from auth session
-    const orgId = request.headers.get('x-org-id') || 'mock-org-id'
+    const supabase = await createServerSupabase()
+
+    // Check authentication
+    const {
+      data: { session },
+      error: authError,
+    } = await supabase.auth.getSession()
+
+    if (authError || !session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const orgId = currentUser.org_id
 
     const searchParams = request.nextUrl.searchParams
     const query = recentActivityQuerySchema.parse({

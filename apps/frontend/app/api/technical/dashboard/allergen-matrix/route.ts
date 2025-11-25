@@ -1,11 +1,35 @@
 // GET /api/technical/dashboard/allergen-matrix - Allergen Matrix API (Story 2.24)
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { allergenMatrixQuerySchema } from '@/lib/validation/dashboard-schemas'
 import { getAllergenMatrix } from '@/lib/services/dashboard-service'
 
 export async function GET(request: NextRequest) {
   try {
-    const orgId = request.headers.get('x-org-id') || 'mock-org-id'
+    const supabase = await createServerSupabase()
+
+    // Check authentication
+    const {
+      data: { session },
+      error: authError,
+    } = await supabase.auth.getSession()
+
+    if (authError || !session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const orgId = currentUser.org_id
 
     const searchParams = request.nextUrl.searchParams
 
