@@ -2,7 +2,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { AllergenMatrixResponse } from '@/lib/types/dashboard'
+import type { AllergenMatrixResponse, AllergenMatrixRow } from '@/lib/types/dashboard'
+
+interface AllergenInfo {
+  id: string
+  name: string
+  code: string
+}
 
 export default function AllergenMatrixPage() {
   const [data, setData] = useState<AllergenMatrixResponse | null>(null)
@@ -33,7 +39,7 @@ export default function AllergenMatrixPage() {
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold">Product Name</th>
               <th className="px-4 py-3 text-left text-sm font-semibold">Type</th>
-              {data?.allergens.map(allergen => (
+              {data?.allergens.map((allergen: AllergenInfo) => (
                 <th key={allergen.id} className="px-2 py-3 text-center text-xs">
                   <div className="transform -rotate-45 origin-left">{allergen.name}</div>
                 </th>
@@ -42,14 +48,14 @@ export default function AllergenMatrixPage() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {data?.matrix.map(row => (
+            {data?.matrix.map((row: AllergenMatrixRow) => (
               <tr key={row.product_id} className="hover:bg-gray-50">
                 <td className="sticky left-0 bg-white px-4 py-3 text-sm font-medium">
                   {row.product_code}
                 </td>
                 <td className="px-4 py-3 text-sm">{row.product_name}</td>
                 <td className="px-4 py-3 text-sm">{row.product_type}</td>
-                {data.allergens.map(allergen => (
+                {data.allergens.map((allergen: AllergenInfo) => (
                   <td key={allergen.id} className="px-2 py-3 text-center">
                     <AllergenCell status={row.allergens[allergen.id]} />
                   </td>

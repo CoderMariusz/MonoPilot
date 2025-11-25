@@ -56,7 +56,7 @@ export default function TechnicalDashboardPage() {
 
       {/* Product Groups */}
       <div className="space-y-6">
-        {data?.groups?.map(group => (
+        {data?.groups?.map((group: ProductGroup) => (
           <ProductGroupSection key={group.category} group={group} />
         ))}
       </div>

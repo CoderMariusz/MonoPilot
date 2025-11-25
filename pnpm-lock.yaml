@@ -95,6 +95,15 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.84.0
         version: 2.84.0
+      '@types/node':
+        specifier: ^22
+        version: 22.19.1
+      '@types/react':
+        specifier: ^19
+        version: 19.2.6
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.2.3(@types/react@19.2.6)
       '@upstash/redis':
         specifier: ^1.35.6
         version: 1.35.6
@@ -162,18 +171,9 @@ importers:
       '@types/jsonwebtoken':
         specifier: ^9.0.10
         version: 9.0.10
-      '@types/node':
-        specifier: ^22
-        version: 22.19.1
       '@types/qrcode':
         specifier: ^1.5.6
         version: 1.5.6
-      '@types/react':
-        specifier: ^19
-        version: 19.2.6
-      '@types/react-dom':
-        specifier: ^19
-        version: 19.2.3(@types/react@19.2.6)
       '@types/ua-parser-js':
         specifier: ^0.7.39
         version: 0.7.39

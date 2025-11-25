@@ -2,7 +2,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { TraceResult, RecallSimulationResult } from '@/lib/types/traceability'
+import type { TraceResult, RecallSimulationResult, LocationAnalysis, CustomerImpact } from '@/lib/types/traceability'
 import { GenealogyTree } from '@/components/technical/GenealogyTree'
 
 type TabType = 'forward' | 'backward' | 'recall'
@@ -294,7 +294,7 @@ export default function TracingPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {recallResult.locations.map((loc, idx) => (
+                    {recallResult.locations.map((loc: LocationAnalysis, idx: number) => (
                       <tr key={idx} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm">{loc.warehouse_name}</td>
                         <td className="px-4 py-3 text-sm">{loc.affected_lps}</td>
@@ -326,7 +326,7 @@ export default function TracingPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {recallResult.customers.map((customer, idx) => (
+                    {recallResult.customers.map((customer: CustomerImpact, idx: number) => (
                       <tr key={idx} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm">{customer.customer_name}</td>
                         <td className="px-4 py-3 text-sm">{customer.contact_email}</td>
