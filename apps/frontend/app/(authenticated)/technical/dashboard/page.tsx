@@ -129,7 +129,7 @@ export default function TechnicalDashboardPage() {
 
   // Scroll to section
   const scrollToSection = (category: ProductCategory) => {
-    const refs: Record<ProductCategory, React.RefObject<HTMLDivElement>> = {
+    const refs: Record<ProductCategory, React.RefObject<HTMLDivElement | null>> = {
       RM: rmSectionRef,
       WIP: wipSectionRef,
       FG: fgSectionRef
