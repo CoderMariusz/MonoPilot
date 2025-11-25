@@ -184,7 +184,12 @@ export default function RoutingDetailPage() {
       <OperationsTable routingId={routingId} />
 
       {/* Assigned Products Section (AC-017.4) */}
-      <AssignedProductsTable routingId={routingId} isReusable={routing.is_reusable} />
+      <AssignedProductsTable
+        routingId={routingId}
+        routingCode={routing.code}
+        routingName={routing.name}
+        isReusable={routing.is_reusable}
+      />
 
       {/* Edit Drawer (AC-015.6) */}
       <EditRoutingDrawer
