@@ -27,8 +27,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
-import { FileText, Search, Edit, Trash2, Eye, Plus } from 'lucide-react'
+import { Search, Edit, Trash2, Eye, Plus } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import type { BOMWithProduct } from '@/lib/validation/bom-schemas'
@@ -42,6 +52,7 @@ export default function BOMsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingBOM, setEditingBOM] = useState<BOMWithProduct | null>(null)
+  const [deletingBOM, setDeletingBOM] = useState<BOMWithProduct | null>(null)
 
   const { toast } = useToast()
 
@@ -90,17 +101,15 @@ export default function BOMsPage() {
   }, [searchTerm])
 
   // Delete handler (AC-2.6.6)
-  const handleDelete = async (bom: BOMWithProduct) => {
-    if (
-      !confirm(
-        `Delete BOM v${bom.version} for "${bom.product.name}"? This will also delete all BOM items. This action cannot be undone.`
-      )
-    ) {
-      return
-    }
+  const handleDeleteClick = (bom: BOMWithProduct) => {
+    setDeletingBOM(bom)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingBOM) return
 
     try {
-      const response = await fetch(`/api/technical/boms/${bom.id}`, {
+      const response = await fetch(`/api/technical/boms/${deletingBOM.id}`, {
         method: 'DELETE',
       })
 
@@ -111,9 +120,10 @@ export default function BOMsPage() {
 
       toast({
         title: 'Success',
-        description: `BOM v${bom.version} deleted successfully`,
+        description: `BOM v${deletingBOM.version} deleted successfully`,
       })
 
+      setDeletingBOM(null)
       fetchBOMs() // Refresh list
     } catch (error) {
       console.error('Error deleting BOM:', error)
@@ -274,7 +284,7 @@ export default function BOMsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(bom)}
+                          onClick={() => handleDeleteClick(bom)}
                           title="Delete"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
@@ -293,6 +303,31 @@ export default function BOMsPage() {
       {(showCreateModal || editingBOM) && (
         <BOMFormModal bom={editingBOM} onClose={handleCloseModal} onSuccess={handleSaveSuccess} />
       )}
+
+      {/* Delete Confirmation Dialog (AC-2.6.6) */}
+      <AlertDialog open={!!deletingBOM} onOpenChange={(open) => !open && setDeletingBOM(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete BOM?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingBOM && (
+                <>
+                  Are you sure you want to delete BOM v{deletingBOM.version} for{' '}
+                  <span className="font-semibold">{deletingBOM.product.name}</span>?
+                  <br /><br />
+                  This will also delete all BOM items. This action cannot be undone.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-500 hover:bg-red-600">
+              Delete BOM
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

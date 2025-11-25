@@ -1,6 +1,7 @@
 -- Migration 024: Create Products Tables
 -- Epic 2 - Batch 2A: Products + Settings
--- Stories: 2.1, 2.2, 2.3, 2.4, 2.5, 2.22
+-- Stories: 2.1, 2.2, 2.3, 2.4, 2.5
+-- Note: technical_settings table (Story 2.22) is shared across batches and defined here for convenience
 -- Date: 2025-01-23
 
 -- ============================================================================
