@@ -27,7 +27,7 @@ import { Copy, Calendar } from 'lucide-react'
 
 interface BOMCloneModalProps {
   bomId: string
-  version: number
+  version: string | number
   onClose: () => void
   onSuccess: () => void
 }
@@ -203,7 +203,7 @@ export function BOMCloneModal({ bomId, version, onClose, onSuccess }: BOMCloneMo
               <li>Output quantity and settings</li>
             </ul>
             <p className="mt-2 text-blue-600">
-              Version will be auto-incremented (v{version} → v{(version + 0.1).toFixed(1)})
+              Version will be auto-incremented (v{version} → v{(Number(version) + 0.1).toFixed(1)})
             </p>
           </div>
 
