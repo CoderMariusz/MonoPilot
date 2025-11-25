@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseAdmin } from '@/lib/supabase/server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { productTypeUpdateSchema } from '@/lib/validation/product-schemas'
 import { ZodError } from 'zod'
 
@@ -15,20 +15,34 @@ type RouteContext = {
 // GET /api/technical/product-types/[id] - Get single product type
 export async function GET(req: NextRequest, context: RouteContext) {
   try {
-    const supabase = createServerSupabaseAdmin()
+    const supabase = await createServerSupabase()
     const { id } = await context.params
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Check authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (authError || !user) {
+    if (authError || !session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    const orgId = user.user_metadata.org_id
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentUser.org_id
 
     // Fetch product type
     const { data, error } = await supabase
@@ -59,20 +73,34 @@ export async function GET(req: NextRequest, context: RouteContext) {
 // PUT /api/technical/product-types/[id] - Update product type
 export async function PUT(req: NextRequest, context: RouteContext) {
   try {
-    const supabase = createServerSupabaseAdmin()
+    const supabase = await createServerSupabase()
     const { id } = await context.params
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Check authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (authError || !user) {
+    if (authError || !session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    const orgId = user.user_metadata.org_id
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentUser.org_id
 
     // Parse and validate request body
     const body = await req.json()
@@ -105,7 +133,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       .from('product_type_config')
       .update({
         ...validated,
-        updated_by: user.id
+        updated_by: session.user.id
       })
       .eq('id', id)
       .eq('org_id', orgId)
@@ -141,20 +169,34 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 // DELETE /api/technical/product-types/[id] - Delete custom product type
 export async function DELETE(req: NextRequest, context: RouteContext) {
   try {
-    const supabase = createServerSupabaseAdmin()
+    const supabase = await createServerSupabase()
     const { id } = await context.params
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Check authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (authError || !user) {
+    if (authError || !session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    const orgId = user.user_metadata.org_id
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentUser.org_id
 
     // Check if product type exists and is not default
     const { data: existing } = await supabase
@@ -193,7 +235,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
       // Soft delete by deactivating
       const { error: updateError } = await supabase
         .from('product_type_config')
-        .update({ is_active: false, updated_by: user.id })
+        .update({ is_active: false, updated_by: session.user.id })
         .eq('id', id)
         .eq('org_id', orgId)
 

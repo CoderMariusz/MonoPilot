@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseAdmin } from '@/lib/supabase/server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { versionCompareQuerySchema } from '@/lib/validation/product-schemas'
 import { ZodError } from 'zod'
 
@@ -15,20 +15,34 @@ type RouteContext = {
 // GET /api/technical/products/[id]/history/compare?v1=1.0&v2=1.5
 export async function GET(req: NextRequest, context: RouteContext) {
   try {
-    const supabase = createServerSupabaseAdmin()
+    const supabase = await createServerSupabase()
     const { id } = await context.params
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Check authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (authError || !user) {
+    if (authError || !session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    const orgId = user.user_metadata.org_id
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentUser.org_id
 
     // Parse query parameters
     const searchParams = Object.fromEntries(req.nextUrl.searchParams.entries())
