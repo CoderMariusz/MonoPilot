@@ -1,0 +1,81 @@
+<story-context id="3-7-to-line-management" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>7</storyId>
+    <title>TO Line Management</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Template B - Line Items Pattern</template>
+    <estimatedTokens>4000</estimatedTokens>
+    <estimatedEffort>1 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Warehouse user</asA>
+    <iWant>to add products to transfer orders</iWant>
+    <soThat>I can specify what to transfer</soThat>
+    <tasks>
+      <task id="1" ac="AC-3.7.1">TO Lines Table Schema - to_lines table with product_id, quantity, shipped_qty, received_qty</task>
+      <task id="2" ac="AC-3.7.2">TO Lines CRUD Service - addTOLine(), updateTOLine(), deleteTOLine() with parent validation</task>
+      <task id="3" ac="AC-3.7.3">API Routes - POST/PUT/DELETE /api/planning/transfer-orders/:id/lines endpoints</task>
+      <task id="4" ac="AC-3.7.4">TO Lines Table UI - Table displaying product, qty, shipped_qty, received_qty</task>
+      <task id="5" ac="ALL">Unit & Integration Tests - TO line CRUD tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-3.7.1">Given TO is created, When adding line, Then modal opens with: product_id (required), quantity (required), uom (from product)</criterion>
+    <criterion id="AC-3.7.2">When TO is shipped, Then shipped_qty tracked per line; When TO is received, Then received_qty tracked</criterion>
+    <criterion id="AC-3.7.3">API: POST /api/planning/transfer-orders/:id/lines - Request: { product_id, quantity } - Response: { data: TOLine }</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-3-planning.md</path>
+        <title>Epic 3: Planning Operations</title>
+        <section>Story 3.7: TO Line Management</section>
+        <snippet>Add products to transfer orders. to_lines table with product_id, quantity, shipped_qty, received_qty. Prerequisites: Story 3.6.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/planning/transfer-orders/[id]/lines</path>
+        <kind>directory</kind>
+        <symbol>TO Lines API route</symbol>
+        <reason>Story requires route.ts for POST/PUT/DELETE /api/planning/transfer-orders/:id/lines</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for TO line CRUD" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Template B Line Items Pattern - parent-child (TO → TO Lines)</constraint>
+    <constraint type="testing">Test pyramid - 95% unit, 70% integration, 100% E2E</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/planning/transfer-orders/:id/lines</name>
+      <kind>API route</kind>
+      <signature>POST /api/planning/transfer-orders/{to_id}/lines - Request: { product_id, quantity } - Response: { data: TOLine }</signature>
+      <path>app/api/planning/transfer-orders/[id]/lines/route.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Test Pyramid: unit tests (95%), integration tests (70%), E2E tests (100%)</standards>
+    <locations>
+      <location>lib/services/__tests__/to-line-service.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-3.7.3">Unit test: addTOLine() with invalid to_id - returns error "TO not found"</idea>
+    </ideas>
+  </tests>
+</story-context>

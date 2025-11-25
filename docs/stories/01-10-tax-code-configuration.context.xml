@@ -1,0 +1,347 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.10</storyId>
+    <title>Tax Code Configuration</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-20</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-10-tax-code-configuration.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Admin</asA>
+    <iWant>manage tax codes</iWant>
+    <soThat>POs have correct VAT rates</soThat>
+    <tasks>
+      - Task 1: Database Schema - Tax Codes Table (with RLS, rate decimal field)
+      - Task 2: Tax Code Seed Script (country-based: Poland 4 rates, UK 3 rates, default 1 rate)
+      - Task 3: Tax Code Service - Core Logic (seed, create, update, get, delete with PO usage checks)
+      - Task 4: Zod Validation Schemas (CreateTaxCodeSchema with rate validation)
+      - Task 5: API Endpoints (GET, POST, PUT, DELETE for /api/settings/tax-codes)
+      - Task 6: Frontend Tax Codes List Page (/settings/production → Tax Codes tab)
+      - Task 7: Tax Code Form Modal (with rate change warnings)
+      - Task 8: Organization Creation Hook (seed tax codes based on country)
+      - Task 9: Rate Change Warning (warn if PO usage exists)
+      - Task 10: Cache Invalidation & Events (tax_code.updated for Epic 3)
+      - Task 11: Integration & Testing (Unit, Integration, E2E tests, seed by country)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-009.1">
+      <title>Tax codes preloaded based on organization country</title>
+      <details>
+        - On organization creation: seed tax codes based on organizations.country
+        - Poland: VAT 23%, VAT 8%, VAT 5%, VAT 0%
+        - UK: Standard 20%, Reduced 5%, Zero 0%
+        - Default codes: { code: 'VAT23', description: 'VAT 23%', rate: 23.00 }
+        - Rate stored as decimal (23.00 for 23%)
+        - Preloaded tax codes can be edited or deleted (unlike allergens)
+      </details>
+    </criterion>
+
+    <criterion id="AC-009.2">
+      <title>Admin może dodać custom tax codes</title>
+      <details>
+        - Navigate to /settings/production → "Tax Codes" tab
+        - Click "Add Tax Code" button
+        - Form fields: code (required, unique per org, uppercase), description (required, max 200 chars), rate (required, decimal %)
+        - Validation: code unique, rate >= 0
+        - On save: tax code created
+      </details>
+    </criterion>
+
+    <criterion id="AC-009.3">
+      <title>Tax codes list view</title>
+      <details>
+        - Table columns: Code, Description, Rate (%), POs (count), Actions
+        - Rate column: formatted as "23.00%" with 2 decimals
+        - POs column: count of PO lines using this tax code (Epic 3 JOIN)
+        - Search by code or description
+        - Sort by code, rate, description
+        - Filter: All, Zero-rated, Standard, Reduced
+      </details>
+    </criterion>
+
+    <criterion id="AC-009.4">
+      <title>Cannot delete tax code if used in POs</title>
+      <details>
+        - FK constraint: tax_codes used in po_lines table (Epic 3)
+        - Check: query po_lines.tax_code_id COUNT
+        - If used: error "Cannot delete - used by X PO lines"
+        - Archive option: add is_active flag (soft delete)
+      </details>
+    </criterion>
+
+    <criterion id="AC-009.5">
+      <title>Edit tax code</title>
+      <details>
+        - Click Edit action → drawer opens
+        - All fields editable (code, description, rate)
+        - Warning if editing rate: "X PO lines use this rate. Changes affect historical data."
+        - Recommendation: create new tax code instead of changing rate
+        - On save: tax code updated
+      </details>
+    </criterion>
+
+    <criterion id="AC-009.6">
+      <title>Tax code seed migration</title>
+      <details>
+        - Run on organization creation
+        - Country-based seed: Poland (4 codes), UK (3 codes), Other (1 code)
+        - Idempotent: ON CONFLICT DO NOTHING
+      </details>
+    </criterion>
+
+    <criterion id="AC-009.7">
+      <title>Cache invalidation events</title>
+      <details>
+        - On tax code create/update/delete: emit 'tax_code.updated' event
+        - Epic 3 refetches tax code list on event
+        - Redis cache TTL: 10 min
+        - Cache key: `tax_codes:{org_id}`
+      </details>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-1.md</path>
+        <title>Technical Specification - Epic 1 (Foundation & Settings)</title>
+        <section>FR-SET-009: Tax Code Configuration</section>
+        <snippet>Country-based tax code seeding (Poland, UK, default), rate change warnings, FK protection for PO usage.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/epics/epic-1-settings.md</path>
+        <title>Epic 1: Foundation & Settings</title>
+        <section>Story 1.10: Tax Code Configuration</section>
+        <snippet>Tax code management with country-specific preloading and rate change warnings for historical data protection.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/lib/supabase/server.ts</path>
+        <kind>lib</kind>
+        <symbol>createClient</symbol>
+        <lines>all</lines>
+        <reason>Supabase server client for database operations</reason>
+      </artifact>
+
+      <artifact>
+        <path>app/lib/types.ts</path>
+        <kind>types</kind>
+        <symbol>Database types</symbol>
+        <lines>all</lines>
+        <reason>TypeScript types for database tables - will be updated after tax_codes table migration</reason>
+      </artifact>
+
+      <artifact>
+        <path>packages/shared/schemas.ts</path>
+        <kind>schemas</kind>
+        <symbol>Zod schemas</symbol>
+        <lines>all</lines>
+        <reason>Shared validation schemas - add CreateTaxCodeSchema</reason>
+      </artifact>
+
+      <artifact>
+        <path>packages/shared/types.ts</path>
+        <kind>types</kind>
+        <symbol>Shared types</symbol>
+        <lines>all</lines>
+        <reason>Shared TypeScript types - add TaxCode interface</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@supabase/supabase-js" version="latest">Supabase client for database</package>
+        <package name="zod" version="latest">Schema validation (CreateTaxCodeSchema)</package>
+        <package name="react-hook-form" version="latest">Form state management</package>
+        <package name="swr" version="latest">Data fetching and caching</package>
+        <package name="ioredis" version="latest">Redis client for caching</package>
+      </ecosystem>
+
+      <ecosystem name="shadcn">
+        <component name="table">Tax codes table component</component>
+        <component name="dialog">Tax code form modal, rate change warning modal</component>
+        <component name="toast">Success/error notifications</component>
+        <component name="input">Form fields</component>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">
+      <rule>Multi-tenancy: RLS policy on tax_codes table (org_id isolation)</rule>
+      <rule>Country-Based Seeding: Poland (4 rates), UK (3 rates), default (1 rate)</rule>
+      <rule>Rate Change Warning: Editing rate affects historical PO data, warn user</rule>
+      <rule>FK Protection: Tax codes in use by POs cannot be deleted (po_lines table)</rule>
+      <rule>Cache Invalidation: Events emitted on mutations, consumed by Epic 3</rule>
+    </constraint>
+
+    <constraint type="security">
+      <rule>RLS Policy REQUIRED: org_id = (auth.jwt() ->> 'org_id')::uuid on tax_codes table</rule>
+      <rule>Admin Only: Only Admin role can create/edit/delete tax codes</rule>
+      <rule>FK Protection: Tax codes in use by PO lines cannot be deleted</rule>
+    </constraint>
+
+    <constraint type="data">
+      <rule>Unique Constraint: (org_id, code) - tax code unique per organization</rule>
+      <rule>Check Constraint: rate >= 0 (non-negative rates only)</rule>
+      <rule>Indexes REQUIRED: org_id, rate for query performance</rule>
+      <rule>Rate Storage: decimal(5,2) - supports 0.00 to 999.99%</rule>
+      <rule>Seed Data: Poland (VAT23, VAT8, VAT5, VAT0), UK (STD20, RED5, ZERO), Default (VAT0)</rule>
+    </constraint>
+
+    <constraint type="performance">
+      <rule>Tax code list load: &lt;200ms p95</rule>
+      <rule>Create tax code: &lt;200ms</rule>
+      <rule>Cache TTL: 10 min (master data, rarely changes)</rule>
+      <rule>Cache hit rate: &gt;80%</rule>
+    </constraint>
+
+    <constraint type="testing">
+      <rule>RLS Testing: MUST add to RLS test suite (Sprint 0 Gap 4)</rule>
+      <rule>Seed Testing: MUST verify country-based seeding (Poland, UK, default)</rule>
+      <rule>FK Testing: MUST verify deletion protection for PO usage</rule>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="GET /api/settings/tax-codes">
+      <kind>REST endpoint</kind>
+      <signature>
+        Query: { search? }
+        Response: TaxCode[] (with PO line count from po_lines)
+        Auth: Authenticated user
+        Cache: 10 min TTL (Redis)
+      </signature>
+      <path>app/api/settings/tax-codes/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="POST /api/settings/tax-codes">
+      <kind>REST endpoint</kind>
+      <signature>
+        Body: CreateTaxCodeInput { code, description, rate }
+        Response: TaxCode
+        Auth: Admin only
+        Validation: Code unique per org, rate >= 0
+        Side effects: Insert tax code, emit tax_code.created event
+      </signature>
+      <path>app/api/settings/tax-codes/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="PUT /api/settings/tax-codes/:id">
+      <kind>REST endpoint</kind>
+      <signature>
+        Params: { id: UUID }
+        Body: UpdateTaxCodeInput { code?, description?, rate? }
+        Response: TaxCode
+        Auth: Admin only
+        Warning: If rate changing and PO usage > 0, show warning modal
+        Side effects: Update tax code, emit tax_code.updated event
+      </signature>
+      <path>app/api/settings/tax-codes/[id]/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="DELETE /api/settings/tax-codes/:id">
+      <kind>REST endpoint</kind>
+      <signature>
+        Params: { id: UUID }
+        Response: { success: boolean } or { error: string }
+        Auth: Admin only
+        Validation: Not used in PO lines (query count)
+        Side effects: Delete tax code, emit tax_code.deleted event
+      </signature>
+      <path>app/api/settings/tax-codes/[id]/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="TaxCodeService.seedTaxCodes">
+      <kind>Service method</kind>
+      <signature>
+        async seedTaxCodes(orgId: string, country: string): Promise&lt;void&gt;
+        Logic: Determine tax codes based on country (PL, UK, DEFAULT)
+        Inserts: Bulk insert with ON CONFLICT (org_id, code) DO NOTHING
+        Idempotent: Safe to re-run
+      </signature>
+      <path>lib/services/TaxCodeService.ts (NEW)</path>
+    </interface>
+
+    <interface name="CreateTaxCodeSchema">
+      <kind>Zod schema</kind>
+      <signature>
+        z.object({
+          code: z.string().regex(/^[A-Z0-9-]+$/).min(2).max(50),
+          description: z.string().min(1).max(200),
+          rate: z.number().min(0).max(100)
+        })
+      </signature>
+      <path>packages/shared/schemas.ts</path>
+    </interface>
+
+    <interface name="Cache Event: tax_code.updated">
+      <kind>Event emitter</kind>
+      <signature>
+        Event: 'tax_code.created' | 'tax_code.updated' | 'tax_code.deleted'
+        Payload: { type: string, org_id: string, tax_code_id: string, timestamp: Date }
+        Consumers: Epic 3 (PO line tax calculation)
+        Action: Invalidate Redis cache key `tax_codes:{org_id}`, refetch tax code list
+      </signature>
+      <path>Server: TaxCodeService, Consumers: Epic 3 services</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing stack: Vitest for unit/integration tests, Playwright for E2E tests.
+      RLS tests MUST be added to tests/integration/rls/ suite (Sprint 0 Gap 4).
+      Seed tests MUST verify country-based logic (Poland, UK, default).
+    </standards>
+
+    <locations>
+      - lib/services/TaxCodeService.test.ts (Tax code CRUD, seed logic)
+      - packages/shared/schemas.test.ts (Zod schema validation tests)
+      - app/api/settings/tax-codes/**/*.test.ts (API endpoint tests)
+      - tests/integration/tax-codes/ (Integration tests: seed, FK protection, rate change warnings)
+      - tests/integration/rls/tax-codes-rls.test.ts (RLS policy tests)
+      - tests/e2e/settings/tax-codes.spec.ts (E2E tax code management flow)
+    </locations>
+
+    <ideas>
+      <test id="AC-009.1" type="integration">
+        - Seed tax codes for Poland org → 4 codes (VAT23, VAT8, VAT5, VAT0)
+        - Seed tax codes for UK org → 3 codes (STD20, RED5, ZERO)
+        - Seed tax codes for other country → 1 code (VAT0)
+        - Re-run seed → idempotent (no duplicates)
+      </test>
+
+      <test id="AC-009.2" type="integration">
+        - POST /api/settings/tax-codes → custom tax code created
+        - Verify unique constraint (org_id, code)
+        - Verify rate validation (>= 0)
+      </test>
+
+      <test id="AC-009.4" type="integration">
+        - DELETE tax code in use by POs → FK constraint error with PO count
+        - DELETE tax code not in use → succeeds
+      </test>
+
+      <test id="AC-009.5" type="integration">
+        - PUT tax code → rate changed → warning if PO usage > 0
+        - PUT tax code → code changed → unique validation
+      </test>
+
+      <test id="all" type="e2e">
+        - E2E: Create custom tax code → appears in list with rate formatted "23.00%"
+        - E2E: Edit tax code rate → warning modal if PO usage
+        - E2E: Delete tax code → confirmation modal → deleted
+        - E2E: Cannot delete tax code in use → error shown
+        - E2E: Search tax codes → filtered correctly
+      </test>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,356 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.3</storyId>
+    <title>User Invitations</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-20</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-3-user-invitations.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Admin</asA>
+    <iWant>invite users via email or QR code</iWant>
+    <soThat>new team members can easily onboard</soThat>
+    <tasks>
+      - Task 1: Database Schema - Invitations Table (user_invitations with RLS, token, expiry tracking)
+      - Task 2: Invitation Token Generation (JWT with 7-day expiry, validate/invalidate)
+      - Task 3: QR Code Generation (qrcode library, base64 embedding)
+      - Task 4: API Endpoints (POST/GET/DELETE for invitations, resend logic)
+      - Task 5: SendGrid Email Integration (template, retry logic, transactional email)
+      - Task 6: Signup Page (token validation, password setup, auto-login)
+      - Task 7: Frontend Invitations Tab (table, resend/cancel, status badges)
+      - Task 8: Invitation Modal (QR code display, copy link)
+      - Task 9: Auto-Cleanup Expired Invitations (weekly cron job)
+      - Task 10: Integration &amp; Testing (Unit, Integration, E2E)
+      - Task 11: SendGrid Mock for Testing
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-002.6">
+      <title>Invitation email wysłany within 5s</title>
+      <details>
+        - Signup link z pre-filled email
+        - QR code do mobile scanning
+        - Invitation expires after 7 days
+        - Link format: /signup?token={jwt_token}&amp;email={email}
+      </details>
+    </criterion>
+
+    <criterion id="AC-002.7">
+      <title>Invitation expires after 7 days</title>
+      <details>
+        - Token zawiera expiry timestamp (JWT exp claim)
+        - Expired invitation shows error: "This invitation has expired. Please request a new one."
+        - Admin może resend invitation (extends expiry o kolejne 7 days)
+      </details>
+    </criterion>
+
+    <criterion id="AC-002.8">
+      <title>Signup z invitation link</title>
+      <details>
+        - Email pre-filled (read-only)
+        - User sets password (min 8 chars, 1 uppercase, 1 number)
+        - On successful signup: user.status → 'active'
+        - Invitation token invalidated (one-time use)
+        - Redirect to dashboard with welcome message
+      </details>
+    </criterion>
+
+    <criterion id="AC-003.1">
+      <title>Admin views pending invitations</title>
+      <details>
+        - Navigate to /settings/users → "Invitations" tab
+        - Table columns: Email, Role, Invited By, Sent Date, Expires At, Status, Actions
+        - Status: Pending, Accepted, Expired
+        - Filter by status, search by email
+      </details>
+    </criterion>
+
+    <criterion id="AC-003.2">
+      <title>Resend invitation functionality</title>
+      <details>
+        - Click "Resend" action → new email sent
+        - New token generated (7-day expiry)
+        - Previous token invalidated
+        - Success toast: "Invitation resent to {email}"
+      </details>
+    </criterion>
+
+    <criterion id="AC-003.3">
+      <title>Cancel invitation functionality</title>
+      <details>
+        - Click "Cancel" action → confirmation modal
+        - On confirm: invitation deleted, token invalidated
+        - User record removed from users table (if status still 'invited')
+      </details>
+    </criterion>
+
+    <criterion id="AC-003.4">
+      <title>Expired invitations marked visually</title>
+      <details>
+        - Expires At column shows "Expired" badge (red)
+        - Status = "Expired"
+        - Auto-cleanup: expired invitations >30 days old deleted weekly
+      </details>
+    </criterion>
+
+    <criterion id="AC-003.5">
+      <title>QR code generation</title>
+      <details>
+        - QR code contains same signup URL as email link
+        - QR code displayed in invitation modal
+        - QR code embedded in email (base64 image)
+      </details>
+    </criterion>
+
+    <criterion id="AC-003.6">
+      <title>Invitation email template</title>
+      <details>
+        - Subject: "You've been invited to {org_name} on MonoPilot"
+        - Body: org name, role, signup link, QR code, expiry date
+        - SendGrid transactional email with org branding
+      </details>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-1.md</path>
+        <title>Technical Specification - Epic 1</title>
+        <section>FR-SET-002: User Management (User Invitations)</section>
+        <snippet>Invitation flow with JWT tokens, SendGrid integration, 7-day expiry, QR code generation</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/epics/epic-1-settings.md</path>
+        <title>Epic 1: Foundation &amp; Settings</title>
+        <section>Story 1.3: User Invitations</section>
+        <snippet>Email + QR code invitations for easy onboarding</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/settings/users/route.ts</path>
+        <kind>api</kind>
+        <symbol>POST /api/settings/users</symbol>
+        <lines>all</lines>
+        <reason>Extend with invitation sending logic after user creation (Story 1.2)</reason>
+      </artifact>
+
+      <artifact>
+        <path>packages/shared/schemas.ts</path>
+        <kind>schemas</kind>
+        <symbol>Zod schemas</symbol>
+        <lines>all</lines>
+        <reason>Add InvitationTokenSchema for JWT payload validation</reason>
+      </artifact>
+
+      <artifact>
+        <path>packages/shared/types.ts</path>
+        <kind>types</kind>
+        <symbol>Shared types</symbol>
+        <lines>all</lines>
+        <reason>Add UserInvitation, InvitationStatus types</reason>
+      </artifact>
+
+      <artifact>
+        <path>tests/support/fixtures/factories/user-factory.ts</path>
+        <kind>test-factory</kind>
+        <symbol>UserFactory</symbol>
+        <lines>all</lines>
+        <reason>Create InvitationFactory for test data</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@sendgrid/mail" version="latest">Email sending (NEW - needs install)</package>
+        <package name="jsonwebtoken" version="latest">JWT token generation/validation (NEW - needs install)</package>
+        <package name="qrcode" version="latest">QR code generation (NEW - needs install)</package>
+        <package name="@supabase/supabase-js" version="latest">Supabase client</package>
+        <package name="zod" version="latest">Schema validation</package>
+      </ecosystem>
+
+      <ecosystem name="shadcn">
+        <component name="tabs">Invitations tab in users page</component>
+        <component name="table">Invitations table</component>
+        <component name="dialog">Invitation modal, cancel confirmation</component>
+        <component name="badge">Status badges (Pending, Accepted, Expired)</component>
+        <component name="toast">Success/error notifications</component>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">
+      <rule>JWT Token: 7-day expiry, HS256 algorithm, signed with JWT_SECRET env variable</rule>
+      <rule>One-time use: Token invalidated after successful signup (prevent reuse)</rule>
+      <rule>SendGrid Integration: Transactional emails with retry logic (3 attempts, exponential backoff)</rule>
+      <rule>RLS Policy: user_invitations table filtered by org_id</rule>
+    </constraint>
+
+    <constraint type="security">
+      <rule>Token Security: JWT must include exp claim, validated on server before signup</rule>
+      <rule>Email Validation: Token email MUST match signup email (prevent token sharing)</rule>
+      <rule>Expiry Enforcement: Server validates expiry, not just client UI</rule>
+      <rule>Admin-only: Only Admin role can invite, resend, cancel invitations</rule>
+    </constraint>
+
+    <constraint type="data">
+      <rule>Unique Constraint: (org_id, email, status) WHERE status = 'pending' - prevents duplicate pending invitations</rule>
+      <rule>Indexes REQUIRED: org_id, email, status, expires_at for query performance</rule>
+      <rule>Auto-Cleanup: Weekly cron job deletes expired invitations >30 days old</rule>
+    </constraint>
+
+    <constraint type="integration">
+      <rule>Story 1.2 Integration: POST /api/settings/users triggers invitation flow</rule>
+      <rule>Email Template: Use SendGrid dynamic template or inline HTML</rule>
+      <rule>QR Code Format: {APP_URL}/signup?token={jwt}&amp;email={email}</rule>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="GET /api/settings/invitations">
+      <kind>REST endpoint</kind>
+      <signature>
+        Query: { status?: string, search?: string }
+        Response: UserInvitation[]
+        Auth: Admin only
+      </signature>
+      <path>app/api/settings/invitations/route.ts</path>
+    </interface>
+
+    <interface name="POST /api/settings/invitations/:id/resend">
+      <kind>REST endpoint</kind>
+      <signature>
+        Params: { id: UUID }
+        Response: UserInvitation
+        Auth: Admin only
+        Side effects: New token, new email, invalidate old token
+      </signature>
+      <path>app/api/settings/invitations/[id]/resend/route.ts</path>
+    </interface>
+
+    <interface name="DELETE /api/settings/invitations/:id">
+      <kind>REST endpoint</kind>
+      <signature>
+        Params: { id: UUID }
+        Response: { success: boolean }
+        Auth: Admin only
+        Side effects: status=cancelled, delete user if invited
+      </signature>
+      <path>app/api/settings/invitations/[id]/route.ts</path>
+    </interface>
+
+    <interface name="InvitationService.generateToken">
+      <kind>Service method</kind>
+      <signature>
+        generateToken(email: string, role: string, orgId: string): string
+        Returns: JWT token (7-day expiry)
+      </signature>
+      <path>lib/services/InvitationService.ts (NEW)</path>
+    </interface>
+
+    <interface name="InvitationService.validateToken">
+      <kind>Service method</kind>
+      <signature>
+        validateToken(token: string): InvitationTokenPayload
+        Throws: Error if expired or invalid signature
+      </signature>
+      <path>lib/services/InvitationService.ts (NEW)</path>
+    </interface>
+
+    <interface name="InvitationService.sendInvitation">
+      <kind>Service method</kind>
+      <signature>
+        sendInvitation(email, token, qrCode, orgName, role): Promise&lt;boolean&gt;
+        Returns: Success status
+        Side effects: Sends email via SendGrid, retries on failure
+      </signature>
+      <path>lib/services/InvitationService.ts (NEW)</path>
+    </interface>
+
+    <interface name="QRCodeGenerator.generate">
+      <kind>Utility function</kind>
+      <signature>
+        generate(url: string): Promise&lt;string&gt;
+        Returns: Base64 data URL of QR code image
+      </signature>
+      <path>lib/utils/QRCodeGenerator.ts (NEW)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing stack: Vitest for unit/integration tests, Playwright for E2E tests.
+      Unit tests for JWT token generation/validation, QR code generation, email template rendering.
+      Integration tests with SendGrid mock (capture sent emails, verify content).
+      E2E tests: Complete invitation flow (create → email sent → signup → login).
+      Test expiry scenarios: expired token, resend, cancel.
+    </standards>
+
+    <locations>
+      - lib/services/InvitationService.test.ts (JWT, email sending)
+      - lib/utils/QRCodeGenerator.test.ts (QR code generation)
+      - app/api/settings/invitations/**/*.test.ts (API endpoints)
+      - tests/integration/invitations/ (DB + email integration)
+      - tests/e2e/auth/signup.spec.ts (E2E signup flow)
+      - tests/e2e/settings/invitations.spec.ts (E2E invitations tab)
+    </locations>
+
+    <ideas>
+      <test id="AC-002.6" type="unit">
+        - JWT generation with correct exp claim (7 days from now)
+        - QR code generates valid base64 data URL
+        - Email template renders with correct placeholders
+      </test>
+
+      <test id="AC-002.6" type="integration">
+        - POST /api/settings/users → email sent within 5s (mock SendGrid)
+        - Invitation record created in DB with token, expires_at
+        - Verify email content: signup link, QR code, expiry date
+      </test>
+
+      <test id="AC-002.7" type="integration">
+        - Validate token with future exp → succeeds
+        - Validate token with past exp → throws error
+        - Resend invitation → new token generated, old invalidated
+      </test>
+
+      <test id="AC-002.8" type="integration">
+        - POST /signup with valid token → user.status = 'active'
+        - POST /signup with valid token → invitation.status = 'accepted'
+        - POST /signup with valid token → auto-login (session created)
+        - POST /signup with expired token → error returned
+        - POST /signup with used token (2nd time) → error (one-time use)
+      </test>
+
+      <test id="AC-003.2" type="integration">
+        - POST /api/settings/invitations/:id/resend → new email sent
+        - Resend → sent_at, expires_at updated
+        - Old token invalidated, new token works
+      </test>
+
+      <test id="AC-003.3" type="integration">
+        - DELETE /api/settings/invitations/:id → status = 'cancelled'
+        - Cancel → user deleted if status = 'invited'
+        - Cancelled token no longer works for signup
+      </test>
+
+      <test id="all" type="e2e">
+        - E2E: Admin creates user → invitation modal appears with QR code
+        - E2E: Copy signup link → open in new browser → signup page loads
+        - E2E: Complete signup → redirected to dashboard, user logged in
+        - E2E: View invitations tab → pending invitation listed
+        - E2E: Resend invitation → new email sent (verify with mock)
+        - E2E: Cancel invitation → removed from list
+        - E2E: Try signup with expired token → error shown
+      </test>
+    </ideas>
+  </tests>
+</story-context>

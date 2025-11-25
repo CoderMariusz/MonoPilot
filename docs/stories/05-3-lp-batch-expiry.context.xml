@@ -1,0 +1,119 @@
+<story-context id="5-3-lp-batch-expiry" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>3</storyId>
+    <title>LP Batch/Expiry Tracking</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Custom</template>
+    <estimatedTokens>3000</estimatedTokens>
+    <estimatedEffort>0.5 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Warehouse user</asA>
+    <iWant>to track batch and expiry dates</iWant>
+    <soThat>I can manage FIFO/FEFO picking strategies</soThat>
+    <tasks>
+      <task id="1" ac="AC-5.3.1">Batch Fields - batch_number (required), supplier_batch_number (optional), manufacture_date, expiry_date</task>
+      <task id="2" ac="AC-5.3.2">FEFO Sort - Sort LPs by expiry_date for picking suggestions (First Expired First Out)</task>
+      <task id="3" ac="AC-5.3.3">Expiry Highlighting - Highlight expired LPs in red, warn near-expiry (< 7 days)</task>
+      <task id="4" ac="AC-5.3.4">Filter by Expiry - Allow filtering LPs by expiry date range</task>
+      <task id="5" ac="AC-5.3.5">Expiry Validation - Validate expiry >= manufacture on LP creation/update</task>
+      <task id="6" ac="ALL">Unit & Integration Tests - FEFO sort tests, expiry validation tests, filter tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-5.3.1">Given LP is created, Then stores batch_number (required), supplier_batch_number (optional), manufacture_date (optional), expiry_date (optional)</criterion>
+    <criterion id="AC-5.3.2">When searching LPs for picking, Then results sorted by expiry_date ascending (FEFO: First Expired First Out) when configured</criterion>
+    <criterion id="AC-5.3.3">And expired LPs (expiry_date < current_date) highlighted in red with warning icon</criterion>
+    <criterion id="AC-5.3.4">And near-expiry LPs (expiry < 7 days) highlighted in yellow with warning</criterion>
+    <criterion id="AC-5.3.5">When filtering LPs, can filter by expiry_date range (from_date, to_date)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-5-warehouse.md</path>
+        <title>Epic 5: Warehouse & Scanner</title>
+        <section>Story 5.3: LP Batch/Expiry Tracking</section>
+        <snippet>Track batch_number, supplier_batch, manufacture/expiry dates. Filter by expiry, highlight expired LPs in red. FEFO (First Expired First Out) sort by expiry for picking. Prerequisites: Story 5.1.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>lib/services/license-plate-service.ts</path>
+        <kind>file</kind>
+        <symbol>License Plate service</symbol>
+        <reason>Story requires listLicensePlates() with FEFO sort option and expiry filters</reason>
+      </artifact>
+      <artifact>
+        <path>components/warehouse/LPTable.tsx</path>
+        <kind>component</kind>
+        <symbol>LPTable</symbol>
+        <reason>Story requires LP list with expiry highlighting (red/yellow) and FEFO sort</reason>
+      </artifact>
+      <artifact>
+        <path>lib/utils/expiry-helper.ts</path>
+        <kind>file</kind>
+        <symbol>Expiry helper utilities</symbol>
+        <reason>Story requires isExpired(), isNearExpiry(), getExpiryColor() utility functions</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="date-fns" version="^4.1.0" usage="Date utilities for expiry calculations (isBefore, addDays)" />
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for LP queries with expiry filters and FEFO sort" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="business">FEFO strategy - sort by expiry_date ASC when configured (First Expired First Out)</constraint>
+    <constraint type="business">Expiry highlighting - red for expired (<= current_date), yellow for near-expiry (< 7 days)</constraint>
+    <constraint type="validation">Expiry >= manufacture_date if both provided</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>listLicensePlates</name>
+      <kind>service function</kind>
+      <signature>async function listLicensePlates(filters?: { fefo?: boolean, expiryFrom?: string, expiryTo?: string }): Promise&lt;ServiceResult&lt;LicensePlate[]&gt;&gt; - Lists LPs with FEFO sort and expiry filters</signature>
+      <path>lib/services/license-plate-service.ts</path>
+    </interface>
+    <interface>
+      <name>isExpired</name>
+      <kind>utility function</kind>
+      <signature>function isExpired(expiryDate: string | null): boolean - Returns true if expiry_date <= current_date</signature>
+      <path>lib/utils/expiry-helper.ts</path>
+    </interface>
+    <interface>
+      <name>isNearExpiry</name>
+      <kind>utility function</kind>
+      <signature>function isNearExpiry(expiryDate: string | null, daysThreshold: number = 7): boolean - Returns true if expiry < current_date + daysThreshold</signature>
+      <path>lib/utils/expiry-helper.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing strategy: unit tests for expiry utilities (95% coverage), integration tests for FEFO sort and filters (70% coverage), E2E tests for expiry highlighting (100% user flows).
+    </standards>
+    <locations>
+      <location>lib/utils/__tests__/expiry-helper.test.ts (Expiry utility unit tests)</location>
+      <location>lib/services/__tests__/license-plate-service.test.ts (FEFO sort and filter tests)</location>
+      <location>e2e/warehouse/lp-fefo-sort.e2e.ts (FEFO sort E2E tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-5.3.2">Unit test: listLicensePlates(fefo=true) returns LPs sorted by expiry_date ASC</idea>
+      <idea ac="AC-5.3.3">Unit test: isExpired() returns true for date <= current_date</idea>
+      <idea ac="AC-5.3.4">Unit test: isNearExpiry() returns true for date < current_date + 7 days</idea>
+      <idea ac="AC-5.3.5">Integration test: Filter LPs by expiry_date range returns correct results</idea>
+      <idea ac="AC-5.3.3">E2E test: LP list displays expired LPs with red highlighting and warning icon</idea>
+      <idea ac="AC-5.3.4">E2E test: Near-expiry LPs (< 7 days) displayed with yellow highlighting</idea>
+    </ideas>
+  </tests>
+</story-context>

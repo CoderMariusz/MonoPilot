@@ -1,0 +1,350 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.11</storyId>
+    <title>Module Activation</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-20</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/1-11-module-activation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>Admin</asA>
+    <iWant>enable/disable modules for my organization</iWant>
+    <soThat>we only see features we need</soThat>
+    <tasks>
+      - Task 1: Database Schema - modules_enabled Column (TEXT[] on organizations table)
+      - Task 2: Module Configuration (8 modules: technical, planning, production, warehouse, quality, shipping, npd, finance)
+      - Task 3: Module Service - Core Logic (get, update, toggle with entity count)
+      - Task 4: API Middleware - Module Check (403 for disabled modules)
+      - Task 5: API Endpoints (GET, PUT for /api/settings/modules, POST for /api/settings/modules/toggle)
+      - Task 6: Frontend Modules Page (grid with toggle switches, status badges)
+      - Task 7: Module Toggle Confirmation Modal (with affected entity count)
+      - Task 8: Navigation Rebuild (filter nav by enabled modules)
+      - Task 9: Module Dependencies Validation (optional for MVP)
+      - Task 10: Role-Module Integration (optional for MVP)
+      - Task 11: Affected Entities Count (query active entities on disable)
+      - Task 12: Integration & Testing (Unit, Integration, E2E tests, middleware)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-010.1">
+      <title>Admin może toggle 8 modules</title>
+      <details>
+        - Navigate to /settings/modules
+        - Grid or list of modules with toggle switches
+        - 8 modules: Technical (default On), Planning (On), Production (On), Warehouse (On), Quality (Off), Shipping (Off), NPD (Off), Finance (Off)
+        - Each module: name, description, icon, toggle switch, status badge (Active/Inactive)
+      </details>
+    </criterion>
+
+    <criterion id="AC-010.2">
+      <title>Default enabled modules</title>
+      <details>
+        - On organization creation: Technical, Planning, Production, Warehouse enabled
+        - Stored in organizations.modules_enabled array: ['technical', 'planning', 'production', 'warehouse']
+        - Quality, Shipping, NPD, Finance disabled by default
+        - User can enable/disable any module
+      </details>
+    </criterion>
+
+    <criterion id="AC-010.3">
+      <title>Disabled module hidden from navigation</title>
+      <details>
+        - Navbar/sidebar hides links to disabled modules
+        - Example: If Quality disabled → /quality/* routes hidden
+        - Dashboard widgets for disabled modules hidden
+        - Navigation rebuild on module toggle
+      </details>
+    </criterion>
+
+    <criterion id="AC-010.4">
+      <title>API endpoints dla disabled module return 403</title>
+      <details>
+        - API middleware checks organizations.modules_enabled array
+        - If module disabled → return 403 Forbidden
+        - Error message: "Module 'Quality' is not enabled for your organization"
+        - Frontend: redirect to 403 page or show toast
+      </details>
+    </criterion>
+
+    <criterion id="AC-010.5">
+      <title>Confirmation modal przy toggle off</title>
+      <details>
+        - Click toggle to disable → confirmation modal
+        - Modal shows: "Disabling [Module] will hide [X] active entities", list affected entities, warning "Data will not be deleted, only hidden. You can re-enable later."
+        - Actions: Cancel, Disable Module
+        - On confirm: module disabled, navigation updated, toast shown
+      </details>
+    </criterion>
+
+    <criterion id="AC-010.6">
+      <title>Module dependencies validation</title>
+      <details>
+        - Some modules depend on others (e.g., Shipping requires Warehouse)
+        - If disabling Warehouse: warn "Shipping module requires Warehouse. Disable both?"
+        - Dependencies (future): Shipping → Warehouse, Production → Planning, NPD → Technical
+        - For MVP: no hard dependencies, just warnings
+      </details>
+    </criterion>
+
+    <criterion id="AC-010.7">
+      <title>Module activation affects role permissions</title>
+      <details>
+        - Roles are module-specific (e.g., qc role only useful if Quality enabled)
+        - If Quality disabled: qc users still have role, but no access
+        - Admin can reassign roles when enabling/disabling modules
+        - Role management integration (Story 1.2)
+      </details>
+    </criterion>
+
+    <criterion id="AC-010.8">
+      <title>Module enable/disable audit log</title>
+      <details>
+        - Track: who, when, which module, action (enable/disable)
+        - Display in audit log (future feature)
+        - For MVP: log to organizations.updated_by, updated_at
+      </details>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-1.md</path>
+        <title>Technical Specification - Epic 1 (Foundation & Settings)</title>
+        <section>FR-SET-010: Module Activation</section>
+        <snippet>8 module toggle system with default enabled modules (Technical, Planning, Production, Warehouse), API middleware for 403 enforcement, navigation filtering.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/epics/epic-1-settings.md</path>
+        <title>Epic 1: Foundation & Settings</title>
+        <section>Story 1.11: Module Activation</section>
+        <snippet>Module enable/disable functionality to show only needed features, with navigation hiding and API enforcement.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/lib/supabase/server.ts</path>
+        <kind>lib</kind>
+        <symbol>createClient</symbol>
+        <lines>all</lines>
+        <reason>Supabase server client for database operations</reason>
+      </artifact>
+
+      <artifact>
+        <path>app/lib/types.ts</path>
+        <kind>types</kind>
+        <symbol>Database types</symbol>
+        <lines>all</lines>
+        <reason>TypeScript types for database tables - will be updated after modules_enabled column added</reason>
+      </artifact>
+
+      <artifact>
+        <path>app/middleware.ts</path>
+        <kind>middleware</kind>
+        <symbol>middleware</symbol>
+        <lines>all</lines>
+        <reason>Next.js middleware - add module check middleware</reason>
+      </artifact>
+
+      <artifact>
+        <path>packages/shared/types.ts</path>
+        <kind>types</kind>
+        <symbol>Shared types</symbol>
+        <lines>all</lines>
+        <reason>Shared TypeScript types - add Module interface</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@supabase/supabase-js" version="latest">Supabase client for database</package>
+        <package name="zod" version="latest">Schema validation</package>
+        <package name="react-hook-form" version="latest">Form state management</package>
+        <package name="swr" version="latest">Data fetching and caching</package>
+      </ecosystem>
+
+      <ecosystem name="shadcn">
+        <component name="dialog">Module toggle confirmation modal</component>
+        <component name="badge">Status badges (Active/Inactive)</component>
+        <component name="toast">Success/error notifications</component>
+        <component name="switch">Module toggle switches</component>
+        <component name="card">Module grid cards</component>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">
+      <rule>Storage: organizations.modules_enabled TEXT[] (PostgreSQL array)</rule>
+      <rule>Default Modules: ['technical', 'planning', 'production', 'warehouse'] on org creation</rule>
+      <rule>API Middleware: Extract module from route path, check modules_enabled, return 403 if disabled</rule>
+      <rule>UI Hiding: Frontend filters nav links by enabled modules, backend enforces 403</rule>
+      <rule>Data Preservation: Disabling module hides data, doesn't delete (can re-enable later)</rule>
+    </constraint>
+
+    <constraint type="security">
+      <rule>Admin Only: Only Admin role can enable/disable modules</rule>
+      <rule>API Enforcement: 403 for disabled modules enforced by middleware</rule>
+      <rule>Navigation Filtering: Frontend hides disabled module routes</rule>
+      <rule>Audit Trail: updated_by, updated_at tracked on module changes</rule>
+    </constraint>
+
+    <constraint type="data">
+      <rule>modules_enabled Column: TEXT[] NOT NULL, default ['technical', 'planning', 'production', 'warehouse']</rule>
+      <rule>Check Constraint: array_length(modules_enabled, 1) > 0 (at least one module required)</rule>
+      <rule>Module Codes: technical, planning, production, warehouse, quality, shipping, npd, finance (8 total)</rule>
+    </constraint>
+
+    <constraint type="performance">
+      <rule>Module check middleware: &lt;10ms overhead per API request</rule>
+      <rule>Navigation rebuild: &lt;100ms on module toggle</rule>
+    </constraint>
+
+    <constraint type="testing">
+      <rule>Middleware Testing: MUST verify 403 for disabled modules</rule>
+      <rule>Integration Tests: MUST verify navigation filtering, API enforcement</rule>
+      <rule>E2E Tests: MUST test module toggle flow, confirmation modal</rule>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="GET /api/settings/modules">
+      <kind>REST endpoint</kind>
+      <signature>
+        Response: { current: string[], modules: Module[] }
+        Returns: Current modules_enabled array + full module config
+        Auth: Authenticated user
+      </signature>
+      <path>app/api/settings/modules/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="PUT /api/settings/modules">
+      <kind>REST endpoint</kind>
+      <signature>
+        Body: { modules: string[] }
+        Response: { success: boolean }
+        Auth: Admin only
+        Validation: At least one module enabled
+        Side effects: Update organizations.modules_enabled, invalidate org cache
+      </signature>
+      <path>app/api/settings/modules/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="POST /api/settings/modules/toggle">
+      <kind>REST endpoint</kind>
+      <signature>
+        Body: { module: string, enabled: boolean }
+        Response: { success: boolean, affectedCount?: number }
+        Auth: Admin only
+        Logic: If disabling, return count of affected entities (active WOs, QA checks, etc.)
+        Side effects: Update modules_enabled array, invalidate cache
+      </signature>
+      <path>app/api/settings/modules/toggle/route.ts (NEW)</path>
+    </interface>
+
+    <interface name="moduleCheckMiddleware">
+      <kind>API middleware</kind>
+      <signature>
+        Extracts module from route: /api/quality/* → 'quality'
+        Queries: organizations.modules_enabled for current org
+        Returns: 403 Forbidden if module not in array
+        Error: { error: 'Module not enabled', module: 'quality' }
+        Excludes: /api/settings/* (settings always accessible)
+      </signature>
+      <path>app/middleware.ts (modified)</path>
+    </interface>
+
+    <interface name="ModuleService.toggleModule">
+      <kind>Service method</kind>
+      <signature>
+        async toggleModule(orgId: string, moduleCode: string, enabled: boolean): Promise&lt;{ success: boolean, affectedCount: number }&gt;
+        Logic: If disabling, check active entities (query count)
+        Side effects: Update modules_enabled array (add or remove)
+      </signature>
+      <path>lib/services/ModuleService.ts (NEW)</path>
+    </interface>
+
+    <interface name="useEnabledModules">
+      <kind>React hook</kind>
+      <signature>
+        const enabledModules = useEnabledModules()
+        Fetches: organizations.modules_enabled
+        Returns: string[] of enabled module codes
+        Used in: Navigation component to filter links
+      </signature>
+      <path>hooks/useEnabledModules.ts (NEW)</path>
+    </interface>
+
+    <interface name="Module Configuration">
+      <kind>Constants</kind>
+      <signature>
+        const MODULES = [
+          { code: 'technical', name: 'Technical', description: 'Products, BOMs, Routings', defaultEnabled: true, epic: 2 },
+          { code: 'planning', name: 'Planning', description: 'POs, TOs, WOs', defaultEnabled: true, epic: 3 },
+          { code: 'production', name: 'Production', description: 'WO Execution', defaultEnabled: true, epic: 4 },
+          { code: 'warehouse', name: 'Warehouse', description: 'LPs, Moves, Pallets', defaultEnabled: true, epic: 5 },
+          { code: 'quality', name: 'Quality', description: 'QA Workflows', defaultEnabled: false, epic: 6 },
+          { code: 'shipping', name: 'Shipping', description: 'SOs, Pick Lists', defaultEnabled: false, epic: 7 },
+          { code: 'npd', name: 'NPD', description: 'Formulation', defaultEnabled: false, epic: 8 },
+          { code: 'finance', name: 'Finance', description: 'Costing, Margin Analysis', defaultEnabled: false, epic: null }
+        ]
+      </signature>
+      <path>lib/config/modules.ts (NEW)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing stack: Vitest for unit/integration tests, Playwright for E2E tests.
+      Middleware tests critical for API enforcement.
+      Navigation tests verify link filtering on module toggle.
+    </standards>
+
+    <locations>
+      - lib/services/ModuleService.test.ts (Module toggle logic)
+      - app/middleware.test.ts (Module check middleware)
+      - app/api/settings/modules/**/*.test.ts (API endpoint tests)
+      - tests/integration/modules/ (Integration tests: module toggle, navigation rebuild)
+      - tests/e2e/settings/modules.spec.ts (E2E module management flow)
+    </locations>
+
+    <ideas>
+      <test id="AC-010.1" type="integration">
+        - GET /api/settings/modules → returns current enabled modules + full config
+      </test>
+
+      <test id="AC-010.2" type="integration">
+        - Create organization → modules_enabled default ['technical', 'planning', 'production', 'warehouse']
+      </test>
+
+      <test id="AC-010.3" type="e2e">
+        - E2E: Disable Quality module → Quality nav link hidden
+        - E2E: Enable Quality module → Quality nav link appears
+      </test>
+
+      <test id="AC-010.4" type="integration">
+        - Disable module → API request to module route returns 403
+        - Enable module → API request succeeds
+        - Settings routes always accessible (not checked by middleware)
+      </test>
+
+      <test id="AC-010.5" type="e2e">
+        - E2E: Toggle module off → confirmation modal shows affected entity count
+        - E2E: Confirm disable → module disabled, toast shown
+      </test>
+
+      <test id="all" type="e2e">
+        - E2E: Toggle module on/off → status badge changes
+        - E2E: Disable module with entities → warning shown
+        - E2E: Re-enable module → data still accessible (not deleted)
+        - E2E: Cannot disable all modules → validation error (at least one required)
+      </test>
+    </ideas>
+  </tests>
+</story-context>

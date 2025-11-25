@@ -1,0 +1,161 @@
+<story-context id="6-12-test-result-entry" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>12</storyId>
+    <title>Test Result Entry</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Custom</template>
+    <estimatedTokens>5000</estimatedTokens>
+    <estimatedEffort>1.5 days</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>QC user</asA>
+    <iWant>to record test results against LPs</iWant>
+    <soThat>quality data is tracked</soThat>
+    <tasks>
+      <task id="1" ac="AC-6.12.1">Test Results Table Schema - test_results table (or qc_test_results) with result_value, pass/fail, notes</task>
+      <task id="2" ac="AC-6.12.2">Test Result Entry Service - createTestResult() with auto pass/fail calculation for numeric specs</task>
+      <task id="3" ac="AC-6.12.3">Auto Pass/Fail Logic - Auto-calculate test_status (passed/failed) for numeric specs based on min/max range</task>
+      <task id="4" ac="AC-6.12.4">Manual Override - Allow QC user to override auto-calculated pass/fail with mandatory reason</task>
+      <task id="5" ac="AC-6.12.5">API Route - POST /api/quality/test-results endpoint</task>
+      <task id="6" ac="AC-6.12.6">Test Entry UI - Page for selecting LP/product and entering test results for all specs</task>
+      <task id="7" ac="AC-6.12.7">Validation - Zod schema for test result entry with spec-type-aware validation</task>
+      <task id="8" ac="ALL">Unit & Integration Tests - Test result creation tests, auto pass/fail tests, override tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-6.12.1">Given LP exists, When navigating to /quality/test-results, Then can select LP and product And shows spec list with input fields for each spec</criterion>
+    <criterion id="AC-6.12.2">When entering results, Then for each spec: enter result_value, pass/fail auto-calculated (numeric), can override (with reason), add notes</criterion>
+    <criterion id="AC-6.12.3">Auto pass/fail for numeric specs: test_status = 'passed' if min_value <= result_value <= max_value, else 'failed'. If only min_value exists: result_value >= min_value. If only max_value exists: result_value <= max_value.</criterion>
+    <criterion id="AC-6.12.4">Override logic: QC user can override auto-calculated status with dropdown (Pass/Fail), mandatory reason field appears when override selected</criterion>
+    <criterion id="AC-6.12.5">API: POST /api/quality/test-results - Request body: { lp_id: string, spec_id: string, result_value: string, test_status?: 'passed'|'failed', override_reason?: string, notes?: string, tested_by: string } - Response: { data: TestResult } with status 201</criterion>
+    <criterion id="AC-6.12.6">When saving, Then test results created And linked to LP And LP.qa_status auto-updated based on overall test outcome (all passed → 'passed', any failed → 'failed')</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-6-quality.md</path>
+        <title>Epic 6: Quality Control & Compliance</title>
+        <section>Story 6.12: Record Test Results Against LPs</section>
+        <snippet>Record test results against LPs. test_results table (or qc_test_results). Auto pass/fail for numeric specs. Override with reason. LP.qa_status auto-updated. Prerequisites: Story 6.10.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/quality/test-results</path>
+        <kind>directory</kind>
+        <symbol>Test Results API route location</symbol>
+        <reason>Story requires creating route.ts for POST /api/quality/test-results endpoint</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/test-result-service.ts</path>
+        <kind>file</kind>
+        <symbol>Test Result service layer</symbol>
+        <reason>Story requires createTestResult() method with auto pass/fail calculation and override logic</reason>
+      </artifact>
+      <artifact>
+        <path>lib/validation/test-result-schemas.ts</path>
+        <kind>file</kind>
+        <symbol>Test Result Zod schemas</symbol>
+        <reason>Story requires createTestResultSchema with spec-type-aware validation</reason>
+      </artifact>
+      <artifact>
+        <path>lib/utils/auto-pass-fail.ts</path>
+        <kind>utility</kind>
+        <symbol>Auto pass/fail calculation utility</symbol>
+        <reason>Story requires calculateTestStatus() function for auto pass/fail logic based on numeric specs</reason>
+      </artifact>
+      <artifact>
+        <path>components/quality/TestResultEntryForm.tsx</path>
+        <kind>component</kind>
+        <symbol>TestResultEntryForm</symbol>
+        <reason>Story requires form for entering test results with auto pass/fail, override, notes</reason>
+      </artifact>
+      <artifact>
+        <path>app/quality/test-results/page.tsx</path>
+        <kind>page</kind>
+        <symbol>Test Results Entry page</symbol>
+        <reason>Story requires page for selecting LP/product and entering test results</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for test result CRUD operations" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas for test result entry" />
+        <package name="react-hook-form" version="^7.66.1" usage="Form state management for test result entry form" />
+        <package name="next" version="^15.1.4" usage="Next.js framework with App Router for API routes and pages" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="business">Auto pass/fail - for numeric specs, auto-calculate test_status based on min/max range (min <= result <= max)</constraint>
+    <constraint type="business">Manual override - QC user can override auto-calculated status with mandatory reason</constraint>
+    <constraint type="business">LP QA status update - after test result entry, auto-update LP.qa_status based on overall outcome (all passed → 'passed', any failed → 'failed')</constraint>
+    <constraint type="business">Multi-tenancy - all test result operations scoped by org_id via LP.org_id</constraint>
+    <constraint type="validation">Zod validation - required on BOTH client and server for test result input</constraint>
+    <constraint type="validation">Spec-type-aware validation - result_value format depends on spec_type (numeric → number, text → string, boolean → boolean)</constraint>
+    <constraint type="testing">Test pyramid - 95% unit coverage for test result service, 70% integration coverage, 100% E2E coverage</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/quality/test-results</name>
+      <kind>API route</kind>
+      <signature>POST /api/quality/test-results - Request body: { lp_id: string, spec_id: string, result_value: string, test_status?: 'passed'|'failed', override_reason?: string, notes?: string, tested_by: string } - Response: { data: TestResult } or error 400</signature>
+      <path>app/api/quality/test-results/route.ts</path>
+    </interface>
+    <interface>
+      <name>GET /api/quality/test-results</name>
+      <kind>API route</kind>
+      <signature>GET /api/quality/test-results?lp_id=X - Response: { data: TestResult[] } - Returns all test results for an LP</signature>
+      <path>app/api/quality/test-results/route.ts</path>
+    </interface>
+    <interface>
+      <name>createTestResult</name>
+      <kind>service function</kind>
+      <signature>async function createTestResult(input: CreateTestResultInput): Promise&lt;ServiceResult&lt;TestResult&gt;&gt; - Creates test result, auto-calculates pass/fail (numeric), updates LP.qa_status</signature>
+      <path>lib/services/test-result-service.ts</path>
+    </interface>
+    <interface>
+      <name>calculateTestStatus</name>
+      <kind>utility function</kind>
+      <signature>function calculateTestStatus(resultValue: number, spec: ProductSpecification): 'passed' | 'failed' - Auto-calculates test status for numeric specs based on min/max range</signature>
+      <path>lib/utils/auto-pass-fail.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing strategy follows Test Pyramid: unit tests for test result service and auto pass/fail logic (95% coverage), integration tests for API route (70% coverage), E2E tests for test result entry flow (100% user flows). Mock Supabase in unit tests.
+    </standards>
+    <locations>
+      <location>lib/services/__tests__/test-result-service.test.ts (Test result creation unit tests)</location>
+      <location>lib/utils/__tests__/auto-pass-fail.test.ts (Auto pass/fail calculation unit tests)</location>
+      <location>app/api/quality/test-results/__tests__/route.test.ts (API route integration tests)</location>
+      <location>e2e/quality/test-result-entry.e2e.ts (Test result entry flow E2E tests)</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-6.12.3">Unit test: calculateTestStatus() with result within range (5, min=3, max=7) - returns 'passed'</idea>
+      <idea ac="AC-6.12.3">Unit test: calculateTestStatus() with result below min (2, min=3, max=7) - returns 'failed'</idea>
+      <idea ac="AC-6.12.3">Unit test: calculateTestStatus() with result above max (8, min=3, max=7) - returns 'failed'</idea>
+      <idea ac="AC-6.12.3">Unit test: calculateTestStatus() with only min_value (5, min=3) - returns 'passed'</idea>
+      <idea ac="AC-6.12.3">Unit test: calculateTestStatus() with only max_value (5, max=7) - returns 'passed'</idea>
+      <idea ac="AC-6.12.4">Unit test: createTestResult() with override and reason - creates result with override_reason</idea>
+      <idea ac="AC-6.12.4">Unit test: createTestResult() with override but no reason - returns validation error</idea>
+      <idea ac="AC-6.12.6">Unit test: createTestResult() with all specs passed - updates LP.qa_status to 'passed'</idea>
+      <idea ac="AC-6.12.6">Unit test: createTestResult() with any spec failed - updates LP.qa_status to 'failed'</idea>
+      <idea ac="AC-6.12.5">Integration test: POST /test-results with valid numeric result - returns 201 with auto-calculated status</idea>
+      <idea ac="AC-6.12.5">Integration test: POST /test-results with override - returns 201 with overridden status and reason</idea>
+      <idea ac="AC-6.12.1">E2E test: Navigate to test results page, select LP and product, specs auto-loaded</idea>
+      <idea ac="AC-6.12.2">E2E test: Enter test results, auto pass/fail calculated, save, results recorded</idea>
+      <idea ac="AC-6.12.4">E2E test: Override auto-calculated status, mandatory reason field appears, save with reason</idea>
+    </ideas>
+  </tests>
+</story-context>

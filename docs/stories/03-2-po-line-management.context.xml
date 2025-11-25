@@ -1,0 +1,98 @@
+<story-context id="3-2-po-line-management" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>2</storyId>
+    <title>PO Line Management</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <template>Template B - Line Items Pattern</template>
+    <estimatedTokens>4500</estimatedTokens>
+    <estimatedEffort>1 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Purchasing user</asA>
+    <iWant>to add and manage PO lines</iWant>
+    <soThat>I can specify what to order</soThat>
+    <tasks>
+      <task id="1" ac="AC-3.2.1">PO Lines Table Schema - po_lines table with product_id, quantity, unit_price, discount_percent, line_total</task>
+      <task id="2" ac="AC-3.2.2">PO Lines CRUD Service - addPOLine(), updatePOLine(), deletePOLine() with parent validation</task>
+      <task id="3" ac="AC-3.2.3">Product Inheritance - Inherit UoM and unit_price from product</task>
+      <task id="4" ac="AC-3.2.4">Line Total Calculation - Auto-calculate line_total = quantity × unit_price × (1 - discount_percent/100)</task>
+      <task id="5" ac="AC-3.2.5">PO Totals Update - Auto-update PO subtotal, tax, total when lines change</task>
+      <task id="6" ac="AC-3.2.6">API Routes - POST/PUT/DELETE /api/planning/purchase-orders/:id/lines endpoints</task>
+      <task id="7" ac="AC-3.2.7">PO Lines Table UI - Table displaying product, qty, price, discount, total with add/edit/delete</task>
+      <task id="8" ac="ALL">Unit & Integration Tests - PO line CRUD tests, calculation tests, totals update tests</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-3.2.1">Given PO is created, When adding a line, Then modal opens with fields: product_id (required, inherits UoM + unit_price), quantity (required), unit_price (editable, defaults from product), discount_percent (optional), expected_delivery_date (optional, defaults to header)</criterion>
+    <criterion id="AC-3.2.2">When saving line, Then line_total calculated as: quantity × unit_price × (1 - discount_percent/100) And PO totals updated (subtotal, tax, total)</criterion>
+    <criterion id="AC-3.2.3">API: POST /api/planning/purchase-orders/:id/lines - Request body: { product_id: string, quantity: number, unit_price: number, discount_percent?: number, expected_delivery_date?: date } - Response: { data: POLine } with status 201</criterion>
+    <criterion id="AC-3.2.4">Service validates: PO exists and belongs to org, product exists and belongs to org, quantity > 0, unit_price >= 0</criterion>
+    <criterion id="AC-3.2.5">When PO lines change, PO totals auto-updated: subtotal (sum of line_total), tax (subtotal × tax_rate), total (subtotal + tax)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-3-planning.md</path>
+        <title>Epic 3: Planning Operations</title>
+        <section>Story 3.2: PO Line Management</section>
+        <snippet>Add and manage PO lines. po_lines table with product_id, quantity, unit_price, discount_percent. Inherit UoM and unit_price from product. Line total calculated. PO totals updated. Prerequisites: Story 3.1.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>app/api/planning/purchase-orders/[id]/lines</path>
+        <kind>directory</kind>
+        <symbol>PO Lines API route location</symbol>
+        <reason>Story requires route.ts for POST/PUT/DELETE /api/planning/purchase-orders/:id/lines endpoints</reason>
+      </artifact>
+      <artifact>
+        <path>lib/services/po-line-service.ts</path>
+        <kind>file</kind>
+        <symbol>PO Line service layer</symbol>
+        <reason>Story requires addPOLine(), updatePOLine(), deletePOLine() methods with validation</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="@supabase/supabase-js" version="^2.84.0" usage="Supabase client for PO line CRUD" />
+        <package name="zod" version="^3.25.76" usage="Validation schemas" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Template B Line Items Pattern - parent-child (PO → PO Lines)</constraint>
+    <constraint type="business">Line total calculation - line_total = quantity × unit_price × (1 - discount_percent/100)</constraint>
+    <constraint type="business">PO totals update - auto-update PO subtotal, tax, total when lines change</constraint>
+    <constraint type="testing">Test pyramid - 95% unit coverage, 70% integration, 100% E2E</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/planning/purchase-orders/:id/lines</name>
+      <kind>API route</kind>
+      <signature>POST /api/planning/purchase-orders/{po_id}/lines - Request: { product_id, quantity, unit_price, discount_percent } - Response: { data: POLine }</signature>
+      <path>app/api/planning/purchase-orders/[id]/lines/route.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Test Pyramid: unit tests (95%), integration tests (70%), E2E tests (100%)</standards>
+    <locations>
+      <location>lib/services/__tests__/po-line-service.test.ts</location>
+      <location>app/api/planning/purchase-orders/[id]/lines/__tests__/route.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-3.2.4">Unit test: addPOLine() with invalid po_id - returns error "PO not found"</idea>
+      <idea ac="AC-3.2.2">Unit test: addPOLine() - calculates line_total correctly with discount</idea>
+      <idea ac="AC-3.2.5">Unit test: addPOLine() - updates PO totals</idea>
+    </ideas>
+  </tests>
+</story-context>
