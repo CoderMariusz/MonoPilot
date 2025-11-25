@@ -4,26 +4,40 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseAdmin } from '@/lib/supabase/server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { technicalSettingsSchema } from '@/lib/validation/product-schemas'
 import { ZodError } from 'zod'
 
 // GET /api/technical/settings - Get technical module settings
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseAdmin()
+    const supabase = await createServerSupabase()
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Check authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (authError || !user) {
+    if (authError || !session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    const orgId = user.user_metadata.org_id
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentUser.org_id
 
     // Fetch settings
     const { data, error } = await supabase
@@ -46,7 +60,7 @@ export async function GET(req: NextRequest) {
         .from('technical_settings')
         .insert({
           org_id: orgId,
-          updated_by: user.id
+          updated_by: session.user.id
         })
         .select()
         .single()
@@ -89,28 +103,36 @@ export async function GET(req: NextRequest) {
 // PUT /api/technical/settings - Update technical settings
 export async function PUT(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseAdmin()
+    const supabase = await createServerSupabase()
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Check authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (authError || !user) {
+    if (authError || !session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    const orgId = user.user_metadata.org_id
-
-    // Check if user is admin (only admins can update settings)
-    const { data: userData } = await supabase
+    // Get current user to get org_id and check role
+    const { data: currentUser, error: userError } = await supabase
       .from('users')
-      .select('role')
-      .eq('id', user.id)
+      .select('org_id, role')
+      .eq('id', session.user.id)
       .single()
 
-    if (!userData || userData.role !== 'admin') {
+    if (userError || !currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentUser.org_id
+
+    // Check if user is admin (only admins can update settings)
+    if (currentUser.role !== 'admin') {
       return NextResponse.json(
         { error: 'Only administrators can update technical settings' },
         { status: 403 }
@@ -127,7 +149,7 @@ export async function PUT(req: NextRequest) {
       .upsert({
         org_id: orgId,
         ...validated,
-        updated_by: user.id
+        updated_by: session.user.id
       })
       .select()
       .single()

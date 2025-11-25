@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseAdmin } from '@/lib/supabase/server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { productTypeCreateSchema } from '@/lib/validation/product-schemas'
 import { ZodError } from 'zod'
 
@@ -20,19 +20,33 @@ const DEFAULT_TYPES = [
 // GET /api/technical/product-types - List all product types (default + custom)
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseAdmin()
+    const supabase = await createServerSupabase()
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Check authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (authError || !user) {
+    if (authError || !session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    const orgId = user.user_metadata.org_id
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentUser.org_id
 
     // Get filter parameter
     const activeOnly = req.nextUrl.searchParams.get('active') !== 'false'
@@ -89,19 +103,33 @@ export async function GET(req: NextRequest) {
 // POST /api/technical/product-types - Create custom product type
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseAdmin()
+    const supabase = await createServerSupabase()
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Check authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
-    if (authError || !user) {
+    if (authError || !session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    const orgId = user.user_metadata.org_id
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentUser.org_id
 
     // Parse and validate request body
     const body = await req.json()
@@ -130,8 +158,8 @@ export async function POST(req: NextRequest) {
         is_default: false,
         is_active: true,
         org_id: orgId,
-        created_by: user.id,
-        updated_by: user.id
+        created_by: session.user.id,
+        updated_by: session.user.id
       })
       .select()
       .single()

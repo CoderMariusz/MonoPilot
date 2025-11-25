@@ -75,6 +75,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -99,7 +100,7 @@ export default function ProductsPage() {
       setLoading(true)
 
       const params = new URLSearchParams()
-      if (searchTerm) params.append('search', searchTerm)
+      if (debouncedSearch) params.append('search', debouncedSearch)
       if (typeFilter !== 'all') params.append('type', typeFilter)
       if (statusFilter !== 'all') params.append('status', statusFilter)
       params.append('sort', sortBy)
@@ -129,20 +130,20 @@ export default function ProductsPage() {
     }
   }
 
-  // Fetch on filter/sort/page changes
-  useEffect(() => {
-    fetchProducts()
-  }, [typeFilter, statusFilter, sortBy, sortDirection, page])
-
-  // Debounced search
+  // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
       setPage(1) // Reset to first page on search
-      fetchProducts()
     }, 300)
 
     return () => clearTimeout(timer)
   }, [searchTerm])
+
+  // Fetch on filter/sort/page/search changes
+  useEffect(() => {
+    fetchProducts()
+  }, [typeFilter, statusFilter, sortBy, sortDirection, page, debouncedSearch])
 
   // Handlers
   const handleEdit = (product: Product) => {
