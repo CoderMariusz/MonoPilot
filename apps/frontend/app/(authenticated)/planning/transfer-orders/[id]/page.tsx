@@ -41,6 +41,7 @@ export default function TransferOrderDetailsPage({ params }: { params: Promise<{
   const [loading, setLoading] = useState(true)
   const [changingStatus, setChangingStatus] = useState(false)
   const [lineCount, setLineCount] = useState(0)
+  const [paramsId, setParamsId] = useState<string>('')
   const router = useRouter()
   const { toast } = useToast()
 
@@ -93,7 +94,7 @@ export default function TransferOrderDetailsPage({ params }: { params: Promise<{
     try {
       setChangingStatus(true)
 
-      const response = await fetch(`/api/planning/transfer-orders/${params.id}/status`, {
+      const response = await fetch(`/api/planning/transfer-orders/${paramsId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -275,7 +276,7 @@ export default function TransferOrderDetailsPage({ params }: { params: Promise<{
 
       {/* TO Lines Table */}
       <TOLinesTable
-        transferOrderId={params.id}
+        transferOrderId={paramsId}
         toStatus={to.status}
         onLinesUpdate={handleLinesUpdate}
       />
