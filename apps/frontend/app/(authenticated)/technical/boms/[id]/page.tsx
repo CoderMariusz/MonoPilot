@@ -76,17 +76,20 @@ interface BOMItem {
 
 interface BOM {
   id: string
+  org_id: string
   product_id: string
   product: Product
-  version: number
-  effective_from: string
-  effective_to?: string
+  version: string
+  effective_from: string | Date
+  effective_to: string | Date | null
   status: 'draft' | 'active' | 'phased_out' | 'inactive'
   output_qty: number
   output_uom: string
-  notes?: string
-  created_at: string
-  updated_at: string
+  notes: string | null
+  created_by: string
+  updated_by: string
+  created_at: string | Date
+  updated_at: string | Date
 }
 
 interface Allergen {
@@ -238,9 +241,10 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
   }
 
   // Helpers
-  const formatDate = (date?: string) => {
+  const formatDate = (date?: string | Date | null) => {
     if (!date) return 'No end date'
-    return new Date(date).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })
+    const d = typeof date === 'string' ? new Date(date) : date
+    return d.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })
   }
 
   const getStatusBadge = (status: string) => {
