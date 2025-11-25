@@ -85,7 +85,7 @@ BEGIN
   AND EXISTS (
     SELECT 1 FROM auth.users au
     WHERE au.id = u.id
-    AND au.raw_app_meta_data->>'org_id'::uuid = u.org_id
+    AND (au.raw_app_meta_data->>'org_id')::uuid = u.org_id
   );
 
   SELECT COUNT(*) INTO mismatched_count
@@ -94,7 +94,7 @@ BEGIN
   AND NOT EXISTS (
     SELECT 1 FROM auth.users au
     WHERE au.id = u.id
-    AND au.raw_app_meta_data->>'org_id'::uuid = u.org_id
+    AND (au.raw_app_meta_data->>'org_id')::uuid = u.org_id
   );
 
   RAISE NOTICE 'JWT org_id Verification Complete:';
