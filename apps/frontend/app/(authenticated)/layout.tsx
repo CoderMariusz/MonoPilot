@@ -32,11 +32,11 @@ export default async function AuthenticatedLayout({
   // Get organization to check enabled modules
   const { data: organization } = await supabase
     .from('organizations')
-    .select('enabled_modules')
+    .select('modules_enabled')
     .eq('id', currentUser.org_id)
     .single()
 
-  const enabledModules = organization?.enabled_modules || []
+  const enabledModules = organization?.modules_enabled || []
   const user = session.user
 
   return (
