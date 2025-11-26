@@ -126,7 +126,7 @@ export const CreateBOMItemSchema = z.object({
   quantity: z.number().positive('Quantity must be positive'),
   uom: z.string().min(1, 'UoM is required'),
   scrap_percent: z.number().min(0, 'Scrap percent cannot be negative').max(100, 'Scrap percent cannot exceed 100').optional().default(0),
-  sequence: z.number().int().positive('Sequence must be a positive integer'),
+  sequence: z.number().int().positive('Sequence must be a positive integer').optional(), // Auto-assigned if not provided
   consume_whole_lp: z.boolean().optional().default(false),
 
   // By-products (Story 2.13)
