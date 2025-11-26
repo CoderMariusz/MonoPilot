@@ -1,15 +1,33 @@
 /**
  * Transfer Orders API Integration Tests
- * Story 3.6 & 3.7: Transfer Order CRUD + TO Line Management
+ * Batch 3B: Stories 3.6, 3.7, 3.8, 3.9
  *
- * Tests:
+ * Story 3.6: Transfer Order CRUD
+ * - AC-3.6.1: List TOs with filters
+ * - AC-3.6.2: Create TO
+ * - AC-3.6.3: Get TO details
+ * - AC-3.6.4: Update TO
+ * - AC-3.6.5: Delete TO
  * - AC-3.6.7: Change TO status to 'planned' (requires at least 1 line)
+ *
+ * Story 3.7: TO Line Management
  * - AC-3.7.1: Create TO line
  * - AC-3.7.2: Edit TO line
  * - AC-3.7.3: Delete TO line
  * - AC-3.7.6: TO Lines Summary calculation
  * - AC-3.7.8: Cannot plan TO without lines
- * - Role-based authorization (warehouse, purchasing, technical, admin)
+ *
+ * Story 3.8: Partial Shipments
+ * - AC-3.8.1: Ship full quantity
+ * - AC-3.8.2: Ship partial quantity
+ * - AC-3.8.3: Status transitions (draft → planned → shipped → received)
+ *
+ * Story 3.9: Audit Trail
+ * - AC-3.9.1: Track created_by, updated_by on records
+ * - AC-3.9.2: Track created_at, updated_at timestamps
+ * - AC-3.9.3: Log all changes to audit table (if implemented)
+ *
+ * Role-based authorization (warehouse, purchasing, technical, admin)
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
@@ -647,6 +665,362 @@ describe('Transfer Orders API Integration Tests', () => {
 
       // Cleanup
       await supabase.from('transfer_orders').delete().eq('id', to!.id)
+    })
+  })
+
+  describe('Story 3.6: Transfer Order CRUD', () => {
+    // AC-3.6.1: List TOs with filters
+    it('AC-3.6.1: List transfer orders with filters', async () => {
+      const { data, error, count } = await supabase
+        .from('transfer_orders')
+        .select('*', { count: 'exact' })
+        .eq('org_id', testOrgId)
+        .eq('status', 'draft')
+
+      expect(error).toBeNull()
+      expect(data).toBeDefined()
+      expect(Array.isArray(data)).toBe(true)
+      expect(count).toBeGreaterThanOrEqual(1)
+    })
+
+    // AC-3.6.2: Create TO
+    it('AC-3.6.2: Create transfer order', async () => {
+      const { data: to, error } = await supabase
+        .from('transfer_orders')
+        .insert({
+          org_id: testOrgId,
+          from_warehouse_id: testWarehouse1Id,
+          to_warehouse_id: testWarehouse2Id,
+          status: 'draft',
+          planned_ship_date: '2025-02-01',
+          planned_receive_date: '2025-02-03',
+          created_by: testUserId,
+        })
+        .select()
+        .single()
+
+      expect(error).toBeNull()
+      expect(to).toBeDefined()
+      expect(to?.status).toBe('draft')
+
+      // Cleanup
+      await supabase.from('transfer_orders').delete().eq('id', to!.id)
+    })
+
+    // AC-3.6.3: Get TO details
+    it('AC-3.6.3: Get transfer order details with joins', async () => {
+      const { data: to, error } = await supabase
+        .from('transfer_orders')
+        .select(
+          `
+          *,
+          from_warehouse:from_warehouse_id(id, code, name),
+          to_warehouse:to_warehouse_id(id, code, name)
+        `
+        )
+        .eq('id', testTransferOrderId)
+        .single()
+
+      expect(error).toBeNull()
+      expect(to).toBeDefined()
+      expect(to?.from_warehouse).toBeDefined()
+      expect(to?.to_warehouse).toBeDefined()
+    })
+
+    // AC-3.6.4: Update TO
+    it('AC-3.6.4: Update transfer order', async () => {
+      const newNotes = 'Updated test notes'
+      const { data: to, error } = await supabase
+        .from('transfer_orders')
+        .update({
+          notes: newNotes,
+          updated_by: testUserId,
+        })
+        .eq('id', testTransferOrderId)
+        .select()
+        .single()
+
+      expect(error).toBeNull()
+      expect(to?.notes).toBe(newNotes)
+    })
+
+    // AC-3.6.5: Delete TO
+    it('AC-3.6.5: Delete transfer order', async () => {
+      // Create TO to delete
+      const { data: toToDelete } = await supabase
+        .from('transfer_orders')
+        .insert({
+          org_id: testOrgId,
+          from_warehouse_id: testWarehouse1Id,
+          to_warehouse_id: testWarehouse2Id,
+          status: 'draft',
+          planned_ship_date: '2025-02-05',
+          planned_receive_date: '2025-02-06',
+          created_by: testUserId,
+        })
+        .select()
+        .single()
+
+      const { error } = await supabase
+        .from('transfer_orders')
+        .delete()
+        .eq('id', toToDelete!.id)
+
+      expect(error).toBeNull()
+
+      // Verify deletion
+      const { data: deletedTo } = await supabase
+        .from('transfer_orders')
+        .select('*')
+        .eq('id', toToDelete!.id)
+
+      expect(deletedTo?.length).toBe(0)
+    })
+  })
+
+  describe('Story 3.8: Partial Shipments', () => {
+    let shipmentToId: string
+
+    // Create TO for shipment tests
+    beforeAll(async () => {
+      const { data: to } = await supabase
+        .from('transfer_orders')
+        .insert({
+          org_id: testOrgId,
+          from_warehouse_id: testWarehouse1Id,
+          to_warehouse_id: testWarehouse2Id,
+          status: 'draft',
+          planned_ship_date: '2025-03-01',
+          planned_receive_date: '2025-03-05',
+          created_by: testUserId,
+        })
+        .select()
+        .single()
+
+      shipmentToId = to!.id
+
+      // Add line to the TO
+      await supabase.from('to_lines').insert({
+        transfer_order_id: shipmentToId,
+        product_id: testProductId,
+        quantity: 100,
+        shipped_quantity: 0,
+        created_by: testUserId,
+      })
+    })
+
+    // AC-3.8.1: Ship full quantity
+    it('AC-3.8.1: Ship full transfer order quantity', async () => {
+      // Change status to planned first
+      await supabase
+        .from('transfer_orders')
+        .update({ status: 'planned', updated_by: testUserId })
+        .eq('id', shipmentToId)
+
+      // Get line
+      const { data: lines } = await supabase
+        .from('to_lines')
+        .select('*')
+        .eq('transfer_order_id', shipmentToId)
+
+      if (lines && lines.length > 0) {
+        const line = lines[0]
+        // Update shipped quantity to full
+        const { data: updatedLine } = await supabase
+          .from('to_lines')
+          .update({
+            shipped_quantity: line.quantity,
+            updated_by: testUserId,
+          })
+          .eq('id', line.id)
+          .select()
+          .single()
+
+        expect(updatedLine?.shipped_quantity).toBe(line.quantity)
+
+        // Change TO status to shipped
+        const { data: shippedTo } = await supabase
+          .from('transfer_orders')
+          .update({ status: 'shipped', updated_by: testUserId })
+          .eq('id', shipmentToId)
+          .select()
+          .single()
+
+        expect(shippedTo?.status).toBe('shipped')
+      }
+    })
+
+    // AC-3.8.2: Ship partial quantity
+    it('AC-3.8.2: Ship partial transfer order quantity', async () => {
+      // Create new TO for partial shipment
+      const { data: partialTo } = await supabase
+        .from('transfer_orders')
+        .insert({
+          org_id: testOrgId,
+          from_warehouse_id: testWarehouse1Id,
+          to_warehouse_id: testWarehouse2Id,
+          status: 'planned',
+          planned_ship_date: '2025-03-10',
+          planned_receive_date: '2025-03-15',
+          created_by: testUserId,
+        })
+        .select()
+        .single()
+
+      // Add line
+      const { data: line } = await supabase
+        .from('to_lines')
+        .insert({
+          transfer_order_id: partialTo!.id,
+          product_id: testProductId,
+          quantity: 100,
+          shipped_quantity: 0,
+          created_by: testUserId,
+        })
+        .select()
+        .single()
+
+      // Ship partial quantity (60 out of 100)
+      const { data: partialLine } = await supabase
+        .from('to_lines')
+        .update({
+          shipped_quantity: 60,
+          updated_by: testUserId,
+        })
+        .eq('id', line!.id)
+        .select()
+        .single()
+
+      expect(partialLine?.shipped_quantity).toBe(60)
+      expect(partialLine?.quantity).toBe(100)
+
+      // Cleanup
+      await supabase.from('to_lines').delete().eq('transfer_order_id', partialTo!.id)
+      await supabase.from('transfer_orders').delete().eq('id', partialTo!.id)
+    })
+
+    // AC-3.8.3: Status transitions
+    it('AC-3.8.3: Status transitions (draft → planned → shipped → received)', async () => {
+      const { data: transitionTo } = await supabase
+        .from('transfer_orders')
+        .insert({
+          org_id: testOrgId,
+          from_warehouse_id: testWarehouse1Id,
+          to_warehouse_id: testWarehouse2Id,
+          status: 'draft',
+          planned_ship_date: '2025-03-20',
+          planned_receive_date: '2025-03-25',
+          created_by: testUserId,
+        })
+        .select()
+        .single()
+
+      const toId = transitionTo!.id
+
+      // Add line (required for planned status)
+      await supabase.from('to_lines').insert({
+        transfer_order_id: toId,
+        product_id: testProductId,
+        quantity: 50,
+        shipped_quantity: 0,
+        created_by: testUserId,
+      })
+
+      // Draft → Planned
+      const { data: plannedTo } = await supabase
+        .from('transfer_orders')
+        .update({ status: 'planned', updated_by: testUserId })
+        .eq('id', toId)
+        .select()
+        .single()
+      expect(plannedTo?.status).toBe('planned')
+
+      // Planned → Shipped
+      const { data: shippedTo } = await supabase
+        .from('transfer_orders')
+        .update({ status: 'shipped', updated_by: testUserId })
+        .eq('id', toId)
+        .select()
+        .single()
+      expect(shippedTo?.status).toBe('shipped')
+
+      // Shipped → Received
+      const { data: receivedTo } = await supabase
+        .from('transfer_orders')
+        .update({ status: 'received', updated_by: testUserId })
+        .eq('id', toId)
+        .select()
+        .single()
+      expect(receivedTo?.status).toBe('received')
+
+      // Cleanup
+      await supabase.from('to_lines').delete().eq('transfer_order_id', toId)
+      await supabase.from('transfer_orders').delete().eq('id', toId)
+    })
+  })
+
+  describe('Story 3.9: Audit Trail', () => {
+    // AC-3.9.1 & 3.9.2: Track created_by, updated_by, timestamps
+    it('AC-3.9.1-3.9.2: Track audit fields (created_by, updated_by, timestamps)', async () => {
+      const { data: auditTo } = await supabase
+        .from('transfer_orders')
+        .insert({
+          org_id: testOrgId,
+          from_warehouse_id: testWarehouse1Id,
+          to_warehouse_id: testWarehouse2Id,
+          status: 'draft',
+          planned_ship_date: '2025-04-01',
+          planned_receive_date: '2025-04-05',
+          created_by: testUserId,
+        })
+        .select()
+        .single()
+
+      const toId = auditTo!.id
+
+      // Verify created_by and created_at
+      expect(auditTo?.created_by).toBe(testUserId)
+      expect(auditTo?.created_at).toBeDefined()
+
+      // Update and verify updated_by and updated_at
+      const createdAt = new Date(auditTo!.created_at)
+      await new Promise(resolve => setTimeout(resolve, 100)) // Small delay
+
+      const { data: updatedTo } = await supabase
+        .from('transfer_orders')
+        .update({
+          notes: 'Audit test',
+          updated_by: testUserId,
+        })
+        .eq('id', toId)
+        .select()
+        .single()
+
+      expect(updatedTo?.updated_by).toBe(testUserId)
+      expect(updatedTo?.updated_at).toBeDefined()
+
+      const updatedAt = new Date(updatedTo!.updated_at!)
+      expect(updatedAt.getTime()).toBeGreaterThanOrEqual(createdAt.getTime())
+
+      // Verify lines also have audit fields
+      const { data: line } = await supabase
+        .from('to_lines')
+        .insert({
+          transfer_order_id: toId,
+          product_id: testProductId,
+          quantity: 25,
+          shipped_quantity: 0,
+          created_by: testUserId,
+        })
+        .select()
+        .single()
+
+      expect(line?.created_by).toBe(testUserId)
+      expect(line?.created_at).toBeDefined()
+
+      // Cleanup
+      await supabase.from('to_lines').delete().eq('transfer_order_id', toId)
+      await supabase.from('transfer_orders').delete().eq('id', toId)
     })
   })
 })
