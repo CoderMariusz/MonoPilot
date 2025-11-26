@@ -1,12 +1,16 @@
 /**
  * Purchase Orders Table Component
  * Story 3.1: Purchase Order CRUD
+ * Story 3.3: Bulk PO Creation (Coming Soon)
+ * Story 3.4: PO Approval Workflow
  *
  * Features:
  * - Display POs with PO Number, Supplier, Status, Expected Date, Total
  * - Search and filter by status, supplier, warehouse, date range
+ * - Fast Flow: Quick PO entry with product codes
  * - Create new PO button
  * - Edit and delete actions
+ * - Approval status filter
  */
 
 'use client'
@@ -41,9 +45,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Search, Plus, Pencil, Trash2, Zap, Upload, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { PurchaseOrderFormModal } from './PurchaseOrderFormModal'
+import { POFastFlowModal } from './POFastFlow'
 
 interface Supplier {
   id: string
@@ -64,6 +77,7 @@ interface PurchaseOrder {
   supplier_id: string
   warehouse_id: string
   status: string
+  approval_status: string | null
   expected_delivery_date: string
   total: number
   currency: string
@@ -76,10 +90,13 @@ export function PurchaseOrdersTable() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [approvalFilter, setApprovalFilter] = useState<string>('all')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null)
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null)
+  const [fastFlowOpen, setFastFlowOpen] = useState(false)
+  const [comingSoonOpen, setComingSoonOpen] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -92,6 +109,7 @@ export function PurchaseOrdersTable() {
       const params = new URLSearchParams()
       if (searchTerm) params.append('search', searchTerm)
       if (statusFilter !== 'all') params.append('status', statusFilter)
+      if (approvalFilter !== 'all') params.append('approval_status', approvalFilter)
 
       const response = await fetch(`/api/planning/purchase-orders?${params.toString()}`)
 
@@ -115,7 +133,7 @@ export function PurchaseOrdersTable() {
 
   useEffect(() => {
     fetchPurchaseOrders()
-  }, [statusFilter])
+  }, [statusFilter, approvalFilter])
 
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
@@ -204,23 +222,70 @@ export function PurchaseOrdersTable() {
     }
   }
 
+  // Get approval badge
+  const getApprovalBadge = (status: string | null) => {
+    if (!status) return null
+
+    switch (status) {
+      case 'pending':
+        return (
+          <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300">
+            <Clock className="h-3 w-3 mr-1" />
+            Pending
+          </Badge>
+        )
+      case 'approved':
+        return (
+          <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-300">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Approved
+          </Badge>
+        )
+      case 'rejected':
+        return (
+          <Badge variant="outline" className="ml-2 bg-red-50 text-red-700 border-red-300">
+            <XCircle className="h-3 w-3 mr-1" />
+            Rejected
+          </Badge>
+        )
+      default:
+        return null
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Purchase Orders</h2>
-        <Button onClick={() => {
-          setEditingPO(null)
-          setFormModalOpen(true)
-        }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Purchase Order
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setComingSoonOpen(true)}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Bulk Import
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setFastFlowOpen(true)}
+          >
+            <Zap className="mr-2 h-4 w-4" />
+            Quick Entry
+          </Button>
+          <Button onClick={() => {
+            setEditingPO(null)
+            setFormModalOpen(true)
+          }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add PO
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4">
-        <form onSubmit={handleSearch} className="flex-1 flex gap-2">
+      <div className="flex gap-4 flex-wrap">
+        <form onSubmit={handleSearch} className="flex-1 flex gap-2 min-w-[300px]">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
             <Input
@@ -234,16 +299,28 @@ export function PurchaseOrdersTable() {
         </form>
 
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="draft">Draft</SelectItem>
             <SelectItem value="submitted">Submitted</SelectItem>
             <SelectItem value="confirmed">Confirmed</SelectItem>
-            <SelectItem value="received">Received</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="receiving">Receiving</SelectItem>
+            <SelectItem value="closed">Closed</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={approvalFilter} onValueChange={setApprovalFilter}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Approval" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Approvals</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -296,9 +373,12 @@ export function PurchaseOrdersTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getStatusVariant(po.status)}>
-                      {po.status}
-                    </Badge>
+                    <div className="flex items-center flex-wrap gap-1">
+                      <Badge variant={getStatusVariant(po.status)}>
+                        {po.status}
+                      </Badge>
+                      {getApprovalBadge(po.approval_status)}
+                    </div>
                   </TableCell>
                   <TableCell>{formatDate(po.expected_delivery_date)}</TableCell>
                   <TableCell className="text-right">
@@ -371,6 +451,45 @@ export function PurchaseOrdersTable() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Fast Flow Modal */}
+      <POFastFlowModal
+        open={fastFlowOpen}
+        onClose={() => setFastFlowOpen(false)}
+        onSuccess={() => {
+          setFastFlowOpen(false)
+          fetchPurchaseOrders()
+        }}
+      />
+
+      {/* Bulk Import - Coming Soon Modal */}
+      <Dialog open={comingSoonOpen} onOpenChange={setComingSoonOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Bulk Import POs
+            </DialogTitle>
+            <DialogDescription>
+              Upload Excel/CSV files with product codes and quantities to create multiple purchase orders at once.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-blue-100 mx-auto flex items-center justify-center mb-4">
+              <Clock className="h-8 w-8 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Coming Soon</h3>
+            <p className="text-gray-500 text-sm">
+              This feature is planned for Phase 2 release. Stay tuned!
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setComingSoonOpen(false)}>
+              Got it
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

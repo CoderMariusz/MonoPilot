@@ -7,6 +7,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -76,6 +77,7 @@ export function SuppliersTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const { toast } = useToast()
+  const router = useRouter()
 
   // Fetch suppliers
   const fetchSuppliers = async () => {
@@ -237,7 +239,7 @@ export function SuppliersTable() {
                 <TableRow
                   key={supplier.id}
                   className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => openEditModal(supplier, { stopPropagation: () => {} } as any)}
+                  onClick={() => router.push(`/planning/suppliers/${supplier.id}`)}
                 >
                   <TableCell className="font-medium">{supplier.code}</TableCell>
                   <TableCell>
