@@ -77,7 +77,7 @@ export function BOMFormModal({ bom, onClose, onSuccess }: BOMFormModalProps) {
         }
 
         const data = await response.json()
-        setProducts(data.products || [])
+        setProducts(data.data || [])
       } catch (error) {
         console.error('Error fetching products:', error)
         toast({

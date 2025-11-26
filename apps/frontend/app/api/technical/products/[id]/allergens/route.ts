@@ -12,6 +12,93 @@ type RouteContext = {
   params: Promise<{ id: string }>
 }
 
+// GET /api/technical/products/[id]/allergens - Get product allergens
+export async function GET(req: NextRequest, context: RouteContext) {
+  try {
+    const supabase = await createServerSupabase()
+    const { id } = await context.params
+
+    // Check authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
+
+    if (authError || !session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Get current user to get org_id
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError || !currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentUser.org_id
+
+    // Verify product exists
+    const { data: product } = await supabase
+      .from('products')
+      .select('id')
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .is('deleted_at', null)
+      .single()
+
+    if (!product) {
+      return NextResponse.json(
+        { error: 'Product not found' },
+        { status: 404 }
+      )
+    }
+
+    // Fetch product allergens with details
+    const { data: productAllergens, error: allergensError } = await supabase
+      .from('product_allergens')
+      .select(`
+        allergen_id,
+        relation_type,
+        allergens (id, code, name)
+      `)
+      .eq('product_id', id)
+      .eq('org_id', orgId)
+
+    if (allergensError) {
+      console.error('Error fetching product allergens:', allergensError)
+      return NextResponse.json(
+        { error: 'Failed to fetch allergens', details: allergensError.message },
+        { status: 500 }
+      )
+    }
+
+    const allergens = {
+      contains: productAllergens
+        ?.filter((pa: any) => pa.relation_type === 'contains')
+        .map((pa: any) => pa.allergens) || [],
+      may_contain: productAllergens
+        ?.filter((pa: any) => pa.relation_type === 'may_contain')
+        .map((pa: any) => pa.allergens) || []
+    }
+
+    return NextResponse.json({ allergens })
+
+  } catch (error) {
+    console.error('Unexpected error in GET /api/technical/products/[id]/allergens:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
 // PUT /api/technical/products/[id]/allergens - Update product allergens
 export async function PUT(req: NextRequest, context: RouteContext) {
   try {

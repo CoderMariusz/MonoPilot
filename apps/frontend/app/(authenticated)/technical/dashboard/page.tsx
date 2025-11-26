@@ -189,6 +189,11 @@ export default function TechnicalDashboardPage() {
                 List View
               </Button>
             </Link>
+            <Link href="/technical/boms">
+              <Button variant="ghost" size="sm" className="rounded-none">
+                BOMs
+              </Button>
+            </Link>
             <Link href="/technical/products/allergens">
               <Button variant="ghost" size="sm" className="rounded-none">
                 Allergen Matrix

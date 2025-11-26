@@ -120,7 +120,7 @@ export const productListQuerySchema = z.object({
   status: z.array(z.string()).or(z.string()).optional(),
   category: z.string().optional(),
   page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().positive().max(100).optional().default(50),
+  limit: z.coerce.number().int().positive().max(1000).optional().default(50),
   sort: z.string().optional().default('code'),
   order: z.enum(['asc', 'desc']).optional().default('asc')
 })

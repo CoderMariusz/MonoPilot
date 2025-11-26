@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -27,7 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Search, Edit, Trash2, ArrowUpDown, Eye, History } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, ArrowUpDown, Eye, History, BookOpen } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import { ProductFormModal } from '@/components/technical/ProductFormModal'
@@ -51,6 +52,7 @@ interface Product {
   cost_per_unit?: number
   created_at: string
   updated_at: string
+  bom_count?: number
 }
 
 // Product type labels and colors
@@ -72,6 +74,7 @@ const STATUS_COLORS: Record<string, { variant: 'default' | 'secondary' | 'destru
 
 export default function ProductsPage() {
   const router = useRouter()
+  const [activeView, setActiveView] = useState<'products' | 'boms'>('products')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -192,23 +195,62 @@ export default function ProductsPage() {
     <div className="container mx-auto py-8 px-4">
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center mb-4">
             <div>
-              <CardTitle>Products</CardTitle>
+              <CardTitle>Technical Management</CardTitle>
               <p className="text-sm text-gray-500 mt-1">
-                Manage your product catalog (Raw Materials, WIP, Finished Goods, Packaging, By-Products)
+                {activeView === 'products'
+                  ? 'Manage your product catalog (Raw Materials, WIP, Finished Goods, Packaging, By-Products)'
+                  : 'Manage Bills of Materials and product recipes'}
               </p>
             </div>
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Product
-            </Button>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'products' | 'boms')} className="w-full">
+              <TabsList>
+                <TabsTrigger value="products">
+                  Products
+                </TabsTrigger>
+                <TabsTrigger value="boms">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  BOMs
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="flex gap-2 ml-4">
+              {activeView === 'products' ? (
+                <Button onClick={() => setShowCreateModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Product
+                </Button>
+              ) : (
+                <Button onClick={() => router.push('/technical/boms?create=true')}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create BOM
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent>
-          {/* Filters */}
-          <div className="space-y-4 mb-6">
+        {activeView === 'boms' ? (
+          <div className="text-center py-12">
+            <BookOpen className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Bills of Materials</h3>
+            <p className="text-gray-600 mb-6">
+              Manage BOMs and product recipes in the dedicated BOM management interface.
+            </p>
+            <Button onClick={() => router.push('/technical/boms')} size="lg">
+              <BookOpen className="mr-2 h-4 w-4" />
+              Go to BOM Management
+            </Button>
+          </div>
+        ) : (
+          <CardContent>
+            {/* Filters */}
+            <div className="space-y-4 mb-6">
             <div className="flex gap-4 flex-wrap">
               {/* Search */}
               <div className="flex-1 min-w-[200px]">
@@ -298,6 +340,7 @@ export default function ProductsPage() {
                     <TableHead>UoM</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Version</TableHead>
+                    <TableHead>BOMs</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -310,6 +353,21 @@ export default function ProductsPage() {
                       <TableCell className="text-gray-600">{product.uom}</TableCell>
                       <TableCell>{getStatusBadge(product.status)}</TableCell>
                       <TableCell className="text-gray-600">v{product.version.toFixed(1)}</TableCell>
+                      <TableCell>
+                        {product.bom_count !== undefined ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/technical/products/${product.id}?tab=boms`)}
+                            title={`View ${product.bom_count} BOM${product.bom_count !== 1 ? 's' : ''}`}
+                          >
+                            <BookOpen className="h-4 w-4 mr-1" />
+                            {product.bom_count}
+                          </Button>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button
@@ -382,7 +440,8 @@ export default function ProductsPage() {
               )}
             </>
           )}
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
 
       {/* Create/Edit Modal */}

@@ -23,7 +23,17 @@ import {
   Clock,
   User,
   GitCompare,
+  BookOpen,
+  Plus,
 } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
 import { ProductFormModal } from '@/components/technical/ProductFormModal'
 import { ProductDeleteDialog } from '@/components/technical/ProductDeleteDialog'
@@ -66,8 +76,25 @@ interface VersionHistoryEntry {
   changed_fields: Record<string, { old: unknown; new: unknown }>
   change_summary?: string
   changed_at: string
-  changed_by: string
-  user?: { first_name?: string; last_name?: string; email?: string }
+  changed_by: {
+    id: string
+    first_name?: string
+    last_name?: string
+    email?: string
+  } | null
+}
+
+interface BOM {
+  id: string
+  version: string
+  status: 'draft' | 'active' | 'phased_out' | 'inactive'
+  effective_from: string
+  effective_to: string | null
+  output_qty: number
+  output_uom: string
+  notes?: string
+  created_at: string
+  updated_at: string
 }
 
 // Product type config
@@ -95,6 +122,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [product, setProduct] = useState<Product | null>(null)
   const [allergens, setAllergens] = useState<ProductAllergens>({ contains: [], may_contain: [] })
   const [history, setHistory] = useState<VersionHistoryEntry[]>([])
+  const [boms, setBOMs] = useState<BOM[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState(initialTab)
 
@@ -160,10 +188,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       const response = await fetch(`/api/technical/products/${id}/history`)
       if (response.ok) {
         const data = await response.json()
-        setHistory(data.history || [])
+        setHistory(data.data || [])
       }
     } catch (error) {
       console.error('Error fetching history:', error)
+    }
+  }
+
+  // Fetch BOMs for this product
+  const fetchBOMs = async () => {
+    try {
+      const response = await fetch(`/api/technical/boms?product_id=${id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setBOMs(data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching BOMs:', error)
     }
   }
 
@@ -171,6 +212,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     fetchProduct()
     fetchAllergens()
     fetchHistory()
+    fetchBOMs()
   }, [id])
 
   // Compare versions
@@ -220,6 +262,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     fetchProduct()
     fetchAllergens()
     fetchHistory()
+    fetchBOMs()
   }
 
   const handleDeleteSuccess = () => {
@@ -321,11 +364,92 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             <Package className="mr-2 h-4 w-4" />
             Details
           </TabsTrigger>
+          <TabsTrigger value="boms">
+            <BookOpen className="mr-2 h-4 w-4" />
+            BOMs ({boms.length})
+          </TabsTrigger>
           <TabsTrigger value="history">
             <History className="mr-2 h-4 w-4" />
             Version History ({history.length})
           </TabsTrigger>
         </TabsList>
+
+        {/* BOMs Tab */}
+        <TabsContent value="boms">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-lg">Bills of Materials</CardTitle>
+                <Button onClick={() => router.push(`/technical/boms?create=true&product_id=${id}`)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create BOM
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {boms.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No BOMs created for this product yet.</p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => router.push(`/technical/boms?create=true&product_id=${id}`)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create First BOM
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Effective From</TableHead>
+                      <TableHead>Effective To</TableHead>
+                      <TableHead>Output</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {boms.map((bom) => (
+                      <TableRow key={bom.id} className="cursor-pointer hover:bg-gray-50">
+                        <TableCell className="font-medium font-mono">v{bom.version}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            bom.status === 'active' ? 'default' :
+                            bom.status === 'draft' ? 'secondary' :
+                            'destructive'
+                          }>
+                            {bom.status.charAt(0).toUpperCase() + bom.status.slice(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-600">
+                          {new Date(bom.effective_from).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-600">
+                          {bom.effective_to ? new Date(bom.effective_to).toLocaleDateString() : '∞'}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-600">
+                          {bom.output_qty} {bom.output_uom}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => router.push(`/technical/boms/${bom.id}`)}
+                          >
+                            View Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Details Tab */}
         <TabsContent value="details">
@@ -572,9 +696,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           <span className="text-gray-400">•</span>
                           <span className="text-sm text-gray-600 flex items-center gap-1">
                             <User className="h-3 w-3" />
-                            {entry.user?.first_name && entry.user?.last_name
-                              ? `${entry.user.first_name} ${entry.user.last_name}`
-                              : entry.user?.email || 'Unknown'}
+                            {entry.changed_by?.first_name && entry.changed_by?.last_name
+                              ? `${entry.changed_by.first_name} ${entry.changed_by.last_name}`
+                              : entry.changed_by?.email || 'Unknown'}
                           </span>
                         </div>
 

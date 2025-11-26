@@ -101,7 +101,7 @@ export function WorkOrderFormModal({
         }
 
         const data = await response.json()
-        setProducts(data.products || [])
+        setProducts(data.data || [])
       } catch (error) {
         console.error('Error fetching products:', error)
         toast({

@@ -74,7 +74,7 @@ export function AssignProductsModal({
         }
 
         const data = await response.json()
-        setProducts(data.products || [])
+        setProducts(data.data || [])
       } catch (error) {
         console.error('Error fetching products:', error)
         // Products might not exist yet (Batch 2A)
