@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-// BOM Status enum
-export const BOMStatusEnum = z.enum(['draft', 'active', 'phased_out', 'inactive'])
+// BOM Status enum - must match database enum values exactly
+export const BOMStatusEnum = z.enum(['Draft', 'Active', 'Phased Out', 'Inactive'])
 export type BOMStatus = z.infer<typeof BOMStatusEnum>
 
 // Date string validation (accepts YYYY-MM-DD or full ISO datetime)
@@ -21,7 +21,7 @@ export const CreateBOMSchema = z.object({
   product_id: z.string().uuid('Invalid product ID'),
   effective_from: dateStringSchema.or(z.date()),
   effective_to: dateStringSchema.or(z.date()).optional().nullable(),
-  status: BOMStatusEnum.optional().default('draft'),
+  status: BOMStatusEnum.optional().default('Draft'),
   output_qty: z.number().positive('Output quantity must be positive').optional().default(1.0),
   output_uom: z.string().min(1, 'Unit of measure is required'),
   notes: z.string().optional().nullable()

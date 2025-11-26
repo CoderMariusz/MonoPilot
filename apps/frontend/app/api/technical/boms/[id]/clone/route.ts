@@ -87,7 +87,7 @@ export async function POST(
         version: newVersion,
         effective_from,
         effective_to,
-        status: 'draft', // AC-2.10.3: Cloned BOMs default to Draft
+        status: 'Draft', // AC-2.10.3: Cloned BOMs default to Draft
         output_qty: sourceBOM.output_qty,
         output_uom: sourceBOM.output_uom,
         notes: sourceBOM.notes,
