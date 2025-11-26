@@ -299,7 +299,7 @@ development_status:
   3-14-routing-copy-to-wo: backlog  # ⚠️ BLOCKED by Story 3.10 (WO is STUB) - routing_id field exists but no copy logic
   3-15-configurable-wo-statuses: backlog  # ⚠️ BLOCKED by Story 3.10 (WO is STUB) - Status hard-coded, not configurable
   3-16-wo-source-of-demand: backlog  # ❌ BLOCKED by Story 3.10 (WO is STUB) - No source tracking fields
-  3-17-supplier-management: review  # ✅ BATCH 3A - Migration 025, API (/api/planning/suppliers). NO UI PAGE. NO TESTS
+  3-17-supplier-management: done  # ✅ BATCH 3A - Migration 025, API (/api/planning/suppliers), UI (List + Detail page). NO TESTS
   3-18-supplier-product-assignments: review  # ✅ BATCH 3A - Migration 026 (supplier_products), API (/api/planning/suppliers/[id]/products). NO TESTS
   3-19-po-status-lifecycle: backlog  # ❌ NOT IMPLEMENTED - Status field exists but no lifecycle logic
   3-20-to-status-lifecycle: ready-for-dev  # ✅ BATCH 3B - API endpoint exists, context ready. Needs transition validation logic + tests
