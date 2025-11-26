@@ -24,6 +24,7 @@ export interface ProductSummary {
   updated_at: string
   allergen_count?: number
   has_bom?: boolean
+  bom_count?: number
 }
 
 export interface ProductChange {
