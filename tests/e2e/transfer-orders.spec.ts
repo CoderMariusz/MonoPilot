@@ -459,14 +459,14 @@ async function getExistingWarehouses(page: Page, orgId: string) {
 
 async function getExistingProducts(page: Page, orgId: string) {
   try {
-    const response = await page.request.get('http://localhost:5000/api/settings/products')
+    const response = await page.request.get('http://localhost:5000/api/technical/products')
 
     if (!response.ok()) {
       throw new Error(`API returned ${response.status()}: ${response.statusText()}`)
     }
 
     const data = await response.json()
-    const products = data.products || data
+    const products = data.data || data.products || data
 
     if (!Array.isArray(products) || products.length === 0) {
       throw new Error('No products found in organization')
