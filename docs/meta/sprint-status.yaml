@@ -283,15 +283,15 @@ development_status:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   epic-3: contexted
-  3-1-purchase-order-crud: review  # ✅ BATCH 3A - Migration 027, PO Service, API, UI. NO TESTS
-  3-2-po-line-management: review  # ✅ BATCH 3A - Migration 028, API (/api/planning/purchase-orders/[id]/lines), auto-calc totals trigger. NO TESTS
+  3-1-purchase-order-crud: done  # ✅ BATCH 3A - Migration 027, PO Service, API, UI. NO TESTS
+  3-2-po-line-management: done  # ✅ BATCH 3A - Migration 028, API (/api/planning/purchase-orders/[id]/lines), auto-calc totals trigger. NO TESTS
   3-3-bulk-po-creation: ready-for-dev  # ✅ BATCH 3A - Ready for development (context: Bulk PO from Excel/CSV, auto-grouping by supplier)
-  3-4-po-approval-workflow: review  # ✅ BATCH 3A - Migration 027 (approval fields), Migration 029 (po_approvals), API. NO TESTS
-  3-5-configurable-po-statuses: review  # ✅ BATCH 3A - Migration 029 (planning_settings), API (/api/planning/settings). NO TESTS
-  3-6-transfer-order-crud: review  # ✅ BATCH 3B - Migration 020, TO Service, API, UI. NO TESTS
-  3-7-to-line-management: review  # ✅ BATCH 3B - Migration 021, API (/api/planning/transfer-orders/[id]/lines). NO TESTS
-  3-8-partial-to-shipments: review  # ✅ BATCH 3B - API (/api/planning/transfer-orders/[id]/ship). NO TESTS
-  3-9-lp-selection-for-to: review  # ✅ BATCH 3B - Migration 022 (to_line_lps), API (/api/planning/transfer-orders/[id]/lines/[lineId]/lps). NO TESTS
+  3-4-po-approval-workflow: done  # ✅ BATCH 3A - Migration 027 (approval fields), Migration 029 (po_approvals), API. NO TESTS
+  3-5-configurable-po-statuses: done  # ✅ BATCH 3A - Migration 029 (planning_settings), API (/api/planning/settings). NO TESTS
+  3-6-transfer-order-crud: done  # ✅ BATCH 3B - Migration 020, TO Service, API, UI. NO TESTS
+  3-7-to-line-management: done  # ✅ BATCH 3B - Migration 021, API (/api/planning/transfer-orders/[id]/lines). NO TESTS
+  3-8-partial-to-shipments: done  # ✅ BATCH 3B - API (/api/planning/transfer-orders/[id]/ship). NO TESTS
+  3-9-lp-selection-for-to: done  # ✅ BATCH 3B - Migration 022 (to_line_lps), API (/api/planning/transfer-orders/[id]/lines/[lineId]/lps). NO TESTS
   3-10-work-order-crud: ready-for-dev  # ⚠️ BATCH 3C - Migration 028 (needs completion: add bom_id, snapshot logic, source fields). Ready for development
   3-11-bom-auto-selection-for-wo: backlog  # ❌ BLOCKED by Story 3.10 (WO is STUB) - No bom_id field
   3-12-wo-materials-snapshot: backlog  # ❌ BLOCKED by Story 3.10 (WO is STUB) - No snapshot table
@@ -300,11 +300,11 @@ development_status:
   3-15-configurable-wo-statuses: backlog  # ⚠️ BLOCKED by Story 3.10 (WO is STUB) - Status hard-coded, not configurable
   3-16-wo-source-of-demand: backlog  # ❌ BLOCKED by Story 3.10 (WO is STUB) - No source tracking fields
   3-17-supplier-management: done  # ✅ BATCH 3A - Migration 025, API (/api/planning/suppliers), UI (List + Detail page). NO TESTS
-  3-18-supplier-product-assignments: review  # ✅ BATCH 3A - Migration 026 (supplier_products), API (/api/planning/suppliers/[id]/products). NO TESTS
+  3-18-supplier-product-assignments: done  # ✅ BATCH 3A - Migration 026 (supplier_products), API (/api/planning/suppliers/[id]/products). NO TESTS
   3-19-po-status-lifecycle: backlog  # ❌ NOT IMPLEMENTED - Status field exists but no lifecycle logic
   3-20-to-status-lifecycle: ready-for-dev  # ✅ BATCH 3B - API endpoint exists, context ready. Needs transition validation logic + tests
   3-21-wo-gantt-view: backlog  # ❌ NOT IMPLEMENTED - No Gantt component
-  3-22-planning-settings-configuration: review  # ✅ BATCH 3A - Migration 029 (planning_settings), API (/api/planning/settings). NO TESTS
+  3-22-planning-settings-configuration: done  # ✅ BATCH 3A - Migration 029 (planning_settings), API (/api/planning/settings). NO TESTS
   3-23-verify-bom-snapshot-immutability-sprint-0-gap-3: backlog  # ❌ BLOCKED by Story 3.12 (WO Materials Snapshot) - Test story, no implementation yet
   epic-3-retrospective: optional
 
