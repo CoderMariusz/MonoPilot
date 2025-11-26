@@ -514,11 +514,18 @@ function ProductCard({ product }: { product: ProductSummary }) {
               {product.status}
             </Badge>
           </div>
-          {(product.allergen_count ?? 0) > 0 && (
-            <span className="text-orange-600" title={`${product.allergen_count} allergens`}>
-              {icons.allergen} {product.allergen_count}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {(product.bom_count ?? 0) > 0 && (
+              <span className="text-blue-600" title={`${product.bom_count} BOM${product.bom_count !== 1 ? 's' : ''}`}>
+                📋 {product.bom_count}
+              </span>
+            )}
+            {(product.allergen_count ?? 0) > 0 && (
+              <span className="text-orange-600" title={`${product.allergen_count} allergens`}>
+                {icons.allergen} {product.allergen_count}
+              </span>
+            )}
+          </div>
         </div>
         <div className="text-xs text-gray-500 mt-2">
           Updated {formatDistanceToNow(new Date(product.updated_at), { addSuffix: true })}

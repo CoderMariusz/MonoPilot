@@ -46,6 +46,22 @@ interface Allergen {
   name: string
 }
 
+interface Supplier {
+  id: string
+  code: string
+  name: string
+  currency: string
+  is_active: boolean
+}
+
+interface SupplierProduct {
+  id: string
+  supplier_id: string
+  product_id: string
+  is_default: boolean
+  suppliers: Supplier
+}
+
 interface ProductFormModalProps {
   product?: Product | null
   onClose: () => void
@@ -91,6 +107,12 @@ export function ProductFormModal({ product, onClose, onSuccess }: ProductFormMod
   const [mayContainAllergens, setMayContainAllergens] = useState<string[]>([])
   const [loadingAllergens, setLoadingAllergens] = useState(true)
 
+  // Supplier state
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>('')
+  const [originalSupplierId, setOriginalSupplierId] = useState<string>('')
+  const [loadingSuppliers, setLoadingSuppliers] = useState(true)
+
   const { toast } = useToast()
   const isEditMode = !!product
 
@@ -112,6 +134,49 @@ export function ProductFormModal({ product, onClose, onSuccess }: ProductFormMod
     }
     fetchAllergens()
   }, [])
+
+  // Fetch suppliers on mount
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        setLoadingSuppliers(true)
+        const response = await fetch('/api/planning/suppliers?is_active=true')
+        if (response.ok) {
+          const data = await response.json()
+          setSuppliers(data.suppliers || [])
+        }
+      } catch (error) {
+        console.error('Error fetching suppliers:', error)
+      } finally {
+        setLoadingSuppliers(false)
+      }
+    }
+    fetchSuppliers()
+  }, [])
+
+  // Fetch default supplier for product in edit mode
+  useEffect(() => {
+    if (isEditMode && product?.id) {
+      const fetchProductSupplier = async () => {
+        try {
+          const response = await fetch(
+            `/api/planning/suppliers/products?product_id=${product.id}&is_default=true`
+          )
+          if (response.ok) {
+            const data = await response.json()
+            const defaultAssignment = data.assignments?.[0] as SupplierProduct | undefined
+            if (defaultAssignment) {
+              setSelectedSupplierId(defaultAssignment.supplier_id)
+              setOriginalSupplierId(defaultAssignment.supplier_id)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching product supplier:', error)
+        }
+      }
+      fetchProductSupplier()
+    }
+  }, [isEditMode, product?.id])
 
   // Fetch product allergens in edit mode
   useEffect(() => {
@@ -283,6 +348,31 @@ export function ProductFormModal({ product, onClose, onSuccess }: ProductFormMod
             may_contain: mayContainAllergens,
           }),
         })
+      }
+
+      // Update default supplier
+      // If supplier changed or was removed, handle the update
+      if (selectedSupplierId !== originalSupplierId) {
+        // Remove old default supplier if there was one
+        if (originalSupplierId) {
+          await fetch(
+            `/api/planning/suppliers/products?supplier_id=${originalSupplierId}&product_id=${productId}`,
+            { method: 'DELETE' }
+          )
+        }
+
+        // Add new default supplier if selected
+        if (selectedSupplierId) {
+          await fetch('/api/planning/suppliers/products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              supplier_id: selectedSupplierId,
+              product_id: productId,
+              is_default: true,
+            }),
+          })
+        }
       }
 
       toast({
@@ -537,6 +627,47 @@ export function ProductFormModal({ product, onClose, onSuccess }: ProductFormMod
                 />
               </div>
             </div>
+          </div>
+
+          {/* Default Supplier Section */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Default Supplier</h3>
+
+            {loadingSuppliers ? (
+              <p className="text-sm text-gray-500">Loading suppliers...</p>
+            ) : suppliers.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No active suppliers configured. Configure suppliers in Planning → Suppliers.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="supplier">Select Default Supplier</Label>
+                  <Select
+                    value={selectedSupplierId}
+                    onValueChange={setSelectedSupplierId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a supplier (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No supplier (clear selection)</SelectItem>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id}>
+                          <span className="font-medium">{supplier.code}</span>
+                          <span className="text-gray-500 ml-2">- {supplier.name}</span>
+                          <span className="text-gray-400 ml-2">({supplier.currency})</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Optional: Set a default supplier for this product. You can add more suppliers with specific
+                  prices and lead times in the Planning → Suppliers section.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Allergens Section (Story 2.4) */}

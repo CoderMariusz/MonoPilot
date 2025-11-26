@@ -30,7 +30,8 @@ export async function getProductDashboard(
     .from('products')
     .select(`
       id, code, name, type, version, status, updated_at, created_at,
-      product_allergens (count)
+      product_allergens (count),
+      boms (count)
     `)
     .eq('org_id', orgId)
     .eq('status', 'active')
@@ -91,7 +92,8 @@ export async function getProductDashboard(
         version: p.version || 1,
         status: p.status,
         updated_at: p.updated_at,
-        allergen_count: p.product_allergens?.[0]?.count || 0
+        allergen_count: p.product_allergens?.[0]?.count || 0,
+        bom_count: p.boms?.[0]?.count || 0
       })),
       recent_changes: []
     }
