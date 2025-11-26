@@ -87,7 +87,7 @@ interface VersionHistoryEntry {
 interface BOM {
   id: string
   version: string
-  status: 'draft' | 'active' | 'phased_out' | 'inactive'
+  status: 'Draft' | 'Active' | 'Phased Out' | 'Inactive'
   effective_from: string
   effective_to: string | null
   output_qty: number
@@ -417,11 +417,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         <TableCell className="font-medium font-mono">v{bom.version}</TableCell>
                         <TableCell>
                           <Badge variant={
-                            bom.status === 'active' ? 'default' :
-                            bom.status === 'draft' ? 'secondary' :
+                            bom.status === 'Active' ? 'default' :
+                            bom.status === 'Draft' ? 'secondary' :
                             'destructive'
                           }>
-                            {bom.status.charAt(0).toUpperCase() + bom.status.slice(1)}
+                            {bom.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-gray-600">
