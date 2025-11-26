@@ -44,7 +44,7 @@ export async function POST(
     const validatedData: ShipToInput = shipToSchema.parse(body)
 
     // Call service method
-    const result = await shipTransferOrder(id, validatedData)
+    const result = await shipTransferOrder(id, validatedData, session.user.id)
 
     if (!result.success) {
       if (result.code === 'NOT_FOUND') {

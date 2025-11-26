@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load .env.test for E2E tests
+dotenv.config({ path: path.resolve(__dirname, '.env.test') });
 
 /**
  * Playwright Test Configuration
@@ -37,7 +42,7 @@ export default defineConfig({
   /* Shared settings for all projects */
   use: {
     /* Base URL from environment or default to localhost:5000 */
-    baseURL: process.env.BASE_URL || 'http://localhost:5000',
+    baseURL: process.env.BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5000',
 
     /* Collect trace on first retry */
     trace: 'retain-on-failure',

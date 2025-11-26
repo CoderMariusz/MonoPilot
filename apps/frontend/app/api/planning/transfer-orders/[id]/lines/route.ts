@@ -95,7 +95,7 @@ export async function POST(
     const validatedData: CreateToLineInput = createToLineSchema.parse(body)
 
     // Call service method
-    const result = await createToLine(id, validatedData)
+    const result = await createToLine(id, validatedData, session.user.id)
 
     if (!result.success) {
       if (result.code === 'NOT_FOUND') {

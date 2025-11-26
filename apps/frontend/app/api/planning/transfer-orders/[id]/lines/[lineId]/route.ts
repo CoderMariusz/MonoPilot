@@ -46,7 +46,7 @@ export async function PUT(
     const validatedData: UpdateToLineInput = updateToLineSchema.parse(body)
 
     // Call service method
-    const result = await updateToLine(lineId, validatedData)
+    const result = await updateToLine(lineId, validatedData, session.user.id)
 
     if (!result.success) {
       if (result.code === 'NOT_FOUND') {

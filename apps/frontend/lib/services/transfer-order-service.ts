@@ -684,7 +684,8 @@ export async function getToLines(transferOrderId: string): Promise<ListResult<To
  */
 export async function createToLine(
   transferOrderId: string,
-  input: CreateToLineInput
+  input: CreateToLineInput,
+  userId: string
 ): Promise<ServiceResult<ToLine>> {
   try {
     const supabaseAdmin = createServerSupabaseAdmin()
@@ -738,6 +739,8 @@ export async function createToLine(
         shipped_qty: 0,
         received_qty: 0,
         notes: input.notes || null,
+        created_by: userId,
+        updated_by: userId,
       })
       .select(
         `
@@ -776,7 +779,8 @@ export async function createToLine(
  */
 export async function updateToLine(
   lineId: string,
-  input: UpdateToLineInput
+  input: UpdateToLineInput,
+  userId: string
 ): Promise<ServiceResult<ToLine>> {
   try {
     const supabaseAdmin = createServerSupabaseAdmin()
@@ -818,10 +822,14 @@ export async function updateToLine(
       }
     }
 
-    // Update TO line
+    // Update TO line (add audit trail)
     const { data, error } = await supabaseAdmin
       .from('to_lines')
-      .update(input)
+      .update({
+        ...input,
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', lineId)
       .select(
         `
@@ -939,7 +947,8 @@ export async function deleteToLine(lineId: string): Promise<ServiceResult<void>>
  */
 export async function shipTransferOrder(
   transferOrderId: string,
-  input: ShipToInput
+  input: ShipToInput,
+  userId: string
 ): Promise<ServiceResult<TransferOrder>> {
   try {
     const supabaseAdmin = createServerSupabaseAdmin()
@@ -1009,7 +1018,11 @@ export async function shipTransferOrder(
 
       const { error: updateError } = await supabaseAdmin
         .from('to_lines')
-        .update({ shipped_qty: newShippedQty })
+        .update({
+          shipped_qty: newShippedQty,
+          updated_by: userId,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', lineItem.to_line_id)
 
       if (updateError) {
