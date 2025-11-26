@@ -53,29 +53,9 @@ export async function createTestUser(orgId: string): Promise<{
   token: string
 }> {
   try {
-    // Create auth user with credentials from env or defaults
-    const email = `test-user-${Date.now()}@monopilot.test`
-    const password = process.env.TEST_USER_PASSWORD || 'Test123!@#'
-
-    const { data, error } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { org_id: orgId },
-    })
-
-    if (error) throw error
-
-    const userId = data.user?.id || ''
-
-    // Create user profile
-    await supabase.from('users').insert({
-      id: userId,
-      email,
-      org_id: orgId,
-      role: 'admin',
-      status: 'active',
-    })
+    // Use pre-configured test user from .env.test
+    const email = process.env.TEST_USER_EMAIL || 'test-user@monopilot.test'
+    const password = process.env.TEST_USER_PASSWORD || 'test-password-123'
 
     // Get JWT token via Supabase REST API
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -94,7 +74,10 @@ export async function createTestUser(orgId: string): Promise<{
     })
 
     if (!tokenResponse.ok) {
-      throw new Error(`Failed to get JWT token: ${tokenResponse.statusText}`)
+      throw new Error(
+        `Failed to get JWT token: ${tokenResponse.statusText}. ` +
+        `Make sure test user "${email}" exists in Supabase Auth with password "${password}"`
+      )
     }
 
     const tokenData = await tokenResponse.json()
@@ -104,14 +87,28 @@ export async function createTestUser(orgId: string): Promise<{
       throw new Error('No access token returned from auth endpoint')
     }
 
+    // Get user ID from auth
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single()
+
+    if (userError || !userData) {
+      throw new Error(
+        `Test user "${email}" not found in users table. ` +
+        `Create test user in Supabase Auth and ensure user profile exists.`
+      )
+    }
+
     return {
-      userId,
+      userId: userData.id,
       email,
       password,
       token,
     }
   } catch (error) {
-    console.error('Failed to create test user:', error)
+    console.error('Failed to get test user:', error)
     throw error
   }
 }
@@ -213,30 +210,9 @@ export async function cleanupTestData(orgId: string): Promise<void> {
     // 4. Warehouses
     await supabase.from('warehouses').delete().eq('org_id', orgId)
 
-    // 5. Users - delete from auth and users table
-    const { data: users } = await supabase
-      .from('users')
-      .select('id')
-      .eq('org_id', orgId)
-
-    if (users && users.length > 0) {
-      const userIds = users.map((u) => u.id)
-
-      // Delete each user from auth (one at a time)
-      for (const userId of userIds) {
-        try {
-          await supabase.auth.admin.deleteUser(userId)
-        } catch (authError) {
-          console.warn(`Failed to delete auth user ${userId}:`, authError)
-        }
-      }
-
-      // Delete from users table
-      await supabase.from('users').delete().in('id', userIds)
-    }
-
-    // Note: Don't delete organization - it's used across multiple test runs
-    // It's cleaned up manually or persists as test org fixture
+    // Note: Don't delete users - test user is reused across test runs
+    // Don't delete organization - it's used across multiple test runs
+    // Both are cleaned up manually or persist as test fixtures
 
     console.log(`Cleaned up test data for org: ${orgId}`)
   } catch (error) {
