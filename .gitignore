@@ -112,3 +112,6 @@ Thumbs.db
 .replitignore
 .vercel
 apps/frontend/apps/frontend/nul
+
+# Scripts directory node_modules (symlinks to root node_modules)
+scripts/node_modules
