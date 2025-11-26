@@ -69,7 +69,18 @@
       "SlashCommand(/bmad:bmm:workflows:document-project)",
       "SlashCommand(/bmad:bmm:workflows:sprint-planning)",
       "SlashCommand(/bmad:bmm:workflows:workflow-status)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(apps/frontend/lib/supabase/migrations/024_add_updated_by_to_lines.sql )",
+      "Bash(apps/frontend/lib/services/transfer-order-service.ts )",
+      "Bash(apps/frontend/app/api/planning/transfer-orders/[id]/ship/route.ts )",
+      "Bash(apps/frontend/app/api/planning/transfer-orders/[id]/lines/route.ts )",
+      "Bash(apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/route.ts )",
+      "Bash(playwright.config.ts )",
+      "Bash(.env.test )",
+      "Bash(tests/e2e/transfer-orders.spec.ts )",
+      "Bash(tests/e2e/fixtures/test-setup.ts )",
+      "Bash(docs/E2E-SETUP.md )",
+      "Bash(E2E-CHECKLIST.md)"
     ],
     "deny": [],
     "ask": []

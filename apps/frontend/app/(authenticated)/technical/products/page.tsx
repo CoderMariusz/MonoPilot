@@ -28,7 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Search, Edit, Trash2, ArrowUpDown, Eye, History, BookOpen } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, ArrowUpDown, Eye, History, BookOpen, ArrowLeft } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ProductFormModal } from '@/components/technical/ProductFormModal'
@@ -203,6 +203,14 @@ export default function ProductsPage() {
 
   return (
     <div className="container mx-auto py-8 px-4">
+      {/* Back to Dashboard */}
+      <div className="mb-6">
+        <Button variant="ghost" onClick={() => router.push('/technical/dashboard')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Dashboard
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center mb-4">

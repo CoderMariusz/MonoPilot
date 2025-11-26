@@ -169,6 +169,9 @@ export default function TechnicalDashboardPage() {
     )
   }
 
+  // Type assertion: data is guaranteed non-null after early return
+  const dashboardData: ProductDashboardResponse = data
+
   return (
     <div className="p-8">
       {/* Header with View Toggle (AC-2.23.1) */}
@@ -297,32 +300,32 @@ export default function TechnicalDashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
           title="Total Products"
-          value={data.overall_stats.total_products}
+          value={dashboardData.overall_stats.total_products}
           subtitle="Active Products"
           icon={icons.package}
-          trend={data.overall_stats.trend_this_month}
+          trend={dashboardData.overall_stats.trend_this_month}
           onClick={() => setTypeFilter('all')}
         />
         <StatCard
           title="Raw Materials"
-          value={data.category_stats.find(s => s.category === 'RM')?.count || 0}
-          subtitle={`${data.category_stats.find(s => s.category === 'RM')?.percentage || 0}% of catalog`}
+          value={dashboardData.category_stats.find(s => s.category === 'RM')?.count || 0}
+          subtitle={`${dashboardData.category_stats.find(s => s.category === 'RM')?.percentage || 0}% of catalog`}
           icon={icons.rawMaterial}
           accentColor="green"
           onClick={() => scrollToSection('RM')}
         />
         <StatCard
           title="Work in Progress"
-          value={data.category_stats.find(s => s.category === 'WIP')?.count || 0}
-          subtitle={`${data.category_stats.find(s => s.category === 'WIP')?.percentage || 0}% of catalog`}
+          value={dashboardData.category_stats.find(s => s.category === 'WIP')?.count || 0}
+          subtitle={`${dashboardData.category_stats.find(s => s.category === 'WIP')?.percentage || 0}% of catalog`}
           icon={icons.wip}
           accentColor="orange"
           onClick={() => scrollToSection('WIP')}
         />
         <StatCard
           title="Finished Goods"
-          value={data.category_stats.find(s => s.category === 'FG')?.count || 0}
-          subtitle={`${data.category_stats.find(s => s.category === 'FG')?.percentage || 0}% of catalog`}
+          value={dashboardData.category_stats.find(s => s.category === 'FG')?.count || 0}
+          subtitle={`${dashboardData.category_stats.find(s => s.category === 'FG')?.percentage || 0}% of catalog`}
           icon={icons.finishedGood}
           accentColor="blue"
           onClick={() => scrollToSection('FG')}
@@ -337,7 +340,7 @@ export default function TechnicalDashboardPage() {
           {(typeFilter === 'all' || typeFilter === 'RM') && (
             <div ref={rmSectionRef}>
               <ProductGroupSection
-                group={data.groups.find(g => g.category === 'RM')!}
+                group={dashboardData.groups.find(g => g.category === 'RM')!}
                 onViewAll={() => router.push('/technical/products?type=RM')}
               />
             </div>
@@ -347,7 +350,7 @@ export default function TechnicalDashboardPage() {
           {(typeFilter === 'all' || typeFilter === 'WIP') && (
             <div ref={wipSectionRef}>
               <ProductGroupSection
-                group={data.groups.find(g => g.category === 'WIP')!}
+                group={dashboardData.groups.find(g => g.category === 'WIP')!}
                 onViewAll={() => router.push('/technical/products?type=WIP')}
               />
             </div>
@@ -357,7 +360,7 @@ export default function TechnicalDashboardPage() {
           {(typeFilter === 'all' || typeFilter === 'FG') && (
             <div ref={fgSectionRef}>
               <ProductGroupSection
-                group={data.groups.find(g => g.category === 'FG')!}
+                group={dashboardData.groups.find(g => g.category === 'FG')!}
                 onViewAll={() => router.push('/technical/products?type=FG')}
               />
             </div>

@@ -361,8 +361,8 @@ export function ProductFormModal({ product, onClose, onSuccess }: ProductFormMod
           )
         }
 
-        // Add new default supplier if selected
-        if (selectedSupplierId) {
+        // Add new default supplier if selected (ignore 'none' - it means no supplier)
+        if (selectedSupplierId && selectedSupplierId !== 'none') {
           await fetch('/api/planning/suppliers/products', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -651,7 +651,7 @@ export function ProductFormModal({ product, onClose, onSuccess }: ProductFormMod
                       <SelectValue placeholder="Select a supplier (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No supplier (clear selection)</SelectItem>
+                      <SelectItem value="none">No supplier (clear selection)</SelectItem>
                       {suppliers.map((supplier) => (
                         <SelectItem key={supplier.id} value={supplier.id}>
                           <span className="font-medium">{supplier.code}</span>
