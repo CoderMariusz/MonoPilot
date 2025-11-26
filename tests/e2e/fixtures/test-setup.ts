@@ -213,7 +213,7 @@ export async function cleanupTestData(orgId: string): Promise<void> {
     // 4. Warehouses
     await supabase.from('warehouses').delete().eq('org_id', orgId)
 
-    // 5. Users
+    // 5. Users - delete from auth and users table
     const { data: users } = await supabase
       .from('users')
       .select('id')
@@ -221,7 +221,17 @@ export async function cleanupTestData(orgId: string): Promise<void> {
 
     if (users && users.length > 0) {
       const userIds = users.map((u) => u.id)
-      await supabase.auth.admin.deleteUser(userIds[0])
+
+      // Delete each user from auth (one at a time)
+      for (const userId of userIds) {
+        try {
+          await supabase.auth.admin.deleteUser(userId)
+        } catch (authError) {
+          console.warn(`Failed to delete auth user ${userId}:`, authError)
+        }
+      }
+
+      // Delete from users table
       await supabase.from('users').delete().in('id', userIds)
     }
 
