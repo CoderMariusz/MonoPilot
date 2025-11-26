@@ -270,7 +270,7 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
       version: newVersion,
       effective_from,
       effective_to,
-      status: input.status || 'draft',
+      status: input.status || 'Draft',
       output_qty: input.output_qty || 1.0,
       output_uom: input.output_uom,
       notes: input.notes || null,

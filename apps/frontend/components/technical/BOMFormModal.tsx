@@ -52,7 +52,7 @@ export function BOMFormModal({ bom, onClose, onSuccess }: BOMFormModalProps) {
         ? bom.effective_to.split('T')[0]
         : new Date(bom.effective_to).toISOString().split('T')[0]
       : '',
-    status: bom?.status || 'draft',
+    status: bom?.status || 'Draft',
     output_qty: bom?.output_qty?.toString() || '1',
     output_uom: bom?.output_uom || '',
     notes: bom?.notes || '',
@@ -335,10 +335,10 @@ export function BOMFormModal({ bom, onClose, onSuccess }: BOMFormModalProps) {
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="phased_out">Phased Out</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="Draft">Draft</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Phased Out">Phased Out</SelectItem>
+                <SelectItem value="Inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
             {errors.status && <p className="text-sm text-red-500">{errors.status}</p>}
