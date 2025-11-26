@@ -87,8 +87,30 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    // Fetch BOM counts for each product
+    let productsWithBomCount = data || []
+    if (data && data.length > 0) {
+      const productIds = data.map((p: { id: string }) => p.id)
+      const { data: bomCounts } = await supabase
+        .from('boms')
+        .select('product_id')
+        .in('product_id', productIds)
+
+      // Count BOMs per product
+      const bomCountMap: Record<string, number> = {}
+      bomCounts?.forEach((bom: { product_id: string }) => {
+        bomCountMap[bom.product_id] = (bomCountMap[bom.product_id] || 0) + 1
+      })
+
+      // Add bom_count to each product
+      productsWithBomCount = data.map((product: { id: string }) => ({
+        ...product,
+        bom_count: bomCountMap[product.id] || 0
+      }))
+    }
+
     return NextResponse.json({
-      data,
+      data: productsWithBomCount,
       pagination: {
         page: params.page,
         limit: params.limit,

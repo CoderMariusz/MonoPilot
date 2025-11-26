@@ -40,12 +40,13 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Search, Edit, Trash2, Eye, Plus } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { BOMWithProduct } from '@/lib/validation/bom-schemas'
 import { BOMFormModal } from '@/components/technical/BOMFormModal'
 
 export default function BOMsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [boms, setBOMs] = useState<BOMWithProduct[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -55,6 +56,15 @@ export default function BOMsPage() {
   const [deletingBOM, setDeletingBOM] = useState<BOMWithProduct | null>(null)
 
   const { toast } = useToast()
+
+  // Handle ?create=true query param to auto-open modal
+  useEffect(() => {
+    if (searchParams.get('create') === 'true') {
+      setShowCreateModal(true)
+      // Clean up URL
+      router.replace('/technical/boms', { scroll: false })
+    }
+  }, [searchParams, router])
 
   // Fetch BOMs with filters (AC-2.6.1)
   const fetchBOMs = async () => {
