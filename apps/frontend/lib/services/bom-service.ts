@@ -13,6 +13,31 @@ import type { BOM, BOMWithProduct, BOMStatus, CreateBOMInput, UpdateBOMInput } f
  * - Cache invalidation events
  */
 
+/**
+ * Get current user's org_id from users table
+ * Used for RLS enforcement and multi-tenancy
+ */
+async function getCurrentUserOrgId(): Promise<{ userId: string; orgId: string } | null> {
+  const supabase = await createServerSupabase()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) return null
+
+  // Get org_id from users table
+  const { data: userData, error } = await supabase
+    .from('users')
+    .select('org_id')
+    .eq('id', user.id)
+    .single()
+
+  if (error || !userData?.org_id) {
+    console.error('Failed to get org_id for user:', user.id, error)
+    return null
+  }
+
+  return { userId: user.id, orgId: userData.org_id }
+}
+
 export interface BOMFilters {
   product_id?: string
   status?: BOMStatus
@@ -64,17 +89,13 @@ async function getMaxVersion(productId: string, orgId: string): Promise<string |
  * Get all BOMs with filters
  */
 export async function getBOMs(filters: BOMFilters = {}): Promise<BOMWithProduct[]> {
+  const userInfo = await getCurrentUserOrgId()
+  if (!userInfo) {
+    throw new Error('Unauthorized or no organization found for user')
+  }
+
   const supabase = await createServerSupabase()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    throw new Error('Unauthorized')
-  }
-
-  const org_id = user.user_metadata?.org_id
-  if (!org_id) {
-    throw new Error('No organization found for user')
-  }
+  const org_id = userInfo.orgId
 
   let query = supabase
     .from('boms')
@@ -217,17 +238,13 @@ export async function getBOMById(id: string, include_items = false): Promise<BOM
  * Create new BOM (auto-assigns version)
  */
 export async function createBOM(input: CreateBOMInput): Promise<BOM> {
+  const userInfo = await getCurrentUserOrgId()
+  if (!userInfo) {
+    throw new Error('Unauthorized or no organization found for user')
+  }
+
   const supabase = await createServerSupabase()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    throw new Error('Unauthorized')
-  }
-
-  const org_id = user.user_metadata?.org_id
-  if (!org_id) {
-    throw new Error('No organization found for user')
-  }
+  const org_id = userInfo.orgId
 
   // Get max version for this product
   const maxVersion = await getMaxVersion(input.product_id, org_id)
@@ -257,8 +274,8 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
       output_qty: input.output_qty || 1.0,
       output_uom: input.output_uom,
       notes: input.notes || null,
-      created_by: user.id,
-      updated_by: user.id
+      created_by: userInfo.userId,
+      updated_by: userInfo.userId
     })
     .select()
     .single()
@@ -275,17 +292,17 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
  * Update existing BOM
  */
 export async function updateBOM(id: string, input: UpdateBOMInput): Promise<BOM> {
-  const supabase = await createServerSupabase()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    throw new Error('Unauthorized')
+  const userInfo = await getCurrentUserOrgId()
+  if (!userInfo) {
+    throw new Error('Unauthorized or no organization found for user')
   }
+
+  const supabase = await createServerSupabase()
 
   // Convert dates if needed
   const updates: any = {
     ...input,
-    updated_by: user.id
+    updated_by: userInfo.userId
   }
 
   if (input.effective_from instanceof Date) {
@@ -332,17 +349,13 @@ export async function deleteBOM(id: string): Promise<void> {
  * Get BOM count for a product
  */
 export async function getBOMCountForProduct(productId: string): Promise<number> {
+  const userInfo = await getCurrentUserOrgId()
+  if (!userInfo) {
+    throw new Error('Unauthorized or no organization found for user')
+  }
+
   const supabase = await createServerSupabase()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    throw new Error('Unauthorized')
-  }
-
-  const org_id = user.user_metadata?.org_id
-  if (!org_id) {
-    throw new Error('No organization found for user')
-  }
+  const org_id = userInfo.orgId
 
   const { count, error } = await supabase
     .from('boms')

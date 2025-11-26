@@ -4,16 +4,23 @@ import { z } from 'zod'
 export const BOMStatusEnum = z.enum(['draft', 'active', 'phased_out', 'inactive'])
 export type BOMStatus = z.infer<typeof BOMStatusEnum>
 
+// Date string validation (accepts YYYY-MM-DD or full ISO datetime)
+const dateStringSchema = z.string().refine(
+  (val: string) => {
+    // Accept YYYY-MM-DD format from date input
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return true
+    // Accept full ISO datetime format
+    if (!isNaN(Date.parse(val))) return true
+    return false
+  },
+  { message: 'Invalid date format' }
+)
+
 // Create BOM Schema
 export const CreateBOMSchema = z.object({
   product_id: z.string().uuid('Invalid product ID'),
-  effective_from: z.string().datetime('Invalid date format').or(z.date()),
-  effective_to: z
-    .string()
-    .datetime('Invalid date format')
-    .or(z.date())
-    .optional()
-    .nullable(),
+  effective_from: dateStringSchema.or(z.date()),
+  effective_to: dateStringSchema.or(z.date()).optional().nullable(),
   status: BOMStatusEnum.optional().default('draft'),
   output_qty: z.number().positive('Output quantity must be positive').optional().default(1.0),
   output_uom: z.string().min(1, 'Unit of measure is required'),
@@ -25,8 +32,8 @@ export type CreateBOMInput = z.input<typeof CreateBOMSchema>
 // Update BOM Schema (cannot change product_id)
 export const UpdateBOMSchema = CreateBOMSchema.omit({ product_id: true }).partial().extend({
   status: BOMStatusEnum.optional(),
-  effective_from: z.string().datetime().or(z.date()).optional(),
-  effective_to: z.string().datetime().or(z.date()).optional().nullable()
+  effective_from: dateStringSchema.or(z.date()).optional(),
+  effective_to: dateStringSchema.or(z.date()).optional().nullable()
 })
 
 export type UpdateBOMInput = z.input<typeof UpdateBOMSchema>
@@ -82,8 +89,8 @@ export interface BOMWithProduct extends BOM {
  * Story 2.10: BOM Clone
  */
 export const CloneBOMSchema = z.object({
-  effective_from: z.string().datetime('Invalid date format').or(z.date()),
-  effective_to: z.string().datetime('Invalid date format').or(z.date()).optional().nullable(),
+  effective_from: dateStringSchema.or(z.date()),
+  effective_to: dateStringSchema.or(z.date()).optional().nullable(),
 }).refine(
   (data) => {
     if (data.effective_to && data.effective_from) {
