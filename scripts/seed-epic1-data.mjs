@@ -26,10 +26,15 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the directory of the current script
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Load environment variables from apps/frontend/.env.local
-const envPath = resolve(process.cwd(), 'apps/frontend/.env.local');
+const envPath = resolve(__dirname, '../apps/frontend/.env.local');
 let envVars = {};
 
 try {
@@ -42,7 +47,11 @@ try {
     const match = trimmedLine.match(/^([^=]+)=(.*)$/);
     if (match) {
       const key = match[1].trim();
-      const value = match[2].trim();
+      let value = match[2].trim();
+      // Remove surrounding quotes if present
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
       envVars[key] = value;
     }
   });
