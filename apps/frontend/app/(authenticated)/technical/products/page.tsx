@@ -30,7 +30,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Plus, Search, Edit, Trash2, ArrowUpDown, Eye, History, BookOpen } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ProductFormModal } from '@/components/technical/ProductFormModal'
 import { ProductDeleteDialog } from '@/components/technical/ProductDeleteDialog'
 
@@ -74,6 +74,7 @@ const STATUS_COLORS: Record<string, { variant: 'default' | 'secondary' | 'destru
 
 export default function ProductsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [activeView, setActiveView] = useState<'products' | 'boms'>('products')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,6 +85,15 @@ export default function ProductsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
+
+  // Handle ?create=true query param to auto-open modal
+  useEffect(() => {
+    if (searchParams.get('create') === 'true') {
+      setShowCreateModal(true)
+      // Clean up URL
+      router.replace('/technical/products', { scroll: false })
+    }
+  }, [searchParams, router])
 
   // Sorting
   const [sortBy, setSortBy] = useState<'code' | 'name' | 'type' | 'status' | 'version'>('code')

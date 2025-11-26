@@ -201,7 +201,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       const response = await fetch(`/api/technical/boms?product_id=${id}`)
       if (response.ok) {
         const data = await response.json()
-        setBOMs(data.data || [])
+        setBOMs(data.boms || [])
       }
     } catch (error) {
       console.error('Error fetching BOMs:', error)

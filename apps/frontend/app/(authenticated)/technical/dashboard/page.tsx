@@ -215,7 +215,7 @@ export default function TechnicalDashboardPage() {
 
       {/* Quick Actions Panel (AC-2.23.7) */}
       <div className="flex flex-wrap gap-2 mb-6">
-        <Link href="/technical/products/new">
+        <Link href="/technical/products?create=true">
           <Button size="sm" className="bg-green-600 hover:bg-green-700">
             {icons.plus} Add Product
           </Button>
@@ -452,7 +452,7 @@ function ProductGroupSection({
         <CardContent>
           <div className="text-center py-8 text-gray-500">
             <p>No {group.label.toLowerCase()} defined yet.</p>
-            <Link href="/technical/products/new">
+            <Link href="/technical/products?create=true">
               <Button size="sm" className="mt-4">
                 {icons.plus} Add {group.category === 'RM' ? 'Raw Material' : group.category === 'WIP' ? 'WIP Product' : 'Finished Good'}
               </Button>
