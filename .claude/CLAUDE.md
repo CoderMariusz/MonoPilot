@@ -139,6 +139,69 @@ export default function Component() {
 ```
 **NIE czytaj innych komponentów** - użyj tego wzorca.
 
+### Testing Pattern - Zapamiętaj
+
+#### Playwright E2E (tests/e2e/**/*.spec.ts)
+```typescript
+import { test, expect } from '@playwright/test'
+import { createTestOrganization, createTestUser, createTestWarehouses } from './fixtures/test-setup'
+
+test.describe('Feature X', () => {
+  test('should do something', async ({ page, context, baseURL }) => {
+    const { orgId } = await createTestOrganization()
+    const { userId, token } = await createTestUser(orgId)
+
+    // Set auth cookie
+    await context.addCookies([{
+      name: 'sb-auth',
+      value: token,
+      domain: new URL(baseURL!).hostname,
+      path: '/',
+    }])
+
+    // Navigate and test
+    await page.goto('/page-url')
+    await expect(page.locator('selector')).toBeVisible()
+  })
+})
+```
+
+#### Test Setup Fixtures (test-setup.ts)
+- `createTestOrganization()` - zwraca orgId z .env.test
+- `createTestUser(orgId)` - tworzy auth user + JWT
+- `createTestWarehouses(orgId)` - tworzy 2 magazyny
+- `createTestProducts(orgId, count)` - tworzy produkty
+- `cleanupTestData(orgId)` - czyści dane po teście
+
+#### Konfiguracja (playwright.config.ts)
+- Testy z 3 przeglądarkami (chromium, firefox, webkit)
+- timeout: 60s, expect: 15s, actionTimeout: 15s, navigationTimeout: 30s
+- baseURL: env NEXT_PUBLIC_APP_URL lub http://localhost:5000
+- Automatyczne starty dev servera: `cd apps/frontend && pnpm dev`
+- Screenshoty/videa tylko na failure
+- Traces retain-on-failure
+
+#### Komendy Testów
+```bash
+pnpm test              # Playwright E2E (wszystkie przeglądarki)
+pnpm test:e2e          # Alias dla Playwright
+pnpm test -- --headed  # Z interfejsem
+pnpm test -- --debug   # Debug mode
+pnpm test -- --project=chromium  # Konkretna przeglądarka
+```
+
+#### .env.test wymagane
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+TEST_ORG_ID=...  # ID istniejącej organizacji do testów
+NEXT_PUBLIC_APP_URL=http://localhost:5000
+BASE_URL=http://localhost:5000
+```
+
+**NIE tworz nowych fixture'ów** - użyj istniejących z test-setup.ts.
+
 ### Gdy NIE wiesz - PYTAJ, NIE szukaj
 Jeśli nie znasz:
 - Struktury bazy danych → PYTAJ użytkownika

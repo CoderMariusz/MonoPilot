@@ -112,9 +112,19 @@ export function WorkOrdersTable() {
     }
   }
 
+  // Fetch on status filter change
   useEffect(() => {
     fetchWorkOrders()
-  }, [search, statusFilter])
+  }, [statusFilter])
+
+  // Debounced search (300ms delay to avoid fetching on every keystroke)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchWorkOrders()
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [search])
 
   // Handle delete
   const handleDelete = async () => {

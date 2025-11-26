@@ -9,6 +9,8 @@ build/
 .next/
 out/
 
+playwright-report/
+test-results/
 # Environment variables
 .env
 .env.local

@@ -80,7 +80,17 @@
       "Bash(tests/e2e/transfer-orders.spec.ts )",
       "Bash(tests/e2e/fixtures/test-setup.ts )",
       "Bash(docs/E2E-SETUP.md )",
-      "Bash(E2E-CHECKLIST.md)"
+      "Bash(E2E-CHECKLIST.md)",
+      "Bash(git log:*)",
+      "Bash(node scripts/cleanup-test-users.mjs:*)",
+      "Bash(node scripts/setup-test-user.mjs:*)",
+      "Bash(pnpm test:e2e:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(powershell:*)",
+      "Bash(node -e:*)",
+      "Bash(timeout 60 pnpm test:*)"
     ],
     "deny": [],
     "ask": []

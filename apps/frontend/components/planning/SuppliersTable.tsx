@@ -109,9 +109,19 @@ export function SuppliersTable() {
     }
   }
 
+  // Fetch on status filter change
   useEffect(() => {
     fetchSuppliers()
-  }, [search, statusFilter])
+  }, [statusFilter])
+
+  // Debounced search (300ms delay to avoid fetching on every keystroke)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchSuppliers()
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [search])
 
   // Handle delete
   const handleDelete = async () => {
