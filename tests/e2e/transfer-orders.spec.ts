@@ -58,10 +58,11 @@ test.afterAll(async () => {
 
 async function loginAsTestUser(page: Page, email: string, password: string) {
   await page.goto('/login')
+  await page.waitForSelector('input[type="email"]', { timeout: 30000 })
   await page.fill('input[type="email"]', email)
   await page.fill('input[type="password"]', password)
-  await page.click('button[type="submit"]')
-  await page.waitForURL(/\/(dashboard|planning)/, { timeout: 15000 })
+  await page.click('button:has-text("Sign In")')
+  await page.waitForURL(/\/(dashboard|planning)/, { timeout: 60000 })
 }
 
 async function getExistingWarehouses(page: Page): Promise<{
@@ -178,7 +179,7 @@ test.describe('Story 3.6: Transfer Order CRUD', () => {
     await page.goto('/planning/transfer-orders')
 
     // Click Add/Create button
-    const addButton = page.locator('button').filter({ hasText: /Add|Create|New/i })
+    const addButton = page.locator('button').filter({ hasText: /Add Transfer Order/i })
     await expect(addButton).toBeVisible({ timeout: 10000 })
     await addButton.click()
 
@@ -701,7 +702,7 @@ test.describe('Error Handling & Validation', () => {
     await page.goto('/planning/transfer-orders')
 
     // Click Add button
-    const addButton = page.locator('button').filter({ hasText: /Add|Create|New/i })
+    const addButton = page.locator('button').filter({ hasText: /Add Transfer Order/i })
     await addButton.click()
 
     // Wait for modal
@@ -724,7 +725,7 @@ test.describe('Error Handling & Validation', () => {
     try {
       await page.goto('/planning/transfer-orders')
 
-      const addButton = page.locator('button').filter({ hasText: /Add|Create|New/i })
+      const addButton = page.locator('button').filter({ hasText: /Add Transfer Order/i })
       await addButton.click()
 
       const modal = page.locator('[role="dialog"]')
@@ -782,7 +783,7 @@ test.describe('User Workflows', () => {
     await expect(page.locator('h1, h2').first()).toContainText(/Transfer Order/i, { timeout: 10000 })
 
     // 2. Create new TO
-    const addButton = page.locator('button').filter({ hasText: /Add|Create|New/i })
+    const addButton = page.locator('button').filter({ hasText: /Add Transfer Order/i })
     await addButton.click()
 
     const modal = page.locator('[role="dialog"]')

@@ -90,7 +90,10 @@
       "Bash(taskkill:*)",
       "Bash(powershell:*)",
       "Bash(node -e:*)",
-      "Bash(timeout 60 pnpm test:*)"
+      "Bash(timeout 60 pnpm test:*)",
+      "SlashCommand(/bmad:bmm:workflows:dev-story)",
+      "SlashCommand(/bmad:bmm:workflows:create-story)",
+      "Bash(timeout 30 pnpm test:*)"
     ],
     "deny": [],
     "ask": []

@@ -47,7 +47,7 @@ async function setupTestData() {
     rate: 8,
   })
 
-  await supabase.from('suppliers').insert({
+  const { error: supErr } = await supabase.from('suppliers').insert({
     id: ids.supplierId,
     org_id: ids.orgId,
     code: `SUP-${Math.floor(Math.random() * 9999)}`,
@@ -59,6 +59,7 @@ async function setupTestData() {
     created_by: ids.userId,
     updated_by: ids.userId,
   })
+  if (supErr) console.error('Supplier insert error:', supErr)
 
   return ids
 }

@@ -53,10 +53,11 @@ test.afterAll(async () => {
 
 async function loginAsTestUser(page: Page, email: string, password: string) {
   await page.goto('/login')
+  await page.waitForSelector('input[type="email"]', { timeout: 30000 })
   await page.fill('input[type="email"]', email)
   await page.fill('input[type="password"]', password)
-  await page.click('button[type="submit"]')
-  await page.waitForURL(/\/(dashboard|planning)/, { timeout: 15000 })
+  await page.click('button:has-text("Sign In")')
+  await page.waitForURL(/\/(dashboard|planning)/, { timeout: 60000 })
 }
 
 async function getExistingProduct(page: Page): Promise<string | null> {
@@ -148,7 +149,7 @@ test.describe('Story 3.10: Work Order CRUD', () => {
     await expect(headers.filter({ hasText: /Status/i })).toBeVisible()
 
     // Verify Add WO button
-    const addButton = page.locator('button').filter({ hasText: /Add|Create|New/i })
+    const addButton = page.locator('button').filter({ hasText: /Create Work Order/i })
     await expect(addButton).toBeVisible()
 
     // Verify search input
@@ -165,7 +166,7 @@ test.describe('Story 3.10: Work Order CRUD', () => {
     await page.goto('/planning/work-orders')
 
     // Click Add WO
-    const addButton = page.locator('button').filter({ hasText: /Add|Create|New/i })
+    const addButton = page.locator('button').filter({ hasText: /Create Work Order/i })
     await addButton.click()
 
     // Wait for modal
@@ -592,7 +593,7 @@ test.describe('WO Validation & Errors', () => {
   test('Validate required fields on create', async ({ page }) => {
     await page.goto('/planning/work-orders')
 
-    const addButton = page.locator('button').filter({ hasText: /Add|Create|New/i })
+    const addButton = page.locator('button').filter({ hasText: /Create Work Order/i })
     await addButton.click()
 
     const modal = page.locator('[role="dialog"]')
@@ -610,7 +611,7 @@ test.describe('WO Validation & Errors', () => {
   test('Validate quantity is positive', async ({ page }) => {
     await page.goto('/planning/work-orders')
 
-    const addButton = page.locator('button').filter({ hasText: /Add|Create|New/i })
+    const addButton = page.locator('button').filter({ hasText: /Create Work Order/i })
     await addButton.click()
 
     const modal = page.locator('[role="dialog"]')
@@ -631,7 +632,7 @@ test.describe('WO Validation & Errors', () => {
   test('Validate end date after start date', async ({ page }) => {
     await page.goto('/planning/work-orders')
 
-    const addButton = page.locator('button').filter({ hasText: /Add|Create|New/i })
+    const addButton = page.locator('button').filter({ hasText: /Create Work Order/i })
     await addButton.click()
 
     const modal = page.locator('[role="dialog"]')

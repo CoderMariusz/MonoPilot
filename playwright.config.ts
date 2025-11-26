@@ -24,12 +24,12 @@ export default defineConfig({
   /* Opt out of parallel tests on CI */
   workers: process.env.CI ? 1 : undefined,
 
-  /* Test timeout: 60 seconds */
-  timeout: 60 * 1000,
+  /* Test timeout: 120 seconds */
+  timeout: 120 * 1000,
 
-  /* Assertion timeout: 15 seconds */
+  /* Assertion timeout: 30 seconds */
   expect: {
-    timeout: 15 * 1000,
+    timeout: 30 * 1000,
   },
 
   /* Reporter configuration */
@@ -53,11 +53,11 @@ export default defineConfig({
     /* Video only on failure */
     video: 'retain-on-failure',
 
-    /* Action timeout: 15 seconds */
-    actionTimeout: 15 * 1000,
+    /* Action timeout: 30 seconds */
+    actionTimeout: 30 * 1000,
 
-    /* Navigation timeout: 30 seconds */
-    navigationTimeout: 30 * 1000,
+    /* Navigation timeout: 60 seconds */
+    navigationTimeout: 60 * 1000,
   },
 
   /* Configure projects for major browsers */

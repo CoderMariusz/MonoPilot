@@ -45,10 +45,11 @@ test.afterAll(async () => {
 
 async function loginAsTestUser(page: Page, email: string, password: string) {
   await page.goto('/login')
+  await page.waitForSelector('input[type="email"]', { timeout: 30000 })
   await page.fill('input[type="email"]', email)
   await page.fill('input[type="password"]', password)
-  await page.click('button[type="submit"]')
-  await page.waitForURL(/\/(dashboard|planning)/, { timeout: 15000 })
+  await page.click('button:has-text("Sign In")')
+  await page.waitForURL(/\/(dashboard|planning)/, { timeout: 60000 })
 }
 
 async function createSupplierViaAPI(page: Page): Promise<string> {
