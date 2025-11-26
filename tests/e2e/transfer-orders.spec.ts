@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
-import { createTestUser, createTestOrganization, cleanupTestData } from './fixtures/test-setup'
+import { createTestOrganization, createTestUser, cleanupTestData } from './fixtures/test-setup'
 
 /**
  * Transfer Order E2E Tests
@@ -22,9 +22,9 @@ let testUserId: string
 let testUserToken: string
 
 test.beforeAll(async () => {
-  // Create test organization and user
-  const result = await createTestOrganization()
-  testOrgId = result.orgId
+  // Use pre-existing test organization from .env.test
+  const orgResult = await createTestOrganization()
+  testOrgId = orgResult.orgId
 
   const userResult = await createTestUser(testOrgId)
   testUserId = userResult.userId
@@ -47,10 +47,10 @@ test.describe('Story 3.6: Transfer Order CRUD', () => {
 
   test.beforeEach(async ({ page }) => {
     // Login as test user
-    await loginAsTestUser(page, testUserToken)
+    await loginAsTestUser(page)
 
     // Get existing warehouses from production (no create needed)
-    const warehouses = await getExistingWarehouses(testOrgId, testUserToken)
+    const warehouses = await getExistingWarehouses(page, testOrgId)
     if (!warehouses.from_warehouse_id || !warehouses.to_warehouse_id) {
       throw new Error('No warehouses found in test org. Create at least 2 warehouses first.')
     }
@@ -175,11 +175,11 @@ test.describe('Story 3.7: TO Line Management', () => {
   let productId: string
 
   test.beforeEach(async ({ page }) => {
-    await loginAsTestUser(page, testUserToken)
+    await loginAsTestUser(page)
 
     // Get existing warehouses and products
-    const warehouses = await getExistingWarehouses(testOrgId, testUserToken)
-    const products = await getExistingProducts(testOrgId, testUserToken)
+    const warehouses = await getExistingWarehouses(page, testOrgId)
+    const products = await getExistingProducts(page, testOrgId)
     productId = products[0].id
 
     // Create test TO
@@ -294,11 +294,11 @@ test.describe('Story 3.8: Partial Shipments', () => {
   let toId: string
 
   test.beforeEach(async ({ page }) => {
-    await loginAsTestUser(page, testUserToken)
+    await loginAsTestUser(page)
 
     // Get existing data and create TO with lines
-    const warehouses = await getExistingWarehouses(testOrgId, testUserToken)
-    const products = await getExistingProducts(testOrgId, testUserToken)
+    const warehouses = await getExistingWarehouses(page, testOrgId)
+    const products = await getExistingProducts(page, testOrgId)
 
     toId = await createTestTransferOrder(page, warehouses.from_warehouse_id, warehouses.to_warehouse_id)
     await addTestLine(page, products[0].id, '100')
@@ -413,23 +413,35 @@ test.describe('Story 3.8: Partial Shipments', () => {
 // HELPER FUNCTIONS
 // ============================================================================
 
-async function loginAsTestUser(page: Page, token: string) {
-  // Set auth token in localStorage/cookies
-  await page.evaluate((token) => {
-    localStorage.setItem('supabase-auth-token', token)
-  }, token)
+async function loginAsTestUser(page: Page) {
+  // Go to login page
+  await page.goto('/login')
 
-  await page.goto('/planning/transfer-orders')
+  // Fill login form
+  const testUserEmail = process.env.TEST_USER_EMAIL || 'test-user@monopilot.test'
+  const testUserPassword = process.env.TEST_USER_PASSWORD || 'Test123!@#'
+
+  await page.locator('input[type="email"]').fill(testUserEmail)
+  await page.locator('input[type="password"]').fill(testUserPassword)
+
+  // Submit login
+  await page.locator('button:has-text("Sign In"), button:has-text("Login")').click()
+
+  // Wait for redirect to planning
+  await page.waitForURL('**/planning/**')
   await page.waitForLoadState('networkidle')
 }
 
-async function getExistingWarehouses(orgId: string, token: string) {
+async function getExistingWarehouses(page: Page, orgId: string) {
   try {
-    const response = await fetch('http://localhost:5000/api/settings/warehouses', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    const response = await page.request.get('http://localhost:5000/api/settings/warehouses')
 
-    const warehouses = await response.json()
+    if (!response.ok()) {
+      throw new Error(`API returned ${response.status()}: ${response.statusText()}`)
+    }
+
+    const data = await response.json()
+    const warehouses = data.warehouses || data
 
     if (!Array.isArray(warehouses) || warehouses.length < 2) {
       throw new Error(`Need at least 2 warehouses. Found ${warehouses.length}`)
@@ -445,13 +457,16 @@ async function getExistingWarehouses(orgId: string, token: string) {
   }
 }
 
-async function getExistingProducts(orgId: string, token: string) {
+async function getExistingProducts(page: Page, orgId: string) {
   try {
-    const response = await fetch('http://localhost:5000/api/settings/products', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    const response = await page.request.get('http://localhost:5000/api/settings/products')
 
-    const products = await response.json()
+    if (!response.ok()) {
+      throw new Error(`API returned ${response.status()}: ${response.statusText()}`)
+    }
+
+    const data = await response.json()
+    const products = data.products || data
 
     if (!Array.isArray(products) || products.length === 0) {
       throw new Error('No products found in organization')

@@ -17,22 +17,27 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 // ============================================================================
 
 export async function createTestOrganization(): Promise<{ orgId: string }> {
+  // Use TEST_ORG_ID from environment instead of creating new org
+  const testOrgId = process.env.TEST_ORG_ID
+  if (!testOrgId) {
+    throw new Error('TEST_ORG_ID not configured in .env.test')
+  }
+
+  // Verify org exists
   try {
     const { data, error } = await supabase
       .from('organizations')
-      .insert({
-        name: `Test Org ${Date.now()}`,
-        description: 'E2E test organization',
-        status: 'active',
-      })
       .select('id')
+      .eq('id', testOrgId)
       .single()
 
-    if (error) throw error
+    if (error || !data) {
+      throw new Error(`Organization with id ${testOrgId} not found in Supabase`)
+    }
 
-    return { orgId: data.id }
+    return { orgId: testOrgId }
   } catch (error) {
-    console.error('Failed to create test organization:', error)
+    console.error('Failed to verify test organization:', error)
     throw error
   }
 }
@@ -70,13 +75,36 @@ export async function createTestUser(orgId: string): Promise<{
       status: 'active',
     })
 
-    // Get JWT token
-    const { data: session, error: signInError } = await supabase.auth.admin.getUserById(userId)
-    if (signInError) throw signInError
+    // Get JWT token via Supabase REST API
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+    const tokenResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+      },
+      body: JSON.stringify({
+        email,
+        password,
+      }),
+    })
+
+    if (!tokenResponse.ok) {
+      throw new Error(`Failed to get JWT token: ${tokenResponse.statusText}`)
+    }
+
+    const tokenData = await tokenResponse.json()
+    const token = tokenData.access_token || ''
+
+    if (!token) {
+      throw new Error('No access token returned from auth endpoint')
+    }
 
     return {
       userId,
-      token: session.user?.user_metadata?.token || userId, // In real scenario, get JWT token
+      token,
     }
   } catch (error) {
     console.error('Failed to create test user:', error)
@@ -193,8 +221,8 @@ export async function cleanupTestData(orgId: string): Promise<void> {
       await supabase.from('users').delete().in('id', userIds)
     }
 
-    // 6. Organization
-    await supabase.from('organizations').delete().eq('id', orgId)
+    // Note: Don't delete organization - it's used across multiple test runs
+    // It's cleaned up manually or persists as test org fixture
 
     console.log(`Cleaned up test data for org: ${orgId}`)
   } catch (error) {
