@@ -19,7 +19,8 @@ import { createTestOrganization, createTestUser, cleanupTestData } from './fixtu
 
 let testOrgId: string
 let testUserId: string
-let testUserToken: string
+let testUserEmail: string
+let testUserPassword: string
 
 test.beforeAll(async () => {
   // Use pre-existing test organization from .env.test
@@ -28,7 +29,8 @@ test.beforeAll(async () => {
 
   const userResult = await createTestUser(testOrgId)
   testUserId = userResult.userId
-  testUserToken = userResult.token
+  testUserEmail = userResult.email
+  testUserPassword = userResult.password
 })
 
 test.afterAll(async () => {
@@ -47,7 +49,7 @@ test.describe('Story 3.6: Transfer Order CRUD', () => {
 
   test.beforeEach(async ({ page }) => {
     // Login as test user
-    await loginAsTestUser(page)
+    await loginAsTestUser(page, testUserEmail, testUserPassword)
 
     // Get existing warehouses from production (no create needed)
     const warehouses = await getExistingWarehouses(page, testOrgId)
@@ -175,7 +177,7 @@ test.describe('Story 3.7: TO Line Management', () => {
   let productId: string
 
   test.beforeEach(async ({ page }) => {
-    await loginAsTestUser(page)
+    await loginAsTestUser(page, testUserEmail, testUserPassword)
 
     // Get existing warehouses and products
     const warehouses = await getExistingWarehouses(page, testOrgId)
@@ -294,7 +296,7 @@ test.describe('Story 3.8: Partial Shipments', () => {
   let toId: string
 
   test.beforeEach(async ({ page }) => {
-    await loginAsTestUser(page)
+    await loginAsTestUser(page, testUserEmail, testUserPassword)
 
     // Get existing data and create TO with lines
     const warehouses = await getExistingWarehouses(page, testOrgId)
@@ -413,16 +415,13 @@ test.describe('Story 3.8: Partial Shipments', () => {
 // HELPER FUNCTIONS
 // ============================================================================
 
-async function loginAsTestUser(page: Page) {
+async function loginAsTestUser(page: Page, email: string, password: string) {
   // Go to login page
   await page.goto('/login')
 
   // Fill login form
-  const testUserEmail = process.env.TEST_USER_EMAIL || 'test-user@monopilot.test'
-  const testUserPassword = process.env.TEST_USER_PASSWORD || 'Test123!@#'
-
-  await page.locator('input[type="email"]').fill(testUserEmail)
-  await page.locator('input[type="password"]').fill(testUserPassword)
+  await page.locator('input[type="email"]').fill(email)
+  await page.locator('input[type="password"]').fill(password)
 
   // Submit login
   await page.locator('button:has-text("Sign In"), button:has-text("Login")').click()

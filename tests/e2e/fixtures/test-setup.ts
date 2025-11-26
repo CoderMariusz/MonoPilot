@@ -48,12 +48,14 @@ export async function createTestOrganization(): Promise<{ orgId: string }> {
 
 export async function createTestUser(orgId: string): Promise<{
   userId: string
+  email: string
+  password: string
   token: string
 }> {
   try {
-    // Create auth user
+    // Create auth user with credentials from env or defaults
     const email = `test-user-${Date.now()}@monopilot.test`
-    const password = 'Test123!@#'
+    const password = process.env.TEST_USER_PASSWORD || 'Test123!@#'
 
     const { data, error } = await supabase.auth.admin.createUser({
       email,
@@ -104,6 +106,8 @@ export async function createTestUser(orgId: string): Promise<{
 
     return {
       userId,
+      email,
+      password,
       token,
     }
   } catch (error) {
