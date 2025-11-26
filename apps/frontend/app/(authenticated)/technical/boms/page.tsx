@@ -156,20 +156,20 @@ export default function BOMsPage() {
       string,
       { variant: 'default' | 'destructive' | 'secondary' | 'outline'; className: string }
     > = {
-      draft: { variant: 'secondary', className: 'bg-gray-400 hover:bg-gray-500' },
-      active: { variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
-      phased_out: {
+      'Draft': { variant: 'secondary', className: 'bg-gray-400 hover:bg-gray-500' },
+      'Active': { variant: 'default', className: 'bg-green-500 hover:bg-green-600' },
+      'Phased Out': {
         variant: 'secondary',
         className: 'bg-yellow-500 hover:bg-yellow-600 text-white',
       },
-      inactive: { variant: 'outline', className: 'text-gray-500' },
+      'Inactive': { variant: 'outline', className: 'text-gray-500' },
     }
 
-    const config = variants[status] || variants.draft
+    const config = variants[status] || variants['Draft']
 
     return (
       <Badge variant={config.variant} className={config.className}>
-        {status === 'phased_out' ? 'Phased Out' : status.charAt(0).toUpperCase() + status.slice(1)}
+        {status}
       </Badge>
     )
   }
@@ -218,10 +218,10 @@ export default function BOMsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All BOMs</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="phased_out">Phased Out</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="Draft">Draft</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Phased Out">Phased Out</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>

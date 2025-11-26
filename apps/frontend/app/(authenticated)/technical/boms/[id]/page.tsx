@@ -82,7 +82,7 @@ interface BOM {
   version: string
   effective_from: string | Date
   effective_to: string | Date | null
-  status: 'draft' | 'active' | 'phased_out' | 'inactive'
+  status: 'Draft' | 'Active' | 'Phased Out' | 'Inactive'
   output_qty: number
   output_uom: string
   notes: string | null
@@ -105,10 +105,10 @@ interface BOMAllergens {
 
 // Status config
 const STATUS_COLORS: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }> = {
-  draft: { variant: 'secondary', className: 'bg-gray-400' },
-  active: { variant: 'default', className: 'bg-green-500' },
-  phased_out: { variant: 'secondary', className: 'bg-yellow-500 text-white' },
-  inactive: { variant: 'outline', className: '' },
+  'Draft': { variant: 'secondary', className: 'bg-gray-400' },
+  'Active': { variant: 'default', className: 'bg-green-500' },
+  'Phased Out': { variant: 'secondary', className: 'bg-yellow-500 text-white' },
+  'Inactive': { variant: 'outline', className: '' },
 }
 
 export default function BOMDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -248,10 +248,10 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
   }
 
   const getStatusBadge = (status: string) => {
-    const config = STATUS_COLORS[status] || STATUS_COLORS.draft
+    const config = STATUS_COLORS[status] || STATUS_COLORS['Draft']
     return (
       <Badge variant={config.variant} className={config.className}>
-        {status === 'phased_out' ? 'Phased Out' : status.charAt(0).toUpperCase() + status.slice(1)}
+        {status}
       </Badge>
     )
   }
