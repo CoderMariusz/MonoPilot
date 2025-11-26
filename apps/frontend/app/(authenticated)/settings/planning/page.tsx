@@ -282,7 +282,7 @@ export default function PlanningSettingsPage() {
     if (statusForm.is_default) {
       newStatuses = newStatuses.map((s) => ({
         ...s,
-        is_default: s.code === code || (editingStatus && s.code === editingStatus.code),
+        is_default: s.code === code,
       }))
     }
 
