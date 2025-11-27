@@ -5,15 +5,17 @@
 ## User Story
 
 **As a** System
-**I want** to update LP after consumption
+**I want** to update LP qty when materials are auto-consumed
 **So that** inventory is accurate
 
 ## Acceptance Criteria
 
-### AC-4.18.1: LP Qty Decrease
-**Given** material consumed from LP
-**When** consumption recorded
-**Then** license_plates.current_qty decreased by consumed amount
+### AC-4.18.1: LP Qty Decrease at Output Registration
+**Given** output registered (Story 4.12)
+**When** sequential LP allocation triggered (auto-consume)
+**Then** license_plates.current_qty decreased by consumed amount:
+- Example: LP-2 (30kg) consumed 20kg by Output-1 → LP-2 qty = 10kg
+- When Output-2 consumes remaining 10kg → LP-2 qty = 0kg
 
 ### AC-4.18.2: LP Status Transition
 **When** current_qty = 0

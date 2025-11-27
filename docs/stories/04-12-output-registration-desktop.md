@@ -91,12 +91,20 @@
 **When** registering over-production output:
 1. Show warning: "All reserved LPs consumed. This output (30kg) is over-production."
 2. Show dropdown: "Which reserved LP is source for this 30kg?"
-   - Options: LP-A (80kg), LP-B (40kg), LP-C (80kg)
+   - Options with remaining qty:
+     - LP-A: 80kg total
+     - LP-B: 40kg total
+     - LP-C: 80kg total
 3. Operator selects source LP (e.g., "LP-A")
-4. System creates genealogy link: LP-A → Output-4 (30kg portion of LP-A)
-5. Update genealogy consumption tracking: allocated_qty for LP-A increased
+4. System creates lp_genealogy_allocation record:
+   - parent_lp_id = selected LP (LP-A)
+   - child_lp_id = over-production output LP (Output-4)
+   - allocated_qty = 30kg
+   - is_over_production = true
+   - allocation_type = 'operator_selected'
+5. Create lp_genealogy record linking LP-A → Output-4 (30kg)
 
-**Result**: Over-production output genealogy traces back to ONE of the reserved LPs
+**Result**: Over-production genealogy traced back through allocation record
 
 ### AC-4.12.10: Prerequisites
 **Then** Requires Story 4.7 (Material Reservation) and Story 4.19 (Genealogy)

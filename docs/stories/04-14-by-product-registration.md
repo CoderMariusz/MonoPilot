@@ -14,8 +14,11 @@
 **Given** WO has by-products in wo_materials (from BOM) and main output LP already created (Story 4.12)
 **When** main output registration (Story 4.12) completes
 **Then** system checks: are there by-products defined for this WO?
-- **If yes & auto_create_by_product_lp = false**: Display by-product registration dialog for each by-product
-- **If yes & auto_create_by_product_lp = true** (Story 4.17): Auto-create by-product LPs with calculated qty (no prompt)
+- **If yes & auto_create_by_product_lp = false** (default): Display by-product registration dialog for each by-product
+  - Operator enters by-product qty
+  - System auto-consumes reserved materials for by-product using sequential allocation (same as main output)
+  - Over-consumption check applies (Story 4.11)
+- **If yes & auto_create_by_product_lp = true**: Auto-create by-product LPs with calculated qty (no prompt, auto-consume applies)
 - **If no by-products**: Registration complete, return to WO detail
 
 ### AC-4.14.2: Expected Qty Calculation

@@ -10,10 +10,14 @@
 
 ## Acceptance Criteria
 
-### AC-4.11.1: Over-Consumption Validation
-**Given** over-consumption control enabled in production_settings.allow_over_consumption = false
-**When** consumed_qty > required_qty for material
-**Then** system blocks: "Cannot exceed required qty by X kg"
+### AC-4.11.1: Over-Consumption Warning (not blocking)
+**Given** output qty would trigger over-consumption (consumed_qty > required_qty)
+**When** output is registered (Story 4.12 auto-consume triggered)
+**Then** system shows warning dialog:
+- "⚠️ Over-Consumption Detected!"
+- "Material 'Flour': Required 100kg, Reserved 80+40=120kg, Output triggers consumption of all"
+- Buttons: "Cancel" or "Accept Over-Consumption"
+**Note**: System WARNS but doesn't block - operator must confirm to proceed
 
 ### AC-4.11.2: Over-Consumption Warning (When Allowed)
 **Given** allow_over_consumption = true
@@ -23,16 +27,19 @@
 ### AC-4.11.3: Variance Tracking
 **Then** wo_materials.consumed_qty tracked, variance = consumed - required recorded
 
-### AC-4.11.4: Transaction Atomicity (Sprint 0 Gap 6) - Consumption Endpoint
-**Then** POST /api/production/work-orders/:id/consume with over-consumption check is atomic:
-1. VALIDATE: WO in_progress, material exists, LP sufficient
-2. CALCULATE: total_consumed = wo_materials.consumed_qty + requested_qty
-3. **CHECK over-consumption limit**:
-   - If allow_over_consumption = false AND total_consumed > required_qty: REJECT (400 error)
-   - If allow_over_consumption = true AND total_consumed > required_qty: WARN but allow
-4. INSERT consumption record (wo_consumption table)
-5. UPDATE LP qty (license_plates.qty -= requested_qty)
-6. UPDATE wo_materials consumed_qty (wo_materials.consumed_qty += requested_qty)
+### AC-4.11.4: Transaction Atomicity (Sprint 0 Gap 6) - Output Registration Endpoint
+**Then** POST /api/production/work-orders/:id/outputs with over-consumption check is atomic:
+1. VALIDATE: WO in_progress, reserved materials exist
+2. CALCULATE: total_consumed (cumulative across all outputs)
+3. **CHECK over-consumption per material**:
+   - If total_consumed > required_qty for ANY material:
+     - Return 400 error: "Over-consumption detected for Material X. Confirm to proceed?"
+     - Frontend shows dialog with operator choice
+   - If operator confirms: proceed with auto-consume (Story 4.12 AC-4.12.3)
+   - If operator cancels: cancel output registration
+4. AUTO-CONSUME: Execute sequential LP allocation (Story 4.12 AC-4.12.3)
+5. CREATE genealogy links (Story 4.19)
+6. UPDATE work_orders.output_qty
 7. COMMIT or ROLLBACK (no partial updates)
 
 ### AC-4.11.5: Rollback on Over-Consumption Blocked

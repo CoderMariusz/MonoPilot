@@ -20,11 +20,14 @@
 | allow_pause_wo | Toggle | true/false |
 | auto_complete_wo | Toggle | true/false |
 | require_operation_sequence | Toggle | true/false |
-| allow_over_consumption | Toggle | true/false |
-| allow_partial_lp_consumption | Toggle | true/false |
 | require_qa_on_output | Toggle | true/false |
-| auto_create_by_product_lp | Toggle | true/false |
+| auto_create_by_product_lp | Toggle | true/false (default: false - prompt operator) |
 | dashboard_refresh_seconds | Number | 30-300 seconds (default 30, min 30 to prevent server overload) |
+
+**Note**:
+- `allow_partial_lp_consumption` not needed - default behavior is partial consumption
+- `consume_whole_lp` flag from BOM controls whole LP enforcement (Story 4.9)
+- `allow_over_consumption` check happens at output registration with warning/confirm (Story 4.11)
 
 ### AC-4.17.2: Settings Persistence
 **Then** production_settings table stores settings (org-level isolation)

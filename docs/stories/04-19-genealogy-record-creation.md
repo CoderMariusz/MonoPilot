@@ -10,22 +10,23 @@
 
 ## Acceptance Criteria
 
-### AC-4.19.1: Consumption Genealogy Entry
-**Given** material consumed
-**When** consumption recorded
-**Then** lp_genealogy entry created:
-- parent_lp_id = consumed LP
-- child_lp_id = NULL (filled on output)
-- wo_id = current WO
-- consumed_at = timestamp
-- created_at = timestamp
-
-### AC-4.19.2: Output Genealogy Link
+### AC-4.19.1: Output Genealogy Entry Creation (at Output Registration)
 **Given** output registered
-**When** output LP created
-**Then** genealogy updated:
-- child_lp_id = output LP
+**When** output LP created (Story 4.12)
+**Then** lp_genealogy entries created for each consumed LP:
+- parent_lp_id = consumed LP (from sequential allocation)
+- child_lp_id = output LP (now known)
+- wo_id = current WO
+- consumed_qty = qty consumed from this LP for this output
 - produced_at = timestamp
+- created_at = timestamp
+**Note**: Genealogy created at output registration, not at reservation
+
+### AC-4.19.2: Partial LP Consumption Tracking
+**When** LP is consumed partially across multiple outputs (Story 4.16)
+**Then** genealogy tracks partial consumption:
+- LP-2 (30kg) → Output-1 (20kg) + Output-2 (10kg)
+- Two lp_genealogy records created with consumed_qty = 20kg and 10kg respectively
 
 ### AC-4.19.3: Multiple Outputs & Parent-Child Relationships
 **When** multiple outputs from same WO
