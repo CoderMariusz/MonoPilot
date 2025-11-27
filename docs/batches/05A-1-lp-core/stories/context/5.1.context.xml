@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.1</id>
+    <title>License Plate Creation</title>
+    <batch>5A-1</batch>
+    <points>8</points>
+    <effort_hours>8-10</effort_hours>
+    <status>todo</status>
+    <priority>critical</priority>
+  </metadata>
+
+  <description>
+    Foundational story for warehouse inventory management. Implements atomic tracking unit (License Plate) with CRUD operations, auto-generated numbering, and status lifecycle.
+  </description>
+
+  <dependencies>
+    <blocks>
+      <story id="5.2">LP Status Tracking</story>
+      <story id="5.3">LP Batch/Expiry Tracking</story>
+      <story id="5.4">LP Number Generation</story>
+      <batch id="5A-2">LP Operations (Split/Merge)</batch>
+      <batch id="5A-3">Receiving Flow</batch>
+    </blocks>
+    <requires>
+      <epic id="1">Organizations, Users, Locations, warehouse_settings</epic>
+      <epic id="2">Products with UoM</epic>
+    </requires>
+    <related>
+      <story id="5.11">GRN creates LPs</story>
+      <story id="5.14">Move LPs between locations</story>
+    </related>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>license_plates</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PRIMARY KEY"/>
+          <column name="org_id" type="UUID" constraint="FK organizations(id), NOT NULL"/>
+          <column name="lp_number" type="VARCHAR(50)" constraint="NOT NULL, UNIQUE per org"/>
+          <column name="product_id" type="UUID" constraint="FK products(id), NOT NULL"/>
+          <column name="batch_number" type="VARCHAR(50)" constraint="NOT NULL"/>
+          <column name="supplier_batch_number" type="VARCHAR(50)"/>
+          <column name="quantity" type="DECIMAL(15,4)" constraint="NOT NULL, > 0"/>
+          <column name="uom" type="VARCHAR(10)" constraint="from product"/>
+          <column name="manufacture_date" type="DATE"/>
+          <column name="expiry_date" type="DATE"/>
+          <column name="status" type="VARCHAR(20)" constraint="DEFAULT 'available'"/>
+          <column name="location_id" type="UUID" constraint="FK locations(id)"/>
+          <column name="grn_id" type="UUID" constraint="FK grns(id)"/>
+          <column name="qa_status" type="VARCHAR(20)" constraint="DEFAULT 'pending'"/>
+          <column name="created_at" type="TIMESTAMP" constraint="DEFAULT now()"/>
+          <column name="created_by_user_id" type="UUID" constraint="FK users(id)"/>
+          <column name="updated_at" type="TIMESTAMP" constraint="DEFAULT now()"/>
+          <column name="updated_by_user_id" type="UUID" constraint="FK users(id)"/>
+        </columns>
+        <indexes>
+          <index columns="org_id,lp_number" unique="true"/>
+          <index columns="org_id,status"/>
+          <index columns="org_id,product_id"/>
+          <index columns="expiry_date"/>
+        </indexes>
+        <rls_enabled>true</rls_enabled>
+      </table>
+      <table>
+        <name>lp_number_sequence</name>
+        <columns>
+          <column name="org_id" type="UUID" constraint="PK"/>
+          <column name="sequence_date" type="DATE" constraint="PK"/>
+          <column name="next_sequence" type="INT" constraint="DEFAULT 1"/>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="POST" path="/api/warehouse/license-plates">
+        <description>Create new LP with auto-generated number</description>
+        <request>
+          <field name="product_id" type="UUID" required="true"/>
+          <field name="batch_number" type="string" required="true"/>
+          <field name="supplier_batch_number" type="string"/>
+          <field name="quantity" type="decimal" required="true"/>
+          <field name="location_id" type="UUID" required="true"/>
+          <field name="manufacture_date" type="date"/>
+          <field name="expiry_date" type="date"/>
+          <field name="qa_status" type="enum: pending|passed|rejected"/>
+        </request>
+        <response status="201">
+          <field name="id" type="UUID"/>
+          <field name="lp_number" type="string"/>
+          <field name="status" type="string"/>
+          <field name="created_at" type="timestamp"/>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/warehouse/license-plates">
+        <description>List LPs with filters</description>
+        <query_params>
+          <param name="status" type="string" example="available,reserved"/>
+          <param name="product_id" type="UUID"/>
+          <param name="location_id" type="UUID"/>
+          <param name="batch_number" type="string"/>
+          <param name="page" type="int" default="1"/>
+          <param name="limit" type="int" default="50"/>
+        </query_params>
+        <response status="200">
+          <field name="data" type="array of LP objects"/>
+          <field name="pagination" type="object"/>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/warehouse/license-plates/:id">
+        <description>Get single LP detail</description>
+        <response status="200">
+          <field name="id" type="UUID"/>
+          <field name="lp_number" type="string"/>
+          <field name="product" type="object with name, sku, uom"/>
+          <field name="location" type="object with name, code"/>
+          <field name="status" type="string"/>
+          <field name="quantity" type="decimal"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+
+    <frontend_routes>
+      <route path="/warehouse/license-plates" component="LicensePlatesListPage">
+        <description>List all LPs with table, filters, create button</description>
+      </route>
+      <route path="/warehouse/license-plates/:id" component="LicensePlateDetailPage">
+        <description>LP detail with status, batch info, location, genealogy</description>
+      </route>
+      <route path="/settings/warehouse" component="WarehouseSettingsPage">
+        <description>LP format configuration (for Story 5.4)</description>
+      </route>
+    </frontend_routes>
+
+    <components_to_create>
+      <component name="LicensePlateTable">
+        <props>
+          <prop name="lps" type="LP[]"/>
+          <prop name="onDelete" type="callback"/>
+          <prop name="onEdit" type="callback"/>
+        </props>
+        <columns>lp_number, product, batch, qty, expiry, status, location, created_date, actions</columns>
+      </component>
+      <component name="CreateLPModal">
+        <props>
+          <prop name="isOpen" type="boolean"/>
+          <prop name="onClose" type="callback"/>
+          <prop name="onSuccess" type="callback"/>
+        </props>
+        <form_fields>product, batch, supplier_batch, qty, location, dates, qa_status</form_fields>
+      </component>
+      <component name="StatusBadge">
+        <props>
+          <prop name="status" type="string"/>
+        </props>
+        <colors>available=green, reserved=yellow, consumed=gray, quarantine=red, shipped=blue</colors>
+      </component>
+    </components_to_create>
+
+    <hooks_to_create>
+      <hook name="useCreateLP">
+        <description>Mutation for POST /api/warehouse/license-plates</description>
+        <returns>createLP, isLoading, error</returns>
+      </hook>
+      <hook name="useLicensePlates">
+        <description>Query for GET /api/warehouse/license-plates with filters</description>
+        <returns>data, isLoading, filters, setFilters</returns>
+      </hook>
+    </hooks_to_create>
+
+    <validation_rules>
+      <rule field="product_id">Required, must exist in products table</rule>
+      <rule field="batch_number">Required, max 50 chars, non-empty</rule>
+      <rule field="quantity">Required, must be > 0, decimal with 4 decimals</rule>
+      <rule field="location_id">Required, must exist in locations table, location.status = 'active'</rule>
+      <rule field="expiry_date">Optional, must be >= manufacture_date (if both provided)</rule>
+    </validation_rules>
+
+    <rls_policies_needed>
+      <policy name="SELECT - org isolation">
+        ON license_plates FOR SELECT TO authenticated
+        USING (org_id = (auth.jwt() ->> 'org_id')::uuid)
+      </policy>
+      <policy name="INSERT - org isolation">
+        ON license_plates FOR INSERT TO authenticated
+        WITH CHECK (org_id = (auth.jwt() ->> 'org_id')::uuid)
+      </policy>
+      <policy name="UPDATE - org isolation">
+        ON license_plates FOR UPDATE TO authenticated
+        USING (org_id = (auth.jwt() ->> 'org_id')::uuid)
+        WITH CHECK (org_id = (auth.jwt() ->> 'org_id')::uuid)
+      </policy>
+      <policy name="DELETE - org isolation">
+        ON license_plates FOR DELETE TO authenticated
+        USING (org_id = (auth.jwt() ->> 'org_id')::uuid)
+      </policy>
+    </rls_policies_needed>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1" title="LP Creation Modal">
+      <description>Modal opens with form containing all required/optional fields</description>
+      <test>Navigate to /warehouse/license-plates, click "Create", verify modal with fields</test>
+    </ac>
+    <ac id="2" title="Auto-Generate LP Number">
+      <description>LP number auto-generated as LP-YYYYMMDD-NNNN, globally unique per org</description>
+      <test>Create LP without lp_number, verify format LP-20250127-0001, check uniqueness</test>
+    </ac>
+    <ac id="3" title="Save LP">
+      <description>LP created with status='available', FKs validated, success message shown</description>
+      <test>Fill form, click Save, verify LP in DB, verify toast message</test>
+    </ac>
+    <ac id="4" title="List LPs">
+      <description>Table displays all LP columns with sortable headers</description>
+      <test>Navigate to /warehouse/license-plates, verify table with all columns</test>
+    </ac>
+    <ac id="5" title="Validation Errors">
+      <description>Invalid data shows specific error messages</description>
+      <test>Submit invalid data (qty<=0, missing product), verify error messages</test>
+    </ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test>LP CRUD operations (create, read, update, delete)</test>
+      <test>LP number generation (format, uniqueness)</test>
+      <test>Validation logic (qty > 0, FK checks)</test>
+      <test>Status field defaults to 'available'</test>
+    </unit_tests>
+    <integration_tests>
+      <test>POST /api/warehouse/license-plates with valid data → LP created</test>
+      <test>POST with invalid product_id → 404 error</test>
+      <test>POST with invalid location_id → 404 error</test>
+      <test>POST with qty <= 0 → 400 validation error</test>
+      <test>GET /api/warehouse/license-plates with filters → correct results</test>
+      <test>RLS: user can only see LPs from their org</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Create LP via UI → LP appears in list with correct data</test>
+      <test>Create with invalid data → error message shown, form not submitted</test>
+      <test>LP status displays as green badge "available"</test>
+      <test>Edit LP location → location updated in detail</test>
+    </e2e_tests>
+    <test_file_location>__tests__/api/warehouse/license-plates.test.ts</test_file_location>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="critical">LP number uniqueness must be enforced at DB level (unique index)</note>
+    <note priority="critical">org_id isolation via RLS is security requirement</note>
+    <note priority="high">Daily sequence reset for LP numbering requires DB trigger or app logic</note>
+    <note priority="high">FK to products.id and locations.id - validate in API before insert</note>
+    <note priority="medium">UoM should be auto-filled from product on form load</note>
+    <note priority="medium">Location dropdown should only show active locations</note>
+  </implementation_notes>
+
+  <related_documentation>
+    <doc type="epic" ref="05-warehouse.md">Epic 5: Warehouse & Scanner</doc>
+    <doc type="batch" ref="../index.md">Batch 5A-1 Index</doc>
+    <doc type="tech_spec" ref="../tech-spec.md">Batch 5A-1 Tech Spec</doc>
+  </related_documentation>
+</story>
