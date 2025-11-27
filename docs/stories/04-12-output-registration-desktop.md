@@ -10,10 +10,11 @@
 
 ## Acceptance Criteria
 
-### AC-4.12.1: Output Registration Modal
+### AC-4.12.1: Main Output Registration Modal
 **Given** WO is In Progress
 **When** clicking "Register Output"
-**Then** modal opens with fields: quantity (required), qa_status (if required), location_id (default from line), notes
+**Then** modal opens with fields for **main output only**: quantity (required), qa_status (if required), location_id (default from line), notes
+- **Note**: By-product registration is separate (Story 4.14), comes AFTER main output
 
 ### AC-4.12.2: Output LP Creation
 **When** confirming
@@ -24,9 +25,14 @@
 - status = 'available'
 - quantity = entered value
 
-### AC-4.12.3: WO Output Tracking & Genealogy Linking
-**Then** work_orders.output_qty updated.
-**For genealogy:** Update all lp_genealogy records created during consumption (Story 4.7) by setting child_lp_id = output LP (links consumed inputs → output)
+### AC-4.12.3: WO Output Tracking & Genealogy Update
+**Then**:
+- **Output tracking**: work_orders.output_qty += registered_qty
+- **Genealogy linking** (Story 4.19 integration):
+  - Update all lp_genealogy records for this WO (created during Story 4.7 consumption) by setting:
+    - child_lp_id = output LP (now that output LP exists)
+    - produced_at = current timestamp
+  - Result: Each consumed input LP (parent) now links to this output LP (child)
 
 ### AC-4.12.4: Progress Tracking
 **Then** Cumulative output tracked, progress = output_qty / planned_qty × 100%

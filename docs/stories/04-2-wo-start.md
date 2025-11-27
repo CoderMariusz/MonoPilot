@@ -44,8 +44,14 @@ Currently, operators cannot transition a WO from "Released" to "In Progress". Th
 | Header | "Start Work Order: WO-20251127-0001" |
 | WO Summary | WO number, Product, Quantity, Scheduled date |
 | Line/Machine | Confirm assigned production line and machine |
-| Material Availability | Warning if any material < 100% available (info only, not blocking) |
+| Material Availability | Show for each material in BOM: available_qty from license_plates, warning if < 100% (info only, not blocking) |
 | Buttons | Cancel, Confirm Start |
+
+**Material Availability Calculation** (added detail):
+- For each wo_materials entry: required_qty (from BOM snapshot)
+- Calculate: available_qty = SUM(license_plates.qty) WHERE product = material.product AND status NOT IN ('consumed', 'discarded')
+- Show: available_pct = (available_qty / required_qty) × 100%
+- Example: "Material 'Flour': Need 100kg, have 80kg (80% available) ⚠️"
 
 **Success Criteria:**
 - ✅ Modal shows all required information

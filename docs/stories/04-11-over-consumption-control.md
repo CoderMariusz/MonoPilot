@@ -23,14 +23,16 @@
 ### AC-4.11.3: Variance Tracking
 **Then** wo_materials.consumed_qty tracked, variance = consumed - required recorded
 
-### AC-4.11.4: Transaction Atomicity (Sprint 0 Gap 6)
-**Then** Consumption with over-consumption check is atomic:
+### AC-4.11.4: Transaction Atomicity (Sprint 0 Gap 6) - Consumption Endpoint
+**Then** POST /api/production/work-orders/:id/consume with over-consumption check is atomic:
 1. VALIDATE: WO in_progress, material exists, LP sufficient
-2. CALCULATE: total_consumed = existing + new
-3. CHECK over-consumption limit
-4. INSERT consumption record
-5. UPDATE LP qty
-6. UPDATE wo_materials consumed_qty
+2. CALCULATE: total_consumed = wo_materials.consumed_qty + requested_qty
+3. **CHECK over-consumption limit**:
+   - If allow_over_consumption = false AND total_consumed > required_qty: REJECT (400 error)
+   - If allow_over_consumption = true AND total_consumed > required_qty: WARN but allow
+4. INSERT consumption record (wo_consumption table)
+5. UPDATE LP qty (license_plates.qty -= requested_qty)
+6. UPDATE wo_materials consumed_qty (wo_materials.consumed_qty += requested_qty)
 7. COMMIT or ROLLBACK (no partial updates)
 
 ### AC-4.11.5: Rollback on Over-Consumption Blocked

@@ -23,11 +23,17 @@
 **When** consuming via desktop (Story 4.7)
 **Then** qty field shows full LP qty, cannot change, only "Consume All" button
 
-### AC-4.9.4: Validation Check
+### AC-4.9.4: Validation Check Locations
 **Then** consume_whole_lp flag from wo_materials (copied from BOM in Story 3.10)
+- **Desktop UI** (Story 4.7): qty field disabled, "Consume All" button only
+- **Scanner UI** (Story 4.8): qty input disabled, shows full LP qty (read-only)
+- **API Layer**: POST /api/production/work-orders/:id/consume validates consume_whole_lp
 
 ### AC-4.9.5: API Validation
-**Then** POST /api/production/work-orders/:id/consume validates consume_whole_lp
+**Then** POST /api/production/work-orders/:id/consume:
+- Checks consume_whole_lp flag
+- If true: validates qty == LP.qty (entire LP)
+- If qty != LP.qty when flag=true: rejects with 400 error
 
 ### AC-4.9.6: Error Message
 **When** attempting partial consumption

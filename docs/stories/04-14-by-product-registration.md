@@ -10,10 +10,13 @@
 
 ## Acceptance Criteria
 
-### AC-4.14.1: By-Product Detection
-**Given** WO has by-products in wo_materials (from BOM)
-**When** registering main output
-**Then** system prompts for each by-product
+### AC-4.14.1: By-Product Detection & Sequential Prompting
+**Given** WO has by-products in wo_materials (from BOM) and main output LP already created (Story 4.12)
+**When** main output registration (Story 4.12) completes
+**Then** system checks: are there by-products defined for this WO?
+- **If yes & auto_create_by_product_lp = false**: Display by-product registration dialog for each by-product
+- **If yes & auto_create_by_product_lp = true** (Story 4.17): Auto-create by-product LPs with calculated qty (no prompt)
+- **If no by-products**: Registration complete, return to WO detail
 
 ### AC-4.14.2: Expected Qty Calculation
 **Then** Shows expected qty: wo_qty × yield_percent / 100

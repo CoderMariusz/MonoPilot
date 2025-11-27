@@ -19,6 +19,13 @@
 **When** confirmed
 **Then** operation status → 'in_progress', started_at set, operator_id recorded
 
+**Operation Status Enum** (defined for all operation stories):
+- **'not_started'**: Initial state (set by Story 3.14 routing, or story 3.10 when operations created)
+- **'in_progress'**: After Story 4.4 (Operation Start)
+- **'completed'**: After Story 4.5 (Operation Complete)
+
+Initial Status: Operations created with status='not_started' (from routing in Story 3.14)
+
 ### AC-4.4.3: Sequence Enforcement
 **Given** require_operation_sequence enabled
 **When** trying to start operation N

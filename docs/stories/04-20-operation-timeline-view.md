@@ -10,12 +10,15 @@
 
 ## Acceptance Criteria
 
-### AC-4.20.1: Timeline Visualization
+### AC-4.20.1: Timeline Visualization with Status Color Mapping
 **Given** viewing WO with operations
 **When** scrolling to timeline section
-**Then** see visual timeline:
+**Then** see visual timeline with color mapping (from Story 4.4 operation status enum):
 - Each operation as horizontal segment
-- Color by status: gray=not started, blue=in progress, green=completed
+- **Color by status**:
+  - Gray: status='not_started' (initial state)
+  - Blue: status='in_progress' (from Story 4.4)
+  - Green: status='completed' (from Story 4.5)
 - Actual vs expected duration shown
 
 ### AC-4.20.2: Operation Segment Details

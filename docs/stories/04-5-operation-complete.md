@@ -19,6 +19,10 @@
 **When** confirmed
 **Then** operation status → 'completed', completed_at set, yield% recorded
 
+**Status Reference** (see Story 4.4 for full enum):
+- Requires: operation.status = 'in_progress' (from Story 4.4)
+- Transitions to: operation.status = 'completed'
+
 ### AC-4.5.3: Yield Calculation
 **Then** actual_yield_percent = (actual_output / expected_output) × 100, defaults to 100%
 

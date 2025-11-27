@@ -42,7 +42,7 @@ Production managers currently have no centralized view of:
 |-----|-------------|--------|
 | Orders Today | COUNT(work_orders WHERE completed_at >= TODAY) | work_orders table |
 | Units Produced | SUM(production_outputs.quantity WHERE created_at >= TODAY) | production_outputs table |
-| Avg Yield | AVG(actual_output / planned_qty × 100) for today | work_orders + production_outputs |
+| Avg Yield | **Weighted**: SUM(actual_output) / SUM(planned_qty) × 100% for WOs completed today | work_orders + production_outputs |
 | Active WOs | COUNT(work_orders WHERE status IN ['in_progress', 'paused']) | work_orders table |
 | Material Shortages | COUNT(wo_materials WHERE available_qty < required_qty) | calculated from license_plates |
 
@@ -116,7 +116,7 @@ Production managers currently have no centralized view of:
 **Success Criteria:**
 - ✅ Refresh configured via production_settings.dashboard_refresh_seconds
 - ✅ Default: 30 seconds
-- ✅ Range: 10-300 seconds (configurable by admin)
+- ✅ Range: 30-300 seconds (minimum 30s to prevent server overload, configurable by admin)
 - ✅ Manual refresh button available (top-right)
 - ✅ Visual indicator: "Last updated: X seconds ago"
 - ✅ Refresh only if data changed (compare prev vs current)
@@ -135,7 +135,7 @@ Response: {
   data: {
     orders_today: number,          // 12
     units_produced_today: number,  // 1250
-    avg_yield_today: number,       // 87.5 (%)
+    avg_yield_today: number,       // 87.5 (%) - weighted average: SUM(actual_output)/SUM(planned_qty) × 100
     active_wos: number,            // 5
     material_shortages: number     // 2
   }

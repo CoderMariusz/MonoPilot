@@ -11,7 +11,7 @@
 ## Acceptance Criteria
 
 ### AC-4.6.1: Complete Modal & Validation
-**Given** WO is In Progress
+**Given** WO is In Progress OR Paused (can resume and complete, or complete directly if paused)
 **When** clicking "Complete WO"
 **Then** modal shows WO summary and validates:
 - All operations completed (if required)
@@ -29,11 +29,11 @@
 
 ### AC-4.6.4: Transaction Atomicity (Sprint 0 Gap 6)
 **Then** WO completion is atomic:
-1. VALIDATE: status='in_progress', operations complete, output exists
-2. UPDATE work_orders: status, completed_at, completed_by
-3. UPDATE wo_operations: status → 'completed'
+1. VALIDATE: status='in_progress' OR 'paused', operations complete, output exists, genealogy complete
+2. UPDATE work_orders: status → 'completed', completed_at, completed_by
+3. UPDATE wo_operations: status → 'completed' (only if all ops have outputs)
 4. UPDATE output LPs: status → 'available' (from 'in_production')
-5. INSERT genealogy records (consumed → outputs)
+5. **VALIDATE genealogy**: All lp_genealogy records for this WO have child_lp_id filled (created 4.7, updated 4.12)
 6. COMMIT or ROLLBACK all (no partial updates)
 
 ### AC-4.6.5: Error Handling & Rollback

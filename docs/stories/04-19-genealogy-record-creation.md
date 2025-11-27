@@ -27,9 +27,12 @@
 - child_lp_id = output LP
 - produced_at = timestamp
 
-### AC-4.19.3: Multiple Outputs Support
+### AC-4.19.3: Multiple Outputs & Parent-Child Relationships
 **When** multiple outputs from same WO
-**Then** Genealogy supports many-to-many (consumed inputs → multiple outputs)
+**Then** Genealogy structure:
+- **Per WO output**: Each output LP has many parent LPs (materials consumed in that WO) → many-to-one per output
+- **Per parent LP**: Each parent LP can have many children (from different WOs using that material) → one-to-many from parent perspective
+- **Result**: From genealogy table view: many consumed parent LPs → one output LP per record, but one parent LP can appear in multiple genealogy records (to different children)
 
 ### AC-4.19.4: Genealogy Tree View
 **Then** Forward tracing: input LP → WO → output LP, Backward tracing: output LP → WO → input LPs
