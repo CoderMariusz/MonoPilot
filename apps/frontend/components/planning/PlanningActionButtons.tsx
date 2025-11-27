@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
+import { PLANNING_COLORS } from '@/lib/constants/planning-colors'
 
 interface PlanningActionButtonsProps {
   showPO?: boolean
@@ -18,7 +19,7 @@ export function PlanningActionButtons({
   return (
     <div className="flex gap-2 flex-wrap">
       {showPO && (
-        <Button asChild className="bg-green-600 hover:bg-green-700">
+        <Button asChild className={PLANNING_COLORS.button.primary}>
           <Link href="/planning/purchase-orders/new">
             <Plus className="h-4 w-4 mr-1" />
             Create PO
@@ -26,7 +27,7 @@ export function PlanningActionButtons({
         </Button>
       )}
       {showTO && (
-        <Button asChild className="bg-green-600 hover:bg-green-700">
+        <Button asChild className={PLANNING_COLORS.button.primary}>
           <Link href="/planning/transfer-orders/new">
             <Plus className="h-4 w-4 mr-1" />
             Create TO
@@ -34,7 +35,7 @@ export function PlanningActionButtons({
         </Button>
       )}
       {showWO && (
-        <Button asChild className="bg-green-600 hover:bg-green-700">
+        <Button asChild className={PLANNING_COLORS.button.primary}>
           <Link href="/planning/work-orders/new">
             <Plus className="h-4 w-4 mr-1" />
             Create WO
