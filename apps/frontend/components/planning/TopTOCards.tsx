@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Loader2 } from 'lucide-react'
+import { getStatusColor } from '@/lib/constants/planning-colors'
 
 interface TransferOrder {
   id: string
@@ -20,15 +21,6 @@ interface TransferOrder {
     name: string
     code: string
   }
-}
-
-const statusColors: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  pending: 'bg-yellow-100 text-yellow-700',
-  in_transit: 'bg-blue-100 text-blue-700',
-  received: 'bg-green-100 text-green-700',
-  completed: 'bg-purple-100 text-purple-700',
-  cancelled: 'bg-red-100 text-red-700',
 }
 
 export function TopTOCards() {
@@ -80,7 +72,7 @@ export function TopTOCards() {
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-medium text-sm">{to.to_number}</span>
-                <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[to.status] || statusColors.draft}`}>
+                <Badge className={`text-[10px] px-1.5 py-0 ${getStatusColor(to.status)}`}>
                   {to.status.toLowerCase()}
                 </Badge>
               </div>

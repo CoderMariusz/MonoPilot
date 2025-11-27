@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Loader2 } from 'lucide-react'
+import { getStatusColor } from '@/lib/constants/planning-colors'
 
 interface PurchaseOrder {
   id: string
@@ -16,15 +17,6 @@ interface PurchaseOrder {
     name: string
     code: string
   }
-}
-
-const statusColors: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  submitted: 'bg-blue-100 text-blue-700',
-  confirmed: 'bg-green-100 text-green-700',
-  receiving: 'bg-yellow-100 text-yellow-700',
-  closed: 'bg-purple-100 text-purple-700',
-  cancelled: 'bg-red-100 text-red-700',
 }
 
 export function TopPOCards() {
@@ -76,7 +68,7 @@ export function TopPOCards() {
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-medium text-sm">{po.po_number}</span>
-                <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[po.status] || statusColors.draft}`}>
+                <Badge className={`text-[10px] px-1.5 py-0 ${getStatusColor(po.status)}`}>
                   {po.status}
                 </Badge>
               </div>

@@ -1,4 +1,4 @@
-# Story 3.24: Kompaktne Stats Cards
+# Story 3.24: Planning Stats Cards
 
 **Epic:** 3 - Planning Operations
 **Batch:** 3D - Planning UI Redesign
@@ -6,13 +6,15 @@
 **Priority:** P1 (High)
 **Story Points:** 2
 **Created:** 2025-11-27
+**Updated:** 2025-11-27
 **Effort Estimate:** 0.5 days
+**UX Reference:** `docs/ux-design/ux-design-shared-system.md` (Section 1.2)
 
 ---
 
 ## Goal
 
-Refactor stats cards (PO, TO, WO) to be compact and lightweight, not taking excessive space.
+Create compact stats cards (PO, TO, WO) following Shared UI Design System - 120px height, 2×2 grid layout.
 
 ---
 
@@ -24,53 +26,108 @@ Refactor stats cards (PO, TO, WO) to be compact and lightweight, not taking exce
 
 ---
 
+## Problem Statement
+
+Current stats cards are too tall and inconsistent:
+- Cards take too much vertical space
+- No standardized layout
+- Missing 2×2 grid for metrics
+- Inconsistent with Shared UI Design System
+
+---
+
 ## Acceptance Criteria
 
-### AC-3.24.1: Compact Stats Card Design
+### AC-3.24.1: Compact Stats Card Design (Shared System)
 **Given** I view dashboard stats (PO, TO, WO)
 **When** checking card size
 **Then**:
-- Card height: max 120px (currently too tall)
-- Card contains: icon + label + 2-3 key metrics
-- No large padding, tight spacing
-- Font sizes: title 14px, numbers 16px, labels 12px
+- Card height: **max 120px**
+- **2×2 grid layout** inside each card (4 metrics)
+- Font: labels 12px (text-xs), values 18px (text-lg font-semibold)
+- Icon + Title at top
 
-### AC-3.24.2: Stats Content Reduction
-**Given** I view a stats card
-**When** checking displayed info
-**Then** card shows only:
-- **PO Card**: Total | Draft | Pending Approval | Confirmed
-- **TO Card**: Total | In Transit | Pending | Completed
-- **WO Card**: Total | Active | Completed Today | Released
-
-### AC-3.24.3: Grid Layout
-**Given** I view stats on desktop
-**When** checking layout
+### AC-3.24.2: PO Stats Card Content
+**Given** I view Purchase Orders card
+**When** checking metrics
 **Then**:
-- 3 columns on desktop (lg breakpoint)
-- 1 column on mobile (responsive)
-- Gap between cards: 16px
+```
+┌──────────────────────────────┐
+│ 📋 Purchase Orders           │
+├──────────┬───────────────────┤
+│ Total    │ 156               │
+│ Draft    │ 23                │
+├──────────┼───────────────────┤
+│ Pending  │ 45                │
+│ Confirmed│ 88                │
+└──────────┴───────────────────┘
+```
+- Click → `/planning/purchase-orders`
 
-### AC-3.24.4: No shadcn Overhead
-**Given** Stats card is rendered
-**When** inspecting CSS
+### AC-3.24.3: TO Stats Card Content
+**Given** I view Transfer Orders card
+**When** checking metrics
 **Then**:
-- Use Tailwind classes directly
-- Remove unnecessary padding/margins from shadcn components
-- Minimal use of shadcn Card (or custom lightweight card)
+```
+┌──────────────────────────────┐
+│ 🔄 Transfer Orders           │
+├──────────┬───────────────────┤
+│ Total    │ 78                │
+│ In Transit│ 12               │
+├──────────┼───────────────────┤
+│ Pending  │ 34                │
+│ Completed│ 32                │
+└──────────┴───────────────────┘
+```
+- Click → `/planning/transfer-orders`
+
+### AC-3.24.4: WO Stats Card Content
+**Given** I view Work Orders card
+**When** checking metrics
+**Then**:
+```
+┌──────────────────────────────┐
+│ 🏭 Work Orders               │
+├──────────┬───────────────────┤
+│ Total    │ 245               │
+│ Active   │ 18                │
+├──────────┼───────────────────┤
+│ Completed│ 156               │
+│ Released │ 71                │
+└──────────┴───────────────────┘
+```
+- Click → `/planning/work-orders`
+
+### AC-3.24.5: Responsive Layout (Shared System)
+**Given** I view on different screen sizes
+**When** resizing browser
+**Then**:
+- **Desktop (lg+):** 3 cards in 1 row
+- **Tablet (md):** 2 cards per row
+- **Mobile (sm):** 1 card per row (stacked)
+
+### AC-3.24.6: Hover Effects
+**Given** I hover over a stats card
+**When** checking interaction
+**Then**:
+- Shadow increases (shadow-md → shadow-lg)
+- Slight scale (scale-[1.02])
+- Cursor: pointer
 
 ---
 
 ## Implementation Tasks
 
 - [ ] Refactor `PlanningStatsCard` component in `/components/planning/PlanningStatsCard.tsx`
-  - Reduce height from ~200px to ~120px
-  - Simplify content (remove extra stats)
-  - Use lightweight Tailwind styling only
-  - Reduce padding to minimal (px-4 py-3)
-- [ ] Update stats display on `/planning/page.tsx`
-- [ ] Test layout on different breakpoints (mobile, tablet, desktop)
-- [ ] Verify no visual regression in other uses of stats card
+  - Follow Shared System: 120px height, 2×2 grid
+  - Use `app-colors.ts` (not planning-colors.ts)
+  - Clickable with hover effect
+- [ ] Create/update API endpoint `/api/planning/stats` to aggregate metrics
+- [ ] Update `/planning/page.tsx` dashboard
+  - Stats cards after header/action buttons
+  - Before Top Cards section
+- [ ] Add loading states (skeleton)
+- [ ] Test responsive behavior
 
 ---
 
@@ -80,6 +137,8 @@ Refactor stats cards (PO, TO, WO) to be compact and lightweight, not taking exce
 apps/frontend/
 ├── components/planning/
 │   └── PlanningStatsCard.tsx (REFACTOR)
+├── app/api/planning/
+│   └── stats/route.ts (NEW/UPDATE)
 └── app/(authenticated)/planning/
     └── page.tsx (UPDATE - verify layout)
 ```

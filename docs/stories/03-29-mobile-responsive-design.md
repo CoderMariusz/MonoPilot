@@ -6,13 +6,15 @@
 **Priority:** P1 (High)
 **Story Points:** 3
 **Created:** 2025-11-27
+**Updated:** 2025-11-27
 **Effort Estimate:** 1 day
+**UX Reference:** `docs/ux-design/ux-design-shared-system.md` (Section 2.4, 4)
 
 ---
 
 ## Goal
 
-Ensure all planning pages are fully responsive with card view for mobile without horizontal scrolling.
+Ensure all Planning pages are fully responsive with card view for mobile without horizontal scrolling.
 
 ---
 
@@ -26,105 +28,152 @@ Ensure all planning pages are fully responsive with card view for mobile without
 
 ## Acceptance Criteria
 
-### AC-3.29.1: Card View for Tables (SM breakpoint)
-**Given** I view any planning table on mobile (screen < 768px)
-**When** page loads
+### AC-3.29.1: Card View for Tables (< 768px)
+**Given** I view any planning table on mobile
+**When** screen width < 768px
 **Then**:
 - Table automatically converts to card view
 - Each row becomes an expandable card
-- Minimal info on card front: "PO-XXXX | Status | Supplier" (example)
-- ">" or "Expand" button to see details
-- Smooth animation on expand/collapse
+- Card front: Primary column + Status + Key info + ">" expand icon
+- Smooth expand/collapse animation (200ms)
 
-### AC-3.29.2: Expandable Details
-**Given** I'm viewing a card on mobile
-**When** I click expand
+**PO Card Example:**
+```
+┌──────────────────────────────────┐
+│ PO-001 │ Draft │ Supplier X │ >  │
+├──────────────────────────────────┤ (expanded)
+│ Date: 2025-11-27                │
+│ Total: €5,000                   │
+│ Actions: [View][Edit][Delete]   │
+└──────────────────────────────────┘
+```
+
+**TO Card Example:**
+```
+┌──────────────────────────────────┐
+│ TO-001 │ Pending │ WH-A→B │ >    │
+├──────────────────────────────────┤ (expanded)
+│ Date: 2025-11-27                │
+│ Items: 15                       │
+│ Actions: [View][Edit][Delete]   │
+└──────────────────────────────────┘
+```
+
+**WO Card Example:**
+```
+┌──────────────────────────────────┐
+│ WO-001 │ Active │ Line 1 │ >     │
+├──────────────────────────────────┤ (expanded)
+│ Product: Chicken                │
+│ Qty: 100, Progress: 75%         │
+│ Actions: [View][Edit][Delete]   │
+└──────────────────────────────────┘
+```
+
+### AC-3.29.2: Mobile Header with Hamburger Menu
+**Given** I view planning pages on mobile (< 768px)
+**When** page loads
 **Then**:
-- Card expands to show all columns
-- All info visible without horizontal scroll
-- Smooth animation
-- Can collapse back to minimal view
+- PlanningHeader collapses to: `[Logo] Planning [☰]`
+- Hamburger menu (☰) on right side
+- Tap opens full-screen navigation overlay
+- Current page highlighted in menu
 
-### AC-3.29.3: Header Responsive
-**Given** I view header on mobile
-**When** screen size < md (768px)
+### AC-3.29.3: Mobile Nav Overlay
+**Given** I tap hamburger menu
+**When** menu opens
 **Then**:
-- Navigation tabs stack vertically OR collapse to dropdown
-- Logo/app name visible
-- Height still compact (~60px or less)
-- Buttons remain accessible
+```
+┌─────────────────────────────────────┐
+│                              ✕      │
+│                                     │
+│   Planning Dashboard                │
+│   ─────────────────                 │
+│   Purchase Orders          ●        │
+│   Transfer Orders                   │
+│   Work Orders                       │
+│   Suppliers                         │
+│   ─────────────────                 │
+│   Settings                          │
+│                                     │
+└─────────────────────────────────────┘
+```
+- Current page marked with ●
+- Tap item → navigate + close menu
+- Tap ✕ or outside → close menu
+- Smooth animation (200ms)
 
-### AC-3.29.4: No Horizontal Scrolling
+### AC-3.29.4: Touch-Friendly Targets (Shared System)
+**Given** I use planning on mobile
+**When** interacting
+**Then**:
+- All touch targets **min 48px × 48px**
+- **Min 8px spacing** between clickable elements
+- Buttons full-width on mobile
+- Forms readable and fillable
+
+### AC-3.29.5: No Horizontal Scrolling
 **Given** I view any planning page on mobile
 **When** scrolling
 **Then**:
 - All content fits within viewport width
 - No horizontal scroll needed
 - Vertical scroll only
+- Stats cards stack 1 per row
 
-### AC-3.29.5: Touch-Friendly
-**Given** I use planning on mobile
-**When** interacting
+### AC-3.29.6: Responsive Padding
+**Given** I view planning pages
+**When** checking padding
 **Then**:
-- Buttons are large enough (min 44px height for tap targets)
-- Spacing between clickable elements (min 8px)
-- No hover states that don't work on touch
-- Forms readable and easily fillable
+- Mobile (sm): `px-4 py-4` (16px)
+- Tablet (md): `px-6 py-6` (24px)
+- Desktop (lg): `px-8 py-6` (32px horizontal)
+
+### AC-3.29.7: Spreadsheet Mode Desktop Only
+**Given** I'm on WO page on mobile
+**When** checking available views
+**Then**:
+- Spreadsheet Mode toggle **hidden** on mobile
+- Only Table View available (card format)
+- Spreadsheet Mode available on desktop (lg+) only
 
 ---
 
 ## Implementation Tasks
 
-- [ ] Create utility function `useResponsiveView()` for responsive card/table switching
+- [ ] Create `useResponsiveView` hook in `/lib/hooks/useResponsiveView.ts`
+  - Detects screen size
+  - Returns: `{ isMobile, isTablet, isDesktop }`
 - [ ] Update all table components (PO, TO, WO)
-  - Implement card view rendering for SM breakpoint (< 768px)
-  - Smooth expand/collapse animation
-  - CSS transitions, no janky layout shifts
-- [ ] Update PlanningHeader for mobile
-  - Consider hamburger menu for nav tabs OR stack vertically
+  - Card view rendering for mobile
+  - Expand/collapse animation (CSS transitions)
+- [ ] Update `PlanningHeader` for mobile
+  - Hamburger menu icon (lg:hidden)
   - Keep logo visible
-  - Ensure touch-friendly
+- [ ] Create `PlanningMobileNav` overlay component
+  - Full-screen navigation
+  - Active page indicator
+  - Close on tap outside
 - [ ] Update action buttons (Create buttons)
-  - Stack vertically on mobile if needed
-  - Maintain 44px+ height for touch
-- [ ] Update all page layouts (px-6 py-6)
-  - Responsive padding adjustments (px-4 on mobile, px-6 on desktop)
-- [ ] Test on multiple devices:
-  - iPhone 12 (390px, portrait/landscape)
+  - Stack vertically on mobile
+  - Full-width buttons
+- [ ] Update page layouts for responsive padding
+- [ ] Hide Spreadsheet toggle on mobile (WO page)
+- [ ] Test on devices:
+  - iPhone 12 (390px)
   - iPhone SE (375px)
   - Pixel 6 (412px)
   - iPad (768px)
-  - Generic Android (360px+)
-- [ ] Verify no horizontal scrolling on any screen size
 
 ---
 
-## Design Notes
+## Responsive Breakpoints (Shared System)
 
 ```
-Desktop (≥768px):
-┌────────────────────────────────────────┐
-│ Table with all columns                 │
-└────────────────────────────────────────┘
-
-Mobile (<768px) - Collapsed:
-┌──────────────────────────────────────┐
-│ PO-20251127 │ Supplier X │ Draft │ > │
-├──────────────────────────────────────┤
-│ [Click to expand]                    │
-└──────────────────────────────────────┘
-
-Mobile - Expanded:
-┌──────────────────────────────────────┐
-│ PO-20251127                          │
-│ Status: Draft                        │
-│ Supplier: Supplier X                 │
-│ Date: 2025-11-27                     │
-│ Total: €5,000                        │
-│ Actions: [View] [Edit] [Delete]      │
-│                                      │ ^
-│                                (collapse)
-└──────────────────────────────────────┘
+sm:  640px   (mobile)      → Card view, hamburger menu, stacked
+md:  768px   (tablet)      → Card view, collapsed tabs
+lg:  1024px  (desktop)     → Full table, full tabs
+xl:  1280px  (large)       → Full table, full tabs
 ```
 
 ---
@@ -133,16 +182,17 @@ Mobile - Expanded:
 
 ```
 apps/frontend/
-├── lib/
-│   └── hooks/useResponsiveView.ts (NEW - utility)
+├── lib/hooks/
+│   └── useResponsiveView.ts (NEW)
 ├── components/planning/
-│   ├── PurchaseOrdersTable.tsx (ENHANCE - mobile view)
-│   ├── WorkOrdersTable.tsx (ENHANCE - mobile view)
-│   ├── TransferOrdersTable.tsx (ENHANCE - mobile view)
-│   ├── PlanningHeader.tsx (ENHANCE - mobile header)
-│   └── PlanningActionButtons.tsx (ENHANCE - responsive)
+│   ├── PlanningHeader.tsx (UPDATE - hamburger)
+│   ├── PlanningMobileNav.tsx (NEW)
+│   ├── PurchaseOrdersTable.tsx (UPDATE - card view)
+│   ├── WorkOrdersTable.tsx (UPDATE - card view)
+│   ├── TransferOrdersTable.tsx (UPDATE - card view)
+│   └── PlanningActionButtons.tsx (UPDATE - responsive)
 └── app/(authenticated)/planning/
-    └── **/*.tsx (VERIFY - responsive padding)
+    └── **/*.tsx (UPDATE - responsive padding)
 ```
 
 ---
