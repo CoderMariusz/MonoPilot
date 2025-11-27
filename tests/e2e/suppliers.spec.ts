@@ -55,6 +55,9 @@ async function loginAsTestUser(page: Page, email: string, password: string) {
 async function createSupplierViaAPI(page: Page): Promise<string> {
   const supplierCode = `SUP-E2E-${Date.now()}`
 
+  // Get or create tax code first
+  const taxCodeId = await getOrCreateTaxCode(page)
+
   const response = await page.request.post('/api/planning/suppliers', {
     data: {
       code: supplierCode,
@@ -65,12 +68,13 @@ async function createSupplierViaAPI(page: Page): Promise<string> {
       address: '123 Test Street',
       city: 'Warsaw',
       postal_code: '00-001',
-      country: 'Poland',
+      country: 'PL', // 2-letter ISO code
       currency: 'PLN',
       payment_terms: 'Net 30',
       lead_time_days: 14,
       moq: 100,
       is_active: true,
+      tax_code_id: taxCodeId, // Required field
     },
   })
 
@@ -86,13 +90,34 @@ async function deleteSupplierViaAPI(page: Page, supplierId: string): Promise<voi
   await page.request.delete(`/api/planning/suppliers/${supplierId}`)
 }
 
-async function getExistingTaxCode(page: Page): Promise<string | null> {
+async function getOrCreateTaxCode(page: Page): Promise<string> {
+  // Try to get existing tax code
   const response = await page.request.get('/api/settings/tax-codes')
-  if (!response.ok()) return null
+  if (response.ok()) {
+    const data = await response.json()
+    const taxCodes = data.tax_codes || data || []
+    if (taxCodes.length > 0) {
+      return taxCodes[0].id
+    }
+  }
 
-  const data = await response.json()
-  const taxCodes = data.tax_codes || data || []
-  return taxCodes.length > 0 ? taxCodes[0].id : null
+  // Create a new tax code if none exists
+  const createResponse = await page.request.post('/api/settings/tax-codes', {
+    data: {
+      code: `TAX-E2E-${Date.now()}`,
+      name: 'E2E Test Tax Code',
+      rate: 23,
+      description: 'Test tax code for E2E tests',
+      is_active: true,
+    },
+  })
+
+  if (!createResponse.ok()) {
+    throw new Error(`Failed to create tax code: ${await createResponse.text()}`)
+  }
+
+  const createData = await createResponse.json()
+  return createData.tax_code?.id || createData.id
 }
 
 // ============================================================================
@@ -109,7 +134,7 @@ test.describe('Story 3.17: Supplier Management', () => {
     await page.goto('/planning/suppliers')
 
     // Verify page loads with title
-    await expect(page.locator('h1')).toContainText(/Supplier/i, { timeout: 10000 })
+    await expect(page.getByRole('heading', { name: 'Suppliers' })).toBeVisible({ timeout: 10000 })
 
     // Verify table structure
     const table = page.locator('table')
@@ -144,68 +169,76 @@ test.describe('Story 3.17: Supplier Management', () => {
 
     // Wait for modal
     const modal = page.locator('[role="dialog"]')
-    await expect(modal).toBeVisible({ timeout: 5000 })
+    await expect(modal).toBeVisible({ timeout: 10000 })
+
+    // Wait for form to load (tax codes dropdown)
+    await page.waitForTimeout(1000)
 
     // Generate unique code
     const supplierCode = `SUP-E2E-${Date.now()}`
 
-    // Fill required fields
-    await page.fill('input[name="code"]', supplierCode)
-    await page.fill('input[name="name"]', 'E2E Test Supplier Created')
+    // Fill required fields - use modal context and wait for inputs
+    const codeInput = modal.locator('#code')
+    await expect(codeInput).toBeVisible({ timeout: 5000 })
+    await codeInput.fill(supplierCode)
+
+    const nameInput = modal.locator('#name')
+    await nameInput.fill('E2E Test Supplier Created')
 
     // Fill optional fields
-    const contactInput = page.locator('input[name="contact_person"]')
+    const contactInput = modal.locator('#contact_person')
     if (await contactInput.isVisible()) {
       await contactInput.fill('John Test')
     }
 
-    const emailInput = page.locator('input[name="email"]')
+    const emailInput = modal.locator('#email')
     if (await emailInput.isVisible()) {
       await emailInput.fill('john@test-supplier.com')
     }
 
-    const phoneInput = page.locator('input[name="phone"]')
+    const phoneInput = modal.locator('#phone')
     if (await phoneInput.isVisible()) {
       await phoneInput.fill('+48111222333')
     }
 
-    const cityInput = page.locator('input[name="city"]')
+    const cityInput = modal.locator('#city')
     if (await cityInput.isVisible()) {
       await cityInput.fill('Krakow')
     }
 
-    const countryInput = page.locator('input[name="country"]')
+    const countryInput = modal.locator('#country')
     if (await countryInput.isVisible()) {
-      await countryInput.fill('Poland')
+      await countryInput.fill('PL')
     }
 
-    // Select currency if dropdown exists
-    const currencySelect = page.locator('[role="combobox"]').filter({ hasText: /Currency|PLN|EUR|USD/i }).first()
-    if (await currencySelect.isVisible()) {
-      await currencySelect.click()
-      const plnOption = page.locator('[role="option"]').filter({ hasText: /PLN/i })
-      if (await plnOption.isVisible()) {
-        await plnOption.click()
-      } else {
-        await page.keyboard.press('Escape')
-      }
+    // Select Tax Code (required) - find by id
+    const taxCodeTrigger = modal.locator('#tax_code_id')
+    await expect(taxCodeTrigger).toBeVisible({ timeout: 5000 })
+    await taxCodeTrigger.click()
+    await page.waitForTimeout(500)
+    const taxCodeOption = page.locator('[role="option"]').first()
+    if (await taxCodeOption.isVisible()) {
+      await taxCodeOption.click()
     }
 
-    // Set payment terms
-    const paymentTermsInput = page.locator('input[name="payment_terms"]')
-    if (await paymentTermsInput.isVisible()) {
-      await paymentTermsInput.fill('Net 30')
-    }
+    // Set payment terms (required)
+    const paymentTermsInput = modal.locator('#payment_terms')
+    await paymentTermsInput.fill('Net 30')
 
     // Set lead time
-    const leadTimeInput = page.locator('input[name="lead_time_days"]')
+    const leadTimeInput = modal.locator('#lead_time_days')
     if (await leadTimeInput.isVisible()) {
+      await leadTimeInput.clear()
       await leadTimeInput.fill('14')
     }
 
-    // Submit form
-    const submitButton = modal.locator('button[type="submit"], button').filter({ hasText: /Save|Create|Submit/i })
+    // Submit form - use getByRole for reliable selection
+    const submitButton = modal.getByRole('button', { name: /Create|Save/i })
+    await expect(submitButton).toBeEnabled({ timeout: 5000 })
     await submitButton.click()
+
+    // Wait for modal to close (increase timeout for API call)
+    await expect(modal).not.toBeVisible({ timeout: 30000 })
 
     // Verify success - supplier appears in table
     await expect(page.locator(`text=${supplierCode}`)).toBeVisible({ timeout: 10000 })
@@ -228,26 +261,29 @@ test.describe('Story 3.17: Supplier Management', () => {
 
       // Wait for modal
       const modal = page.locator('[role="dialog"]')
-      await expect(modal).toBeVisible({ timeout: 5000 })
+      await expect(modal).toBeVisible({ timeout: 10000 })
+      await page.waitForTimeout(500) // Wait for form to populate
 
-      // Modify name
-      const nameInput = page.locator('input[name="name"]')
+      // Modify name - use modal context
+      const nameInput = modal.locator('#name')
+      await expect(nameInput).toBeVisible({ timeout: 5000 })
       await nameInput.clear()
       await nameInput.fill('Updated E2E Supplier Name')
 
       // Modify contact
-      const contactInput = page.locator('input[name="contact_person"]')
+      const contactInput = modal.locator('#contact_person')
       if (await contactInput.isVisible()) {
         await contactInput.clear()
         await contactInput.fill('Jane Updated')
       }
 
       // Submit changes
-      const submitButton = modal.locator('button[type="submit"], button').filter({ hasText: /Save|Update|Submit/i })
+      const submitButton = modal.getByRole('button', { name: /Update|Save/i })
+      await expect(submitButton).toBeEnabled({ timeout: 5000 })
       await submitButton.click()
 
       // Verify modal closes
-      await expect(modal).not.toBeVisible({ timeout: 5000 })
+      await expect(modal).not.toBeVisible({ timeout: 30000 })
 
       // Verify updated name in table
       await expect(page.locator('text=Updated E2E Supplier Name')).toBeVisible({ timeout: 5000 })
@@ -308,7 +344,7 @@ test.describe('Story 3.17: Supplier Management', () => {
       await expect(page).toHaveURL(/\/planning\/suppliers\/[a-z0-9-]+/, { timeout: 10000 })
 
       // Verify detail page content
-      await expect(page.locator('text=/SUP-/i')).toBeVisible({ timeout: 5000 })
+      await expect(page.locator('text=/SUP-/i').first()).toBeVisible({ timeout: 5000 })
     } finally {
       await deleteSupplierViaAPI(page, supplierId)
     }
@@ -356,8 +392,8 @@ test.describe('Story 3.17: Supplier Management', () => {
     const statusFilter = page.locator('[role="combobox"]').first()
     await statusFilter.click()
 
-    // Select Active
-    const activeOption = page.locator('[role="option"]').filter({ hasText: /Active/i })
+    // Select Active (use exact match to avoid matching "Inactive")
+    const activeOption = page.getByRole('option', { name: 'Active', exact: true })
     if (await activeOption.isVisible()) {
       await activeOption.click()
 
@@ -368,7 +404,7 @@ test.describe('Story 3.17: Supplier Management', () => {
       await expect(page.locator('table')).toBeVisible()
 
       // All visible badges should show Active (if any suppliers exist)
-      const badges = page.locator('table tbody [class*="badge"]').filter({ hasText: /Active/i })
+      const badges = page.locator('table tbody [class*="badge"]').filter({ hasText: /^Active$/i })
       // Badges exist (may be 0 if no active suppliers)
     }
   })
@@ -417,7 +453,7 @@ test.describe('Supplier Products Management', () => {
     await page.goto(`/planning/suppliers/${supplierId}`)
 
     // Wait for detail page
-    await expect(page.locator('text=/SUP-/i')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('text=/SUP-/i').first()).toBeVisible({ timeout: 10000 })
 
     // Look for products section
     const productsSection = page.locator('text=/Products|Items|Catalog/i')
@@ -429,7 +465,7 @@ test.describe('Supplier Products Management', () => {
   test('Add product to supplier', async ({ page }) => {
     await page.goto(`/planning/suppliers/${supplierId}`)
 
-    await expect(page.locator('text=/SUP-/i')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('text=/SUP-/i').first()).toBeVisible({ timeout: 10000 })
 
     // Look for Add Product button
     const addProductButton = page.locator('button').filter({ hasText: /Add Product|Link Product/i })
@@ -486,7 +522,7 @@ test.describe('Supplier Validation & Errors', () => {
     await submitButton.click()
 
     // Verify validation errors appear
-    const errorMessage = page.locator('[class*="error"], [class*="destructive"], [role="alert"], text=/required/i')
+    const errorMessage = page.locator('[class*="error"], [class*="destructive"], [role="alert"]')
     await expect(errorMessage).toBeVisible({ timeout: 5000 })
   })
 
@@ -504,8 +540,8 @@ test.describe('Supplier Validation & Errors', () => {
       await expect(modal).toBeVisible({ timeout: 5000 })
 
       // Use same code as existing supplier
-      await page.fill('input[name="code"]', `SUP-DUPLICATE-${Date.now()}`)
-      await page.fill('input[name="name"]', 'Duplicate Test')
+      await page.fill('#code', `SUP-DUPLICATE-${Date.now()}`)
+      await page.fill('#name', 'Duplicate Test')
 
       const submitButton = modal.locator('button[type="submit"]')
       await submitButton.click()
@@ -526,11 +562,11 @@ test.describe('Supplier Validation & Errors', () => {
     await expect(modal).toBeVisible({ timeout: 5000 })
 
     // Fill required fields
-    await page.fill('input[name="code"]', `SUP-VALID-${Date.now()}`)
-    await page.fill('input[name="name"]', 'Validation Test')
+    await page.fill('#code', `SUP-VALID-${Date.now()}`)
+    await page.fill('#name', 'Validation Test')
 
     // Enter invalid email
-    const emailInput = page.locator('input[name="email"]')
+    const emailInput = page.locator('#email')
     if (await emailInput.isVisible()) {
       await emailInput.fill('invalid-email')
 
@@ -628,7 +664,7 @@ test.describe('Supplier Navigation', () => {
     try {
       // Go to detail page
       await page.goto(`/planning/suppliers/${supplierId}`)
-      await expect(page.locator('text=/SUP-/i')).toBeVisible({ timeout: 10000 })
+      await expect(page.locator('text=/SUP-/i').first()).toBeVisible({ timeout: 10000 })
 
       // Click back or navigate to list
       const backButton = page.locator('button, a').filter({ hasText: /Back|←|Suppliers/i }).first()

@@ -13,6 +13,21 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 })
 
 // ============================================================================
+// Token Cache - Prevents rate limiting by reusing JWT tokens
+// ============================================================================
+
+interface CachedToken {
+  token: string
+  userId: string
+  email: string
+  password: string
+  expiresAt: number
+}
+
+let tokenCache: CachedToken | null = null
+let tokenFetchPromise: Promise<CachedToken> | null = null
+
+// ============================================================================
 // Test Organization Setup
 // ============================================================================
 
@@ -46,6 +61,72 @@ export async function createTestOrganization(): Promise<{ orgId: string }> {
 // Test User Setup
 // ============================================================================
 
+async function fetchTokenWithRetry(): Promise<CachedToken> {
+  const email = process.env.TEST_USER_EMAIL || 'test-user@monopilot.test'
+  const password = process.env.TEST_USER_PASSWORD || 'test-password-123'
+  const supabaseUrlEnv = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+  // Retry up to 3 times with exponential backoff
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const tokenResponse = await fetch(`${supabaseUrlEnv}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+      },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (tokenResponse.ok) {
+      const tokenData = await tokenResponse.json()
+      const token = tokenData.access_token || ''
+
+      if (!token) {
+        throw new Error('No access token returned from auth endpoint')
+      }
+
+      // Get user ID
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single()
+
+      if (userError || !userData) {
+        throw new Error(
+          `Test user "${email}" not found in users table. ` +
+          `Create test user in Supabase Auth and ensure user profile exists.`
+        )
+      }
+
+      // Cache expires in 50 minutes (JWT usually valid for 1 hour)
+      return {
+        token,
+        userId: userData.id,
+        email,
+        password,
+        expiresAt: Date.now() + 50 * 60 * 1000,
+      }
+    }
+
+    // Rate limited - wait and retry
+    if (tokenResponse.status === 429) {
+      const waitMs = Math.pow(2, attempt) * 1000 // 2s, 4s, 8s
+      console.log(`Rate limited, waiting ${waitMs}ms before retry ${attempt}/3...`)
+      await new Promise((resolve) => setTimeout(resolve, waitMs))
+      continue
+    }
+
+    throw new Error(
+      `Failed to get JWT token: ${tokenResponse.statusText}. ` +
+      `Make sure test user "${email}" exists in Supabase Auth with password "${password}"`
+    )
+  }
+
+  throw new Error('Failed to get JWT token after 3 retries due to rate limiting')
+}
+
 export async function createTestUser(orgId: string): Promise<{
   userId: string
   email: string
@@ -53,59 +134,40 @@ export async function createTestUser(orgId: string): Promise<{
   token: string
 }> {
   try {
-    // Use pre-configured test user from .env.test
-    const email = process.env.TEST_USER_EMAIL || 'test-user@monopilot.test'
-    const password = process.env.TEST_USER_PASSWORD || 'test-password-123'
-
-    // Get JWT token via Supabase REST API
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-
-    const tokenResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: anonKey,
-      },
-      body: JSON.stringify({
-        email,
-        password,
-      }),
-    })
-
-    if (!tokenResponse.ok) {
-      throw new Error(
-        `Failed to get JWT token: ${tokenResponse.statusText}. ` +
-        `Make sure test user "${email}" exists in Supabase Auth with password "${password}"`
-      )
+    // Check if we have a valid cached token
+    if (tokenCache && tokenCache.expiresAt > Date.now()) {
+      return {
+        userId: tokenCache.userId,
+        email: tokenCache.email,
+        password: tokenCache.password,
+        token: tokenCache.token,
+      }
     }
 
-    const tokenData = await tokenResponse.json()
-    const token = tokenData.access_token || ''
-
-    if (!token) {
-      throw new Error('No access token returned from auth endpoint')
+    // If another call is already fetching the token, wait for it
+    if (tokenFetchPromise) {
+      const cached = await tokenFetchPromise
+      return {
+        userId: cached.userId,
+        email: cached.email,
+        password: cached.password,
+        token: cached.token,
+      }
     }
 
-    // Get user ID from auth
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single()
+    // Fetch new token (only one concurrent request)
+    tokenFetchPromise = fetchTokenWithRetry()
 
-    if (userError || !userData) {
-      throw new Error(
-        `Test user "${email}" not found in users table. ` +
-        `Create test user in Supabase Auth and ensure user profile exists.`
-      )
-    }
-
-    return {
-      userId: userData.id,
-      email,
-      password,
-      token,
+    try {
+      tokenCache = await tokenFetchPromise
+      return {
+        userId: tokenCache.userId,
+        email: tokenCache.email,
+        password: tokenCache.password,
+        token: tokenCache.token,
+      }
+    } finally {
+      tokenFetchPromise = null
     }
   } catch (error) {
     console.error('Failed to get test user:', error)
