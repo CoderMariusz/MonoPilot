@@ -1,9 +1,40 @@
 # Shipping Module - UX Design Specification
 
 **Date:** 2025-11-19
-**Designer:** AI-Assisted UX Design (BMAD 7-Step Methodology)
+**Updated:** 2025-11-27 - Integrated with Shared System
+**Version:** 2.0
 **Status:** Ready for Implementation
 **Priority:** P1 (Outbound Logistics)
+
+---
+
+## 🔗 SHARED UI SYSTEM INTEGRATION (v2.0)
+
+Shipping Module now integrates with [Shared UI Design System](./ux-design-shared-system.md).
+
+**Applied Components:**
+- ✅ **ModuleHeader**: Shipping | Sales Orders | Picking | Packing | Shipments | ⚙️
+- ✅ **Stats Cards**: 4 cards (Orders, Picking, Packed, Shipped) - 120px, 2×2 grid
+- ✅ **DataTable Base**: Sales Orders table, Picking list, Shipment list (sortable, filterable)
+- ✅ **Colors**: app-colors.ts (green Create, gray View/Edit, red Delete)
+- ✅ **Mobile Responsive**: Tables → Card view on < 768px
+- ✅ **Dark Mode**: Settings → Appearance
+
+**Shipping-Specific Features (Enhanced):**
+- 🎯 **Sales Order Management** - Customer orders, lines, status tracking
+- 🎯 **Picking Workflow** - License plate selection, quantity management
+- 🎯 **Packing Workflow** - Box/container assignment, weight tracking
+- 🎯 **Shipment Tracking** - Carrier integration, tracking numbers, delivery confirmation
+- 🎯 **Document Generation** - Packing slips, shipping labels, COCs (Certificates of Conformance)
+
+**Layout:**
+```
+ModuleHeader: Shipping│SO│Picking│Packing│Shipments│⚙️  ← Shared
+[Create SO] [Print Labels] [Generate Docs]              ← Shared buttons
+[Stats Cards: Orders, Picking, Packed, Shipped]         ← Shared (4 cards)
+[SO Table] [Picking List] [Shipment Status]             ← Shipping-specific (Shared table base)
+Customer tracking, Carrier integration, Documents       ← Shipping-specific
+```
 
 ---
 

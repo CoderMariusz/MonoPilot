@@ -1,9 +1,40 @@
 # Warehouse Module - UX Design Specification
 
 **Date:** 2025-11-19
-**Designer:** AI-Assisted UX Design (BMAD 7-Step Methodology)
+**Updated:** 2025-11-27 - Integrated with Shared System
+**Version:** 2.0
 **Status:** Ready for Implementation
 **Priority:** P0 (Core Inventory Operations)
+
+---
+
+## 🔗 SHARED UI SYSTEM INTEGRATION (v2.0)
+
+Warehouse Module now integrates with [Shared UI Design System](./ux-design-shared-system.md).
+
+**Applied Components:**
+- ✅ **ModuleHeader**: Warehouse | License Plates | ASN/GRN | Movements | Scanner | ⚙️
+- ✅ **Stats Cards**: 4 cards (LPs, ASN/GRN, Movements, Inventory Health) - 120px, 2×2 grid
+- ✅ **DataTable Base**: LP table, ASN table, GRN table, Movements (sortable, filterable)
+- ✅ **Colors**: app-colors.ts (green Create, gray View/Edit, red Delete)
+- ✅ **Mobile Responsive**: Tables → Card view on < 768px
+- ✅ **Dark Mode**: Settings → Appearance
+
+**Warehouse-Specific Features (Enhanced):**
+- 🎯 **License Plate Management** - Track LPs by batch, expiry, status, location
+- 🎯 **ASN/GRN Processing** - Inbound workflow (receipt, quality hold, putaway)
+- 🎯 **Movement Tracking** - Warehouse transfers, replenishment, picking
+- 🎯 **Scanner Integration** - Barcode scanning for LP operations (Phase 2)
+- 🎯 **Inventory Health Dashboard** - Expiry dates, aging inventory, space utilization
+
+**Layout:**
+```
+ModuleHeader: Warehouse│LPs│ASN/GRN│Movements│Scanner│⚙️  ← Shared
+[Create LP] [Receive ASN] [Create Movement]               ← Shared buttons
+[Stats Cards: LPs, ASN/GRN, Movements, Health]            ← Shared (4 cards)
+[LP Table] [Filters] [Mobile Card View]                   ← Warehouse-specific (Shared table base)
+Location tracking, Batch management, Expiry alerts        ← Warehouse-specific
+```
 
 ---
 

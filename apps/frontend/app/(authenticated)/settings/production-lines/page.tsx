@@ -32,6 +32,7 @@ import { Search, Edit, Trash2, Plus, AlertCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { ProductionLine } from '@/lib/validation/production-line-schemas'
 import { ProductionLineFormModal } from '@/components/settings/ProductionLineFormModal'
+import { SettingsHeader } from '@/components/settings/SettingsHeader'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -174,7 +175,9 @@ export default function ProductionLinesPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div>
+      <SettingsHeader currentPage="lines" />
+      <div className="px-4 md:px-6 py-6 space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -365,6 +368,7 @@ export default function ProductionLinesPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+      </div>
     </div>
   )
 }

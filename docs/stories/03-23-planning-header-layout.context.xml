@@ -1,0 +1,95 @@
+<story-context id="3-23-planning-header-layout" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>23</storyId>
+    <title>Standardowy Header Layout dla Planning</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <template>UI Component Pattern</template>
+    <estimatedEffort>0.5 days</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Planner</asA>
+    <iWant>to see consistent header navigation across all planning pages</iWant>
+    <soThat>I can navigate easily and have more space for content</soThat>
+    <tasks>
+      <task id="1" ac="AC-3.23.1">Create PlanningHeader component with navigation tabs</task>
+      <task id="2" ac="AC-3.23.2">Style navigation tabs with active state highlighting</task>
+      <task id="3" ac="AC-3.23.3">Create PlanningActionButtons component for Create buttons</task>
+      <task id="4" ac="AC-3.23.4">Apply header to all planning pages</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-3.23.1">PlanningHeader component with Logo, Navigation tabs (Planning|PO|TO|WO|Suppliers|Settings), max 60px height</criterion>
+    <criterion id="AC-3.23.2">Active tab highlighted, 14px font, clickable links, Settings as outline button</criterion>
+    <criterion id="AC-3.23.3">Create buttons (PO, TO, WO) below header, green color, flex-wrapped</criterion>
+    <criterion id="AC-3.23.4">Header on all pages: /planning, /planning/purchase-orders, /planning/transfer-orders, /planning/work-orders, /planning/suppliers</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/stories/03-23-planning-header-layout.md</path>
+        <title>Story 3.23: Planning Header Layout</title>
+        <section>Design Notes</section>
+        <snippet>Header 60px height, navigation tabs center, buttons below in separate row</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>apps/frontend/components/planning/PlanningHeader.tsx</path>
+        <kind>component</kind>
+        <symbol>PlanningHeader</symbol>
+        <reason>NEW - Create reusable header component with navigation tabs</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/components/planning/PlanningActionButtons.tsx</path>
+        <kind>component</kind>
+        <symbol>PlanningActionButtons</symbol>
+        <reason>NEW - Create buttons row component</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/app/(authenticated)/planning/page.tsx</path>
+        <kind>page</kind>
+        <symbol>PlanningDashboard</symbol>
+        <reason>UPDATE - Add PlanningHeader component</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="react" version="^18.0.0" usage="React components" />
+        <package name="next" version="^15.0.0" usage="Next.js App Router" />
+        <package name="tailwindcss" version="^3.0.0" usage="Styling" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="ui">Max header height: 60px</constraint>
+    <constraint type="ui">Navigation tabs centered, font-size 14px</constraint>
+    <constraint type="ui">Consistent padding px-6 py-6 on all pages</constraint>
+    <constraint type="architecture">Use Tailwind classes, avoid inline styles</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>PlanningHeader</name>
+      <kind>React Component</kind>
+      <signature>PlanningHeader({ currentPage: 'dashboard' | 'po' | 'to' | 'wo' | 'suppliers' })</signature>
+      <path>apps/frontend/components/planning/PlanningHeader.tsx</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Playwright E2E tests for navigation, Vitest for component unit tests</standards>
+    <locations>tests/e2e/*.spec.ts, apps/frontend/__tests__/**/*.test.ts</locations>
+    <ideas>
+      <idea ac="AC-3.23.1">Test header renders on all planning pages</idea>
+      <idea ac="AC-3.23.2">Test active tab highlighting</idea>
+      <idea ac="AC-3.23.4">Test navigation between pages</idea>
+    </ideas>
+  </tests>
+</story-context>

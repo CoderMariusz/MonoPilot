@@ -43,6 +43,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { BOMWithProduct } from '@/lib/validation/bom-schemas'
 import { BOMFormModal } from '@/components/technical/BOMFormModal'
+import { TechnicalHeader } from '@/components/technical/TechnicalHeader'
 
 export default function BOMsPage() {
   const router = useRouter()
@@ -192,7 +193,9 @@ export default function BOMsPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div>
+      <TechnicalHeader currentPage="boms" />
+      <div className="px-4 md:px-6 py-6">
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
@@ -338,6 +341,7 @@ export default function BOMsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   )
 }

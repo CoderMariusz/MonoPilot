@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { PlanningStatsCard } from '@/components/planning/PlanningStatsCard'
+import { PlanningHeader } from '@/components/planning/PlanningHeader'
+import { PlanningActionButtons } from '@/components/planning/PlanningActionButtons'
+import { TopPOCards } from '@/components/planning/TopPOCards'
+import { TopTOCards } from '@/components/planning/TopTOCards'
+import { TopWOCards } from '@/components/planning/TopWOCards'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { Loader2 } from 'lucide-react'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 
 interface DashboardStats {
   purchase_orders: {
@@ -82,76 +85,25 @@ export default function PlanningDashboardPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="space-y-6">
-        {/* Page Header with View Toggle */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Planning Module</h1>
-            <p className="text-muted-foreground">Manage purchase orders, transfer orders, and work orders</p>
-          </div>
+    <div>
+      <PlanningHeader currentPage="dashboard" />
 
-          <div className="flex items-center gap-2 mt-4 md:mt-0">
-            {/* View Toggle Buttons */}
-            <div className="flex rounded-lg border overflow-hidden">
-              <Button variant="secondary" size="sm" className="rounded-none bg-blue-100">
-                Dashboard
-              </Button>
-              <Link href="/planning/purchase-orders">
-                <Button variant="ghost" size="sm" className="rounded-none">
-                  Purchase Orders
-                </Button>
-              </Link>
-              <Link href="/planning/transfer-orders">
-                <Button variant="ghost" size="sm" className="rounded-none">
-                  Transfer Orders
-                </Button>
-              </Link>
-              <Link href="/planning/work-orders">
-                <Button variant="ghost" size="sm" className="rounded-none">
-                  Work Orders
-                </Button>
-              </Link>
-              <Link href="/planning/suppliers">
-                <Button variant="ghost" size="sm" className="rounded-none">
-                  Suppliers
-                </Button>
-              </Link>
-            </div>
-
-            {/* Settings Button */}
-            <Link href="/settings/planning">
-              <Button variant="outline" size="sm">
-                ⚙️ Settings
-              </Button>
-            </Link>
-          </div>
+      <div className="px-6 py-6 space-y-6">
+        {/* Page Title */}
+        <div>
+          <h1 className="text-2xl font-bold">Planning Dashboard</h1>
+          <p className="text-muted-foreground text-sm">Manage purchase orders, transfer orders, and work orders</p>
         </div>
 
         {/* Create Buttons */}
-        <div className="flex gap-2 flex-wrap">
-          <Button asChild className="bg-green-600 hover:bg-green-700">
-            <Link href="/planning/purchase-orders/new">
-              ➕ Create PO
-            </Link>
-          </Button>
-          <Button asChild className="bg-green-600 hover:bg-green-700">
-            <Link href="/planning/transfer-orders/new">
-              ➕ Create TO
-            </Link>
-          </Button>
-          <Button asChild className="bg-green-600 hover:bg-green-700">
-            <Link href="/planning/work-orders/new">
-              ➕ Create WO
-            </Link>
-          </Button>
-        </div>
+        <PlanningActionButtons />
 
         {/* Main Layout Grid: Stats on left (3/4), Activity on right (1/4) */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Stats Cards (Left - 3/4 width) */}
           <div className="lg:col-span-3 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Stats Cards Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <PlanningStatsCard
                 title="Purchase Orders"
                 icon="📊"
@@ -171,6 +123,15 @@ export default function PlanningDashboardPage() {
                 type="wo"
               />
             </div>
+
+            {/* Recent PO Cards */}
+            <TopPOCards />
+
+            {/* Recent TO Cards */}
+            <TopTOCards />
+
+            {/* Recent WO Cards */}
+            <TopWOCards />
           </div>
 
           {/* Activity Feed (Right - 1/4 width) */}

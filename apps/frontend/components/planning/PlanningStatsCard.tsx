@@ -1,28 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+'use client'
 
-interface StatItemProps {
-  label: string
-  value: number
-  isBig?: boolean
-}
-
-function StatItem({ label, value, isBig = false }: StatItemProps) {
-  return (
-    <div className="flex flex-col space-y-1">
-      {isBig ? (
-        <>
-          <p className="text-xl font-bold">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </>
-      ) : (
-        <>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-sm font-semibold">{value}</p>
-        </>
-      )}
-    </div>
-  )
-}
+import Link from 'next/link'
 
 interface PlanningStatsCardProps {
   title: string
@@ -31,63 +9,65 @@ interface PlanningStatsCardProps {
   type?: 'po' | 'to' | 'wo'
 }
 
-const accentColors: Record<string, string> = {
-  po: 'border-l-blue-500',
-  to: 'border-l-orange-500',
-  wo: 'border-l-green-500'
+const cardConfig = {
+  po: {
+    color: 'border-l-blue-500 bg-blue-50/50',
+    href: '/planning/purchase-orders',
+    fields: ['total', 'draft', 'pending_approval', 'confirmed'],
+  },
+  to: {
+    color: 'border-l-orange-500 bg-orange-50/50',
+    href: '/planning/transfer-orders',
+    fields: ['total', 'in_transit', 'pending_receipt', 'completed'],
+  },
+  wo: {
+    color: 'border-l-green-500 bg-green-50/50',
+    href: '/planning/work-orders',
+    fields: ['total', 'active', 'completed_today', 'released'],
+  },
+}
+
+function formatLabel(key: string): string {
+  const labelMap: Record<string, string> = {
+    total: 'Total',
+    draft: 'Draft',
+    pending_approval: 'Pending',
+    confirmed: 'Confirmed',
+    in_transit: 'In Transit',
+    pending_receipt: 'Pending',
+    completed: 'Completed',
+    active: 'Active',
+    completed_today: 'Today',
+    released: 'Released',
+  }
+  return labelMap[key] || key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
 export function PlanningStatsCard({ title, icon, stats, type = 'po' }: PlanningStatsCardProps) {
-  // Define which fields are "big" numbers for each type
-  const bigFields: Record<string, string[]> = {
-    po: ['confirmed', 'close'],
-    to: ['in_transit', 'pending_receipt'],
-    wo: ['released', 'active']
-  }
-
-  const big = bigFields[type] || []
+  const config = cardConfig[type]
 
   return (
-    <Card className={`border-l-4 ${accentColors[type] || accentColors.po}`}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <span className="text-2xl">{icon}</span>
-          <span>{title}</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Big Numbers (First row) */}
-          <div className="grid grid-cols-2 gap-4">
-            {Object.entries(stats)
-              .filter(([key]) => big.includes(key))
-              .map(([key, value]) => (
-                <StatItem
-                  key={key}
-                  label={key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                  value={value}
-                  isBig={true}
-                />
-              ))}
-          </div>
-
-          {/* Small Numbers (Second row) */}
-          <div className="border-t pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(stats)
-                .filter(([key]) => !big.includes(key))
-                .map(([key, value]) => (
-                  <StatItem
-                    key={key}
-                    label={key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                    value={value}
-                    isBig={false}
-                  />
-                ))}
-            </div>
-          </div>
+    <Link href={config.href}>
+      <div
+        className={`border-l-4 rounded-lg px-4 py-3 hover:shadow-md transition-shadow cursor-pointer ${config.color}`}
+        style={{ maxHeight: '120px' }}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg">{icon}</span>
+          <span className="text-sm font-semibold text-gray-700">{title}</span>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-4 gap-2">
+          {config.fields.map((field) => (
+            <div key={field} className="text-center">
+              <p className="text-base font-bold text-gray-900">{stats[field] ?? 0}</p>
+              <p className="text-[10px] text-gray-500 leading-tight">{formatLabel(field)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Link>
   )
 }

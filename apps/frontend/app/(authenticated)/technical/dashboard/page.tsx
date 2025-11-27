@@ -26,6 +26,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { TechnicalHeader } from '@/components/technical/TechnicalHeader'
 
 // Icons
 const icons = {
@@ -173,7 +174,9 @@ export default function TechnicalDashboardPage() {
   const dashboardData: ProductDashboardResponse = data
 
   return (
-    <div className="p-8">
+    <div>
+      <TechnicalHeader currentPage="dashboard" />
+      <div className="px-4 md:px-6 py-6">
       {/* Header with View Toggle (AC-2.23.1) */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <div>
@@ -375,6 +378,7 @@ export default function TechnicalDashboardPage() {
             onDaysChange={setActivityDays}
           />
         </div>
+      </div>
       </div>
     </div>
   )

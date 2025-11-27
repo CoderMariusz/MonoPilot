@@ -1,10 +1,39 @@
 # MonoPilot - Settings Module UX Design
 
 **Date:** 2025-11-15
-**Designer:** Mary (Business Analyst / UX Designer)
-**Methodology:** BMAD Method UX Design Workflow (7 Steps)
+**Updated:** 2025-11-27 - Integrated with Shared System
+**Version:** 2.0
 **Status:** ✅ Complete - Ready for Implementation
 **Module Priority:** P0 (Critical - Setup Wizard for MVP)
+
+---
+
+## 🔗 SHARED UI SYSTEM INTEGRATION (v2.0)
+
+Settings Module now integrates with [Shared UI Design System](./ux-design-shared-system.md).
+
+**Applied Components:**
+- ✅ **ModuleHeader**: Settings | Organization | Users | Warehouses | Modules | ⚙️
+- ✅ **Colors**: app-colors.ts (green Create, gray View/Edit, red Delete)
+- ✅ **Mobile Responsive**: Forms stack on < 768px
+- ✅ **Dark Mode Toggle**: Settings → Appearance (part of Settings module)
+- ✅ **Keyboard Navigation**: Tab, Enter, Escape
+
+**Settings-Specific Features (Enhanced):**
+- 🎯 **Organization Setup** - Company info, legal details, regional settings (timezone, currency)
+- 🎯 **User Management** - Roles, permissions, teams, invitations
+- 🎯 **Warehouse Configuration** - Locations, machines, equipment
+- 🎯 **Module Settings** - Feature toggles per module (allow pause WO, validate BOM version, etc.)
+- 🎯 **Tax Codes & Allergens** - Master data configuration
+- 🎯 **Appearance** - Dark mode toggle, theme settings
+
+**Layout:**
+```
+ModuleHeader: Settings│Organization│Users│Warehouses│Modules│⚙️  ← Shared
+[Add User] [Add Warehouse] [Configure Module]                    ← Shared buttons
+[Form sections: Organization, Users Table, Warehouses Table]     ← Shared table base
+Master data, Feature toggles, Regional config                    ← Settings-specific
+```
 
 ---
 

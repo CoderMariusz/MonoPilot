@@ -8,11 +8,24 @@
 'use client'
 
 import { PurchaseOrdersTable } from '@/components/planning/PurchaseOrdersTable'
+import { PlanningHeader } from '@/components/planning/PlanningHeader'
+import { PlanningActionButtons } from '@/components/planning/PlanningActionButtons'
 
 export default function PurchaseOrdersPage() {
   return (
-    <div className="container mx-auto py-6">
-      <PurchaseOrdersTable />
+    <div>
+      <PlanningHeader currentPage="po" />
+
+      <div className="px-6 py-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Purchase Orders</h1>
+          <p className="text-muted-foreground text-sm">Manage and track purchase orders</p>
+        </div>
+
+        <PlanningActionButtons showTO={false} showWO={false} />
+
+        <PurchaseOrdersTable />
+      </div>
     </div>
   )
 }

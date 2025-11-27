@@ -24,7 +24,7 @@ export const supplierSchema = z.object({
   tax_code_id: z.string().uuid('Invalid tax code'),
   payment_terms: z.string().min(1, 'Payment terms required').max(100),
   lead_time_days: z.number().int().min(0, 'Lead time must be >= 0').optional().default(7),
-  moq: z.number().positive('MOQ must be positive').optional(),
+  moq: z.number().positive('MOQ must be positive').nullable().optional(),
   is_active: z.boolean().optional().default(true),
 })
 
@@ -42,7 +42,7 @@ export const supplierProductSchema = z.object({
   supplier_product_code: z.string().max(100).optional(),
   unit_price: z.number().nonnegative('Unit price must be >= 0').optional(),
   lead_time_days: z.number().int().min(0, 'Lead time must be >= 0').optional(),
-  moq: z.number().positive('MOQ must be positive').optional(),
+  moq: z.number().positive('MOQ must be positive').nullable().optional(),
 })
 
 export type SupplierProductInput = z.input<typeof supplierProductSchema>

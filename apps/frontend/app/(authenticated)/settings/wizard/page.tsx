@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { MODULES } from '@/lib/config/modules'
 import { ArrowLeft, ArrowRight, CheckCircle2, X } from 'lucide-react'
+import { SettingsHeader } from '@/components/settings/SettingsHeader'
 
 interface WizardData {
   step: number
@@ -574,7 +575,9 @@ export default function SettingsWizardPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 max-w-3xl">
+    <div>
+      <SettingsHeader currentPage="wizard" />
+      <div className="px-4 md:px-6 py-6 max-w-3xl mx-auto">
       <Card>
         <CardHeader>
           <CardTitle>Organization Setup Wizard</CardTitle>
@@ -621,6 +624,7 @@ export default function SettingsWizardPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

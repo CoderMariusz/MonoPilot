@@ -1,0 +1,83 @@
+<story-context id="1-17-settings-stats-cards" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>17</storyId>
+    <title>Settings Stats Cards</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <template>UI Component Pattern</template>
+    <estimatedEffort>0.5 days</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Administrator</asA>
+    <iWant>quick statistics on the settings dashboard</iWant>
+    <soThat>I can understand system configuration at a glance</soThat>
+    <tasks>
+      <task id="1" ac="AC-1.17.1">Create SettingsStatsCards component with 4 cards</task>
+      <task id="2" ac="AC-1.17.2">Style cards (120px max height, 2x2 metrics grid)</task>
+      <task id="3" ac="AC-1.17.3">Create /api/settings/stats endpoint</task>
+      <task id="4" ac="AC-1.17.4">Add responsive layout (4→2→1 columns)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1.17.1">4 cards: Users (Total, Active, Pending, Last activity), Locations (WH, Loc, Machines, Lines), Config (Allergens, Tax, Types, Modules), System (Wizard %, Updated, Org, Plan)</criterion>
+    <criterion id="AC-1.17.2">Max 120px height, 4 metrics per card (2x2), 12px labels, 18px values, clickable, shadow on hover</criterion>
+    <criterion id="AC-1.17.3">Real-time data on page reload, loading skeleton while fetching</criterion>
+    <criterion id="AC-1.17.4">Desktop: 4 cards row, Tablet: 2 cards row, Mobile: 1 card stacked</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/stories/01-17-settings-stats-cards.md</path>
+        <title>Story 1.17: Settings Stats Cards</title>
+        <section>Implementation Reference</section>
+        <snippet>Compact stats cards matching PlanningStatsCard design</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>apps/frontend/components/settings/SettingsStatsCards.tsx</path>
+        <kind>component</kind>
+        <symbol>SettingsStatsCards</symbol>
+        <reason>NEW - Stats cards component</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/app/api/settings/stats/route.ts</path>
+        <kind>api</kind>
+        <symbol>GET /api/settings/stats</symbol>
+        <reason>NEW - Aggregate metrics endpoint</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/app/(authenticated)/settings/page.tsx</path>
+        <kind>page</kind>
+        <symbol>SettingsPage</symbol>
+        <reason>UPDATE - Add stats cards</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="react" version="^18.0.0" usage="React components" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="ui">Card max 120px height</constraint>
+    <constraint type="ui">4 metrics per card (2x2 grid)</constraint>
+    <constraint type="architecture">Match PlanningStatsCard component pattern</constraint>
+  </constraints>
+
+  <tests>
+    <standards>API response, visual consistency</standards>
+    <locations>tests/e2e/settings.spec.ts</locations>
+    <ideas>
+      <idea ac="AC-1.17.1">Test all 4 cards render with correct metrics</idea>
+      <idea ac="AC-1.17.3">Test API returns expected data</idea>
+      <idea ac="AC-1.17.4">Test responsive layout on different viewports</idea>
+    </ideas>
+  </tests>
+</story-context>

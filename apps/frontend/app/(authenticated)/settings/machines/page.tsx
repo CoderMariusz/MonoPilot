@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import type { Machine } from '@/lib/validation/machine-schemas'
 import { MachineFormModal } from '@/components/settings/MachineFormModal'
+import { SettingsHeader } from '@/components/settings/SettingsHeader'
 
 export default function MachinesPage() {
   const router = useRouter()
@@ -182,7 +183,9 @@ export default function MachinesPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div>
+      <SettingsHeader currentPage="machines" />
+      <div className="px-4 md:px-6 py-6">
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
@@ -322,6 +325,7 @@ export default function MachinesPage() {
           onSuccess={handleSaveSuccess}
         />
       )}
+      </div>
     </div>
   )
 }

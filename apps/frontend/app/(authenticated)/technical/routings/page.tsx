@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import type { Routing } from '@/lib/services/routing-service'
 import { CreateRoutingModal } from '@/components/technical/routings/create-routing-modal'
+import { TechnicalHeader } from '@/components/technical/TechnicalHeader'
 
 export default function RoutingsPage() {
   const router = useRouter()
@@ -135,7 +136,9 @@ export default function RoutingsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div>
+      <TechnicalHeader currentPage="routings" />
+      <div className="px-4 md:px-6 py-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -282,6 +285,7 @@ export default function RoutingsPage() {
         onClose={() => setShowCreateModal(false)}
         onSuccess={handleCreateSuccess}
       />
+      </div>
     </div>
   )
 }

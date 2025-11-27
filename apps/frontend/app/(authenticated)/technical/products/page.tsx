@@ -33,6 +33,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ProductFormModal } from '@/components/technical/ProductFormModal'
 import { ProductDeleteDialog } from '@/components/technical/ProductDeleteDialog'
+import { TechnicalHeader } from '@/components/technical/TechnicalHeader'
 
 // Product type interface
 interface Product {
@@ -202,14 +203,9 @@ export default function ProductsPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      {/* Back to Dashboard */}
-      <div className="mb-6">
-        <Button variant="ghost" onClick={() => router.push('/technical/dashboard')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
-        </Button>
-      </div>
+    <div>
+      <TechnicalHeader currentPage="products" />
+      <div className="px-4 md:px-6 py-6">
 
       <Card>
         <CardHeader>
@@ -479,6 +475,7 @@ export default function ProductsPage() {
           onSuccess={handleDeleteSuccess}
         />
       )}
+      </div>
     </div>
   )
 }

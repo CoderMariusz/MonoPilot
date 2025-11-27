@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { Warehouse } from '@/lib/validation/warehouse-schemas'
 import { WarehouseFormModal } from '@/components/settings/WarehouseFormModal'
 import { WarehouseCard } from '@/components/settings/WarehouseCard'
+import { SettingsHeader } from '@/components/settings/SettingsHeader'
 
 type ViewMode = 'table' | 'card'
 
@@ -173,8 +174,11 @@ export default function WarehousesPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <Card>
+    <div>
+      <SettingsHeader currentPage="warehouses" />
+
+      <div className="px-4 md:px-6 py-6">
+        <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Warehouse Configuration</CardTitle>
@@ -349,6 +353,7 @@ export default function WarehousesPage() {
           onSuccess={handleSaveSuccess}
         />
       )}
+      </div>
     </div>
   )
 }

@@ -3,8 +3,57 @@
 **Module**: Technical (BOM Management, Products, Routings, Allergens)
 **Priority**: P1 🟡 (Critical - Manufacturing Core)
 **Created**: 2025-11-15
-**Status**: Draft v1.0
-**Methodology**: 7-Step UX Design Process
+**Updated**: 2025-11-27 - Integrated with Shared UI System
+**Status**: v2.0 - Hybrid (Existing Design + Shared System)
+**Methodology**: 7-Step UX Design Process + Shared System Integration
+
+---
+
+## 🔗 INTEGRATION WITH SHARED UI SYSTEM (v2.0 - NEW)
+
+This Technical Module design now **integrates with** the [Shared UI Design System](./ux-design-shared-system.md) while **maintaining existing features** (Timeline, Allergen Matrix, BOM Variants).
+
+### Applied from Shared System:
+- ✅ **ModuleHeader**: `Technical | Products | BOMs | Routings | Tracing | ⚙️` (consistent across all modules)
+- ✅ **Stats Cards**: 4 cards on dashboard (Products, BOMs, Routings, Traceability) - 120px height, 2×2 grid
+- ✅ **DataTable Base**: Products, BOMs, Routings tables (sortable, filterable, paginated)
+- ✅ **Colors**: app-colors.ts (green-600 Create, gray-600 View/Edit, red-600 Delete)
+- ✅ **Mobile Responsive**: Table → Card view on < 768px
+- ✅ **Dark Mode Toggle**: Settings → Appearance
+- ✅ **Keyboard Navigation**: Tab, Enter, Escape support
+
+### Technical-Specific Features (Enhanced):
+- 🎯 **BOM Timeline** (Variant B) - Visual Gantt chart for version management (overlap detection)
+- 🎯 **Allergen Matrix** (Variant C) - Heatmap showing cross-contamination risks (P1)
+- 🎯 **Integrated Routings** (Variant D) - Linked to Products/BOMs (not separate tab)
+- 🎯 **BOM Grouping** (Dashboard) - Products grouped by type (Raw Materials, Finished Goods, Process)
+
+### Layout Structure:
+
+```
+┌─────────────────────────────────────────┐
+│ ModuleHeader: Technical│Products│BOMs...│  ← Shared
+├─────────────────────────────────────────┤
+│ [Create Product] [Create BOM] [Create RT]│  ← Shared buttons
+├─────────────────────────────────────────┤
+│ [Stats Cards: 4 cards, 2×2 grid]        │  ← Shared + stats API
+├─────────────────────────────────────────┤
+│ View Selector: [Table] [Timeline] [Matrix] ← Technical-specific
+├─────────────────────────────────────────┤
+│ Content Area:                           │
+│ ├─ Table View (Standard DataTable)      │  ← Shared
+│ ├─ Timeline View (BOM versions gantt)   │  ← Technical-specific
+│ └─ Matrix View (Allergen heatmap)       │  ← Technical-specific
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+### Stories Affected:
+- 02-25: TechnicalHeader + TechnicalActionButtons (from Shared)
+- 02-26: TechnicalStatsCards (4 cards from Shared)
+- 02-27: Standard Tables (ProductsTable, BOMsTable, RoutingsTable from Shared)
+- 02-28: Mobile responsive (from Shared)
+- **Additional**: BOM Timeline + Allergen Matrix (Technical-specific, existing design kept)
 
 ---
 

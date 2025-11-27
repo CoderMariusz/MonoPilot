@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge'
 import { MapPin, Search, Edit, Trash2, Archive, QrCode } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { LocationForm } from '@/components/settings/LocationForm'
+import { SettingsHeader } from '@/components/settings/SettingsHeader'
 import { LocationDetailModal } from '@/components/settings/LocationDetailModal'
 
 interface Location {
@@ -194,7 +195,9 @@ export default function LocationsPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div>
+      <SettingsHeader currentPage="locations" />
+      <div className="px-4 md:px-6 py-6">
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
@@ -372,6 +375,7 @@ export default function LocationsPage() {
         onOpenChange={(open) => !open && setViewingLocationId(null)}
         locationId={viewingLocationId}
       />
+      </div>
     </div>
   )
 }

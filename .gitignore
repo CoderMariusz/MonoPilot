@@ -11,6 +11,7 @@ out/
 
 playwright-report/
 test-results/
+tests/
 # Environment variables
 .env
 .env.local

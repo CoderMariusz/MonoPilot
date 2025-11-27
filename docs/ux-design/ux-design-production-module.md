@@ -2,10 +2,38 @@
 
 **Project**: MonoPilot MES
 **Module**: Production Module (Real-Time Dashboard)
-**Version**: 1.0
+**Version**: 2.0 - Integrated with Shared System
 **Date**: 2025-11-15
-**Author**: UX Design Workflow (7-Step Methodology)
+**Updated**: 2025-11-27
 **Status**: Ready for Implementation
+
+---
+
+## 🔗 SHARED UI SYSTEM INTEGRATION (v2.0)
+
+Production Module now integrates with [Shared UI Design System](./ux-design-shared-system.md).
+
+**Applied Components:**
+- ✅ **ModuleHeader**: Production | Dashboard | Active WOs | Completed | Yields | ⚙️
+- ✅ **Stats Cards**: 5 KPI cards (Orders Today, Units Produced, Avg Yield, Active WOs, Shortages) - 120px, 2×2 grid
+- ✅ **Colors**: app-colors.ts (green Create, gray View/Edit, red Delete, orange Pause)
+- ✅ **Mobile Responsive**: Tables → Card view on < 768px
+- ✅ **Dark Mode**: Settings → Appearance
+- ✅ **Keyboard Navigation**: Tab, Enter, Escape
+
+**Production-Specific Features (Enhanced):**
+- 🎯 **Real-Time Dashboard** (Variant B) - Kanban-style line board + KPI cards + alerts
+- 🎯 **TV Display Mode** (Variant C) - Full-screen shop floor visibility (1920×1080)
+- 🎯 **Customizable Widgets** (Variant D - P2) - Drag-drop dashboard (future)
+
+**Layout:**
+```
+ModuleHeader: Production│Dashboard│Active WOs│Completed│Yields│⚙️  ← Shared
+[Create WO] [Print Labels] [Settings]                           ← Shared buttons
+[KPI Cards: Orders, Units, Yield, Active, Shortages]            ← Shared (5 cards)
+[Kanban Board: by Line] [Active WOs Table] [View Selector]       ← Production-specific
+Real-time updates, WebSocket sync, Alerts panel                  ← Production-specific
+```
 
 ---
 

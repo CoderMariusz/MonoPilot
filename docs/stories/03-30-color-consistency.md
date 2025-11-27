@@ -2,7 +2,7 @@
 
 **Epic:** 3 - Planning Operations
 **Batch:** 3D - Planning UI Redesign
-**Status:** todo
+**Status:** ready-for-dev
 **Priority:** P1 (Medium)
 **Story Points:** 2
 **Created:** 2025-11-27

@@ -255,32 +255,34 @@ export function PurchaseOrdersTable() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Purchase Orders</h2>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setComingSoonOpen(true)}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Bulk Import
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => setFastFlowOpen(true)}
-          >
-            <Zap className="mr-2 h-4 w-4" />
-            Quick Entry
-          </Button>
-          <Button onClick={() => {
+      {/* Action Buttons */}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setComingSoonOpen(true)}
+        >
+          <Upload className="mr-2 h-4 w-4" />
+          Bulk Import
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setFastFlowOpen(true)}
+        >
+          <Zap className="mr-2 h-4 w-4" />
+          Quick Entry
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => {
             setEditingPO(null)
             setFormModalOpen(true)
-          }}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add PO
-          </Button>
-        </div>
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Add PO
+        </Button>
       </div>
 
       {/* Filters */}

@@ -1,0 +1,89 @@
+<story-context id="2-25-technical-header-layout" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>25</storyId>
+    <title>Technical Header Layout</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <template>UI Component Pattern</template>
+    <estimatedEffort>0.5 days</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Technical User</asA>
+    <iWant>consistent header navigation across all technical pages</iWant>
+    <soThat>I can navigate easily between Products, BOMs, Routings, and Tracing</soThat>
+    <tasks>
+      <task id="1" ac="AC-2.25.1">Create TechnicalHeader component with nav tabs</task>
+      <task id="2" ac="AC-2.25.2">Style navigation tabs with active state</task>
+      <task id="3" ac="AC-2.25.3">Create TechnicalActionButtons component</task>
+      <task id="4" ac="AC-2.25.4">Apply header to all 5 technical pages</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-2.25.1">Header with tabs: Technical|Products|BOMs|Routings|Tracing|Settings, max 60px height</criterion>
+    <criterion id="AC-2.25.2">Active tab highlighted, 14px font, clickable links</criterion>
+    <criterion id="AC-2.25.3">Action buttons below header: Create Product, Create BOM, Create Routing (green-600)</criterion>
+    <criterion id="AC-2.25.4">Header on all pages: dashboard, products, products/[id], boms, boms/[id], routings, routings/[id], tracing</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/stories/02-25-technical-header-layout.md</path>
+        <title>Story 2.25: Technical Header Layout</title>
+        <section>Implementation Reference</section>
+        <snippet>TechnicalHeader component matching PlanningHeader design</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>apps/frontend/components/technical/TechnicalHeader.tsx</path>
+        <kind>component</kind>
+        <symbol>TechnicalHeader</symbol>
+        <reason>NEW - Header component with navigation tabs</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/components/technical/TechnicalActionButtons.tsx</path>
+        <kind>component</kind>
+        <symbol>TechnicalActionButtons</symbol>
+        <reason>NEW - Action buttons component</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/components/planning/PlanningHeader.tsx</path>
+        <kind>component</kind>
+        <symbol>PlanningHeader</symbol>
+        <reason>REFERENCE - Design pattern to follow</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/app/(authenticated)/technical/page.tsx</path>
+        <kind>page</kind>
+        <symbol>TechnicalPage</symbol>
+        <reason>UPDATE - Add TechnicalHeader</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="react" version="^18.0.0" usage="React components" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="ui">Header max 60px height</constraint>
+    <constraint type="architecture">Match PlanningHeader component pattern</constraint>
+    <constraint type="implementation">Cross-module with Story 1.16 (SettingsHeader)</constraint>
+  </constraints>
+
+  <tests>
+    <standards>Visual consistency, navigation tests</standards>
+    <locations>tests/e2e/technical.spec.ts</locations>
+    <ideas>
+      <idea ac="AC-2.25.1">Test header renders on all technical pages</idea>
+      <idea ac="AC-2.25.2">Test active tab highlighting</idea>
+      <idea ac="AC-2.25.3">Test action buttons visible on list pages</idea>
+    </ideas>
+  </tests>
+</story-context>

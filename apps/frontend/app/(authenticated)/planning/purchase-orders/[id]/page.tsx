@@ -48,6 +48,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { POLinesTable } from '@/components/planning/POLinesTable'
+import { PlanningHeader } from '@/components/planning/PlanningHeader'
 
 interface Supplier {
   id: string
@@ -433,21 +434,24 @@ export default function PurchaseOrderDetailsPage({
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push('/planning/purchase-orders')}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <h1 className="text-3xl font-bold">{po.po_number}</h1>
-        {getStatusBadge(po.status)}
-        {getApprovalBadge(po.approval_status)}
-      </div>
+    <div>
+      <PlanningHeader currentPage="po" />
+
+      <div className="px-6 py-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/planning/purchase-orders')}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold">{po.po_number}</h1>
+          {getStatusBadge(po.status)}
+          {getApprovalBadge(po.approval_status)}
+        </div>
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
@@ -788,6 +792,7 @@ export default function PurchaseOrderDetailsPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   )
 }

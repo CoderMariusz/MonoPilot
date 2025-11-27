@@ -25,6 +25,7 @@ import { Search, Edit, Trash2, Plus, AlertCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { TaxCode } from '@/lib/validation/tax-code-schemas'
 import { TaxCodeFormModal } from '@/components/settings/TaxCodeFormModal'
+import { SettingsHeader } from '@/components/settings/SettingsHeader'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -151,7 +152,9 @@ export default function TaxCodesPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div>
+      <SettingsHeader currentPage="tax-codes" />
+      <div className="px-4 md:px-6 py-6 space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -312,6 +315,7 @@ export default function TaxCodesPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+      </div>
     </div>
   )
 }

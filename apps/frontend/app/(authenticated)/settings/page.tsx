@@ -1,12 +1,15 @@
 /**
  * Settings Dashboard Landing Page
  * Story: 1.15 Settings Dashboard Landing Page
+ * Story: 1.16 Settings Header Layout
  *
  * Provides visual overview of all available settings sections,
  * allowing users to discover and navigate to configuration areas.
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SettingsHeader } from '@/components/settings/SettingsHeader'
+import { SettingsStatsCards } from '@/components/settings/SettingsStatsCards'
 import Link from 'next/link'
 import {
   Building2,
@@ -109,17 +112,23 @@ const settingsModules: SettingModule[] = [
 
 export default function SettingsPage() {
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      {/* AC-015.1: Page Title and Subtitle */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground mt-2">
-          Configure your MonoPilot system
-        </p>
-      </div>
+    <div>
+      <SettingsHeader currentPage="dashboard" />
 
-      {/* AC-015.2 & AC-015.4: Responsive Grid of Settings Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="px-4 md:px-6 py-6 space-y-6">
+        {/* AC-015.1: Page Title and Subtitle */}
+        <div>
+          <h1 className="text-2xl font-bold">Settings Dashboard</h1>
+          <p className="text-muted-foreground text-sm">
+            Configure your MonoPilot system
+          </p>
+        </div>
+
+        {/* AC-1.17: Settings Stats Cards */}
+        <SettingsStatsCards />
+
+        {/* AC-015.2 & AC-015.4: Responsive Grid of Settings Cards */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {settingsModules.map((module) => {
           const Icon = module.icon
 
@@ -155,12 +164,12 @@ export default function SettingsPage() {
         })}
       </div>
 
-      {/* Helper Text */}
-      <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-        <p className="text-sm text-blue-900 dark:text-blue-100">
-          <strong>💡 Tip:</strong> Click on any card above to configure that area of the system.
-          You can access these settings anytime from the sidebar.
-        </p>
+        {/* Helper Text */}
+        <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            <strong>Tip:</strong> Click on any card above to configure that area of the system.
+          </p>
+        </div>
       </div>
     </div>
   )

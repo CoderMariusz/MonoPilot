@@ -1,0 +1,97 @@
+<story-context id="2-27-technical-tables-consistency" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>27</storyId>
+    <title>Technical Tables Consistency</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <template>UI Component Pattern</template>
+    <estimatedEffort>1 day</estimatedEffort>
+  </metadata>
+
+  <story>
+    <asA>Technical User</asA>
+    <iWant>consistent table layouts across all technical pages</iWant>
+    <soThat>I can efficiently manage products, BOMs, and routings</soThat>
+    <tasks>
+      <task id="1" ac="AC-2.27.1">Standardize Products table</task>
+      <task id="2" ac="AC-2.27.2">Standardize BOMs table</task>
+      <task id="3" ac="AC-2.27.3">Standardize Routings table</task>
+      <task id="4" ac="AC-2.27.4">Consistent action buttons</task>
+      <task id="5" ac="AC-2.27.5">Status badge colors from app-colors.ts</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-2.27.1">Products table: SKU|Name|Type|Status|Allergens|Actions, search, filter by Type/Status, pagination 20/page</criterion>
+    <criterion id="AC-2.27.2">BOMs table: Code|Product|Version|Status|Items|Effective|Actions, search, filter by Status/Version</criterion>
+    <criterion id="AC-2.27.3">Routings table: Code|Product|Operations|Status|Actions, search, filter by Status</criterion>
+    <criterion id="AC-2.27.4">Actions: View (gray-600), Edit (gray-600), Clone (gray-600 for BOMs), Delete (red-600), tooltips</criterion>
+    <criterion id="AC-2.27.5">Status colors: Active/Current green-600, Draft/Pending yellow-500, Inactive/Archived gray-400, Expired red-600</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/stories/02-27-technical-tables-consistency.md</path>
+        <title>Story 2.27: Technical Tables Consistency</title>
+        <section>Implementation Reference</section>
+        <snippet>Standardized tables with search, filter, pagination, actions</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>apps/frontend/components/technical/TechnicalTable.tsx</path>
+        <kind>component</kind>
+        <symbol>TechnicalTable</symbol>
+        <reason>NEW - Base table component</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/components/technical/ProductsTable.tsx</path>
+        <kind>component</kind>
+        <symbol>ProductsTable</symbol>
+        <reason>REFACTOR - Use TechnicalTable</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/components/technical/BOMsTable.tsx</path>
+        <kind>component</kind>
+        <symbol>BOMsTable</symbol>
+        <reason>REFACTOR - Use TechnicalTable</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/components/technical/RoutingsTable.tsx</path>
+        <kind>component</kind>
+        <symbol>RoutingsTable</symbol>
+        <reason>REFACTOR - Use TechnicalTable</reason>
+      </artifact>
+      <artifact>
+        <path>apps/frontend/lib/constants/app-colors.ts</path>
+        <kind>constants</kind>
+        <symbol>APP_COLORS</symbol>
+        <reason>USE - Shared colors across modules</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="tailwindcss" version="^3.0.0" usage="Color utilities" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="ui">Pagination default 20 per page</constraint>
+    <constraint type="ui">Action buttons: View|Edit|Clone|Delete order</constraint>
+    <constraint type="architecture">Shared app-colors.ts across all modules</constraint>
+  </constraints>
+
+  <tests>
+    <standards>Table functionality, visual consistency</standards>
+    <locations>tests/e2e/technical.spec.ts</locations>
+    <ideas>
+      <idea ac="AC-2.27.1">Test products table sorting and filtering</idea>
+      <idea ac="AC-2.27.2">Test BOMs table with clone action</idea>
+      <idea ac="AC-2.27.5">Test status badge colors</idea>
+    </ideas>
+  </tests>
+</story-context>

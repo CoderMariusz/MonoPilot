@@ -36,6 +36,7 @@ import { UserForm } from '@/components/settings/UserForm'
 import { EditUserDrawer } from '@/components/settings/EditUserDrawer'
 import { InvitationsTable } from '@/components/settings/InvitationsTable'
 import { InvitationModal } from '@/components/settings/InvitationModal'
+import { SettingsHeader } from '@/components/settings/SettingsHeader'
 
 export default function UsersPage() {
   const [activeTab, setActiveTab] = useState('users')
@@ -156,8 +157,11 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <Card>
+    <div>
+      <SettingsHeader currentPage="users" />
+
+      <div className="px-4 md:px-6 py-6">
+        <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>User Management</CardTitle>
@@ -319,6 +323,7 @@ export default function UsersPage() {
         onOpenChange={(open) => !open && setEditingUser(null)}
         onSuccess={fetchUsers}
       />
+      </div>
     </div>
   )
 }

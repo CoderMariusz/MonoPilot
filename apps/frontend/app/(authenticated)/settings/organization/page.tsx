@@ -1,7 +1,14 @@
+/**
+ * Organization Settings Page
+ * Story: 1.1 Organization Configuration
+ * Story: 1.16 Settings Header Layout
+ */
+
 import { createServerSupabase } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { OrganizationForm } from '@/components/settings/OrganizationForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SettingsHeader } from '@/components/settings/SettingsHeader'
 
 export default async function OrganizationSettingsPage() {
   const supabase = await createServerSupabase()
@@ -15,20 +22,14 @@ export default async function OrganizationSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Simple Header */}
-      <header className="border-b bg-white">
-        <div className="container mx-auto flex h-16 items-center px-4">
-          <h1 className="text-2xl font-bold text-primary">MonoPilot</h1>
-        </div>
-      </header>
+    <div>
+      <SettingsHeader currentPage="organization" />
 
-      {/* Main Content */}
-      <main className="container mx-auto p-4">
+      <div className="px-4 md:px-6 py-6">
         <div className="mx-auto max-w-4xl space-y-6">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Organization Settings</h2>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl font-bold">Organization Settings</h1>
+            <p className="text-muted-foreground text-sm">
               Configure your organization&apos;s basic information and preferences
             </p>
           </div>
@@ -45,7 +46,7 @@ export default async function OrganizationSettingsPage() {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

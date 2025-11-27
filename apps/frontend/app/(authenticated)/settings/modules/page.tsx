@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { AlertCircle, CheckCircle2, Info } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { MODULES, type Module } from '@/lib/config/modules'
+import { SettingsHeader } from '@/components/settings/SettingsHeader'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -140,7 +141,9 @@ export default function ModulesPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div>
+      <SettingsHeader currentPage="modules" />
+      <div className="px-4 md:px-6 py-6 space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Module Activation</CardTitle>
@@ -263,6 +266,7 @@ export default function ModulesPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+      </div>
     </div>
   )
 }

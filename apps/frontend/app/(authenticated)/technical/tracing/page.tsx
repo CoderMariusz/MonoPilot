@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import type { TraceResult, RecallSimulationResult, LocationAnalysis, CustomerImpact } from '@/lib/types/traceability'
 import { GenealogyTree } from '@/components/technical/GenealogyTree'
+import { TechnicalHeader } from '@/components/technical/TechnicalHeader'
 
 type TabType = 'forward' | 'backward' | 'recall'
 type ViewMode = 'list' | 'tree'
@@ -50,7 +51,9 @@ export default function TracingPage() {
   }
 
   return (
-    <div className="p-8">
+    <div>
+      <TechnicalHeader currentPage="tracing" />
+      <div className="px-4 md:px-6 py-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Product Traceability</h1>
         <p className="text-gray-600">Forward, Backward, and Recall Simulation</p>
@@ -413,6 +416,7 @@ export default function TracingPage() {
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }

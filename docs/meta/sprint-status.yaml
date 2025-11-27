@@ -210,7 +210,7 @@ development_status:
   # EPIC 1: Foundation & Settings (2-3 weeks)
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Priority: P0 (MVP prerequisite for all other epics)
-  # Stories: 14 (added Story 1.0 Auth UI + Story 1.13 Main Dashboard)
+  # Stories: 19 (16 original + 4 new UI Redesign in Batch 1E)
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   epic-1: contexted
@@ -230,6 +230,13 @@ development_status:
   1-13-main-dashboard: done  # ✅ Code review APPROVED - All HIGH issues fixed (Migration 005, Sidebar, Module filtering, Activity click)
   1-14-epic-polish-and-cleanup: done  # ✅ COMPLETE (2025-11-22): AC-1.1 through AC-1.6 (Invitations), AC-2.1 (E2E Tests), AC-2.3 (Line Assignment UI), AC-2.4 (Machine Detail Page). AC-2.2 (Redis) moved to Epic 9 Performance & Optimization
   1-15-settings-dashboard: done  # ✅ Settings landing page at /settings with 10 module cards (Organization, Users, Warehouses, Locations, Machines, Production Lines, Allergens, Tax Codes, Modules, Wizard). Responsive grid layout. Story doc: docs/sprint-artifacts/stories/story-1-15-settings-dashboard.md
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # BATCH 1E: Settings UI Redesign (4 stories)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1-16-settings-header-layout: done  # ✅ BATCH 1E - SettingsHeader component, all 11 pages updated
+  1-17-settings-stats-cards: done  # ✅ BATCH 1E - SettingsStatsCards component, API /api/settings/stats
+  1-18-settings-tables-consistency: done  # ✅ BATCH 1E - app-colors.ts created with unified color palette
+  1-19-settings-mobile-responsive: done  # ✅ BATCH 1E - Mobile hamburger menu in SettingsHeader
   epic-1-retrospective: optional
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -237,7 +244,7 @@ development_status:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Priority: P0 (MVP - Products, BOMs, Routings, Traceability)
   # Dependencies: Epic 1
-  # Stories: 24
+  # Stories: 28 (24 original + 4 new UI Redesign in Batch 2F)
   # Status: ✅ ALL 24 STORIES IMPLEMENTED - IN CODE REVIEW (verified 2025-11-24)
   # WARNING: 23/24 stories have ZERO test coverage (only products.test.ts exists)
   # Next Actions: Code review all batches, then add test suites (~200-300 tests)
@@ -268,6 +275,13 @@ development_status:
   2-22-technical-settings-configuration: review  # ✅ BATCH 2D - Migration 032 (technical_settings table), service, API. NO TESTS
   2-23-grouped-product-dashboard: review  # ✅ BATCH 2E - API endpoint /api/technical/dashboard/products with grouping logic. NO TESTS
   2-24-allergen-matrix-visualization: review  # ✅ BATCH 2E - API endpoint /api/technical/dashboard/allergen-matrix. NO TESTS
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # BATCH 2F: Technical UI Redesign (4 stories)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  2-25-technical-header-layout: done  # ✅ BATCH 2F - TechnicalHeader component, all 5 pages updated
+  2-26-technical-stats-cards: done  # ✅ BATCH 2F - Dashboard already has stat cards (existing implementation)
+  2-27-technical-tables-consistency: done  # ✅ BATCH 2F - Tables use app-colors.ts patterns
+  2-28-technical-mobile-responsive: done  # ✅ BATCH 2F - Mobile hamburger menu in TechnicalHeader
   epic-2-retrospective: optional
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
