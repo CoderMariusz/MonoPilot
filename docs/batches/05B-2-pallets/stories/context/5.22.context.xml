@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.22</id>
+    <title>Pallet Status</title>
+    <batch>5B-2</batch>
+    <points>3</points>
+    <effort_hours>3-4</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Track and manage pallet status transitions (open, closed, shipped) with locked states and permission controls</description>
+  <dependencies>
+    <requires><story id="5.19">Pallet Creation</story><story id="5.20">Pallet LP Management</story></requires>
+    <enables>Shipping workflows, reporting</enables>
+  </dependencies>
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="PUT" path="/api/warehouse/pallets/:id/status">
+        <description>Change pallet status with transition validation</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="status" type="string" required="true">Target status: open, closed, shipped</field>
+        </request>
+        <response status="200">
+          <field name="id" type="UUID"/>
+          <field name="pallet_number" type="string"/>
+          <field name="status" type="string"/>
+          <field name="updated_at" type="timestamp"/>
+          <field name="shipped_at" type="timestamp" nullable="true" comment="Set when status='shipped'"/>
+        </response>
+        <response status="400">
+          <field name="error" type="string" example="Invalid status transition: closed -> open"/>
+        </response>
+      </endpoint>
+      <endpoint method="PUT" path="/api/warehouse/pallets/:id">
+        <description>Update pallet notes (only if status='open')</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="notes" type="string" required="false">Updated notes</field>
+        </request>
+        <response status="200">
+          <field name="id" type="UUID"/>
+          <field name="notes" type="string"/>
+          <field name="updated_at" type="timestamp"/>
+        </response>
+        <response status="400">
+          <field name="error" type="string" example="Cannot edit notes on closed pallet"/>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/warehouse/pallets">
+        <description>Enhanced: support status filter with counts</description>
+        <query_parameters>
+          <param name="status" type="string" required="false">Filter: open, closed, shipped (comma-separated for multiple)</param>
+        </query_parameters>
+        <response status="200">
+          <field name="pallets" type="array"/>
+          <field name="status_counts" type="object">
+            <field name="open" type="integer"/>
+            <field name="closed" type="integer"/>
+            <field name="shipped" type="integer"/>
+          </field>
+        </response>
+      </endpoint>
+    </api_endpoints>
+    <status_transitions>
+      <status name="open">
+        <description>Pallet accepting items, default on creation</description>
+        <allowed_transitions>
+          <transition to="closed">Pallet ready for shipping</transition>
+          <transition to="shipped">Direct ship without closing</transition>
+        </allowed_transitions>
+        <permissions>
+          - Add/remove LPs (enabled)
+          - Move pallet (enabled)
+          - Edit notes (enabled)
+          - Close pallet (enabled)
+          - Ship pallet (enabled)
+        </permissions>
+      </status>
+      <status name="closed">
+        <description>Pallet ready for shipping, contents locked</description>
+        <allowed_transitions>
+          <transition to="shipped">Mark as shipped</transition>
+        </allowed_transitions>
+        <permissions>
+          - Add/remove LPs (disabled - "Pallet locked")
+          - Move pallet (disabled - "Cannot move closed pallet")
+          - Edit notes (disabled - "Cannot edit closed pallet")
+          - Reopen (NOT supported)
+          - Ship pallet (enabled)
+        </permissions>
+      </status>
+      <status name="shipped">
+        <description>Pallet sent out, final immutable state</description>
+        <allowed_transitions>
+          - NONE (locked)
+        </allowed_transitions>
+        <permissions>
+          - All modifications disabled
+          - View only
+          - Show shipped_at timestamp
+        </permissions>
+      </status>
+    </status_transitions>
+    <database_columns>
+      <column name="status" type="VARCHAR(20)" constraint="CHECK IN ('open', 'closed', 'shipped'), DEFAULT 'open'"/>
+      <column name="shipped_at" type="TIMESTAMP" nullable="true" comment="Set when status='shipped'"/>
+    </database_columns>
+    <status_validation_logic>
+      <validation>
+        CASE pallet.status:
+          WHEN 'open':
+            IF new_status = 'closed' OR new_status = 'shipped': ALLOW
+            ELSE: REJECT "Invalid transition: open -> {new_status}"
+          WHEN 'closed':
+            IF new_status = 'shipped': ALLOW
+            ELSE: REJECT "Invalid transition: closed -> {new_status}"
+          WHEN 'shipped':
+            REJECT "Shipped pallet is locked, cannot change status"
+      END
+
+      IF new_status = 'shipped':
+        SET shipped_at = NOW()
+      END
+      </validation>
+    </status_validation_logic>
+    <components>
+      <component name="PalletStatusBadge">
+        <location>src/components/warehouse/pallets/PalletStatusBadge.tsx</location>
+        <description>Visual status indicator for pallet</description>
+        <displays>
+          - open: blue badge "OPEN"
+          - closed: yellow badge "CLOSED"
+          - shipped: green badge "SHIPPED"
+          - For shipped: append shipped_at timestamp
+        </displays>
+      </component>
+      <component name="ClosePalletModal">
+        <location>src/components/warehouse/pallets/ClosePalletModal.tsx</location>
+        <description>Confirmation modal for closing pallet</description>
+        <displays>
+          - "Close pallet P-20250127-0001?"
+          - "This pallet contains 5 items and will be locked for modifications"
+          - "After closing, you can only mark it as shipped"
+          - Close and Cancel buttons
+        </displays>
+      </component>
+      <component name="ShipPalletModal">
+        <location>src/components/warehouse/pallets/ShipPalletModal.tsx</location>
+        <description>Modal for marking pallet as shipped</description>
+        <fields>
+          - Optional shipping notes/reference textarea
+          - Ship date picker (default: today)
+          - Carrier input (optional)
+          - Tracking number input (optional)
+          - Ship and Cancel buttons
+        </fields>
+      </component>
+      <component name="PalletDetailPageActions">
+        <location>src/components/warehouse/pallets/PalletDetailPageActions.tsx</location>
+        <description>Action buttons that change based on pallet status</description>
+        <logic>
+          IF status = 'open':
+            - "Move Pallet" button (enabled)
+            - "Close Pallet" button (enabled)
+            - "Add LP" button (enabled)
+            - "Remove LP" buttons (enabled)
+            - "Edit Notes" button (enabled)
+          ELSIF status = 'closed':
+            - "Ship Pallet" button (enabled)
+            - "Move Pallet" button (disabled with tooltip)
+            - "Add LP" button (disabled)
+            - "Remove LP" buttons (disabled)
+            - "Edit Notes" button (disabled)
+            - Show "Locked" warning
+          ELSIF status = 'shipped':
+            - All buttons disabled
+            - Show "Final state - cannot modify" message
+            - Show shipped_at timestamp
+        </logic>
+      </component>
+      <component name="StatusFilterPanel">
+        <location>src/components/warehouse/pallets/StatusFilterPanel.tsx</location>
+        <description>Filter pallet list by status</description>
+        <features>
+          - Checkboxes per status: open, closed, shipped (all checked by default)
+          - Show count per status: "Open (12)", "Closed (5)", "Shipped (3)"
+          - "Select All / Clear All" buttons
+          - Multi-select support
+        </features>
+      </component>
+    </components>
+    <hooks>
+      <hook name="usePalletStatusChange">
+        <accepts>pallet_id, new_status</accepts>
+        <returns>{ pallet, loading, error }</returns>
+        <api_call>PUT /api/warehouse/pallets/:id/status</api_call>
+      </hook>
+      <hook name="useShipPallet">
+        <accepts>pallet_id, shipping_notes (optional), ship_date (optional)</accepts>
+        <returns>{ pallet, loading, error }</returns>
+        <api_call>PUT /api/warehouse/pallets/:id/status with status='shipped'</api_call>
+      </hook>
+    </hooks>
+    <validation_rules>
+      <rule id="status_enum">status must be one of: open, closed, shipped</rule>
+      <rule id="open_to_closed">open → closed allowed</rule>
+      <rule id="open_to_shipped">open → shipped allowed (skip closed)</rule>
+      <rule id="closed_to_shipped">closed → shipped allowed</rule>
+      <rule id="shipped_locked">shipped → no transitions (final state)</rule>
+      <rule id="no_backward">backward transitions not allowed (closed → open, etc)</rule>
+      <rule id="shipped_at_set">shipped_at set only when status='shipped'</rule>
+      <rule id="notes_edit_open_only">notes editable only if status='open'</rule>
+    </validation_rules>
+    <permission_matrix>
+      <permission action="add_lp" open="true" closed="false" shipped="false"/>
+      <permission action="remove_lp" open="true" closed="false" shipped="false"/>
+      <permission action="move_pallet" open="true" closed="false" shipped="false"/>
+      <permission action="edit_notes" open="true" closed="false" shipped="false"/>
+      <permission action="close_pallet" open="true" closed="false" shipped="false"/>
+      <permission action="ship_pallet" open="false" closed="true" shipped="false"/>
+      <permission action="view_detail" open="true" closed="true" shipped="true"/>
+    </permission_matrix>
+    <rls_policies>
+      <policy table="pallets">
+        <update>WHERE org_id = current_user.org_id (enforced in code: only status/notes editable when allowed)</update>
+      </policy>
+    </rls_policies>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1" title="Status Display with Badges">
+      <test>View pallet detail → status badge shown: "OPEN" (blue), "CLOSED" (yellow), "SHIPPED" (green)</test>
+      <test>For shipped pallet: show shipped_at timestamp next to badge</test>
+    </ac>
+    <ac id="2" title="Status Transitions Validated">
+      <test>Close pallet (open → closed): success</test>
+      <test>Ship pallet (closed → shipped): success</test>
+      <test>Direct ship (open → shipped): success</test>
+      <test>Attempt invalid transition (closed → open): error "Cannot reopen closed pallet"</test>
+      <test>Attempt ship locked pallet (shipped → ...): error "Shipped pallet is locked"</test>
+    </ac>
+    <ac id="3" title="Close Pallet Modal">
+      <test>Open pallet → "Close Pallet" button visible</test>
+      <test>Click → confirmation modal shows pallet number, LP count, warning message</test>
+      <test>Confirm → PUT /api/warehouse/pallets/:id/status with status='closed'</test>
+      <test>Status changes to "CLOSED" (yellow)</test>
+    </ac>
+    <ac id="4" title="Ship Pallet Modal">
+      <test>Closed pallet → "Ship Pallet" button visible</test>
+      <test>Click → ship modal opens with optional notes/carrier/tracking</test>
+      <test>Submit → status changes to "SHIPPED" (green), shipped_at populated</test>
+    </ac>
+    <ac id="5" title="Lock Contents When Closed">
+      <test>Close pallet → "Add LP" button disabled with tooltip "Pallet is locked"</test>
+      <test>Remove LP buttons disabled</test>
+      <test>"Edit Notes" button disabled</test>
+      <test>Show "Locked" warning badge</test>
+    </ac>
+    <ac id="6" title="Shipped Pallet Fully Locked">
+      <test>Ship pallet → all modification buttons disabled</test>
+      <test>Show "Final state - cannot modify" message</test>
+      <test>Show shipped_at timestamp</test>
+    </ac>
+    <ac id="7" title="Status Filter in List">
+      <test>Pallet list page → filter checkboxes: Open, Closed, Shipped</test>
+      <test>Each shows count: "Open (12)", "Closed (5)", "Shipped (3)"</test>
+      <test>Select only "Shipped" → list shows shipped pallets</test>
+    </ac>
+    <ac id="8" title="Notes Editing">
+      <test>Open pallet → "Edit Notes" button enabled</test>
+      <test>Click → can edit notes, save updates</test>
+      <test>Closed pallet → "Edit Notes" button disabled</test>
+      <test>Cannot edit notes on closed/shipped pallets</test>
+    </ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>
+      <test>Status transition validation: open → closed OK, closed → open FAIL</test>
+      <test>Shipped locked: no transitions allowed</test>
+      <test>shipped_at set only for shipped status</test>
+      <test>Notes edit only if open</test>
+    </unit_tests>
+    <integration_tests>
+      <test>PUT /api/warehouse/pallets/:id/status with status='closed' → 200 OK</test>
+      <test>Status updated to 'closed', updated_at changed</test>
+      <test>PUT with invalid transition → 400 error</test>
+      <test>PUT with status='shipped' → shipped_at populated</test>
+      <test>GET /api/warehouse/pallets?status=open returns only open pallets</test>
+      <test>Pagination with status filter works correctly</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Open 'open' pallet → see "Close Pallet" button, "Add LP" enabled</test>
+      <test>Click "Close Pallet" → confirmation modal</test>
+      <test>Confirm → status changes to "CLOSED" (yellow badge)</test>
+      <test>"Add LP" button now disabled, show "Pallet locked" tooltip</test>
+      <test>See "Ship Pallet" button enabled</test>
+      <test>Click "Ship Pallet" → modal opens</test>
+      <test>Enter optional notes</test>
+      <test>Submit → status "SHIPPED" (green), shipped_at shown</test>
+      <test>All buttons disabled, "Final state" message shown</test>
+      <test>List page: filter by status, counts updated</test>
+    </e2e_tests>
+  </test_plan>
+</story>
