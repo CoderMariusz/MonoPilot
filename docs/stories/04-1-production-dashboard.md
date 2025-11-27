@@ -49,7 +49,7 @@ Production managers currently have no centralized view of:
 **Success Criteria:**
 - ✅ KPI cards display with current values
 - ✅ Orders Today shows count (e.g., "12")
-- ✅ Units Produced shows sum (e.g., "1,250 kg")
+- ✅ Units Produced shows sum with default UoM (e.g., "1,250 kg" - use product.default_uom for display)
 - ✅ Avg Yield shows percentage with color coding (green/yellow/red)
 - ✅ Active WOs shows count with link to active list
 - ✅ Material Shortages shows count with warning indicator
@@ -96,7 +96,6 @@ Production managers currently have no centralized view of:
 | Material Shortage | wo_materials.available_qty < required_qty | ⚠️ | Warning |
 | WO Delayed | WO > scheduled_date + 4 hours | ⏰ | Warning |
 | Quality Hold | QA status = 'hold' on input LP | 🔒 | Critical |
-| Machine Down | maintenance_status = 'down' | 🔧 | Warning |
 
 **Success Criteria:**
 - ✅ Alerts list shows max 5, with "View All" link

@@ -28,9 +28,9 @@
 ### AC-4.16.5: Genealogy Per Output
 **Then** Each output LP has separate genealogy linking to consumed materials
 
-### AC-4.16.6: Partial Genealogy Support
+### AC-4.16.6: Genealogy Support for Multiple Outputs
 **When** multiple outputs from same WO
-**Then** Genealogy can be partial (each output links to consumed inputs)
+**Then** Each output LP links to ALL consumed inputs for the WO (genealogy is not split by output, but shared - each output can trace back to all consumed materials)
 
 ### AC-4.16.7: API Tracking
 **Then** production_outputs table tracks all outputs with: wo_id, product_id, qty, created_at, operator_id

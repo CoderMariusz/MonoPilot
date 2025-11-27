@@ -24,8 +24,9 @@
 - status = 'available'
 - quantity = entered value
 
-### AC-4.12.3: WO Output Tracking
-**Then** work_orders.output_qty updated, genealogy completed (consumed LPs → output LP)
+### AC-4.12.3: WO Output Tracking & Genealogy Linking
+**Then** work_orders.output_qty updated.
+**For genealogy:** Update all lp_genealogy records created during consumption (Story 4.7) by setting child_lp_id = output LP (links consumed inputs → output)
 
 ### AC-4.12.4: Progress Tracking
 **Then** Cumulative output tracked, progress = output_qty / planned_qty × 100%

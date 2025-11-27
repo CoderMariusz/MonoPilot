@@ -40,7 +40,7 @@
 **Then** Operators and Production Managers can consume
 
 ### AC-4.7.8: Prerequisites
-**Then** Requires Story 3.12 (BOM Snapshot) and Epic 5 (License Plates)
+**Then** Requires Story 3.10 (Work Order CRUD with BOM Snapshot) and Epic 5 (License Plates)
 
 ## Tasks / Subtasks
 

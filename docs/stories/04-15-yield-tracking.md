@@ -25,9 +25,9 @@
 - 🔴 Red: < 80%
 
 ### AC-4.15.3: Calculation Logic
-- Output Yield = (actual_output_qty / wo.quantity) × 100%
-- Material Yield = (wo_materials.required_qty / wo_materials.consumed_qty) × 100%
-- Operation Yield = (operation.actual_yield_percent)
+- Output Yield = (actual_output_qty / wo.quantity) × 100% (if wo.quantity = 0, yield = N/A)
+- Material Yield = (wo_materials.required_qty / wo_materials.consumed_qty) × 100% (if consumed_qty = 0, yield = 0%)
+- Operation Yield = (operation.actual_yield_percent) (default 0% if not recorded)
 
 ### AC-4.15.4: API Endpoint
 **Then** GET /api/production/work-orders/:id/yield returns:

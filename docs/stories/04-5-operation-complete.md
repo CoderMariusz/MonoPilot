@@ -1,6 +1,6 @@
 # Story 4.5: Operation Complete
 
-**Epic:** 4 - Production Execution | **Status:** drafted | **Priority:** P0 | **Story Points:** 2 | **Effort:** 0.5 day
+**Epic:** 4 - Production Execution | **Status:** drafted | **Priority:** P0 | **Story Points:** 1 | **Effort:** 0.5 day
 
 ## User Story
 

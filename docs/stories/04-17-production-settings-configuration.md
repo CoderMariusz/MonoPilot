@@ -24,7 +24,7 @@
 | allow_partial_lp_consumption | Toggle | true/false |
 | require_qa_on_output | Toggle | true/false |
 | auto_create_by_product_lp | Toggle | true/false |
-| dashboard_refresh_seconds | Number | 10-300 (default 30) |
+| dashboard_refresh_seconds | Number | 30-300 seconds (default 30, min 30 to prevent server overload) |
 
 ### AC-4.17.2: Settings Persistence
 **Then** production_settings table stores settings (org-level isolation)
@@ -40,7 +40,7 @@
 **Then** New settings applied immediately (no restart needed)
 
 ### AC-4.17.6: Validation
-**Then** dashboard_refresh_seconds validated: 10 <= value <= 300
+**Then** dashboard_refresh_seconds validated: 30 <= value <= 300 (minimum 30 seconds to prevent server overload)
 
 ### AC-4.17.7: Audit Logging
 **When** settings changed
