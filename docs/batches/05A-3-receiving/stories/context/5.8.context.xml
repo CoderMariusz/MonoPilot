@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.8</id>
+    <title>ASN Creation</title>
+    <batch>5A-3</batch>
+    <points>5</points>
+    <effort_hours>5-6</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Create ASN (Advanced Shipping Notice) for incoming shipments with PO pre-fill</description>
+  <dependencies>
+    <requires><story id="3.1">Purchase Orders</story></requires>
+    <enables><story id="5.9">ASN Item Management</story><story id="5.11">GRN Creation</story></enables>
+  </dependencies>
+  <technical_context>
+    <tables>
+      <table>
+        <name>asn</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK"/>
+          <column name="org_id" type="UUID" constraint="FK organizations(id)"/>
+          <column name="asn_number" type="VARCHAR(50)" constraint="UNIQUE(org_id, asn_number)"/>
+          <column name="po_id" type="UUID" constraint="FK purchase_orders(id)"/>
+          <column name="supplier_id" type="UUID" constraint="NOT NULL, FK suppliers(id)"/>
+          <column name="warehouse_id" type="UUID" constraint="NOT NULL, FK warehouses(id)"/>
+          <column name="expected_arrival_date" type="DATE"/>
+          <column name="carrier" type="VARCHAR(100)"/>
+          <column name="tracking_number" type="VARCHAR(100)"/>
+          <column name="status" type="VARCHAR(20)" constraint="DEFAULT 'pending'"/>
+          <column name="created_at" type="TIMESTAMP" constraint="DEFAULT now()"/>
+          <column name="created_by_user_id" type="UUID" constraint="FK users(id)"/>
+        </columns>
+      </table>
+      <table>
+        <name>asn_items</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK"/>
+          <column name="org_id" type="UUID" constraint="FK organizations(id)"/>
+          <column name="asn_id" type="UUID" constraint="NOT NULL, FK asn(id)"/>
+          <column name="po_line_id" type="UUID" constraint="FK po_lines(id)"/>
+          <column name="product_id" type="UUID" constraint="NOT NULL, FK products(id)"/>
+          <column name="quantity" type="DECIMAL(15,4)" constraint="NOT NULL"/>
+          <column name="uom" type="VARCHAR(10)" constraint="NOT NULL"/>
+          <column name="supplier_batch_number" type="VARCHAR(50)"/>
+          <column name="manufacture_date" type="DATE"/>
+          <column name="expiry_date" type="DATE"/>
+        </columns>
+      </table>
+      <table>
+        <name>asn_number_sequence</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, UNIQUE"/>
+          <column name="sequence_date" type="DATE" constraint="NOT NULL"/>
+          <column name="next_sequence" type="INT" constraint="DEFAULT 1"/>
+        </columns>
+      </table>
+    </tables>
+    <api_endpoints>
+      <endpoint method="POST" path="/api/warehouse/asns">
+        <request>po_id, expected_arrival_date, carrier (optional), tracking_number (optional)</request>
+        <response>asn_id, asn_number (ASN-YYYYMMDD-NNNN), asn_items from PO lines</response>
+      </endpoint>
+      <endpoint method="GET" path="/api/warehouse/asns">
+        <filters>status, supplier_id, date_from, date_to</filters>
+      </endpoint>
+    </api_endpoints>
+    <components>
+      <component name="CreateASNModal">PO selector, expected arrival, carrier, tracking</component>
+      <component name="ASNListPage">/warehouse/asns with columns: ASN#, PO, supplier, status, items count</component>
+      <component name="ASNDetailPage">/warehouse/asns/:id with items table, Receive Goods button</component>
+    </components>
+    <validation_rules>
+      <rule>po_id must exist and belong to org_id</rule>
+      <rule>expected_arrival_date optional (future date if provided)</rule>
+      <rule>asn_items auto-filled from po_lines</rule>
+      <rule>asn_number auto-generated with daily reset</rule>
+      <rule>status: pending (default) → received → completed</rule>
+    </validation_rules>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1">ASN modal opens from PO detail with form</ac>
+    <ac id="2">ASN items pre-filled from PO lines (product, qty, uom)</ac>
+    <ac id="3">ASN number auto-generated (ASN-YYYYMMDD-NNNN)</ac>
+    <ac id="4">ASN linked to PO and PO lines via ids</ac>
+    <ac id="5">Status tracking: pending → received → completed</ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>ASN number format, uniqueness, daily reset</unit_tests>
+    <integration_tests>POST /api/warehouse/asns, verify asn_items from po_lines</integration_tests>
+    <e2e_tests>Create PO, click Create ASN, verify pre-filled items, auto-number</e2e_tests>
+  </test_plan>
+  <implementation_notes>
+    <note priority="high">Pre-fill items from PO lines reduces manual data entry</note>
+    <note priority="medium">Tracking number enables shipment tracking integration (future)</note>
+  </implementation_notes>
+</story>
