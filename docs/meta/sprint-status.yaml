@@ -319,14 +319,14 @@ development_status:
   epic-4: contexted
   4-1-production-dashboard: drafted
   4-2-wo-start: drafted
-  4-3-wo-pause-resume: backlog
-  4-4-operation-start: backlog
-  4-5-operation-complete: backlog
-  4-6-wo-complete: backlog
-  4-7-material-consumption-desktop: backlog
-  4-8-material-consumption-scanner: backlog
-  4-9-1-1-consumption-enforcement: backlog
-  4-10-consumption-correction: backlog
+  4-3-wo-pause-resume: drafted
+  4-4-operation-start: drafted
+  4-5-operation-complete: drafted
+  4-6-wo-complete: drafted
+  4-7-material-consumption-desktop: drafted
+  4-8-material-consumption-scanner: drafted
+  4-9-1-1-consumption-enforcement: drafted
+  4-10-consumption-correction: drafted
   4-11-over-consumption-control: backlog
   4-12-output-registration-desktop: backlog
   4-13-output-registration-scanner: backlog
