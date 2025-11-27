@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.26</id>
+    <title>Scanner Operations Menu</title>
+    <batch>5C-1</batch>
+    <points>2</points>
+    <effort_hours>2-3</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Quick-access operations menu with large touch targets for workflow selection and session management</description>
+  <dependencies>
+    <requires><story id="5.23">Scanner Guided Workflows</story><story id="5.24">Scanner Barcode Validation</story><story id="5.25">Scanner Feedback</story></requires>
+    <enables><story id="5.27">Scanner Session Timeout</story></enables>
+  </dependencies>
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="GET" path="/api/scanner/operations">
+        <description>Get list of available operations for organization</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="operations" type="array">
+            <field name="name" type="string" comment="receive, put_away, pick, consume, output, move, count, settings"/>
+            <field name="icon" type="string" comment="icon name from lucide-react"/>
+            <field name="color" type="string" comment="hex color code"/>
+            <field name="workflow_type" type="string" nullable="true" comment="null for settings button"/>
+            <field name="enabled" type="boolean"/>
+          </field>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/scanner/active-session">
+        <description>Get current active session if exists</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="session_id" type="UUID" nullable="true"/>
+          <field name="workflow_type" type="string" nullable="true"/>
+          <field name="current_step" type="integer" nullable="true"/>
+          <field name="steps_completed" type="integer" nullable="true"/>
+          <field name="created_at" type="timestamp" nullable="true"/>
+        </response>
+        <response status="204">
+          <field name="comment">No active session</field>
+        </response>
+      </endpoint>
+      <endpoint method="PATCH" path="/api/scanner/sessions/:id/resume">
+        <description>Resume paused session</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="session_id" type="UUID"/>
+          <field name="current_step" type="integer"/>
+          <field name="workflow_config" type="object"/>
+        </response>
+      </endpoint>
+      <endpoint method="DELETE" path="/api/scanner/sessions/:id/cancel">
+        <description>Cancel active session</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="confirm" type="boolean" required="true" comment="Confirmation flag"/>
+        </request>
+        <response status="200">
+          <field name="cancelled_at" type="timestamp"/>
+          <field name="summary" type="object">
+            <field name="workflow_type" type="string"/>
+            <field name="steps_completed" type="integer"/>
+            <field name="items_processed" type="integer"/>
+          </field>
+        </response>
+      </endpoint>
+    </api_endpoints>
+    <database_tables>
+      <table>
+        <name>scanner_operations</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK, DEFAULT gen_random_uuid()"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, FK organizations(id)"/>
+          <column name="name" type="VARCHAR(50)" constraint="NOT NULL"/>
+          <column name="icon" type="VARCHAR(50)" constraint="NOT NULL" comment="lucide-react icon name"/>
+          <column name="color" type="VARCHAR(7)" constraint="NOT NULL" comment="hex color #RRGGBB"/>
+          <column name="workflow_type" type="VARCHAR(50)" constraint="nullable"/>
+          <column name="display_order" type="INTEGER" constraint="DEFAULT 0"/>
+          <column name="enabled" type="BOOLEAN" constraint="DEFAULT true"/>
+          <column name="created_at" type="TIMESTAMP" constraint="DEFAULT NOW()"/>
+          <column name="constraint" name="unique_operation" constraint="UNIQUE(org_id, name)"/>
+        </columns>
+      </table>
+    </database_tables>
+    <operations_definitions>
+      <operation>
+        <name>Receive</name>
+        <icon>ArrowDown</icon>
+        <color>#3B82F6</color>
+        <workflow_type>receive</workflow_type>
+        <description>Receive goods into warehouse</description>
+      </operation>
+      <operation>
+        <name>Put Away</name>
+        <icon>Archive</icon>
+        <color>#10B981</color>
+        <workflow_type>put_away</workflow_type>
+        <description>Store items in designated locations</description>
+      </operation>
+      <operation>
+        <name>Pick</name>
+        <icon>ArrowUp</icon>
+        <color>#F59E0B</color>
+        <workflow_type>pick</workflow_type>
+        <description>Pick items for orders or production</description>
+      </operation>
+      <operation>
+        <name>Consume</name>
+        <icon>Minus</icon>
+        <color>#EF4444</color>
+        <workflow_type>consume</workflow_type>
+        <description>Consume items from stock</description>
+      </operation>
+      <operation>
+        <name>Output</name>
+        <icon>Plus</icon>
+        <color>#A855F7</color>
+        <workflow_type>output</workflow_type>
+        <description>Add produced items to stock</description>
+      </operation>
+      <operation>
+        <name>Move</name>
+        <icon>Repeat2</icon>
+        <color>#06B6D4</color>
+        <workflow_type>move</workflow_type>
+        <description>Transfer items between locations</description>
+      </operation>
+      <operation>
+        <name>Count</name>
+        <icon>List</icon>
+        <color>#6B7280</color>
+        <workflow_type>count</workflow_type>
+        <description>Conduct inventory counts</description>
+      </operation>
+      <operation>
+        <name>Settings</name>
+        <icon>Settings</icon>
+        <color>#1F2937</color>
+        <workflow_type>null</workflow_type>
+        <description>Configure scanner settings</description>
+      </operation>
+    </operations_definitions>
+    <components>
+      <component name="OperationsMenu">
+        <location>src/components/scanner/OperationsMenu.tsx</location>
+        <description>Main menu displaying operation buttons in 3-row grid</description>
+        <layout>
+          - Row 1: Receive, Put Away, Pick
+          - Row 2: Consume, Output, Move
+          - Row 3: Count, Settings
+          - Full screen, landscape-optimized
+          - Responsive grid: 3 columns
+        </layout>
+        <features>
+          - Fetch operations from GET /api/scanner/operations
+          - Check for active session
+          - Show ActiveSessionBanner if session exists
+          - Show OfflineIndicator if offline
+        </features>
+      </component>
+      <component name="OperationButton">
+        <location>src/components/scanner/OperationButton.tsx</location>
+        <description>Individual operation button with icon and label</description>
+        <displays>
+          - Icon (32px × 32px, centered)
+          - Label (14px font, bold, below icon)
+          - Background color per operation
+          - Rounded corners (12px border-radius)
+          - Minimum 60px × 60px with padding
+        </displays>
+        <interactions>
+          - Press animation: scale 0.95 on tap
+          - Ripple effect (Material Design)
+          - Loading spinner if loading state
+          - Disabled opacity 0.3 if other op in progress
+        </interactions>
+      </component>
+      <component name="ActiveSessionBanner">
+        <location>src/components/scanner/ActiveSessionBanner.tsx</location>
+        <description>Banner showing active session status and resume/cancel options</description>
+        <displays>
+          - Status: "Receive in progress"
+          - Item count: "(5 items processed)"
+          - Buttons: "Resume" (green), "Cancel" (red)
+          - Color: yellow/warning if approaching timeout
+        </displays>
+      </component>
+      <component name="OfflineIndicator">
+        <location>src/components/scanner/OfflineIndicator.tsx</location>
+        <description>Badge indicating offline mode status</description>
+        <displays>
+          - Text: "Offline Mode"
+          - Color: orange/yellow warning
+          - Tooltip: "Pending validations will sync when online"
+          - Only visible if navigator.onLine = false
+        </displays>
+      </component>
+      <component name="SessionTimeoutWarning">
+        <location>src/components/scanner/SessionTimeoutWarning.tsx</location>
+        <description>Warning overlay for approaching session timeout</description>
+        <displays>
+          - Fixed top banner
+          - Text: "Session expiring in 30 seconds"
+          - Countdown timer: MM:SS format
+          - Large button: "Extend Session"
+          - Auto-dismiss on extend
+        </displays>
+      </component>
+    </components>
+    <hooks>
+      <hook name="useOperationsMenu">
+        <accepts>none</accepts>
+        <returns>{ operations, activeSession, isOffline, createSession, resumeSession, cancelSession, loading, error }</returns>
+        <api_calls>
+          - GET /api/scanner/operations
+          - GET /api/scanner/active-session
+        </api_calls>
+      </hook>
+      <hook name="useDeviceId">
+        <accepts>none</accepts>
+        <returns>{ device_id }</returns>
+        <description>Generate and store persistent device_id in localStorage</description>
+      </hook>
+    </hooks>
+    <device_detection>
+      <function name="getDeviceId">
+        <step number="1">Check localStorage for 'scanner_device_id'</step>
+        <step number="2">If exists: return stored device_id</step>
+        <step number="3">If not exists: generate UUID</step>
+        <step number="4">Save to localStorage with 1-year expiry</step>
+        <step number="5">Return device_id</step>
+      </function>
+      <function name="detectPlatform">
+        <checks>
+          - iOS vs Android (navigator.userAgent)
+          - PWA installed (window.matchMedia('(display-mode: standalone)'))
+          - Browser type (Chrome, Safari, Firefox)
+        </checks>
+      </function>
+    </device_detection>
+    <validation_rules>
+      <rule id="operation_exists">Operation must exist in scanner_operations</rule>
+      <rule id="operation_enabled">Operation must have enabled=true</rule>
+      <rule id="device_id_required">Device ID must be provided for session creation</rule>
+      <rule id="one_active_session">Only one active session per user at a time</rule>
+      <rule id="session_cancel_confirm">Confirmation required before canceling session</rule>
+    </validation_rules>
+    <rls_policies>
+      <policy table="scanner_operations">
+        <select>WHERE org_id = current_user.org_id</select>
+      </policy>
+    </rls_policies>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1" title="Operations Menu Layout">
+      <test>Open scanner app → operations menu displayed (full screen)</test>
+      <test>8 buttons visible: Receive, Put Away, Pick, Consume, Output, Move, Count, Settings</test>
+      <test>Grid layout: 3 rows × 3 columns (Settings in bottom right)</test>
+    </ac>
+    <ac id="2" title="Button Design">
+      <test>Each button shows icon (32px) and label (14px, bold)</test>
+      <test>Button colors match operation type: Receive=blue, Put Away=green, Pick=orange, etc.</test>
+      <test>Rounded corners (12px border-radius)</test>
+      <test>Minimum 60px × 60px with padding</test>
+    </ac>
+    <ac id="3" title="Touch Optimization">
+      <test>Tap button → press animation (scale 0.95)</test>
+      <test>Ripple effect visible on tap</test>
+      <test>16px margin between buttons</test>
+      <test>No hover states (mobile only)</test>
+    </ac>
+    <ac id="4" title="Active Session Indicator">
+      <test>User has active session → banner shows "Receive in progress (5 items)"</test>
+      <test>Banner shows "Resume" and "Cancel" buttons</test>
+      <test>Resume button: green, resumes at current step</test>
+      <test>Cancel button: red, shows confirmation before canceling</test>
+    </ac>
+    <ac id="5" title="Operations Selection">
+      <test>Click "Receive" → other buttons disabled (0.3 opacity)</test>
+      <test>Selected button shows loading spinner</test>
+      <test>POST /api/scanner/sessions called with workflow_type='receive'</test>
+      <test>On success → navigate to workflow guide at Step 1</test>
+      <test>On error → show error toast</test>
+    </ac>
+    <ac id="6" title="Settings Access">
+      <test>Click Settings button → navigate to /scanner/settings</test>
+      <test>Settings page shows panels: Haptic, Audio, Auto-advance, Device Info, About</test>
+    </ac>
+    <ac id="7" title="Offline Indicator">
+      <test>Disconnect internet → "Offline Mode" badge shown</test>
+      <test>Color: orange/yellow warning</test>
+      <test>Tooltip: "Pending validations will sync when online"</test>
+      <test>Operations still available (offline-capable)</test>
+    </ac>
+    <ac id="8" title="Timeout Indicator">
+      <test>User idle 4.5+ minutes → warning banner shows "Session expiring in 30 seconds"</test>
+      <test>Countdown timer visible (MM:SS format)</test>
+      <test>Click "Extend Session" → warning dismisses, timer resets</test>
+      <test>If not extended → auto-logout after countdown</test>
+    </ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>
+      <test>Operations list rendering: 8 buttons displayed</test>
+      <test>Button colors: each operation has correct hex color</test>
+      <test>Active session detection: banner shown if session exists</test>
+      <test>Offline detection: navigator.onLine used correctly</test>
+      <test>Device ID generation: creates UUID on first load, persists in localStorage</test>
+    </unit_tests>
+    <integration_tests>
+      <test>GET /api/scanner/operations returns 8 operations with all fields</test>
+      <test>GET /api/scanner/active-session returns null if no session</test>
+      <test>GET /api/scanner/active-session returns session if exists</test>
+      <test>POST /api/scanner/sessions on operation click creates session</test>
+      <test>PATCH /api/scanner/sessions/:id/resume resumes session at correct step</test>
+      <test>DELETE /api/scanner/sessions/:id/cancel cancels with confirmation</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Open scanner app → operations menu displayed</test>
+      <test>8 operation buttons visible with correct colors and icons</test>
+      <test>Click "Receive" → session created → workflow guide shown</test>
+      <test>Click "Put Away" → different session created</test>
+      <test>Cancel mid-workflow → return to menu → no active session</test>
+      <test>Start "Receive" → return to menu → banner shows "Receive in progress"</test>
+      <test>Click "Resume" → workflow continues at current step</test>
+      <test>Click "Cancel" → confirmation modal shown → confirm → session canceled</test>
+      <test>Click Settings → navigate to /scanner/settings → show all config options</test>
+      <test>Disable internet → offline indicator shown</test>
+      <test>Session idle 4.5+ min → timeout warning shown</test>
+      <test>Click "Extend Session" → warning dismissed, timer resets</test>
+    </e2e_tests>
+  </test_plan>
+</story>
