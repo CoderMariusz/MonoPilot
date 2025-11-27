@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.15</id>
+    <title>Movement Audit Trail</title>
+    <batch>5B-1</batch>
+    <points>3</points>
+    <effort_hours>3-4</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Movement history page with filtering, sorting, and statistics dashboard for warehouse inventory tracking</description>
+  <dependencies>
+    <requires><story id="5.14">LP Location Move</story></requires>
+    <enables><story id="5.16">Partial Move</story><story id="5.35">Inventory Count</story></enables>
+  </dependencies>
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="GET" path="/api/warehouse/stock-moves">
+        <description>Retrieve movement history with optional filters and pagination</description>
+        <auth>authenticated</auth>
+        <query_parameters>
+          <param name="lp_id" type="UUID" required="false">Filter by specific license plate</param>
+          <param name="location_id" type="UUID" required="false">Filter by from/to location (either direction)</param>
+          <param name="movement_type" type="string" required="false">Filter by type: receiving, put_away, pick, transfer, adjustment</param>
+          <param name="user_id" type="UUID" required="false">Filter by user who performed movement</param>
+          <param name="date_from" type="ISO8601" required="false">Start date for range (default: 7 days ago)</param>
+          <param name="date_to" type="ISO8601" required="false">End date for range (default: now)</param>
+          <param name="limit" type="integer" required="false" default="50">Results per page (max 200)</param>
+          <param name="offset" type="integer" required="false" default="0">Pagination offset</param>
+        </query_parameters>
+        <response status="200">
+          <field name="data" type="array">
+            <item>
+              <field name="id" type="UUID"/>
+              <field name="org_id" type="UUID"/>
+              <field name="lp_id" type="UUID"/>
+              <field name="lp_number" type="string"/>
+              <field name="from_location" type="object">
+                <field name="id" type="UUID"/>
+                <field name="code" type="string"/>
+                <field name="name" type="string"/>
+              </field>
+              <field name="to_location" type="object">
+                <field name="id" type="UUID"/>
+                <field name="code" type="string"/>
+                <field name="name" type="string"/>
+              </field>
+              <field name="movement_type" type="string"/>
+              <field name="quantity" type="decimal"/>
+              <field name="uom" type="string"/>
+              <field name="reason" type="string" nullable="true"/>
+              <field name="moved_at" type="timestamp"/>
+              <field name="moved_by_user_id" type="UUID"/>
+              <field name="moved_by_user_name" type="string"/>
+              <field name="created_at" type="timestamp"/>
+            </item>
+          </field>
+          <field name="pagination" type="object">
+            <field name="total" type="integer"/>
+            <field name="limit" type="integer"/>
+            <field name="offset" type="integer"/>
+            <field name="has_more" type="boolean"/>
+          </field>
+        </response>
+        <response status="400">
+          <field name="error" type="string" example="Invalid date range or filter parameter"/>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/warehouse/stock-moves/lp/:id/history">
+        <description>Get complete movement history for specific license plate</description>
+        <auth>authenticated</auth>
+        <path_parameters>
+          <param name="id" type="UUID" required="true">License plate ID</param>
+        </path_parameters>
+        <response status="200">
+          <field name="lp_id" type="UUID"/>
+          <field name="lp_number" type="string"/>
+          <field name="movements" type="array">
+            <field name="id" type="UUID"/>
+            <field name="from_location" type="object"/>
+            <field name="to_location" type="object"/>
+            <field name="movement_type" type="string"/>
+            <field name="quantity" type="decimal"/>
+            <field name="moved_at" type="timestamp"/>
+            <field name="moved_by" type="string"/>
+            <field name="reason" type="string"/>
+          </field>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/warehouse/stock-moves/summary">
+        <description>Get aggregated movement statistics for warehouse analytics</description>
+        <auth>authenticated</auth>
+        <query_parameters>
+          <param name="date_from" type="ISO8601" required="false">Start date (default: 30 days ago)</param>
+          <param name="date_to" type="ISO8601" required="false">End date (default: now)</param>
+          <param name="warehouse_id" type="UUID" required="false">Filter by warehouse</param>
+        </query_parameters>
+        <response status="200">
+          <field name="total_movements" type="integer"/>
+          <field name="by_type" type="object">
+            <field name="receiving" type="integer"/>
+            <field name="put_away" type="integer"/>
+            <field name="pick" type="integer"/>
+            <field name="transfer" type="integer"/>
+            <field name="adjustment" type="integer"/>
+          </field>
+          <field name="by_user" type="array">
+            <field name="user_id" type="UUID"/>
+            <field name="user_name" type="string"/>
+            <field name="count" type="integer"/>
+          </field>
+          <field name="by_location" type="array">
+            <field name="location_id" type="UUID"/>
+            <field name="location_code" type="string"/>
+            <field name="location_name" type="string"/>
+            <field name="count" type="integer"/>
+          </field>
+          <field name="date_range" type="object">
+            <field name="from" type="ISO8601"/>
+            <field name="to" type="ISO8601"/>
+          </field>
+        </response>
+      </endpoint>
+    </api_endpoints>
+    <database_queries>
+      <query name="get_stock_moves_with_filters">
+        SELECT
+          sm.id, sm.lp_id, lp.lp_number, sm.from_location_id, sm.to_location_id,
+          fl.code as from_location_code, fl.name as from_location_name,
+          tl.code as to_location_code, tl.name as to_location_name,
+          sm.movement_type, sm.quantity, sm.uom, sm.reason,
+          sm.moved_at, sm.moved_by_user_id, u.full_name as moved_by_user_name
+        FROM stock_moves sm
+        JOIN license_plates lp ON sm.lp_id = lp.id
+        LEFT JOIN locations fl ON sm.from_location_id = fl.id
+        JOIN locations tl ON sm.to_location_id = tl.id
+        JOIN users u ON sm.moved_by_user_id = u.id
+        WHERE sm.org_id = $1
+          AND ($2::UUID IS NULL OR sm.lp_id = $2)
+          AND ($3::UUID IS NULL OR sm.from_location_id = $3 OR sm.to_location_id = $3)
+          AND ($4::TEXT IS NULL OR sm.movement_type = $4)
+          AND ($5::UUID IS NULL OR sm.moved_by_user_id = $5)
+          AND sm.moved_at >= COALESCE($6, NOW() - INTERVAL '7 days')
+          AND sm.moved_at <= COALESCE($7, NOW())
+        ORDER BY sm.moved_at DESC
+        LIMIT $8 OFFSET $9
+      </query>
+      <query name="get_movement_statistics">
+        SELECT
+          movement_type,
+          COUNT(*) as count,
+          ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) as percentage
+        FROM stock_moves
+        WHERE org_id = $1
+          AND moved_at >= COALESCE($2, NOW() - INTERVAL '30 days')
+          AND moved_at <= COALESCE($3, NOW())
+        GROUP BY movement_type
+      </query>
+      <query name="get_movement_by_user">
+        SELECT
+          sm.moved_by_user_id,
+          u.full_name,
+          COUNT(*) as movement_count
+        FROM stock_moves sm
+        JOIN users u ON sm.moved_by_user_id = u.id
+        WHERE sm.org_id = $1
+          AND sm.moved_at >= COALESCE($2, NOW() - INTERVAL '30 days')
+          AND sm.moved_at <= COALESCE($3, NOW())
+        GROUP BY sm.moved_by_user_id, u.full_name
+        ORDER BY movement_count DESC
+        LIMIT 10
+      </query>
+    </database_queries>
+    <indexes>
+      <index name="idx_stock_moves_org_id">On column: org_id</index>
+      <index name="idx_stock_moves_lp_id">On column: lp_id</index>
+      <index name="idx_stock_moves_from_location_id">On column: from_location_id</index>
+      <index name="idx_stock_moves_to_location_id">On column: to_location_id</index>
+      <index name="idx_stock_moves_movement_type">On column: movement_type</index>
+      <index name="idx_stock_moves_moved_at_desc">On column: moved_at DESC (critical for range queries and ordering)</index>
+      <index name="idx_stock_moves_moved_by_user_id">On column: moved_by_user_id</index>
+      <index name="idx_stock_moves_composite">Composite on (org_id, moved_at DESC) for efficient filtered range queries</index>
+    </indexes>
+    <components>
+      <component name="StockMovesListPage">
+        <location>src/app/warehouse/stock-moves/page.tsx</location>
+        <description>Main page component showing movement history table with filters and detail panel</description>
+        <features>
+          - Server-side table with sortable columns
+          - Filter panel (left sidebar)
+          - Detail panel (right slide-out)
+          - Export to CSV button
+          - Statistics dashboard section
+        </features>
+      </component>
+      <component name="MovementFilterPanel">
+        <location>src/components/warehouse/stock-moves/MovementFilterPanel.tsx</location>
+        <description>Filter controls for movement history</description>
+        <fields>
+          - LP number search (autocomplete dropdown)
+          - Location multi-select dropdown
+          - Movement type checkboxes (receiving, put_away, pick, transfer, adjustment)
+          - User dropdown
+          - Date range pickers (from/to dates, preset buttons: Last 7 days, Last 30 days)
+          - Clear filters button
+        </fields>
+        <hooks>useMovementFilters - manages filter state</hooks>
+      </component>
+      <component name="MovementDetailPanel">
+        <location>src/components/warehouse/stock-moves/MovementDetailPanel.tsx</location>
+        <description>Side panel showing full details of selected movement</description>
+        <displays>
+          - Movement record with all fields
+          - LP number as clickable link to LP detail
+          - User name and info (department, email)
+          - From/to locations with visual arrow
+          - Before/after state visualization
+          - Timestamp with timezone
+          - Action buttons: Copy ID, Download record
+        </displays>
+      </component>
+      <component name="MovementStatisticsDashboard">
+        <location>src/components/warehouse/stock-moves/MovementStatisticsDashboard.tsx</location>
+        <description>Analytics dashboard for movement statistics</description>
+        <visualizations>
+          - Total movement count card
+          - Pie chart: breakdown by movement_type with percentages
+          - Bar chart: top 10 users by movement count
+          - Bar chart: top 10 locations by movement count
+          - Trend line chart: movements over time (last 30 days, grouped by day)
+          - Summary table: stats per type (count, %, avg time if available)
+        </visualizations>
+      </component>
+    </components>
+    <hooks>
+      <hook name="useStockMoves">
+        <accepts>filters: {lp_id?, location_id?, movement_type?, user_id?, date_from?, date_to?, limit?, offset?}</accepts>
+        <returns>{ data: StockMove[], loading, error, total, hasMore, refetch }</returns>
+        <api_call>GET /api/warehouse/stock-moves</api_call>
+      </hook>
+      <hook name="useMovementSummary">
+        <accepts>date_from?, date_to?, warehouse_id?</accepts>
+        <returns>{ summary: SummaryData, loading, error }</returns>
+        <api_call>GET /api/warehouse/stock-moves/summary</api_call>
+      </hook>
+      <hook name="useLPMovementHistory">
+        <accepts>lp_id: UUID</accepts>
+        <returns>{ movements: StockMove[], loading, error }</returns>
+        <api_call>GET /api/warehouse/stock-moves/lp/:id/history</api_call>
+      </hook>
+    </hooks>
+    <validation_rules>
+      <rule id="date_range_valid">date_from must be before date_to</rule>
+      <rule id="limit_max">limit cannot exceed 200 (pagination safety)</rule>
+      <rule id="offset_non_negative">offset must be >= 0</rule>
+      <rule id="lp_id_uuid">lp_id filter must be valid UUID if provided</rule>
+      <rule id="location_id_uuid">location_id filter must be valid UUID if provided</rule>
+      <rule id="user_id_uuid">user_id filter must be valid UUID if provided</rule>
+      <rule id="movement_type_enum">movement_type must be one of: receiving, put_away, pick, transfer, adjustment</rule>
+    </validation_rules>
+    <rls_policies>
+      <policy table="stock_moves">
+        <select>WHERE org_id = current_user.org_id</select>
+        <insert>WHERE org_id = current_user.org_id</insert>
+        <update>WHERE org_id = current_user.org_id</update>
+      </policy>
+      <policy table="locations">
+        <select>WHERE org_id = current_user.org_id</select>
+      </policy>
+      <policy table="license_plates">
+        <select>WHERE org_id = current_user.org_id</select>
+      </policy>
+    </rls_policies>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1" title="Movement History Display">
+      <test>Open /warehouse/stock-moves → table displays columns: LP number, from/to location, type, qty, UoM, timestamp, user, reason</test>
+    </ac>
+    <ac id="2" title="Detail Panel">
+      <test>Click movement row → side panel opens showing full record with links to LP and user info</test>
+    </ac>
+    <ac id="3" title="Filter by LP">
+      <test>Search LP-20250120-0001 → shows only movements for that LP in chronological order</test>
+    </ac>
+    <ac id="4" title="Filter by Location">
+      <test>Select location WH-A-05 → shows all movements from/to that location</test>
+    </ac>
+    <ac id="5" title="Filter by Date Range">
+      <test>Select date range Last 7 days → shows only movements within 7 days, default sorts newest first</test>
+    </ac>
+    <ac id="6" title="Filter by User">
+      <test>Select user John Doe → shows only movements performed by John</test>
+    </ac>
+    <ac id="7" title="Filter by Movement Type">
+      <test>Check only 'pick' type → shows only pick movements</test>
+    </ac>
+    <ac id="8" title="Statistics Dashboard">
+      <test>View statistics section → shows total count, pie chart by type, bar charts by user/location, trends</test>
+    </ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>
+      <test>Filter validation: invalid date ranges return error</test>
+      <test>Pagination: limit validation (0-200)</test>
+      <test>Sort order: moved_at DESC correctly orders results</test>
+    </unit_tests>
+    <integration_tests>
+      <test>GET /api/warehouse/stock-moves with lp_id filter</test>
+      <test>GET with location_id filter (both directions)</test>
+      <test>GET with movement_type filter</test>
+      <test>GET with multiple filters combined (AND logic)</test>
+      <test>GET /api/warehouse/stock-moves/summary returns correct aggregations</test>
+      <test>GET /api/warehouse/stock-moves/lp/:id/history returns chronological history</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Open /warehouse/stock-moves → page loads with recent movements</test>
+      <test>Apply LP filter → table updates with matching movements</test>
+      <test>Apply date range → only movements in range displayed</test>
+      <test>Click movement row → detail panel slides out with full info</test>
+      <test>Click LP link in detail → navigates to LP detail page</test>
+      <test>Export to CSV → downloads filtered results with all columns</test>
+      <test>Statistics dashboard → pie/bar charts render with correct data</test>
+    </e2e_tests>
+  </test_plan>
+</story>
