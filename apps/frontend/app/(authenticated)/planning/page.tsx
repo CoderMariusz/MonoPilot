@@ -84,10 +84,48 @@ export default function PlanningDashboardPage() {
   return (
     <div className="p-8">
       <div className="space-y-6">
-        {/* Page Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Planning Module</h1>
-          <p className="text-muted-foreground">Manage purchase orders, transfer orders, and work orders</p>
+        {/* Page Header with View Toggle */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Planning Module</h1>
+            <p className="text-muted-foreground">Manage purchase orders, transfer orders, and work orders</p>
+          </div>
+
+          <div className="flex items-center gap-2 mt-4 md:mt-0">
+            {/* View Toggle Buttons */}
+            <div className="flex rounded-lg border overflow-hidden">
+              <Button variant="secondary" size="sm" className="rounded-none bg-blue-100">
+                Dashboard
+              </Button>
+              <Link href="/planning/purchase-orders">
+                <Button variant="ghost" size="sm" className="rounded-none">
+                  Purchase Orders
+                </Button>
+              </Link>
+              <Link href="/planning/transfer-orders">
+                <Button variant="ghost" size="sm" className="rounded-none">
+                  Transfer Orders
+                </Button>
+              </Link>
+              <Link href="/planning/work-orders">
+                <Button variant="ghost" size="sm" className="rounded-none">
+                  Work Orders
+                </Button>
+              </Link>
+              <Link href="/planning/suppliers">
+                <Button variant="ghost" size="sm" className="rounded-none">
+                  Suppliers
+                </Button>
+              </Link>
+            </div>
+
+            {/* Settings Button */}
+            <Link href="/settings/planning">
+              <Button variant="outline" size="sm">
+                ⚙️ Settings
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Create Buttons */}
