@@ -67,9 +67,18 @@
 - [03-7: TO Line Management](03-7-to-lines.md)
 - [03-8: Partial Shipments](03-8-partial-shipments.md)
 - [03-9: LP Selection for TO](03-9-lp-selection.md)
+- [03-10: Work Order CRUD](03-10-work-order-crud.md)
 - [03-17: Supplier Management](03-17-supplier-management.md)
 - [03-18: Supplier Contact Management](03-18-supplier-contact-management.md)
 - [03-22: Planning Settings](03-22-planning-settings.md)
+- [03-23: Planning Header Layout](03-23-planning-header-layout.md)
+- [03-24: Kompaktne Stats Cards](03-24-planning-stats-cards.md)
+- [03-25: Purchase Orders Dashboard View](03-25-purchase-orders-dashboard.md)
+- [03-26: Purchase Order Details + Line Items](03-26-purchase-order-details.md)
+- [03-27: Work Orders Table View](03-27-work-orders-table.md)
+- [03-28: Transfer Orders Table View](03-28-transfer-orders-table.md)
+- [03-29: Mobile Responsive Design](03-29-mobile-responsive-design.md)
+- [03-30: Color Consistency](03-30-color-consistency.md)
 
 ## Epic 04: Production Module
 - [04-2: Work Order Start](04-2-wo-start.md)
