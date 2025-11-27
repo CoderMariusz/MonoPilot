@@ -15,15 +15,18 @@
 **When** Manager clicks "Reverse"
 **Then** modal confirms: "Reverse consumption of X kg of Y?"
 
-### AC-4.10.2: Reverse Reservation & Genealogy Deletion
+### AC-4.10.2: Reverse Reservation & Genealogy Marking
 **When** confirming
 **Then**:
 - **Reservation marked as reversed**: wo_material_reservations.status = 'reversed'
   - reversed_by, reversed_at, reverse_reason recorded
 - **LP status restored**: license_plates.status = previous (e.g., 'available', not 'reserved')
 - **LP qty restored**: license_plates.qty += reversed_qty
-- **Genealogy record DELETED**: lp_genealogy record for this reservation removed (as if reservation never happened)
-  - Reason: Genealogy needs clean parent-child links; reversed LPs should have no trace
+- **Genealogy record MARKED AS REVERSED** (not deleted):
+  - lp_genealogy.status = 'reversed' (or add reversed flag)
+  - lp_genealogy.reversed_at = timestamp
+  - lp_genealogy.reversed_by = user_id
+  - Reason: Full audit trail of genealogy links (even reversed ones) for compliance
 - **Audit trail preserved**: wo_material_reservations record remains with status='reversed' for compliance
 
 ### AC-4.10.3: Audit Trail
