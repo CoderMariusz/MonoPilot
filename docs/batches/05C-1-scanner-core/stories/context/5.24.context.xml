@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.24</id>
+    <title>Scanner Barcode Validation</title>
+    <batch>5C-1</batch>
+    <points>3</points>
+    <effort_hours>3-4</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Instant visual feedback (green/red) for barcode validation with expected vs. scanned comparison and fuzzy matching</description>
+  <dependencies>
+    <requires><story id="5.23">Scanner Guided Workflows</story></requires>
+    <enables><story id="5.25">Scanner Feedback</story><story id="5.27">Scanner Session Timeout</story></enables>
+  </dependencies>
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="POST" path="/api/scanner/validate-barcode">
+        <description>Validate scanned barcode against expected value and database</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="session_id" type="UUID" required="true">Scanner session ID</field>
+          <field name="scanned_barcode" type="string" required="true">Scanned barcode value</field>
+          <field name="expected_lp_id" type="UUID" required="false">Expected LP ID if known</field>
+        </request>
+        <response status="200">
+          <field name="validation_status" type="string" comment="valid, invalid, partial_match, not_found"/>
+          <field name="lp_id" type="UUID" comment="Found LP ID if valid match"/>
+          <field name="lp_number" type="string"/>
+          <field name="product_name" type="string"/>
+          <field name="quantity" type="decimal"/>
+          <field name="uom" type="string"/>
+          <field name="error_message" type="string" nullable="true"/>
+          <field name="confidence_score" type="decimal" comment="0-1, only for partial_match"/>
+        </response>
+        <response status="200" comment="Invalid barcode">
+          <field name="validation_status" type="string" value="invalid"/>
+          <field name="error_message" type="string" example="Barcode not found"/>
+          <field name="expected_barcode" type="string" nullable="true"/>
+          <field name="scanned_barcode" type="string"/>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/scanner/sessions/:id/validations">
+        <description>Get barcode validation history for session</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="validations" type="array">
+            <field name="scan_timestamp" type="timestamp"/>
+            <field name="scanned_barcode" type="string"/>
+            <field name="validation_status" type="string"/>
+            <field name="lp_number" type="string" nullable="true"/>
+            <field name="error_message" type="string" nullable="true"/>
+          </field>
+          <field name="total_scans" type="integer"/>
+          <field name="valid_scans" type="integer"/>
+          <field name="error_rate" type="decimal"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+    <database_tables>
+      <table>
+        <name>barcode_validations</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK, DEFAULT gen_random_uuid()"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, FK organizations(id)"/>
+          <column name="session_id" type="UUID" constraint="NOT NULL, FK scanner_sessions(id)"/>
+          <column name="scanned_barcode" type="VARCHAR(255)" constraint="NOT NULL"/>
+          <column name="expected_barcode" type="VARCHAR(255)" constraint="nullable"/>
+          <column name="validation_status" type="VARCHAR(20)" constraint="NOT NULL, CHECK IN (valid, invalid, partial_match, not_found)"/>
+          <column name="lp_id" type="UUID" constraint="nullable, FK license_plates(id)"/>
+          <column name="expected_lp_id" type="UUID" constraint="nullable, FK license_plates(id)"/>
+          <column name="error_message" type="TEXT" constraint="nullable"/>
+          <column name="confidence_score" type="DECIMAL(3,2)" constraint="nullable, CHECK >= 0 AND <= 1"/>
+          <column name="scan_timestamp" type="TIMESTAMP" constraint="DEFAULT NOW()"/>
+          <column name="validated_by_user_id" type="UUID" constraint="NOT NULL, FK users(id)"/>
+          <column name="created_at" type="TIMESTAMP" constraint="DEFAULT NOW()"/>
+        </columns>
+      </table>
+    </database_tables>
+    <queries>
+      <query name="validate_barcode_exact">
+        SELECT id, lp_number, product_name, quantity, uom
+        FROM license_plates
+        WHERE LOWER(lp_number) = LOWER($1) AND org_id = $2
+        LIMIT 1
+      </query>
+      <query name="validate_barcode_fuzzy">
+        SELECT id, lp_number, product_name, quantity, uom,
+               similarity(LOWER(lp_number), LOWER($1)) as match_score
+        FROM license_plates
+        WHERE org_id = $2 AND similarity(LOWER(lp_number), LOWER($1)) >= $3
+        ORDER BY match_score DESC
+        LIMIT 1
+      </query>
+      <query name="log_validation">
+        INSERT INTO barcode_validations (org_id, session_id, scanned_barcode, expected_barcode, validation_status, lp_id, expected_lp_id, error_message, confidence_score, validated_by_user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      </query>
+      <query name="get_validation_history">
+        SELECT scan_timestamp, scanned_barcode, validation_status, lp_id, error_message
+        FROM barcode_validations
+        WHERE session_id = $1 AND org_id = $2
+        ORDER BY scan_timestamp DESC
+      </query>
+    </queries>
+    <indexes>
+      <index name="idx_barcode_validations_org_id">On column: org_id (org filtering)</index>
+      <index name="idx_barcode_validations_session_id">On column: session_id (fast history lookup)</index>
+      <index name="idx_barcode_validations_lp_id">On column: lp_id (LP validation history)</index>
+      <index name="idx_barcode_validations_validation_status">On column: validation_status (error analysis)</index>
+      <index name="idx_barcode_validations_scan_timestamp">On column: scan_timestamp DESC (timeline queries)</index>
+      <index name="idx_barcode_validations_session_status">On columns: (session_id, validation_status) (composite for fast error counts)</index>
+    </indexes>
+    <components>
+      <component name="BarcodeValidationResult">
+        <location>src/components/scanner/BarcodeValidationResult.tsx</location>
+        <description>Visual feedback for barcode validation (green/red/yellow)</description>
+        <displays>
+          - Color background: green (valid), red (invalid), yellow (partial)
+          - Icon: checkmark (valid), X (invalid), warning (partial)
+          - LP details: number, product, quantity (if valid)
+          - Error message: "Barcode not found" (if invalid)
+          - Expected vs. Scanned: side-by-side comparison (if mismatch)
+          - Confidence score: "90% match" (if partial)
+        </displays>
+      </component>
+      <component name="PartialMatchModal">
+        <location>src/components/scanner/PartialMatchModal.tsx</location>
+        <description>Modal for confirming fuzzy match results</description>
+        <features>
+          - Display: "90% confidence match"
+          - Side-by-side: expected vs. matched LP
+          - Large buttons: "Confirm" (accept match), "Rescan" (try again)
+          - On confirm: proceed as valid
+          - On rescan: hide modal, refocus input
+        </features>
+      </component>
+      <component name="ScanLogDisplay">
+        <location>src/components/scanner/ScanLogDisplay.tsx</location>
+        <description>List of all scans in workflow with status indicators</description>
+        <displays>
+          - Scan number: 1, 2, 3...
+          - Status: ✓ (valid), ✗ (invalid), ⚠ (partial)
+          - LP number (if found)
+          - Timestamp (HH:MM:SS)
+          - Error message (if failed)
+          - Summary: "5 scans, 4 items, 1 retry"
+        </displays>
+      </component>
+      <component name="BarcodeInputField">
+        <location>src/components/scanner/BarcodeInputField.tsx</location>
+        <description>Hidden input for hardware barcode scanner events</description>
+        <features>
+          - Auto-focus on mount
+          - No visible caret
+          - Validate on every keystroke
+          - Emit validation result immediately
+          - Clear on Enter key
+          - No autocomplete, no manual typing
+        </features>
+      </component>
+    </components>
+    <hooks>
+      <hook name="useBarcodeValidation">
+        <accepts>session_id, expected_lp_id (optional)</accepts>
+        <returns>{ validate, validationResult, loading, error }</returns>
+        <api_call>POST /api/scanner/validate-barcode</api_call>
+      </hook>
+      <hook name="useValidationHistory">
+        <accepts>session_id</accepts>
+        <returns>{ validations, total_scans, valid_scans, error_rate, refetch }</returns>
+        <api_call>GET /api/scanner/sessions/:id/validations</api_call>
+      </hook>
+    </hooks>
+    <validation_functions>
+      <function name="validate_barcode">
+        <step number="1">NORMALIZE: remove whitespace, lowercase, remove leading zeros</step>
+        <step number="2">EXACT MATCH: query license_plates WHERE lp_number = normalized_barcode</step>
+        <step number="3">IF FOUND: return valid status + LP details</step>
+        <step number="4">IF NOT FOUND: attempt fuzzy match</step>
+        <step number="5">FUZZY MATCH: use Levenshtein distance, threshold 0.8 (80%)</step>
+        <step number="6">IF FUZZY MATCH >= threshold: return partial_match + confidence score</step>
+        <step number="7">IF NO FUZZY MATCH: return invalid status + "Barcode not found"</step>
+      </function>
+      <function name="fuzzy_match_barcode">
+        <algorithm>Levenshtein distance (edit distance)</algorithm>
+        <threshold>0.8 (80% confidence minimum)</threshold>
+        <normalization>lowercase, remove special chars, remove whitespace</normalization>
+        <common_errors>missing digit, extra digit, transposed digits, OCR errors</common_errors>
+      </function>
+      <function name="normalize_barcode">
+        <step number="1">TRIM: remove leading/trailing whitespace</step>
+        <step number="2">LOWERCASE: all characters lowercase</step>
+        <step number="3">REMOVE LEADING ZEROS: LP001 = LP1 (configurable per org)</step>
+        <step number="4">REMOVE SPECIAL CHARS: hyphens, slashes (except those part of barcode)</step>
+        <return>normalized_barcode</return>
+      </function>
+    </validation_functions>
+    <error_scenarios>
+      <scenario name="barcode_not_found">
+        - Barcode scanned: "LP999"
+        - Result: "invalid", no fuzzy match
+        - Display: red X, message "Barcode not found"
+        - Action: stay on step, clear input
+      </scenario>
+      <scenario name="fuzzy_match_90_percent">
+        - Barcode scanned: "LP0001" (OCR error)
+        - Expected: "LP001"
+        - Result: "partial_match", confidence 0.90
+        - Display: yellow screen, offer "Confirm" or "Rescan"
+      </scenario>
+      <scenario name="expected_vs_scanned_mismatch">
+        - Step expects: LP001
+        - Barcode scanned: LP002
+        - Result: "invalid", expected != scanned
+        - Display: red screen, show both barcodes side-by-side
+        - Message: "Wrong item. Expected LP001, scanned LP002."
+      </scenario>
+      <scenario name="quantity_exceeds_available">
+        - Barcode valid: LP001
+        - Quantity input: 100
+        - Available: 50
+        - Display: yellow warning, "Only 50 available"
+        - Action: block advancement until qty corrected
+      </scenario>
+    </error_scenarios>
+    <rls_policies>
+      <policy table="barcode_validations">
+        <select>WHERE org_id = current_user.org_id</select>
+        <insert>WHERE org_id = current_user.org_id</insert>
+      </policy>
+    </rls_policies>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1" title="Valid Barcode Feedback">
+      <test>Scan correct LP barcode → green screen displayed</test>
+      <test>Green checkmark icon shown (80px)</test>
+      <test>LP details displayed: "LP-001 | 50kg Sugar"</test>
+      <test>Green border around input field</test>
+    </ac>
+    <ac id="2" title="Invalid Barcode Feedback">
+      <test>Scan barcode not in system → red screen displayed</test>
+      <test>Red X icon shown (80px)</test>
+      <test>Error message: "Barcode not found"</test>
+      <test>Red border around input field</test>
+      <test>Don't auto-advance, remain on step</test>
+    </ac>
+    <ac id="3" title="Expected vs. Scanned Display">
+      <test>Step expects specific LP (LP-001)</test>
+      <test>Scan different LP (LP-002) → show validation status "Invalid"</test>
+      <test>Display in two columns: Expected (LP-001 | 50kg) and Scanned (LP-002 | 30kg)</test>
+      <test>Highlight mismatch in red</test>
+      <test>Message: "Wrong item. Expected LP-001, scanned LP-002."</test>
+    </ac>
+    <ac id="4" title="Partial Match Warning">
+      <test>Barcode scanner returns fuzzy match (90% confidence)</test>
+      <test>Show yellow/orange screen (warning)</test>
+      <test>Display confidence score: "90% match"</test>
+      <test>Show both expected and matched: "Expected: LP-001 | Matched: LP-0010"</test>
+      <test>Offer options: "Confirm" or "Rescan"</test>
+    </ac>
+    <ac id="5" title="Blocking Until Correct">
+      <test>Invalid scan on required barcode field</test>
+      <test>Disable "Next" button (if present)</test>
+      <test>Don't allow workflow progression</test>
+      <test>Message: "Fix error to continue"</test>
+    </ac>
+    <ac id="6" title="Quantity Validation">
+      <test>Scan multiple units of same LP</test>
+      <test>After scan: accept with "Scanned LP-001 ✓"</test>
+      <test>Show quantity input: "How many? [  1  ]"</test>
+      <test>Validate: qty > 0 and <= available stock</test>
+      <test>If qty exceeds available: show warning "Only 10 available"</test>
+    </ac>
+    <ac id="7" title="Validation History">
+      <test>Complete workflow with 5 scans</test>
+      <test>View workflow summary → show "Scan Log"</test>
+      <test>Display: 1. LP-001 ✓, 2. LP-002 ✓, 3. LP-003 ✗ (retry), 4. LP-003 ✓, 5. LP-004 ✓</test>
+      <test>Count: "5 scans, 4 items, 1 retry"</test>
+    </ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>
+      <test>Fuzzy matching: "LP001" matches "LP-001" with >= 80%</test>
+      <test>Fuzzy matching: "LP0001" matches "LP001" with >= 80%</test>
+      <test>Exact match: "LP-001" matches "LP-001" with 100%</test>
+      <test>Barcode normalization: removes whitespace and leading zeros</test>
+      <test>Quantity validation: qty <= available passes, qty > available fails</test>
+      <test>Error message generation: specific messages per error type</test>
+    </unit_tests>
+    <integration_tests>
+      <test>POST /api/scanner/validate-barcode with valid barcode → 200 valid status</test>
+      <test>POST with invalid barcode → 200 invalid status + error message</test>
+      <test>POST with fuzzy match (90%) → 200 partial_match status + confidence</test>
+      <test>GET /api/scanner/sessions/:id/validations returns history ordered by timestamp DESC</test>
+      <test>barcode_validations table logged correctly with all fields</test>
+      <test>Expected barcode set correctly when provided</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Scan valid LP barcode (LP-001) → green screen displayed</test>
+      <test>Green checkmark icon and LP details shown</test>
+      <test>Scan invalid barcode (LP999) → red screen displayed</test>
+      <test>Red X icon and error message shown</test>
+      <test>Scan barcode when expecting specific LP → show expected vs. scanned</test>
+      <test>Fuzzy match 90% → yellow screen with "Confirm" and "Rescan" buttons</test>
+      <test>Click "Confirm" on fuzzy match → accept as valid, auto-advance</test>
+      <test>Click "Rescan" on fuzzy match → clear input, stay on step</test>
+      <test>Invalid scan blocks "Next" button</test>
+      <test>Rescan same barcode (second attempt) → green screen (success)</test>
+      <test>View summary → scan log shows all 2 attempts for that LP</test>
+      <test>Validation history shows correct counts: total, valid, error_rate</test>
+    </e2e_tests>
+  </test_plan>
+</story>

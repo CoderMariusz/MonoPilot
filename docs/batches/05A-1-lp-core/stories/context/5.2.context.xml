@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.2</id>
+    <title>LP Status Tracking</title>
+    <batch>5A-1</batch>
+    <points>5</points>
+    <effort_hours>5-6</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>Implement status lifecycle for LPs (available → reserved → consumed → quarantine → shipped)</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.1">License Plate Creation</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>license_plates</name>
+        <columns>
+          <column name="status" type="VARCHAR(20)" constraint="DEFAULT 'available', ENUM CHECK"/>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="PATCH" path="/api/warehouse/license-plates/:id/status">
+        <description>Update LP status with transition validation</description>
+        <request>
+          <field name="new_status" type="enum" required="true"/>
+          <field name="reason" type="string"/>
+        </request>
+        <response status="200">
+          <field name="id" type="UUID"/>
+          <field name="status" type="string"/>
+          <field name="updated_at" type="timestamp"/>
+          <field name="updated_by_user_id" type="UUID"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+
+    <frontend_routes>
+      <route path="/warehouse/license-plates/:id" component="LicensePlateDetailPage">
+        <description>Show LP detail with "Change Status" button</description>
+      </route>
+    </frontend_routes>
+
+    <components_to_create>
+      <component name="ChangeStatusModal">
+        <props>
+          <prop name="lp" type="LP object"/>
+          <prop name="onSuccess" type="callback"/>
+        </props>
+        <form_fields>new_status dropdown, reason textarea</form_fields>
+      </component>
+      <component name="StatusBadge">
+        <props>
+          <prop name="status" type="string: available|reserved|consumed|quarantine|shipped"/>
+        </props>
+        <colors>available=🟢, reserved=🟡, consumed=⚫, quarantine=🔴, shipped=🔵</colors>
+      </component>
+    </components_to_create>
+
+    <validation_rules>
+      <rule>Status must be one of: available, reserved, consumed, quarantine, shipped</rule>
+      <rule>Transitions: available→reserved|consumed|quarantine; reserved→available|consumed; quarantine→available|consumed; any→shipped</rule>
+      <rule>Reason field optional but recommended for audit trail</rule>
+    </validation_rules>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1" title="Status Lifecycle">
+      <test>Create LP (status=available), verify can transition to reserved/consumed/quarantine</test>
+    </ac>
+    <ac id="2" title="Status Update UI">
+      <test>Click "Change Status", see modal with dropdown of allowed next states</test>
+    </ac>
+    <ac id="3" title="Audit Trail">
+      <test>Update status, verify updated_by_user_id and updated_at recorded</test>
+    </ac>
+    <ac id="4" title="Status Display">
+      <test>View LP list, verify status shown with correct color badge</test>
+    </ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test>Status transition validation (all valid paths)</test>
+      <test>Invalid transition rejection</test>
+    </unit_tests>
+    <integration_tests>
+      <test>PATCH /api/warehouse/license-plates/:id/status with valid transition</test>
+      <test>Invalid transition returns 400 error</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Change LP status via UI, see updated badge</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="high">Status transitions should be validated at API level</note>
+    <note priority="medium">Consider adding reason field to lp_status_history table for audit</note>
+  </implementation_notes>
+</story>

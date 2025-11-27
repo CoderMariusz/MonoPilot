@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.19</id>
+    <title>Pallet Creation</title>
+    <batch>5B-2</batch>
+    <points>3</points>
+    <effort_hours>3-4</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Create pallets with auto-generated numbering for grouping license plates during warehouse operations</description>
+  <dependencies>
+    <requires><story id="5.1">License Plate Creation</story></requires>
+    <enables><story id="5.20">Pallet LP Management</story><story id="5.21">Pallet Move</story><story id="5.22">Pallet Status</story></enables>
+  </dependencies>
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="POST" path="/api/warehouse/pallets">
+        <description>Create new pallet with auto-generated number</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="location_id" type="UUID" required="true">Destination location for pallet</field>
+          <field name="notes" type="string" required="false">Optional notes for pallet (order reference, customer, etc)</field>
+        </request>
+        <response status="201">
+          <field name="id" type="UUID"/>
+          <field name="org_id" type="UUID"/>
+          <field name="pallet_number" type="string" comment="Auto-generated: P-YYYYMMDD-NNNN"/>
+          <field name="location_id" type="UUID"/>
+          <field name="location_code" type="string"/>
+          <field name="location_name" type="string"/>
+          <field name="status" type="string" comment="Always 'open' on creation"/>
+          <field name="notes" type="string" nullable="true"/>
+          <field name="lp_count" type="integer" comment="0 initially"/>
+          <field name="total_quantity" type="decimal" comment="0 initially"/>
+          <field name="created_at" type="timestamp"/>
+          <field name="created_by_user_id" type="UUID"/>
+        </response>
+        <response status="400">
+          <field name="error" type="string" example="Location does not exist or is inactive"/>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/warehouse/pallets">
+        <description>List pallets with filtering and pagination</description>
+        <auth>authenticated</auth>
+        <query_parameters>
+          <param name="status" type="string" required="false">Filter by status: open, closed, shipped</param>
+          <param name="location_id" type="UUID" required="false">Filter by location</param>
+          <param name="warehouse_id" type="UUID" required="false">Filter by warehouse</param>
+          <param name="limit" type="integer" required="false" default="50">Pagination limit (max 200)</param>
+          <param name="offset" type="integer" required="false" default="0">Pagination offset</param>
+        </query_parameters>
+        <response status="200">
+          <field name="pallets" type="array">
+            <field name="id" type="UUID"/>
+            <field name="pallet_number" type="string"/>
+            <field name="location_code" type="string"/>
+            <field name="location_name" type="string"/>
+            <field name="status" type="string"/>
+            <field name="lp_count" type="integer"/>
+            <field name="total_quantity" type="decimal"/>
+            <field name="notes" type="string" nullable="true"/>
+            <field name="created_at" type="timestamp"/>
+            <field name="created_by" type="string"/>
+          </field>
+          <field name="pagination" type="object">
+            <field name="total" type="integer"/>
+            <field name="limit" type="integer"/>
+            <field name="offset" type="integer"/>
+            <field name="has_more" type="boolean"/>
+          </field>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/warehouse/pallets/:id">
+        <description>Get pallet detail with items</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="id" type="UUID"/>
+          <field name="pallet_number" type="string"/>
+          <field name="location" type="object">
+            <field name="id" type="UUID"/>
+            <field name="code" type="string"/>
+            <field name="name" type="string"/>
+            <field name="warehouse_id" type="UUID"/>
+          </field>
+          <field name="status" type="string"/>
+          <field name="notes" type="string" nullable="true"/>
+          <field name="items" type="array">
+            <field name="id" type="UUID"/>
+            <field name="lp_id" type="UUID"/>
+            <field name="lp_number" type="string"/>
+            <field name="product_name" type="string"/>
+            <field name="quantity" type="decimal"/>
+            <field name="uom" type="string"/>
+            <field name="position_order" type="integer"/>
+            <field name="added_at" type="timestamp"/>
+            <field name="added_by" type="string"/>
+          </field>
+          <field name="summary" type="object">
+            <field name="lp_count" type="integer"/>
+            <field name="total_quantity" type="decimal"/>
+            <field name="total_uom" type="string"/>
+          </field>
+          <field name="created_at" type="timestamp"/>
+          <field name="created_by" type="string"/>
+          <field name="updated_at" type="timestamp"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+    <database_tables>
+      <table>
+        <name>pallets</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK, DEFAULT gen_random_uuid()"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, FK organizations(id)"/>
+          <column name="pallet_number" type="VARCHAR(50)" constraint="NOT NULL, UNIQUE(org_id, pallet_number)"/>
+          <column name="location_id" type="UUID" constraint="NOT NULL, FK locations(id)"/>
+          <column name="status" type="VARCHAR(20)" constraint="NOT NULL, CHECK IN ('open', 'closed', 'shipped'), DEFAULT 'open'"/>
+          <column name="notes" type="TEXT" constraint="nullable"/>
+          <column name="created_at" type="TIMESTAMP" constraint="DEFAULT NOW()"/>
+          <column name="created_by_user_id" type="UUID" constraint="NOT NULL, FK users(id)"/>
+          <column name="updated_at" type="TIMESTAMP" constraint="DEFAULT NOW()"/>
+          <column name="updated_by_user_id" type="UUID" constraint="FK users(id)"/>
+          <column name="shipped_at" type="TIMESTAMP" constraint="nullable"/>
+        </columns>
+      </table>
+      <table>
+        <name>pallet_number_sequence</name>
+        <columns>
+          <column name="org_id" type="UUID" constraint="NOT NULL, FK organizations(id)"/>
+          <column name="sequence_date" type="DATE" constraint="NOT NULL"/>
+          <column name="next_sequence" type="INTEGER" constraint="DEFAULT 1"/>
+          <column name="pk" constraint="PRIMARY KEY (org_id, sequence_date)"/>
+        </columns>
+        <note>Daily reset: sequence resets at midnight per warehouse timezone</note>
+      </table>
+    </database_tables>
+    <pallet_numbering>
+      <format>P-YYYYMMDD-NNNN</format>
+      <components>
+        <component name="prefix">P (fixed)</component>
+        <component name="date">YYYYMMDD (creation date)</component>
+        <component name="sequence">NNNN (0001-9999, daily reset)</component>
+      </components>
+      <examples>
+        <example>P-20250127-0001</example>
+        <example>P-20250127-0002</example>
+        <example>P-20250128-0001 (reset at midnight)</example>
+      </examples>
+    </pallet_numbering>
+    <indexes>
+      <index name="idx_pallets_org_id">On column: org_id for org filtering</index>
+      <index name="idx_pallets_location_id">On column: location_id for finding pallets by location</index>
+      <index name="idx_pallets_status">On column: status for open/closed/shipped filtering</index>
+      <index name="idx_pallets_created_at">On column: created_at DESC for timeline queries</index>
+    </indexes>
+    <queries>
+      <query name="generate_pallet_number">
+        INSERT INTO pallet_number_sequence (org_id, sequence_date, next_sequence)
+        VALUES ($1, CURRENT_DATE, 2)
+        ON CONFLICT (org_id, sequence_date)
+        DO UPDATE SET next_sequence = pallet_number_sequence.next_sequence + 1
+        RETURNING next_sequence;
+      </query>
+      <query name="format_pallet_number">
+        SELECT CONCAT('P-', TO_CHAR(CURRENT_DATE, 'YYYYMMDD'), '-', LPAD($1::TEXT, 4, '0'));
+      </query>
+    </queries>
+    <components>
+      <component name="CreatePalletModal">
+        <location>src/components/warehouse/pallets/CreatePalletModal.tsx</location>
+        <description>Modal for creating new pallet with auto-generated number</description>
+        <fields>
+          - Pallet number (read-only, auto-generated): P-20250127-0001
+          - Location selector (required dropdown, filtered to active locations)
+          - Notes textarea (optional, 0-500 chars)
+          - Create button
+          - Cancel button
+        </fields>
+      </component>
+      <component name="PalletListPage">
+        <location>src/app/warehouse/pallets/page.tsx</location>
+        <description>Page showing list of pallets with pagination and filters</description>
+        <features>
+          - Table: Pallet #, Location, Status, LP Count, Created, Actions
+          - "Create Pallet" button (top right)
+          - Filter options: Status, Location, Warehouse
+          - Pagination: limit/offset
+          - Click row → navigate to detail page
+        </features>
+      </component>
+      <component name="LocationSelector">
+        <location>src/components/warehouse/LocationSelector.tsx</location>
+        <description>Reusable location dropdown for pallet creation</description>
+        <features>
+          - Show only active locations (is_active=true)
+          - Autocomplete search by code/name
+          - Show location code and name: "WH-A-05 - Storage Bin 5"
+          - Show location type hint: "(Storage)"
+          - Show warehouse if multi-warehouse
+        </features>
+      </component>
+    </components>
+    <hooks>
+      <hook name="useCreatePallet">
+        <accepts>location_id, notes (optional)</accepts>
+        <returns>{ pallet, loading, error, create }</returns>
+        <api_call>POST /api/warehouse/pallets</api_call>
+      </hook>
+      <hook name="usePallets">
+        <accepts>filters: {status?, location_id?, warehouse_id?, limit?, offset?}</accepts>
+        <returns>{ pallets, loading, error, total, hasMore, refetch }</returns>
+        <api_call>GET /api/warehouse/pallets</api_call>
+      </hook>
+    </hooks>
+    <validation_rules>
+      <rule id="location_exists">location_id must exist in locations table</rule>
+      <rule id="location_active">location.is_active must = true</rule>
+      <rule id="location_org">location.org_id must match user org_id</rule>
+      <rule id="pallet_number_unique">pallet_number must be unique per org (enforced by UNIQUE constraint)</rule>
+      <rule id="status_default">status must default to 'open' on creation</rule>
+      <rule id="notes_length">notes field 0-500 characters (optional)</rule>
+    </validation_rules>
+    <rls_policies>
+      <policy table="pallets">
+        <select>WHERE org_id = current_user.org_id</select>
+        <insert>WHERE org_id = current_user.org_id</insert>
+        <update>WHERE org_id = current_user.org_id</update>
+      </policy>
+      <policy table="pallet_number_sequence">
+        <select>WHERE org_id = current_user.org_id</select>
+        <insert>WHERE org_id = current_user.org_id</insert>
+        <update>WHERE org_id = current_user.org_id</update>
+      </policy>
+    </rls_policies>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1" title="Pallet Creation Modal">
+      <test>Navigate to /warehouse/pallets → click "Create Pallet" → modal opens with location selector and notes field</test>
+    </ac>
+    <ac id="2" title="Auto-Generated Pallet Number">
+      <test>Modal displays pallet_number (P-20250127-0001) as read-only field</test>
+      <test>Number format: P-YYYYMMDD-NNNN (P prefix, date, sequential 4-digit)</test>
+    </ac>
+    <ac id="3" title="Location Validation">
+      <test>Location dropdown shows only active locations filtered by is_active=true</test>
+      <test>Select inactive location → filtered from dropdown, cannot select</test>
+    </ac>
+    <ac id="4" title="Pallet Creation">
+      <test>Submit modal → POST /api/warehouse/pallets → pallet created with status='open'</test>
+      <test>Pallet record contains: id, pallet_number, location_id, status, created_at, created_by_user_id</test>
+    </ac>
+    <ac id="5" title="Success Feedback">
+      <test>After creation → show success toast "Pallet P-20250127-0001 created successfully"</test>
+      <test>Redirect to /warehouse/pallets or /warehouse/pallets/:id</test>
+    </ac>
+    <ac id="6" title="Pallet List Display">
+      <test>Navigate to /warehouse/pallets → table shows created pallet with number, location, status='open', LP count=0</test>
+    </ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>
+      <test>Pallet number generation: format P-YYYYMMDD-NNNN correct</test>
+      <test>Daily sequence reset: sequence resets at midnight</test>
+      <test>Location validation: active check, org check</test>
+      <test>Status default: status='open' on creation</test>
+    </unit_tests>
+    <integration_tests>
+      <test>POST /api/warehouse/pallets with valid location_id → 201 created</test>
+      <test>POST with invalid location_id → 400 "Location does not exist"</test>
+      <test>POST with inactive location → 400 "Location is inactive"</test>
+      <test>GET /api/warehouse/pallets → returns paginated list with new pallet</test>
+      <test>Pallet number uniqueness: same number on same org rejected</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Navigate to /warehouse/pallets</test>
+      <test>Click "Create Pallet" button → CreatePalletModal opens</test>
+      <test>Pallet number auto-filled and read-only: P-20250127-0001</test>
+      <test>Select location from dropdown (WH-A-05 - Storage Bin 5)</test>
+      <test>Enter notes: "Customer order shipment"</test>
+      <test>Click Create → POST sent, pallet created</test>
+      <test>Success toast shown: "Pallet P-20250127-0001 created successfully"</test>
+      <test>Pallet appears in list with status='open', LP count=0</test>
+    </e2e_tests>
+  </test_plan>
+</story>

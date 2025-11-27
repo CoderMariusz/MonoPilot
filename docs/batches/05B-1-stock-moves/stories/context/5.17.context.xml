@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.17</id>
+    <title>Destination Validation</title>
+    <batch>5B-1</batch>
+    <points>3</points>
+    <effort_hours>3-4</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Validate move destination by location existence, type, and warehouse constraints</description>
+  <dependencies>
+    <requires><story id="5.14">LP Location Move</story></requires>
+  </dependencies>
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="GET" path="/api/warehouse/locations">
+        <description>Get filtered locations for move destination selector</description>
+        <auth>authenticated</auth>
+        <query_parameters>
+          <param name="movement_type" type="string" required="false">Filter by compatible location type for movement</param>
+          <param name="warehouse_id" type="UUID" required="false">Filter by warehouse</param>
+          <param name="is_active" type="boolean" required="false" default="true">Filter active locations only</param>
+        </query_parameters>
+        <response status="200">
+          <field name="locations" type="array">
+            <field name="id" type="UUID"/>
+            <field name="code" type="string"/>
+            <field name="name" type="string"/>
+            <field name="location_type" type="string"/>
+            <field name="warehouse_id" type="UUID"/>
+            <field name="is_active" type="boolean"/>
+            <field name="current_load_percentage" type="number" comment="Optional: 0-100"/>
+          </field>
+        </response>
+      </endpoint>
+    </api_endpoints>
+    <validation_function>
+      <function name="validate_destination_location">
+        <parameters>
+          <param name="org_id" type="UUID">Organization ID for context</param>
+          <param name="location_id" type="UUID">Destination location to validate</param>
+          <param name="movement_type" type="string">Type: receiving, put_away, pick, transfer, adjustment</param>
+          <param name="current_lp_location_id" type="UUID" optional="true">Current LP location (for cross-warehouse checks)</param>
+        </parameters>
+        <logic>
+          1. VALIDATE_EXISTENCE:
+             - Query: SELECT * FROM locations WHERE id = location_id AND org_id = org_id
+             - If not found: RETURN error "Location does not exist"
+
+          2. VALIDATE_ACTIVE:
+             - Check: location.is_active = true
+             - If false: RETURN error "Location {code} is inactive"
+
+          3. VALIDATE_TYPE_MATCHES:
+             - CASE movement_type:
+               - receiving: location_type must = 'receiving' OR 'storage'
+               - put_away: location_type must = 'storage'
+               - pick: location_type must IN ('production', 'shipping')
+               - transfer: location_type must = 'storage'
+               - adjustment: location_type IN ('storage', 'production', 'shipping', 'quarantine', 'receiving')
+             - If mismatch: RETURN error "Cannot move {movement_type} to {location_type} location"
+
+          4. VALIDATE_WAREHOUSE:
+             - CASE movement_type:
+               - transfer: get current_lp location's warehouse_id
+                 - if destination.warehouse_id != current.warehouse_id:
+                   RETURN error "Cannot transfer between warehouses. Use Transfer Order instead"
+               - receiving: allow any warehouse (receiving from external)
+               - put_away: allow any warehouse (can put away to any warehouse)
+               - pick: allow any warehouse (picking can be cross-warehouse)
+               - adjustment: allow any warehouse
+
+          5. VALIDATE_CAPACITY (optional):
+             - If location has capacity limits:
+               - Check: current_load less than max_capacity
+               - If at/over: RETURN warning "Location approaching capacity"
+
+          6. VALIDATE_QUARANTINE (optional):
+             - If location_type = 'quarantine':
+               - Only allow if movement_type = 'adjustment' (QA holds)
+               - RETURN warning "Quarantine location for QA holds only"
+
+          RETURN: { valid: true, location: locationObject, warnings: [] }
+        </logic>
+        <error_responses>
+          {
+            "error": "Location does not exist",
+            "location_id": "...",
+            "error_code": "LOCATION_NOT_FOUND"
+          }
+          {
+            "error": "Location WH-B-05 is inactive",
+            "location_code": "WH-B-05",
+            "error_code": "LOCATION_INACTIVE"
+          }
+          {
+            "error": "Cannot move pick movement to storage location. Pick movements must go to production or shipping",
+            "movement_type": "pick",
+            "location_type": "storage",
+            "error_code": "TYPE_MISMATCH"
+          }
+          {
+            "error": "Cannot transfer between warehouses. Use Transfer Order instead",
+            "movement_type": "transfer",
+            "current_warehouse": "WH-A",
+            "destination_warehouse": "WH-B",
+            "error_code": "CROSS_WAREHOUSE_TRANSFER"
+          }
+        </error_responses>
+      </function>
+    </validation_function>
+    <constraints>
+      <constraint name="receiving" from="receiving_dock" to="storage">
+        - location_type must = 'storage'
+        - Can be any warehouse
+      </constraint>
+      <constraint name="put_away" from="receiving" to="storage">
+        - location_type must = 'storage'
+        - Can be any warehouse (assuming GRN to TO cross-warehouse)
+      </constraint>
+      <constraint name="pick" from="storage" to="production_or_shipping">
+        - location_type must IN ('production', 'shipping')
+        - Can be any warehouse (inter-warehouse movements)
+      </constraint>
+      <constraint name="transfer" from="storage" to="storage_same_warehouse">
+        - location_type must = 'storage'
+        - Must be SAME warehouse (no cross-warehouse internal transfers)
+        - Warning: "Consider using Transfer Order for cross-warehouse moves"
+      </constraint>
+      <constraint name="adjustment" from="any" to="any">
+        - location_type can be any (even quarantine for QA holds)
+        - No warehouse restrictions
+      </constraint>
+    </constraints>
+    <database_schema>
+      <table>
+        <name>locations</name>
+        <required_columns>
+          <column name="id" type="UUID" constraint="PK"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, FK organizations(id)"/>
+          <column name="code" type="VARCHAR(50)" constraint="UNIQUE(org_id, code)"/>
+          <column name="name" type="VARCHAR(100)" constraint="NOT NULL"/>
+          <column name="location_type" type="VARCHAR(20)" constraint="CHECK IN ('receiving', 'storage', 'production', 'shipping', 'quarantine')"/>
+          <column name="warehouse_id" type="UUID" constraint="NOT NULL, FK warehouses(id)"/>
+          <column name="is_active" type="BOOLEAN" constraint="DEFAULT true"/>
+          <column name="max_capacity_units" type="DECIMAL(15,4)" constraint="Optional for capacity validation"/>
+          <column name="allows_storage" type="BOOLEAN" constraint="DEFAULT true"/>
+        </required_columns>
+        <indexes>
+          <index name="idx_locations_org_id">On column: org_id</index>
+          <index name="idx_locations_warehouse_id">On column: warehouse_id (critical for cross-warehouse checks)</index>
+          <index name="idx_locations_location_type">On column: location_type (for filtering by type)</index>
+          <index name="idx_locations_is_active">On column: is_active (for active filters)</index>
+          <index name="idx_locations_org_warehouse">Composite on (org_id, warehouse_id) for efficiency</index>
+        </indexes>
+      </table>
+    </database_schema>
+    <queries>
+      <query name="validate_location_exists">
+        SELECT id, code, name, location_type, warehouse_id, is_active, max_capacity_units
+        FROM locations
+        WHERE id = $1 AND org_id = $2
+      </query>
+      <query name="get_current_lp_warehouse">
+        SELECT l.warehouse_id
+        FROM license_plates lp
+        JOIN locations l ON lp.location_id = l.id
+        WHERE lp.id = $1 AND lp.org_id = $2
+      </query>
+      <query name="filter_locations_by_type">
+        SELECT id, code, name, location_type, warehouse_id, is_active
+        FROM locations
+        WHERE org_id = $1
+          AND location_type = $2
+          AND is_active = true
+        ORDER BY code
+      </query>
+    </queries>
+    <components>
+      <component name="MoveLocationModal">
+        <location>src/components/warehouse/stock-moves/MoveLocationModal.tsx</location>
+        <enhancements>
+          - Destination location dropdown uses filtered list from validate_destination_location
+          - Shows location type as badge/hint (e.g., "(Storage)" green, "(Production)" blue)
+          - Shows warehouse name if multiple warehouses
+          - Filters inactive locations from dropdown
+          - Shows validation errors on selection (if user somehow bypasses frontend filtering)
+        </enhancements>
+      </component>
+      <component name="LocationSelector">
+        <location>src/components/warehouse/LocationSelector.tsx</location>
+        <description>Reusable location dropdown with filtering</description>
+        <features>
+          - Filter by movement_type (via query param)
+          - Filter by warehouse (optional)
+          - Filter by is_active = true (always)
+          - Autocomplete search by code/name
+          - Show location_type as badge
+          - Show warehouse info if multi-warehouse
+          - Disable capacity-full locations (visual feedback)
+        </features>
+      </component>
+      <component name="LocationValidationError">
+        <location>src/components/warehouse/stock-moves/LocationValidationError.tsx</location>
+        <description>Error display with specific validation failure reason</description>
+        <displays>
+          - Error icon (red)
+          - Error message (specific to validation failure)
+          - Error code (for logging/debugging)
+          - Suggestion/remediation (e.g., "Select a different location type" or "Contact admin to activate location")
+        </displays>
+      </component>
+    </components>
+    <validation_rules>
+      <rule id="location_exists">Location with given ID must exist in database</rule>
+      <rule id="location_org">Location.org_id must match user's org_id</rule>
+      <rule id="location_active">Location.is_active must = true</rule>
+      <rule id="location_type_valid">Location type must match movement_type constraints</rule>
+      <rule id="warehouse_match_transfer">For transfer movements: source and destination must be same warehouse</rule>
+      <rule id="warehouse_allow_cross">For pick/put_away: cross-warehouse allowed with warning</rule>
+      <rule id="quarantine_restricted">Quarantine locations only for adjustments</rule>
+      <rule id="not_same_location">Destination cannot be same as current location (at validation level)</rule>
+    </validation_rules>
+    <rls_policies>
+      <policy table="locations">
+        <select>WHERE org_id = current_user.org_id</select>
+        <note>Users can only see/move to locations in their organization</note>
+      </policy>
+    </rls_policies>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1" title="Location Existence Check">
+      <test>POST stock-move with non-existent location → 400 error "Location does not exist"</test>
+    </ac>
+    <ac id="2" title="Location Active Check">
+      <test>Try move to inactive location → filtered from dropdown, if forced via API → 400 "Location is inactive"</test>
+    </ac>
+    <ac id="3" title="Type Matching">
+      <test>Select put_away movement to non-storage location → error "Cannot move put_away to {type} location"</test>
+      <test>Select pick movement to storage location → error "Pick must go to production/shipping"</test>
+    </ac>
+    <ac id="4" title="Warehouse Restrictions">
+      <test>Select transfer to different warehouse → error "Cannot transfer between warehouses"</test>
+      <test>Select pick to different warehouse → success (allowed)</test>
+    </ac>
+    <ac id="5" title="Error Messages">
+      <test>Each validation failure returns specific error code (LOCATION_NOT_FOUND, TYPE_MISMATCH, CROSS_WAREHOUSE_TRANSFER, etc)</test>
+    </ac>
+    <ac id="6" title="Optional: Capacity Check">
+      <test>Show warning when location at 90%+ capacity</test>
+    </ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>
+      <test>validate_destination_location(org_id, location_id, 'pick') with storage location → error TYPE_MISMATCH</test>
+      <test>validate_destination_location(...) with inactive location → error LOCATION_INACTIVE</test>
+      <test>validate_destination_location(...) with transfer to different warehouse → error CROSS_WAREHOUSE_TRANSFER</test>
+      <test>validate_destination_location(...) with valid storage location for put_away → success</test>
+      <test>validate_destination_location(...) with non-existent location → error LOCATION_NOT_FOUND</test>
+    </unit_tests>
+    <integration_tests>
+      <test>GET /api/warehouse/locations?movement_type=put_away → returns only storage locations</test>
+      <test>GET /api/warehouse/locations?warehouse_id=WH-A → returns only WH-A locations</test>
+      <test>GET /api/warehouse/locations?is_active=true → filters inactive</test>
+      <test>POST /api/warehouse/stock-moves with invalid location_id → 400 with validation error</test>
+      <test>POST with valid location → 201 success</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Open move modal → location dropdown shows only active storage locations (for put_away)</test>
+      <test>Try to move pick to storage location → error shown, cannot submit</test>
+      <test>Try to transfer to different warehouse → error shown</test>
+      <test>Select valid location for movement type → no error, can submit</test>
+      <test>Select location from different warehouse for pick → warning shown but allowed</test>
+    </e2e_tests>
+  </test_plan>
+</story>

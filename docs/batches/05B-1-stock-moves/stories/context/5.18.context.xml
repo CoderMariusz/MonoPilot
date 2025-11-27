@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.18</id>
+    <title>Movement Types</title>
+    <batch>5B-1</batch>
+    <points>3</points>
+    <effort_hours>3-4</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Categorize movements for workflow tracking and analytics: receiving, put_away, pick, transfer, adjustment</description>
+  <dependencies>
+    <requires><story id="5.14">LP Location Move</story><story id="5.11">GRN Creation</story></requires>
+    <enables><story id="5.35">Inventory Count</story><story id="5.15">Movement Audit Trail</story></enables>
+  </dependencies>
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="POST" path="/api/warehouse/stock-moves">
+        <description>Enhanced with movement_type field and type-specific validation</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="lp_id" type="UUID" required="true">License plate to move</field>
+          <field name="to_location_id" type="UUID" required="true">Destination location</field>
+          <field name="movement_type" type="string" required="true">Enum: receiving, put_away, pick, transfer, adjustment</field>
+          <field name="wo_id" type="UUID" required="false" comment="For pick movements (links to work order)"/>
+          <field name="to_id" type="UUID" required="false" comment="For pick movements (links to transfer order)"/>
+          <field name="reason" type="string" required="false" comment="Required for adjustment, optional for others"/>
+          <field name="quantity" type="decimal" required="false">Optional for partial move (Story 5.16)</field>
+        </request>
+        <response status="201">
+          <field name="stock_move_id" type="UUID"/>
+          <field name="movement_type" type="string"/>
+          <field name="lp_id" type="UUID"/>
+          <field name="quantity" type="decimal"/>
+          <field name="moved_at" type="timestamp"/>
+        </response>
+        <response status="400">
+          <field name="error" type="string" example="Adjustment movements require a reason"/>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/warehouse/stock-moves/stats">
+        <description>Get movement statistics by type and time period</description>
+        <auth>authenticated</auth>
+        <query_parameters>
+          <param name="date_from" type="ISO8601" required="false">Start date (default: 30 days ago)</param>
+          <param name="date_to" type="ISO8601" required="false">End date (default: now)</param>
+          <param name="warehouse_id" type="UUID" required="false">Filter by warehouse</param>
+        </query_parameters>
+        <response status="200">
+          <field name="by_type" type="object">
+            <field name="receiving" type="object">
+              <field name="count" type="integer"/>
+              <field name="percentage" type="number"/>
+              <field name="trend" type="array" comment="Daily counts for chart"/>
+            </field>
+            <field name="put_away" type="object">
+              <field name="count" type="integer"/>
+              <field name="percentage" type="number"/>
+              <field name="trend" type="array"/>
+            </field>
+            <field name="pick" type="object">
+              <field name="count" type="integer"/>
+              <field name="percentage" type="number"/>
+              <field name="trend" type="array"/>
+            </field>
+            <field name="transfer" type="object">
+              <field name="count" type="integer"/>
+              <field name="percentage" type="number"/>
+              <field name="trend" type="array"/>
+            </field>
+            <field name="adjustment" type="object">
+              <field name="count" type="integer"/>
+              <field name="percentage" type="number"/>
+              <field name="trend" type="array"/>
+            </field>
+          </field>
+          <field name="total_movements" type="integer"/>
+          <field name="date_range" type="object">
+            <field name="from" type="ISO8601"/>
+            <field name="to" type="ISO8601"/>
+          </field>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/warehouse/stock-moves/stats/by-type">
+        <description>Detailed statistics per movement type</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="types" type="array">
+            <field name="type" type="string" comment="receiving, put_away, pick, transfer, adjustment"/>
+            <field name="description" type="string"/>
+            <field name="count" type="integer" comment="Lifetime or period total"/>
+            <field name="percentage" type="number"/>
+            <field name="avg_time_seconds" type="number" comment="Optional: average duration"/>
+            <field name="cost_per_move" type="decimal" comment="Optional: labor cost"/>
+          </field>
+        </response>
+      </endpoint>
+      <endpoint method="POST" path="/api/warehouse/grn/:id/auto-assign-moves">
+        <description>Auto-assign movement_type='put_away' for GRN-created LPs</description>
+        <auth>service_role (internal API)</auth>
+        <request>
+          <field name="grn_id" type="UUID" required="true">GRN ID to auto-assign moves for</field>
+          <field name="from_location_id" type="UUID" required="true">Receiving dock location</field>
+          <field name="to_location_id" type="UUID" required="true">Default storage location per warehouse</field>
+        </request>
+        <response status="200">
+          <field name="stock_moves" type="array">
+            <field name="id" type="UUID"/>
+            <field name="lp_id" type="UUID"/>
+            <field name="movement_type" type="string" comment="put_away"/>
+          </field>
+        </response>
+      </endpoint>
+    </api_endpoints>
+    <movement_types>
+      <type name="receiving">
+        <description>LP arriving from external supplier (inbound)</description>
+        <semantics>
+          - From: Receiving dock (external or dock location)
+          - To: Storage location
+          - Use case: GRN receiving goods from PO/ASN
+        </semantics>
+        <validation>
+          - location_type: 'storage'
+          - warehouse: any
+          - reason: optional
+        </validation>
+        <fields>
+          - reason: optional (e.g., "Received from ACME Corp")
+          - wo_id: N/A
+          - to_id: N/A
+        </fields>
+        <auto_assign>
+          - Triggered by: GRN creation during PO receiving
+          - from_location: receiving dock
+          - to_location: warehouse default storage location
+        </auto_assign>
+      </type>
+      <type name="put_away">
+        <description>LP placed in storage after receiving (storage placement)</description>
+        <semantics>
+          - From: Receiving area (receiving dock or initial location)
+          - To: Storage location
+          - Use case: Material handler placing received goods into bins
+        </semantics>
+        <validation>
+          - location_type: 'storage'
+          - warehouse: any (GRN cross-warehouse support)
+          - reason: optional
+        </validation>
+        <fields>
+          - reason: optional (e.g., "Placed in bin WH-A-05-01")
+          - wo_id: N/A
+          - to_id: N/A
+        </fields>
+        <auto_assign>
+          - Triggered by: GRN creation (same as receiving)
+          - from_location: receiving dock
+          - to_location: default storage location per warehouse
+        </auto_assign>
+      </type>
+      <type name="pick">
+        <description>LP allocated for Work Order or Transfer Order (outbound)</description>
+        <semantics>
+          - From: Storage location
+          - To: Production floor or Shipping location
+          - Use case: Warehouse picker allocating stock for WO/TO fulfillment
+        </semantics>
+        <validation>
+          - location_type: 'production' OR 'shipping'
+          - warehouse: can be cross-warehouse
+          - reason: optional
+        </validation>
+        <fields>
+          - reason: optional (e.g., "For WO-2025-001")
+          - wo_id: optional UUID (link to work order)
+          - to_id: optional UUID (link to transfer order)
+        </fields>
+        <constraints>
+          - If wo_id provided: validate FK to work_orders table
+          - If to_id provided: validate FK to transfer_orders table
+          - One of wo_id or to_id should be provided (validation hint)
+        </constraints>
+      </type>
+      <type name="transfer">
+        <description>LP relocated between storage locations (internal reorganization)</description>
+        <semantics>
+          - From: Storage location
+          - To: Storage location (same warehouse)
+          - Use case: Warehouse manager reorganizing inventory or consolidating stock
+        </semantics>
+        <validation>
+          - location_type (to): 'storage'
+          - warehouse: SAME warehouse (from and to)
+          - reason: optional
+        </validation>
+        <fields>
+          - reason: optional (e.g., "Consolidating slow-moving items")
+          - wo_id: N/A
+          - to_id: N/A
+        </fields>
+        <constraints>
+          - Strict warehouse validation: from and to must be same warehouse
+          - Error if attempting cross-warehouse: "Cannot transfer between warehouses. Use Transfer Order instead"
+        </constraints>
+      </type>
+      <type name="adjustment">
+        <description>Quantity correction for inventory discrepancies (correction)</description>
+        <semantics>
+          - From: Any location
+          - To: Any location
+          - Use case: QA damage, sampling, recount correction, thefts/losses
+        </semantics>
+        <validation>
+          - location_type (to): ANY (even quarantine for QA holds)
+          - warehouse: any
+          - reason: REQUIRED (must explain correction reason)
+        </validation>
+        <fields>
+          - reason: REQUIRED (red asterisk in UI)
+            - Examples: "Damage from forklift", "Sample for testing", "Recount correction", "Theft/Loss"
+          - wo_id: N/A
+          - to_id: N/A
+        </fields>
+        <constraints>
+          - Adjustment without reason rejected: 400 "Adjustment movements require a reason"
+          - Audit trail critical for adjustments (traceability for compliance)
+        </constraints>
+      </type>
+    </movement_types>
+    <database_queries>
+      <query name="get_stats_by_type">
+        SELECT
+          movement_type,
+          COUNT(*) as count,
+          ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) as percentage
+        FROM stock_moves
+        WHERE org_id = $1
+          AND moved_at >= COALESCE($2, NOW() - INTERVAL '30 days')
+          AND moved_at <= COALESCE($3, NOW())
+        GROUP BY movement_type
+      </query>
+      <query name="get_trend_by_type">
+        SELECT
+          DATE(sm.moved_at) as date,
+          sm.movement_type,
+          COUNT(*) as count
+        FROM stock_moves sm
+        WHERE sm.org_id = $1
+          AND sm.moved_at >= COALESCE($2, NOW() - INTERVAL '30 days')
+          AND sm.moved_at <= COALESCE($3, NOW())
+        GROUP BY DATE(sm.moved_at), sm.movement_type
+        ORDER BY DATE(sm.moved_at), sm.movement_type
+      </query>
+    </database_queries>
+    <components>
+      <component name="MoveTypeSelector">
+        <location>src/components/warehouse/stock-moves/MoveTypeSelector.tsx</location>
+        <description>Movement type selection with descriptions and help text</description>
+        <fields>
+          - Radio buttons or tabs for 5 types
+          - Icon per type (arrow for receiving, box for put_away, pick icon, transfer icon, adjustment icon)
+          - Description text under each option (one-liner)
+          - Hover tooltip: full semantic description and use case
+        </fields>
+        <logic>
+          - On type selection: show type-specific fields (reason, wo_id, to_id)
+          - Mark required fields (red asterisk)
+          - Show validation feedback
+        </logic>
+      </component>
+      <component name="AdjustmentReasonField">
+        <location>src/components/warehouse/stock-moves/AdjustmentReasonField.tsx</location>
+        <description>Required reason field for adjustment movements</description>
+        <features>
+          - Shows only when movement_type='adjustment'
+          - Required validation (red asterisk, cannot submit empty)
+          - Textarea with placeholder: "Explain the adjustment reason (damage, sample, recount, etc)"
+          - Min 5 characters, max 500
+          - Character counter
+        </features>
+      </component>
+      <component name="MovementTypeStatsDashboard">
+        <location>src/components/warehouse/stock-moves/MovementTypeStatsDashboard.tsx</location>
+        <description>Analytics dashboard showing movement type breakdown</description>
+        <visualizations>
+          - Pie chart: 5 slices (receiving, put_away, pick, transfer, adjustment) with percentages
+          - Bar chart: trend over last 30 days grouped by type (stacked or multi-series)
+          - Summary table:
+            - Type | Count | % | Avg Time (optional) | Cost (optional)
+          - Cards: total movements, most common type, least common type
+        </visualizations>
+      </component>
+      <component name="MovementTypeFilter">
+        <location>src/components/warehouse/stock-moves/MovementTypeFilter.tsx</location>
+        <description>Filter audit trail by movement type</description>
+        <features>
+          - Checkboxes: receiving, put_away, pick, transfer, adjustment (all checked by default)
+          - Multi-select behavior
+          - "Select All / Deselect All" buttons
+          - Shows count per type: "Pick (234)"
+        </features>
+      </component>
+    </components>
+    <validation_rules>
+      <rule id="movement_type_enum">movement_type must be one of: receiving, put_away, pick, transfer, adjustment</rule>
+      <rule id="adjustment_reason_required">If movement_type='adjustment': reason field is REQUIRED and cannot be empty</rule>
+      <rule id="receiving_location_type">If movement_type='receiving': to_location.type must = 'storage'</rule>
+      <rule id="put_away_location_type">If movement_type='put_away': to_location.type must = 'storage'</rule>
+      <rule id="pick_location_type">If movement_type='pick': to_location.type IN ('production', 'shipping')</rule>
+      <rule id="transfer_location_type">If movement_type='transfer': to_location.type = 'storage'</rule>
+      <rule id="transfer_warehouse_same">If movement_type='transfer': source and destination must be same warehouse</rule>
+      <rule id="wo_id_validation">If wo_id provided: must be valid UUID and exist in work_orders</rule>
+      <rule id="to_id_validation">If to_id provided: must be valid UUID and exist in transfer_orders</rule>
+    </validation_rules>
+    <rls_policies>
+      <policy table="stock_moves">
+        <select>WHERE org_id = current_user.org_id</select>
+        <insert>WHERE org_id = current_user.org_id (validates movement_type enum)</insert>
+      </policy>
+    </rls_policies>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1" title="Movement Type Selection">
+      <test>Open move modal → see 5 options: receiving, put_away, pick, transfer, adjustment with icons and descriptions</test>
+    </ac>
+    <ac id="2" title="Type-Specific Descriptions">
+      <test>Hover over each type → see help text: use case, from/to locations, data fields required</test>
+    </ac>
+    <ac id="3" title="Type-Specific Validation">
+      <test>Select put_away → only storage locations shown in destination dropdown</test>
+      <test>Select pick → only production/shipping locations shown</test>
+      <test>Select transfer → only same-warehouse locations shown</test>
+    </ac>
+    <ac id="4" title="Type-Specific Required Fields">
+      <test>Select adjustment → reason field marked REQUIRED (red asterisk), cannot submit without</test>
+      <test>Select pick → wo_id and to_id optional (no asterisk)</test>
+    </ac>
+    <ac id="5" title="Auto-Assignment on GRN">
+      <test>Create GRN with 3 items → auto-create 3 stock_moves with movement_type='put_away'</test>
+      <test>Each auto-move has from_location=receiving dock, to_location=default storage</test>
+    </ac>
+    <ac id="6" title="Statistics by Type">
+      <test>View statistics dashboard → see pie chart breakdown by type with accurate counts/percentages</test>
+      <test>Filter audit trail by movement_type='pick' → shows only pick movements</test>
+      <test>Trend chart shows receiving ↑ 10%, put_away ↑ 5%, pick ↑ 15% (example trends)</test>
+    </ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>
+      <test>movement_type enum validation: valid values (receiving, put_away, pick, transfer, adjustment) accepted</test>
+      <test>movement_type enum validation: invalid value rejected with error</test>
+      <test>Adjustment reason required: POST without reason → error "Reason required for adjustment"</test>
+      <test>Put_away location type: to_location.type != 'storage' → error TYPE_MISMATCH</test>
+      <test>Transfer warehouse: source != destination warehouse → error CROSS_WAREHOUSE_TRANSFER</test>
+    </unit_tests>
+    <integration_tests>
+      <test>POST /api/warehouse/stock-moves with movement_type='receiving' and storage location → 201 success</test>
+      <test>POST with movement_type='pick' and production location → 201 success</test>
+      <test>POST with movement_type='adjustment' and no reason → 400 error</test>
+      <test>POST with wo_id (FK to work_orders) → validates FK, 400 if invalid</test>
+      <test>GET /api/warehouse/stock-moves/stats → returns breakdown by type with correct counts</test>
+      <test>GET /api/warehouse/stock-moves/stats/by-type → returns array of types with descriptions</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Open move modal → see all 5 movement types with icons</test>
+      <test>Select receiving type → tooltip shows "LP arriving from supplier" and location hints</test>
+      <test>Select adjustment type → reason field appears, marked required</test>
+      <test>Try to submit adjustment without reason → error shown, cannot submit</test>
+      <test>GRN creation → verify auto-created stock_moves have movement_type='put_away'</test>
+      <test>Audit trail: apply filter movement_type IN ['pick', 'transfer'] → shows only those 2 types</test>
+      <test>Statistics dashboard: pie chart shows 5 slices with correct proportions</test>
+      <test>Statistics: bar chart shows trend over 30 days per type</test>
+    </e2e_tests>
+  </test_plan>
+</story>

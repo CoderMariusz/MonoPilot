@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata><id>5.13</id><title>Update PO/TO Received Qty</title><batch>5A-3</batch><points>3</points><effort_hours>3-4</effort_hours><status>todo</status></metadata>
+  <description>Automatically update PO/TO received quantities and close when all lines received</description>
+  <dependencies><requires><story id="5.11">GRN Creation</story></requires></dependencies>
+  <technical_context>
+    <operations>
+      - UPDATE po_line.received_qty += grn_item.received_qty
+      - CHECK: IF all po_lines.received_qty >= ordered_qty THEN UPDATE po.status → 'closed'
+      - Same logic for Transfer Orders (TO)
+    </operations>
+    <helper_functions>
+      - finalize_po_status(po_id): Close PO if all lines complete
+      - finalize_to_status(to_id): Close TO if all lines complete
+    </helper_functions>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1">po_line.received_qty updated += grn_item.received_qty on GRN creation</ac>
+    <ac id="2">PO status auto-transitions to 'closed' when all lines received >= ordered</ac>
+    <ac id="3">Partial receives accumulate correctly (50+40+10=100)</ac>
+    <ac id="4">Transfer Orders updated same as PO</ac>
+    <ac id="5">Over-receipt handled: qty updates even if exceeds ordered</ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>Qty accumulation, status transitions</unit_tests>
+    <integration_tests>POST /api/warehouse/grns, verify po_line/po updates</integration_tests>
+    <e2e_tests>Receive partial, see progress updated, final receive closes PO</e2e_tests>
+  </test_plan>
+</story>

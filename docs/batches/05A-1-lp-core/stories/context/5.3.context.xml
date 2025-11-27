@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.3</id>
+    <title>LP Batch/Expiry Tracking</title>
+    <batch>5A-1</batch>
+    <points>5</points>
+    <effort_hours>5-6</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>Track batch numbers and expiry dates with FEFO (First Expired First Out) sorting for compliance</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.1">License Plate Creation</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>license_plates</name>
+        <columns>
+          <column name="batch_number" type="VARCHAR(50)" constraint="NOT NULL"/>
+          <column name="supplier_batch_number" type="VARCHAR(50)"/>
+          <column name="manufacture_date" type="DATE"/>
+          <column name="expiry_date" type="DATE"/>
+        </columns>
+        <indexes>
+          <index columns="expiry_date" purpose="FEFO sorting"/>
+        </indexes>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/warehouse/license-plates">
+        <description>List LPs with expiry date filtering</description>
+        <query_params>
+          <param name="expiry_from" type="date" example="2025-01-27"/>
+          <param name="expiry_to" type="date" example="2025-02-27"/>
+          <param name="sort" type="enum: expiry_asc|expiry_desc" default="expiry_asc"/>
+        </query_params>
+      </endpoint>
+    </api_endpoints>
+
+    <frontend_components>
+      <component name="ExpiryDateColumn">
+        <conditional_styling>if expiry_date &lt; today: background-color #fee (light red)</conditional_styling>
+      </component>
+      <component name="ExpiryFilter">
+        <filter_options>date_from, date_to, expiring_in_days (30/60/90 presets)</filter_options>
+      </component>
+    </frontend_components>
+
+    <validation_rules>
+      <rule>batch_number required, max 50 chars</rule>
+      <rule>manufacture_date &lt; expiry_date (if both provided)</rule>
+      <rule>Expired LPs (expiry_date &lt; today) highlighted in UI</rule>
+    </validation_rules>
+
+    <fefo_logic>
+      <description>First Expired First Out - earliest expiry date first</description>
+      <sort_order>ORDER BY expiry_date ASC (earliest first)</sort_order>
+      <expired_handling>Expired LPs appear at top of list for visibility</expired_handling>
+    </fefo_logic>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1" title="Batch Number Required">
+      <test>Create LP without batch_number, verify validation error</test>
+    </ac>
+    <ac id="2" title="Expiry Date Display">
+      <test>View LP list, verify expiry_date shown; expired LPs highlighted red</test>
+    </ac>
+    <ac id="3" title="Expired LP Warning">
+      <test>View LP with past expiry_date, verify warning banner shown</test>
+    </ac>
+    <ac id="4" title="FEFO Sorting">
+      <test>Click expiry_date column header, verify LPs sorted earliest-first</test>
+    </ac>
+    <ac id="5" title="Filter by Expiry Range">
+      <test>Use date range filter, verify only LPs with expiry in range shown</test>
+    </ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test>FEFO sorting with mixed expiry dates</test>
+      <test>Expired LP detection (expiry_date &lt; today)</test>
+    </unit_tests>
+    <integration_tests>
+      <test>GET /api/warehouse/license-plates?expiry_from=X&expiry_to=Y returns correct LPs</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Create LP with past expiry → see warning banner</test>
+      <test>Sort by expiry_date → verify order (earliest first)</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="critical">FEFO is regulatory requirement for perishable goods (food, pharma)</note>
+    <note priority="high">Expiry_date index is critical for sorting performance</note>
+    <note priority="medium">Red highlighting for expired LPs prevents accidental use</note>
+  </implementation_notes>
+</story>

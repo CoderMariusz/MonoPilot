@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata><id>5.10</id><title>Over-Receipt Validation</title><batch>5A-3</batch><points>3</points><effort_hours>3-4</effort_hours><status>todo</status></metadata>
+  <description>Validate receiving against PO: prevent (or warn) over-receipt based on warehouse settings</description>
+  <dependencies><requires><story id="5.8">ASN Creation</story><story id="5.11">GRN Creation</story></requires></dependencies>
+  <technical_context>
+    <validation>
+      <function name="check_over_receipt(po_line_id, received_qty)">
+        <logic>SUM(grn_items.received_qty WHERE po_line_id) + received_qty > po_line.ordered_qty</logic>
+        <return>boolean over_receipt_detected</return>
+      </function>
+    </validation>
+    <settings>warehouse_settings.allow_over_receipt (BOOLEAN DEFAULT false)</settings>
+    <error_messages>
+      - If allow_over_receipt=false AND over_receipt: Error, block receipt
+      - If allow_over_receipt=true AND over_receipt: Warning, allow proceed
+    </error_messages>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1">Over-receipt detected when received_qty would exceed ordered_qty</ac>
+    <ac id="2">Action based on warehouse_settings.allow_over_receipt toggle</ac>
+    <ac id="3">Clear warning: "Ordered: 100 kg, receiving: 110 kg (Over by 10 kg)"</ac>
+    <ac id="4">Per-line validation for mixed receipts</ac>
+    <ac id="5">Admin configurable toggle in /settings/warehouse</ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>Over-receipt calculation, blocked vs allowed</unit_tests>
+    <integration_tests>POST /api/warehouse/grns with over-receipt, both settings</integration_tests>
+    <e2e_tests>Receive more than ordered, see error (setting=false) then warning (setting=true)</e2e_tests>
+  </test_plan>
+</story>
