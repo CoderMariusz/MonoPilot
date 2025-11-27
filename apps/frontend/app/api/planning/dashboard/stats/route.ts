@@ -39,6 +39,8 @@ export async function GET() {
       draft: poData.filter((po: any) => po.status === 'draft').length,
       pending_approval: poData.filter((po: any) => po.approval_status === 'pending').length,
       confirmed: poData.filter((po: any) => po.status === 'confirmed').length,
+      close: poData.filter((po: any) => po.status === 'closed').length,
+      receiving_total: poData.filter((po: any) => po.status === 'receiving').length,
     }
 
     // Get Transfer Orders stats
@@ -74,9 +76,14 @@ export async function GET() {
     const woStats = {
       total: woData.length,
       active: woData.filter((wo: any) => wo.status === 'in_progress').length,
-      paused: woData.filter((wo: any) => wo.status === 'released').length, // "released" as "paused/ready"
+      paused: woData.filter((wo: any) => wo.status === 'paused').length,
       completed_today: woData.filter((wo: any) =>
         wo.status === 'completed' &&
+        wo.actual_end_date &&
+        wo.actual_end_date.startsWith(today)
+      ).length,
+      released: woData.filter((wo: any) => wo.status === 'released').length,
+      total_today: woData.filter((wo: any) =>
         wo.actual_end_date &&
         wo.actual_end_date.startsWith(today)
       ).length,
