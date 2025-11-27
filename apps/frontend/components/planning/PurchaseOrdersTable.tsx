@@ -55,6 +55,7 @@ import {
 } from '@/components/ui/dialog'
 import { Search, Plus, Pencil, Trash2, Zap, Upload, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { getStatusColor, PLANNING_COLORS } from '@/lib/constants/planning-colors'
 import { PurchaseOrderFormModal } from './PurchaseOrderFormModal'
 import { POFastFlowModal } from './POFastFlow'
 
@@ -204,23 +205,6 @@ export function PurchaseOrdersTable() {
     })
   }
 
-  // Get status badge variant
-  const getStatusVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'draft':
-        return 'secondary'
-      case 'submitted':
-        return 'default'
-      case 'confirmed':
-        return 'default'
-      case 'received':
-        return 'default'
-      case 'cancelled':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
-  }
 
   // Get approval badge
   const getApprovalBadge = (status: string | null) => {
@@ -275,6 +259,7 @@ export function PurchaseOrdersTable() {
         </Button>
         <Button
           size="sm"
+          className={PLANNING_COLORS.button.primary}
           onClick={() => {
             setEditingPO(null)
             setFormModalOpen(true)
@@ -376,7 +361,7 @@ export function PurchaseOrdersTable() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center flex-wrap gap-1">
-                      <Badge variant={getStatusVariant(po.status)}>
+                      <Badge className={getStatusColor(po.status)}>
                         {po.status}
                       </Badge>
                       {getApprovalBadge(po.approval_status)}
