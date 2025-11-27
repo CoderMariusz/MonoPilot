@@ -1,0 +1,683 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <story-metadata>
+    <id>04-20-operation-timeline-view</id>
+    <title>Operation Timeline View</title>
+    <epic>4 - Production Execution</epic>
+    <status>drafted</status>
+    <priority>P0</priority>
+    <story-points>1</story-points>
+    <effort>0.5 day</effort>
+    <dependencies>
+      <dependency>Story 4.4 - Operation Start (status='in_progress')</dependency>
+      <dependency>Story 4.5 - Operation Complete (status='completed')</dependency>
+      <dependency>wo_operations table with started_at, completed_at, status enum</dependency>
+      <dependency>routing_operations table with expected_duration_minutes</dependency>
+    </dependencies>
+  </story-metadata>
+
+  <!-- ============================================================ -->
+  <!-- STORY CONTENT -->
+  <!-- ============================================================ -->
+
+  <story-content>
+    <user-story>
+      <as-a>Production Manager</as-a>
+      <i-want>to see operations as visual timeline</i-want>
+      <so-that>I can track progress at a glance</so-that>
+    </user-story>
+
+    <acceptance-criteria>
+      <criterion id="AC-4.20.1">
+        <title>Timeline Visualization with Status Color Mapping</title>
+        <given>viewing WO with operations</given>
+        <when>scrolling to timeline section</when>
+        <then>see visual timeline with color mapping (from Story 4.4 operation status enum):
+          - Each operation as horizontal segment
+          - Color by status:
+            - Gray: status='not_started' (initial state)
+            - Blue: status='in_progress' (from Story 4.4)
+            - Green: status='completed' (from Story 4.5)
+          - Actual vs expected duration shown
+        </then>
+      </criterion>
+
+      <criterion id="AC-4.20.2">
+        <title>Operation Segment Details</title>
+        <when>clicking operation segment</when>
+        <then>popover shows:
+          - Operation name
+          - Status
+          - Started/completed timestamps
+          - Duration (actual vs expected)
+          - Operator name
+          - Yield %
+        </then>
+      </criterion>
+
+      <criterion id="AC-4.20.3">
+        <title>Timeline Positioning</title>
+        <then>Segment width proportional to duration, positioned in timeline order</then>
+      </criterion>
+
+      <criterion id="AC-4.20.4">
+        <title>Duration Display</title>
+        <then>Actual duration = completed_at - started_at, expected from routing_operations.estimated_duration_minutes</then>
+      </criterion>
+
+      <criterion id="AC-4.20.5">
+        <title>Color Legend</title>
+        <then>Legend shows: Not Started (gray), In Progress (blue), Completed (green)</then>
+      </criterion>
+
+      <criterion id="AC-4.20.6">
+        <title>Responsive Design</title>
+        <then>Timeline scrollable on mobile, full-width on desktop</then>
+      </criterion>
+
+      <criterion id="AC-4.20.7">
+        <title>CSS/SVG Implementation</title>
+        <then>Use CSS/SVG only, no external charting library</then>
+      </criterion>
+
+      <criterion id="AC-4.20.8">
+        <title>Prerequisites</title>
+        <then>Requires Stories 4.4-4.5 (Operation Start/Complete)</then>
+      </criterion>
+    </acceptance-criteria>
+
+    <tasks>
+      <task id="1" status="pending">Timeline data aggregation (from wo_operations)</task>
+      <task id="2" status="pending">SVG/CSS timeline component</task>
+      <task id="3" status="pending">Color mapping logic</task>
+      <task id="4" status="pending">Duration calculations</task>
+      <task id="5" status="pending">Popover details component</task>
+      <task id="6" status="pending">Responsive styling</task>
+      <task id="7" status="pending">Tests</task>
+    </tasks>
+  </story-content>
+
+  <!-- ============================================================ -->
+  <!-- DATABASE SCHEMA -->
+  <!-- ============================================================ -->
+
+  <database-schema>
+    <table name="wo_operations">
+      <description>Work Order Operations - tracks individual routing steps per WO (from Story 4.4/4.5)</description>
+      <columns>
+        <column name="id" type="UUID" constraints="PRIMARY KEY" />
+        <column name="org_id" type="UUID" constraints="NOT NULL REFERENCES organizations(id)" />
+        <column name="wo_id" type="UUID" constraints="NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE" />
+        <column name="sequence_number" type="INTEGER" constraints="NOT NULL" />
+        <column name="operation_name" type="VARCHAR(100)" constraints="NOT NULL" />
+        <column name="status" type="VARCHAR(20)" constraints="NOT NULL DEFAULT 'not_started'" notes="'not_started' | 'in_progress' | 'completed'" />
+        <column name="started_at" type="TIMESTAMP WITH TIME ZONE" constraints="NULL (set by Story 4.4)" />
+        <column name="finished_at" type="TIMESTAMP WITH TIME ZONE" constraints="NULL (set by Story 4.5)" notes="Also called completed_at" />
+        <column name="operator_id" type="UUID" constraints="NULL REFERENCES users(id)" notes="Who started operation" />
+        <column name="expected_yield_pct" type="DECIMAL(5,2)" constraints="DEFAULT 100.00" />
+        <column name="actual_yield_pct" type="DECIMAL(5,2)" constraints="NULL (set by Story 4.5)" />
+        <column name="expected_duration_minutes" type="INTEGER" constraints="NULL" notes="From routing_operations" />
+        <column name="actual_duration_minutes" type="INTEGER" constraints="NULL" notes="Calculated: completed_at - started_at" />
+        <column name="notes" type="TEXT" constraints="NULL" />
+        <column name="created_at" type="TIMESTAMP WITH TIME ZONE" constraints="DEFAULT NOW()" />
+        <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" constraints="DEFAULT NOW()" />
+      </columns>
+      <constraints>
+        <constraint type="CHECK">status IN ('not_started', 'in_progress', 'completed')</constraint>
+        <constraint type="UNIQUE">UNIQUE(wo_id, sequence_number)</constraint>
+      </constraints>
+      <indexes>
+        <index>idx_wo_operations_org ON wo_operations(org_id)</index>
+        <index>idx_wo_operations_wo ON wo_operations(wo_id)</index>
+        <index>idx_wo_operations_status ON wo_operations(status)</index>
+      </indexes>
+    </table>
+
+    <table name="routing_operations">
+      <description>Routing operations - master template for operations (Story 2.16)</description>
+      <relevant-columns>
+        <column name="id" type="UUID" />
+        <column name="routing_id" type="UUID" />
+        <column name="sequence" type="INTEGER" notes="Execution order (1, 2, 3...)" />
+        <column name="operation_name" type="VARCHAR(100)" />
+        <column name="expected_duration_minutes" type="INTEGER" notes="Duration in minutes (> 0)" />
+        <column name="expected_yield_percent" type="NUMERIC(5,2)" notes="Yield % (0.01-100.00)" />
+      </relevant-columns>
+    </table>
+
+    <table name="users">
+      <description>Users table - for operator names in timeline popover</description>
+      <relevant-columns>
+        <column name="id" type="UUID" />
+        <column name="name" type="VARCHAR(100)" notes="Operator name" />
+      </relevant-columns>
+    </table>
+
+    <query-example name="Timeline Data Aggregation">
+      <description>Query to fetch all operations for a WO with operator names and duration calculations</description>
+      <sql>
+        SELECT
+          wo_ops.id,
+          wo_ops.sequence_number,
+          wo_ops.operation_name,
+          wo_ops.status,
+          wo_ops.started_at,
+          wo_ops.finished_at,
+          wo_ops.expected_duration_minutes,
+          wo_ops.actual_duration_minutes,
+          wo_ops.expected_yield_pct,
+          wo_ops.actual_yield_pct,
+          users.name AS operator_name,
+          -- Calculate actual duration in minutes if completed
+          CASE
+            WHEN wo_ops.status = 'completed' AND wo_ops.started_at IS NOT NULL AND wo_ops.finished_at IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (wo_ops.finished_at - wo_ops.started_at)) / 60
+            ELSE NULL
+          END AS calculated_duration_minutes
+        FROM wo_operations wo_ops
+        LEFT JOIN users ON wo_ops.operator_id = users.id
+        WHERE wo_ops.wo_id = $1
+        ORDER BY wo_ops.sequence_number ASC;
+      </sql>
+    </query-example>
+  </database-schema>
+
+  <!-- ============================================================ -->
+  <!-- UX DESIGN REFERENCE -->
+  <!-- ============================================================ -->
+
+  <ux-design>
+    <source>docs/ux-design/ux-design-production-module.md</source>
+    <source>docs/ux-design/ux-design-shared-system.md</source>
+
+    <shared-ui-system>
+      <source>docs/ux-design/ux-design-shared-system.md</source>
+      <colors>
+        <status-colors>
+          <status value="not_started" bg="gray-200" text="gray-800" notes="Gray for pending/not started" />
+          <status value="in_progress" bg="blue-200" text="blue-800" notes="Blue for active/in progress (from shared system Warning/Info)" />
+          <status value="completed" bg="green-200" text="green-800" notes="Green for success/completed" />
+        </status-colors>
+        <accent-colors>
+          <color name="info" value="blue-500" hex="#3b82f6" notes="For in-progress segments" />
+          <color name="success" value="green-500" hex="#10b981" notes="For completed segments" />
+          <color name="neutral" value="gray-400" hex="#9ca3af" notes="For not-started segments" />
+        </accent-colors>
+      </colors>
+      <typography>
+        <text size="text-sm" weight="font-medium" usage="Timeline segment labels" />
+        <text size="text-xs" weight="font-regular" usage="Timestamps, duration values" />
+        <text size="text-base" weight="font-semibold" usage="Popover headers" />
+      </typography>
+      <spacing>
+        <padding value="p-4" usage="Timeline container padding (16px)" />
+        <gap value="gap-2" usage="Between timeline segments (8px)" />
+        <padding value="p-3" usage="Popover content padding (12px)" />
+      </spacing>
+    </shared-ui-system>
+
+    <timeline-visualization>
+      <layout>
+        <container>
+          <width>100% (full-width on desktop, scrollable on mobile)</width>
+          <height>auto (scales with number of operations)</height>
+          <background>white or gray-50</background>
+          <border>border border-gray-200</border>
+          <padding>p-4 (16px)</padding>
+        </container>
+        <legend>
+          <position>Top-right of timeline container</position>
+          <items>
+            <item color="gray-400" label="Not Started" />
+            <item color="blue-500" label="In Progress" />
+            <item color="green-500" label="Completed" />
+          </items>
+          <layout>Horizontal flex row, gap-4</layout>
+        </legend>
+        <timeline-axis>
+          <type>Horizontal SVG segments</type>
+          <height>60px per operation row</height>
+          <segment-height>40px</segment-height>
+          <segment-spacing>8px gap between segments</segment-spacing>
+        </timeline-axis>
+      </layout>
+
+      <segment-structure>
+        <svg-rect>
+          <width>Proportional to duration (expected or actual)</width>
+          <height>40px</height>
+          <fill>status color (gray-400, blue-500, green-500)</fill>
+          <stroke>stroke-2 stroke-gray-300</stroke>
+          <rx>4 (rounded corners)</rx>
+        </svg-rect>
+        <label>
+          <position>Inside segment (centered)</position>
+          <content>Operation name (truncated if too long)</content>
+          <color>white or gray-900 (contrast)</color>
+          <font-size>text-sm</font-size>
+          <font-weight>font-medium</font-weight>
+        </label>
+        <duration-badge>
+          <position>Bottom-right of segment</position>
+          <content>Actual vs Expected (e.g., "135/120 min")</content>
+          <color>text-xs text-gray-600</color>
+        </duration-badge>
+      </segment-structure>
+
+      <popover-design>
+        <trigger>Click on timeline segment</trigger>
+        <position>Above segment (or below if near top)</position>
+        <layout>
+          <header>
+            <title>Operation name</title>
+            <status-badge>Status (not_started/in_progress/completed)</status-badge>
+          </header>
+          <content>
+            <field label="Sequence" value="2 of 3" />
+            <field label="Status" value="Completed" badge="green" />
+            <field label="Operator" value="Anna K." />
+            <field label="Started At" value="10:30 AM" />
+            <field label="Completed At" value="12:45 PM" />
+            <field label="Expected Duration" value="120 min" />
+            <field label="Actual Duration" value="135 min" color="amber if > expected" />
+            <field label="Expected Yield" value="95.0%" />
+            <field label="Actual Yield" value="92.5%" color="amber if < expected" />
+          </content>
+          <footer>
+            <button type="close" color="gray-600">Close</button>
+            <button type="view-details" color="blue-600">View Full Details</button>
+          </footer>
+        </layout>
+        <styling>
+          <background>white</background>
+          <border>border border-gray-200 shadow-lg</border>
+          <padding>p-3 (12px)</padding>
+          <width>min-w-[280px] max-w-[400px]</width>
+        </styling>
+      </popover-design>
+
+      <responsive-behavior>
+        <desktop>
+          <breakpoint>lg (1024px+)</breakpoint>
+          <layout>Full timeline visible, no horizontal scroll</layout>
+          <segments>All segments visible in single row per operation</segments>
+        </desktop>
+        <tablet>
+          <breakpoint>md (768-1024px)</breakpoint>
+          <layout>Timeline scrollable horizontally</layout>
+          <segments>Segments may overflow, horizontal scroll enabled</segments>
+        </tablet>
+        <mobile>
+          <breakpoint>sm (&lt;768px)</breakpoint>
+          <layout>Vertical stack layout (list view)</layout>
+          <segments>Each operation as card with timeline bar inside</segments>
+          <alternative>Horizontal scroll with touch gestures</alternative>
+        </mobile>
+      </responsive-behavior>
+    </timeline-visualization>
+
+    <duration-calculation-logic>
+      <expected-duration>
+        <source>routing_operations.expected_duration_minutes</source>
+        <fallback>If not set, default to 60 minutes</fallback>
+      </expected-duration>
+      <actual-duration>
+        <formula>EXTRACT(EPOCH FROM (completed_at - started_at)) / 60</formula>
+        <unit>minutes (rounded to nearest integer)</unit>
+        <when-null>If not completed, show "In Progress" or "Not Started"</when-null>
+      </actual-duration>
+      <duration-comparison>
+        <on-time>actual &lt;= expected → green badge</on-time>
+        <delayed>actual > expected → amber badge with "+" prefix (e.g., "+15 min")</delayed>
+        <percentage>Show variance as % (e.g., "112% of expected")</percentage>
+      </duration-comparison>
+    </duration-calculation-logic>
+
+    <production-module-context>
+      <source>docs/ux-design/ux-design-production-module.md (lines 385-390)</source>
+      <wo-details-modal>
+        <tabs>
+          <tab name="Overview">Status, Progress, Operations summary, Materials summary, Issues &amp; Alerts</tab>
+          <tab name="Operations">Per-operation breakdown (seq, name, IN/OUT, losses, yield%, operator)</tab>
+          <tab name="Materials">BOM snapshot vs actual (variance %, color-coded rows)</tab>
+          <tab name="Yield">Trend chart (last 10 WOs), pattern detection</tab>
+          <tab name="Trace">Forward/backward genealogy tree (reuse existing)</tab>
+          <tab name="History">Audit log timeline (status changes, operations, outputs, alerts)</tab>
+        </tabs>
+        <notes>Timeline view should be integrated into "Operations" tab or "Overview" tab for quick visibility</notes>
+      </wo-details-modal>
+    </production-module-context>
+  </ux-design>
+
+  <!-- ============================================================ -->
+  <!-- API PATTERNS -->
+  <!-- ============================================================ -->
+
+  <api-patterns>
+    <endpoint path="/api/production/work-orders/:id/operations" method="GET">
+      <description>Fetch all operations for a WO with timeline data</description>
+      <response success="200">
+        <schema>
+          <field name="operations" type="array" notes="List of WO operations with timeline data">
+            <operation>
+              <field name="id" type="uuid" />
+              <field name="sequence_number" type="integer" />
+              <field name="operation_name" type="string" />
+              <field name="status" type="string" enum="not_started | in_progress | completed" />
+              <field name="started_at" type="timestamp | null" />
+              <field name="finished_at" type="timestamp | null" notes="Also called completed_at" />
+              <field name="expected_duration_minutes" type="integer | null" />
+              <field name="actual_duration_minutes" type="integer | null" notes="Calculated from timestamps" />
+              <field name="expected_yield_pct" type="decimal" />
+              <field name="actual_yield_pct" type="decimal | null" />
+              <field name="operator" type="object | null">
+                <field name="id" type="uuid" />
+                <field name="name" type="string" notes="Operator name for timeline popover" />
+              </field>
+            </operation>
+          </field>
+        </schema>
+      </response>
+      <errors>
+        <error code="401">Unauthorized - no session</error>
+        <error code="404">Work Order not found</error>
+        <error code="500">Internal server error</error>
+      </errors>
+    </endpoint>
+
+    <reference-pattern>
+      <source>apps/frontend/app/api/planning/transfer-orders/[id]/route.ts</source>
+      <pattern>
+        <step>1. Create Supabase client</step>
+        <step>2. Check authentication (getSession)</step>
+        <step>3. Parse and validate params (await params)</step>
+        <step>4. Query with joins (LEFT JOIN users for operator names)</step>
+        <step>5. Return JSON response with operations array</step>
+        <step>6. Handle errors with appropriate status codes</step>
+      </pattern>
+    </reference-pattern>
+
+    <data-fetching-pattern>
+      <frontend>
+        <hook>useSWR or useEffect for initial load</hook>
+        <endpoint>GET /api/production/work-orders/:id/operations</endpoint>
+        <state>Store operations array in component state</state>
+        <transform>Calculate segment widths based on max duration in dataset</transform>
+      </frontend>
+      <backend>
+        <query>
+          SELECT wo_ops.*, users.name AS operator_name,
+            CASE WHEN status = 'completed' THEN
+              EXTRACT(EPOCH FROM (finished_at - started_at)) / 60
+            ELSE NULL END AS actual_duration_minutes
+          FROM wo_operations wo_ops
+          LEFT JOIN users ON wo_ops.operator_id = users.id
+          WHERE wo_ops.wo_id = $1
+          ORDER BY sequence_number ASC
+        </query>
+      </backend>
+    </data-fetching-pattern>
+  </api-patterns>
+
+  <!-- ============================================================ -->
+  <!-- COMPONENT STRUCTURE -->
+  <!-- ============================================================ -->
+
+  <component-structure>
+    <component name="OperationTimelineView">
+      <file>apps/frontend/components/production/OperationTimelineView.tsx</file>
+      <props>
+        <prop name="woId" type="string" required="true" notes="Work Order ID" />
+        <prop name="operations" type="WOOperation[]" required="false" notes="If provided, skip API fetch" />
+        <prop name="onOperationClick" type="(opId: string) => void" required="false" notes="Callback when segment clicked" />
+      </props>
+      <state>
+        <state-var name="operations" type="WOOperation[]" notes="Fetched from API or passed as prop" />
+        <state-var name="selectedOperation" type="WOOperation | null" notes="Currently selected for popover" />
+        <state-var name="maxDuration" type="number" notes="Max duration for scaling segment widths" />
+        <state-var name="loading" type="boolean" />
+        <state-var name="error" type="string | null" />
+      </state>
+      <methods>
+        <method name="fetchOperations">Fetch operations from API if not provided as prop</method>
+        <method name="calculateMaxDuration">Find max duration (expected or actual) for width scaling</method>
+        <method name="getSegmentWidth">Calculate segment width as percentage of max duration</method>
+        <method name="getSegmentColor">Map status to color (gray/blue/green)</method>
+        <method name="handleSegmentClick">Open popover with operation details</method>
+      </methods>
+    </component>
+
+    <component name="TimelineSegment">
+      <file>apps/frontend/components/production/TimelineSegment.tsx</file>
+      <props>
+        <prop name="operation" type="WOOperation" required="true" />
+        <prop name="widthPercent" type="number" required="true" notes="Percentage of container width" />
+        <prop name="onClick" type="() => void" required="true" />
+      </props>
+      <render>
+        <svg width={widthPercent + '%'} height="40">
+          <rect width="100%" height="40" fill={statusColor} stroke="gray-300" strokeWidth="2" rx="4" />
+          <text x="50%" y="50%" textAnchor="middle" fill="white" fontSize="14">{operation.operation_name}</text>
+          <text x="95%" y="90%" textAnchor="end" fontSize="12" fill="gray-600">{duration}</text>
+        </svg>
+      </render>
+    </component>
+
+    <component name="OperationPopover">
+      <file>apps/frontend/components/production/OperationPopover.tsx</file>
+      <props>
+        <prop name="operation" type="WOOperation" required="true" />
+        <prop name="onClose" type="() => void" required="true" />
+        <prop name="position" type="{ x: number, y: number }" required="true" />
+      </props>
+      <layout>
+        <header>Operation name + Status badge</header>
+        <content>
+          <field label="Sequence" value={operation.sequence_number + ' of ' + totalOps} />
+          <field label="Operator" value={operation.operator?.name || 'N/A'} />
+          <field label="Started At" value={formatTimestamp(operation.started_at)} />
+          <field label="Completed At" value={formatTimestamp(operation.finished_at)} />
+          <field label="Expected Duration" value={operation.expected_duration_minutes + ' min'} />
+          <field label="Actual Duration" value={operation.actual_duration_minutes + ' min'} color={durationColor} />
+          <field label="Expected Yield" value={operation.expected_yield_pct + '%'} />
+          <field label="Actual Yield" value={operation.actual_yield_pct + '%'} color={yieldColor} />
+        </content>
+        <footer>
+          <button onClick={onClose}>Close</button>
+        </footer>
+      </layout>
+    </component>
+
+    <component name="TimelineLegend">
+      <file>Inline in OperationTimelineView</file>
+      <render>
+        <div className="flex gap-4 items-center">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-gray-400 rounded"></div>
+            <span className="text-xs text-gray-600">Not Started</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-blue-500 rounded"></div>
+            <span className="text-xs text-gray-600">In Progress</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-green-500 rounded"></div>
+            <span className="text-xs text-gray-600">Completed</span>
+          </div>
+        </div>
+      </render>
+    </component>
+  </component-structure>
+
+  <!-- ============================================================ -->
+  <!-- TESTING STRATEGY -->
+  <!-- ============================================================ -->
+
+  <testing-strategy>
+    <unit-tests>
+      <location>apps/frontend/components/production/__tests__/OperationTimelineView.test.tsx</location>
+      <test-cases>
+        <test>renders timeline with 3 operations (not_started, in_progress, completed)</test>
+        <test>calculates segment widths proportional to duration</test>
+        <test>maps status to correct colors (gray, blue, green)</test>
+        <test>displays duration as "actual/expected min" format</test>
+        <test>shows legend with 3 status types</test>
+        <test>handles click on segment - opens popover</test>
+        <test>handles no operations - shows empty state</test>
+        <test>calculates actual duration from started_at and finished_at</test>
+      </test-cases>
+    </unit-tests>
+
+    <integration-tests>
+      <location>apps/frontend/app/api/production/work-orders/__tests__/operations-timeline.test.ts</location>
+      <test-cases>
+        <test>GET /api/production/work-orders/:id/operations - returns operations with operator names</test>
+        <test>GET /api/production/work-orders/:id/operations - calculates actual_duration_minutes for completed ops</test>
+        <test>GET /api/production/work-orders/:id/operations - 401 unauthorized</test>
+        <test>GET /api/production/work-orders/:id/operations - 404 WO not found</test>
+      </test-cases>
+    </integration-tests>
+
+    <e2e-tests>
+      <location>tests/e2e/production-operation-timeline.spec.ts</location>
+      <setup>
+        <fixture name="createTestOrganization">Returns orgId from .env.test</fixture>
+        <fixture name="createTestUser">Creates auth user + JWT token</fixture>
+        <fixture name="createTestWO">Creates work order with 3 operations (not_started, in_progress, completed)</fixture>
+      </setup>
+      <test-cases>
+        <test name="Timeline - Full Visualization">
+          <steps>
+            <step>Navigate to /production/work-orders/:id</step>
+            <step>Scroll to timeline section (or Operations tab)</step>
+            <step>Verify 3 operation segments visible</step>
+            <step>Verify Op1 (completed) - green color</step>
+            <step>Verify Op2 (in_progress) - blue color</step>
+            <step>Verify Op3 (not_started) - gray color</step>
+            <step>Verify legend shows 3 status types</step>
+          </steps>
+        </test>
+        <test name="Timeline - Segment Click Popover">
+          <steps>
+            <step>Click on Op2 (in_progress) segment</step>
+            <step>Popover appears with operation details</step>
+            <step>Verify popover shows: operation name, status badge (blue), started timestamp, operator name, duration, yield</step>
+            <step>Click "Close" button - popover dismisses</step>
+          </steps>
+        </test>
+        <test name="Timeline - Duration Comparison">
+          <steps>
+            <step>Verify Op1 (completed) shows "135/120 min" (actual/expected)</step>
+            <step>Verify duration badge is amber (actual > expected)</step>
+            <step>Verify Op2 (in_progress) shows "In Progress" or "--/120 min"</step>
+          </steps>
+        </test>
+        <test name="Timeline - Responsive Mobile">
+          <given>viewport set to mobile (375x667)</given>
+          <steps>
+            <step>Timeline converts to vertical list or horizontal scroll</step>
+            <step>Each operation segment still clickable</step>
+            <step>Popover adjusts position to fit screen</step>
+          </steps>
+        </test>
+      </test-cases>
+    </e2e-tests>
+
+    <test-configuration>
+      <file>playwright.config.ts</file>
+      <settings>
+        <timeout>60000ms per test</timeout>
+        <expect-timeout>15000ms</expect-timeout>
+        <browsers>chromium, firefox, webkit</browsers>
+        <base-url>env NEXT_PUBLIC_APP_URL or http://localhost:5000</base-url>
+      </settings>
+    </test-configuration>
+  </testing-strategy>
+
+  <!-- ============================================================ -->
+  <!-- IMPLEMENTATION NOTES -->
+  <!-- ============================================================ -->
+
+  <implementation-notes>
+    <priority>P0 - MVP Critical</priority>
+    <estimated-effort>0.5 day (4 hours)</estimated-effort>
+
+    <breakdown>
+      <task name="API Endpoint" hours="0.5">
+        GET /api/production/work-orders/:id/operations
+        Join with users table for operator names
+        Calculate actual_duration_minutes in query
+      </task>
+      <task name="Timeline Component" hours="1.5">
+        OperationTimelineView component
+        TimelineSegment SVG rendering
+        Color mapping logic (gray/blue/green)
+        Segment width calculation based on duration
+        Legend component
+      </task>
+      <task name="Popover Component" hours="0.5">
+        OperationPopover component
+        Position calculation (above segment)
+        Display all operation details
+      </task>
+      <task name="Responsive Styling" hours="0.5">
+        Desktop layout (full-width timeline)
+        Tablet/mobile (horizontal scroll or vertical list)
+        Touch-friendly segment targets (min 48px height)
+      </task>
+      <task name="Tests" hours="1.0">
+        Unit tests (8 test cases)
+        Integration tests (4 test cases)
+        E2E tests (4 test cases)
+      </task>
+    </breakdown>
+
+    <dependencies>
+      <dependency critical="true">Story 4.4 must be complete - operation status transitions to 'in_progress'</dependency>
+      <dependency critical="true">Story 4.5 must be complete - operation status transitions to 'completed'</dependency>
+      <dependency critical="true">wo_operations table must have started_at, finished_at, status columns</dependency>
+      <dependency>routing_operations table for expected_duration_minutes</dependency>
+    </dependencies>
+
+    <risks>
+      <risk level="low">SVG rendering performance with many operations (10+) - use virtualization if needed</risk>
+      <risk level="low">Mobile responsive layout complexity - may need alternative design</risk>
+    </risks>
+
+    <follow-up-stories>
+      <story>04-21 - Enhanced Timeline with Zoom/Pan (P2 Future)</story>
+      <story>04-22 - Timeline Export to PDF/Image (P2 Future)</story>
+    </follow-up-stories>
+  </implementation-notes>
+
+  <!-- ============================================================ -->
+  <!-- ARCHITECTURE ALIGNMENT -->
+  <!-- ============================================================ -->
+
+  <architecture-alignment>
+    <epic-reference>docs/epics/04-production.md</epic-reference>
+    <epic-description>Execute work orders - start, consume materials, register outputs, track yield</epic-description>
+
+    <functional-requirements>
+      <fr id="FR-PROD-004">WO Operations Tracking - Visual timeline of operation progress</fr>
+      <fr id="FR-PROD-020">Operation Timeline View - At-a-glance progress visualization</fr>
+    </functional-requirements>
+
+    <consistency-checks>
+      <check>Uses shared UI system (ModuleHeader, StatusBadge patterns)</check>
+      <check>Follows API route pattern (auth, validation, joins)</check>
+      <check>Uses standard color palette (gray/blue/green for status)</check>
+      <check>Integrates with WO Details Modal (Operations tab or Overview tab)</check>
+      <check>No external charting libraries (CSS/SVG only per AC-4.20.7)</check>
+      <check>Responsive design follows shared system breakpoints (sm/md/lg)</check>
+    </consistency-checks>
+
+    <integration-points>
+      <point>WO Details Modal - embed timeline in Operations or Overview tab</point>
+      <point>Operation Start (Story 4.4) - timeline reflects 'in_progress' status</point>
+      <point>Operation Complete (Story 4.5) - timeline reflects 'completed' status</point>
+      <point>Dashboard - future integration for line-level timelines</point>
+    </integration-points>
+  </architecture-alignment>
+
+</story-context>

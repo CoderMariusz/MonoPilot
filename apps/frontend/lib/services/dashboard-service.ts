@@ -29,7 +29,7 @@ export async function getProductDashboard(
   let query = supabase
     .from('products')
     .select(`
-      id, code, name, type, version, status, updated_at, created_at,
+      id, code, name, type, uom, version, status, updated_at, created_at,
       product_allergens (count),
       boms (count)
     `)
@@ -89,9 +89,11 @@ export async function getProductDashboard(
         id: p.id,
         code: p.code,
         name: p.name,
+        type: p.type as 'RM' | 'WIP' | 'FG' | 'PKG' | 'BP' | 'CUSTOM',
         version: p.version || 1,
         status: p.status,
         updated_at: p.updated_at,
+        uom: p.uom,
         allergen_count: p.product_allergens?.[0]?.count || 0,
         bom_count: p.boms?.[0]?.count || 0
       })),

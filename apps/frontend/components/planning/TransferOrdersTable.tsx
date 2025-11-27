@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { getStatusColor } from '@/lib/constants/app-colors'
 import { TransferOrderFormModal } from './TransferOrderFormModal'
 
 interface Warehouse {
@@ -172,28 +173,6 @@ export function TransferOrdersTable() {
     })
   }
 
-  // Get status badge variant
-  const getStatusVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'draft':
-        return 'secondary'
-      case 'planned':
-        return 'default'
-      case 'partially_shipped':
-        return 'default'
-      case 'shipped':
-        return 'default'
-      case 'partially_received':
-        return 'default'
-      case 'received':
-        return 'default'
-      case 'cancelled':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
-  }
-
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -290,7 +269,7 @@ export function TransferOrdersTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getStatusVariant(to.status)}>
+                    <Badge className={getStatusColor(to.status)}>
                       {to.status.replace('_', ' ')}
                     </Badge>
                   </TableCell>

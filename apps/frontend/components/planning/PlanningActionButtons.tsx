@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
-import { PLANNING_COLORS } from '@/lib/constants/planning-colors'
+import { PLANNING_COLORS } from '@/lib/constants/app-colors'
 
 interface PlanningActionButtonsProps {
   showPO?: boolean

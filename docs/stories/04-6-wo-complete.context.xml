@@ -1,0 +1,681 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>04-6</story-id>
+    <story-name>WO Complete</story-name>
+    <epic>4 - Production Execution</epic>
+    <status>drafted</status>
+    <priority>P0</priority>
+    <story-points>3</story-points>
+    <effort>1 day</effort>
+    <created>2025-11-27</created>
+  </metadata>
+
+  <story-overview>
+    <user-story>
+      As an Operator, I want to complete a work order so that I can finish production.
+    </user-story>
+    <description>
+      Implements atomic work order completion with validation, status transitions, and genealogy tracking.
+      Supports completion from both 'in_progress' and 'paused' states. Includes auto-complete when output
+      quantity reaches planned quantity. Critical transaction atomicity ensures no partial updates.
+    </description>
+    <dependencies>
+      <dependency>Story 4.7 - WO Output Registration (creates output LPs)</dependency>
+      <dependency>Story 4.12 - Material Genealogy (creates lp_genealogy records)</dependency>
+      <dependency>Story 4.19 - Genealogy Integration (validates genealogy completion)</dependency>
+    </dependencies>
+  </story-overview>
+
+  <acceptance-criteria>
+    <criterion id="AC-4.6.1">
+      <title>Complete Modal &amp; Validation</title>
+      <given>WO is In Progress OR Paused (can resume and complete, or complete directly if paused)</given>
+      <when>clicking "Complete WO"</when>
+      <then>
+        Modal shows WO summary and validates:
+        - All operations completed (if required)
+        - At least one output registered
+        - By-products registered (if in BOM)
+      </then>
+    </criterion>
+
+    <criterion id="AC-4.6.2">
+      <title>Status Transition</title>
+      <when>validation passes</when>
+      <then>status → 'completed', completed_at set, completed_by_user_id recorded</then>
+    </criterion>
+
+    <criterion id="AC-4.6.3">
+      <title>Auto-Complete</title>
+      <given>auto_complete_wo enabled</given>
+      <when>output_qty &gt;= planned_qty</when>
+      <then>WO auto-completes without user action</then>
+    </criterion>
+
+    <criterion id="AC-4.6.4">
+      <title>Transaction Atomicity (Sprint 0 Gap 6)</title>
+      <then>
+        WO completion is atomic:
+        1. VALIDATE: status='in_progress' OR 'paused', operations complete, output exists, genealogy complete
+        2. UPDATE work_orders: status → 'completed', completed_at, completed_by
+        3. UPDATE wo_operations: status → 'completed' (only if all ops have outputs)
+        4. UPDATE output LPs: status → 'available' (from 'in_production')
+        5. VALIDATE genealogy: All lp_genealogy records for this WO have child_lp_id filled
+        6. COMMIT or ROLLBACK all (no partial updates)
+      </then>
+    </criterion>
+
+    <criterion id="AC-4.6.5">
+      <title>Error Handling &amp; Rollback</title>
+      <when>any validation fails</when>
+      <then>400 error with specific reason, NO partial updates</then>
+      <error-messages>
+        <error>Already complete: "WO #X is already completed"</error>
+        <error>Operations pending: "2 operations not completed"</error>
+        <error>No output: "Register at least one output LP"</error>
+        <error>Missing by-products: "By-product 'Y' not registered"</error>
+      </error-messages>
+    </criterion>
+
+    <criterion id="AC-4.6.6">
+      <title>API Endpoint</title>
+      <then>POST /api/production/work-orders/:id/complete available</then>
+    </criterion>
+
+    <criterion id="AC-4.6.7">
+      <title>Concurrency Handling</title>
+      <then>Row-level lock on work_orders (SELECT...FOR UPDATE), prevent duplicate completion</then>
+    </criterion>
+
+    <criterion id="AC-4.6.8">
+      <title>Dashboard Integration</title>
+      <when>WO completed</when>
+      <then>removed from "Active WOs" list, appears in "Completed Today"</then>
+    </criterion>
+  </acceptance-criteria>
+
+  <database-schema>
+    <table name="work_orders">
+      <description>Main work order tracking table</description>
+      <columns>
+        <column name="id" type="uuid" primary-key="true"/>
+        <column name="org_id" type="uuid" required="true"/>
+        <column name="wo_number" type="text" required="true" description="Auto-generated WO number"/>
+        <column name="product_id" type="uuid" required="true"/>
+        <column name="bom_id" type="uuid" required="true"/>
+        <column name="routing_id" type="uuid" required="false"/>
+        <column name="quantity" type="numeric" required="true" description="Planned output quantity"/>
+        <column name="uom" type="text" required="true"/>
+        <column name="priority" type="text" required="true" values="low|medium|high|urgent"/>
+        <column name="status" type="text" required="true" values="draft|released|in_progress|paused|completed|cancelled"/>
+        <column name="line_id" type="uuid" required="false" description="Production line assignment"/>
+        <column name="scheduled_start" type="timestamptz"/>
+        <column name="scheduled_end" type="timestamptz"/>
+        <column name="actual_start" type="timestamptz"/>
+        <column name="actual_end" type="timestamptz"/>
+        <column name="completed_at" type="timestamptz" description="Completion timestamp"/>
+        <column name="completed_by_user_id" type="uuid" description="User who completed WO"/>
+        <column name="auto_complete_wo" type="boolean" default="false" description="Enable auto-completion"/>
+        <column name="created_at" type="timestamptz"/>
+        <column name="updated_at" type="timestamptz"/>
+      </columns>
+      <indexes>
+        <index>idx_work_orders_org_id</index>
+        <index>idx_work_orders_status</index>
+        <index>idx_work_orders_line_id</index>
+      </indexes>
+    </table>
+
+    <table name="wo_operations">
+      <description>Operations sequence for work orders</description>
+      <columns>
+        <column name="id" type="uuid" primary-key="true"/>
+        <column name="wo_id" type="uuid" required="true"/>
+        <column name="sequence_number" type="integer" required="true"/>
+        <column name="operation_name" type="text" required="true"/>
+        <column name="status" type="text" required="true" values="pending|in_progress|completed|skipped"/>
+        <column name="started_at" type="timestamptz"/>
+        <column name="finished_at" type="timestamptz"/>
+        <column name="expected_yield_pct" type="numeric"/>
+        <column name="actual_yield_pct" type="numeric"/>
+      </columns>
+    </table>
+
+    <table name="production_outputs">
+      <description>Output tracking (PR/FG/BP)</description>
+      <columns>
+        <column name="id" type="uuid" primary-key="true"/>
+        <column name="wo_id" type="uuid" required="true"/>
+        <column name="product_id" type="uuid" required="true"/>
+        <column name="quantity" type="numeric" required="true"/>
+        <column name="uom" type="text" required="true"/>
+        <column name="operation_seq" type="integer" required="false"/>
+        <column name="qa_status" type="text" values="pending|passed|failed|on_hold"/>
+        <column name="type" type="text" required="true" values="PR|FG|BP" description="Production Record|Finished Good|By-Product"/>
+      </columns>
+    </table>
+
+    <table name="license_plates">
+      <description>Physical inventory units</description>
+      <columns>
+        <column name="id" type="uuid" primary-key="true"/>
+        <column name="lp_number" type="text" required="true" unique="true"/>
+        <column name="product_id" type="uuid" required="true"/>
+        <column name="quantity" type="numeric" required="true"/>
+        <column name="uom" type="text" required="true"/>
+        <column name="status" type="text" required="true" values="in_production|available|reserved|consumed|expired"/>
+        <column name="batch_number" type="text"/>
+        <column name="expiry_date" type="date"/>
+      </columns>
+    </table>
+
+    <table name="lp_genealogy">
+      <description>Material traceability (created in Story 4.12, validated in 4.19)</description>
+      <columns>
+        <column name="id" type="uuid" primary-key="true"/>
+        <column name="wo_id" type="uuid" required="true"/>
+        <column name="parent_lp_id" type="uuid" required="true" description="Input material LP"/>
+        <column name="child_lp_id" type="uuid" required="false" description="Output LP (filled on completion)"/>
+        <column name="quantity_consumed" type="numeric"/>
+      </columns>
+      <validation>
+        All lp_genealogy records for WO must have child_lp_id filled before completion
+      </validation>
+    </table>
+  </database-schema>
+
+  <ux-design>
+    <module>Production Module</module>
+    <source>docs/ux-design/ux-design-production-module.md</source>
+
+    <dashboard-layout>
+      <header>
+        ModuleHeader: Production│Dashboard│Active WOs│Completed│Yields│⚙️
+      </header>
+      <action-buttons>
+        [Create WO] [Print Labels] [Settings]
+      </action-buttons>
+      <kpi-cards>
+        5 cards: Orders Today, Units Produced, Avg Yield, Active WOs, Shortages (120px height, 2×2 grid)
+      </kpi-cards>
+      <kanban-board>
+        4 columns: Line A, Line B, Line C, Line D
+        Sections per line: RUNNING (green), DELAYED (amber), PLANNED (blue), COMPLETED (gray), DOWNTIME (red)
+        WO cards: 440×140px with progress bars, operation status, alerts
+      </kanban-board>
+    </dashboard-layout>
+
+    <complete-modal>
+      <title>Complete Work Order</title>
+      <trigger>Click "Complete WO" button on WO card or detail view</trigger>
+      <content>
+        <section name="summary">
+          - WO Number
+          - Product Name
+          - Planned Quantity vs Actual Output
+          - Operations Status (X/Y completed)
+          - Materials Status (all consumed/by-products registered)
+        </section>
+        <validation-checklist>
+          ✓ All operations completed (if required)
+          ✓ At least one output registered
+          ✓ By-products registered (if in BOM)
+          ✓ Genealogy complete (all parent LPs linked to child LPs)
+        </validation-checklist>
+        <actions>
+          [Cancel] [Complete WO] (green button)
+        </actions>
+      </content>
+      <error-display>
+        Show validation errors inline with red background
+      </error-display>
+    </complete-modal>
+
+    <colors>
+      <source>apps/frontend/lib/constants/app-colors.ts</source>
+      <primary>green-600 (#16a34a) - Create/CTA buttons</primary>
+      <secondary>gray-600 (#4b5563) - View/Edit actions</secondary>
+      <danger>red-600 (#dc2626) - Delete/errors</danger>
+      <status-running>green-200 bg + green-800 text</status-running>
+      <status-completed>gray-200 bg + gray-800 text</status-completed>
+      <status-paused>yellow-200 bg + yellow-800 text</status-paused>
+    </colors>
+
+    <responsive>
+      <mobile>&lt;768px: Single-column, larger touch targets (48px min)</mobile>
+      <tablet>768-1024px: 2 columns</tablet>
+      <desktop>&gt;1024px: 4 columns (Kanban board)</desktop>
+    </responsive>
+  </ux-design>
+
+  <api-patterns>
+    <endpoint>
+      <method>POST</method>
+      <path>/api/production/work-orders/:id/complete</path>
+      <description>Complete work order with atomic transaction</description>
+      <request>
+        <body>
+          {
+            "force": false, // Optional: bypass non-critical validations
+            "notes": "Optional completion notes"
+          }
+        </body>
+      </request>
+      <response>
+        <success status="200">
+          {
+            "success": true,
+            "wo_number": "WO-001",
+            "completed_at": "2025-11-27T10:30:00Z",
+            "completed_by_user_id": "uuid",
+            "output_qty": 785,
+            "operations_completed": 3
+          }
+        </success>
+        <error status="400">
+          {
+            "error": "Validation failed",
+            "details": {
+              "operations_pending": 2,
+              "missing_output": false,
+              "missing_byproducts": ["Product X"]
+            }
+          }
+        </error>
+        <error status="409">
+          {
+            "error": "WO already completed"
+          }
+        </error>
+        <error status="500">
+          {
+            "error": "Transaction failed - rolled back"
+          }
+        </error>
+      </response>
+    </endpoint>
+
+    <api-route-pattern>
+      <file>apps/frontend/app/api/production/work-orders/[id]/complete/route.ts</file>
+      <pattern>
+        import { createClient } from '@/lib/supabase/server'
+        import { NextResponse } from 'next/server'
+
+        export async function POST(
+          request: Request,
+          { params }: { params: { id: string } }
+        ) {
+          const supabase = await createClient()
+
+          // Transaction with row-level lock
+          const { data, error } = await supabase.rpc('complete_work_order', {
+            p_wo_id: params.id,
+            p_user_id: user.id
+          })
+
+          if (error) {
+            return NextResponse.json(
+              { error: error.message },
+              { status: 500 }
+            )
+          }
+
+          return NextResponse.json(data)
+        }
+      </pattern>
+    </api-route-pattern>
+
+    <database-function>
+      <name>complete_work_order</name>
+      <description>Atomic RPC function for WO completion</description>
+      <signature>
+        CREATE OR REPLACE FUNCTION complete_work_order(
+          p_wo_id UUID,
+          p_user_id UUID
+        ) RETURNS JSON
+      </signature>
+      <logic>
+        BEGIN
+          -- 1. Row-level lock
+          SELECT * FROM work_orders WHERE id = p_wo_id FOR UPDATE;
+
+          -- 2. Validate status
+          IF status NOT IN ('in_progress', 'paused') THEN
+            RAISE EXCEPTION 'Invalid status: %', status;
+          END IF;
+
+          -- 3. Validate operations
+          SELECT COUNT(*) INTO pending_ops
+          FROM wo_operations
+          WHERE wo_id = p_wo_id AND status != 'completed';
+
+          IF pending_ops > 0 THEN
+            RAISE EXCEPTION '% operations not completed', pending_ops;
+          END IF;
+
+          -- 4. Validate output
+          SELECT COUNT(*) INTO output_count
+          FROM production_outputs
+          WHERE wo_id = p_wo_id;
+
+          IF output_count = 0 THEN
+            RAISE EXCEPTION 'Register at least one output LP';
+          END IF;
+
+          -- 5. Validate genealogy (Story 4.19)
+          SELECT COUNT(*) INTO incomplete_genealogy
+          FROM lp_genealogy
+          WHERE wo_id = p_wo_id AND child_lp_id IS NULL;
+
+          IF incomplete_genealogy > 0 THEN
+            RAISE EXCEPTION 'Genealogy incomplete';
+          END IF;
+
+          -- 6. Update WO
+          UPDATE work_orders
+          SET status = 'completed',
+              completed_at = NOW(),
+              completed_by_user_id = p_user_id
+          WHERE id = p_wo_id;
+
+          -- 7. Update output LPs
+          UPDATE license_plates
+          SET status = 'available'
+          WHERE id IN (
+            SELECT lp_id FROM production_outputs WHERE wo_id = p_wo_id
+          ) AND status = 'in_production';
+
+          RETURN json_build_object('success', true);
+        END;
+      </logic>
+    </database-function>
+  </api-patterns>
+
+  <existing-code-references>
+    <component>
+      <path>apps/frontend/app/(authenticated)/planning/page.tsx</path>
+      <description>Similar dashboard pattern with stats cards and tables</description>
+      <pattern>
+        - ModuleHeader usage
+        - Stats cards grid (4 cards)
+        - DataTable with filters
+        - Real-time data fetching with useEffect
+      </pattern>
+    </component>
+
+    <supabase-client>
+      <pattern>
+        'use client'
+        import { createClient } from '@/lib/supabase/client'
+
+        const supabase = createClient()
+
+        async function fetchData() {
+          const { data, error } = await supabase
+            .from('work_orders')
+            .select('*')
+            .eq('status', 'in_progress')
+        }
+      </pattern>
+    </supabase-client>
+
+    <api-call-pattern>
+      <pattern>
+        async function completeWorkOrder(woId: string) {
+          const response = await fetch(`/api/production/work-orders/${woId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: 'Optional notes' })
+          })
+
+          if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.details)
+          }
+
+          return response.json()
+        }
+      </pattern>
+    </api-call-pattern>
+  </existing-code-references>
+
+  <testing-strategy>
+    <test-framework>Playwright E2E (tests/e2e/**/*.spec.ts)</test-framework>
+    <config>playwright.config.ts (3 browsers, 60s timeout, retain-on-failure traces)</config>
+
+    <test-setup>
+      <fixtures>tests/e2e/fixtures/test-setup.ts</fixtures>
+      <functions>
+        - createTestOrganization() → returns orgId from .env.test
+        - createTestUser(orgId) → creates auth user + JWT token
+        - createTestWarehouses(orgId) → creates 2 warehouses
+        - createTestProducts(orgId, count) → creates products
+        - cleanupTestData(orgId) → cleanup after test
+      </functions>
+    </test-setup>
+
+    <test-file>
+      <path>tests/e2e/wo-complete.spec.ts</path>
+      <scenarios>
+        <test name="should complete WO successfully">
+          1. Create test WO with status='in_progress'
+          2. Create production outputs (1 FG LP)
+          3. Mark all operations as completed
+          4. Create genealogy records with child_lp_id
+          5. Navigate to /production
+          6. Click "Complete WO" on WO card
+          7. Verify modal shows summary
+          8. Click "Complete WO" button
+          9. Verify success toast
+          10. Verify WO appears in "Completed Today"
+          11. Verify LP status changed to 'available'
+        </test>
+
+        <test name="should reject completion with pending operations">
+          1. Create test WO with 3 operations
+          2. Mark only 2 operations as completed
+          3. Attempt completion
+          4. Verify error: "1 operations not completed"
+        </test>
+
+        <test name="should reject completion without output">
+          1. Create test WO with status='in_progress'
+          2. Complete all operations
+          3. NO production outputs created
+          4. Attempt completion
+          5. Verify error: "Register at least one output LP"
+        </test>
+
+        <test name="should auto-complete when output reaches planned qty">
+          1. Create test WO with quantity=1000, auto_complete_wo=true
+          2. Register output with quantity=1000
+          3. Verify WO auto-completes (status='completed')
+        </test>
+
+        <test name="should handle concurrency (2 operators clicking simultaneously)">
+          1. Create test WO
+          2. Simulate 2 POST requests to /complete endpoint
+          3. Verify only ONE completes successfully
+          4. Other returns 409 "Already completed"
+        </test>
+
+        <test name="should rollback on transaction failure">
+          1. Mock genealogy validation to fail
+          2. Attempt completion
+          3. Verify WO status unchanged
+          4. Verify LP status unchanged
+          5. Verify no partial updates committed
+        </test>
+      </scenarios>
+    </test-file>
+
+    <test-commands>
+      <command>pnpm test -- wo-complete.spec.ts</command>
+      <command>pnpm test -- --headed</command>
+      <command>pnpm test -- --debug</command>
+    </test-commands>
+
+    <env-requirements>
+      <file>.env.test</file>
+      <variables>
+        NEXT_PUBLIC_SUPABASE_URL=...
+        NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+        SUPABASE_SERVICE_ROLE_KEY=...
+        TEST_ORG_ID=... (existing organization)
+        NEXT_PUBLIC_APP_URL=http://localhost:5000
+        BASE_URL=http://localhost:5000
+      </variables>
+    </env-requirements>
+  </testing-strategy>
+
+  <implementation-tasks>
+    <task id="1" priority="P0">
+      <title>Design atomic transaction flow</title>
+      <details>
+        - Document state transition diagram (in_progress/paused → completed)
+        - Define rollback scenarios
+        - Plan row-level locking strategy
+      </details>
+      <deliverable>docs/technical/wo-completion-flow.md</deliverable>
+    </task>
+
+    <task id="2" priority="P0">
+      <title>Create WOCompleteService with transaction logic</title>
+      <details>
+        - Create database RPC function: complete_work_order(p_wo_id, p_user_id)
+        - Implement SELECT...FOR UPDATE lock
+        - Implement 6-step atomic transaction (AC-4.6.4)
+        - Add comprehensive error handling
+      </details>
+      <deliverable>Migration: supabase/migrations/XXXXXX_wo_complete_function.sql</deliverable>
+    </task>
+
+    <task id="3" priority="P0">
+      <title>Implement validation checks</title>
+      <details>
+        - Status validation (in_progress OR paused)
+        - Operations completion check
+        - Output existence check
+        - By-products registration check (if in BOM)
+        - Genealogy completion check (Story 4.19)
+      </details>
+      <deliverable>Database function validation logic</deliverable>
+    </task>
+
+    <task id="4" priority="P0">
+      <title>Implement genealogy record creation (Story 4.19 dependency)</title>
+      <details>
+        - Validate all lp_genealogy records have child_lp_id
+        - Ensure no orphaned genealogy records
+        - Handle edge cases (by-products, multi-output)
+      </details>
+      <deliverable>Part of complete_work_order() RPC</deliverable>
+    </task>
+
+    <task id="5" priority="P0">
+      <title>Create API endpoint with proper error responses</title>
+      <details>
+        - Create POST /api/production/work-orders/[id]/complete/route.ts
+        - Call RPC function
+        - Map database errors to HTTP status codes
+        - Return structured error responses (AC-4.6.5)
+      </details>
+      <deliverable>apps/frontend/app/api/production/work-orders/[id]/complete/route.ts</deliverable>
+    </task>
+
+    <task id="6" priority="P0">
+      <title>Frontend modal with validation feedback</title>
+      <details>
+        - Create WOCompleteModal component
+        - Show WO summary (number, product, qty, operations, materials)
+        - Display validation checklist
+        - Show errors inline (red background)
+        - Toast notification on success/error
+      </details>
+      <deliverable>apps/frontend/components/production/WOCompleteModal.tsx</deliverable>
+    </task>
+
+    <task id="7" priority="P0">
+      <title>Tests (unit, integration, E2E, concurrency tests)</title>
+      <details>
+        - E2E: Happy path completion
+        - E2E: Validation errors (pending ops, no output, missing by-products)
+        - E2E: Auto-complete trigger
+        - E2E: Concurrency (2 operators)
+        - E2E: Transaction rollback
+        - Unit: Database function logic
+        - Integration: API endpoint
+      </details>
+      <deliverable>tests/e2e/wo-complete.spec.ts (6 scenarios)</deliverable>
+    </task>
+  </implementation-tasks>
+
+  <dev-notes>
+    <note>
+      <title>Transaction Atomicity Required</title>
+      <description>
+        Follow AC-4.6.4 exactly. Use database RPC function with SELECT...FOR UPDATE.
+        All 6 steps must succeed or rollback entirely. NO partial updates allowed.
+      </description>
+    </note>
+
+    <note>
+      <title>Genealogy Integration</title>
+      <description>
+        Must validate genealogy completion before allowing WO completion (Story 4.19 dependency).
+        All lp_genealogy records for WO must have child_lp_id filled (created in Story 4.7, updated in 4.12).
+      </description>
+    </note>
+
+    <note>
+      <title>Concurrency Risk</title>
+      <description>
+        Multiple operators may click Complete simultaneously. Use SELECT...FOR UPDATE to prevent
+        race conditions. Second request must return 409 "Already completed".
+      </description>
+    </note>
+
+    <note>
+      <title>Auto-Complete Logic</title>
+      <description>
+        When auto_complete_wo=true and output_qty >= planned_qty, trigger automatic completion.
+        Implement as database trigger on production_outputs INSERT/UPDATE.
+      </description>
+    </note>
+
+    <note>
+      <title>Status Transition Rules</title>
+      <description>
+        - in_progress → completed: Normal flow
+        - paused → completed: Allowed (resume not required)
+        - draft/released/cancelled → completed: BLOCKED
+        - completed → *: BLOCKED (immutable)
+      </description>
+    </note>
+
+    <note>
+      <title>Reference Documentation</title>
+      <description>
+        - AC Template Checklist: docs/templates/ac-template.md
+        - Sprint 0 Gap 6: Transaction atomicity requirements
+        - Story 4.7: WO Output Registration
+        - Story 4.12: Material Genealogy
+        - Story 4.19: Genealogy Integration
+      </description>
+    </note>
+  </dev-notes>
+
+  <traceability>
+    <epic>Epic 4 - Production Execution</epic>
+    <related-stories>
+      <story id="4.1">WO Start</story>
+      <story id="4.2">WO Pause/Resume</story>
+      <story id="4.5">Operations Progress</story>
+      <story id="4.7">WO Output Registration</story>
+      <story id="4.12">Material Genealogy</story>
+      <story id="4.19">Genealogy Integration</story>
+    </related-stories>
+    <sprint-status>docs/meta/sprint-status.yaml</sprint-status>
+  </traceability>
+</story-context>

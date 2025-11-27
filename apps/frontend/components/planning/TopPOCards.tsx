@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Loader2 } from 'lucide-react'
-import { getStatusColor } from '@/lib/constants/planning-colors'
+import { getStatusColor } from '@/lib/constants/app-colors'
 
 interface PurchaseOrder {
   id: string

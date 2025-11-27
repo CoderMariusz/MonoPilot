@@ -1,0 +1,803 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>04-16</story-id>
+    <story-name>Multiple Outputs per WO</story-name>
+    <epic>4 - Production Execution</epic>
+    <status>drafted</status>
+    <priority>P0</priority>
+    <story-points>1</story-points>
+    <effort>0.5 day</effort>
+    <created>2025-11-27</created>
+    <dependencies>
+      <dependency>Story 4.12 - Output Registration</dependency>
+      <dependency>Story 4.19 - Genealogy</dependency>
+    </dependencies>
+  </metadata>
+
+  <story-content>
+    <user-story>
+      As an Operator
+      I want to register multiple outputs
+      So that I can track partial production
+    </user-story>
+
+    <acceptance-criteria>
+      <criterion id="AC-4.16.1">
+        <title>Multiple Output Support</title>
+        <description>
+          Given WO allows multiple outputs
+          When registering output
+          Then each creates separate LP (not cumulative)
+        </description>
+      </criterion>
+
+      <criterion id="AC-4.16.2">
+        <title>Output History</title>
+        <description>
+          Then work_orders.output_qty = sum of all outputs, output history shown in WO detail
+        </description>
+      </criterion>
+
+      <criterion id="AC-4.16.3">
+        <title>Output List View</title>
+        <description>
+          Then Table showing all outputs: qty, date, operator, qa_status
+        </description>
+      </criterion>
+
+      <criterion id="AC-4.16.4">
+        <title>Auto-Complete Trigger</title>
+        <description>
+          When total output >= planned
+          Then system prompts to complete WO (or auto-completes if enabled)
+        </description>
+      </criterion>
+
+      <criterion id="AC-4.16.5">
+        <title>Genealogy Per Output</title>
+        <description>
+          Then Each output LP has separate genealogy linking to consumed materials
+        </description>
+      </criterion>
+
+      <criterion id="AC-4.16.6">
+        <title>Sequential LP Allocation with Shared Consumption</title>
+        <description>
+          When multiple outputs from same WO
+          Then Reserved LPs consumed sequentially across outputs (LPs can span multiple outputs)
+        </description>
+        <example>
+          WO: 200kg meat, Reserved:
+            - LP-1: 40kg
+            - LP-2: 30kg
+            - LP-3: 40kg
+            - LP-4: 60kg
+
+          Output-1 (60kg): consumes LP-1 (40kg) + LP-2 (20kg of 30kg)
+          Output-2 (30kg): consumes LP-2 (10kg remaining) + LP-3 (20kg of 40kg)
+          Output-3 (40kg): consumes LP-3 (20kg remaining) + LP-4 (20kg of 60kg)
+          Output-4 (30kg): over-production, operator selects source LP
+
+          Genealogy per output:
+          - Output-1: LP-1 → Output-1, LP-2 (partial) → Output-1
+          - Output-2: LP-2 (partial) → Output-2, LP-3 (partial) → Output-2
+          - Output-3: LP-3 (partial) → Output-3, LP-4 (partial) → Output-3
+          - Output-4: [operator choice] → Output-4
+
+          Key: LPs consumed sequentially, can be split across multiple outputs
+        </example>
+      </criterion>
+
+      <criterion id="AC-4.16.7">
+        <title>API Tracking</title>
+        <description>
+          Then production_outputs table tracks all outputs with: wo_id, product_id, qty, created_at, operator_id
+        </description>
+      </criterion>
+
+      <criterion id="AC-4.16.8">
+        <title>Prerequisites</title>
+        <description>
+          Then Requires Story 4.12 (Output Registration) and Story 4.19 (Genealogy)
+        </description>
+      </criterion>
+    </acceptance-criteria>
+
+    <tasks>
+      <task id="task-1" status="pending">Create production_outputs table (if not exists)</task>
+      <task id="task-2" status="pending">Multiple output logic in OutputService</task>
+      <task id="task-3" status="pending">Output list/history UI</task>
+      <task id="task-4" status="pending">Auto-complete trigger (Story 4.6 integration)</task>
+      <task id="task-5" status="pending">Genealogy per-output linking</task>
+      <task id="task-6" status="pending">Tests</task>
+    </tasks>
+  </story-content>
+
+  <ux-design>
+    <shared-system>
+      <component name="ModuleHeader">
+        <description>Production | Dashboard | Active WOs | Completed | Yields | ⚙️</description>
+        <file>components/shared/ModuleHeader.tsx</file>
+      </component>
+
+      <component name="DataTable">
+        <description>Output list table with sortable columns, filters, responsive card view on mobile</description>
+        <file>components/shared/DataTable.tsx</file>
+        <columns>
+          <column key="output_number" label="Output #" sortable="true"/>
+          <column key="quantity" label="Qty" sortable="true"/>
+          <column key="created_at" label="Date" sortable="true"/>
+          <column key="operator" label="Operator" sortable="false"/>
+          <column key="qa_status" label="QA Status" render="StatusBadge"/>
+        </columns>
+        <features>
+          <feature>Pagination (20 items per page)</feature>
+          <feature>Search on output_number, operator</feature>
+          <feature>Filter by qa_status, date range</feature>
+          <feature>Mobile: card view (&lt;768px)</feature>
+        </features>
+      </component>
+
+      <design-tokens>
+        <color-palette>
+          <color name="primary-create" value="green-600">#16a34a</color>
+          <color name="secondary-action" value="gray-600">#4b5563</color>
+          <color name="danger" value="red-600">#dc2626</color>
+          <color name="status-active" value="green-200 bg + green-800 text">#dcfce7, #166534</color>
+          <color name="status-pending" value="yellow-200 bg + yellow-800 text">#fef08a, #854d0e</color>
+        </color-palette>
+
+        <typography>
+          <font-scale>
+            <size name="h2">text-2xl (24px) - Section headers</size>
+            <size name="h3">text-xl (20px) - Card titles</size>
+            <size name="base">text-base (16px) - Table data</size>
+            <size name="sm">text-sm (14px) - Labels</size>
+            <size name="xs">text-xs (12px) - Metadata</size>
+          </font-scale>
+        </typography>
+
+        <responsive>
+          <breakpoint name="sm">640px (mobile) - single column, card view</breakpoint>
+          <breakpoint name="md">768px (tablet) - 2 columns</breakpoint>
+          <breakpoint name="lg">1024px (desktop) - full table, 3-4 columns</breakpoint>
+        </responsive>
+      </design-tokens>
+    </shared-system>
+
+    <production-specific>
+      <component name="WODetailsModal">
+        <description>Modal with 6 tabs including "Outputs" tab for output history</description>
+        <tabs>
+          <tab>Overview</tab>
+          <tab>Operations</tab>
+          <tab>Materials</tab>
+          <tab>Outputs</tab>
+          <tab>Trace</tab>
+          <tab>History</tab>
+        </tabs>
+        <outputs-tab>
+          <feature>Table showing all outputs for WO</feature>
+          <feature>Sum total output_qty displayed vs planned_quantity</feature>
+          <feature>Progress bar: (total_output / planned) × 100%</feature>
+          <feature>Auto-complete prompt when total_output >= planned_quantity</feature>
+          <feature>Each row links to LP detail (click output # → navigate to LP page)</feature>
+        </outputs-tab>
+      </component>
+
+      <component name="OutputRegistrationForm">
+        <description>Form for registering single output (creates new LP + genealogy link)</description>
+        <fields>
+          <field name="quantity" type="number" required="true" validation="positive, <= remaining_qty"/>
+          <field name="uom" type="select" required="true" options="from product"/>
+          <field name="qa_status" type="select" required="true" options="pending, passed, failed, hold"/>
+          <field name="batch_number" type="text" required="false" auto-generated="true"/>
+          <field name="notes" type="textarea" required="false"/>
+        </fields>
+        <logic>
+          <step>Validate: quantity > 0, total_output + quantity <= planned_quantity × 1.1 (10% over-production allowed)</step>
+          <step>Create LP: product_id, quantity, uom, qa_status, batch_number, wo_id</step>
+          <step>Update work_orders.output_qty += quantity</step>
+          <step>Create lp_genealogy entries: consumed LPs → new output LP (sequential allocation)</step>
+          <step>If total_output >= planned_quantity: show completion prompt</step>
+        </logic>
+      </component>
+
+      <sequential-lp-allocation>
+        <description>Algorithm for consuming reserved LPs across multiple outputs</description>
+        <algorithm>
+          1. Get reserved LPs for WO (ORDER BY created_at ASC)
+          2. For each output:
+             - Calculate remaining qty to allocate
+             - Iterate through reserved LPs:
+               - If LP has remaining qty:
+                 - consume_qty = MIN(lp.remaining_qty, output.remaining_qty)
+                 - Create lp_genealogy(parent_lp_id: reserved_lp, child_lp_id: output_lp, qty: consume_qty)
+                 - Update lp_reservations.qty_consumed += consume_qty
+                 - output.remaining_qty -= consume_qty
+               - If output.remaining_qty == 0: BREAK
+          3. If over-production (remaining_qty > 0 after all reserved LPs):
+             - Show operator modal: "Select source LP for over-production"
+             - Operator manually selects LP from available stock
+        </algorithm>
+        <example>
+          Reserved LPs: [LP-1: 40kg, LP-2: 30kg, LP-3: 40kg, LP-4: 60kg]
+          Output-1 (60kg):
+            - LP-1: consume 40kg (LP-1 depleted)
+            - LP-2: consume 20kg (LP-2 remaining: 10kg)
+            - genealogy: [LP-1 → Output-1 (40kg), LP-2 → Output-1 (20kg)]
+          Output-2 (30kg):
+            - LP-2: consume 10kg (LP-2 depleted)
+            - LP-3: consume 20kg (LP-3 remaining: 20kg)
+            - genealogy: [LP-2 → Output-2 (10kg), LP-3 → Output-2 (20kg)]
+          Output-3 (40kg):
+            - LP-3: consume 20kg (LP-3 depleted)
+            - LP-4: consume 20kg (LP-4 remaining: 40kg)
+            - genealogy: [LP-3 → Output-3 (20kg), LP-4 → Output-3 (20kg)]
+        </example>
+      </sequential-lp-allocation>
+    </production-specific>
+  </ux-design>
+
+  <database-schema>
+    <table name="work_orders">
+      <description>Work orders (STUB from Epic 2, enhanced in Epic 4)</description>
+      <columns>
+        <column name="id" type="UUID" pk="true"/>
+        <column name="org_id" type="UUID" fk="organizations(id)"/>
+        <column name="wo_number" type="VARCHAR(50)" unique="true"/>
+        <column name="product_id" type="UUID" fk="products(id)"/>
+        <column name="planned_quantity" type="DECIMAL(12,3)" check="positive"/>
+        <column name="produced_quantity" type="DECIMAL(12,3)" default="0" check="non-negative"/>
+        <column name="uom" type="VARCHAR(10)"/>
+        <column name="status" type="VARCHAR(20)" check="draft|released|in_progress|completed|closed|cancelled"/>
+        <column name="planned_start_date" type="DATE"/>
+        <column name="planned_end_date" type="DATE"/>
+        <column name="actual_start_date" type="DATE"/>
+        <column name="actual_end_date" type="DATE"/>
+        <column name="production_line_id" type="UUID" fk="machines(id)"/>
+        <column name="routing_id" type="UUID"/>
+        <column name="created_by" type="UUID" fk="users(id)"/>
+        <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+        <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+      </columns>
+      <migration>apps/frontend/lib/supabase/migrations/028_create_work_orders_stub.sql</migration>
+    </table>
+
+    <table name="production_outputs">
+      <description>Individual output registrations for work orders (NEW - Epic 4)</description>
+      <status>TO BE CREATED</status>
+      <columns>
+        <column name="id" type="UUID" pk="true" default="gen_random_uuid()"/>
+        <column name="org_id" type="UUID" fk="organizations(id)" required="true"/>
+        <column name="wo_id" type="UUID" fk="work_orders(id)" required="true"/>
+        <column name="lp_id" type="UUID" fk="license_plates(id)" required="true" comment="Output LP created"/>
+        <column name="product_id" type="UUID" fk="products(id)" required="true"/>
+        <column name="quantity" type="DECIMAL(12,3)" required="true" check="positive"/>
+        <column name="uom" type="VARCHAR(10)" required="true"/>
+        <column name="qa_status" type="VARCHAR(20)" required="true" check="pending|passed|failed|hold"/>
+        <column name="batch_number" type="VARCHAR(50)"/>
+        <column name="notes" type="TEXT"/>
+        <column name="operator_id" type="UUID" fk="users(id)"/>
+        <column name="created_at" type="TIMESTAMP WITH TIME ZONE" default="NOW()"/>
+        <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" default="NOW()"/>
+      </columns>
+      <indexes>
+        <index name="idx_production_outputs_wo" columns="wo_id"/>
+        <index name="idx_production_outputs_lp" columns="lp_id"/>
+        <index name="idx_production_outputs_operator" columns="operator_id"/>
+        <index name="idx_production_outputs_date" columns="created_at"/>
+      </indexes>
+      <rls>
+        <policy name="Users can view outputs in their org" action="SELECT">
+          org_id = (auth.jwt() ->> 'org_id')::uuid
+        </policy>
+        <policy name="Production/Admin can create outputs" action="INSERT">
+          org_id = (auth.jwt() ->> 'org_id')::uuid
+          AND (auth.jwt() ->> 'role') IN ('production', 'admin')
+        </policy>
+        <policy name="Production/Admin can update outputs" action="UPDATE">
+          org_id = (auth.jwt() ->> 'org_id')::uuid
+          AND (auth.jwt() ->> 'role') IN ('production', 'admin')
+        </policy>
+        <policy name="Admin can delete outputs" action="DELETE">
+          org_id = (auth.jwt() ->> 'org_id')::uuid
+          AND (auth.jwt() ->> 'role') = 'admin'
+        </policy>
+      </rls>
+    </table>
+
+    <table name="lp_genealogy">
+      <description>Parent-child relationships between License Plates for traceability</description>
+      <columns>
+        <column name="id" type="UUID" pk="true"/>
+        <column name="parent_lp_id" type="UUID" fk="license_plates(id)" required="true"/>
+        <column name="child_lp_id" type="UUID" fk="license_plates(id)" required="true"/>
+        <column name="relationship_type" type="VARCHAR(20)" check="split|combine|transform"/>
+        <column name="work_order_id" type="UUID" fk="work_orders(id)"/>
+        <column name="transfer_order_id" type="UUID" fk="transfer_orders(id)"/>
+        <column name="quantity_from_parent" type="DECIMAL(12,3)" required="true" check="positive"/>
+        <column name="uom" type="VARCHAR(10)" required="true"/>
+        <column name="created_by" type="UUID" fk="users(id)"/>
+        <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+      </columns>
+      <indexes>
+        <index name="idx_lp_genealogy_parent" columns="parent_lp_id" comment="Critical for forward trace queries"/>
+        <index name="idx_lp_genealogy_child" columns="child_lp_id" comment="Critical for backward trace queries"/>
+        <index name="idx_lp_genealogy_wo" columns="work_order_id"/>
+        <index name="idx_lp_genealogy_composite" columns="parent_lp_id, child_lp_id, relationship_type"/>
+      </indexes>
+      <constraints>
+        <constraint name="lp_genealogy_no_self_reference" check="parent_lp_id != child_lp_id"/>
+      </constraints>
+      <migration>apps/frontend/lib/supabase/migrations/030_create_lp_genealogy_table.sql</migration>
+      <note>Immutable audit trail - no UPDATE/DELETE policies</note>
+    </table>
+
+    <table name="lp_reservations">
+      <description>Tracks reserved LPs for work orders and consumption progress</description>
+      <columns>
+        <column name="id" type="UUID" pk="true"/>
+        <column name="lp_id" type="UUID" fk="license_plates(id)" required="true"/>
+        <column name="wo_id" type="UUID" fk="work_orders(id)" required="true"/>
+        <column name="qty_reserved" type="DECIMAL(12,3)" required="true" check="positive"/>
+        <column name="qty_consumed" type="DECIMAL(12,3)" default="0" check="non-negative"/>
+        <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+      </columns>
+      <computed-fields>
+        <field name="remaining_qty" expression="qty_reserved - qty_consumed"/>
+      </computed-fields>
+    </table>
+
+    <table name="license_plates">
+      <description>Physical license plates (pallets, boxes, etc.)</description>
+      <columns>
+        <column name="id" type="UUID" pk="true"/>
+        <column name="lp_number" type="VARCHAR(50)" unique="true"/>
+        <column name="product_id" type="UUID" fk="products(id)"/>
+        <column name="quantity" type="DECIMAL(12,3)"/>
+        <column name="uom" type="VARCHAR(10)"/>
+        <column name="status" type="VARCHAR(20)"/>
+        <column name="batch_number" type="VARCHAR(50)"/>
+        <column name="expiry_date" type="DATE"/>
+        <column name="wo_id" type="UUID" fk="work_orders(id)" comment="Source WO for produced LPs"/>
+      </columns>
+    </table>
+  </database-schema>
+
+  <api-patterns>
+    <endpoint path="/api/production/outputs" method="GET">
+      <description>Get all outputs for a work order</description>
+      <query-params>
+        <param name="wo_id" type="UUID" required="true"/>
+        <param name="limit" type="number" default="20"/>
+        <param name="offset" type="number" default="0"/>
+      </query-params>
+      <response>
+        <field name="outputs" type="array">
+          <item>
+            <field name="id" type="UUID"/>
+            <field name="wo_id" type="UUID"/>
+            <field name="lp_id" type="UUID"/>
+            <field name="lp_number" type="string"/>
+            <field name="quantity" type="number"/>
+            <field name="uom" type="string"/>
+            <field name="qa_status" type="string"/>
+            <field name="operator_name" type="string"/>
+            <field name="created_at" type="timestamp"/>
+          </item>
+        </field>
+        <field name="total_output" type="number" comment="sum(quantity)"/>
+        <field name="planned_quantity" type="number"/>
+        <field name="completion_percentage" type="number" comment="(total_output / planned) × 100"/>
+        <field name="count" type="number"/>
+      </response>
+      <example>
+        GET /api/production/outputs?wo_id=abc-123
+        Response:
+        {
+          "outputs": [
+            { "id": "out-1", "lp_number": "LP-00105", "quantity": 60, "qa_status": "passed", "operator_name": "Anna K", "created_at": "2025-11-27T08:30:00Z" },
+            { "id": "out-2", "lp_number": "LP-00106", "quantity": 30, "qa_status": "passed", "operator_name": "Anna K", "created_at": "2025-11-27T09:15:00Z" }
+          ],
+          "total_output": 90,
+          "planned_quantity": 200,
+          "completion_percentage": 45,
+          "count": 2
+        }
+      </example>
+    </endpoint>
+
+    <endpoint path="/api/production/outputs" method="POST">
+      <description>Register new output for work order</description>
+      <body>
+        <field name="wo_id" type="UUID" required="true"/>
+        <field name="quantity" type="number" required="true" validation="positive"/>
+        <field name="uom" type="string" required="true"/>
+        <field name="qa_status" type="string" required="true" options="pending|passed|failed|hold"/>
+        <field name="batch_number" type="string" required="false"/>
+        <field name="notes" type="string" required="false"/>
+      </body>
+      <logic>
+        <step>1. Validate: quantity > 0</step>
+        <step>2. Get WO: planned_quantity, produced_quantity, product_id</step>
+        <step>3. Check over-production: total + quantity <= planned × 1.1 (10% allowed)</step>
+        <step>4. Create LP: product_id, quantity, uom, batch_number, wo_id, status=available</step>
+        <step>5. Create production_outputs record: wo_id, lp_id, quantity, qa_status, operator_id</step>
+        <step>6. Create lp_genealogy entries: sequential allocation from reserved LPs</step>
+        <step>7. Update work_orders.produced_quantity += quantity</step>
+        <step>8. If produced_quantity >= planned_quantity: return { should_complete: true }</step>
+      </logic>
+      <response>
+        <field name="output_id" type="UUID"/>
+        <field name="lp_id" type="UUID"/>
+        <field name="lp_number" type="string"/>
+        <field name="total_output" type="number"/>
+        <field name="completion_percentage" type="number"/>
+        <field name="should_complete" type="boolean" comment="true if total >= planned"/>
+      </response>
+      <example>
+        POST /api/production/outputs
+        Body: { "wo_id": "abc-123", "quantity": 60, "uom": "kg", "qa_status": "passed" }
+        Response:
+        {
+          "output_id": "out-1",
+          "lp_id": "lp-105",
+          "lp_number": "LP-00105",
+          "total_output": 60,
+          "completion_percentage": 30,
+          "should_complete": false
+        }
+      </example>
+    </endpoint>
+
+    <endpoint path="/api/production/outputs/genealogy" method="GET">
+      <description>Get genealogy for specific output (consumed LPs)</description>
+      <query-params>
+        <param name="output_id" type="UUID" required="true"/>
+      </query-params>
+      <response>
+        <field name="output" type="object">
+          <field name="id" type="UUID"/>
+          <field name="lp_number" type="string"/>
+          <field name="quantity" type="number"/>
+        </field>
+        <field name="consumed_lps" type="array">
+          <item>
+            <field name="lp_number" type="string"/>
+            <field name="quantity_consumed" type="number"/>
+            <field name="product_name" type="string"/>
+          </item>
+        </field>
+      </response>
+      <query>
+        SELECT
+          lg.parent_lp_id,
+          parent_lp.lp_number,
+          lg.quantity_from_parent,
+          p.name AS product_name
+        FROM lp_genealogy lg
+        JOIN license_plates parent_lp ON parent_lp.id = lg.parent_lp_id
+        JOIN products p ON p.id = parent_lp.product_id
+        WHERE lg.child_lp_id = (SELECT lp_id FROM production_outputs WHERE id = $output_id)
+        ORDER BY lg.created_at ASC
+      </query>
+    </endpoint>
+
+    <service-class name="OutputService">
+      <description>Business logic for output registration and genealogy</description>
+      <methods>
+        <method name="registerOutput">
+          <params>
+            <param name="woId" type="UUID"/>
+            <param name="quantity" type="number"/>
+            <param name="uom" type="string"/>
+            <param name="qaStatus" type="string"/>
+            <param name="operatorId" type="UUID"/>
+          </params>
+          <returns>
+            <field name="outputId" type="UUID"/>
+            <field name="lpId" type="UUID"/>
+            <field name="shouldComplete" type="boolean"/>
+          </returns>
+          <steps>
+            <step>Validate input</step>
+            <step>Create LP</step>
+            <step>Create production_outputs record</step>
+            <step>Allocate consumed LPs sequentially</step>
+            <step>Update work_orders.produced_quantity</step>
+            <step>Check completion threshold</step>
+          </steps>
+        </method>
+
+        <method name="allocateConsumedLPs">
+          <params>
+            <param name="woId" type="UUID"/>
+            <param name="outputLpId" type="UUID"/>
+            <param name="quantityNeeded" type="number"/>
+          </params>
+          <returns>
+            <field name="genealogyEntries" type="array"/>
+          </returns>
+          <algorithm>
+            1. Get reserved LPs (ORDER BY created_at ASC)
+            2. remaining = quantityNeeded
+            3. FOR EACH reserved LP:
+               - available = lp.qty_reserved - lp.qty_consumed
+               - consume = MIN(available, remaining)
+               - INSERT lp_genealogy(parent: reserved_lp, child: output_lp, qty: consume, type: 'transform', wo_id)
+               - UPDATE lp_reservations SET qty_consumed += consume
+               - remaining -= consume
+               - IF remaining == 0: BREAK
+            4. IF remaining > 0: THROW OverProductionError (manual selection required)
+          </algorithm>
+        </method>
+
+        <method name="getOutputHistory">
+          <params>
+            <param name="woId" type="UUID"/>
+          </params>
+          <returns>
+            <field name="outputs" type="array"/>
+            <field name="totalOutput" type="number"/>
+            <field name="completionPercentage" type="number"/>
+          </returns>
+        </method>
+
+        <method name="getOutputGenealogy">
+          <params>
+            <param name="outputId" type="UUID"/>
+          </params>
+          <returns>
+            <field name="consumedLPs" type="array"/>
+          </returns>
+        </method>
+      </methods>
+    </service-class>
+  </api-patterns>
+
+  <testing-strategy>
+    <test-setup>
+      <fixtures>
+        <fixture name="createTestOrganization">
+          Returns org_id from TEST_ORG_ID environment variable
+        </fixture>
+        <fixture name="createTestUser">
+          Creates authenticated user with JWT token for test org
+        </fixture>
+        <fixture name="createTestWorkOrder">
+          Creates WO with planned_quantity, product_id, status=in_progress
+        </fixture>
+        <fixture name="createTestLPs">
+          Creates reserved LPs for WO (qty_reserved, qty_consumed=0)
+        </fixture>
+      </fixtures>
+      <config>
+        Test environment: .env.test
+        Base URL: http://localhost:5000
+        Timeout: 60s
+        Browsers: chromium, firefox, webkit
+      </config>
+    </test-setup>
+
+    <e2e-tests>
+      <test-suite name="Multiple Outputs per WO">
+        <test name="Register first output">
+          <steps>
+            1. Create test WO: planned_quantity=200kg
+            2. Create reserved LPs: [LP-1: 40kg, LP-2: 30kg, LP-3: 40kg, LP-4: 60kg]
+            3. Navigate to /production/work-orders/{wo_id}
+            4. Click "Register Output" button
+            5. Fill form: quantity=60kg, qa_status=passed
+            6. Submit form
+            7. Verify: New LP created (LP-00105)
+            8. Verify: production_outputs record created
+            9. Verify: work_orders.produced_quantity = 60
+            10. Verify: Completion percentage = 30%
+            11. Verify: Genealogy created: LP-1 → LP-00105 (40kg), LP-2 → LP-00105 (20kg)
+            12. Verify: lp_reservations updated: LP-1 qty_consumed=40, LP-2 qty_consumed=20
+          </steps>
+        </test>
+
+        <test name="Register second output (sequential consumption)">
+          <steps>
+            1. Use same WO from test 1 (produced_quantity=60kg)
+            2. Click "Register Output" button
+            3. Fill form: quantity=30kg, qa_status=passed
+            4. Submit form
+            5. Verify: New LP created (LP-00106)
+            6. Verify: work_orders.produced_quantity = 90
+            7. Verify: Completion percentage = 45%
+            8. Verify: Genealogy created: LP-2 → LP-00106 (10kg), LP-3 → LP-00106 (20kg)
+            9. Verify: lp_reservations updated: LP-2 qty_consumed=30 (depleted), LP-3 qty_consumed=20
+          </steps>
+        </test>
+
+        <test name="View output history in WO detail modal">
+          <steps>
+            1. Navigate to /production/work-orders
+            2. Click WO row → Opens WO Detail Modal
+            3. Click "Outputs" tab
+            4. Verify: Table shows 2 outputs
+            5. Verify: Row 1: LP-00105, 60kg, passed, Anna K, 2025-11-27 08:30
+            6. Verify: Row 2: LP-00106, 30kg, passed, Anna K, 2025-11-27 09:15
+            7. Verify: Total output: 90kg / 200kg (45%)
+            8. Verify: Progress bar at 45%
+            9. Verify: No completion prompt (not yet >= 100%)
+          </steps>
+        </test>
+
+        <test name="Auto-complete prompt when output >= planned">
+          <steps>
+            1. Use same WO (produced_quantity=90kg, planned=200kg)
+            2. Register output: quantity=110kg (total becomes 200kg)
+            3. Verify: API response includes { should_complete: true }
+            4. Verify: Toast notification: "WO ready for completion. Complete now?"
+            5. Verify: Modal with "Complete WO" and "Continue Production" buttons
+            6. Click "Complete WO"
+            7. Verify: work_orders.status = 'completed'
+            8. Verify: work_orders.actual_end_date = NOW()
+          </steps>
+        </test>
+
+        <test name="Over-production handling">
+          <steps>
+            1. Create WO: planned=100kg, reserved LPs total=100kg
+            2. Register outputs totaling 100kg (all reserved LPs consumed)
+            3. Register output: quantity=20kg (over-production)
+            4. Verify: Modal appears: "Over-production detected. Select source LP"
+            5. Verify: List of available LPs shown
+            6. Select LP manually
+            7. Submit
+            8. Verify: Genealogy created with operator-selected LP
+          </steps>
+        </test>
+
+        <test name="Output list filtering and sorting">
+          <steps>
+            1. Create WO with 10 outputs (varying qa_status, dates, operators)
+            2. Navigate to Outputs tab
+            3. Click "QA Status" filter → Select "passed"
+            4. Verify: Only passed outputs shown
+            5. Click "Date" column header → Sort ascending
+            6. Verify: Oldest output first
+            7. Search "Anna" in operator field
+            8. Verify: Only Anna's outputs shown
+          </steps>
+        </test>
+
+        <test name="Output genealogy view">
+          <steps>
+            1. Navigate to Outputs tab
+            2. Click output LP number (LP-00105)
+            3. Verify: Navigates to /warehouse/license-plates/lp-105
+            4. Verify: "Genealogy" section shows consumed LPs:
+               - LP-1 → LP-00105 (40kg Beef Trimmings)
+               - LP-2 → LP-00105 (20kg Pork Shoulder)
+          </steps>
+        </test>
+
+        <test name="Mobile responsive - outputs list as cards">
+          <steps>
+            1. Set viewport: 375×667 (mobile)
+            2. Navigate to Outputs tab
+            3. Verify: Table converts to card view
+            4. Verify: Each card shows: LP #, qty, date, qa_status
+            5. Verify: Expand button (>) visible
+            6. Click expand on card 1
+            7. Verify: Smooth animation (200ms)
+            8. Verify: All columns visible: operator, notes, actions
+          </steps>
+        </test>
+      </test-suite>
+    </e2e-tests>
+
+    <unit-tests>
+      <test-suite name="OutputService.allocateConsumedLPs">
+        <test name="Sequential allocation - single LP sufficient">
+          Given: Reserved LPs [LP-1: 100kg]
+          When: allocateConsumedLPs(woId, outputLpId, 60kg)
+          Then: genealogy = [LP-1 → output (60kg)]
+          And: LP-1 qty_consumed = 60kg
+        </test>
+
+        <test name="Sequential allocation - multiple LPs">
+          Given: Reserved LPs [LP-1: 40kg, LP-2: 30kg, LP-3: 40kg]
+          When: allocateConsumedLPs(woId, outputLpId, 60kg)
+          Then: genealogy = [LP-1 → output (40kg), LP-2 → output (20kg)]
+          And: LP-1 qty_consumed = 40kg, LP-2 qty_consumed = 20kg
+        </test>
+
+        <test name="Sequential allocation - exact match">
+          Given: Reserved LPs [LP-1: 40kg, LP-2: 30kg]
+          When: allocateConsumedLPs(woId, outputLpId, 70kg)
+          Then: genealogy = [LP-1 → output (40kg), LP-2 → output (30kg)]
+          And: LP-1 qty_consumed = 40kg, LP-2 qty_consumed = 30kg (both depleted)
+        </test>
+
+        <test name="Over-production error">
+          Given: Reserved LPs [LP-1: 40kg] (all consumed)
+          When: allocateConsumedLPs(woId, outputLpId, 50kg)
+          Then: THROW OverProductionError("Insufficient reserved LPs, manual selection required")
+        </test>
+
+        <test name="Partial consumption across outputs">
+          Given: Reserved LPs [LP-1: 40kg, LP-2: 30kg]
+          When: Output-1: allocateConsumedLPs(woId, out1LpId, 60kg)
+          Then: LP-1 consumed=40, LP-2 consumed=20
+          When: Output-2: allocateConsumedLPs(woId, out2LpId, 10kg)
+          Then: LP-2 consumed=30 (total), genealogy=[LP-2 → out2 (10kg)]
+        </test>
+      </test-suite>
+
+      <test-suite name="OutputService.registerOutput">
+        <test name="Update work_orders.produced_quantity">
+          Given: WO produced_quantity=0
+          When: registerOutput(woId, 60kg)
+          Then: work_orders.produced_quantity = 60
+          When: registerOutput(woId, 30kg)
+          Then: work_orders.produced_quantity = 90
+        </test>
+
+        <test name="Should complete when total >= planned">
+          Given: WO planned=200kg, produced=180kg
+          When: registerOutput(woId, 20kg)
+          Then: response.should_complete = true
+        </test>
+
+        <test name="Should not complete when total < planned">
+          Given: WO planned=200kg, produced=100kg
+          When: registerOutput(woId, 50kg)
+          Then: response.should_complete = false
+        </test>
+
+        <test name="Prevent over-production > 110%">
+          Given: WO planned=100kg, produced=100kg
+          When: registerOutput(woId, 15kg) (total=115kg > 110%)
+          Then: THROW ValidationError("Over-production limit exceeded")
+        </test>
+      </test-suite>
+    </unit-tests>
+  </testing-strategy>
+
+  <implementation-notes>
+    <note priority="high">
+      production_outputs table must be created in migration before implementing service logic
+    </note>
+    <note priority="high">
+      Sequential LP allocation is critical - MUST preserve order (ORDER BY created_at ASC)
+    </note>
+    <note priority="medium">
+      Auto-complete prompt should be dismissible (user may want to continue production for over-production)
+    </note>
+    <note priority="medium">
+      Over-production limit (10%) should be configurable per organization in settings
+    </note>
+    <note priority="low">
+      Consider batch output registration for operators (register 5 outputs at once)
+    </note>
+    <note priority="low">
+      Future: barcode scanner integration for output registration (scan LP, enter qty, submit)
+    </note>
+  </implementation-notes>
+
+  <traceability>
+    <story-to-epic>
+      This story (04-16) is part of Epic 4 - Production Execution
+      Depends on: Story 4.12 (Output Registration), Story 4.19 (Genealogy)
+    </story-to-epic>
+    <acceptance-criteria-to-tests>
+      <mapping>
+        <ac id="AC-4.16.1" tests="e2e: Register first output, e2e: Register second output"/>
+        <ac id="AC-4.16.2" tests="unit: Update work_orders.produced_quantity, e2e: View output history"/>
+        <ac id="AC-4.16.3" tests="e2e: View output history, e2e: Output list filtering and sorting"/>
+        <ac id="AC-4.16.4" tests="e2e: Auto-complete prompt when output >= planned, unit: Should complete when total >= planned"/>
+        <ac id="AC-4.16.5" tests="e2e: Output genealogy view"/>
+        <ac id="AC-4.16.6" tests="unit: Sequential allocation - all tests, e2e: Register second output"/>
+        <ac id="AC-4.16.7" tests="e2e: Register first output (production_outputs record)"/>
+        <ac id="AC-4.16.8" tests="Prerequisite validation in Story 4.12, 4.19 completion"/>
+      </mapping>
+    </acceptance-criteria-to-tests>
+  </traceability>
+</story-context>

@@ -19,9 +19,11 @@ export interface ProductSummary {
   id: string
   code: string
   name: string
+  type: 'RM' | 'WIP' | 'FG' | 'PKG' | 'BP' | 'CUSTOM'
   version: number
   status: string
   updated_at: string
+  uom?: string
   allergen_count?: number
   has_bom?: boolean
   bom_count?: number

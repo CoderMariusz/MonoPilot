@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Plus, Pencil, Trash2, Search } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { getStatusColor } from '@/lib/constants/app-colors'
 import { WorkOrderFormModal } from './WorkOrderFormModal'
 
 interface Product {
@@ -197,26 +198,6 @@ export function WorkOrdersTable() {
     }).format(num)
   }
 
-  // Get status badge variant
-  const getStatusVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'draft':
-        return 'secondary'
-      case 'released':
-        return 'default'
-      case 'in_progress':
-        return 'default'
-      case 'completed':
-        return 'default'
-      case 'closed':
-        return 'default'
-      case 'cancelled':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
-  }
-
   // Format status label
   const formatStatusLabel = (status: string) => {
     return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -304,7 +285,7 @@ export function WorkOrdersTable() {
                     <div className="text-sm text-gray-500">{wo.products?.code}</div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getStatusVariant(wo.status)}>
+                    <Badge className={getStatusColor(wo.status)}>
                       {formatStatusLabel(wo.status)}
                     </Badge>
                   </TableCell>

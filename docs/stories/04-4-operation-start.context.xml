@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <story-metadata>
+    <id>04-4-operation-start</id>
+    <title>Operation Start</title>
+    <epic>4 - Production Execution</epic>
+    <status>drafted</status>
+    <priority>P0</priority>
+    <story-points>1</story-points>
+    <effort>0.5 day</effort>
+    <dependencies>
+      <dependency>Story 3.14 - WO Routing Application</dependency>
+      <dependency>Story 3.10 - Create WO (wo_operations table)</dependency>
+      <dependency>Story 4.2 - WO Start</dependency>
+    </dependencies>
+  </story-metadata>
+
+  <!-- ============================================================ -->
+  <!-- STORY CONTENT -->
+  <!-- ============================================================ -->
+
+  <story-content>
+    <user-story>
+      <as-a>Operator</as-a>
+      <i-want>to start a WO operation</i-want>
+      <so-that>I can track step progress</so-that>
+    </user-story>
+
+    <acceptance-criteria>
+      <criterion id="AC-4.4.1">
+        <title>Operation Start Modal</title>
+        <given>WO has operations from routing (Story 3.14)</given>
+        <when>clicking "Start" on operation</when>
+        <then>modal shows operation details and "Confirm Start" button</then>
+      </criterion>
+
+      <criterion id="AC-4.4.2">
+        <title>Operation Status Transition</title>
+        <when>confirmed</when>
+        <then>operation status → 'in_progress', started_at set, operator_id recorded</then>
+        <notes>
+          Operation Status Enum (defined for all operation stories):
+          - 'not_started': Initial state (set by Story 3.14 routing, or story 3.10 when operations created)
+          - 'in_progress': After Story 4.4 (Operation Start)
+          - 'completed': After Story 4.5 (Operation Complete)
+
+          Initial Status: Operations created with status='not_started' (from routing in Story 3.14)
+        </notes>
+      </criterion>
+
+      <criterion id="AC-4.4.3">
+        <title>Sequence Enforcement</title>
+        <given>require_operation_sequence enabled</given>
+        <when>trying to start operation N</when>
+        <then>system validates N-1 is completed; blocks if not</then>
+      </criterion>
+
+      <criterion id="AC-4.4.4">
+        <title>API Endpoint</title>
+        <then>POST /api/production/work-orders/:id/operations/:opId/start available</then>
+      </criterion>
+
+      <criterion id="AC-4.4.5">
+        <title>Dashboard Integration</title>
+        <when>operation started</when>
+        <then>operation appears in active operations list on dashboard</then>
+      </criterion>
+
+      <criterion id="AC-4.4.6">
+        <title>Error Handling</title>
+        <when>operation already in progress</when>
+        <then>400 error: "Operation is already in progress"</then>
+      </criterion>
+
+      <criterion id="AC-4.4.7">
+        <title>Role-Based Access</title>
+        <then>Operators and Production Managers can start operations</then>
+      </criterion>
+
+      <criterion id="AC-4.4.8">
+        <title>Audit Trail</title>
+        <then>started_at and operator_id recorded</then>
+      </criterion>
+    </acceptance-criteria>
+
+    <tasks>
+      <task id="1" status="pending">Verify wo_operations table schema (started_at, operator_id)</task>
+      <task id="2" status="pending">Create OperationStartService</task>
+      <task id="3" status="pending">Create API endpoint</task>
+      <task id="4" status="pending">Frontend modal component</task>
+      <task id="5" status="pending">Tests (unit, integration, E2E)</task>
+    </tasks>
+  </story-content>
+
+  <!-- ============================================================ -->
+  <!-- DATABASE SCHEMA -->
+  <!-- ============================================================ -->
+
+  <database-schema>
+    <table name="wo_operations">
+      <description>Work Order Operations - tracks individual routing steps per WO</description>
+      <location>Mentioned in Epic 4 docs, needs migration verification/creation</location>
+      <columns>
+        <column name="id" type="UUID" constraints="PRIMARY KEY" />
+        <column name="org_id" type="UUID" constraints="NOT NULL REFERENCES organizations(id)" />
+        <column name="wo_id" type="UUID" constraints="NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE" />
+        <column name="sequence_number" type="INTEGER" constraints="NOT NULL" />
+        <column name="operation_name" type="VARCHAR(100)" constraints="NOT NULL" />
+        <column name="status" type="VARCHAR(20)" constraints="NOT NULL DEFAULT 'not_started'" />
+        <column name="started_at" type="TIMESTAMP WITH TIME ZONE" constraints="NULL (set on start)" />
+        <column name="finished_at" type="TIMESTAMP WITH TIME ZONE" constraints="NULL (set on complete)" />
+        <column name="operator_id" type="UUID" constraints="NULL REFERENCES users(id)" />
+        <column name="expected_yield_pct" type="DECIMAL(5,2)" constraints="DEFAULT 100.00" />
+        <column name="actual_yield_pct" type="DECIMAL(5,2)" constraints="NULL (set on complete)" />
+        <column name="notes" type="TEXT" constraints="NULL" />
+        <column name="created_at" type="TIMESTAMP WITH TIME ZONE" constraints="DEFAULT NOW()" />
+        <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" constraints="DEFAULT NOW()" />
+      </columns>
+      <constraints>
+        <constraint type="CHECK">status IN ('not_started', 'in_progress', 'completed')</constraint>
+        <constraint type="UNIQUE">UNIQUE(wo_id, sequence_number)</constraint>
+      </constraints>
+      <indexes>
+        <index>idx_wo_operations_org ON wo_operations(org_id)</index>
+        <index>idx_wo_operations_wo ON wo_operations(wo_id)</index>
+        <index>idx_wo_operations_status ON wo_operations(status)</index>
+      </indexes>
+    </table>
+
+    <table name="work_orders">
+      <description>Work Orders - main production orders (existing stub)</description>
+      <location>apps/frontend/lib/supabase/migrations/028_create_work_orders_stub.sql</location>
+      <relevant-columns>
+        <column name="id" type="UUID" />
+        <column name="org_id" type="UUID" />
+        <column name="wo_number" type="VARCHAR(50)" />
+        <column name="status" type="VARCHAR(20)" notes="draft, released, in_progress, completed, closed, cancelled" />
+        <column name="routing_id" type="UUID" notes="stub field" />
+      </relevant-columns>
+    </table>
+
+    <table name="production_settings">
+      <description>Production module settings (needs creation or verification)</description>
+      <relevant-columns>
+        <column name="org_id" type="UUID" />
+        <column name="require_operation_sequence" type="BOOLEAN" constraints="DEFAULT false" notes="AC-4.4.3" />
+      </relevant-columns>
+    </table>
+
+    <rls-policies table="wo_operations">
+      <policy name="SELECT">
+        <description>Users can view operations in their organization</description>
+        <code>org_id = (auth.jwt() ->> 'org_id')::uuid</code>
+      </policy>
+      <policy name="INSERT">
+        <description>Production/Technical/Admin can create operations</description>
+        <code>(auth.jwt() ->> 'role') IN ('production', 'technical', 'admin')</code>
+      </policy>
+      <policy name="UPDATE">
+        <description>Operators and Production Managers can update operations</description>
+        <code>(auth.jwt() ->> 'role') IN ('operator', 'production', 'admin')</code>
+      </policy>
+    </rls-policies>
+  </database-schema>
+
+  <!-- ============================================================ -->
+  <!-- UX DESIGN REFERENCE -->
+  <!-- ============================================================ -->
+
+  <ux-design>
+    <source>docs/ux-design/ux-design-production-module.md</source>
+
+    <shared-ui-system>
+      <source>docs/ux-design/ux-design-shared-system.md</source>
+      <components>
+        <component name="ModuleHeader">
+          <tabs>Production | Dashboard | Active WOs | Completed | Yields | ⚙️</tabs>
+        </component>
+        <component name="DataTable">
+          <pattern>[Checkbox] [Primary Column↕] [Status] [Date] [Details] [Action Buttons]</pattern>
+          <action-buttons>
+            <button type="view" icon="👁️" color="gray-600" />
+            <button type="edit" icon="✏️" color="gray-600" />
+            <button type="delete" icon="🗑️" color="red-600" />
+          </action-buttons>
+        </component>
+        <component name="StatusBadge">
+          <status value="not_started" bg="gray-200" text="gray-800" />
+          <status value="in_progress" bg="yellow-200" text="yellow-800" />
+          <status value="completed" bg="green-200" text="green-800" />
+        </component>
+      </components>
+      <colors>
+        <primary action="Create/CTA" color="green-600" hex="#16a34a" />
+        <secondary action="Actions" color="gray-600" hex="#4b5563" />
+        <danger action="Delete" color="red-600" hex="#dc2626" />
+      </colors>
+    </shared-ui-system>
+
+    <operation-start-modal>
+      <title>Start Operation</title>
+      <layout>
+        <header>Operation Details</header>
+        <fields>
+          <field name="operation_name" readonly="true" />
+          <field name="sequence_number" readonly="true" display-as="Step X of Y" />
+          <field name="expected_duration" readonly="true" optional="true" />
+          <field name="expected_yield_pct" readonly="true" />
+        </fields>
+        <actions>
+          <button type="cancel" color="gray-600">Cancel</button>
+          <button type="submit" color="green-600">Confirm Start</button>
+        </actions>
+      </layout>
+      <validation>
+        <rule>If require_operation_sequence enabled, check previous operation completed</rule>
+        <rule>Check operation status != 'in_progress' and != 'completed'</rule>
+      </validation>
+    </operation-start-modal>
+
+    <wo-details-modal>
+      <source>Production Module - Variant B - WO Details Modal</source>
+      <tabs>
+        <tab name="Overview">Status, Progress, Operations summary, Materials summary, Issues &amp; Alerts</tab>
+        <tab name="Operations">Per-operation breakdown (seq, name, IN/OUT, losses, yield%, operator)</tab>
+        <tab name="Materials">BOM snapshot vs actual (variance %, color-coded rows)</tab>
+        <tab name="Yield">Trend chart (last 10 WOs), pattern detection</tab>
+        <tab name="Trace">Forward/backward genealogy tree (reuse existing)</tab>
+        <tab name="History">Audit log timeline (status changes, operations, outputs, alerts)</tab>
+      </tabs>
+      <notes>Operations tab will display start button for each operation with status='not_started'</notes>
+    </wo-details-modal>
+  </ux-design>
+
+  <!-- ============================================================ -->
+  <!-- API PATTERNS -->
+  <!-- ============================================================ -->
+
+  <api-patterns>
+    <endpoint path="/api/production/work-orders/:id/operations/:opId/start" method="POST">
+      <description>Start a WO operation</description>
+      <request-body>
+        <schema>
+          <field name="started_at" type="string (ISO 8601)" optional="true" notes="Defaults to NOW() if not provided" />
+          <field name="notes" type="string" optional="true" />
+        </schema>
+      </request-body>
+      <response success="200">
+        <schema>
+          <field name="operation" type="object" notes="Updated wo_operations record" />
+          <field name="message" type="string" example="Operation started successfully" />
+        </schema>
+      </response>
+      <errors>
+        <error code="401">Unauthorized - no session</error>
+        <error code="403">Forbidden - user role not allowed (must be operator/production/admin)</error>
+        <error code="404">Work Order or Operation not found</error>
+        <error code="400">
+          <reason>Operation already in progress</reason>
+          <reason>Operation already completed</reason>
+          <reason>Previous operation not completed (if sequence enforcement enabled)</reason>
+        </error>
+        <error code="500">Internal server error</error>
+      </errors>
+    </endpoint>
+
+    <reference-pattern>
+      <source>apps/frontend/app/api/planning/transfer-orders/[id]/status/route.ts</source>
+      <pattern>
+        <step>1. Create Supabase client</step>
+        <step>2. Check authentication (getSession)</step>
+        <step>3. Parse and validate params (await params)</step>
+        <step>4. Parse and validate request body (Zod schema)</step>
+        <step>5. Call service method</step>
+        <step>6. Handle result with specific error codes (NOT_FOUND, INVALID_STATUS, etc.)</step>
+        <step>7. Return JSON response with appropriate status code</step>
+        <step>8. Catch ZodError for validation errors</step>
+      </pattern>
+    </reference-pattern>
+
+    <service-pattern>
+      <source>apps/frontend/app/api/planning/transfer-orders/[id]/ship/route.ts</source>
+      <service-method-signature>
+        async function startOperation(
+          woId: string,
+          operationId: string,
+          input: StartOperationInput,
+          userId: string
+        ): Promise&lt;ServiceResult&lt;WOOperation&gt;&gt;
+      </service-method-signature>
+      <service-result-type>
+        <success>{ success: true, data: WOOperation }</success>
+        <error>{ success: false, error: string, code: 'NOT_FOUND' | 'INVALID_STATUS' | 'SEQUENCE_ERROR' }</error>
+      </service-result-type>
+    </service-pattern>
+
+    <validation-schema>
+      <location>apps/frontend/lib/validation/production-schemas.ts (to be created)</location>
+      <schema name="startOperationSchema">
+        <field name="started_at" type="z.string().datetime().optional()" />
+        <field name="notes" type="z.string().max(500).optional()" />
+      </schema>
+    </validation-schema>
+  </api-patterns>
+
+  <!-- ============================================================ -->
+  <!-- EXISTING CODE REFERENCES -->
+  <!-- ============================================================ -->
+
+  <existing-code>
+    <api-route-example>
+      <file>apps/frontend/app/api/planning/transfer-orders/[id]/status/route.ts</file>
+      <pattern-highlights>
+        <highlight>NextRequest, NextResponse imports</highlight>
+        <highlight>createServerSupabase for auth</highlight>
+        <highlight>Zod validation with ZodError catch</highlight>
+        <highlight>Service method pattern with ServiceResult</highlight>
+        <highlight>Error code mapping (NOT_FOUND → 404, INVALID_STATUS → 400)</highlight>
+      </pattern-highlights>
+    </api-route-example>
+
+    <api-route-example>
+      <file>apps/frontend/app/api/planning/transfer-orders/[id]/ship/route.ts</file>
+      <pattern-highlights>
+        <highlight>Session user ID extraction (session.user.id)</highlight>
+        <highlight>Multiple error codes handling (NOT_FOUND, INVALID_STATUS, INVALID_QUANTITY)</highlight>
+        <highlight>Success message in response</highlight>
+      </pattern-highlights>
+    </api-route-example>
+
+    <work-orders-stub>
+      <file>apps/frontend/lib/supabase/migrations/028_create_work_orders_stub.sql</file>
+      <notes>Existing work_orders table with basic structure. wo_operations table not yet created - needs migration.</notes>
+    </work-orders-stub>
+
+    <rls-policy-pattern>
+      <source>028_create_work_orders_stub.sql</source>
+      <example>
+        <policy type="SELECT">
+          CREATE POLICY "Users can view work orders in their org"
+            ON work_orders FOR SELECT
+            USING (org_id = (auth.jwt() ->> 'org_id')::uuid);
+        </policy>
+        <policy type="UPDATE">
+          CREATE POLICY "Production/Technical/Admin can update work orders"
+            ON work_orders FOR UPDATE
+            USING (
+              org_id = (auth.jwt() ->> 'org_id')::uuid
+              AND (auth.jwt() ->> 'role') IN ('production', 'technical', 'admin')
+            );
+        </policy>
+      </example>
+    </rls-policy-pattern>
+  </existing-code>
+
+  <!-- ============================================================ -->
+  <!-- TESTING STRATEGY -->
+  <!-- ============================================================ -->
+
+  <testing-strategy>
+    <unit-tests>
+      <location>apps/frontend/lib/services/__tests__/operation-start-service.test.ts (to be created)</location>
+      <test-cases>
+        <test>startOperation - success with valid data</test>
+        <test>startOperation - error when operation not found</test>
+        <test>startOperation - error when operation already in progress</test>
+        <test>startOperation - error when operation already completed</test>
+        <test>startOperation - error when previous operation not completed (sequence enforcement)</test>
+        <test>startOperation - success without sequence enforcement</test>
+      </test-cases>
+    </unit-tests>
+
+    <integration-tests>
+      <location>apps/frontend/app/api/production/work-orders/__tests__/operations.test.ts (to be created)</location>
+      <test-cases>
+        <test>POST /operations/:opId/start - 200 success</test>
+        <test>POST /operations/:opId/start - 401 unauthorized</test>
+        <test>POST /operations/:opId/start - 403 forbidden (wrong role)</test>
+        <test>POST /operations/:opId/start - 404 operation not found</test>
+        <test>POST /operations/:opId/start - 400 already in progress</test>
+        <test>POST /operations/:opId/start - 400 sequence violation</test>
+        <test>POST /operations/:opId/start - validates Zod schema</test>
+      </test-cases>
+    </integration-tests>
+
+    <e2e-tests>
+      <location>tests/e2e/work-orders-operations.spec.ts (to be created)</location>
+      <setup>
+        <fixture name="createTestOrganization">Returns orgId from .env.test</fixture>
+        <fixture name="createTestUser">Creates auth user + JWT token</fixture>
+        <fixture name="createTestWO">Creates work order with routing and operations</fixture>
+      </setup>
+      <test-cases>
+        <test name="Operation Start - Happy Path">
+          <steps>
+            <step>Navigate to /production/work-orders/:id</step>
+            <step>Expand Operations tab</step>
+            <step>Click "Start" on first operation (status=not_started)</step>
+            <step>Modal appears with operation details</step>
+            <step>Click "Confirm Start"</step>
+            <step>Operation status updates to "In Progress" badge</step>
+            <step>started_at timestamp displayed</step>
+            <step>operator_id shows current user</step>
+          </steps>
+        </test>
+        <test name="Sequence Enforcement - Blocked">
+          <given>require_operation_sequence = true</given>
+          <steps>
+            <step>Try to start operation 2 (sequence_number=2)</step>
+            <step>Error toast: "Cannot start - previous operation not completed"</step>
+            <step>Start button disabled or error displayed</step>
+          </steps>
+        </test>
+        <test name="Already In Progress Error">
+          <steps>
+            <step>Start operation 1</step>
+            <step>Try to start operation 1 again</step>
+            <step>Error toast: "Operation is already in progress"</step>
+          </steps>
+        </test>
+      </test-cases>
+      <reference-fixture>
+        <file>tests/e2e/fixtures/test-setup.ts</file>
+        <pattern>
+          - createTestOrganization() - returns TEST_ORG_ID
+          - createTestUser(orgId) - creates auth user + JWT
+          - context.addCookies([{ name: 'sb-auth', value: token }])
+        </pattern>
+      </reference-fixture>
+    </e2e-tests>
+
+    <test-configuration>
+      <file>playwright.config.ts</file>
+      <settings>
+        <timeout>60000ms per test</timeout>
+        <expect-timeout>15000ms</expect-timeout>
+        <browsers>chromium, firefox, webkit</browsers>
+        <base-url>env NEXT_PUBLIC_APP_URL or http://localhost:5000</base-url>
+      </settings>
+    </test-configuration>
+  </testing-strategy>
+
+  <!-- ============================================================ -->
+  <!-- IMPLEMENTATION NOTES -->
+  <!-- ============================================================ -->
+
+  <implementation-notes>
+    <priority>P0 - MVP Critical</priority>
+    <estimated-effort>0.5 day (4 hours)</estimated-effort>
+
+    <breakdown>
+      <task name="Migration" hours="0.5">
+        Create wo_operations table migration if not exists
+        Add production_settings.require_operation_sequence column
+      </task>
+      <task name="Service" hours="1.0">
+        Create OperationStartService with validation logic
+        Implement sequence enforcement check
+        Handle all error cases
+      </task>
+      <task name="API Route" hours="0.5">
+        POST /api/production/work-orders/:id/operations/:opId/start
+        Follow existing pattern from transfer-orders
+      </task>
+      <task name="Frontend Modal" hours="1.0">
+        Create OperationStartModal component
+        Integrate with WO Details Modal (Operations tab)
+        Display operation details
+        Handle confirmation and error states
+      </task>
+      <task name="Tests" hours="1.0">
+        Unit tests for service (6 test cases)
+        Integration tests for API (7 test cases)
+        E2E tests (3 test cases)
+      </task>
+    </breakdown>
+
+    <dependencies>
+      <dependency critical="true">Story 3.14 must be complete - routing operations copied to wo_operations</dependency>
+      <dependency critical="true">wo_operations table must exist with correct schema</dependency>
+      <dependency>production_settings table for require_operation_sequence flag</dependency>
+    </dependencies>
+
+    <risks>
+      <risk level="low">wo_operations table may not exist - needs verification/creation</risk>
+      <risk level="low">Sequence enforcement logic complexity</risk>
+    </risks>
+
+    <follow-up-stories>
+      <story>04-5 - Operation Complete (depends on this story)</story>
+      <story>04-6 - WO Complete (validates all operations completed)</story>
+      <story>04-20 - Operation Timeline View (displays operation history)</story>
+    </follow-up-stories>
+  </implementation-notes>
+
+  <!-- ============================================================ -->
+  <!-- ARCHITECTURE ALIGNMENT -->
+  <!-- ============================================================ -->
+
+  <architecture-alignment>
+    <epic-reference>docs/epics/04-production.md</epic-reference>
+    <epic-description>Execute work orders - start, consume materials, register outputs, track yield</epic-description>
+
+    <functional-requirements>
+      <fr id="FR-PROD-004">WO Operations Tracking - Start, track, complete individual routing steps</fr>
+    </functional-requirements>
+
+    <consistency-checks>
+      <check>Uses shared UI system (ModuleHeader, StatusBadge, Modal patterns)</check>
+      <check>Follows API route pattern (auth, validation, service, error codes)</check>
+      <check>Uses standard RLS policies (org_id scoping, role-based access)</check>
+      <check>Integrates with existing work_orders table</check>
+      <check>Follows Zod validation pattern</check>
+    </consistency-checks>
+  </architecture-alignment>
+
+</story-context>

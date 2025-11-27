@@ -55,7 +55,7 @@ import {
 } from '@/components/ui/dialog'
 import { Search, Plus, Pencil, Trash2, Zap, Upload, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { getStatusColor, PLANNING_COLORS } from '@/lib/constants/planning-colors'
+import { getStatusColor, PLANNING_COLORS } from '@/lib/constants/app-colors'
 import { PurchaseOrderFormModal } from './PurchaseOrderFormModal'
 import { POFastFlowModal } from './POFastFlow'
 

@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TechnicalHeader } from '@/components/technical/TechnicalHeader'
+import { ProductFormModal } from '@/components/technical/ProductFormModal'
 
 // Icons
 const icons = {
@@ -60,6 +61,10 @@ export default function TechnicalDashboardPage() {
     (searchParams.get('type_filter') as 'all' | ProductCategory) || 'all'
   )
   const [activityDays, setActivityDays] = useState(7)
+
+  // Modal state
+  const [productModalOpen, setProductModalOpen] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<ProductSummary | null>(null)
 
   // Section refs for scroll-to-section
   const rmSectionRef = useRef<HTMLDivElement>(null)
@@ -128,6 +133,18 @@ export default function TechnicalDashboardPage() {
     fetchActivity()
   }
 
+  // Open product modal for create/edit
+  const openProductModal = (product?: ProductSummary) => {
+    setSelectedProduct(product || null)
+    setProductModalOpen(true)
+  }
+
+  // Close product modal
+  const closeProductModal = () => {
+    setProductModalOpen(false)
+    setSelectedProduct(null)
+  }
+
   // Scroll to section
   const scrollToSection = (category: ProductCategory) => {
     const refs: Record<ProductCategory, React.RefObject<HTMLDivElement | null>> = {
@@ -184,59 +201,16 @@ export default function TechnicalDashboardPage() {
           <p className="text-gray-600">Product Catalog Overview</p>
         </div>
 
-        <div className="flex items-center gap-2 mt-4 md:mt-0">
-          {/* View Toggle Buttons */}
-          <div className="flex rounded-lg border overflow-hidden">
-            <Button variant="secondary" size="sm" className="rounded-none bg-blue-100">
-              Dashboard
-            </Button>
-            <Link href="/technical/products">
-              <Button variant="ghost" size="sm" className="rounded-none">
-                List View
-              </Button>
-            </Link>
-            <Link href="/technical/boms">
-              <Button variant="ghost" size="sm" className="rounded-none">
-                BOMs
-              </Button>
-            </Link>
-            <Link href="/technical/products/allergens">
-              <Button variant="ghost" size="sm" className="rounded-none">
-                Allergen Matrix
-              </Button>
-            </Link>
-          </div>
-
-          {/* Refresh Button (AC-2.23.9) */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            {refreshing ? 'Refreshing...' : icons.refresh} Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* Quick Actions Panel (AC-2.23.7) */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        <Link href="/technical/products?create=true">
-          <Button size="sm" className="bg-green-600 hover:bg-green-700">
-            {icons.plus} Add Product
-          </Button>
-        </Link>
-        <Button variant="outline" size="sm">
-          {icons.upload} Import Products
+        {/* Refresh Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="mt-4 md:mt-0"
+        >
+          {refreshing ? 'Refreshing...' : icons.refresh} Refresh
         </Button>
-        <Button variant="outline" size="sm">
-          {icons.download} Export Catalog
-        </Button>
-        <Link href="/technical/products/allergens">
-          <Button variant="outline" size="sm">
-            {icons.allergen} Allergen Matrix
-          </Button>
-        </Link>
       </div>
 
       {/* Search and Filter (AC-2.23.8) */}
@@ -345,6 +319,8 @@ export default function TechnicalDashboardPage() {
               <ProductGroupSection
                 group={dashboardData.groups.find(g => g.category === 'RM')!}
                 onViewAll={() => router.push('/technical/products?type=RM')}
+                onProductClick={openProductModal}
+                onAddProduct={() => openProductModal()}
               />
             </div>
           )}
@@ -355,6 +331,8 @@ export default function TechnicalDashboardPage() {
               <ProductGroupSection
                 group={dashboardData.groups.find(g => g.category === 'WIP')!}
                 onViewAll={() => router.push('/technical/products?type=WIP')}
+                onProductClick={openProductModal}
+                onAddProduct={() => openProductModal()}
               />
             </div>
           )}
@@ -365,6 +343,8 @@ export default function TechnicalDashboardPage() {
               <ProductGroupSection
                 group={dashboardData.groups.find(g => g.category === 'FG')!}
                 onViewAll={() => router.push('/technical/products?type=FG')}
+                onProductClick={openProductModal}
+                onAddProduct={() => openProductModal()}
               />
             </div>
           )}
@@ -380,6 +360,26 @@ export default function TechnicalDashboardPage() {
         </div>
       </div>
       </div>
+
+      {/* Product Form Modal */}
+      {productModalOpen && (
+        <ProductFormModal
+          product={selectedProduct ? {
+            id: selectedProduct.id,
+            code: selectedProduct.code,
+            name: selectedProduct.name,
+            type: selectedProduct.type,
+            uom: selectedProduct.uom || 'pcs',
+            version: selectedProduct.version,
+            status: selectedProduct.status as 'active' | 'inactive' | 'obsolete'
+          } : null}
+          onClose={closeProductModal}
+          onSuccess={() => {
+            closeProductModal()
+            fetchDashboard(false)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -431,10 +431,14 @@ function StatCard({
 // Product Group Section Component (AC-2.23.3-5)
 function ProductGroupSection({
   group,
-  onViewAll
+  onViewAll,
+  onProductClick,
+  onAddProduct
 }: {
   group: ProductGroup
   onViewAll: () => void
+  onProductClick: (product: ProductSummary) => void
+  onAddProduct: () => void
 }) {
   if (!group) return null
 
@@ -459,11 +463,9 @@ function ProductGroupSection({
         <CardContent>
           <div className="text-center py-8 text-gray-500">
             <p>No {group.label.toLowerCase()} defined yet.</p>
-            <Link href="/technical/products?create=true">
-              <Button size="sm" className="mt-4">
-                {icons.plus} Add {group.category === 'RM' ? 'Raw Material' : group.category === 'WIP' ? 'WIP Product' : 'Finished Good'}
-              </Button>
-            </Link>
+            <Button size="sm" className="mt-4" onClick={onAddProduct}>
+              {icons.plus} Add {group.category === 'RM' ? 'Raw Material' : group.category === 'WIP' ? 'WIP Product' : 'Finished Good'}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -484,7 +486,7 @@ function ProductGroupSection({
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {group.products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard key={product.id} product={product} onClick={() => onProductClick(product)} />
           ))}
         </div>
       </CardContent>
@@ -493,52 +495,43 @@ function ProductGroupSection({
 }
 
 // Product Card Component
-function ProductCard({ product }: { product: ProductSummary }) {
+function ProductCard({ product, onClick }: { product: ProductSummary; onClick: () => void }) {
   return (
-    <Link href={`/technical/products/${product.id}`}>
-      <div className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer">
-        <div className="flex items-start justify-between mb-2">
-          <div className="font-semibold text-sm">{product.code}</div>
-          <div className="flex gap-1">
-            <button className="text-gray-400 hover:text-gray-600 text-xs" title="View">
-              {icons.eye}
-            </button>
-            <button className="text-gray-400 hover:text-gray-600 text-xs" title="Edit">
-              {icons.edit}
-            </button>
-          </div>
-        </div>
-        <div className="text-sm text-gray-600 truncate mb-2" title={product.name}>
-          {product.name}
-        </div>
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">v{product.version}</Badge>
-            <Badge
-              variant={product.status === 'active' ? 'default' : 'secondary'}
-              className="text-xs"
-            >
-              {product.status}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2">
-            {(product.bom_count ?? 0) > 0 && (
-              <span className="text-blue-600" title={`${product.bom_count} BOM${product.bom_count !== 1 ? 's' : ''}`}>
-                📋 {product.bom_count}
-              </span>
-            )}
-            {(product.allergen_count ?? 0) > 0 && (
-              <span className="text-orange-600" title={`${product.allergen_count} allergens`}>
-                {icons.allergen} {product.allergen_count}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="text-xs text-gray-500 mt-2">
-          Updated {formatDistanceToNow(new Date(product.updated_at), { addSuffix: true })}
+    <div
+      className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+      onClick={onClick}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="font-semibold text-sm">{product.code}</div>
+        <Badge
+          variant={product.status === 'active' ? 'default' : 'secondary'}
+          className="text-xs"
+        >
+          {product.status}
+        </Badge>
+      </div>
+      <div className="text-sm text-gray-600 truncate mb-2" title={product.name}>
+        {product.name}
+      </div>
+      <div className="flex items-center justify-between text-xs">
+        <Badge variant="outline" className="text-xs">v{product.version}</Badge>
+        <div className="flex items-center gap-2">
+          {(product.bom_count ?? 0) > 0 && (
+            <span className="text-blue-600" title={`${product.bom_count} BOM${product.bom_count !== 1 ? 's' : ''}`}>
+              📋 {product.bom_count}
+            </span>
+          )}
+          {(product.allergen_count ?? 0) > 0 && (
+            <span className="text-orange-600" title={`${product.allergen_count} allergens`}>
+              {icons.allergen} {product.allergen_count}
+            </span>
+          )}
         </div>
       </div>
-    </Link>
+      <div className="text-xs text-gray-500 mt-2">
+        Updated {formatDistanceToNow(new Date(product.updated_at), { addSuffix: true })}
+      </div>
+    </div>
   )
 }
 

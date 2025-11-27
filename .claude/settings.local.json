@@ -101,7 +101,13 @@
       "Bash(timeout 600 pnpm test:e2e:*)",
       "SlashCommand(/bmad:bmm:workflows:story-context)",
       "Bash(NEXT_PUBLIC_SUPABASE_URL=\"https://pgroxddbtaevdegnidaz.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncm94ZGRidGFldmRlZ25pZGF6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTk1ODM3MywiZXhwIjoyMDc1NTM0MzczfQ.ZdMzCB9SPMuPLvM5pq1g6s7p-8qvYdyf6WfCoDIPVDg\" TEST_ORG_ID=\"ef9783be-0a55-4bbd-aae8-ca86768ba76f\" pnpm test:*)",
-      "SlashCommand(/bmad:bmm:workflows:create-ux-design)"
+      "SlashCommand(/bmad:bmm:workflows:create-ux-design)",
+      "Bash(dir:*)",
+      "Bash(git mv:*)",
+      "Bash(del \"c:\\Users\\Mariusz K\\Documents\\Programowanie\\MonoPilot\\apps\\frontend\\lib\\constants\\planning-colors.ts\")",
+      "Bash(dir /b \"c:\\Users\\Mariusz K\\Documents\\Programowanie\\MonoPilot\\docs\\ux-design\")",
+      "Bash(grep:*)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []

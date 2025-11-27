@@ -1,0 +1,1133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>04-10</story-id>
+    <story-title>Consumption Correction</story-title>
+    <epic>4 - Production Execution</epic>
+    <status>drafted</status>
+    <priority>P0</priority>
+    <story-points>1</story-points>
+    <effort>0.5 day</effort>
+    <created>2025-11-27</created>
+  </metadata>
+
+  <!-- ========================================== -->
+  <!-- STORY CONTENT -->
+  <!-- ========================================== -->
+  <story-content>
+    <user-story>
+      <as>Manager</as>
+      <i-want>to correct consumption errors</i-want>
+      <so-that>inventory stays accurate</so-that>
+    </user-story>
+
+    <problem-statement>
+      Material consumption errors occur in production (wrong LP scanned, wrong qty entered, operator error).
+      System must allow Managers to reverse consumption while preserving full audit trail for compliance.
+      Reversal must restore LP status/qty, mark reservation as reversed, and mark genealogy record as reversed
+      (not delete) to maintain traceability history.
+    </problem-statement>
+
+    <acceptance-criteria>
+      <ac id="AC-4.10.1" title="Reverse Consumption Modal">
+        Given consumption was recorded incorrectly
+        When Manager clicks "Reverse"
+        Then modal confirms: "Reverse consumption of X kg of Y?"
+      </ac>
+
+      <ac id="AC-4.10.2" title="Reverse Reservation &amp; Genealogy Marking">
+        When confirming
+        Then:
+        - Reservation marked as reversed: wo_material_reservations.status = 'reversed'
+          - reversed_by, reversed_at, reverse_reason recorded
+        - LP status restored: license_plates.status = previous (e.g., 'available', not 'reserved')
+        - LP qty restored: license_plates.qty += reversed_qty
+        - Genealogy record MARKED AS REVERSED (not deleted):
+          - lp_genealogy.status = 'reversed' (or add reversed flag)
+          - lp_genealogy.reversed_at = timestamp
+          - lp_genealogy.reversed_by = user_id
+          - Reason: Full audit trail of genealogy links (even reversed ones) for compliance
+        - Audit trail preserved: wo_material_reservations record remains with status='reversed' for compliance
+      </ac>
+
+      <ac id="AC-4.10.3" title="Audit Trail">
+        Then Audit entry created: operation="consume_reverse", wo_id, material_id, lp_id, qty_reversed, reversed_by, reversed_at
+      </ac>
+
+      <ac id="AC-4.10.4" title="Role-Based Access">
+        Then Only Manager and Admin roles can reverse (not Operator)
+      </ac>
+
+      <ac id="AC-4.10.5" title="LP Qty Restoration">
+        Then license_plates.current_qty += reversed_qty, status updated if needed
+      </ac>
+
+      <ac id="AC-4.10.6" title="API Endpoint">
+        Then POST /api/production/work-orders/:id/consume/reverse with {consumption_record_id}
+      </ac>
+
+      <ac id="AC-4.10.7" title="Error Handling">
+        When consumption record not found
+        Then 404 error
+
+        When insufficient permissions
+        Then 403 error
+      </ac>
+
+      <ac id="AC-4.10.8" title="Consumption History">
+        Then Reversed record still visible in consumption history (marked as "Reversed on X by Y")
+      </ac>
+    </acceptance-criteria>
+
+    <tasks>
+      <task id="1" status="pending">Add reversed flag to wo_material_reservations table</task>
+      <task id="2" status="pending">Create ReverseConsumptionService</task>
+      <task id="3" status="pending">API endpoint for reverse operation</task>
+      <task id="4" status="pending">Frontend reverse button + modal</task>
+      <task id="5" status="pending">Audit trail logging</task>
+      <task id="6" status="pending">Tests</task>
+    </tasks>
+  </story-content>
+
+  <!-- ========================================== -->
+  <!-- DESIGN CONTEXT -->
+  <!-- ========================================== -->
+  <design-context>
+    <ux-design source="ux-design-production-module.md">
+      <section name="Desktop Work Order Details - Materials Tab">
+        <wireframe>
+          Materials Consumption History Table:
+          - Material | Reserved LPs | Consumed Qty | Status | Date/Time | Operator | Actions
+          - Status column shows: "Consumed" (green) or "Reversed on 2025-11-27 by Anna K." (gray)
+          - Actions column:
+            * For consumed records: [Reverse] button (gray-600, only visible to Manager/Admin)
+            * For reversed records: No actions, just status text
+          - Reverse button triggers confirmation modal
+        </wireframe>
+
+        <interaction-pattern>
+          Click Reverse button:
+          1. Modal opens: "Reverse Consumption?"
+          2. Shows details: Material, LP, Qty, Date, Operator
+          3. Reason field (textarea, 250 chars max)
+          4. Buttons: [Cancel] (gray-600), [Confirm Reverse] (red-600)
+          5. On confirm:
+             - API call POST /api/production/work-orders/:id/consume/reverse
+             - Success toast: "Consumption reversed successfully"
+             - Table refreshes, shows reversed status
+             - LP status/qty restored in real-time
+        </interaction-pattern>
+      </section>
+
+      <section name="Reverse Consumption Modal">
+        <wireframe>
+          ┌────────────────────────────────────────────────────┐
+          │ Reverse Consumption                           ✕   │
+          ├────────────────────────────────────────────────────┤
+          │                                                    │
+          │ ⚠️ Warning: This action will restore LP inventory │
+          │    and mark consumption as reversed.               │
+          │                                                    │
+          │ Material: Beef Trimmings                           │
+          │ License Plate: LP-20251127-0001                    │
+          │ Quantity: 50 kg                                    │
+          │ Consumed By: Anna K.                               │
+          │ Consumed At: 2025-11-27 14:30                      │
+          │                                                    │
+          │ Reason for Reversal: *                             │
+          │ ┌──────────────────────────────────────────────┐   │
+          │ │ Wrong LP scanned by operator                 │   │
+          │ │                                              │   │
+          │ │ 50/250 characters                            │   │
+          │ └──────────────────────────────────────────────┘   │
+          │                                                    │
+          │                        [Cancel]  [Confirm Reverse] │
+          └────────────────────────────────────────────────────┘
+        </wireframe>
+
+        <styling>
+          Modal width: 600px
+          Confirm button: bg-red-600 (DANGER color)
+          Warning icon: ⚠️ amber-500
+          Reason textarea: 250 chars max, required field
+        </styling>
+      </section>
+
+      <section name="Shared System Colors">
+        <colors source="ux-design-shared-system.md">
+          PRIMARY (Create/CTA):     green-600   (#16a34a)
+          DANGER (Delete/Reverse):  red-600     (#dc2626)
+          SECONDARY (Actions):      gray-600    (#4b5563)
+          WARNING:                  amber-500   (#f59e0b)
+          STATUS BADGES:
+          ├─ Consumed:              green-200 bg + green-800 text
+          └─ Reversed:              gray-200 bg + gray-800 text
+        </colors>
+
+        <typography>
+          Modal title:    Text-xl (20px) - Card titles
+          Warning text:   Text-base (16px) - Body text
+          Button text:    Text-sm (14px) - Secondary text
+          Status badge:   Text-xs (12px) - Hints, metadata
+        </typography>
+      </section>
+    </ux-design>
+  </design-context>
+
+  <!-- ========================================== -->
+  <!-- DATABASE SCHEMA -->
+  <!-- ========================================== -->
+  <database-schema>
+    <table name="wo_material_reservations">
+      <description>
+        Tracks LP reservations for WO materials.
+        This story adds reversed status and audit fields.
+      </description>
+      <columns>
+        <column name="id" type="UUID" primary-key="true">PK</column>
+        <column name="org_id" type="UUID" not-null="true">FK → organizations</column>
+        <column name="wo_id" type="UUID" not-null="true">FK → work_orders</column>
+        <column name="material_id" type="UUID" not-null="true">FK → wo_materials</column>
+        <column name="lp_id" type="UUID" not-null="true">FK → license_plates</column>
+        <column name="reserved_qty" type="NUMERIC" not-null="true">Quantity reserved from LP</column>
+        <column name="sequence_number" type="INTEGER" not-null="true">Consumption order (1, 2, 3...)</column>
+        <column name="status" type="VARCHAR" default="reserved">
+          reserved | consumed | reversed  ← **NEW: reversed status**
+        </column>
+        <column name="reversed_by" type="UUID">
+          **NEW**: FK → users (who reversed this consumption)
+        </column>
+        <column name="reversed_at" type="TIMESTAMPTZ">
+          **NEW**: Timestamp of reversal
+        </column>
+        <column name="reverse_reason" type="TEXT">
+          **NEW**: Reason for reversal (required, max 250 chars)
+        </column>
+        <column name="notes" type="TEXT">Optional notes</column>
+        <column name="created_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+        <column name="updated_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+      </columns>
+      <constraints>
+        <check>reserved_qty > 0</check>
+        <check>sequence_number > 0</check>
+        <check>status IN ('reserved', 'consumed', 'reversed')</check>
+        <check>
+          IF status = 'reversed' THEN
+            reversed_by IS NOT NULL AND
+            reversed_at IS NOT NULL AND
+            reverse_reason IS NOT NULL
+        </check>
+      </constraints>
+      <indexes>
+        <index>(org_id, wo_id)</index>
+        <index>(lp_id)</index>
+        <index>(status)</index>
+      </indexes>
+    </table>
+
+    <table name="license_plates">
+      <description>
+        Inventory units (LPs) with quantity tracking.
+        Reversal restores quantity and status.
+      </description>
+      <columns>
+        <column name="id" type="UUID" primary-key="true">PK</column>
+        <column name="org_id" type="UUID" not-null="true">FK → organizations</column>
+        <column name="lp_number" type="VARCHAR" not-null="true">Unique barcode (LP-YYYYMMDD-NNNN)</column>
+        <column name="product_id" type="UUID" not-null="true">FK → products</column>
+        <column name="quantity" type="NUMERIC" not-null="true">
+          Current quantity (restored on reversal: quantity += reversed_qty)
+        </column>
+        <column name="uom" type="VARCHAR" not-null="true">Unit of measure</column>
+        <column name="status" type="VARCHAR" default="available">
+          available | reserved | consumed | quarantine
+          **Reversal logic**:
+          - If LP was fully consumed (qty was 0), restore to 'available'
+          - If LP was partially consumed, restore to 'reserved' or 'available' based on business logic
+        </column>
+        <column name="batch_number" type="VARCHAR">Batch/Lot number</column>
+        <column name="expiry_date" type="DATE">Expiry date (if applicable)</column>
+        <column name="created_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+        <column name="updated_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+      </columns>
+      <constraints>
+        <unique>(org_id, lp_number)</unique>
+        <check>quantity >= 0</check>
+      </constraints>
+    </table>
+
+    <table name="lp_genealogy">
+      <description>
+        Genealogy tree for traceability (parent LP → child LP via WO).
+        This story adds reversed status to preserve audit trail.
+      </description>
+      <columns>
+        <column name="id" type="UUID" primary-key="true">PK</column>
+        <column name="org_id" type="UUID" not-null="true">FK → organizations</column>
+        <column name="parent_lp_id" type="UUID" not-null="true">FK → license_plates (input material)</column>
+        <column name="child_lp_id" type="UUID">
+          FK → license_plates (output FG/BP, NULL if WO not completed)
+        </column>
+        <column name="wo_id" type="UUID" not-null="true">FK → work_orders</column>
+        <column name="status" type="VARCHAR" default="active">
+          **NEW**: active | reversed
+          - active: Normal genealogy link
+          - reversed: Consumption was reversed, link is inactive but preserved for audit
+        </column>
+        <column name="reversed_by" type="UUID">
+          **NEW**: FK → users (who reversed this genealogy link)
+        </column>
+        <column name="reversed_at" type="TIMESTAMPTZ">
+          **NEW**: Timestamp of reversal
+        </column>
+        <column name="created_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+      </columns>
+      <constraints>
+        <check>status IN ('active', 'reversed')</check>
+        <check>
+          IF status = 'reversed' THEN
+            reversed_by IS NOT NULL AND
+            reversed_at IS NOT NULL
+        </check>
+      </constraints>
+      <indexes>
+        <index>(parent_lp_id)</index>
+        <index>(child_lp_id)</index>
+        <index>(wo_id)</index>
+        <index>(status) WHERE status = 'active'</index>
+      </indexes>
+    </table>
+
+    <table name="audit_logs">
+      <description>
+        Audit trail for all production operations.
+        Consumption reversal creates audit entry.
+      </description>
+      <columns>
+        <column name="id" type="UUID" primary-key="true">PK</column>
+        <column name="org_id" type="UUID" not-null="true">FK → organizations</column>
+        <column name="operation" type="VARCHAR" not-null="true">
+          consume_reverse | consume | wo_start | wo_complete | etc.
+        </column>
+        <column name="entity_type" type="VARCHAR">wo_material_reservation | work_order | license_plate</column>
+        <column name="entity_id" type="UUID">PK of affected entity</column>
+        <column name="wo_id" type="UUID">FK → work_orders (if applicable)</column>
+        <column name="material_id" type="UUID">FK → wo_materials (if applicable)</column>
+        <column name="lp_id" type="UUID">FK → license_plates (if applicable)</column>
+        <column name="details" type="JSONB">
+          {
+            "qty_reversed": 50,
+            "lp_number": "LP-20251127-0001",
+            "product_name": "Beef Trimmings",
+            "reverse_reason": "Wrong LP scanned by operator"
+          }
+        </column>
+        <column name="performed_by" type="UUID" not-null="true">FK → users</column>
+        <column name="performed_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+      </columns>
+      <indexes>
+        <index>(org_id, operation)</index>
+        <index>(wo_id)</index>
+        <index>(performed_by)</index>
+        <index>(performed_at DESC)</index>
+      </indexes>
+    </table>
+
+    <migration-requirements>
+      <migration name="add_reversed_status_to_reservations">
+        <sql>
+          -- Add reversed status and audit fields to wo_material_reservations
+          ALTER TABLE wo_material_reservations
+            ADD COLUMN reversed_by UUID REFERENCES users(id),
+            ADD COLUMN reversed_at TIMESTAMPTZ,
+            ADD COLUMN reverse_reason TEXT,
+            ALTER COLUMN status TYPE VARCHAR,
+            DROP CONSTRAINT IF EXISTS wo_material_reservations_status_check,
+            ADD CONSTRAINT wo_material_reservations_status_check
+              CHECK (status IN ('reserved', 'consumed', 'reversed'));
+
+          -- Add reversed status to lp_genealogy
+          ALTER TABLE lp_genealogy
+            ADD COLUMN status VARCHAR DEFAULT 'active' CHECK (status IN ('active', 'reversed')),
+            ADD COLUMN reversed_by UUID REFERENCES users(id),
+            ADD COLUMN reversed_at TIMESTAMPTZ;
+
+          -- Create index on reversed records
+          CREATE INDEX idx_wo_material_reservations_reversed
+            ON wo_material_reservations(reversed_at DESC)
+            WHERE status = 'reversed';
+
+          CREATE INDEX idx_lp_genealogy_reversed
+            ON lp_genealogy(reversed_at DESC)
+            WHERE status = 'reversed';
+        </sql>
+      </migration>
+    </migration-requirements>
+  </database-schema>
+
+  <!-- ========================================== -->
+  <!-- API PATTERNS -->
+  <!-- ========================================== -->
+  <api-patterns>
+    <endpoint method="POST" path="/api/production/work-orders/:id/consume/reverse">
+      <description>
+        Reverse consumption for a WO material reservation.
+        Only Manager and Admin roles can perform this operation.
+      </description>
+
+      <request-body>
+        {
+          "consumption_record_id": "uuid",  // FK to wo_material_reservations
+          "reverse_reason": "string"        // Required, max 250 chars
+        }
+      </request-body>
+
+      <validation-steps>
+        1. Auth check: Verify user is authenticated
+        2. Role check: Verify user role is 'manager' or 'admin' (NOT 'operator')
+        3. Org isolation: Verify wo_id belongs to user's org_id
+        4. Fetch consumption record: Get wo_material_reservations by consumption_record_id
+        5. Validate status: Verify status = 'consumed' (cannot reverse 'reserved' or already 'reversed')
+        6. Validate reason: Verify reverse_reason is not empty (1-250 chars)
+        7. Begin transaction:
+           a. Update wo_material_reservations:
+              - status = 'reversed'
+              - reversed_by = user_id
+              - reversed_at = NOW()
+              - reverse_reason = reverse_reason
+           b. Restore LP quantity:
+              - license_plates.quantity += reserved_qty
+              - license_plates.status = 'available' (or logic based on qty)
+           c. Mark genealogy as reversed:
+              - lp_genealogy.status = 'reversed'
+              - lp_genealogy.reversed_by = user_id
+              - lp_genealogy.reversed_at = NOW()
+              - WHERE parent_lp_id = lp_id AND wo_id = wo_id
+           d. Create audit log:
+              - operation = 'consume_reverse'
+              - entity_type = 'wo_material_reservation'
+              - entity_id = consumption_record_id
+              - details = { qty_reversed, lp_number, product_name, reverse_reason }
+        8. Commit transaction
+        9. Return success response
+      </validation-steps>
+
+      <response-success status="200">
+        {
+          "success": true,
+          "message": "Consumption reversed successfully",
+          "reservation": {
+            "id": "uuid",
+            "status": "reversed",
+            "reversed_by": "uuid",
+            "reversed_at": "2025-11-27T15:30:00Z",
+            "reverse_reason": "Wrong LP scanned by operator"
+          },
+          "lp_restored": {
+            "lp_id": "uuid",
+            "lp_number": "LP-20251127-0001",
+            "quantity_restored": 50,
+            "new_quantity": 50,
+            "new_status": "available"
+          }
+        }
+      </response-success>
+
+      <response-error status="403">
+        {
+          "error": "INSUFFICIENT_PERMISSIONS",
+          "message": "Only Manager or Admin can reverse consumption",
+          "details": {
+            "user_role": "operator",
+            "required_roles": ["manager", "admin"]
+          }
+        }
+      </response-error>
+
+      <response-error status="404">
+        {
+          "error": "CONSUMPTION_RECORD_NOT_FOUND",
+          "message": "Consumption record not found",
+          "details": {
+            "consumption_record_id": "uuid"
+          }
+        }
+      </response-error>
+
+      <response-error status="400">
+        {
+          "error": "INVALID_STATUS",
+          "message": "Cannot reverse consumption with status 'reserved' or 'reversed'",
+          "details": {
+            "consumption_record_id": "uuid",
+            "current_status": "reversed"
+          }
+        }
+      </response-error>
+
+      <response-error status="400">
+        {
+          "error": "MISSING_REASON",
+          "message": "Reverse reason is required (1-250 characters)",
+          "details": {
+            "reverse_reason": null
+          }
+        }
+      </response-error>
+    </endpoint>
+
+    <service-layer source="lib/services/reverse-consumption-service.ts">
+      <class name="ReverseConsumptionService">
+        <method name="reverseConsumption" async="true">
+          <parameters>
+            consumptionRecordId: string
+            reverseReason: string
+            userId: string
+            orgId: string
+          </parameters>
+          <returns>Promise&lt;ReverseConsumptionResult&gt;</returns>
+          <steps>
+            1. Fetch consumption record (wo_material_reservations)
+            2. Validate status = 'consumed'
+            3. Validate reverse_reason length (1-250 chars)
+            4. Fetch LP details (lp_id, quantity, product_id, status)
+            5. Begin transaction:
+               a. Update wo_material_reservations:
+                  - status = 'reversed'
+                  - reversed_by = userId
+                  - reversed_at = NOW()
+                  - reverse_reason = reverseReason
+               b. Restore LP:
+                  - quantity += reserved_qty
+                  - status = determineNewLPStatus(currentQty, restoredQty)
+               c. Mark genealogy as reversed:
+                  - UPDATE lp_genealogy SET status='reversed', reversed_by=userId, reversed_at=NOW()
+                    WHERE parent_lp_id = lp_id AND wo_id = wo_id
+               d. Insert audit log:
+                  - operation = 'consume_reverse'
+                  - details = { qty_reversed, lp_number, product_name, reverse_reason }
+            6. Commit transaction
+            7. Return result
+          </steps>
+        </method>
+
+        <method name="determineNewLPStatus" async="false">
+          <description>
+            Determine new LP status after reversal based on quantity.
+            - If LP was fully consumed (qty was 0), restore to 'available'
+            - If LP has other active reservations, keep 'reserved'
+            - Otherwise, restore to 'available'
+          </description>
+          <parameters>
+            currentQty: number
+            restoredQty: number
+            lpId: string
+            orgId: string
+          </parameters>
+          <returns>Promise&lt;'available' | 'reserved'&gt;</returns>
+          <steps>
+            1. Check if LP has other active reservations:
+               SELECT COUNT(*) FROM wo_material_reservations
+               WHERE lp_id = lpId AND status IN ('reserved', 'consumed')
+            2. If count > 0: return 'reserved'
+            3. Else: return 'available'
+          </steps>
+        </method>
+      </class>
+
+      <error-classes>
+        class InsufficientPermissionsError extends Error {
+          code: 'INSUFFICIENT_PERMISSIONS'
+          httpStatus: 403
+          details: { user_role: string, required_roles: string[] }
+        }
+
+        class ConsumptionRecordNotFoundError extends Error {
+          code: 'CONSUMPTION_RECORD_NOT_FOUND'
+          httpStatus: 404
+          details: { consumption_record_id: string }
+        }
+
+        class InvalidStatusError extends Error {
+          code: 'INVALID_STATUS'
+          httpStatus: 400
+          details: { consumption_record_id: string, current_status: string }
+        }
+
+        class MissingReasonError extends Error {
+          code: 'MISSING_REASON'
+          httpStatus: 400
+          details: { reverse_reason: string | null }
+        }
+      </error-classes>
+    </service-layer>
+
+    <existing-api-pattern source="apps/frontend/app/api/planning/work-orders/[id]/route.ts">
+      <template>
+        // apps/frontend/app/api/production/work-orders/[id]/consume/reverse/route.ts
+
+        import { createClient } from '@/lib/supabase/server'
+        import { NextResponse } from 'next/server'
+        import { ReverseConsumptionService } from '@/lib/services/reverse-consumption-service'
+
+        export async function POST(
+          request: Request,
+          { params }: { params: { id: string } }
+        ) {
+          try {
+            const supabase = await createClient()
+
+            // 1. Auth check
+            const { data: { user }, error: authError } = await supabase.auth.getUser()
+            if (authError || !user) {
+              return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            }
+
+            // 2. Get user details (role + org_id)
+            const { data: userData } = await supabase
+              .from('users')
+              .select('org_id, role')
+              .eq('id', user.id)
+              .single()
+
+            const orgId = userData?.org_id
+            const userRole = userData?.role
+
+            if (!orgId) {
+              return NextResponse.json({ error: 'Organization not found' }, { status: 403 })
+            }
+
+            // 3. Role check: Only Manager or Admin
+            if (!['manager', 'admin'].includes(userRole)) {
+              return NextResponse.json(
+                {
+                  error: 'INSUFFICIENT_PERMISSIONS',
+                  message: 'Only Manager or Admin can reverse consumption',
+                  details: { user_role: userRole, required_roles: ['manager', 'admin'] }
+                },
+                { status: 403 }
+              )
+            }
+
+            // 4. Parse request body
+            const body = await request.json()
+            const { consumption_record_id, reverse_reason } = body
+
+            // 5. Validate input
+            if (!consumption_record_id || !reverse_reason) {
+              return NextResponse.json(
+                { error: 'Missing required fields: consumption_record_id, reverse_reason' },
+                { status: 400 }
+              )
+            }
+
+            if (reverse_reason.length < 1 || reverse_reason.length > 250) {
+              return NextResponse.json(
+                {
+                  error: 'MISSING_REASON',
+                  message: 'Reverse reason is required (1-250 characters)',
+                  details: { reverse_reason: reverse_reason }
+                },
+                { status: 400 }
+              )
+            }
+
+            // 6. Call service layer
+            const service = new ReverseConsumptionService(supabase)
+            const result = await service.reverseConsumption(
+              consumption_record_id,
+              reverse_reason,
+              user.id,
+              orgId
+            )
+
+            return NextResponse.json({
+              success: true,
+              message: 'Consumption reversed successfully',
+              ...result
+            }, { status: 200 })
+
+          } catch (error: any) {
+            if (error.code === 'INSUFFICIENT_PERMISSIONS') {
+              return NextResponse.json(
+                { error: error.code, message: error.message, details: error.details },
+                { status: 403 }
+              )
+            }
+            if (error.code === 'CONSUMPTION_RECORD_NOT_FOUND') {
+              return NextResponse.json(
+                { error: error.code, message: error.message, details: error.details },
+                { status: 404 }
+              )
+            }
+            if (error.code === 'INVALID_STATUS' || error.code === 'MISSING_REASON') {
+              return NextResponse.json(
+                { error: error.code, message: error.message, details: error.details },
+                { status: 400 }
+              )
+            }
+            return NextResponse.json(
+              { error: 'Internal server error', message: error.message },
+              { status: 500 }
+            )
+          }
+        }
+      </template>
+    </existing-api-pattern>
+  </api-patterns>
+
+  <!-- ========================================== -->
+  <!-- UI COMPONENTS -->
+  <!-- ========================================== -->
+  <ui-components>
+    <component name="ReverseConsumptionModal" location="apps/frontend/components/production/ReverseConsumptionModal.tsx">
+      <description>
+        Modal for reversing consumption with reason input.
+        Triggered from Materials tab in WO details page.
+      </description>
+
+      <props>
+        {
+          woId: string
+          consumptionRecord: {
+            id: string
+            material_name: string
+            lp_number: string
+            reserved_qty: number
+            uom: string
+            consumed_by: string
+            consumed_at: string
+          }
+          onReverse: (result: ReverseResult) => void
+          onClose: () => void
+        }
+      </props>
+
+      <state>
+        {
+          reverseReason: string
+          loading: boolean
+          error: string | null
+        }
+      </state>
+
+      <rendering>
+        &lt;div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"&gt;
+          &lt;div className="bg-white rounded-lg p-6 w-full max-w-xl"&gt;
+            &lt;div className="flex justify-between items-center mb-4"&gt;
+              &lt;h2 className="text-xl font-semibold"&gt;Reverse Consumption&lt;/h2&gt;
+              &lt;button onClick={onClose} className="text-gray-600"&gt;✕&lt;/button&gt;
+            &lt;/div&gt;
+
+            &lt;div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4"&gt;
+              &lt;p className="text-amber-800 text-sm"&gt;
+                ⚠️ Warning: This action will restore LP inventory and mark consumption as reversed.
+              &lt;/p&gt;
+            &lt;/div&gt;
+
+            &lt;div className="space-y-3 mb-4"&gt;
+              &lt;div&gt;
+                &lt;span className="text-sm font-medium text-gray-700"&gt;Material:&lt;/span&gt;
+                &lt;span className="ml-2 text-gray-900"&gt;{consumptionRecord.material_name}&lt;/span&gt;
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;span className="text-sm font-medium text-gray-700"&gt;License Plate:&lt;/span&gt;
+                &lt;span className="ml-2 text-gray-900"&gt;{consumptionRecord.lp_number}&lt;/span&gt;
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;span className="text-sm font-medium text-gray-700"&gt;Quantity:&lt;/span&gt;
+                &lt;span className="ml-2 text-gray-900"&gt;{consumptionRecord.reserved_qty} {consumptionRecord.uom}&lt;/span&gt;
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;span className="text-sm font-medium text-gray-700"&gt;Consumed By:&lt;/span&gt;
+                &lt;span className="ml-2 text-gray-900"&gt;{consumptionRecord.consumed_by}&lt;/span&gt;
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;span className="text-sm font-medium text-gray-700"&gt;Consumed At:&lt;/span&gt;
+                &lt;span className="ml-2 text-gray-900"&gt;{consumptionRecord.consumed_at}&lt;/span&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+
+            &lt;div className="mb-4"&gt;
+              &lt;label className="block text-sm font-medium text-gray-700 mb-2"&gt;
+                Reason for Reversal *
+              &lt;/label&gt;
+              &lt;textarea
+                value={reverseReason}
+                onChange={(e) => setReverseReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-3"
+                rows={3}
+                maxLength={250}
+                placeholder="E.g., Wrong LP scanned by operator"
+              /&gt;
+              &lt;p className="text-xs text-gray-500 mt-1"&gt;
+                {reverseReason.length}/250 characters
+              &lt;/p&gt;
+            &lt;/div&gt;
+
+            {error &amp;&amp; (
+              &lt;div className="bg-red-100 border border-red-400 text-red-800 px-4 py-3 rounded-lg mb-4"&gt;
+                {error}
+              &lt;/div&gt;
+            )}
+
+            &lt;div className="flex justify-end gap-3"&gt;
+              &lt;button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                disabled={loading}
+              &gt;
+                Cancel
+              &lt;/button&gt;
+              &lt;button
+                onClick={handleConfirmReverse}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                disabled={loading || !reverseReason.trim()}
+              &gt;
+                {loading ? 'Reversing...' : 'Confirm Reverse'}
+              &lt;/button&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      </rendering>
+
+      <api-call>
+        async function handleConfirmReverse() {
+          setLoading(true)
+          setError(null)
+
+          try {
+            const response = await fetch(`/api/production/work-orders/${woId}/consume/reverse`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                consumption_record_id: consumptionRecord.id,
+                reverse_reason: reverseReason.trim()
+              })
+            })
+
+            if (!response.ok) {
+              const error = await response.json()
+              throw new Error(error.message || 'Failed to reverse consumption')
+            }
+
+            const result = await response.json()
+            onReverse(result)
+            onClose()
+          } catch (err: any) {
+            setError(err.message)
+          } finally {
+            setLoading(false)
+          }
+        }
+      </api-call>
+    </component>
+
+    <component name="MaterialConsumptionHistory" location="apps/frontend/components/production/MaterialConsumptionHistory.tsx">
+      <description>
+        Table showing consumption history for a WO material.
+        Includes Reverse button for Manager/Admin roles.
+      </description>
+
+      <rendering>
+        &lt;table className="w-full"&gt;
+          &lt;thead&gt;
+            &lt;tr className="border-b"&gt;
+              &lt;th&gt;Material&lt;/th&gt;
+              &lt;th&gt;License Plate&lt;/th&gt;
+              &lt;th&gt;Quantity&lt;/th&gt;
+              &lt;th&gt;Status&lt;/th&gt;
+              &lt;th&gt;Date/Time&lt;/th&gt;
+              &lt;th&gt;Operator&lt;/th&gt;
+              &lt;th&gt;Actions&lt;/th&gt;
+            &lt;/tr&gt;
+          &lt;/thead&gt;
+          &lt;tbody&gt;
+            {consumptionRecords.map((record) => (
+              &lt;tr key={record.id} className="border-b hover:bg-gray-50"&gt;
+                &lt;td&gt;{record.material_name}&lt;/td&gt;
+                &lt;td&gt;{record.lp_number}&lt;/td&gt;
+                &lt;td&gt;{record.reserved_qty} {record.uom}&lt;/td&gt;
+                &lt;td&gt;
+                  {record.status === 'consumed' ? (
+                    &lt;span className="bg-green-200 text-green-800 px-2 py-1 rounded-full text-xs"&gt;
+                      Consumed
+                    &lt;/span&gt;
+                  ) : (
+                    &lt;span className="bg-gray-200 text-gray-800 px-2 py-1 rounded-full text-xs"&gt;
+                      Reversed on {record.reversed_at} by {record.reversed_by_name}
+                    &lt;/span&gt;
+                  )}
+                &lt;/td&gt;
+                &lt;td&gt;{record.consumed_at}&lt;/td&gt;
+                &lt;td&gt;{record.consumed_by}&lt;/td&gt;
+                &lt;td&gt;
+                  {record.status === 'consumed' &amp;&amp; canReverse &amp;&amp; (
+                    &lt;button
+                      onClick={() => handleReverseClick(record)}
+                      className="text-gray-600 hover:text-gray-900 text-sm"
+                    &gt;
+                      Reverse
+                    &lt;/button&gt;
+                  )}
+                &lt;/td&gt;
+              &lt;/tr&gt;
+            ))}
+          &lt;/tbody&gt;
+        &lt;/table&gt;
+
+        {showReverseModal &amp;&amp; (
+          &lt;ReverseConsumptionModal
+            woId={woId}
+            consumptionRecord={selectedRecord}
+            onReverse={handleReverseSuccess}
+            onClose={() => setShowReverseModal(false)}
+          /&gt;
+        )}
+      </rendering>
+    </component>
+  </ui-components>
+
+  <!-- ========================================== -->
+  <!-- TESTING STRATEGY -->
+  <!-- ========================================== -->
+  <testing-strategy>
+    <unit-tests>
+      <test file="lib/services/reverse-consumption-service.test.ts">
+        <test-case name="Should reverse consumption and restore LP">
+          const result = await service.reverseConsumption(
+            'consumption-001',
+            'Wrong LP scanned',
+            'user-001',
+            'org-001'
+          )
+
+          expect(result.reservation.status).toBe('reversed')
+          expect(result.lp_restored.quantity_restored).toBe(50)
+          expect(result.lp_restored.new_status).toBe('available')
+        </test-case>
+
+        <test-case name="Should throw error if status is already reversed">
+          const consumptionRecord = { status: 'reversed' }
+
+          await expect(service.reverseConsumption(...)).rejects.toThrow(
+            'Cannot reverse consumption with status \'reversed\''
+          )
+        </test-case>
+
+        <test-case name="Should throw error if reverse_reason is empty">
+          await expect(service.reverseConsumption(..., '')).rejects.toThrow(
+            'Reverse reason is required (1-250 characters)'
+          )
+        </test-case>
+
+        <test-case name="Should mark genealogy as reversed">
+          await service.reverseConsumption(...)
+
+          const genealogy = await db.lp_genealogy.findOne({ parent_lp_id: 'lp-001', wo_id: 'wo-001' })
+          expect(genealogy.status).toBe('reversed')
+          expect(genealogy.reversed_by).toBe('user-001')
+          expect(genealogy.reversed_at).not.toBeNull()
+        </test-case>
+
+        <test-case name="Should create audit log entry">
+          await service.reverseConsumption(...)
+
+          const auditLog = await db.audit_logs.findOne({ operation: 'consume_reverse' })
+          expect(auditLog.details.qty_reversed).toBe(50)
+          expect(auditLog.details.reverse_reason).toBe('Wrong LP scanned')
+        </test-case>
+      </test>
+    </unit-tests>
+
+    <integration-tests>
+      <test file="app/api/production/work-orders/[id]/consume/reverse/route.test.ts">
+        <test-case name="POST - 200 when reversal successful">
+          const response = await POST('/api/production/work-orders/WO-001/consume/reverse', {
+            consumption_record_id: 'res-001',
+            reverse_reason: 'Wrong LP scanned by operator'
+          })
+
+          expect(response.status).toBe(200)
+          expect(response.body.success).toBe(true)
+          expect(response.body.reservation.status).toBe('reversed')
+          expect(response.body.lp_restored.quantity_restored).toBe(50)
+        </test-case>
+
+        <test-case name="POST - 403 when user is not Manager/Admin">
+          // Login as 'operator' role
+          const response = await POST('/api/production/work-orders/WO-001/consume/reverse', {
+            consumption_record_id: 'res-001',
+            reverse_reason: 'Test'
+          })
+
+          expect(response.status).toBe(403)
+          expect(response.body.error).toBe('INSUFFICIENT_PERMISSIONS')
+        </test-case>
+
+        <test-case name="POST - 404 when consumption record not found">
+          const response = await POST('/api/production/work-orders/WO-001/consume/reverse', {
+            consumption_record_id: 'nonexistent',
+            reverse_reason: 'Test'
+          })
+
+          expect(response.status).toBe(404)
+          expect(response.body.error).toBe('CONSUMPTION_RECORD_NOT_FOUND')
+        </test-case>
+
+        <test-case name="POST - 400 when reverse_reason is missing">
+          const response = await POST('/api/production/work-orders/WO-001/consume/reverse', {
+            consumption_record_id: 'res-001',
+            reverse_reason: ''
+          })
+
+          expect(response.status).toBe(400)
+          expect(response.body.error).toBe('MISSING_REASON')
+        </test-case>
+      </test>
+    </integration-tests>
+
+    <e2e-tests>
+      <test file="tests/e2e/production-consumption-reversal.spec.ts">
+        <test-case name="Manager should be able to reverse consumption">
+          // Login as Manager
+          await page.goto('/production/work-orders/WO-001')
+          await page.click('text=Materials')
+
+          // Find consumed record and click Reverse
+          await page.click('button:has-text("Reverse")')
+
+          // Fill reason
+          await page.fill('textarea[placeholder*="Wrong LP"]', 'Wrong LP scanned by operator')
+
+          // Confirm
+          await page.click('button:has-text("Confirm Reverse")')
+
+          // Verify success toast
+          await expect(page.locator('text=Consumption reversed successfully')).toBeVisible()
+
+          // Verify status changed
+          await expect(page.locator('text=Reversed on')).toBeVisible()
+        </test-case>
+
+        <test-case name="Operator should NOT see Reverse button">
+          // Login as Operator
+          await page.goto('/production/work-orders/WO-001')
+          await page.click('text=Materials')
+
+          // Reverse button should not exist
+          await expect(page.locator('button:has-text("Reverse")')).not.toBeVisible()
+        </test-case>
+
+        <test-case name="LP quantity should be restored after reversal">
+          // Before reversal: LP-001 has qty=0, status=consumed
+          await page.goto('/warehouse/license-plates/LP-001')
+          await expect(page.locator('text=0 kg')).toBeVisible()
+          await expect(page.locator('text=consumed')).toBeVisible()
+
+          // Reverse consumption
+          await page.goto('/production/work-orders/WO-001')
+          await page.click('text=Materials')
+          await page.click('button:has-text("Reverse")')
+          await page.fill('textarea', 'Wrong LP scanned')
+          await page.click('button:has-text("Confirm Reverse")')
+
+          // After reversal: LP-001 has qty=50, status=available
+          await page.goto('/warehouse/license-plates/LP-001')
+          await expect(page.locator('text=50 kg')).toBeVisible()
+          await expect(page.locator('text=available')).toBeVisible()
+        </test-case>
+
+        <test-case name="Genealogy should be marked as reversed">
+          // Reverse consumption
+          await page.goto('/production/work-orders/WO-001')
+          await page.click('text=Materials')
+          await page.click('button:has-text("Reverse")')
+          await page.fill('textarea', 'Wrong LP scanned')
+          await page.click('button:has-text("Confirm Reverse")')
+
+          // Check genealogy tree
+          await page.goto('/technical/traceability/LP-001')
+          await expect(page.locator('text=Reversed')).toBeVisible()
+        </test-case>
+      </test>
+    </e2e-tests>
+  </testing-strategy>
+
+  <!-- ========================================== -->
+  <!-- DEPENDENCIES & INTEGRATION -->
+  <!-- ========================================== -->
+  <dependencies>
+    <prerequisite story="04-7" title="Material Reservation (Desktop)">
+      wo_material_reservations table must exist with status column.
+      This story extends the table with reversed status.
+    </prerequisite>
+
+    <prerequisite story="04-19" title="Genealogy Tree Creation">
+      lp_genealogy table must exist.
+      This story adds reversed status to genealogy records.
+    </prerequisite>
+
+    <integration story="04-12" title="Output Registration (Desktop)">
+      When output is registered, system should ignore reversed genealogy records.
+      Only count active genealogy links for traceability.
+    </integration>
+
+    <integration story="02-18" title="Forward Traceability">
+      Forward trace should show reversed genealogy links with visual indicator (grayed out).
+      Preserve full audit trail even for reversed consumption.
+    </integration>
+
+    <integration story="02-19" title="Backward Traceability">
+      Backward trace should show reversed genealogy links with visual indicator.
+    </integration>
+  </dependencies>
+
+  <!-- ========================================== -->
+  <!-- IMPLEMENTATION NOTES -->
+  <!-- ========================================== -->
+  <implementation-notes>
+    <note priority="high">
+      **Reversal vs Deletion:**
+      DO NOT delete consumption records or genealogy links.
+      Mark as 'reversed' to preserve full audit trail for compliance.
+      All reversed records remain queryable with status='reversed'.
+    </note>
+
+    <note priority="high">
+      **Role-Based Access:**
+      Only Manager and Admin roles can reverse consumption.
+      Operator role should not see Reverse button in UI.
+      API must validate user role before allowing reversal.
+    </note>
+
+    <note priority="medium">
+      **LP Status Logic:**
+      After reversal, determine LP status based on:
+      - If LP has other active reservations → status='reserved'
+      - Otherwise → status='available'
+      Implement determineNewLPStatus() method in service.
+    </note>
+
+    <note priority="medium">
+      **Audit Trail:**
+      Create audit_logs entry with:
+      - operation = 'consume_reverse'
+      - details = { qty_reversed, lp_number, product_name, reverse_reason }
+      - performed_by = user_id
+      - performed_at = timestamp
+    </note>
+
+    <note priority="low">
+      **Future Enhancement:**
+      Consider adding "Re-consume" action after reversal (reverse the reversal).
+      This would create a new consumption record (not restore the old one).
+    </note>
+
+    <note priority="low">
+      **UI Enhancement:**
+      Add tooltip on Reverse button explaining what happens:
+      "Reversal will restore LP inventory and mark consumption as reversed. This action is auditable."
+    </note>
+  </implementation-notes>
+</story-context>

@@ -1,0 +1,1052 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context id="04-18-lp-updates-after-consumption">
+
+  <!-- ================================================================ -->
+  <!-- STORY OVERVIEW -->
+  <!-- ================================================================ -->
+  <story>
+    <id>04-18</id>
+    <title>LP Updates After Consumption</title>
+    <epic>4 - Production Execution</epic>
+    <status>drafted</status>
+    <priority>P0</priority>
+    <story-points>1</story-points>
+    <effort>0.5 day</effort>
+
+    <user-story>
+      As a System
+      I want to update LP qty when materials are auto-consumed
+      So that inventory is accurate
+    </user-story>
+
+    <problem-statement>
+      When output is registered (Story 4.12), the system automatically consumes reserved LPs in sequence.
+      This story ensures that license_plates table is updated atomically:
+      - current_qty decreased by consumed amount
+      - status changed to 'consumed' when qty = 0
+      - consumed_by_wo_id set for audit trail
+      - lp_movements record created
+      - All updates in same transaction as consumption recording
+    </problem-statement>
+
+    <dependencies>
+      <requires>
+        <story>4.7</story>
+        <description>Material Reservation - Creates wo_material_reservations and reserves LPs</description>
+      </requires>
+      <requires>
+        <story>4.12</story>
+        <description>Output Registration - Triggers auto-consumption of reserved LPs</description>
+      </requires>
+      <requires>
+        <story>4.19</story>
+        <description>Genealogy - Creates lp_genealogy records during consumption</description>
+      </requires>
+    </dependencies>
+  </story>
+
+  <!-- ================================================================ -->
+  <!-- ACCEPTANCE CRITERIA -->
+  <!-- ================================================================ -->
+  <acceptance-criteria>
+
+    <criterion id="AC-4.18.1">
+      <title>LP Qty Decrease at Output Registration</title>
+      <description>
+        Given: Output registered (Story 4.12)
+        When: Sequential LP allocation triggered (auto-consume)
+        Then: license_plates.current_qty decreased by consumed amount
+
+        Example flow:
+        - LP-2 initially has 30kg
+        - Output-1 registers 20kg → LP-2 consumed 20kg → current_qty = 10kg
+        - Output-2 registers 10kg → LP-2 consumed 10kg → current_qty = 0kg
+      </description>
+      <implementation-notes>
+        - Update happens in same transaction as wo_consumption insert
+        - Use row-level lock (SELECT ... FOR UPDATE) on license_plates
+        - Validate current_qty >= consumed_amount before update
+      </implementation-notes>
+    </criterion>
+
+    <criterion id="AC-4.18.2">
+      <title>LP Status Transition</title>
+      <description>
+        When: current_qty = 0
+        Then: license_plates.status → 'consumed'
+      </description>
+      <implementation-notes>
+        - Check constraint: status IN ('available', 'reserved', 'consumed', 'shipped', 'quarantine', 'recalled')
+        - Status transition: 'reserved' → 'consumed' when qty = 0
+        - Partial consumption: status remains 'reserved' until qty = 0
+      </implementation-notes>
+    </criterion>
+
+    <criterion id="AC-4.18.3">
+      <title>LP Audit Trail</title>
+      <description>
+        Then: license_plates.consumed_by_wo_id = current WO, updated_at timestamp set
+      </description>
+      <implementation-notes>
+        - consumed_by_wo_id: UUID reference to work_orders.id
+        - updated_at: Automatic trigger (update_updated_at_column())
+        - Enables traceability: "Which WO consumed this LP?"
+      </implementation-notes>
+    </criterion>
+
+    <criterion id="AC-4.18.4">
+      <title>Atomic Update</title>
+      <description>
+        Then: Consumption record + LP update atomic (same transaction)
+      </description>
+      <implementation-notes>
+        Transaction flow:
+        1. START transaction
+        2. INSERT wo_consumption record
+        3. UPDATE license_plates.current_qty
+        4. UPDATE license_plates.status (if qty = 0)
+        5. UPDATE license_plates.consumed_by_wo_id
+        6. INSERT lp_movements record (AC-4.18.6)
+        7. UPDATE lp_genealogy.child_lp_id (Story 4.19)
+        8. COMMIT transaction
+
+        If any step fails → ROLLBACK all changes
+      </implementation-notes>
+    </criterion>
+
+    <criterion id="AC-4.18.5">
+      <title>Concurrency Safety</title>
+      <description>
+        Then: Row-level lock on license_plates during update, prevent negative qty
+      </description>
+      <implementation-notes>
+        - SELECT * FROM license_plates WHERE id = ? FOR UPDATE
+        - CHECK constraint: current_qty >= 0 (database level)
+        - Handle concurrent consumption:
+          - If LP qty changed by another transaction → error + rollback
+          - Error message: "LP-2 qty changed by another user. Please refresh."
+      </implementation-notes>
+    </criterion>
+
+    <criterion id="AC-4.18.6">
+      <title>LP Movement Record</title>
+      <description>
+        When: consumption recorded
+        Then: lp_movements record created: type='consumption', wo_id, lp_id, qty
+      </description>
+      <implementation-notes>
+        lp_movements record structure:
+        - id: UUID
+        - org_id: UUID (from license_plate)
+        - lp_id: UUID (consumed LP)
+        - movement_type: 'consumption'
+        - wo_id: UUID (work order consuming)
+        - quantity: DECIMAL(12,3) (consumed amount)
+        - from_location: UUID (LP location before consumption)
+        - to_location: NULL (consumed, not moved to new location)
+        - created_at: TIMESTAMP
+
+        This enables movement tracking: "When and where was this LP consumed?"
+      </implementation-notes>
+    </criterion>
+
+    <criterion id="AC-4.18.7">
+      <title>Validation</title>
+      <description>
+        When: attempting to consume more than available
+        Then: 400 error: "LP has 10kg available, requested 15kg"
+      </description>
+      <implementation-notes>
+        Validation before transaction:
+        - Check current_qty >= requested_qty
+        - If validation fails → 400 error (no transaction started)
+        - Error payload: { error: "LP has {current_qty}kg available, requested {requested_qty}kg" }
+      </implementation-notes>
+    </criterion>
+
+    <criterion id="AC-4.18.8">
+      <title>Prerequisites</title>
+      <description>
+        Then: Requires Story 4.7 (Material Reservation/Consumption)
+      </description>
+      <implementation-notes>
+        - Story 4.7: Creates wo_material_reservations and reserves LPs
+        - Story 4.12: Triggers auto-consumption when output registered
+        - This story (4.18): Updates LP state during consumption
+      </implementation-notes>
+    </criterion>
+
+  </acceptance-criteria>
+
+  <!-- ================================================================ -->
+  <!-- DATABASE SCHEMA -->
+  <!-- ================================================================ -->
+  <database-schema>
+
+    <!-- License Plates Table (Existing - Story 2.27 Stub) -->
+    <table name="license_plates">
+      <description>
+        Stub table from Epic 2 Batch 2D (Traceability).
+        Full implementation in Epic 5 (Warehouse).
+        This story adds: consumed_by_wo_id field.
+      </description>
+      <columns>
+        <column name="id" type="UUID" primary-key="true" default="gen_random_uuid()" />
+        <column name="org_id" type="UUID" not-null="true" references="organizations(id)" on-delete="CASCADE" />
+        <column name="lp_number" type="VARCHAR(50)" not-null="true" unique="true" />
+        <column name="batch_number" type="VARCHAR(50)" nullable="true" />
+        <column name="product_id" type="UUID" not-null="true" references="products(id)" on-delete="RESTRICT" />
+        <column name="quantity" type="DECIMAL(12,3)" not-null="true" description="Initial quantity - DOES NOT CHANGE after creation" />
+        <column name="current_qty" type="DECIMAL(12,3)" not-null="true" description="Current available quantity - UPDATED by this story when consumed" />
+        <column name="uom" type="VARCHAR(10)" not-null="true" />
+        <column name="status" type="VARCHAR(20)" not-null="true" default="available"
+                description="Values: available, reserved, consumed, shipped, quarantine, recalled" />
+        <column name="location_id" type="UUID" nullable="true" references="locations(id)" on-delete="SET NULL" />
+        <column name="manufacturing_date" type="DATE" nullable="true" />
+        <column name="expiry_date" type="DATE" nullable="true" />
+        <column name="received_date" type="DATE" nullable="true" />
+        <column name="consumed_by_wo_id" type="UUID" nullable="true" references="work_orders(id)"
+                description="NEW FIELD - Set by this story when LP fully consumed" />
+        <column name="created_by" type="UUID" nullable="true" references="users(id)" />
+        <column name="created_at" type="TIMESTAMP WITH TIME ZONE" not-null="true" default="NOW()" />
+        <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" not-null="true" default="NOW()" />
+      </columns>
+      <constraints>
+        <check name="license_plates_status_check">
+          status IN ('available', 'reserved', 'consumed', 'shipped', 'quarantine', 'recalled')
+        </check>
+        <check name="license_plates_quantity_positive">
+          quantity > 0
+        </check>
+        <check name="license_plates_current_qty_non_negative">
+          current_qty >= 0
+        </check>
+      </constraints>
+      <indexes>
+        <index name="idx_license_plates_org" columns="org_id" />
+        <index name="idx_license_plates_product" columns="product_id" />
+        <index name="idx_license_plates_batch" columns="batch_number" where="batch_number IS NOT NULL" />
+        <index name="idx_license_plates_status" columns="status" />
+        <index name="idx_license_plates_location" columns="location_id" where="location_id IS NOT NULL" />
+        <index name="idx_license_plates_consumed_by_wo" columns="consumed_by_wo_id" where="consumed_by_wo_id IS NOT NULL" />
+      </indexes>
+      <rls>
+        <policy name="Users can view license plates in their org" for="SELECT">
+          org_id = (auth.jwt() ->> 'org_id')::uuid
+        </policy>
+        <policy name="Technical/Admin can create license plates" for="INSERT">
+          org_id = (auth.jwt() ->> 'org_id')::uuid
+          AND (auth.jwt() ->> 'role') IN ('technical', 'admin', 'qc_manager', 'warehouse')
+        </policy>
+        <policy name="Technical/Admin can update license plates" for="UPDATE">
+          org_id = (auth.jwt() ->> 'org_id')::uuid
+          AND (auth.jwt() ->> 'role') IN ('technical', 'admin', 'qc_manager', 'warehouse')
+        </policy>
+        <policy name="Admin can delete license plates" for="DELETE">
+          org_id = (auth.jwt() ->> 'org_id')::uuid
+          AND (auth.jwt() ->> 'role') = 'admin'
+        </policy>
+      </rls>
+    </table>
+
+    <!-- LP Movements Table (Epic 5 - Stub reference for this story) -->
+    <table name="lp_movements">
+      <description>
+        Tracks all LP movements (consumption, transfer, receipt, etc.).
+        This story creates 'consumption' type movements.
+      </description>
+      <columns>
+        <column name="id" type="UUID" primary-key="true" default="gen_random_uuid()" />
+        <column name="org_id" type="UUID" not-null="true" references="organizations(id)" on-delete="CASCADE" />
+        <column name="lp_id" type="UUID" not-null="true" references="license_plates(id)" on-delete="CASCADE" />
+        <column name="movement_type" type="VARCHAR(20)" not-null="true"
+                description="Values: consumption, transfer, receipt, adjustment, split, merge" />
+        <column name="wo_id" type="UUID" nullable="true" references="work_orders(id)"
+                description="Set when movement_type = 'consumption'" />
+        <column name="quantity" type="DECIMAL(12,3)" not-null="true" />
+        <column name="from_location" type="UUID" nullable="true" references="locations(id)" />
+        <column name="to_location" type="UUID" nullable="true" references="locations(id)" />
+        <column name="created_by" type="UUID" nullable="true" references="users(id)" />
+        <column name="created_at" type="TIMESTAMP WITH TIME ZONE" not-null="true" default="NOW()" />
+      </columns>
+      <constraints>
+        <check name="lp_movements_type_check">
+          movement_type IN ('consumption', 'transfer', 'receipt', 'adjustment', 'split', 'merge')
+        </check>
+        <check name="lp_movements_quantity_positive">
+          quantity > 0
+        </check>
+      </constraints>
+      <indexes>
+        <index name="idx_lp_movements_lp" columns="lp_id" />
+        <index name="idx_lp_movements_wo" columns="wo_id" where="wo_id IS NOT NULL" />
+        <index name="idx_lp_movements_type" columns="movement_type" />
+      </indexes>
+    </table>
+
+    <!-- WO Material Reservations (Story 4.7) -->
+    <table name="wo_material_reservations">
+      <description>
+        Tracks reserved LPs for work order materials.
+        Created by Story 4.7, consumed by Story 4.12/4.18.
+      </description>
+      <columns>
+        <column name="id" type="UUID" primary-key="true" default="gen_random_uuid()" />
+        <column name="org_id" type="UUID" not-null="true" references="organizations(id)" on-delete="CASCADE" />
+        <column name="wo_id" type="UUID" not-null="true" references="work_orders(id)" on-delete="CASCADE" />
+        <column name="material_id" type="UUID" not-null="true" references="products(id)" on-delete="RESTRICT" />
+        <column name="lp_id" type="UUID" not-null="true" references="license_plates(id)" on-delete="RESTRICT" />
+        <column name="reserved_qty" type="DECIMAL(12,3)" not-null="true" />
+        <column name="consumed_qty" type="DECIMAL(12,3)" not-null="true" default="0"
+                description="UPDATED by Story 4.18 when LP consumed" />
+        <column name="sequence_number" type="INTEGER" not-null="true" description="Order of consumption (1, 2, 3...)" />
+        <column name="status" type="VARCHAR(20)" not-null="true" default="reserved"
+                description="Values: reserved, partially_consumed, consumed" />
+        <column name="created_at" type="TIMESTAMP WITH TIME ZONE" not-null="true" default="NOW()" />
+      </columns>
+      <constraints>
+        <check name="wo_material_reservations_status_check">
+          status IN ('reserved', 'partially_consumed', 'consumed')
+        </check>
+        <check name="wo_material_reservations_consumed_lte_reserved">
+          consumed_qty &lt;= reserved_qty
+        </check>
+      </constraints>
+      <indexes>
+        <index name="idx_wo_material_reservations_wo" columns="wo_id" />
+        <index name="idx_wo_material_reservations_lp" columns="lp_id" />
+      </indexes>
+    </table>
+
+  </database-schema>
+
+  <!-- ================================================================ -->
+  <!-- API PATTERNS -->
+  <!-- ================================================================ -->
+  <api-patterns>
+
+    <pattern name="LP Update Service">
+      <description>
+        Service layer method to update LP after consumption.
+        Called from ConsumptionService during output registration.
+      </description>
+      <file-path>apps/frontend/lib/services/lp-update-service.ts</file-path>
+      <example-code><![CDATA[
+/**
+ * LP Update Service
+ * Story 4.18: Updates license_plates after material consumption
+ */
+
+import { createClient } from '@/lib/supabase/server'
+
+export interface LPUpdateInput {
+  lp_id: string
+  consumed_qty: number
+  wo_id: string
+  org_id: string
+  user_id: string
+}
+
+export interface LPUpdateResult {
+  success: boolean
+  data?: {
+    lp_id: string
+    previous_qty: number
+    new_qty: number
+    status: string
+    movement_id: string
+  }
+  error?: string
+  code?: 'INVALID_INPUT' | 'INSUFFICIENT_QTY' | 'NOT_FOUND' | 'CONCURRENT_UPDATE'
+}
+
+/**
+ * Update LP after consumption (AC-4.18.1 to AC-4.18.6)
+ * MUST be called within existing transaction context
+ */
+export async function updateLPAfterConsumption(
+  input: LPUpdateInput,
+  supabase: ReturnType<typeof createClient>
+): Promise<LPUpdateResult> {
+
+  try {
+    // AC-4.18.5: Row-level lock to prevent concurrent updates
+    const { data: lp, error: lockError } = await supabase
+      .from('license_plates')
+      .select('id, current_qty, status, location_id')
+      .eq('id', input.lp_id)
+      .eq('org_id', input.org_id)
+      // Note: Supabase doesn't support FOR UPDATE directly
+      // Transaction-level isolation provides concurrency safety
+      .single()
+
+    if (lockError || !lp) {
+      return {
+        success: false,
+        error: 'License Plate not found',
+        code: 'NOT_FOUND',
+      }
+    }
+
+    // AC-4.18.7: Validate sufficient quantity
+    if (lp.current_qty < input.consumed_qty) {
+      return {
+        success: false,
+        error: `LP has ${lp.current_qty}kg available, requested ${input.consumed_qty}kg`,
+        code: 'INSUFFICIENT_QTY',
+      }
+    }
+
+    const new_qty = lp.current_qty - input.consumed_qty
+
+    // AC-4.18.1 & AC-4.18.2: Update current_qty and status
+    const updateData: any = {
+      current_qty: new_qty,
+      updated_at: new Date().toISOString(),
+    }
+
+    // AC-4.18.2: Status transition when qty = 0
+    if (new_qty === 0) {
+      updateData.status = 'consumed'
+      updateData.consumed_by_wo_id = input.wo_id // AC-4.18.3
+    }
+
+    const { data: updatedLP, error: updateError } = await supabase
+      .from('license_plates')
+      .update(updateData)
+      .eq('id', input.lp_id)
+      .eq('org_id', input.org_id)
+      .select('id, current_qty, status')
+      .single()
+
+    if (updateError) {
+      return {
+        success: false,
+        error: updateError.message,
+        code: 'CONCURRENT_UPDATE',
+      }
+    }
+
+    // AC-4.18.6: Create LP movement record
+    const { data: movement, error: movementError } = await supabase
+      .from('lp_movements')
+      .insert({
+        org_id: input.org_id,
+        lp_id: input.lp_id,
+        movement_type: 'consumption',
+        wo_id: input.wo_id,
+        quantity: input.consumed_qty,
+        from_location: lp.location_id,
+        to_location: null, // Consumed, not moved
+        created_by: input.user_id,
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+
+    if (movementError) {
+      return {
+        success: false,
+        error: 'Failed to create movement record',
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        lp_id: updatedLP.id,
+        previous_qty: lp.current_qty,
+        new_qty: updatedLP.current_qty,
+        status: updatedLP.status,
+        movement_id: movement.id,
+      },
+    }
+
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to update LP',
+    }
+  }
+}
+      ]]></example-code>
+    </pattern>
+
+    <pattern name="API Route Pattern">
+      <description>
+        Standard Next.js API route pattern for Production module.
+        Based on existing apps/frontend/app/api/planning/work-orders/[id]/route.ts
+      </description>
+      <file-path>apps/frontend/app/api/production/work-orders/[id]/consume/route.ts</file-path>
+      <example-code><![CDATA[
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabase } from '@/lib/supabase/server'
+import { consumeMaterialSchema } from '@/lib/validation/production-schemas'
+import { consumeMaterial } from '@/lib/services/consumption-service'
+import { ZodError } from 'zod'
+
+/**
+ * Material Consumption API Route
+ * Story 4.7 + 4.18: Consume material and update LP
+ *
+ * POST /api/production/work-orders/[id]/consume
+ */
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: wo_id } = await params
+    const supabase = await createServerSupabase()
+
+    // Authentication check
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
+
+    if (authError || !session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Parse and validate request body
+    const body = await request.json()
+    const validatedData = consumeMaterialSchema.parse(body)
+
+    // AC-4.18.4: Atomic transaction (consumption + LP update)
+    const result = await consumeMaterial({
+      wo_id,
+      ...validatedData,
+      user_id: session.user.id,
+      org_id: session.user.org_id,
+    })
+
+    if (!result.success) {
+      if (result.code === 'INSUFFICIENT_QTY') {
+        return NextResponse.json(
+          { error: result.error },
+          { status: 400 }
+        )
+      }
+
+      if (result.code === 'NOT_FOUND') {
+        return NextResponse.json(
+          { error: result.error },
+          { status: 404 }
+        )
+      }
+
+      return NextResponse.json(
+        { error: result.error || 'Failed to consume material' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(
+      {
+        consumption: result.data,
+        message: 'Material consumed successfully',
+      },
+      { status: 200 }
+    )
+
+  } catch (error) {
+    console.error('Error in POST /api/production/work-orders/[id]/consume:', error)
+
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: error.errors },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+      ]]></example-code>
+    </pattern>
+
+    <pattern name="Atomic Transaction Pattern">
+      <description>
+        Transaction pattern for consumption + LP update (AC-4.18.4).
+        Uses Supabase RPC function for atomic operations.
+      </description>
+      <file-path>apps/frontend/lib/supabase/migrations/XXX_create_consume_material_function.sql</file-path>
+      <example-code><![CDATA[
+-- Migration: Create consume_material RPC function
+-- Story 4.18: Atomic consumption + LP update transaction
+
+CREATE OR REPLACE FUNCTION consume_material(
+  p_org_id UUID,
+  p_wo_id UUID,
+  p_lp_id UUID,
+  p_material_id UUID,
+  p_consumed_qty DECIMAL(12,3),
+  p_user_id UUID
+) RETURNS JSON AS $$
+DECLARE
+  v_lp RECORD;
+  v_new_qty DECIMAL(12,3);
+  v_consumption_id UUID;
+  v_movement_id UUID;
+BEGIN
+  -- AC-4.18.5: Lock license_plate row
+  SELECT id, current_qty, status, location_id
+  INTO v_lp
+  FROM license_plates
+  WHERE id = p_lp_id AND org_id = p_org_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'License Plate not found';
+  END IF;
+
+  -- AC-4.18.7: Validate sufficient quantity
+  IF v_lp.current_qty < p_consumed_qty THEN
+    RAISE EXCEPTION 'LP has % available, requested %', v_lp.current_qty, p_consumed_qty;
+  END IF;
+
+  v_new_qty := v_lp.current_qty - p_consumed_qty;
+
+  -- AC-4.18.1: Update current_qty
+  UPDATE license_plates
+  SET
+    current_qty = v_new_qty,
+    -- AC-4.18.2: Status transition when qty = 0
+    status = CASE WHEN v_new_qty = 0 THEN 'consumed' ELSE status END,
+    -- AC-4.18.3: Audit trail
+    consumed_by_wo_id = CASE WHEN v_new_qty = 0 THEN p_wo_id ELSE consumed_by_wo_id END,
+    updated_at = NOW()
+  WHERE id = p_lp_id;
+
+  -- Insert consumption record
+  INSERT INTO wo_consumption (org_id, wo_id, lp_id, material_id, quantity, created_by, created_at)
+  VALUES (p_org_id, p_wo_id, p_lp_id, p_material_id, p_consumed_qty, p_user_id, NOW())
+  RETURNING id INTO v_consumption_id;
+
+  -- AC-4.18.6: Create movement record
+  INSERT INTO lp_movements (org_id, lp_id, movement_type, wo_id, quantity, from_location, created_by, created_at)
+  VALUES (p_org_id, p_lp_id, 'consumption', p_wo_id, p_consumed_qty, v_lp.location_id, p_user_id, NOW())
+  RETURNING id INTO v_movement_id;
+
+  -- Return result as JSON
+  RETURN json_build_object(
+    'success', true,
+    'consumption_id', v_consumption_id,
+    'movement_id', v_movement_id,
+    'previous_qty', v_lp.current_qty,
+    'new_qty', v_new_qty,
+    'status', CASE WHEN v_new_qty = 0 THEN 'consumed' ELSE v_lp.status END
+  );
+
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN json_build_object(
+      'success', false,
+      'error', SQLERRM
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+      ]]></example-code>
+    </pattern>
+
+  </api-patterns>
+
+  <!-- ================================================================ -->
+  <!-- UX DESIGN REFERENCES -->
+  <!-- ================================================================ -->
+  <ux-design>
+
+    <module-integration>
+      <shared-system>
+        <reference>docs/ux-design/ux-design-shared-system.md</reference>
+        <applicable-components>
+          <component>ModuleHeader - Production | Dashboard | Active WOs | Completed | Yields | ⚙️</component>
+          <component>Stats Cards - 120px height, 2×2 grid metrics</component>
+          <component>DataTable - Sortable, filterable, paginated</component>
+          <component>Color Palette - green-600 (Create), gray-600 (Actions), red-600 (Delete)</component>
+        </applicable-components>
+      </shared-system>
+
+      <production-module>
+        <reference>docs/ux-design/ux-design-production-module.md</reference>
+        <relevant-sections>
+          <section>Real-Time Production Board - WO Details Modal with Materials tab</section>
+          <section>Material Consumption UI - LP selection, qty input, consumption confirmation</section>
+          <section>Live Indicator - Real-time updates when LP consumed</section>
+        </relevant-sections>
+        <ui-patterns>
+          <pattern name="Material Consumption Flow">
+            1. Operator clicks "Consume" on material row
+            2. Modal opens: LP search/scan input
+            3. System validates: product, UoM, qty available
+            4. Operator enters qty to consume
+            5. Confirmation → API call → LP update (this story)
+            6. Success toast: "20kg consumed from LP-2"
+            7. Table updates: Consumed Qty, Remaining Qty
+          </pattern>
+          <pattern name="LP Status Visual Indicator">
+            - Reserved: Yellow badge "Reserved"
+            - Partially Consumed: Orange badge "Partial (10kg left)"
+            - Consumed: Gray badge "Consumed"
+            - Color consistency: Tailwind gray-200/600/800
+          </pattern>
+        </ui-patterns>
+      </production-module>
+    </module-integration>
+
+    <visual-feedback>
+      <toast-notifications>
+        <success>
+          <message>✓ 20kg consumed from LP-2. Remaining: 10kg</message>
+          <duration>3 seconds</duration>
+          <position>center-bottom</position>
+        </success>
+        <error>
+          <message>✗ LP-2 has 10kg available, requested 15kg</message>
+          <duration>5 seconds</duration>
+          <position>center-bottom</position>
+        </error>
+        <warning>
+          <message>⚠ LP-2 fully consumed (0kg left). Status: Consumed</message>
+          <duration>4 seconds</duration>
+          <position>center-bottom</position>
+        </warning>
+      </toast-notifications>
+
+      <real-time-updates>
+        <description>
+          When LP consumed, UI updates immediately:
+          - Materials table: Consumed Qty increases, Remaining decreases
+          - LP badge: Status changes from "Reserved" to "Consumed"
+          - Progress bar: Updates to reflect consumption
+        </description>
+        <technology>Supabase Realtime (WebSocket)</technology>
+      </real-time-updates>
+    </visual-feedback>
+
+  </ux-design>
+
+  <!-- ================================================================ -->
+  <!-- TESTING STRATEGY -->
+  <!-- ================================================================ -->
+  <testing-strategy>
+
+    <unit-tests>
+      <test-file>apps/frontend/lib/services/__tests__/lp-update-service.test.ts</test-file>
+      <test-cases>
+        <test name="updateLPAfterConsumption - successful partial consumption">
+          <description>LP has 30kg, consume 20kg → current_qty = 10kg, status = 'reserved'</description>
+          <assertions>
+            - LP current_qty decreased by consumed amount
+            - LP status remains 'reserved' (not fully consumed)
+            - Movement record created with type 'consumption'
+            - Returns success with correct new_qty
+          </assertions>
+        </test>
+
+        <test name="updateLPAfterConsumption - successful full consumption">
+          <description>LP has 10kg, consume 10kg → current_qty = 0kg, status = 'consumed'</description>
+          <assertions>
+            - LP current_qty = 0
+            - LP status = 'consumed'
+            - LP consumed_by_wo_id = wo_id
+            - Movement record created
+            - Returns success with status 'consumed'
+          </assertions>
+        </test>
+
+        <test name="updateLPAfterConsumption - insufficient quantity">
+          <description>LP has 10kg, attempt to consume 15kg → error</description>
+          <assertions>
+            - Returns success = false
+            - Error message: "LP has 10kg available, requested 15kg"
+            - Code: 'INSUFFICIENT_QTY'
+            - No LP update (rollback)
+            - No movement record created
+          </assertions>
+        </test>
+
+        <test name="updateLPAfterConsumption - LP not found">
+          <description>Invalid lp_id → error</description>
+          <assertions>
+            - Returns success = false
+            - Error message: "License Plate not found"
+            - Code: 'NOT_FOUND'
+          </assertions>
+        </test>
+
+        <test name="updateLPAfterConsumption - movement record creation">
+          <description>Verify movement record structure</description>
+          <assertions>
+            - movement_type = 'consumption'
+            - wo_id = input.wo_id
+            - quantity = consumed_qty
+            - from_location = LP location
+            - to_location = null
+            - created_by = user_id
+          </assertions>
+        </test>
+      </test-cases>
+    </unit-tests>
+
+    <e2e-tests>
+      <test-file>tests/e2e/production-consumption.spec.ts</test-file>
+      <test-cases>
+        <test name="AC-4.18.1: LP qty decrease after consumption">
+          <setup>
+            1. Create test org, user, auth token
+            2. Create product "Flour 25kg"
+            3. Create LP-1 (product=Flour, current_qty=30kg, status=reserved)
+            4. Create WO-1 (product=Bread, status=in_progress)
+            5. Reserve LP-1 for WO-1
+          </setup>
+          <steps>
+            1. Navigate to /production/work-orders/{wo_id}/materials
+            2. Click "Consume" on Flour material
+            3. Select LP-1 from dropdown
+            4. Enter qty = 20kg
+            5. Click "Confirm Consumption"
+          </steps>
+          <assertions>
+            - Toast: "✓ 20kg consumed from LP-1. Remaining: 10kg"
+            - Materials table: Consumed Qty = 20kg, Remaining = 10kg
+            - Database: license_plates.current_qty = 10kg
+            - Database: license_plates.status = 'reserved' (not 'consumed')
+          </assertions>
+        </test>
+
+        <test name="AC-4.18.2: LP status transition to consumed">
+          <setup>Same as above, but LP-1 current_qty = 20kg</setup>
+          <steps>
+            1. Consume 20kg from LP-1 (full consumption)
+          </steps>
+          <assertions>
+            - Database: license_plates.current_qty = 0kg
+            - Database: license_plates.status = 'consumed'
+            - Database: license_plates.consumed_by_wo_id = WO-1 id
+            - LP badge: "Consumed" (gray)
+          </assertions>
+        </test>
+
+        <test name="AC-4.18.6: LP movement record created">
+          <setup>Same as AC-4.18.1</setup>
+          <steps>
+            1. Consume 20kg from LP-1
+          </steps>
+          <assertions>
+            - Database: lp_movements record exists
+            - movement_type = 'consumption'
+            - lp_id = LP-1 id
+            - wo_id = WO-1 id
+            - quantity = 20kg
+            - from_location = LP-1 location
+            - to_location = null
+          </assertions>
+        </test>
+
+        <test name="AC-4.18.7: Validation - insufficient quantity">
+          <setup>LP-1 current_qty = 10kg</setup>
+          <steps>
+            1. Attempt to consume 15kg from LP-1
+          </steps>
+          <assertions>
+            - Error toast: "✗ LP-1 has 10kg available, requested 15kg"
+            - No consumption record created
+            - LP current_qty unchanged (still 10kg)
+            - No movement record
+          </assertions>
+        </test>
+
+        <test name="AC-4.18.4: Atomic transaction (rollback on error)">
+          <setup>
+            1. Create LP-1 (30kg)
+            2. Mock database error during movement insert
+          </setup>
+          <steps>
+            1. Attempt to consume 20kg
+          </steps>
+          <assertions>
+            - Error toast: "Failed to create movement record"
+            - LP current_qty unchanged (still 30kg) - rollback verified
+            - No consumption record
+            - No movement record
+          </assertions>
+        </test>
+      </test-cases>
+
+      <fixtures>
+        <fixture name="createTestLP">
+          <description>Create test license plate with specified qty</description>
+          <params>
+            - org_id: UUID
+            - product_id: UUID
+            - current_qty: number
+            - status: 'available' | 'reserved' | 'consumed'
+          </params>
+          <returns>lp_id: UUID, lp_number: string</returns>
+        </fixture>
+
+        <fixture name="createTestWO">
+          <description>Create test work order in progress</description>
+          <params>
+            - org_id: UUID
+            - product_id: UUID
+            - status: 'in_progress'
+          </params>
+          <returns>wo_id: UUID, wo_number: string</returns>
+        </fixture>
+      </fixtures>
+    </e2e-tests>
+
+    <integration-tests>
+      <test name="Consumption Service + LP Update Service integration">
+        <description>
+          Verify ConsumptionService correctly calls LPUpdateService
+          and handles transaction atomicity
+        </description>
+        <test-file>apps/frontend/lib/services/__tests__/consumption-service.integration.test.ts</test-file>
+      </test>
+    </integration-tests>
+
+  </testing-strategy>
+
+  <!-- ================================================================ -->
+  <!-- IMPLEMENTATION NOTES -->
+  <!-- ================================================================ -->
+  <implementation-notes>
+
+    <task id="Task-1">
+      <title>Verify license_plates schema (current_qty, status, consumed_by_wo_id)</title>
+      <details>
+        - Check migration 027_create_license_plates_stub.sql
+        - Verify current_qty column exists (may need to add in new migration)
+        - Add consumed_by_wo_id column if missing
+        - Add constraint: current_qty >= 0
+        - Add index on consumed_by_wo_id
+      </details>
+      <files>
+        <file>apps/frontend/lib/supabase/migrations/027_create_license_plates_stub.sql</file>
+        <file>apps/frontend/lib/supabase/migrations/XXX_add_current_qty_to_license_plates.sql</file>
+      </files>
+    </task>
+
+    <task id="Task-2">
+      <title>LP update logic in ConsumptionService</title>
+      <details>
+        - Create apps/frontend/lib/services/lp-update-service.ts
+        - Implement updateLPAfterConsumption() function
+        - Handle row-level locking (transaction context)
+        - Implement quantity validation
+        - Implement status transition logic
+        - Call from ConsumptionService during consumption
+      </details>
+      <files>
+        <file>apps/frontend/lib/services/lp-update-service.ts</file>
+        <file>apps/frontend/lib/services/consumption-service.ts</file>
+      </files>
+    </task>
+
+    <task id="Task-3">
+      <title>Movement record creation</title>
+      <details>
+        - Create lp_movements table migration (if not exists)
+        - Implement movement insert in updateLPAfterConsumption()
+        - Set movement_type = 'consumption'
+        - Link wo_id, lp_id, quantity, from_location
+      </details>
+      <files>
+        <file>apps/frontend/lib/supabase/migrations/XXX_create_lp_movements.sql</file>
+        <file>apps/frontend/lib/services/lp-update-service.ts</file>
+      </files>
+    </task>
+
+    <task id="Task-4">
+      <title>Atomic transaction handling</title>
+      <details>
+        - Option A: Use Supabase RPC function for atomicity
+        - Option B: Use TypeScript service with manual rollback
+        - Preferred: RPC function (consume_material)
+        - Test rollback scenarios (insufficient qty, concurrent update)
+      </details>
+      <files>
+        <file>apps/frontend/lib/supabase/migrations/XXX_create_consume_material_function.sql</file>
+        <file>apps/frontend/lib/services/consumption-service.ts</file>
+      </files>
+    </task>
+
+    <task id="Task-5">
+      <title>Concurrency tests</title>
+      <details>
+        - Test concurrent consumption of same LP
+        - Verify row-level locking prevents negative qty
+        - Test error handling: "LP qty changed by another user"
+      </details>
+      <files>
+        <file>apps/frontend/lib/services/__tests__/lp-update-service.concurrency.test.ts</file>
+      </files>
+    </task>
+
+    <task id="Task-6">
+      <title>Qty validation</title>
+      <details>
+        - Validate consumed_qty > 0
+        - Validate current_qty >= consumed_qty
+        - Error messages: "LP has 10kg available, requested 15kg"
+        - Add to Zod schema: consumeMaterialSchema
+      </details>
+      <files>
+        <file>apps/frontend/lib/validation/production-schemas.ts</file>
+        <file>apps/frontend/lib/services/lp-update-service.ts</file>
+      </files>
+    </task>
+
+  </implementation-notes>
+
+  <!-- ================================================================ -->
+  <!-- RELATED STORIES -->
+  <!-- ================================================================ -->
+  <related-stories>
+    <story id="04-07">
+      <title>Material Reservation (Desktop)</title>
+      <relationship>Prerequisite - Creates wo_material_reservations and reserves LPs</relationship>
+    </story>
+    <story id="04-12">
+      <title>Output Registration (Desktop)</title>
+      <relationship>Prerequisite - Triggers auto-consumption that updates LPs</relationship>
+    </story>
+    <story id="04-19">
+      <title>Genealogy Tree</title>
+      <relationship>Parallel - Updates lp_genealogy records during consumption</relationship>
+    </story>
+    <story id="04-09">
+      <title>1:1 Consumption Enforcement</title>
+      <relationship>Related - Enforces consume_whole_lp flag during LP update</relationship>
+    </story>
+    <story id="04-11">
+      <title>Over-Consumption Control</title>
+      <relationship>Related - Validates consumption limits before LP update</relationship>
+    </story>
+  </related-stories>
+
+  <!-- ================================================================ -->
+  <!-- TRACEABILITY -->
+  <!-- ================================================================ -->
+  <traceability>
+    <functional-requirement>
+      <id>FR-PROD-007</id>
+      <title>Material Consumption Tracking</title>
+      <description>
+        System shall track material consumption with LP qty updates and traceability
+      </description>
+    </functional-requirement>
+
+    <epic-reference>
+      <id>Epic 4</id>
+      <title>Production Execution</title>
+      <section>Story 4.18: LP Updates After Consumption</section>
+    </epic-reference>
+  </traceability>
+
+</story-context>
