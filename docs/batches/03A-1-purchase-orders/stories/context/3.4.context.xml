@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context id="3-4-po-approval-workflow" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>3.4</storyId>
+    <title>PO Approval Workflow</title>
+    <batch>03A-1</batch>
+    <points>5</points>
+    <effort_hours>6-8</effort_hours>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-28</generatedAt>
+  </metadata>
+
+  <description>
+    Optional approval workflow for POs with configurable threshold,
+    role-based authorization (Manager/Admin only), and full audit trail.
+  </description>
+
+  <dependencies>
+    <requires>
+      <story id="3.1">PO CRUD</story>
+      <epic id="1">Users (role check)</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>po_approvals</name>
+        <description>Audit trail for PO approvals/rejections</description>
+        <columns>
+          <column name="id" type="UUID" pk="true"/>
+          <column name="org_id" type="UUID" fk="organizations.id"/>
+          <column name="po_id" type="UUID" fk="purchase_orders.id" on_delete="CASCADE"/>
+          <column name="status" type="VARCHAR(20)">pending, approved, rejected</column>
+          <column name="approved_by" type="UUID" fk="users.id" nullable="true"/>
+          <column name="approved_at" type="TIMESTAMPTZ"/>
+          <column name="rejection_reason" type="TEXT" nullable="true"/>
+          <column name="comments" type="TEXT" nullable="true"/>
+          <column name="created_at" type="TIMESTAMPTZ"/>
+        </columns>
+        <indexes>
+          <index name="idx_po_approvals_po" columns="po_id"/>
+        </indexes>
+      </table>
+      <table_update>
+        <name>purchase_orders</name>
+        <add_columns>
+          <column name="approval_status" type="VARCHAR(20)" nullable="true">null, pending, approved, rejected</column>
+          <column name="approved_by" type="UUID" fk="users.id" nullable="true"/>
+          <column name="approved_at" type="TIMESTAMPTZ" nullable="true"/>
+          <column name="rejection_reason" type="TEXT" nullable="true"/>
+        </add_columns>
+      </table_update>
+      <table_update>
+        <name>planning_settings</name>
+        <add_columns>
+          <column name="po_require_approval" type="BOOLEAN" default="false"/>
+          <column name="po_approval_threshold" type="NUMERIC(15,2)" nullable="true"/>
+        </add_columns>
+      </table_update>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="PUT" path="/api/planning/purchase-orders/:id/approve">
+        <description>Approve or reject PO (Manager/Admin only)</description>
+        <request_body>{ action: 'approve' | 'reject', rejection_reason?: string, comments?: string }</request_body>
+        <authorization>Role: Manager or Admin</authorization>
+      </endpoint>
+    </api_endpoints>
+
+    <components_to_create>
+      <component name="POApprovalModal" path="components/planning/"/>
+      <component name="ApprovalTab" path="components/planning/" description="Approval history in PO detail"/>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <criterion id="AC-4.1">Settings - Toggle po_require_approval, threshold input</criterion>
+    <criterion id="AC-4.2">Auto Pending - If enabled and total > threshold, set approval_status=pending</criterion>
+    <criterion id="AC-4.3">Pending List - Filter to show only pending approval POs</criterion>
+    <criterion id="AC-4.4">Approve PO - Modal with summary, optional comment; updates status</criterion>
+    <criterion id="AC-4.5">Reject PO - Modal with mandatory rejection reason; PO back to draft</criterion>
+    <criterion id="AC-4.6">Audit Trail - Full history in po_approvals table</criterion>
+    <criterion id="AC-4.7">Permission - Only Manager/Admin can approve/reject</criterion>
+    <criterion id="AC-4.8">Status Badge - pending=yellow, approved=green, rejected=red</criterion>
+  </acceptance_criteria>
+
+  <authorization>
+    <rule>Only users with role='manager' or role='admin' can call approve endpoint</rule>
+    <rule>API returns 403 if user lacks permission</rule>
+    <rule>UI hides Approve/Reject buttons for non-managers</rule>
+  </authorization>
+
+  <test_plan>
+    <unit_tests>
+      <test>Approval threshold logic</test>
+      <test>Role permission check</test>
+    </unit_tests>
+    <integration_tests>
+      <test>Approve PO - status updated, audit record created</test>
+      <test>Reject PO - status=rejected, reason saved, PO back to draft</test>
+      <test>Non-manager approve - returns 403</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Enable approval in settings</test>
+      <test>Create PO above threshold - shows pending</test>
+      <test>Manager approves - success</test>
+      <test>Manager rejects - PO back to draft</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note type="important">Approval is optional (disabled by default)</note>
+    <note type="important">Threshold is configurable per org</note>
+    <note type="critical">Full audit trail in po_approvals table</note>
+    <note type="future">Email notifications for approval requests</note>
+  </implementation_notes>
+</story-context>

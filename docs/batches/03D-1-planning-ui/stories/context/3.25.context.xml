@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story_context version="1.0">
+  <metadata>
+    <story_id>3.25</story_id>
+    <title>Purchase Orders Table View</title>
+    <batch>03D-1-planning-ui</batch>
+    <priority>P1</priority>
+    <story_points>3</story_points>
+  </metadata>
+
+  <dependencies>
+    <database_tables>
+      <table name="purchase_orders" status="exists"/>
+      <table name="po_lines" status="exists"/>
+      <table name="suppliers" status="exists"/>
+    </database_tables>
+    <existing_components>
+      <component path="apps/frontend/components/ui/table.tsx"/>
+      <component path="apps/frontend/components/ui/badge.tsx"/>
+      <component path="apps/frontend/components/planning/PlanningHeader.tsx"/>
+    </existing_components>
+    <ux_reference>docs/ux-design/ux-design-planning-po-module.md</ux_reference>
+  </dependencies>
+
+  <technical_context>
+    <components>
+      <component name="TopPOCards">
+        Display top 3 recent POs as compact cards (100px max height)
+        Shows: PO#, Supplier, Status, Total
+      </component>
+      <component name="PurchaseOrdersTable">
+        Full table with columns: PO#, Supplier, Status, Lines, Total, Date, Actions
+        Features: Search, Filters, Pagination (20/page), Sorting
+        Mobile: Card view with expand/collapse
+      </component>
+      <component name="PlanningActionButtons">
+        Create PO button (green-600)
+        Bulk Entry button (gray-600)
+      </component>
+    </components>
+
+    <status_colors>
+      draft: yellow-200/yellow-800
+      confirmed: green-200/green-800
+      received: green-200/green-800
+      cancelled: red-200/red-800
+    </status_colors>
+  </technical_context>
+
+  <test_plan>
+    <e2e_tests>
+      <test>PO table loads with data</test>
+      <test>Search filters results</test>
+      <test>Pagination works</test>
+      <test>Mobile card view displays correctly</test>
+    </e2e_tests>
+  </test_plan>
+</story_context>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story_context version="1.0">
+  <metadata>
+    <story_id>3.27</story_id>
+    <title>Work Orders Table + Spreadsheet Mode</title>
+    <batch>03D-1-planning-ui</batch>
+    <priority>P1</priority>
+    <story_points>5</story_points>
+  </metadata>
+
+  <dependencies>
+    <database_tables>
+      <table name="work_orders" status="exists"/>
+      <table name="products" status="exists"/>
+      <table name="production_lines" status="exists"/>
+    </database_tables>
+    <existing_components>
+      <component path="apps/frontend/components/ui/table.tsx"/>
+      <component path="apps/frontend/components/planning/PlanningHeader.tsx"/>
+    </existing_components>
+    <ux_reference>docs/ux-design/ux-design-planning-wo-spreadsheet.md</ux_reference>
+  </dependencies>
+
+  <technical_context>
+    <components>
+      <component name="TopWOCards">
+        Top 3 recent WOs (100px max height)
+        Shows: WO#, Line, Status, Progress %
+      </component>
+      <component name="WorkOrdersTable">
+        Standard table view (default)
+        Columns: WO#, Line, Product, Qty, Start, End, Status, Progress, Actions
+      </component>
+      <component name="WorkOrdersSpreadsheet">
+        Excel-like editing mode (desktop only, lg+)
+        Features: Inline editable cells, Drag-drop priority, Paste from Excel, Undo/Redo
+        Keyboard: Tab, Enter, Escape, Ctrl+S, Delete
+      </component>
+      <component name="BulkActionsBar">
+        Bulk status change, Bulk assign line, Bulk delete
+      </component>
+    </components>
+
+    <view_modes>
+      - Standard Table View (default)
+      - Spreadsheet Mode (desktop only)
+      - Timeline View (future)
+    </view_modes>
+
+    <status_colors>
+      draft: yellow-200/yellow-800
+      released: yellow-200/yellow-800
+      in_progress: blue-200/blue-800
+      completed: green-200/green-800
+      cancelled: red-200/red-800
+    </status_colors>
+  </technical_context>
+
+  <test_plan>
+    <e2e_tests>
+      <test>WO table loads correctly</test>
+      <test>Toggle to spreadsheet mode</test>
+      <test>Inline edit cells</test>
+      <test>Drag-drop priority reorder</test>
+      <test>Bulk actions apply to selected</test>
+    </e2e_tests>
+  </test_plan>
+</story_context>

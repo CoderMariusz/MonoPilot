@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story_context version="1.0">
+  <metadata>
+    <story_id>3.17</story_id>
+    <title>Supplier Management</title>
+    <batch>03C-1-suppliers</batch>
+    <priority>P1</priority>
+    <story_points>3</story_points>
+  </metadata>
+
+  <dependencies>
+    <database_tables>
+      <table name="suppliers" status="to_create"/>
+      <table name="supplier_products" status="to_create"/>
+      <table name="organizations" status="exists"/>
+    </database_tables>
+    <existing_components>
+      <component path="apps/frontend/components/ui/*" note="shadcn components"/>
+      <component path="apps/frontend/lib/supabase/client.ts"/>
+    </existing_components>
+  </dependencies>
+
+  <technical_context>
+    <database_schema>
+      <table name="suppliers">
+        <columns>
+          id UUID PK DEFAULT gen_random_uuid(),
+          organization_id UUID FK NOT NULL,
+          code VARCHAR(20) UNIQUE NOT NULL,
+          name VARCHAR(200) NOT NULL,
+          contact_email VARCHAR(255),
+          contact_phone VARCHAR(50),
+          address TEXT,
+          payment_terms VARCHAR(100),
+          lead_time_days INTEGER DEFAULT 7,
+          is_active BOOLEAN DEFAULT true,
+          notes TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        </columns>
+        <rls_policies>Standard authenticated CRUD</rls_policies>
+      </table>
+      <table name="supplier_products">
+        <columns>
+          id UUID PK,
+          supplier_id UUID FK NOT NULL,
+          product_id UUID FK NOT NULL,
+          supplier_sku VARCHAR(50),
+          unit_price DECIMAL(10,2),
+          min_order_qty DECIMAL(10,3),
+          is_preferred BOOLEAN DEFAULT false
+        </columns>
+      </table>
+    </database_schema>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/settings/suppliers"/>
+      <endpoint method="POST" path="/api/settings/suppliers"/>
+      <endpoint method="GET" path="/api/settings/suppliers/[id]"/>
+      <endpoint method="PUT" path="/api/settings/suppliers/[id]"/>
+      <endpoint method="DELETE" path="/api/settings/suppliers/[id]"/>
+    </api_endpoints>
+  </technical_context>
+
+  <test_plan>
+    <unit_tests>
+      <test>Supplier CRUD operations</test>
+      <test>Supplier code uniqueness validation</test>
+      <test>Supplier-product linking</test>
+    </unit_tests>
+    <e2e_tests>
+      <test>Create new supplier flow</test>
+      <test>Edit supplier details</test>
+      <test>Link products to supplier</test>
+    </e2e_tests>
+  </test_plan>
+</story_context>
