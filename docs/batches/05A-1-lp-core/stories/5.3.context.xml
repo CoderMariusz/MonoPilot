@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <id>5.3</id>
+  <name>Batch & Expiry Tracking (Simplified)</name>
+  <batch>5A-1 (LP Core)</batch>
+  <updated>2025-11-28</updated>
+  <status>Todo</status>
+
+  <context>
+    <description>
+      Tracks supplier batch numbers and expiry dates for FDA compliance.
+      Simplified to use supplier_batch_number only (batch_number removed).
+    </description>
+
+    <key-changes>
+      <change type="REMOVED">batch_number field completely</change>
+      <change type="UPDATED">supplier_batch_number is NOW the primary batch identifier</change>
+      <change type="CLARIFIED">supplier_batch_number = supplier's lot number (e.g., "LOT-2025-001")</change>
+      <change type="ADDED">soft delete handling: query with WHERE deleted_at IS NULL</change>
+    </key-changes>
+
+    <critical-requirements>
+      supplier_batch_number is REQUIRED field (from supplier).
+      Used in Story 5.6 for merge validation: all LPs must have SAME supplier_batch_number to merge.
+      Expiry date tracking for QA and recall scenarios.
+    </critical-requirements>
+
+    <related-stories>
+      <requires>5.1 (LP Creation)</requires>
+      <used-by>5.6 (Merge Validation), 5.7a (Genealogy Recording)</used-by>
+    </related-stories>
+
+    <implementation-notes>
+      - supplier_batch_number removed from form in 5.1
+      - Story 5.3 adds validation and display of batch info
+      - Merge validation in 5.6 checks supplier_batch_number match
+      - FDA traceability: supplier_batch_number links to supplier documentation
+      - Deleted LPs excluded from batch queries via deleted_at IS NULL check
+    </implementation-notes>
+  </context>
+</story>

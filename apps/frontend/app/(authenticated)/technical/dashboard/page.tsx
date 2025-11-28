@@ -277,32 +277,32 @@ export default function TechnicalDashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
           title="Total Products"
-          value={dashboardData.overall_stats.total_products}
+          value={dashboardData.overall_stats?.total_products ?? 0}
           subtitle="Active Products"
           icon={icons.package}
-          trend={dashboardData.overall_stats.trend_this_month}
+          trend={dashboardData.overall_stats?.trend_this_month}
           onClick={() => setTypeFilter('all')}
         />
         <StatCard
           title="Raw Materials"
-          value={dashboardData.category_stats.find(s => s.category === 'RM')?.count || 0}
-          subtitle={`${dashboardData.category_stats.find(s => s.category === 'RM')?.percentage || 0}% of catalog`}
+          value={dashboardData.category_stats?.find(s => s.category === 'RM')?.count ?? 0}
+          subtitle={`${dashboardData.category_stats?.find(s => s.category === 'RM')?.percentage ?? 0}% of catalog`}
           icon={icons.rawMaterial}
           accentColor="green"
           onClick={() => scrollToSection('RM')}
         />
         <StatCard
           title="Work in Progress"
-          value={dashboardData.category_stats.find(s => s.category === 'WIP')?.count || 0}
-          subtitle={`${dashboardData.category_stats.find(s => s.category === 'WIP')?.percentage || 0}% of catalog`}
+          value={dashboardData.category_stats?.find(s => s.category === 'WIP')?.count ?? 0}
+          subtitle={`${dashboardData.category_stats?.find(s => s.category === 'WIP')?.percentage ?? 0}% of catalog`}
           icon={icons.wip}
           accentColor="orange"
           onClick={() => scrollToSection('WIP')}
         />
         <StatCard
           title="Finished Goods"
-          value={dashboardData.category_stats.find(s => s.category === 'FG')?.count || 0}
-          subtitle={`${dashboardData.category_stats.find(s => s.category === 'FG')?.percentage || 0}% of catalog`}
+          value={dashboardData.category_stats?.find(s => s.category === 'FG')?.count ?? 0}
+          subtitle={`${dashboardData.category_stats?.find(s => s.category === 'FG')?.percentage ?? 0}% of catalog`}
           icon={icons.finishedGood}
           accentColor="blue"
           onClick={() => scrollToSection('FG')}
@@ -314,7 +314,7 @@ export default function TechnicalDashboardPage() {
         {/* Product Groups (3/4 width) */}
         <div className="lg:col-span-3 space-y-6">
           {/* Raw Materials Section (AC-2.23.3) */}
-          {(typeFilter === 'all' || typeFilter === 'RM') && (
+          {(typeFilter === 'all' || typeFilter === 'RM') && dashboardData.groups?.find(g => g.category === 'RM') && (
             <div ref={rmSectionRef}>
               <ProductGroupSection
                 group={dashboardData.groups.find(g => g.category === 'RM')!}
@@ -326,7 +326,7 @@ export default function TechnicalDashboardPage() {
           )}
 
           {/* Work in Progress Section (AC-2.23.4) */}
-          {(typeFilter === 'all' || typeFilter === 'WIP') && (
+          {(typeFilter === 'all' || typeFilter === 'WIP') && dashboardData.groups?.find(g => g.category === 'WIP') && (
             <div ref={wipSectionRef}>
               <ProductGroupSection
                 group={dashboardData.groups.find(g => g.category === 'WIP')!}
@@ -338,7 +338,7 @@ export default function TechnicalDashboardPage() {
           )}
 
           {/* Finished Goods Section (AC-2.23.5) */}
-          {(typeFilter === 'all' || typeFilter === 'FG') && (
+          {(typeFilter === 'all' || typeFilter === 'FG') && dashboardData.groups?.find(g => g.category === 'FG') && (
             <div ref={fgSectionRef}>
               <ProductGroupSection
                 group={dashboardData.groups.find(g => g.category === 'FG')!}
@@ -571,7 +571,7 @@ function RecentActivityFeed({
         </Select>
       </CardHeader>
       <CardContent>
-        {!activity || activity.activities.length === 0 ? (
+        {!activity || !activity.activities || activity.activities.length === 0 ? (
           <div className="text-center py-8 text-gray-500 text-sm">
             No recent activity in the last {days} days.
           </div>

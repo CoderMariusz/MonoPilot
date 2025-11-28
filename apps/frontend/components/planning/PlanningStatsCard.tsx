@@ -49,7 +49,7 @@ export function PlanningStatsCard({ title, icon, stats, type = 'po' }: PlanningS
   return (
     <Link href={config.href}>
       <div
-        className={`border-l-4 rounded-lg px-4 py-3 hover:shadow-md transition-shadow cursor-pointer ${config.color}`}
+        className={`border-l-4 rounded-lg px-4 py-3 shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer ${config.color}`}
         style={{ maxHeight: '120px' }}
       >
         {/* Header */}

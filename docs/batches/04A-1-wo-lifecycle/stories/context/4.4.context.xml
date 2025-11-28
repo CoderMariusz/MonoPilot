@@ -4,10 +4,11 @@
     <id>04-4-operation-start</id>
     <title>Operation Start</title>
     <epic>4 - Production Execution</epic>
-    <status>drafted</status>
+    <status>todo</status>
     <priority>P0</priority>
-    <story-points>1</story-points>
-    <effort>0.5 day</effort>
+    <story-points>2</story-points>
+    <effort>1 day</effort>
+    <updated>2025-11-28 - Expanded ACs from 8 to 10, added Operation Status Enum definition (not_started→in_progress→completed), configurable sequence enforcement (per-warehouse, default TRUE), 8 error codes, wo_operations schema, atomic transition logic, modal states</updated>
     <dependencies>
       <dependency>Story 3.14 - WO Routing Application</dependency>
       <dependency>Story 3.10 - Create WO (wo_operations table)</dependency>

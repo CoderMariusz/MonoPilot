@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>3.19</id>
+    <title>PO Status Lifecycle</title>
+    <batch>03C-3</batch>
+    <points>3</points>
+    <effort_hours>2-3</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>
+    Move PO through status lifecycle with audit trail.
+    Typical flow: Draft → Submitted → Confirmed → Receiving → Closed
+  </description>
+
+  <dependencies>
+    <blocks/>
+    <requires>
+      <story id="3.1">PO CRUD</story>
+      <story id="3.5">Configurable PO Statuses</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>po_status_history</name>
+        <columns>
+          <column name="id" type="UUID" pk="true"/>
+          <column name="org_id" type="UUID" fk="organizations.id"/>
+          <column name="po_id" type="UUID" fk="purchase_orders.id" on_delete="CASCADE"/>
+          <column name="from_status" type="VARCHAR(50)" nullable="true"/>
+          <column name="to_status" type="VARCHAR(50)"/>
+          <column name="changed_by" type="UUID" fk="users.id"/>
+          <column name="changed_at" type="TIMESTAMPTZ"/>
+          <column name="notes" type="TEXT" nullable="true"/>
+        </columns>
+        <indexes>
+          <index name="idx_po_status_history_po" columns="po_id"/>
+        </indexes>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="PUT" path="/api/planning/purchase-orders/:id/status">
+        <request>
+          <field name="status" type="string"/>
+          <field name="notes" type="string" optional="true"/>
+        </request>
+        <response>
+          <field name="id" type="string"/>
+          <field name="status" type="string"/>
+          <field name="updated_at" type="string"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+
+    <services>
+      <service name="POStatusService">
+        <method name="changeStatus">
+          <param name="poId" type="string"/>
+          <param name="newStatus" type="string"/>
+          <param name="userId" type="string"/>
+          <returns>PurchaseOrder</returns>
+        </method>
+      </service>
+    </services>
+
+    <components_to_create>
+      <component name="StatusChangeButton" path="components/planning/StatusChangeButton.tsx"/>
+      <component name="StatusBadge" path="components/planning/StatusBadge.tsx"/>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <criterion id="AC-1">
+      <description>Status Change Button</description>
+      <given>PO exists</given>
+      <when>clicking status change button</when>
+      <then>PO moves to next status</then>
+    </criterion>
+    <criterion id="AC-2">
+      <description>Typical Flow</description>
+      <flow>Draft → Submitted → Confirmed → Receiving → Closed</flow>
+    </criterion>
+    <criterion id="AC-3">
+      <description>Audit Trail</description>
+      <then>status change logged with timestamp and user</then>
+    </criterion>
+    <criterion id="AC-4">
+      <description>Status Badge</description>
+      <when>viewing PO</when>
+      <then>status shown with color badge</then>
+    </criterion>
+    <criterion id="AC-5">
+      <description>Transition Validation</description>
+      <given>PO status = 'Closed'</given>
+      <when>attempting to change status</when>
+      <then>show error</then>
+    </criterion>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test>Status transition validation</test>
+      <test>Audit log creation</test>
+    </unit_tests>
+    <integration_tests>
+      <test>API changes status correctly</test>
+      <test>Audit trail created</test>
+      <test>Timestamps updated</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Change PO status through full lifecycle</test>
+      <test>Verify audit trail in history</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="medium">Use colors from planning_settings.po_statuses</note>
+  </implementation_notes>
+</story>

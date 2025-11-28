@@ -83,9 +83,26 @@ CREATE UNIQUE INDEX idx_supplier_products_unique ON supplier_products(supplier_i
 
 ## Stories
 
-| Story | Title | Points |
-|-------|-------|--------|
-| 3.17 | Supplier Management | 5 |
-| 3.18 | Supplier Contacts | 3 |
+| Story | Title | Points | Effort |
+|-------|-------|--------|--------|
+| 3.17 | Supplier Management | 5 | 4-6h |
+| 3.18 | Supplier-Product Assignments | 3 | 3-4h |
 
-**Total:** 8 points
+**Total:** 8 points (~7-10 hours)
+
+---
+
+## Key Features
+
+### Supplier Defaults
+- Currency (inherited by POs)
+- Tax Code (inherited by PO lines)
+- Payment Terms (inherited by POs)
+- Lead Time Days (for delivery estimates)
+- MOQ (minimum order quantity)
+
+### Supplier-Product Assignments
+- One default supplier per product
+- Override pricing per supplier
+- Override lead time per supplier
+- Used by Bulk PO creation for auto-grouping

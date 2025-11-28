@@ -4,11 +4,12 @@
     <story-id>04-6</story-id>
     <story-name>WO Complete</story-name>
     <epic>4 - Production Execution</epic>
-    <status>drafted</status>
+    <status>todo</status>
     <priority>P0</priority>
     <story-points>3</story-points>
     <effort>1 day</effort>
     <created>2025-11-27</created>
+    <updated>2025-11-28 - Expanded with 10 detailed ACs including atomic transaction (8-step process with SELECT...FOR UPDATE), genealogy validation warning pattern (warn don't block), concurrency protection, LP splitting on partial consumption, by-products validation (optional), 9 error codes including CONCURRENCY_ERROR</updated>
   </metadata>
 
   <story-overview>

@@ -53,8 +53,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, Plus, Pencil, Trash2, Zap, Upload, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, Zap, Upload, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useResponsiveView } from '@/hooks/use-responsive-view'
 import { getStatusColor, PLANNING_COLORS } from '@/lib/constants/app-colors'
 import { PurchaseOrderFormModal } from './PurchaseOrderFormModal'
 import { POFastFlowModal } from './POFastFlow'
@@ -98,8 +99,10 @@ export function PurchaseOrdersTable() {
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null)
   const [fastFlowOpen, setFastFlowOpen] = useState(false)
   const [comingSoonOpen, setComingSoonOpen] = useState(false)
+  const [expandedCard, setExpandedCard] = useState<string | null>(null)
   const router = useRouter()
   const { toast } = useToast()
+  const { isMobile } = useResponsiveView()
 
   // Fetch purchase orders
   const fetchPurchaseOrders = async () => {
@@ -312,95 +315,207 @@ export function PurchaseOrdersTable() {
         </Select>
       </div>
 
-      {/* Table */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>PO Number</TableHead>
-              <TableHead>Supplier</TableHead>
-              <TableHead>Warehouse</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Expected Date</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : purchaseOrders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
-                  No purchase orders found
-                </TableCell>
-              </TableRow>
-            ) : (
-              purchaseOrders.map((po) => (
-                <TableRow
+      {/* Mobile Card View */}
+      {isMobile ? (
+        <div className="space-y-3">
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">Loading...</div>
+          ) : purchaseOrders.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No purchase orders found</div>
+          ) : (
+            purchaseOrders.map((po) => {
+              const isExpanded = expandedCard === po.id
+
+              return (
+                <div
                   key={po.id}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => router.push(`/planning/purchase-orders/${po.id}`)}
+                  className="border rounded-lg overflow-hidden bg-white"
                 >
-                  <TableCell className="font-medium">{po.po_number}</TableCell>
-                  <TableCell>
-                    {po.suppliers?.name || 'N/A'}
-                    <div className="text-sm text-gray-500">
-                      {po.suppliers?.code}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {po.warehouses?.name || 'N/A'}
-                    <div className="text-sm text-gray-500">
-                      {po.warehouses?.code}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center flex-wrap gap-1">
+                  {/* Card Header */}
+                  <div
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
+                    onClick={() => setExpandedCard(isExpanded ? null : po.id)}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <span className="font-medium truncate">{po.po_number}</span>
                       <Badge className={getStatusColor(po.status)}>
                         {po.status}
                       </Badge>
-                      {getApprovalBadge(po.approval_status)}
                     </div>
-                  </TableCell>
-                  <TableCell>{formatDate(po.expected_delivery_date)}</TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(po.total, po.currency)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openEditModal(po)
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openDeleteDialog(po)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{formatCurrency(po.total, po.currency)}</span>
+                      {isExpanded ? (
+                        <ChevronUp className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-gray-400" />
+                      )}
                     </div>
+                  </div>
+
+                  {/* Expanded Content */}
+                  <div
+                    className={`overflow-hidden transition-all duration-200 ${
+                      isExpanded ? 'max-h-96' : 'max-h-0'
+                    }`}
+                  >
+                    <div className="px-4 pb-4 space-y-3 border-t">
+                      <div className="pt-3 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-500">Supplier:</span>
+                          <p className="font-medium">{po.suppliers?.name || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Warehouse:</span>
+                          <p className="font-medium">{po.warehouses?.name || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Expected:</span>
+                          <p className="font-medium">{formatDate(po.expected_delivery_date)}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Total:</span>
+                          <p className="font-medium">{formatCurrency(po.total, po.currency)}</p>
+                        </div>
+                        {po.approval_status && (
+                          <div className="col-span-2">
+                            <span className="text-gray-500">Approval:</span>
+                            <div className="mt-1">{getApprovalBadge(po.approval_status)}</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => router.push(`/planning/purchase-orders/${po.id}`)}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openEditModal(po)
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openDeleteDialog(po)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      ) : (
+        /* Desktop Table View */
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>PO Number</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead>Warehouse</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Expected Date</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    Loading...
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ) : purchaseOrders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    No purchase orders found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                purchaseOrders.map((po) => (
+                  <TableRow
+                    key={po.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => router.push(`/planning/purchase-orders/${po.id}`)}
+                  >
+                    <TableCell className="font-medium">{po.po_number}</TableCell>
+                    <TableCell>
+                      {po.suppliers?.name || 'N/A'}
+                      <div className="text-sm text-gray-500">
+                        {po.suppliers?.code}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {po.warehouses?.name || 'N/A'}
+                      <div className="text-sm text-gray-500">
+                        {po.warehouses?.code}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center flex-wrap gap-1">
+                        <Badge className={getStatusColor(po.status)}>
+                          {po.status}
+                        </Badge>
+                        {getApprovalBadge(po.approval_status)}
+                      </div>
+                    </TableCell>
+                    <TableCell>{formatDate(po.expected_delivery_date)}</TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(po.total, po.currency)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openEditModal(po)
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openDeleteDialog(po)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* Form Modal */}
       {formModalOpen && (

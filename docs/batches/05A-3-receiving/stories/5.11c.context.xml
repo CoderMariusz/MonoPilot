@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <id>5.11c</id>
+  <name>Transaction Atomicity & Over-Receipt Validation</name>
+  <batch>5A-3 (Receiving) - SPLIT from 5.11</batch>
+  <part>3 of 3</part>
+  <updated>2025-11-28</updated>
+  <status>Todo</status>
+  <priority>🔴 CRITICAL (Gap 2 Sprint 0)</priority>
+
+  <context>
+    <description>
+      Part 3 of GRN implementation. CRITICAL: Guarantees atomic GRN + LP creation
+      with complete rollback on ANY failure. Adds over-receipt validation from
+      merged Story 5.10. Required for Gap 2 Sprint 0 production release.
+    </description>
+
+    <scope>
+      - Transaction atomicity wrapper (all-or-nothing)
+      - Specific error messages per failure point
+      - Over-receipt validation (warehouse tolerance check)
+      - Idempotent LP# generation (auto-retry on duplicate)
+      - Concurrent receiving protection (SELECT FOR UPDATE)
+      - Comprehensive error handling
+    </scope>
+
+    <what-is-already-done>
+      - Basic GRN/LP creation (5.11a)
+      - ASN/PO status integration (5.11b)
+    </what-is-already-done>
+
+    <critical-requirements>
+      TRANSACTION ATOMICITY: All-or-nothing guarantee.
+      If ANY step fails: entire transaction ROLLBACK.
+      No partial updates ever.
+      Zero tolerance for data inconsistency.
+
+      OVER-RECEIPT VALIDATION:
+      Check warehouse_settings.over_receipt_tolerance_percent
+      If received > ordered * (1 + tolerance%): Error (configurable per warehouse)
+      Example: 5% tolerance on 100kg ordered = max 105kg
+      Ad-hoc receiving (no order): skip check
+
+      IDEMPOTENCY:
+      Duplicate LP# detection (rare race condition)
+      Auto-retry with next sequence number (transparent)
+      Max 3 retry attempts before failing transaction
+
+      CONCURRENCY:
+      SELECT FOR UPDATE on po_line/asn before reading received_qty
+      Prevents race conditions in multi-user environment
+
+      Gap 2 Sprint 0: PREREQUISITE for production release
+    </critical-requirements>
+
+    <related-stories>
+      <requires>5.11a (GRN & LP Creation), 5.11b (GRN Integration)</requires>
+      <shares-pattern-with>5.7b (Transaction Atomicity)</shares-pattern-with>
+      <enables>5.12 (Auto-Print Labels), 5.13 (PO Dashboard)</enables>
+    </related-stories>
+
+    <effort-estimate>
+      <hours>3-4</hours>
+      <points>2</points>
+    </effort-estimate>
+
+    <implementation-notes>
+      TRANSACTION PATTERN (shared with 5.7b):
+      BEGIN TRANSACTION
+        Step 1: FK validation (async pre-check)
+        Step 2: INSERT grn
+        Step 3: For each item: validate qty, check over-receipt, INSERT grn_item/license_plates
+        Step 4: UPDATE ASN status
+        Step 5: UPDATE PO received_qty
+        Step 6: Check PO completion, UPDATE PO status
+        Step 7: UPDATE TO status
+        Step 8: INSERT status_history (audit)
+      COMMIT or ROLLBACK (atomicity)
+
+      ERROR HANDLING:
+      Map each failure point to specific error message
+      Return 400 with context (what failed, why, how to fix)
+      Log full error to server for debugging
+
+      OVER-RECEIPT:
+      warehouse_settings has tolerance_percent (default 5%)
+      Calculate: max_allowed = ordered_qty * (1 + tolerance/100)
+      If received > max_allowed: reject with detailed message
+
+      IDEMPOTENCY:
+      Try INSERT license_plates
+      Catch UniqueConstraintError on lp_number
+      Increment sequence, retry (max 3 times)
+      All within same transaction
+
+      CONCURRENCY:
+      SELECT FOR UPDATE po_line WHERE id=X
+      SELECT FOR UPDATE asn WHERE id=X
+      Ensures serialized access, prevents lost updates
+    </implementation-notes>
+  </context>
+</story>

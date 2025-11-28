@@ -4,10 +4,11 @@
     <story-id>04-3-wo-pause-resume</story-id>
     <epic>Epic 4 - Production Execution</epic>
     <title>WO Pause/Resume</title>
-    <status>drafted</status>
+    <status>todo</status>
     <priority>P0</priority>
-    <story-points>1</story-points>
-    <effort>0.5 day</effort>
+    <story-points>2</story-points>
+    <effort>1 day</effort>
+    <updated>2025-11-28 - Expanded ACs from 8 to 10, added configurable pause reasons (per-warehouse: Breakdown, Break, Material Wait, Other), detailed downtime tracking with breakdown by reason, wo_pauses table schema, concurrency safety</updated>
   </story-metadata>
 
   <story-content>

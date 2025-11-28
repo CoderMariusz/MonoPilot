@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <id>5.1</id>
+  <name>LP Creation CRUD</name>
+  <batch>5A-1 (LP Core)</batch>
+  <updated>2025-11-28</updated>
+  <status>Todo</status>
+
+  <context>
+    <description>
+      Foundation story for License Plate system. Establishes LP creation workflow,
+      warehouse context, and LP detail modal pattern used throughout Batch 5A.
+    </description>
+
+    <key-changes>
+      <change type="REMOVED">batch_number field (LP number plays this role)</change>
+      <change type="ADDED">warehouse_id context (from user's default warehouse)</change>
+      <change type="ADDED">supplier_batch_number required field (FDA traceability)</change>
+      <change type="ADDED">LP Detail Modal (scrollable, 85% window, tabs for Overview/Genealogy/History)</change>
+      <change type="UPDATED">status field expanded to include: available, reserved, consumed, quarantine, shipped, merged, deleted</change>
+      <change type="ADDED">soft delete support (deleted_at timestamp)</change>
+      <change type="ADDED">created_by tracking for audit trail</change>
+    </key-changes>
+
+    <acceptance-criteria-count>5</acceptance-criteria-count>
+    <critical-requirements>
+      <!-- AC 2: Warehouse context -->
+      LP creation must derive warehouse_id from user's default warehouse.
+      Can be overridden in receiving workflow context.
+
+      <!-- AC 4: LP Detail Modal -->
+      Modal must be scrollable, max 85% window height/width.
+      Triggered from LP list/search/genealogy views.
+      Tabs: Overview (details, actions), Genealogy (parent/children trees), History (status changes, movements).
+    </critical-requirements>
+
+    <related-stories>
+      <blocks>5.2 (LP Status Tracking), 5.3 (Batch/Expiry), 5.4 (LP Number Gen), 5.5 (Split), 5.6 (Merge)</blocks>
+      <related>5.7a (Genealogy Recording), 5.11a (GRN & LP Creation)</related>
+    </related-stories>
+
+    <effort-estimate>
+      <original>8-10h</original>
+      <revised>10-12h</revised>
+      <reason>Added warehouse context logic, detail modal creation, expanded status enum, soft delete support</reason>
+    </effort-estimate>
+
+    <database-changes>
+      <add column="warehouse_id" type="UUID" constraint="NOT NULL, FK to warehouses"/>
+      <add column="supplier_batch_number" type="VARCHAR(100)" constraint="NOT NULL"/>
+      <drop column="batch_number"/>
+      <add column="deleted_at" type="TIMESTAMPTZ" constraint="NULL"/>
+      <add column="created_by_user_id" type="UUID" constraint="FK to users"/>
+      <update column="status" enum="available,reserved,consumed,quarantine,shipped,merged,deleted"/>
+    </database-changes>
+
+    <implementation-notes>
+      - warehouse_id must be populated before LP creation
+      - User.warehouse_id added to users table (default warehouse for user)
+      - supplier_batch_number is REQUIRED (for FDA compliance, even if from manual entry)
+      - LP Detail Modal is single source of truth for viewing/editing LPs
+      - Status transitions validated (see 5.2 for full rules)
+      - Backfill existing LPs with default warehouse_id, created_by, created_at
+    </implementation-notes>
+  </context>
+</story>

@@ -79,6 +79,7 @@ export interface WorkOrder {
   org_id: string
   wo_number: string
   product_id: string
+  bom_id: string | null
   planned_quantity: number
   produced_quantity: number
   uom: string
@@ -102,5 +103,10 @@ export interface WorkOrder {
     id: string
     code: string
     name: string
+  }
+  boms?: {
+    id: string
+    version: string
+    status: string
   }
 }

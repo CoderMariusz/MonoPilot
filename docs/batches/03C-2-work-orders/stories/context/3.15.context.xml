@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>3.15</id>
+    <title>Configurable WO Statuses</title>
+    <batch>03C-2</batch>
+    <points>3</points>
+    <effort_hours>3-4</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>
+    Admin can configure WO status lifecycle including add/remove/rename statuses,
+    set default status for new WOs, and configure status expiry for auto-close.
+  </description>
+
+  <dependencies>
+    <blocks>
+      <story id="3.10">Work Order CRUD (uses statuses)</story>
+    </blocks>
+    <requires>
+      <epic id="1">Settings Infrastructure</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>planning_settings</name>
+        <columns>
+          <column name="wo_statuses" type="JSONB">
+            <default>[
+              {"code": "draft", "label": "Draft", "color": "gray", "is_default": true, "sequence": 1},
+              {"code": "planned", "label": "Planned", "color": "blue", "is_default": false, "sequence": 2},
+              {"code": "released", "label": "Released", "color": "green", "is_default": false, "sequence": 3},
+              {"code": "in_progress", "label": "In Progress", "color": "yellow", "is_default": false, "sequence": 4},
+              {"code": "completed", "label": "Completed", "color": "purple", "is_default": false, "sequence": 5},
+              {"code": "closed", "label": "Closed", "color": "gray", "is_default": false, "sequence": 6}
+            ]</default>
+          </column>
+          <column name="wo_status_expiry_days" type="INTEGER" nullable="true"/>
+          <column name="wo_default_status" type="VARCHAR(50)" default="draft"/>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/planning/settings">
+        <response>
+          <field name="wo_statuses" type="array"/>
+          <field name="wo_status_expiry_days" type="number" nullable="true"/>
+          <field name="wo_default_status" type="string"/>
+        </response>
+      </endpoint>
+      <endpoint method="PUT" path="/api/planning/settings">
+        <request>
+          <field name="wo_statuses" type="array"/>
+          <field name="wo_status_expiry_days" type="number" nullable="true"/>
+        </request>
+      </endpoint>
+    </api_endpoints>
+
+    <services>
+      <service name="PlanningSettingsService">
+        <method name="getWOStatuses">
+          <returns>WOStatus[]</returns>
+        </method>
+        <method name="updateWOStatuses">
+          <param name="statuses" type="WOStatus[]"/>
+          <returns>WOStatus[]</returns>
+          <validation>At least one default status required</validation>
+          <validation>Cannot delete status with existing WOs</validation>
+        </method>
+      </service>
+    </services>
+
+    <components_to_create>
+      <component name="WOStatusConfig" path="components/settings/WOStatusConfig.tsx">
+        <props>
+          <prop name="statuses" type="WOStatus[]"/>
+          <prop name="onSave" type="(statuses: WOStatus[]) => void"/>
+        </props>
+        <features>
+          <feature>Drag-drop reorder</feature>
+          <feature>Color picker per status</feature>
+          <feature>Default status toggle</feature>
+          <feature>Expiry days input</feature>
+        </features>
+      </component>
+    </components_to_create>
+
+    <types>
+      <type name="WOStatus">
+        <field name="code" type="string"/>
+        <field name="label" type="string"/>
+        <field name="color" type="string"/>
+        <field name="is_default" type="boolean"/>
+        <field name="sequence" type="number"/>
+      </type>
+    </types>
+  </technical_context>
+
+  <acceptance_criteria>
+    <criterion id="AC-1">
+      <description>Status Configuration UI</description>
+      <given>Admin navigates to /settings/planning</given>
+      <when>viewing WO Statuses section</when>
+      <then>can add/remove/rename statuses and set order</then>
+    </criterion>
+    <criterion id="AC-2">
+      <description>Default Statuses</description>
+      <default_statuses>Draft, Planned, Released, In Progress, Completed, Closed</default_statuses>
+    </criterion>
+    <criterion id="AC-3">
+      <description>Optional Statuses</description>
+      <optional_statuses>On Hold, Cancelled, Quality Hold</optional_statuses>
+    </criterion>
+    <criterion id="AC-4">
+      <description>Status Expiry</description>
+      <then>can set status expiry for auto-close after X days</then>
+    </criterion>
+    <criterion id="AC-5">
+      <description>Delete Protection</description>
+      <given>status has existing WOs</given>
+      <then>cannot delete, shows error with count</then>
+    </criterion>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test>Status validation (unique codes)</test>
+      <test>Default status enforcement (exactly one)</test>
+      <test>Delete protection logic</test>
+    </unit_tests>
+    <integration_tests>
+      <test>Settings saved correctly</test>
+      <test>Default status applied to new WO</test>
+      <test>Cannot delete in-use status</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Add custom status</test>
+      <test>Reorder statuses</test>
+      <test>Set expiry days</test>
+      <test>Attempt delete with WOs → error shown</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="medium">Status expiry useful for auto-closing old WOs</note>
+    <note priority="low">Colors should match PO status colors for consistency</note>
+    <note priority="low">Consider status transition rules (future enhancement)</note>
+  </implementation_notes>
+</story>

@@ -3,11 +3,12 @@
     <epicId>4</epicId>
     <storyId>5</storyId>
     <title>Operation Complete</title>
-    <status>drafted</status>
-    <generatedAt>2025-11-27</generatedAt>
-    <template>Action Pattern - Status Transition with Yield Calculation</template>
-    <estimatedTokens>5200</estimatedTokens>
-    <estimatedEffort>0.5 days</estimatedEffort>
+    <status>todo</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <template>Action Pattern - Status Transition with Yield Calculation & BOM-based Yield</template>
+    <estimatedTokens>6500</estimatedTokens>
+    <estimatedEffort>1 day</estimatedEffort>
+    <updated>2025-11-28 - Expanded ACs from 8 to 9, added BOM-based yield calculation (read-only, NOT operator-editable), detailed duration auto-calculation, yield validation (0-200%, warn if <80% or >120%), next operation sequencing (3 aspects: automatic+event+ready marker)</updated>
   </metadata>
 
   <story>

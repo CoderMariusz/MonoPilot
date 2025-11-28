@@ -5,6 +5,7 @@ import {
   type UpdateWorkOrderInput,
   type WorkOrderFilters,
 } from '@/lib/validation/work-order-schemas'
+import { getActiveBOMForProduct } from './bom-service'
 
 /**
  * Work Order Service
@@ -73,15 +74,19 @@ async function getCurrentUserId(): Promise<string | null> {
 }
 
 /**
- * Generate next WO number in format: WO-YYYY-NNN
- * Resets sequence each year
+ * Generate next WO number in format: WO-YYYYMMDD-NNNN
+ * AC-3.10.2: Resets sequence daily, unique per org
  */
 async function generateWoNumber(orgId: string): Promise<string> {
   const supabaseAdmin = createServerSupabaseAdmin()
-  const currentYear = new Date().getFullYear()
-  const prefix = `WO-${currentYear}-`
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const datePrefix = `${year}${month}${day}`
+  const prefix = `WO-${datePrefix}-`
 
-  // Find highest number for current year
+  // Find highest number for current day
   const { data: existingWos, error } = await supabaseAdmin
     .from('work_orders')
     .select('wo_number')
@@ -98,7 +103,7 @@ async function generateWoNumber(orgId: string): Promise<string> {
   let nextSequence = 1
 
   if (existingWos && existingWos.length > 0) {
-    // Extract sequence from WO-YYYY-NNN
+    // Extract sequence from WO-YYYYMMDD-NNNN
     const latestWo = existingWos[0].wo_number
     const parts = latestWo.split('-')
     if (parts.length === 3) {
@@ -109,9 +114,9 @@ async function generateWoNumber(orgId: string): Promise<string> {
     }
   }
 
-  // Format: WO-YYYY-NNN (3 digits)
-  const formattedSequence = nextSequence.toString().padStart(3, '0')
-  return `WO-${currentYear}-${formattedSequence}`
+  // Format: WO-YYYYMMDD-NNNN (4 digits)
+  const formattedSequence = nextSequence.toString().padStart(4, '0')
+  return `WO-${datePrefix}-${formattedSequence}`
 }
 
 /**
@@ -173,6 +178,19 @@ export async function createWorkOrder(
     // Generate WO number
     const woNumber = await generateWoNumber(orgId)
 
+    // AC-3.10.3: Auto-select BOM based on scheduled date
+    let bomId: string | null = null
+    const scheduledDate = input.planned_start_date || new Date()
+    try {
+      const activeBom = await getActiveBOMForProduct(input.product_id, scheduledDate)
+      if (activeBom) {
+        bomId = activeBom.id
+      }
+    } catch (bomError) {
+      // BOM selection is optional - log but don't fail WO creation
+      console.warn('Could not auto-select BOM:', bomError)
+    }
+
     // Create work order
     const { data: workOrder, error: createError } = await supabaseAdmin
       .from('work_orders')
@@ -180,6 +198,7 @@ export async function createWorkOrder(
         org_id: orgId,
         wo_number: woNumber,
         product_id: input.product_id,
+        bom_id: bomId,
         planned_quantity: input.planned_quantity,
         produced_quantity: 0,
         uom: product.uom,
@@ -192,7 +211,8 @@ export async function createWorkOrder(
       .select(`
         *,
         products:product_id (id, code, name, uom),
-        machines:production_line_id (id, code, name)
+        machines:production_line_id (id, code, name),
+        boms:bom_id (id, version, status)
       `)
       .single()
 
@@ -302,7 +322,8 @@ export async function updateWorkOrder(
       .select(`
         *,
         products:product_id (id, code, name, uom),
-        machines:production_line_id (id, code, name)
+        machines:production_line_id (id, code, name),
+        boms:bom_id (id, version, status)
       `)
       .single()
 
@@ -351,7 +372,8 @@ export async function getWorkOrder(woId: string): Promise<ServiceResult<WorkOrde
       .select(`
         *,
         products:product_id (id, code, name, uom),
-        machines:production_line_id (id, code, name)
+        machines:production_line_id (id, code, name),
+        boms:bom_id (id, version, status)
       `)
       .eq('id', woId)
       .eq('org_id', orgId)
@@ -403,7 +425,8 @@ export async function listWorkOrders(
         `
         *,
         products:product_id (id, code, name, uom),
-        machines:production_line_id (id, code, name)
+        machines:production_line_id (id, code, name),
+        boms:bom_id (id, version, status)
       `,
         { count: 'exact' }
       )

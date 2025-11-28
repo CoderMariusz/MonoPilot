@@ -36,8 +36,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useResponsiveView } from '@/hooks/use-responsive-view'
 import { getStatusColor } from '@/lib/constants/app-colors'
 import { WorkOrderFormModal } from './WorkOrderFormModal'
 
@@ -81,8 +82,10 @@ export function WorkOrdersTable() {
   const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null)
+  const [expandedCard, setExpandedCard] = useState<string | null>(null)
   const router = useRouter()
   const { toast } = useToast()
+  const { isMobile } = useResponsiveView()
 
   // Fetch work orders
   const fetchWorkOrders = async () => {
@@ -244,88 +247,203 @@ export function WorkOrdersTable() {
         </Select>
       </div>
 
-      {/* Table */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>WO Number</TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Planned Qty</TableHead>
-              <TableHead className="text-right">Produced Qty</TableHead>
-              <TableHead>Production Line</TableHead>
-              <TableHead>Start Date</TableHead>
-              <TableHead className="text-right w-24">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : workOrders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
-                  No work orders found
-                </TableCell>
-              </TableRow>
-            ) : (
-              workOrders.map((wo) => (
-                <TableRow
+      {/* Mobile Card View */}
+      {isMobile ? (
+        <div className="space-y-3">
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">Loading...</div>
+          ) : workOrders.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No work orders found</div>
+          ) : (
+            workOrders.map((wo) => {
+              const isExpanded = expandedCard === wo.id
+              const progress = wo.planned_quantity > 0
+                ? Math.round((wo.produced_quantity / wo.planned_quantity) * 100)
+                : 0
+
+              return (
+                <div
                   key={wo.id}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => router.push(`/planning/work-orders/${wo.id}`)}
+                  className="border rounded-lg overflow-hidden bg-white"
                 >
-                  <TableCell className="font-medium">{wo.wo_number}</TableCell>
-                  <TableCell>
-                    {wo.products?.name || 'N/A'}
-                    <div className="text-sm text-gray-500">{wo.products?.code}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(wo.status)}>
-                      {formatStatusLabel(wo.status)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(wo.planned_quantity)} {wo.uom}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(wo.produced_quantity)} {wo.uom}
-                  </TableCell>
-                  <TableCell>
-                    {wo.machines?.name || '-'}
-                    {wo.machines && (
-                      <div className="text-sm text-gray-500">{wo.machines.code}</div>
-                    )}
-                  </TableCell>
-                  <TableCell>{formatDate(wo.planned_start_date)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => openEditModal(wo, e)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => openDeleteDialog(wo, e)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  {/* Card Header - Always visible */}
+                  <div
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
+                    onClick={() => setExpandedCard(isExpanded ? null : wo.id)}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <span className="font-medium truncate">{wo.wo_number}</span>
+                      <Badge className={getStatusColor(wo.status)}>
+                        {formatStatusLabel(wo.status)}
+                      </Badge>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500">{progress}%</span>
+                      {isExpanded ? (
+                        <ChevronUp className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-gray-400" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanded Content */}
+                  <div
+                    className={`overflow-hidden transition-all duration-200 ${
+                      isExpanded ? 'max-h-96' : 'max-h-0'
+                    }`}
+                  >
+                    <div className="px-4 pb-4 space-y-3 border-t">
+                      <div className="pt-3 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-500">Product:</span>
+                          <p className="font-medium">{wo.products?.name || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Line:</span>
+                          <p className="font-medium">{wo.machines?.name || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Planned Qty:</span>
+                          <p className="font-medium">{formatNumber(wo.planned_quantity)} {wo.uom}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Produced:</span>
+                          <p className="font-medium">{formatNumber(wo.produced_quantity)} {wo.uom}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-gray-500">Start Date:</span>
+                          <p className="font-medium">{formatDate(wo.planned_start_date)}</p>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-green-500 h-2 rounded-full transition-all"
+                          style={{ width: `${Math.min(100, progress)}%` }}
+                        />
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => router.push(`/planning/work-orders/${wo.id}`)}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={(e) => openEditModal(wo, e)}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600"
+                          onClick={(e) => openDeleteDialog(wo, e)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      ) : (
+        /* Desktop Table View */
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>WO Number</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Planned Qty</TableHead>
+                <TableHead className="text-right">Produced Qty</TableHead>
+                <TableHead>Production Line</TableHead>
+                <TableHead>Start Date</TableHead>
+                <TableHead className="text-right w-24">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    Loading...
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ) : workOrders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    No work orders found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                workOrders.map((wo) => (
+                  <TableRow
+                    key={wo.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => router.push(`/planning/work-orders/${wo.id}`)}
+                  >
+                    <TableCell className="font-medium">{wo.wo_number}</TableCell>
+                    <TableCell>
+                      {wo.products?.name || 'N/A'}
+                      <div className="text-sm text-gray-500">{wo.products?.code}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(wo.status)}>
+                        {formatStatusLabel(wo.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatNumber(wo.planned_quantity)} {wo.uom}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatNumber(wo.produced_quantity)} {wo.uom}
+                    </TableCell>
+                    <TableCell>
+                      {wo.machines?.name || '-'}
+                      {wo.machines && (
+                        <div className="text-sm text-gray-500">{wo.machines.code}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>{formatDate(wo.planned_start_date)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => openEditModal(wo, e)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => openDeleteDialog(wo, e)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* Form Modal */}
       {formModalOpen && (

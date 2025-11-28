@@ -346,6 +346,52 @@ export async function deleteBOM(id: string): Promise<void> {
 }
 
 /**
+ * Get active BOM for a product on a specific date
+ * AC-3.10.3: Select active BOM based on scheduled_date
+ * Query: effective_from <= date AND (effective_to IS NULL OR >= date) AND status = 'Active'
+ */
+export async function getActiveBOMForProduct(
+  productId: string,
+  targetDate: Date | string
+): Promise<BOM | null> {
+  const userInfo = await getCurrentUserOrgId()
+  if (!userInfo) {
+    throw new Error('Unauthorized or no organization found for user')
+  }
+
+  const supabase = await createServerSupabase()
+  const org_id = userInfo.orgId
+
+  // Format date as YYYY-MM-DD
+  const dateStr = targetDate instanceof Date
+    ? targetDate.toISOString().split('T')[0]
+    : targetDate
+
+  // Find active BOM where:
+  // - effective_from <= targetDate
+  // - effective_to IS NULL OR effective_to >= targetDate
+  // - status = 'Active'
+  const { data, error } = await supabase
+    .from('boms')
+    .select('*')
+    .eq('org_id', org_id)
+    .eq('product_id', productId)
+    .eq('status', 'Active')
+    .lte('effective_from', dateStr)
+    .or(`effective_to.gte.${dateStr},effective_to.is.null`)
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Error fetching active BOM:', error)
+    return null
+  }
+
+  return data as BOM | null
+}
+
+/**
  * Get BOM count for a product
  */
 export async function getBOMCountForProduct(productId: string): Promise<number> {

@@ -102,8 +102,8 @@ export default function PlanningDashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Stats Cards (Left - 3/4 width) */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Stats Cards Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Stats Cards Row - AC-3.24.5: Responsive 1/2/3 columns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <PlanningStatsCard
                 title="Purchase Orders"
                 icon="📊"
