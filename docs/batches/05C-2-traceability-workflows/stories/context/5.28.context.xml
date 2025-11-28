@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.28</id>
+    <title>Forward/Backward Traceability</title>
+    <batch>5C-2</batch>
+    <points>8</points>
+    <effort_hours>8-10</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>Query LP genealogy tree to trace parent-child relationships upstream and downstream for FDA traceability and issue investigation</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.1">License Plate Creation</story>
+      <story id="5.7">LP Genealogy Tracking</story>
+    </requires>
+    <enables>
+      <story id="5.29">Genealogy Recording</story>
+      <story id="5.30">Source Document Linking</story>
+    </enables>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>lp_genealogy</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, FK organizations(id)"/>
+          <column name="parent_lp_id" type="UUID" constraint="FK license_plates(id)"/>
+          <column name="child_lp_id" type="UUID" constraint="FK license_plates(id)"/>
+          <column name="operation_type" type="VARCHAR(20)" constraint="CHECK IN ('split','merge','consume','produce')"/>
+          <column name="wo_id" type="UUID" constraint="FK work_orders(id)"/>
+          <column name="to_id" type="UUID" constraint="FK transfer_orders(id)"/>
+          <column name="created_at" type="TIMESTAMP" constraint="DEFAULT now()"/>
+          <column name="created_by_user_id" type="UUID" constraint="FK users(id)"/>
+        </columns>
+        <indexes>
+          <index name="idx_genealogy_parent" columns="parent_lp_id"/>
+          <index name="idx_genealogy_child" columns="child_lp_id"/>
+          <index name="idx_genealogy_operation" columns="operation_type"/>
+        </indexes>
+      </table>
+      <table>
+        <name>license_plates</name>
+        <note>See Story 5.1 tech-spec for schema</note>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/warehouse/license-plates/:id/trace/forward">
+        <description>Get all downstream LPs (children, grandchildren, etc.)</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="lp_id" type="UUID"/>
+          <field name="trace" type="array">
+            <item>
+              <field name="lp_id" type="UUID"/>
+              <field name="lp_number" type="string"/>
+              <field name="operation_type" type="string" example="split|merge|consume|produce"/>
+              <field name="created_at" type="timestamp"/>
+              <field name="depth" type="integer" constraint="1-10"/>
+              <field name="children" type="array"/>
+            </item>
+          </field>
+        </response>
+      </endpoint>
+
+      <endpoint method="GET" path="/api/warehouse/license-plates/:id/trace/backward">
+        <description>Get all upstream LPs (parents, grandparents, etc.)</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="lp_id" type="UUID"/>
+          <field name="trace" type="array">
+            <item>
+              <field name="lp_id" type="UUID"/>
+              <field name="lp_number" type="string"/>
+              <field name="operation_type" type="string" example="split|merge|consume|produce"/>
+              <field name="created_at" type="timestamp"/>
+              <field name="depth" type="integer" constraint="1-10"/>
+              <field name="parents" type="array"/>
+            </item>
+          </field>
+        </response>
+      </endpoint>
+    </api_endpoints>
+
+    <services>
+      <service name="TraceabilityService">
+        <method name="getForwardTrace" params="lp_id: UUID" return="LPTrace[]">
+          <description>Recursive CTE to fetch all descendants</description>
+          <sql>WITH RECURSIVE descendants AS (SELECT child_lp_id... UNION ALL SELECT g.child_lp_id...) SELECT * FROM descendants</sql>
+        </method>
+        <method name="getBackwardTrace" params="lp_id: UUID" return="LPTrace[]">
+          <description>Recursive CTE to fetch all ancestors</description>
+        </method>
+        <method name="validateNoCycle" params="parent_id, child_id" return="boolean">
+          <description>Detect circular genealogy (should not occur with RLS)</description>
+        </method>
+      </service>
+    </services>
+
+    <frontend_routes>
+      <route path="/warehouse/traceability/:lp_id" method="GET" description="View LP genealogy tree"/>
+    </frontend_routes>
+
+    <components_to_create>
+      <component name="TraceabilityViewer.tsx" path="src/components/warehouse/">
+        <props>lp_id: UUID, direction: 'forward'|'backward'</props>
+        <description>Display genealogy tree with operation type labels and source links</description>
+      </component>
+    </components_to_create>
+
+    <hooks_to_create>
+      <hook name="useTraceability" path="src/hooks/">
+        <signature>useTraceability(lp_id: UUID, direction: 'forward'|'backward')</signature>
+        <return>{trace: LPTrace[], loading: boolean, error: Error}</return>
+      </hook>
+    </hooks_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <criterion id="AC1">Forward trace displays all child LPs with operation types</criterion>
+    <criterion id="AC2">Backward trace displays all parent LPs with operation types</criterion>
+    <criterion id="AC3">Trace completes within 2 seconds for large genealogies</criterion>
+    <criterion id="AC4">Empty trace shows user-friendly message</criterion>
+    <criterion id="AC5">Source document links are clickable</criterion>
+    <criterion id="AC6">Export to CSV works correctly</criterion>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test name="getForwardTrace returns correct descendants"/>
+      <test name="getBackwardTrace returns correct ancestors"/>
+      <test name="Depth limit stops at max 10 levels"/>
+      <test name="Empty trace returns empty array"/>
+    </unit_tests>
+    <integration_tests>
+      <test name="Create genealogy A→B→C, trace forward from A includes B,C"/>
+      <test name="Performance: 1000 genealogy records traced in less than 2 seconds"/>
+    </integration_tests>
+    <e2e_tests>
+      <test name="Navigate to LP detail → Click Trace Forward → Verify genealogy tree displays"/>
+      <test name="Click Trace Backward → Verify ancestors displayed"/>
+      <test name="Click source document link and navigate"/>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="critical">Recursive CTEs must have depth limit (max 10) to prevent infinite loops</note>
+    <note priority="high">Index optimization essential for large genealogy tables (1000+ records)</note>
+    <note priority="high">Genealogy is immutable audit trail - never update/delete records</note>
+    <note priority="medium">Consider caching trace results in Redis if very frequent queries</note>
+  </implementation_notes>
+</story>

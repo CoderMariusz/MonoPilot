@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.31</id>
+    <title>Warehouse Settings Configuration</title>
+    <batch>5C-2</batch>
+    <points>5</points>
+    <effort_hours>5-6</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>Admin configuration page for warehouse module settings (LP format, scanner timeout, barcode formats)</description>
+
+  <dependencies>
+    <requires>
+      <story id="1.1">Admin users and permissions</story>
+    </requires>
+    <enables>
+      <story id="5.1">LP creation (uses lp_number_format)</story>
+      <story id="5.12">Auto-print labels</story>
+      <story id="5.23">Scanner (uses timeout settings)</story>
+      <story id="5.36">Offline queue (uses queue settings)</story>
+    </enables>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>warehouse_settings</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, UNIQUE, FK organizations(id)"/>
+          <column name="warehouse_id" type="UUID" constraint="FK warehouses(id)"/>
+          <column name="lp_number_format" type="VARCHAR(50)" constraint="DEFAULT 'LP-{WH}-YYYYMMDD-NNNN'"/>
+          <column name="auto_print_labels" type="BOOLEAN" constraint="DEFAULT false"/>
+          <column name="allow_over_receipt" type="BOOLEAN" constraint="DEFAULT false"/>
+          <column name="scanner_session_timeout_mins" type="INT" constraint="DEFAULT 5, CHECK (1-60)"/>
+          <column name="barcode_format_lp" type="VARCHAR(20)" constraint="DEFAULT 'EAN128', CHECK IN ('EAN128','CODE128','QR')"/>
+          <column name="created_at" type="TIMESTAMP"/>
+          <column name="updated_at" type="TIMESTAMP"/>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/warehouse/settings">
+        <description>Get current warehouse settings for org</description>
+        <auth>authenticated</auth>
+        <response status="200" type="WarehouseSettings"/>
+      </endpoint>
+      <endpoint method="PUT" path="/api/warehouse/settings">
+        <description>Update warehouse settings (admin only)</description>
+        <auth>authenticated+admin</auth>
+        <request type="Partial&lt;WarehouseSettings&gt;"/>
+      </endpoint>
+    </api_endpoints>
+
+    <services>
+      <service name="WarehouseSettingsService">
+        <method name="getSettings" params="org_id" return="WarehouseSettings"/>
+        <method name="updateSettings" params="org_id, settings" return="void"/>
+        <method name="validateSettings" params="settings" return="ValidationError[]"/>
+      </service>
+    </services>
+
+    <frontend_routes>
+      <route path="/settings/warehouse" method="GET" description="Warehouse settings admin page"/>
+    </frontend_routes>
+
+    <components_to_create>
+      <component name="WarehouseSettingsPage.tsx" path="src/components/settings/">
+        <sections>LP Config, Scanner Config, Barcode Config</sections>
+      </component>
+      <component name="LPFormatPreview.tsx" path="src/components/settings/">
+        <description>Show example LP numbers with different formats</description>
+      </component>
+    </components_to_create>
+  </technical_context>
+
+  <test_plan>
+    <unit_tests>
+      <test name="LP format validation (required variables, length)"/>
+      <test name="Timeout range validation (1-60)"/>
+      <test name="Barcode format validation (allowed values)"/>
+    </unit_tests>
+    <e2e_tests>
+      <test name="Navigate to settings → modify LP format → see preview update → save → reload → settings persisted"/>
+      <test name="Invalid input → validation error shown"/>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="high">Settings apply immediately without restart</note>
+    <note priority="high">Broadcast changes via WebSocket to all users in org</note>
+    <note priority="medium">Cache settings on frontend to reduce API calls</note>
+  </implementation_notes>
+</story>
