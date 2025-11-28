@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.15</id>
+    <title>Routing CRUD</title>
+    <batch>02C-1</batch>
+    <points>5</points>
+    <effort_hours>6-8</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Create, read, update, delete production routings with code, name, status, and reusability flag.</description>
+
+  <dependencies>
+    <blocks>
+      <story id="2.16">Routing Operations</story>
+      <story id="2.17">Routing-Product Assignment</story>
+    </blocks>
+    <requires>
+      <epic id="1">Organizations, Machines, Production Lines</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>routings</name>
+        <columns>
+          <column name="id" type="UUID" pk="true"/>
+          <column name="org_id" type="UUID" fk="organizations.id"/>
+          <column name="code" type="VARCHAR(50)" required="true" format="^[A-Z0-9-]+$"/>
+          <column name="name" type="VARCHAR(100)" required="true"/>
+          <column name="description" type="TEXT"/>
+          <column name="status" type="VARCHAR(20)" default="active">active | inactive</column>
+          <column name="is_reusable" type="BOOLEAN" default="true"/>
+          <column name="created_by" type="UUID"/>
+          <column name="updated_by" type="UUID"/>
+        </columns>
+        <constraints>
+          <unique>org_id, code</unique>
+        </constraints>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/routings">List with filters</endpoint>
+      <endpoint method="POST" path="/api/technical/routings">Create routing</endpoint>
+      <endpoint method="GET" path="/api/technical/routings/:id">Get with operations and products</endpoint>
+      <endpoint method="PUT" path="/api/technical/routings/:id">Update</endpoint>
+      <endpoint method="DELETE" path="/api/technical/routings/:id">Delete (cascade)</endpoint>
+    </api_endpoints>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.15.1">Create routing with code, name, description, status, is_reusable</ac>
+    <ac id="2.15.2">List shows code, name, status, products count</ac>
+    <ac id="2.15.3">Search by code/name, filter by status</ac>
+    <ac id="2.15.4">Unique code validation per org</ac>
+    <ac id="2.15.5">Admin/Technical role required</ac>
+  </acceptance_criteria>
+</story>

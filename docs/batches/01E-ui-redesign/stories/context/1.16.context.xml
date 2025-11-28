@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>1.16</story-id>
+    <story-name>Settings Header Layout</story-name>
+    <epic-id>1</epic-id>
+    <batch-id>1E</batch-id>
+    <batch-name>Settings UI Redesign</batch-name>
+    <status>ready-for-dev</status>
+    <priority>P1 (High)</priority>
+    <story-points>3</story-points>
+    <effort-estimate>0.5 days</effort-estimate>
+    <created-date>2025-11-27</created-date>
+    <dependencies>
+      <cross-module>
+        <story-id>2.25</story-id>
+        <story-name>Technical Header Layout</story-name>
+        <note>Implement together - shared header pattern</note>
+      </cross-module>
+    </dependencies>
+  </metadata>
+
+  <goal>
+    <description>
+      Create reusable header component with consistent navigation for all settings pages, matching Planning module design.
+    </description>
+  </goal>
+
+  <user-story>
+    <as-a>Administrator</as-a>
+    <i-want>to see consistent header navigation across all settings pages</i-want>
+    <so-that>I can navigate easily between configuration options</so-that>
+  </user-story>
+
+  <problem-statement>
+    <description>
+      Settings pages have inconsistent headers:
+      - Landing page has card grid layout
+      - Sub-pages lack unified header navigation
+      - No way to quickly switch between settings sections
+      - Inconsistent with Planning module design
+    </description>
+  </problem-statement>
+
+  <acceptance-criteria>
+    <criterion id="AC-1.16.1">
+      <name>Reusable SettingsHeader Component</name>
+      <given>I view any settings page</given>
+      <when>the page loads</when>
+      <then>
+        <item>I see Logo/App name (left)</item>
+        <item>I see navigation tabs: "Settings | Org | Users | WH | Loc | Machines | Lines | Allergens | Tax | Modules | Wizard" (center)</item>
+        <item>Header height: max 60px (compact)</item>
+        <item>Consistent styling matching PlanningHeader</item>
+        <item>Tabs wrap to second row if needed on smaller screens</item>
+      </then>
+    </criterion>
+
+    <criterion id="AC-1.16.2">
+      <name>Navigation Tab Styling</name>
+      <given>I'm on a settings page</given>
+      <when>I check the navigation tabs</when>
+      <then>
+        <item>Active tab highlighted (bottom border or bg color)</item>
+        <item>All tabs use consistent font size (14px)</item>
+        <item>Tabs are clickable links (all visible, no dropdown)</item>
+      </then>
+    </criterion>
+
+    <criterion id="AC-1.16.3">
+      <name>Breadcrumb Navigation</name>
+      <given>I'm on a settings sub-page (e.g., /settings/machines/[id])</given>
+      <when>checking navigation</when>
+      <then>
+        <item>Breadcrumb shows: Settings > Machines > Machine Name</item>
+        <item>Back button available to return to list</item>
+      </then>
+    </criterion>
+
+    <criterion id="AC-1.16.4">
+      <name>Header Applied to All Pages</name>
+      <given>Settings module pages</given>
+      <when>checking implementation</when>
+      <then>
+        <pages>
+          <page>/settings (dashboard)</page>
+          <page>/settings/organization</page>
+          <page>/settings/users</page>
+          <page>/settings/warehouses</page>
+          <page>/settings/locations</page>
+          <page>/settings/machines</page>
+          <page>/settings/production-lines</page>
+          <page>/settings/allergens</page>
+          <page>/settings/tax-codes</page>
+          <page>/settings/modules</page>
+          <page>/settings/wizard</page>
+        </pages>
+      </then>
+    </criterion>
+  </acceptance-criteria>
+
+  <ui-components>
+    <component name="SettingsHeader">
+      <file-path>apps/frontend/components/settings/SettingsHeader.tsx</file-path>
+      <type>NEW</type>
+      <props>
+        <prop name="currentPage" type="'dashboard' | 'organization' | 'users' | 'warehouses' | 'locations' | 'machines' | 'lines' | 'allergens' | 'tax-codes' | 'modules' | 'wizard'" required="true">
+          <description>Current active page for tab highlighting</description>
+        </prop>
+      </props>
+      <structure>
+        <section name="Logo Area" position="left">
+          <height>60px</height>
+          <content>Logo + App name</content>
+        </section>
+        <section name="Navigation Tabs" position="center">
+          <tabs>
+            <tab key="dashboard" label="Settings" href="/settings" />
+            <tab key="organization" label="Org" href="/settings/organization" />
+            <tab key="users" label="Users" href="/settings/users" />
+            <tab key="warehouses" label="WH" href="/settings/warehouses" />
+            <tab key="locations" label="Loc" href="/settings/locations" />
+            <tab key="machines" label="Machines" href="/settings/machines" />
+            <tab key="lines" label="Lines" href="/settings/production-lines" />
+            <tab key="allergens" label="Allergens" href="/settings/allergens" />
+            <tab key="tax-codes" label="Tax" href="/settings/tax-codes" />
+            <tab key="modules" label="Modules" href="/settings/modules" />
+            <tab key="wizard" label="Wizard" href="/settings/wizard" />
+          </tabs>
+          <font-size>14px</font-size>
+          <active-style>
+            <border-bottom>green-600</border-bottom>
+            <text-color>gray-900</text-color>
+          </active-style>
+          <inactive-style>
+            <border>transparent</border>
+            <text-color>gray-600</text-color>
+            <hover-text-color>gray-900</hover-text-color>
+          </inactive-style>
+          <wrap-behavior>Tabs wrap to second row on smaller screens (no horizontal scroll)</wrap-behavior>
+        </section>
+        <section name="Settings Button" position="right">
+          <icon>⚙️</icon>
+          <style>outline (not filled)</style>
+        </section>
+      </structure>
+      <responsive>
+        <mobile breakpoint="&lt;768px">
+          <structure>Logo + Hamburger menu (right)</structure>
+          <note>Full-screen navigation overlay on tap - see SettingsMobileNav component</note>
+        </mobile>
+        <tablet breakpoint="768-1024px">
+          <structure>Logo + all tabs (may wrap to second row)</structure>
+        </tablet>
+        <desktop breakpoint="1024px+">
+          <structure>Logo + all tabs (single row) + settings button</structure>
+        </desktop>
+      </responsive>
+      <reference-component>
+        <name>PlanningHeader</name>
+        <file>apps/frontend/components/planning/PlanningHeader.tsx</file>
+        <note>Match styling and structure from Planning module</note>
+      </reference-component>
+    </component>
+
+    <component name="Breadcrumb Navigation">
+      <integration>Within SettingsHeader or separate component</integration>
+      <position>Below main header (40px height)</position>
+      <format>Settings > Current Page > Detail (if applicable)</format>
+      <example>Settings > Machines > CNC-001</example>
+      <back-button>Include back button to return to list view</back-button>
+    </component>
+  </ui-components>
+
+  <design-tokens>
+    <colors>
+      <source>lib/constants/app-colors.ts</source>
+      <primary-cta>green-600 (#16a34a)</primary-cta>
+      <secondary-action>gray-600 (#4b5563)</secondary-action>
+      <text-primary>gray-900 (#111827)</text-primary>
+      <text-secondary>gray-600 (#4b5563)</text-secondary>
+      <border>gray-200 (#e5e7eb)</border>
+      <active-tab-border>green-600</active-tab-border>
+      <hover-text>gray-900</hover-text>
+    </colors>
+    <typography>
+      <tab-font-size>14px (text-sm)</tab-font-size>
+      <tab-font-weight>500 (medium)</tab-font-weight>
+      <logo-font-size>18px (text-lg)</logo-font-size>
+      <logo-font-weight>600 (semibold)</logo-font-weight>
+    </typography>
+    <spacing>
+      <header-height>60px (max)</header-height>
+      <breadcrumb-height>40px</breadcrumb-height>
+      <horizontal-padding>px-6 (24px)</horizontal-padding>
+      <tab-gap>gap-6 (24px)</tab-gap>
+    </spacing>
+  </design-tokens>
+
+  <implementation-tasks>
+    <task id="1" status="pending">
+      <description>Create SettingsHeader component in /components/settings/SettingsHeader.tsx</description>
+      <details>
+        - Props: currentPage (type union of all page keys)
+        - Render all navigation tabs with active state (no dropdown)
+        - Compact styling (60px max height)
+        - Tabs wrap on smaller screens
+      </details>
+    </task>
+    <task id="2" status="pending">
+      <description>Update all settings pages to use new header</description>
+      <pages>
+        <page>apps/frontend/app/(authenticated)/settings/page.tsx</page>
+        <page>apps/frontend/app/(authenticated)/settings/organization/page.tsx</page>
+        <page>apps/frontend/app/(authenticated)/settings/users/page.tsx</page>
+        <page>apps/frontend/app/(authenticated)/settings/warehouses/page.tsx</page>
+        <page>apps/frontend/app/(authenticated)/settings/locations/page.tsx</page>
+        <page>apps/frontend/app/(authenticated)/settings/machines/page.tsx</page>
+        <page>apps/frontend/app/(authenticated)/settings/production-lines/page.tsx</page>
+        <page>apps/frontend/app/(authenticated)/settings/allergens/page.tsx</page>
+        <page>apps/frontend/app/(authenticated)/settings/tax-codes/page.tsx</page>
+        <page>apps/frontend/app/(authenticated)/settings/modules/page.tsx</page>
+        <page>apps/frontend/app/(authenticated)/settings/wizard/page.tsx</page>
+      </pages>
+    </task>
+    <task id="3" status="pending">
+      <description>Add consistent padding to all pages: px-6 py-6</description>
+    </task>
+    <task id="4" status="pending">
+      <description>Test responsive behavior on mobile/tablet</description>
+      <test-cases>
+        - Tabs wrap to second row on smaller screens
+        - No horizontal scroll
+        - Active tab visible
+        - All tabs clickable
+      </test-cases>
+    </task>
+  </implementation-tasks>
+
+  <testing-strategy>
+    <unit-tests framework="Vitest">
+      <test-file>apps/frontend/__tests__/components/SettingsHeader.test.tsx</test-file>
+      <test-cases>
+        <case>
+          <name>Highlights active tab</name>
+          <code>
+            render(&lt;SettingsHeader currentPage="users" /&gt;)
+            expect(screen.getByText('Users')).toHaveClass('border-green-600')
+          </code>
+        </case>
+        <case>
+          <name>Navigates to correct page on tab click</name>
+          <code>
+            render(&lt;SettingsHeader currentPage="dashboard" /&gt;)
+            fireEvent.click(screen.getByText('Warehouses'))
+            expect(mockPush).toHaveBeenCalledWith('/settings/warehouses')
+          </code>
+        </case>
+        <case>
+          <name>Renders all navigation tabs</name>
+          <code>
+            render(&lt;SettingsHeader currentPage="dashboard" /&gt;)
+            expect(screen.getByText('Settings')).toBeInTheDocument()
+            expect(screen.getByText('Org')).toBeInTheDocument()
+            expect(screen.getByText('Users')).toBeInTheDocument()
+            // ... etc for all tabs
+          </code>
+        </case>
+      </test-cases>
+    </unit-tests>
+
+    <e2e-tests framework="Playwright">
+      <test-file>tests/e2e/settings-header.spec.ts</test-file>
+      <test-cases>
+        <case>
+          <name>Should navigate between settings pages via header tabs</name>
+          <code>
+            await page.goto('/settings')
+            await page.click('text=Users')
+            await expect(page).toHaveURL('/settings/users')
+            await expect(page.locator('[data-testid="users-tab"]')).toHaveClass(/border-green-600/)
+          </code>
+        </case>
+        <case>
+          <name>Mobile: should open hamburger menu</name>
+          <code>
+            await page.setViewportSize({ width: 375, height: 667 })
+            await page.goto('/settings')
+            await page.click('[data-testid="hamburger-menu"]')
+            await expect(page.locator('[data-testid="mobile-nav-overlay"]')).toBeVisible()
+          </code>
+        </case>
+        <case>
+          <name>Tabs should wrap on smaller screens without horizontal scroll</name>
+          <code>
+            await page.setViewportSize({ width: 768, height: 1024 })
+            await page.goto('/settings')
+            const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth)
+            const clientWidth = await page.evaluate(() => document.documentElement.clientWidth)
+            expect(scrollWidth).toBe(clientWidth)
+          </code>
+        </case>
+      </test-cases>
+    </e2e-tests>
+  </testing-strategy>
+
+  <design-notes>
+    <ascii-diagram>
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│ Logo   Settings│Org│Users│WH│Loc│Machines│Lines│Allergens│Tax│Modules│Wizard     │ (60px)
+├───────────────────────────────────────────────────────────────────────────────────┤
+│ [Breadcrumb: Settings > Current Page]                    [+ Create] btn           │ (40px)
+├───────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                   │
+│  [Main Content - Tables, Forms, etc]                                             │
+│                                                                                   │
+└───────────────────────────────────────────────────────────────────────────────────┘
+    </ascii-diagram>
+    <notes>
+      - All tabs visible (no dropdown) - ensures fast navigation
+      - Tabs wrap to second row if needed on smaller screens (responsive)
+      - Active tab: green-600 bottom border (2px)
+      - Inactive tabs: gray-600 text, hover → gray-900
+      - Compact height: 60px (matches Planning module)
+      - Consistent padding: px-6 (24px horizontal)
+      - Settings button (⚙️) on right side (outline style, not filled)
+    </notes>
+  </design-notes>
+
+  <shared-system-reference>
+    <document>docs/ux-design/ux-design-shared-system.md</document>
+    <section>1.1 Module Header Component</section>
+    <key-points>
+      - Header height: 60px (compact)
+      - Logo area: Left side, 40px height
+      - Navigation tabs: Center, 14px font size, underline highlight for active tab
+      - Settings button: Right side, ⚙️ icon, outline style
+      - Consistent padding: px-6 py-6
+    </key-points>
+    <responsive-behavior>
+      <mobile>Logo only, hamburger menu</mobile>
+      <tablet>Logo + collapsed tabs (or wrapped to second row)</tablet>
+      <desktop>Logo + full tabs + settings button</desktop>
+    </responsive-behavior>
+  </shared-system-reference>
+
+  <tech-spec-reference>
+    <document>docs/batches/01E-ui-redesign/tech-spec.md</document>
+    <sections>
+      <section>Overview</section>
+      <section>1. SettingsHeader Component</section>
+      <section>Responsive Breakpoints & Behavior</section>
+      <section>Story Breakdown - Story 1.16</section>
+    </sections>
+    <key-points>
+      - SettingsHeader is reusable for all settings pages
+      - All tabs visible (no dropdown)
+      - Tabs wrap to second row if needed
+      - Compact height: 60px
+      - Active tab: green-600 bottom border
+      - Cross-module consistency with PlanningHeader and TechnicalHeader
+    </key-points>
+  </tech-spec-reference>
+
+  <files-to-modify>
+    <new-files>
+      <file>apps/frontend/components/settings/SettingsHeader.tsx</file>
+    </new-files>
+    <modified-files>
+      <file>apps/frontend/app/(authenticated)/settings/page.tsx</file>
+      <file>apps/frontend/app/(authenticated)/settings/organization/page.tsx</file>
+      <file>apps/frontend/app/(authenticated)/settings/users/page.tsx</file>
+      <file>apps/frontend/app/(authenticated)/settings/warehouses/page.tsx</file>
+      <file>apps/frontend/app/(authenticated)/settings/locations/page.tsx</file>
+      <file>apps/frontend/app/(authenticated)/settings/machines/page.tsx</file>
+      <file>apps/frontend/app/(authenticated)/settings/production-lines/page.tsx</file>
+      <file>apps/frontend/app/(authenticated)/settings/allergens/page.tsx</file>
+      <file>apps/frontend/app/(authenticated)/settings/tax-codes/page.tsx</file>
+      <file>apps/frontend/app/(authenticated)/settings/modules/page.tsx</file>
+      <file>apps/frontend/app/(authenticated)/settings/wizard/page.tsx</file>
+    </modified-files>
+  </files-to-modify>
+
+  <cross-module-consistency>
+    <planning-module>
+      <component>PlanningHeader.tsx</component>
+      <note>Settings header must match Planning module design (60px height, green-600 active tab, gray-600 inactive)</note>
+    </planning-module>
+    <technical-module>
+      <story-id>2.25</story-id>
+      <story-name>Technical Header Layout</story-name>
+      <note>Implement together - shared header pattern across all modules</note>
+    </technical-module>
+  </cross-module-consistency>
+
+  <next-story>
+    <story-id>1.17</story-id>
+    <story-name>Settings Stats Cards</story-name>
+    <note>After header is implemented, add stats cards to dashboard</note>
+  </next-story>
+</story-context>

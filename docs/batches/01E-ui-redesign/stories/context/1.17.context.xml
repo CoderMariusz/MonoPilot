@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>1.17</story-id>
+    <title>Settings Stats Cards</title>
+    <epic>1 - Foundation & Settings</epic>
+    <batch>1E - Settings UI Redesign</batch>
+    <status>ready-for-dev</status>
+    <priority>P1 (Medium)</priority>
+    <story-points>2</story-points>
+    <effort-estimate>0.5 days</effort-estimate>
+    <created>2025-11-27</created>
+    <dependencies>
+      <dependency>Story 1.16 - Settings Header Layout (header must be implemented first)</dependency>
+    </dependencies>
+  </metadata>
+
+  <goal>
+    Create compact stats cards for Settings dashboard showing key metrics (Users, Locations, Configuration, System), matching Planning module design pattern.
+  </goal>
+
+  <user-story>
+    <as>Administrator</as>
+    <i-want>to see quick statistics on the settings dashboard</i-want>
+    <so-that>I can understand system configuration at a glance</so-that>
+  </user-story>
+
+  <problem-statement>
+    Current settings dashboard shows only navigation cards with no metrics or statistics visible.
+    Users cannot see how many users, warehouses, or other entities exist without navigating to each section.
+    Design is inconsistent with Planning module's compact stats cards pattern.
+  </problem-statement>
+
+  <acceptance-criteria>
+    <criterion id="AC-1.17.1">
+      <title>Compact Stats Cards Component</title>
+      <given>I view the settings dashboard (/settings)</given>
+      <when>the page loads</when>
+      <then>
+        I see 4 stats cards showing:
+        - Card 1 (Users): Total users, Active users, Pending invitations, Last activity
+        - Card 2 (Locations): Warehouses count, Locations count, Machines count, Production lines
+        - Card 3 (Configuration): Allergens count, Tax codes count, Product types, Active modules
+        - Card 4 (System): Wizard progress %, Last updated, Organization name, Subscription
+      </then>
+    </criterion>
+
+    <criterion id="AC-1.17.2">
+      <title>Card Styling</title>
+      <given>I view the stats cards</given>
+      <when>checking the design</when>
+      <then>
+        Each card has:
+        - Max height: 120px
+        - 4 metrics in 2x2 grid layout
+        - Compact text: 12px labels, 18px values
+        - Clickable - links to respective section
+        - Shadow effect on hover
+      </then>
+    </criterion>
+
+    <criterion id="AC-1.17.3">
+      <title>Real-time Data</title>
+      <given>the stats cards are displayed</given>
+      <when>data changes (e.g., user added)</when>
+      <then>
+        - Stats update on page reload
+        - No stale data shown
+        - Loading skeleton displayed while fetching
+      </then>
+    </criterion>
+
+    <criterion id="AC-1.17.4">
+      <title>Responsive Layout</title>
+      <given>I view on different screen sizes</given>
+      <when>resizing browser</when>
+      <then>
+        - Desktop (lg): 4 cards in a row
+        - Tablet (md): 2 cards per row
+        - Mobile (sm): 1 card per row (stacked)
+      </then>
+    </criterion>
+  </acceptance-criteria>
+
+  <implementation-tasks>
+    <task id="1">Create SettingsStatsCards component in /components/settings/SettingsStatsCards.tsx</task>
+    <task id="2">Create API endpoint /api/settings/stats to aggregate all metrics</task>
+    <task id="3">Add stats cards to settings dashboard page</task>
+    <task id="4">Style cards to match PlanningStatsCard component</task>
+    <task id="5">Add loading states and error handling</task>
+    <task id="6">Test responsive behavior across breakpoints</task>
+  </implementation-tasks>
+
+  <technical-specification>
+    <api>
+      <endpoint>
+        <method>GET</method>
+        <path>/api/settings/stats</path>
+        <description>Aggregate stats from all settings entities</description>
+        <auth>Admin, Manager roles</auth>
+        <cache>5 min TTL</cache>
+        <response>
+          <type>SettingsStats</type>
+          <example><![CDATA[
+{
+  "users": {
+    "total": 12,
+    "active": 10,
+    "pending": 2,
+    "lastActivity": "2h ago"
+  },
+  "locations": {
+    "warehouses": 3,
+    "locations": 25,
+    "machines": 8,
+    "productionLines": 4
+  },
+  "configuration": {
+    "allergens": 14,
+    "taxCodes": 8,
+    "productTypes": 4,
+    "activeModules": "6/8"
+  },
+  "system": {
+    "wizardProgress": 80,
+    "lastUpdated": "Today",
+    "organizationName": "Acme Corp",
+    "subscription": "Pro"
+  }
+}
+          ]]></example>
+        </response>
+        <implementation-notes>
+          Aggregates data from:
+          - users table (total, active, pending invitations)
+          - warehouses, locations, machines, production_lines tables (counts)
+          - allergens, tax_codes tables (counts)
+          - products table (distinct types count)
+          - organizations table (name, subscription)
+          - settings_wizard_progress table (wizard completion %)
+        </implementation-notes>
+      </endpoint>
+    </api>
+
+    <data-models>
+      <interface name="SettingsStats">
+        <field name="users" type="UserStats">
+          <field name="total" type="number" description="Total users count" />
+          <field name="active" type="number" description="Active users (is_active = true)" />
+          <field name="pending" type="number" description="Pending invitations" />
+          <field name="lastActivity" type="string" description="Last login timestamp (relative, e.g., '2h ago')" />
+        </field>
+        <field name="locations" type="LocationStats">
+          <field name="warehouses" type="number" description="Count of warehouses" />
+          <field name="locations" type="number" description="Count of locations" />
+          <field name="machines" type="number" description="Count of machines" />
+          <field name="productionLines" type="number" description="Count of production lines" />
+        </field>
+        <field name="configuration" type="ConfigurationStats">
+          <field name="allergens" type="number" description="Count of allergens" />
+          <field name="taxCodes" type="number" description="Count of tax codes" />
+          <field name="productTypes" type="number" description="Count of distinct product types" />
+          <field name="activeModules" type="string" description="Format: '6/8' (6 active out of 8 total)" />
+        </field>
+        <field name="system" type="SystemStats">
+          <field name="wizardProgress" type="number" description="Wizard completion % (0-100)" />
+          <field name="lastUpdated" type="string" description="Last settings update (relative)" />
+          <field name="organizationName" type="string" description="From organizations table" />
+          <field name="subscription" type="string" description="Plan name (e.g., 'Pro', 'Enterprise')" />
+        </field>
+      </interface>
+    </data-models>
+
+    <components>
+      <component name="SettingsStatsCards">
+        <file-path>apps/frontend/components/settings/SettingsStatsCards.tsx</file-path>
+        <description>Displays 4 stats cards in responsive grid layout</description>
+        <props>None (fetches data internally using SWR)</props>
+        <features>
+          <feature>Fetches data from /api/settings/stats endpoint</feature>
+          <feature>Displays 4 cards: Users, Locations, Configuration, System</feature>
+          <feature>Each card shows 2x2 grid of metrics</feature>
+          <feature>Cards clickable - navigate to respective section</feature>
+          <feature>Hover effect - shadow and slight scale</feature>
+          <feature>Loading skeleton while fetching</feature>
+          <feature>Responsive: 4→2→1 cards per row (lg→md→sm)</feature>
+        </features>
+        <styling>
+          <property>Max height: 120px per card</property>
+          <property>Layout: grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6</property>
+          <property>Card: border rounded-lg shadow-sm hover:shadow-md transition</property>
+          <property>Label text: text-xs (12px) text-gray-600</property>
+          <property>Value text: text-lg (18px) font-semibold text-gray-900</property>
+          <property>Padding: p-4 (16px)</property>
+        </styling>
+        <reference-component>
+          apps/frontend/components/planning/PlanningStatsCard.tsx
+        </reference-component>
+      </component>
+    </components>
+
+    <cache-strategy>
+      <key>settings-stats:{org_id}</key>
+      <ttl>5 minutes</ttl>
+      <invalidation-events>
+        <event>user.created → Invalidate users list + settings stats</event>
+        <event>warehouse.created → Invalidate warehouses list + settings stats</event>
+        <event>location.created → Invalidate locations list + settings stats</event>
+      </invalidation-events>
+    </cache-strategy>
+  </technical-specification>
+
+  <ui-components>
+    <visual-layout>
+      <ascii-diagram><![CDATA[
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│ USERS            │ │ LOCATIONS        │ │ CONFIGURATION    │ │ SYSTEM           │
+│ ┌──────┬───────┐ │ │ ┌──────┬───────┐ │ │ ┌──────┬───────┐ │ │ ┌──────┬───────┐ │
+│ │Total │Active │ │ │ │WH    │Loc    │ │ │ │Allerg│Tax    │ │ │ │Wizard│Updated│ │
+│ │  12  │  10   │ │ │ │  3   │  25   │ │ │ │  14  │  8    │ │ │ │ 80%  │ Today │ │
+│ ├──────┼───────┤ │ │ ├──────┼───────┤ │ │ ├──────┼───────┤ │ │ ├──────┼───────┤ │
+│ │Pend  │Last   │ │ │ │Mach  │Lines  │ │ │ │Types │Modules│ │ │ │Org   │Plan   │ │
+│ │  2   │ 2h ago│ │ │ │  8   │  4    │ │ │ │  4   │  6/8  │ │ │ │Acme  │Pro    │ │
+│ └──────┴───────┘ │ │ └──────┴───────┘ │ │ └──────┴───────┘ │ │ └──────┴───────┘ │
+└──────────────────┘ └──────────────────┘ └──────────────────┘ └──────────────────┘
+     (120px)             (120px)             (120px)             (120px)
+      ]]></ascii-diagram>
+    </visual-layout>
+
+    <responsive-behavior>
+      <breakpoint name="Desktop (lg: 1024px+)">
+        <layout>4 cards in 1 row (grid-cols-4)</layout>
+      </breakpoint>
+      <breakpoint name="Tablet (md: 768px-1024px)">
+        <layout>2 cards per row (grid-cols-2)</layout>
+      </breakpoint>
+      <breakpoint name="Mobile (sm: &lt;768px)">
+        <layout>1 card per row, stacked (grid-cols-1)</layout>
+      </breakpoint>
+    </responsive-behavior>
+
+    <interaction-patterns>
+      <pattern>
+        <trigger>Hover over card</trigger>
+        <effect>Shadow increases, slight scale (transform: scale(1.02))</effect>
+        <transition>200ms ease</transition>
+      </pattern>
+      <pattern>
+        <trigger>Click card</trigger>
+        <effect>Navigate to respective section (e.g., Users card → /settings/users)</effect>
+      </pattern>
+      <pattern>
+        <trigger>Page load</trigger>
+        <effect>Display loading skeleton (4 placeholder cards with pulse animation)</effect>
+      </pattern>
+    </interaction-patterns>
+
+    <color-palette>
+      <reference>lib/constants/app-colors.ts</reference>
+      <colors>
+        <color name="Card border" value="gray-200" />
+        <color name="Card background" value="white" />
+        <color name="Label text" value="gray-600" />
+        <color name="Value text" value="gray-900" />
+        <color name="Hover shadow" value="shadow-md" />
+      </colors>
+    </color-palette>
+  </ui-components>
+
+  <testing-strategy>
+    <unit-tests>
+      <test>
+        <description>SettingsStatsCards renders 4 cards</description>
+        <file>apps/frontend/__tests__/components/SettingsStatsCards.test.tsx</file>
+        <scenario>
+          Mount component with mocked API response
+          Verify 4 cards rendered (Users, Locations, Configuration, System)
+        </scenario>
+      </test>
+      <test>
+        <description>Each card displays correct metrics</description>
+        <file>apps/frontend/__tests__/components/SettingsStatsCards.test.tsx</file>
+        <scenario>
+          Mock API response with known values
+          Verify each card shows correct labels and values
+          Verify 2x2 grid layout per card
+        </scenario>
+      </test>
+      <test>
+        <description>Loading skeleton displayed while fetching</description>
+        <file>apps/frontend/__tests__/components/SettingsStatsCards.test.tsx</file>
+        <scenario>
+          Mock API with delay
+          Verify skeleton cards visible during loading
+          Verify skeleton replaced with data after load
+        </scenario>
+      </test>
+    </unit-tests>
+
+    <e2e-tests>
+      <test>
+        <description>Stats cards display correct data on dashboard</description>
+        <file>tests/e2e/settings-stats.spec.ts</file>
+        <scenario><![CDATA[
+test('should display settings stats cards with correct data', async ({ page }) => {
+  await page.goto('/settings')
+
+  // Users card
+  await expect(page.locator('[data-testid="stats-card-users"]')).toContainText('Total')
+  await expect(page.locator('[data-testid="stats-card-users"]')).toContainText('Active')
+
+  // Locations card
+  await expect(page.locator('[data-testid="stats-card-locations"]')).toContainText('WH')
+  await expect(page.locator('[data-testid="stats-card-locations"]')).toContainText('Loc')
+
+  // Configuration card
+  await expect(page.locator('[data-testid="stats-card-configuration"]')).toContainText('Allerg')
+  await expect(page.locator('[data-testid="stats-card-configuration"]')).toContainText('Tax')
+
+  // System card
+  await expect(page.locator('[data-testid="stats-card-system"]')).toContainText('Wizard')
+  await expect(page.locator('[data-testid="stats-card-system"]')).toContainText('Plan')
+})
+        ]]></scenario>
+      </test>
+
+      <test>
+        <description>Cards are clickable and navigate to correct sections</description>
+        <file>tests/e2e/settings-stats.spec.ts</file>
+        <scenario><![CDATA[
+test('should navigate to section when card clicked', async ({ page }) => {
+  await page.goto('/settings')
+
+  // Click Users card → navigate to users page
+  await page.click('[data-testid="stats-card-users"]')
+  await expect(page).toHaveURL('/settings/users')
+})
+        ]]></scenario>
+      </test>
+
+      <test>
+        <description>Stats cards are responsive</description>
+        <file>tests/e2e/settings-stats.spec.ts</file>
+        <scenario><![CDATA[
+test('stats cards should be responsive', async ({ page }) => {
+  await page.goto('/settings')
+
+  // Desktop: 4 cards in 1 row
+  await page.setViewportSize({ width: 1280, height: 720 })
+  const cardsDesktop = await page.locator('[data-testid^="stats-card-"]').count()
+  expect(cardsDesktop).toBe(4)
+
+  // Mobile: stacked cards
+  await page.setViewportSize({ width: 375, height: 667 })
+  const cardsMobile = await page.locator('[data-testid^="stats-card-"]').count()
+  expect(cardsMobile).toBe(4)
+})
+        ]]></scenario>
+      </test>
+    </e2e-tests>
+  </testing-strategy>
+
+  <files-to-modify>
+    <new-file>
+      <path>apps/frontend/components/settings/SettingsStatsCards.tsx</path>
+      <description>Main stats cards component</description>
+    </new-file>
+    <new-file>
+      <path>apps/frontend/app/api/settings/stats/route.ts</path>
+      <description>API endpoint to aggregate settings stats</description>
+    </new-file>
+    <modified-file>
+      <path>apps/frontend/app/(authenticated)/settings/page.tsx</path>
+      <description>Add SettingsStatsCards component to dashboard</description>
+    </modified-file>
+  </files-to-modify>
+
+  <design-notes>
+    <note>
+      Match PlanningStatsCard design pattern exactly:
+      - Same max height (120px)
+      - Same 2x2 grid layout
+      - Same hover effects
+      - Same text sizes (12px labels, 18px values)
+    </note>
+    <note>
+      Use SWR for data fetching with 5 min cache TTL to reduce API calls
+    </note>
+    <note>
+      Cards should be keyboard accessible (tab to focus, enter to navigate)
+    </note>
+    <note>
+      Loading skeleton should match card dimensions to prevent layout shift
+    </note>
+  </design-notes>
+
+  <related-documentation>
+    <doc>docs/batches/01E-ui-redesign/tech-spec.md - Epic Technical Specification</doc>
+    <doc>docs/ux-design/ux-design-shared-system.md - Shared UI Design System</doc>
+    <doc>docs/batches/01E-ui-redesign/stories/1.16-settings-header-layout.md - Dependency (header must be implemented first)</doc>
+    <doc>apps/frontend/components/planning/PlanningStatsCard.tsx - Reference implementation</doc>
+  </related-documentation>
+
+  <success-criteria>
+    <criterion>API endpoint /api/settings/stats returns correct data</criterion>
+    <criterion>4 stats cards rendered on dashboard</criterion>
+    <criterion>Each card shows 2x2 grid (4 metrics)</criterion>
+    <criterion>Cards clickable - navigate to respective section</criterion>
+    <criterion>Loading skeleton while fetching</criterion>
+    <criterion>Responsive: 4→2→1 cards per row (lg→md→sm)</criterion>
+    <criterion>All E2E tests pass</criterion>
+  </success-criteria>
+</story-context>

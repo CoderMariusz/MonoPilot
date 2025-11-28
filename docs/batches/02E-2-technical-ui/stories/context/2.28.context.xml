@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.28</id>
+    <title>Technical Mobile Responsive</title>
+    <batch>02E-2</batch>
+    <points>3</points>
+    <effort_hours>4-5</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Mobile-friendly responsive design for all Technical module pages.</description>
+
+  <technical_context>
+    <breakpoints>
+      <breakpoint name="mobile" width="320px - 640px"/>
+      <breakpoint name="tablet" width="768px - 1024px"/>
+      <breakpoint name="desktop" width="1024px+"/>
+    </breakpoints>
+
+    <responsive_patterns>
+      <pattern name="Navigation">Collapsible sidebar on mobile</pattern>
+      <pattern name="Stats Cards">Stack vertically on mobile</pattern>
+      <pattern name="Tables">Horizontal scroll with frozen first column</pattern>
+      <pattern name="Forms">Full-width inputs on mobile</pattern>
+      <pattern name="Modals">Full-screen on mobile</pattern>
+      <pattern name="Actions">Touch-friendly button sizes (min 44px)</pattern>
+    </responsive_patterns>
+
+    <testing>
+      <test>iPhone SE (375px)</test>
+      <test>iPhone 12 (390px)</test>
+      <test>iPad (768px)</test>
+      <test>Desktop (1280px)</test>
+    </testing>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.28.1">Mobile-first responsive design</ac>
+    <ac id="2.28.2">Collapsible navigation</ac>
+    <ac id="2.28.3">Touch-friendly controls</ac>
+    <ac id="2.28.4">Readable on all screen sizes</ac>
+  </acceptance_criteria>
+</story>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.18</id>
+    <title>Forward Traceability</title>
+    <batch>02D-1</batch>
+    <points>5</points>
+    <effort_hours>6-8</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Trace materials forward to see where they were used (children, WOs, output products).</description>
+
+  <dependencies>
+    <blocks>
+      <story id="2.20">Recall Simulation</story>
+      <story id="2.21">Genealogy Tree View</story>
+    </blocks>
+    <requires>
+      <epic id="5">License Plates (LP)</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>lp_genealogy</name>
+        <columns>
+          <column name="parent_lp_id" type="UUID" fk="license_plates.id"/>
+          <column name="child_lp_id" type="UUID" fk="license_plates.id"/>
+          <column name="relationship_type" type="VARCHAR(20)">split | combine | transform</column>
+          <column name="work_order_id" type="UUID"/>
+          <column name="quantity_from_parent" type="DECIMAL(12,3)"/>
+          <column name="uom" type="VARCHAR(10)"/>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="POST" path="/api/technical/tracing/forward">
+        <body>lp_id? | batch_number?</body>
+        <response>trace_tree: TraceNode[], summary</response>
+      </endpoint>
+    </api_endpoints>
+
+    <algorithm>Recursive CTE traversing lp_genealogy from parent to children</algorithm>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.18.1">Enter LP ID or Batch Number</ac>
+    <ac id="2.18.2">Show tree of child LPs, WOs, output products</ac>
+    <ac id="2.18.3">Tree expandable/collapsible</ac>
+    <ac id="2.18.4">Click nodes for LP details</ac>
+    <ac id="2.18.5">Performance &lt; 1 min for 1000+ LPs</ac>
+  </acceptance_criteria>
+</story>

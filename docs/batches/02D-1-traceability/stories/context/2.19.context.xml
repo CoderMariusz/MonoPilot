@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.19</id>
+    <title>Backward Traceability</title>
+    <batch>02D-1</batch>
+    <points>5</points>
+    <effort_hours>6-8</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Trace products backward to see what went into them (parents, source materials, suppliers).</description>
+
+  <dependencies>
+    <requires>
+      <epic id="5">License Plates (LP)</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="POST" path="/api/technical/tracing/backward">
+        <body>lp_id? | batch_number?</body>
+        <response>trace_tree: TraceNode[], summary with suppliers</response>
+      </endpoint>
+    </api_endpoints>
+
+    <algorithm>Recursive CTE traversing lp_genealogy from child to parents</algorithm>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.19.1">Enter LP ID or Batch Number</ac>
+    <ac id="2.19.2">Show tree of parent LPs, source materials, supplier info</ac>
+    <ac id="2.19.3">Tree expandable/collapsible</ac>
+    <ac id="2.19.4">Click nodes for details</ac>
+  </acceptance_criteria>
+</story>

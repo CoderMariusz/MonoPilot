@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.1</id>
+    <title>Product CRUD</title>
+    <batch>02A-1</batch>
+    <points>5</points>
+    <effort_hours>6-8</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Create the Products master data management functionality with CRUD operations for building a comprehensive product catalog.</description>
+
+  <dependencies>
+    <blocks>
+      <story id="2.2">Product Versioning</story>
+      <story id="2.3">Product History</story>
+      <story id="2.4">Product Allergens</story>
+      <story id="2.5">Product Types</story>
+      <story id="2.6">BOM CRUD</story>
+    </blocks>
+    <requires>
+      <epic id="1">Organizations, Users, Settings</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>products</name>
+        <columns>
+          <column name="id" type="UUID" pk="true"/>
+          <column name="code" type="TEXT" required="true" immutable="true"/>
+          <column name="name" type="TEXT" required="true"/>
+          <column name="type" type="product_type" required="true"/>
+          <column name="description" type="TEXT"/>
+          <column name="category" type="TEXT"/>
+          <column name="uom" type="TEXT" required="true"/>
+          <column name="version" type="NUMERIC(4,1)" default="1.0"/>
+          <column name="status" type="TEXT" default="active"/>
+          <column name="shelf_life_days" type="INTEGER"/>
+          <column name="min_stock_qty" type="NUMERIC(10,2)"/>
+          <column name="max_stock_qty" type="NUMERIC(10,2)"/>
+          <column name="reorder_point" type="NUMERIC(10,2)"/>
+          <column name="cost_per_unit" type="NUMERIC(10,2)"/>
+          <column name="org_id" type="UUID" required="true"/>
+          <column name="created_at" type="TIMESTAMPTZ"/>
+          <column name="updated_at" type="TIMESTAMPTZ"/>
+          <column name="created_by" type="UUID"/>
+          <column name="updated_by" type="UUID"/>
+          <column name="deleted_at" type="TIMESTAMPTZ"/>
+        </columns>
+        <constraints>
+          <unique>org_id, code</unique>
+          <check>version >= 1.0</check>
+        </constraints>
+        <indexes>
+          <index>idx_products_org_code ON products(org_id, code)</index>
+          <index>idx_products_org_type ON products(org_id, type)</index>
+          <index>idx_products_org_status ON products(org_id, status) WHERE deleted_at IS NULL</index>
+        </indexes>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/products">
+        <description>List all products with filtering and pagination</description>
+        <query_params>search, type[], status[], category, page, limit, sort, order</query_params>
+        <response>{ data: Product[], pagination: {...} }</response>
+      </endpoint>
+      <endpoint method="POST" path="/api/technical/products">
+        <description>Create new product</description>
+        <body>code, name, type, uom, description?, category?, shelf_life_days?, etc.</body>
+        <response>Product object with version 1.0</response>
+      </endpoint>
+      <endpoint method="GET" path="/api/technical/products/:id">
+        <description>Get single product details</description>
+        <response>Product with allergens</response>
+      </endpoint>
+      <endpoint method="PUT" path="/api/technical/products/:id">
+        <description>Update product (auto-increments version)</description>
+        <note>code and type are immutable</note>
+      </endpoint>
+      <endpoint method="DELETE" path="/api/technical/products/:id">
+        <description>Soft delete product</description>
+        <note>Cannot delete if referenced in active BOMs/WOs</note>
+      </endpoint>
+    </api_endpoints>
+
+    <frontend_routes>
+      <route path="/technical/products" component="ProductsListPage"/>
+      <route path="/technical/products/:id" component="ProductDetailPage"/>
+    </frontend_routes>
+
+    <components_to_create>
+      <component name="ProductTable" path="app/technical/products/components/ProductTable.tsx">
+        Data table with pagination, sorting, search, filters
+      </component>
+      <component name="ProductCreateModal" path="app/technical/products/components/ProductCreateModal.tsx">
+        Create product dialog with form validation
+      </component>
+      <component name="ProductEditDrawer" path="app/technical/products/components/ProductEditDrawer.tsx">
+        Right-side drawer for editing product
+      </component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.1.1">Product List View - table with code, name, type, uom, status, version, actions</ac>
+    <ac id="2.1.2">Product Search and Filtering - real-time search, type/status/category filters</ac>
+    <ac id="2.1.3">Create Product Modal - form with code, name, type, uom, optional fields</ac>
+    <ac id="2.1.4">Edit Product - drawer with editable fields (except code)</ac>
+    <ac id="2.1.5">Delete Product - soft delete with confirmation, check for references</ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test>Product validation schema (code format, required fields)</test>
+      <test>Product type enum validation</test>
+      <test>Duplicate code detection</test>
+    </unit_tests>
+    <integration_tests>
+      <test>POST /api/technical/products - create product</test>
+      <test>GET /api/technical/products - list with pagination</test>
+      <test>PUT /api/technical/products/:id - update increments version</test>
+      <test>DELETE /api/technical/products/:id - soft delete</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Create product flow - fill form, submit, verify in table</test>
+      <test>Search and filter - verify results match criteria</test>
+      <test>Edit product - open drawer, change name, save, verify</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="critical">Code is IMMUTABLE after creation - validate on frontend</note>
+    <note priority="critical">Version starts at 1.0 and auto-increments on update</note>
+    <note priority="high">Field visibility controlled by technical_settings.product_field_config</note>
+    <note priority="medium">Use shadcn DataTable component with tanstack-table</note>
+  </implementation_notes>
+</story>

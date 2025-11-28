@@ -9,13 +9,18 @@
 ## Overview
 
 This batch covers the receiving workflow:
-- **ASN (Advanced Shipping Notice)**: Pre-arrival notification from supplier
+- **ASN (Advanced Shipping Notice)**: **OPTIONAL** pre-arrival notification from supplier
 - **GRN (Goods Received Note)**: Actual receipt of goods with LP creation
-- **Over-Receipt Validation**: Prevent receiving more than ordered
-- **Auto-Print Labels**: Generate ZPL labels for received inventory
+- **Direct PO Receiving**: GRN can be created directly from PO without ASN
+- **Over-Receipt Validation**: Per-warehouse configurable tolerance
+- **Auto-Print Labels**: Generate ZPL labels for received inventory (per-warehouse config)
 - **Status Updates**: Update PO/TO received quantities
 
 **Key Concept:** GRN + LP creation is **atomic** (Sprint 0 Gap 6) - all-or-nothing guarantee.
+
+**Important:** ASN is OPTIONAL. Users can receive goods:
+1. Via ASN → GRN flow (pre-notified shipments)
+2. Directly from PO → GRN (ad-hoc receiving)
 
 ---
 
@@ -96,25 +101,43 @@ CREATE TABLE grn (
 );
 ```
 
-### grn_items Table
+### grn_items Table (with LP link)
 
 ```sql
 CREATE TABLE grn_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID NOT NULL REFERENCES organizations(id),
-  grn_id UUID NOT NULL REFERENCES grn(id),
+  grn_id UUID NOT NULL REFERENCES grn(id) ON DELETE CASCADE,
   po_line_id UUID REFERENCES po_lines(id),
   asn_item_id UUID REFERENCES asn_items(id),
   product_id UUID NOT NULL REFERENCES products(id),
-  received_qty DECIMAL(15,4) NOT NULL,
+  received_qty DECIMAL(15,4) NOT NULL CHECK (received_qty > 0),
   uom VARCHAR(10) NOT NULL,
 
-  INDEX(org_id),
-  INDEX(grn_id),
-  INDEX(product_id),
-  INDEX(po_line_id)
+  -- LP Link (grn_items → LP, not LP → grn_items)
+  lp_id UUID REFERENCES license_plates(id),
+
+  -- Batch/Expiry captured at receiving
+  batch_number VARCHAR(50),
+  supplier_batch_number VARCHAR(50),
+  manufacture_date DATE,
+  expiry_date DATE,
+  location_id UUID REFERENCES locations(id),
+
+  created_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE INDEX idx_grn_items_org ON grn_items(org_id);
+CREATE INDEX idx_grn_items_grn ON grn_items(grn_id);
+CREATE INDEX idx_grn_items_product ON grn_items(product_id);
+CREATE INDEX idx_grn_items_po_line ON grn_items(po_line_id);
+CREATE INDEX idx_grn_items_lp ON grn_items(lp_id);
 ```
+
+**LP Link Pattern:** `grn_items.lp_id` → `license_plates.id`
+- Each GRN item creates exactly ONE LP
+- LP can be traced back to GRN via grn_items join
+- No `grn_id` column needed in license_plates table
 
 **RLS:** Standard org_id isolation on all tables.
 
@@ -181,14 +204,21 @@ Request:
 #### POST /api/warehouse/grns
 **Create GRN + LP (Atomic Transaction - Gap 6)**
 
+**Receiving Modes:**
+1. **From ASN**: `asn_id` provided → items pre-filled from ASN
+2. **From PO (direct)**: `po_id` provided, no `asn_id` → ad-hoc receiving
+3. **Both**: `asn_id` + `po_id` → ASN linked to PO
+
 ```json
 Request:
 {
-  "asn_id": "UUID (optional, for receiving from ASN)",
-  "po_id": "UUID (optional, for ad-hoc receiving)",
+  "asn_id": "UUID (OPTIONAL - for ASN-based receiving)",
+  "po_id": "UUID (OPTIONAL - for direct PO receiving)",
+  "warehouse_id": "UUID (required)",
   "grn_items": [
     {
-      "asn_item_id": "UUID (optional)",
+      "asn_item_id": "UUID (optional, if from ASN)",
+      "po_line_id": "UUID (optional, for PO qty update)",
       "product_id": "UUID",
       "received_qty": 50,
       "batch_number": "BATCH-001",
@@ -196,9 +226,8 @@ Request:
       "manufacture_date": "2025-01-01",
       "expiry_date": "2025-12-31",
       "location_id": "UUID",
-      "qa_status": "pending|passed (optional, default pending)"
-    },
-    ...
+      "qa_status": "pending|passed (optional, default from warehouse_settings)"
+    }
   ],
   "notes": "Received in good condition"
 }
@@ -206,22 +235,26 @@ Request:
 Response (201):
 {
   "grn_id": "UUID",
-  "grn_number": "GRN-20250120-0001",
-  "grn_items": [...],
-  "license_plates": [
+  "grn_number": "GRN-WH01-20250120-0001",
+  "grn_items": [
     {
-      "lp_id": "UUID",
-      "lp_number": "LP-20250120-0001",
+      "grn_item_id": "UUID",
       "product_id": "UUID",
-      "qty": 50,
-      "location_id": "UUID"
-    },
-    ...
+      "received_qty": 50,
+      "lp_id": "UUID",
+      "lp_number": "LP-WH01-20250120-0001"
+    }
   ],
-  "asn_status_updated": "completed (if from ASN)",
+  "license_plates_created": 1,
+  "asn_status_updated": "completed (if from ASN, else null)",
   "po_received_qty_updated": true
 }
 ```
+
+**Validation:**
+- At least one of `asn_id` or `po_id` should be provided (but not required)
+- `warehouse_id` is required
+- Over-receipt check uses `warehouse_settings.allow_over_receipt`
 
 ---
 
@@ -251,32 +284,60 @@ If ANY step fails:
 
 ## Over-Receipt Handling
 
-```sql
-FUNCTION check_over_receipt(po_line_id, received_qty) RETURNS BOOLEAN AS $$
-DECLARE
-  ordered_qty DECIMAL;
-  total_received DECIMAL;
-BEGIN
-  SELECT quantity INTO ordered_qty FROM po_lines WHERE id = po_line_id;
-  SELECT COALESCE(SUM(received_qty), 0) INTO total_received
-    FROM grn_items WHERE po_line_id = po_line_id;
+**Configuration in `warehouse_settings`:**
+- `allow_over_receipt BOOLEAN DEFAULT false` - if false, block over-receipt
+- `over_receipt_tolerance_percent DECIMAL(5,2) DEFAULT 0` - allowed overage (e.g., 5.00 = 5%)
 
-  IF (total_received + received_qty) > ordered_qty THEN
+```sql
+FUNCTION check_over_receipt(
+  p_po_line_id UUID,
+  p_received_qty DECIMAL,
+  p_warehouse_id UUID
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_ordered_qty DECIMAL;
+  v_total_received DECIMAL;
+  v_allow_over BOOLEAN;
+  v_tolerance DECIMAL;
+  v_max_allowed DECIMAL;
+BEGIN
+  -- Get warehouse settings
+  SELECT allow_over_receipt, over_receipt_tolerance_percent
+  INTO v_allow_over, v_tolerance
+  FROM warehouse_settings WHERE warehouse_id = p_warehouse_id;
+
+  -- If over-receipt allowed, skip check
+  IF v_allow_over THEN
+    RETURN true;
+  END IF;
+
+  -- Get ordered qty
+  SELECT quantity INTO v_ordered_qty FROM po_lines WHERE id = p_po_line_id;
+
+  -- Get total received so far
+  SELECT COALESCE(SUM(received_qty), 0) INTO v_total_received
+  FROM grn_items WHERE po_line_id = p_po_line_id;
+
+  -- Calculate max allowed (with tolerance)
+  v_max_allowed := v_ordered_qty * (1 + COALESCE(v_tolerance, 0) / 100);
+
+  IF (v_total_received + p_received_qty) > v_max_allowed THEN
     RETURN false; -- Over-receipt detected
   END IF;
+
   RETURN true;
 END;
 $$ LANGUAGE plpgsql;
 ```
 
-**warehouse_settings table:**
-```sql
-ALTER TABLE warehouse_settings ADD COLUMN allow_over_receipt BOOLEAN DEFAULT false;
-```
-
 ---
 
 ## Label Printing (ZPL Format)
+
+**Configuration in `warehouse_settings` (per warehouse):**
+- `printer_ip VARCHAR(50)` - IP address of Zebra printer
+- `auto_print_on_receive BOOLEAN DEFAULT false` - auto-print on GRN creation
+- `copies_per_label INTEGER DEFAULT 1` - copies per LP (1-5)
 
 **ZPL Template for LP Labels:**
 
@@ -291,11 +352,6 @@ ALTER TABLE warehouse_settings ADD COLUMN allow_over_receipt BOOLEAN DEFAULT fal
 ^FO50,370^ADN,18,10^FDLoc: {location_code}^FS
 ^XZ
 ```
-
-**Printer Configuration:**
-- warehouse_settings.printer_ip: IP address of Zebra printer
-- warehouse_settings.auto_print_on_receive: Boolean (enable/disable)
-- warehouse_settings.copies_per_label: Integer (1-5)
 
 ---
 

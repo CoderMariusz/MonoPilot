@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.8</id>
+    <title>BOM Date Overlap Validation</title>
+    <batch>02B-1</batch>
+    <points>3</points>
+    <effort_hours>4-5</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Database trigger and API validation to prevent overlapping effective date ranges for same product.</description>
+
+  <dependencies>
+    <requires>
+      <story id="2.6">BOM CRUD</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <database_trigger>
+      <name>trigger_check_bom_date_overlap</name>
+      <fires_on>BEFORE INSERT OR UPDATE ON boms</fires_on>
+      <logic>
+        Check if any existing BOM for same product has overlapping dates.
+        If overlap found, RAISE EXCEPTION 'BOM date range overlaps with existing BOM'
+      </logic>
+    </database_trigger>
+
+    <error_response>
+      <code>BOM_DATE_OVERLAP</code>
+      <http_status>400</http_status>
+      <message>Date range overlaps with BOM v{version} ({from} to {to})</message>
+      <fields>conflicting_bom_id, conflicting_version</fields>
+    </error_response>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.8.1">Creating overlapping BOM shows error with conflicting version</ac>
+    <ac id="2.8.2">Existing BOM with no effective_to blocks new BOM creation</ac>
+    <ac id="2.8.3">Error message includes conflicting BOM version and dates</ac>
+    <ac id="2.8.4">API returns 400 BOM_DATE_OVERLAP</ac>
+  </acceptance_criteria>
+</story>

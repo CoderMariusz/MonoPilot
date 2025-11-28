@@ -11,10 +11,10 @@
 
 Batch 5A-1 implements the **foundational License Plate (LP) system** for atomic inventory tracking:
 
-- **LP Creation**: CRUD operations with auto-generated unique numbers
-- **Status Lifecycle**: Available → Reserved/Consumed/Quarantine → Shipped
+- **LP Extension**: Extend existing STUB table with full functionality
+- **Status Lifecycle**: Available → Reserved/Consumed/Quarantine/Merged → Shipped
 - **Batch & Expiry Tracking**: FIFO/FEFO support with date filtering
-- **Number Generation**: Configurable auto-numbering format (LP-YYYYMMDD-NNNN)
+- **Number Generation**: Configurable auto-numbering format per warehouse (LP-{WH}-YYYYMMDD-NNNN)
 
 ---
 
@@ -22,47 +22,94 @@ Batch 5A-1 implements the **foundational License Plate (LP) system** for atomic 
 
 ### Database Schema
 
+#### EXISTING `license_plates` Table (STUB from Epic 2)
+
+Current columns in database:
+- `id`, `org_id`, `lp_number`, `batch_number` (nullable), `product_id`, `quantity`, `uom`
+- `status` CHECK: 'available', 'consumed', 'shipped', 'quarantine', 'recalled'
+- `location_id`, `manufacturing_date`, `expiry_date`, `received_date`
+- `created_by`, `created_at`, `updated_at`
+
+#### Migration: Extend `license_plates`
+
 ```sql
--- Main LP table
-CREATE TABLE license_plates (
-  id UUID PRIMARY KEY,
+-- Add missing columns
+ALTER TABLE license_plates
+  ADD COLUMN IF NOT EXISTS supplier_batch_number VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS qa_status VARCHAR(20) DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS warehouse_id UUID REFERENCES warehouses(id);
+
+-- Update status CHECK to include 'reserved' and 'merged'
+ALTER TABLE license_plates DROP CONSTRAINT IF EXISTS license_plates_status_check;
+ALTER TABLE license_plates ADD CONSTRAINT license_plates_status_check
+  CHECK (status IN ('available', 'reserved', 'consumed', 'shipped', 'quarantine', 'recalled', 'merged'));
+
+-- Add qa_status CHECK
+ALTER TABLE license_plates ADD CONSTRAINT license_plates_qa_status_check
+  CHECK (qa_status IN ('pending', 'passed', 'failed', 'on_hold'));
+
+-- Rename column for consistency (optional, check app code first)
+-- ALTER TABLE license_plates RENAME COLUMN manufacturing_date TO manufacture_date;
+
+-- Add indexes
+CREATE INDEX IF NOT EXISTS idx_license_plates_org_status ON license_plates(org_id, status);
+CREATE INDEX IF NOT EXISTS idx_license_plates_org_product ON license_plates(org_id, product_id);
+CREATE INDEX IF NOT EXISTS idx_license_plates_expiry ON license_plates(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_license_plates_warehouse ON license_plates(warehouse_id);
+```
+
+#### NEW: `warehouse_settings` Table (1:1 with warehouses)
+
+```sql
+CREATE TABLE warehouse_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  warehouse_id UUID NOT NULL UNIQUE REFERENCES warehouses(id) ON DELETE CASCADE,
   org_id UUID NOT NULL REFERENCES organizations(id),
-  lp_number VARCHAR(50) NOT NULL UNIQUE,
-  product_id UUID NOT NULL REFERENCES products(id),
-  batch_number VARCHAR(50) NOT NULL,
-  supplier_batch_number VARCHAR(50),
-  quantity DECIMAL(15, 4) NOT NULL,
-  uom VARCHAR(10) NOT NULL,
-  manufacture_date DATE,
-  expiry_date DATE,
-  status VARCHAR(20) DEFAULT 'available',
-  location_id UUID REFERENCES locations(id),
-  grn_id UUID REFERENCES grns(id),
-  qa_status VARCHAR(20) DEFAULT 'pending',
-  created_at TIMESTAMP DEFAULT now(),
-  created_by_user_id UUID REFERENCES users(id),
-  updated_at TIMESTAMP DEFAULT now(),
-  updated_by_user_id UUID REFERENCES users(id),
-  UNIQUE(org_id, lp_number),
-  INDEX(org_id, status),
-  INDEX(org_id, product_id),
-  INDEX(expiry_date)
+
+  -- LP Number Generation
+  lp_number_format VARCHAR(100) DEFAULT 'LP-{WH}-YYYYMMDD-NNNN',
+
+  -- Receiving Settings
+  allow_over_receipt BOOLEAN DEFAULT false,
+  over_receipt_tolerance_percent DECIMAL(5,2) DEFAULT 0,
+
+  -- Label Printing
+  printer_ip VARCHAR(50),
+  auto_print_on_receive BOOLEAN DEFAULT false,
+  copies_per_label INTEGER DEFAULT 1,
+
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- LP numbering sequence (daily reset)
+-- RLS
+ALTER TABLE warehouse_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for authenticated users"
+  ON warehouse_settings FOR ALL TO authenticated
+  USING (org_id = (auth.jwt() ->> 'org_id')::uuid)
+  WITH CHECK (org_id = (auth.jwt() ->> 'org_id')::uuid);
+```
+
+#### NEW: `lp_number_sequence` Table (per org + warehouse)
+
+```sql
 CREATE TABLE lp_number_sequence (
-  id UUID PRIMARY KEY,
-  org_id UUID NOT NULL UNIQUE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL REFERENCES organizations(id),
+  warehouse_id UUID NOT NULL REFERENCES warehouses(id),
   sequence_date DATE NOT NULL,
-  next_sequence INT DEFAULT 1,
-  UNIQUE(org_id, sequence_date)
+  next_sequence INTEGER DEFAULT 1,
+
+  UNIQUE(org_id, warehouse_id, sequence_date)
 );
 
--- Warehouse settings (LP number format, etc)
-ALTER TABLE warehouse_settings ADD COLUMN IF NOT EXISTS (
-  lp_number_format VARCHAR(100) DEFAULT 'LP-YYYYMMDD-NNNN',
-  allow_over_receipt BOOLEAN DEFAULT false
-);
+-- RLS
+ALTER TABLE lp_number_sequence ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all for authenticated users"
+  ON lp_number_sequence FOR ALL TO authenticated
+  USING (org_id = (auth.jwt() ->> 'org_id')::uuid)
+  WITH CHECK (org_id = (auth.jwt() ->> 'org_id')::uuid);
 ```
 
 ### API Endpoints
@@ -86,8 +133,9 @@ ALTER TABLE warehouse_settings ADD COLUMN IF NOT EXISTS (
 ## Dependencies
 
 ### Required from Previous Epics
-- ✅ **Epic 1**: Organizations, Users, Locations, warehouse_settings table
+- ✅ **Epic 1**: Organizations, Users, Warehouses, Locations
 - ✅ **Epic 2**: Products table with UoM
+- ⚠️ **STUB exists**: `license_plates` table (Epic 2) - will be EXTENDED
 
 ### Internal Dependencies
 - **Story 5.1** → Base entity (blocks all)

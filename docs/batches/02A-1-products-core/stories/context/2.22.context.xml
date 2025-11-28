@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.22</id>
+    <title>Technical Settings</title>
+    <batch>02A-1</batch>
+    <points>2</points>
+    <effort_hours>3-4</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Centralized configuration for Technical module behavior including product field visibility and BOM settings.</description>
+
+  <dependencies>
+    <requires>
+      <epic id="1">Organizations (settings table pattern)</epic>
+    </requires>
+    <blocks>
+      <batch id="02B">BOM System (conditional_flags_enabled)</batch>
+    </blocks>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>technical_settings</name>
+        <columns>
+          <column name="org_id" type="UUID" pk="true" fk="organizations.id"/>
+          <column name="product_field_config" type="JSONB">
+            { field: { visible: bool, mandatory: bool } }
+          </column>
+          <column name="max_bom_versions" type="INTEGER">NULL = unlimited</column>
+          <column name="use_conditional_flags" type="BOOLEAN" default="false"/>
+          <column name="conditional_flags" type="JSONB">
+            ["organic", "gluten_free", "vegan", "kosher", "halal", ...]
+          </column>
+          <column name="updated_at" type="TIMESTAMPTZ"/>
+          <column name="updated_by" type="UUID"/>
+        </columns>
+      </table>
+    </tables>
+
+    <default_field_config>
+      <field name="shelf_life_days" visible="true" mandatory="false"/>
+      <field name="min_stock_qty" visible="true" mandatory="false"/>
+      <field name="max_stock_qty" visible="true" mandatory="false"/>
+      <field name="reorder_point" visible="true" mandatory="false"/>
+      <field name="cost_per_unit" visible="true" mandatory="false"/>
+      <field name="category" visible="true" mandatory="false"/>
+    </default_field_config>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/settings">
+        <description>Get technical module settings</description>
+      </endpoint>
+      <endpoint method="PUT" path="/api/technical/settings">
+        <description>Update technical settings</description>
+        <auth>Admin role required</auth>
+      </endpoint>
+    </api_endpoints>
+
+    <frontend_routes>
+      <route path="/technical/settings" component="TechnicalSettingsPage"/>
+    </frontend_routes>
+
+    <components_to_create>
+      <component name="ProductFieldConfig" path="app/technical/settings/components/ProductFieldConfig.tsx">
+        Toggles for field visibility and mandatory flags
+      </component>
+      <component name="ConditionalFlagsConfig" path="app/technical/settings/components/ConditionalFlagsConfig.tsx">
+        Manage conditional flags for BOM items
+      </component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.22.1">Field Visibility - toggle visibility per product field</ac>
+    <ac id="2.22.2">Mandatory Fields - mark optional fields as required</ac>
+    <ac id="2.22.3">BOM Settings - max versions limit, conditional flags toggle</ac>
+    <ac id="2.22.4">Conditional Flags - manage list of condition flags</ac>
+    <ac id="2.22.5">Admin Only - only admin role can edit settings</ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <integration_tests>
+      <test>GET /api/technical/settings returns defaults</test>
+      <test>PUT settings → persists changes</test>
+      <test>Non-admin cannot PUT settings (403)</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Toggle field visibility → product form updates</test>
+      <test>Add conditional flag → appears in BOM item form</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="high">Settings seeded on org creation with defaults</note>
+    <note priority="medium">Product forms must check settings for field visibility</note>
+  </implementation_notes>
+</story>

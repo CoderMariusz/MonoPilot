@@ -1,0 +1,203 @@
+# generated: 2025-11-28
+# project: MonoPilot
+# project_key: monopilot
+# tracking_system: file-system
+# story_location: docs/sprint-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Batch Status:
+#   - backlog: Batch exists but not started
+#   - contexted: Batch tech-spec reviewed, stories have context files
+#
+# Story Status:
+#   - backlog: Story only exists in batch stories folder
+#   - drafted: Story file created with full requirements
+#   - ready-for-dev: Story context created (has context.xml)
+#   - in-progress: Developer actively working on implementation
+#   - review: Under code review
+#   - done: Story completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Batches should have tech-spec before stories can be developed
+# - Stories with context.xml are ready-for-dev
+# - Epic 1 (batches 01A-01E) is mostly complete (done)
+# - Epic 2-5 are in various stages of planning
+
+generated: 2025-11-28
+project: MonoPilot
+project_key: monopilot
+tracking_system: file-system
+story_location: docs/batches
+
+development_status:
+  # ============================================
+  # EPIC 1: Settings & Infrastructure (Batches 01A-01E)
+  # ============================================
+
+  # Batch 01A: Authentication & Users
+  batch-01A-auth-users: contexted
+  1-0-authentication-ui: done
+  1-1-organization-configuration: done
+  1-2-user-management-crud: done
+  1-3-user-invitations: done
+  1-4-session-management: done
+  batch-01A-retrospective: completed
+
+  # Batch 01B: Infrastructure Config
+  batch-01B-infrastructure-config: contexted
+  1-5-warehouse-configuration: done
+  1-6-location-management: done
+  1-7-machine-configuration: done
+  1-8-production-line-configuration: done
+  batch-01B-retrospective: completed
+
+  # Batch 01C: Master Data
+  batch-01C-master-data: contexted
+  1-9-allergen-management: done
+  1-10-tax-code-configuration: done
+  1-11-module-activation: done
+  batch-01C-retrospective: completed
+
+  # Batch 01D: Dashboards & UX
+  batch-01D-dashboards-ux: contexted
+  1-12-settings-wizard-ux-design: done
+  1-13-main-dashboard: done
+  1-14-epic-polish-cleanup: done
+  1-15-settings-dashboard: done
+  batch-01D-retrospective: completed
+
+  # Batch 01E: UI Redesign
+  batch-01E-ui-redesign: contexted
+  1-16-settings-header-layout: done
+  1-17-settings-stats-cards: done
+  1-18-settings-tables-consistency: done
+  1-19-settings-mobile-responsive: done
+  batch-01E-retrospective: completed
+
+  # ============================================
+  # EPIC 2: Products Module (Batch 02A)
+  # ============================================
+
+  # Batch 02A-1: Products Core
+  batch-02A-1-products-core: contexted
+  2-1-product-crud: ready-for-dev
+  2-2-product-versioning: ready-for-dev
+  2-3-product-history: ready-for-dev
+  2-4-product-allergens: ready-for-dev
+  2-5-product-types: ready-for-dev
+  2-22-technical-settings: ready-for-dev
+  batch-02A-1-retrospective: optional
+
+  # ============================================
+  # EPIC 3: Purchase Orders Module (Batch 03A)
+  # ============================================
+
+  # Batch 03A-1: Purchase Orders
+  batch-03A-1-purchase-orders: contexted
+  3-1-po-crud: done
+  3-2-po-lines: ready-for-dev
+  3-3-bulk-po: drafted
+  3-4-po-approval: ready-for-dev
+  3-5-po-statuses: ready-for-dev
+  batch-03A-1-retrospective: optional
+
+  # ============================================
+  # EPIC 4: Production Module (Batches 04A-04C)
+  # ============================================
+
+  # Batch 04A-1: Work Order Lifecycle
+  batch-04A-1-wo-lifecycle: contexted
+  4-1-production-dashboard: ready-for-dev
+  4-2-wo-start: ready-for-dev
+  4-3-wo-pause-resume: ready-for-dev
+  4-4-operation-start: ready-for-dev
+  4-5-operation-complete: ready-for-dev
+  4-6-wo-complete: ready-for-dev
+  batch-04A-1-retrospective: optional
+
+  # Batch 04A-2: Material Reservation
+  batch-04A-2-material-reservation: contexted
+  4-7-material-reservation-desktop: ready-for-dev
+  4-8-material-reservation-scanner: ready-for-dev
+  batch-04A-2-retrospective: optional
+
+  # Batch 04B-1: Consumption
+  batch-04B-1-consumption: contexted
+  4-9-consumption-enforcement: ready-for-dev
+  4-10-consumption-correction: ready-for-dev
+  4-11-over-consumption-control: ready-for-dev
+  batch-04B-1-retrospective: optional
+
+  # Batch 04B-2: Output Registration
+  batch-04B-2-output-registration: contexted
+  4-12-output-registration-desktop: ready-for-dev
+  4-13-output-registration-scanner: ready-for-dev
+  4-14-by-product-registration: ready-for-dev
+  4-15-yield-tracking: ready-for-dev
+  4-16-multiple-outputs-per-wo: ready-for-dev
+  batch-04B-2-retrospective: optional
+
+  # Batch 04C-1: Config & Traceability
+  batch-04C-1-config-traceability: contexted
+  4-17-production-settings: ready-for-dev
+  4-18-lp-updates-consumption: ready-for-dev
+  4-19-genealogy-creation: ready-for-dev
+  4-20-operation-timeline: ready-for-dev
+  batch-04C-1-retrospective: optional
+
+  # ============================================
+  # EPIC 5: Warehouse & Scanner Module (Batches 05A-05C)
+  # ============================================
+
+  # Batch 05A-1: License Plate Core
+  batch-05A-1-lp-core: contexted
+  5-1-lp-creation: ready-for-dev
+  5-2-lp-status: ready-for-dev
+  5-3-lp-expiry: ready-for-dev
+  5-4-lp-numbering: ready-for-dev
+  batch-05A-1-retrospective: optional
+
+  # Batch 05A-2: LP Operations
+  batch-05A-2-lp-operations: contexted
+  5-5-lp-split: ready-for-dev
+  5-6-lp-merge: ready-for-dev
+  5-7-lp-genealogy: ready-for-dev
+  batch-05A-2-retrospective: optional
+
+  # Batch 05A-3: Receiving
+  batch-05A-3-receiving: contexted
+  5-8-asn-creation: ready-for-dev
+  5-9-asn-item-mgmt: ready-for-dev
+  5-10-over-receipt: ready-for-dev
+  5-11-grn-lp-creation: ready-for-dev
+  5-12-auto-print-labels: ready-for-dev
+  5-13-update-po-to-qty: ready-for-dev
+  batch-05A-3-retrospective: optional
+
+  # Batch 05B-1: Stock Moves
+  batch-05B-1-stock-moves: contexted
+  5-14-lp-location-move: ready-for-dev
+  5-15-movement-audit-trail: ready-for-dev
+  5-16-partial-move: ready-for-dev
+  5-17-destination-validation: ready-for-dev
+  5-18-movement-types: ready-for-dev
+  batch-05B-1-retrospective: optional
+
+  # Batch 05B-2: Pallets
+  batch-05B-2-pallets: contexted
+  5-19-pallet-creation: ready-for-dev
+  5-20-pallet-lp-management: ready-for-dev
+  5-21-pallet-move: ready-for-dev
+  5-22-pallet-status: ready-for-dev
+  batch-05B-2-retrospective: optional
+
+  # Batch 05C-1: Scanner Core
+  batch-05C-1-scanner-core: contexted
+  5-23-scanner-guided-workflows: ready-for-dev
+  5-24-scanner-barcode-validation: ready-for-dev
+  5-25-scanner-feedback: ready-for-dev
+  5-26-scanner-operations-menu: ready-for-dev
+  5-27-scanner-session-timeout: ready-for-dev
+  batch-05C-1-retrospective: optional

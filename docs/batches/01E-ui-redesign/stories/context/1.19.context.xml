@@ -1,0 +1,549 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>1.19</story-id>
+    <story-title>Settings Mobile Responsive</story-title>
+    <epic>Epic 1 - Foundation &amp; Settings</epic>
+    <batch>1E - Settings UI Redesign</batch>
+    <status>ready-for-dev</status>
+    <priority>P1 (High)</priority>
+    <story-points>3</story-points>
+    <effort-estimate>1 day</effort-estimate>
+    <created>2025-11-27</created>
+  </metadata>
+
+  <story-content>
+    <goal>
+      Make all Settings pages fully responsive for mobile devices, matching Planning module's mobile design.
+    </goal>
+
+    <user-story>
+      <as>Mobile Administrator</as>
+      <i-want>to access settings on my phone without horizontal scrolling</i-want>
+      <so-that>I can manage configuration on the go</so-that>
+    </user-story>
+
+    <problem-statement>
+      Settings pages are not optimized for mobile:
+      - Tables overflow horizontally
+      - Header navigation doesn't collapse
+      - Touch targets too small
+      - Forms don't stack properly
+    </problem-statement>
+  </story-content>
+
+  <acceptance-criteria>
+    <criterion id="AC-1.19.1">
+      <title>Mobile Header with Hamburger Menu</title>
+      <given>I view settings on mobile (&lt;768px)</given>
+      <when>the page loads</when>
+      <then>
+        - SettingsHeader collapses to hamburger menu
+        - Menu icon on right side
+        - Tap opens full-screen navigation overlay
+        - Current page highlighted in menu
+      </then>
+    </criterion>
+
+    <criterion id="AC-1.19.2">
+      <title>Table to Card View Conversion</title>
+      <given>I view a settings table on mobile</given>
+      <when>screen width is &lt;768px</when>
+      <then>
+        - Table converts to card view
+        - Each row becomes expandable card
+        - Primary info visible (name, status)
+        - Tap to expand shows all fields
+        - Actions visible on expanded card
+      </then>
+    </criterion>
+
+    <criterion id="AC-1.19.3">
+      <title>Touch-Friendly Targets</title>
+      <given>I interact with settings on mobile</given>
+      <when>tapping buttons/links</when>
+      <then>
+        - All touch targets min 44px height
+        - Min 8px spacing between clickable elements
+        - Buttons full-width on mobile forms
+        - Form inputs have adequate padding
+      </then>
+    </criterion>
+
+    <criterion id="AC-1.19.4">
+      <title>No Horizontal Scroll</title>
+      <given>I view any settings page on mobile</given>
+      <when>checking layout</when>
+      <then>
+        - No horizontal scrollbar appears
+        - All content fits within viewport
+        - Stats cards stack vertically
+        - Forms use single-column layout
+      </then>
+    </criterion>
+
+    <criterion id="AC-1.19.5">
+      <title>Responsive Forms</title>
+      <given>I edit a settings form on mobile</given>
+      <when>interacting with fields</when>
+      <then>
+        - Labels above inputs (not inline)
+        - Full-width inputs
+        - Submit button full-width at bottom
+        - Keyboard doesn't obscure inputs
+      </then>
+    </criterion>
+  </acceptance-criteria>
+
+  <implementation-tasks>
+    <task>Add hamburger menu to SettingsHeader</task>
+    <task>Create mobile nav overlay component</task>
+    <task>Implement useResponsiveView hook for table/card switching</task>
+    <task>Update all settings tables with card view for mobile</task>
+    <task>Test and fix horizontal overflow on all pages</task>
+    <task>Ensure 44px touch targets on all interactive elements</task>
+    <task>Update form layouts for mobile (single column)</task>
+    <task>Test on actual mobile devices (iOS Safari, Android Chrome)</task>
+  </implementation-tasks>
+
+  <design-notes>
+    <mobile-header-collapsed>
+      ┌─────────────────────────────────────┐
+      │ Logo        Settings        ☰      │  (60px)
+      └─────────────────────────────────────┘
+    </mobile-header-collapsed>
+
+    <mobile-card-view>
+      ┌─────────────────────────────────────┐
+      │ John Doe                   🟢Active │
+      │ Admin                         ▼     │
+      ├─────────────────────────────────────┤
+      │ Email: john@example.com             │
+      │ Role: Administrator                 │
+      │ Created: 2025-01-15                 │
+      │ [View] [Edit] [Delete]              │
+      └─────────────────────────────────────┘
+    </mobile-card-view>
+
+    <mobile-nav-overlay>
+      ┌─────────────────────────────────────┐
+      │                              ✕      │
+      │                                     │
+      │   Settings Dashboard                │
+      │   ─────────────────                 │
+      │   Organization                      │
+      │   Users                    ●        │
+      │   Warehouses                        │
+      │   Locations                         │
+      │   Machines                          │
+      │   Production Lines                  │
+      │   Allergens                         │
+      │   Tax Codes                         │
+      │   Modules                           │
+      │   Wizard                            │
+      │                                     │
+      └─────────────────────────────────────┘
+    </mobile-nav-overlay>
+  </design-notes>
+
+  <ui-components>
+    <component>
+      <name>SettingsHeader</name>
+      <file>apps/frontend/components/settings/SettingsHeader.tsx</file>
+      <action>UPDATE - add hamburger menu for mobile</action>
+      <description>
+        Desktop: Full navigation tabs
+        Mobile (&lt;768px): Logo + "Settings" text + hamburger icon (☰) on right
+        Hamburger tap → opens SettingsMobileNav overlay
+      </description>
+    </component>
+
+    <component>
+      <name>SettingsMobileNav</name>
+      <file>apps/frontend/components/settings/SettingsMobileNav.tsx</file>
+      <action>NEW - create mobile navigation overlay</action>
+      <description>
+        Full-screen overlay with navigation links
+        - z-index: 50
+        - Backdrop blur
+        - Slide-in animation (200ms)
+        - Close button (✕) top-right
+        - Tap outside to close
+        - Current page highlighted with ● indicator
+        - All settings pages listed vertically
+      </description>
+    </component>
+
+    <component>
+      <name>SettingsCardView</name>
+      <file>apps/frontend/components/settings/SettingsCardView.tsx</file>
+      <action>NEW - mobile card component for table replacement</action>
+      <description>
+        Converts table rows to expandable cards on mobile
+        - Primary info + Status badge visible
+        - Expand button (▼) on right
+        - Tap to expand shows all fields
+        - Smooth animation (200ms) on expand/collapse
+        - Action buttons visible when expanded
+        - Min 44px height for touch targets
+      </description>
+    </component>
+
+    <component>
+      <name>useResponsiveView</name>
+      <file>apps/frontend/lib/hooks/useResponsiveView.ts</file>
+      <action>REUSE from planning or CREATE</action>
+      <description>
+        Hook to detect screen size and determine view mode
+        - Returns: { isMobile, isTablet, isDesktop }
+        - isMobile: window.innerWidth &lt; 768px
+        - isTablet: 768px ≤ width &lt; 1024px
+        - isDesktop: width ≥ 1024px
+        - Listens to resize events
+        - Triggers re-render on breakpoint change
+      </description>
+    </component>
+  </ui-components>
+
+  <responsive-breakpoints>
+    <breakpoint>
+      <name>sm</name>
+      <width>&lt;640px</width>
+      <device>Mobile phone</device>
+      <behavior>
+        - Hamburger menu
+        - Stats cards: 1 per row (stacked)
+        - Tables: card view (expandable)
+        - Touch targets: min 44px
+        - Forms: single column, full-width inputs
+      </behavior>
+    </breakpoint>
+
+    <breakpoint>
+      <name>md</name>
+      <width>640-768px</width>
+      <device>Tablet portrait</device>
+      <behavior>
+        - Hamburger menu
+        - Stats cards: 2 per row
+        - Tables: card view
+        - Touch targets: min 44px
+      </behavior>
+    </breakpoint>
+
+    <breakpoint>
+      <name>lg</name>
+      <width>768-1024px</width>
+      <device>Tablet landscape</device>
+      <behavior>
+        - Full navigation tabs
+        - Stats cards: 4 per row
+        - Tables: full table view
+        - Standard touch targets
+      </behavior>
+    </breakpoint>
+
+    <breakpoint>
+      <name>xl</name>
+      <width>1024px+</width>
+      <device>Desktop</device>
+      <behavior>
+        - Full navigation tabs
+        - Stats cards: 4 per row
+        - Tables: full table view
+        - Standard interaction
+      </behavior>
+    </breakpoint>
+  </responsive-breakpoints>
+
+  <mobile-navigation-pattern>
+    <hamburger-menu>
+      - Icon: Three horizontal lines (☰)
+      - Position: Top-right of SettingsHeader
+      - Size: 24px × 24px icon, 44px × 44px touch target
+      - Color: gray-600, hover → gray-900
+      - Tap action: Open SettingsMobileNav overlay
+    </hamburger-menu>
+
+    <overlay-structure>
+      - Full-screen: 100vw × 100vh
+      - Background: white (light mode), gray-900 (dark mode)
+      - Backdrop blur: blur-sm behind overlay
+      - Animation: slide-in from right (200ms ease-in-out)
+      - Close button: ✕ icon top-right (44px × 44px)
+      - Navigation links: Vertical list, 48px height each
+      - Active page: green-600 ● indicator on left
+      - Tap link → navigate + close overlay
+      - Tap outside or ✕ → close overlay
+    </overlay-structure>
+
+    <navigation-links>
+      - Settings Dashboard
+      - Organization
+      - Users
+      - Warehouses
+      - Locations
+      - Machines
+      - Production Lines
+      - Allergens
+      - Tax Codes
+      - Modules
+      - Wizard
+    </navigation-links>
+  </mobile-navigation-pattern>
+
+  <table-to-card-conversion>
+    <card-structure>
+      - Border: border border-gray-200
+      - Padding: p-4 (16px)
+      - Margin: mb-2 (8px between cards)
+      - Background: white (light), gray-800 (dark)
+      - Shadow: subtle shadow on hover
+    </card-structure>
+
+    <card-collapsed>
+      - Primary field (e.g., "John Doe") - left, font-semibold
+      - Status badge - right, colored
+      - Secondary field (e.g., "Admin") - below primary, text-sm
+      - Expand button (▼) - right side, 44px × 44px
+    </card-collapsed>
+
+    <card-expanded>
+      - All fields visible as key-value pairs
+      - Layout: vertical stack, gap-2 (8px)
+      - Action buttons: horizontal row at bottom
+      - Buttons: full-width on mobile forms, inline for table actions
+      - Animation: smooth height transition (200ms)
+    </card-expanded>
+
+    <example-card-data>
+      Primary: "John Doe"
+      Status: "Active" (green badge)
+      Secondary: "Admin"
+      Expanded fields:
+        - Email: john@example.com
+        - Role: Administrator
+        - Created: 2025-01-15
+        - Last Login: 2h ago
+      Actions: [View] [Edit] [Delete]
+    </example-card-data>
+  </table-to-card-conversion>
+
+  <touch-targets-accessibility>
+    <minimum-touch-target>
+      - Height: 44px (WCAG AA compliance)
+      - Width: 44px minimum
+      - Applies to: all buttons, links, icons, expandable cards
+    </minimum-touch-target>
+
+    <spacing>
+      - Between buttons: min 8px gap
+      - Between form fields: min 12px gap
+      - Between cards: min 8px gap
+    </spacing>
+
+    <form-inputs>
+      - Height: 48px (includes padding + border)
+      - Padding: px-3 py-3 (12px)
+      - Font size: text-base (16px) to prevent zoom on iOS
+      - Label position: above input (not inline)
+      - Full-width on mobile
+    </form-inputs>
+
+    <buttons>
+      - Height: min 44px
+      - Padding: px-4 py-3 (12px vertical)
+      - Full-width on mobile forms
+      - Inline for table actions (but still 44px height)
+    </buttons>
+  </touch-targets-accessibility>
+
+  <horizontal-scroll-prevention>
+    <page-level>
+      - overflow-x: hidden on body
+      - max-width: 100vw
+      - Box-sizing: border-box on all elements
+    </page-level>
+
+    <tables>
+      - Desktop: full table width
+      - Mobile: convert to card view (no table element)
+      - No horizontal scroll at any breakpoint
+    </tables>
+
+    <stats-cards>
+      - Desktop/Tablet: flex-wrap grid
+      - Mobile: flex-col (stacked vertically)
+      - Each card: width 100% on mobile
+    </stats-cards>
+
+    <forms>
+      - Desktop: 2-column layout possible
+      - Mobile: single column, full-width fields
+      - No inline labels (labels above fields)
+    </forms>
+  </horizontal-scroll-prevention>
+
+  <testing-strategy>
+    <unit-tests>
+      <test>
+        <file>__tests__/components/SettingsMobileNav.test.tsx</file>
+        <description>Test mobile nav overlay open/close, active page highlight</description>
+      </test>
+      <test>
+        <file>__tests__/components/SettingsCardView.test.tsx</file>
+        <description>Test card expand/collapse, action buttons visibility</description>
+      </test>
+      <test>
+        <file>__tests__/hooks/useResponsiveView.test.ts</file>
+        <description>Test breakpoint detection, resize event handling</description>
+      </test>
+    </unit-tests>
+
+    <e2e-tests>
+      <test>
+        <file>tests/e2e/settings-mobile.spec.ts</file>
+        <scenario>Mobile: table should convert to card view</scenario>
+        <steps>
+          1. Set viewport to 375×667 (mobile)
+          2. Navigate to /settings/users
+          3. Verify table element not visible
+          4. Verify card view visible
+          5. Click expand button on first card
+          6. Verify expanded content visible
+          7. Verify action buttons visible when expanded
+        </steps>
+      </test>
+
+      <test>
+        <file>tests/e2e/settings-mobile.spec.ts</file>
+        <scenario>Mobile: no horizontal scroll</scenario>
+        <steps>
+          1. Set viewport to 375×667 (mobile)
+          2. Navigate to each settings page
+          3. Check document.documentElement.scrollWidth === clientWidth
+          4. Verify no horizontal scrollbar
+        </steps>
+      </test>
+
+      <test>
+        <file>tests/e2e/settings-mobile.spec.ts</file>
+        <scenario>Mobile: touch targets are 44px minimum</scenario>
+        <steps>
+          1. Set viewport to 375×667 (mobile)
+          2. Navigate to /settings/users
+          3. Check Create button height ≥ 44px
+          4. Check expand button height ≥ 44px
+          5. Check action buttons height ≥ 44px
+        </steps>
+      </test>
+
+      <test>
+        <file>tests/e2e/settings-mobile.spec.ts</file>
+        <scenario>Mobile: hamburger menu opens navigation overlay</scenario>
+        <steps>
+          1. Set viewport to 375×667 (mobile)
+          2. Navigate to /settings
+          3. Verify hamburger icon visible
+          4. Click hamburger icon
+          5. Verify mobile nav overlay visible
+          6. Verify current page highlighted
+          7. Click Users link in overlay
+          8. Verify navigation to /settings/users
+          9. Verify overlay closed
+        </steps>
+      </test>
+
+      <test>
+        <file>tests/e2e/settings-mobile.spec.ts</file>
+        <scenario>Mobile: stats cards stack vertically</scenario>
+        <steps>
+          1. Set viewport to 375×667 (mobile)
+          2. Navigate to /settings
+          3. Verify 4 stats cards visible
+          4. Verify cards stacked (1 per row)
+          5. Verify no horizontal scroll
+        </steps>
+      </test>
+    </e2e-tests>
+
+    <device-testing>
+      <device>iOS Safari (iPhone 12, 13, 14)</device>
+      <device>Android Chrome (Pixel 5, Samsung S21)</device>
+      <checks>
+        - No horizontal scroll on any page
+        - Touch targets adequate (44px min)
+        - Forms don't cause zoom (16px font size)
+        - Keyboard doesn't obscure inputs
+        - Animations smooth (200ms transitions)
+      </checks>
+    </device-testing>
+  </testing-strategy>
+
+  <files-to-modify>
+    <file>
+      <path>apps/frontend/components/settings/SettingsHeader.tsx</path>
+      <action>UPDATE - add hamburger menu for mobile</action>
+    </file>
+    <file>
+      <path>apps/frontend/components/settings/SettingsMobileNav.tsx</path>
+      <action>NEW - mobile navigation overlay</action>
+    </file>
+    <file>
+      <path>apps/frontend/components/settings/SettingsCardView.tsx</path>
+      <action>NEW - mobile card component</action>
+    </file>
+    <file>
+      <path>apps/frontend/lib/hooks/useResponsiveView.ts</path>
+      <action>REUSE from planning or CREATE</action>
+    </file>
+    <file>
+      <path>apps/frontend/app/(authenticated)/settings/**/*.tsx</path>
+      <action>AUDIT - ensure responsive, no horizontal scroll</action>
+    </file>
+  </files-to-modify>
+
+  <dependencies>
+    <dependency>
+      <story-id>1.16</story-id>
+      <story-title>Settings Header Layout</story-title>
+      <reason>SettingsHeader must exist to add hamburger menu</reason>
+    </dependency>
+    <dependency>
+      <story-id>1.18</story-id>
+      <story-title>Settings Tables Consistency</story-title>
+      <reason>Tables must be standardized before converting to card view</reason>
+    </dependency>
+  </dependencies>
+
+  <references>
+    <reference>
+      <name>Story 1.19 - Settings Mobile Responsive</name>
+      <path>docs/batches/01E-ui-redesign/stories/1.19-settings-mobile-responsive.md</path>
+    </reference>
+    <reference>
+      <name>Epic Technical Specification</name>
+      <path>docs/batches/01E-ui-redesign/tech-spec.md</path>
+    </reference>
+    <reference>
+      <name>Shared UI Design System</name>
+      <path>docs/ux-design/ux-design-shared-system.md</path>
+    </reference>
+    <reference>
+      <name>Planning Module (Reference)</name>
+      <path>apps/frontend/components/planning/PlanningHeader.tsx</path>
+      <note>Reference for mobile navigation pattern</note>
+    </reference>
+  </references>
+
+  <success-criteria>
+    <criterion>Hamburger menu on mobile (&lt;768px)</criterion>
+    <criterion>SettingsMobileNav overlay works (open/close, active page highlight)</criterion>
+    <criterion>All tables convert to card view on mobile</criterion>
+    <criterion>Card view expandable (tap to show all fields)</criterion>
+    <criterion>No horizontal scroll on any page</criterion>
+    <criterion>Touch targets min 44px height</criterion>
+    <criterion>Forms stack vertically on mobile (single column)</criterion>
+    <criterion>Tested on iOS Safari and Android Chrome</criterion>
+  </success-criteria>
+</story-context>

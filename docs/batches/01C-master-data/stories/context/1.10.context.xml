@@ -1,0 +1,507 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story_id>1.10</story_id>
+    <title>Tax Code Configuration</title>
+    <status>ready-for-dev</status>
+    <epic>1 - Foundation &amp; Settings</epic>
+    <batch>01C-master-data</batch>
+    <priority>P0</priority>
+    <dependencies>
+      <prerequisite>Story 1.1 - Organizations (org_id, country field)</prerequisite>
+      <downstream>Epic 3 - PO line tax calculation uses tax_codes table</downstream>
+    </dependencies>
+  </metadata>
+
+  <story>
+    <user_story>
+      As an **Admin**,
+      I want to manage tax codes,
+      so that POs have correct VAT rates.
+    </user_story>
+
+    <acceptance_criteria>
+      <criterion id="AC-009.1">
+        <title>Tax codes preloaded based on organization country</title>
+        <description>
+          - On organization creation: seed tax codes based on organizations.country
+          - Poland: VAT 23%, VAT 8%, VAT 5%, VAT 0%
+          - UK: Standard 20%, Reduced 5%, Zero 0%
+          - Default codes: { code: 'VAT23', description: 'VAT 23%', rate: 23.00 }
+          - Rate stored as decimal (23.00 for 23%)
+          - Preloaded tax codes can be edited or deleted (unlike allergens)
+        </description>
+      </criterion>
+
+      <criterion id="AC-009.2">
+        <title>Admin can add custom tax codes</title>
+        <description>
+          - Navigate to /settings/production → "Tax Codes" tab
+          - Click "Add Tax Code" button
+          - Form fields:
+            - code: required, unique per org, uppercase (e.g., VAT-EXPORT)
+            - description: required, max 200 chars (e.g., "Export Zero VAT")
+            - rate: required, decimal % (e.g., 0.00, 5.00, 23.00)
+          - Validation: code unique, rate &gt;= 0
+          - On save: tax code created
+        </description>
+      </criterion>
+
+      <criterion id="AC-009.3">
+        <title>Tax codes list view</title>
+        <description>
+          - Table columns: Code, Description, Rate (%), POs (count), Actions
+          - Rate column: formatted as "23.00%" with 2 decimals
+          - POs column: count of PO lines using this tax code (Epic 3 JOIN)
+          - Search by code or description
+          - Sort by code, rate, description
+          - Filter: All, Zero-rated, Standard, Reduced
+        </description>
+      </criterion>
+
+      <criterion id="AC-009.4">
+        <title>Cannot delete tax code if used in POs</title>
+        <description>
+          - FK constraint: tax_codes used in po_lines table (Epic 3)
+          - Check: query po_lines.tax_code_id COUNT
+          - If used: error "Cannot delete - used by X PO lines"
+          - Archive option: add is_active flag (soft delete)
+        </description>
+      </criterion>
+
+      <criterion id="AC-009.5">
+        <title>Edit tax code</title>
+        <description>
+          - Click Edit action → drawer opens
+          - All fields editable (code, description, rate)
+          - Warning if editing rate: "X PO lines use this rate. Changes affect historical data."
+          - Recommendation: create new tax code instead of changing rate
+          - On save: tax code updated
+        </description>
+      </criterion>
+
+      <criterion id="AC-009.6">
+        <title>Tax code seed migration</title>
+        <description>
+          - Run on organization creation
+          - Country-based seed:
+            - Poland: VAT 23%, 8%, 5%, 0%
+            - UK: Standard 20%, Reduced 5%, Zero 0%
+            - Other countries: default VAT 0% (user adds their own)
+          - Idempotent: ON CONFLICT DO NOTHING
+        </description>
+      </criterion>
+
+      <criterion id="AC-009.7">
+        <title>Cache invalidation events</title>
+        <description>
+          - On tax code create/update/delete: emit 'tax_code.updated' event
+          - Epic 3 refetches tax code list on event
+          - Redis cache TTL: 10 min
+          - Cache key: `tax_codes:{org_id}`
+        </description>
+      </criterion>
+    </acceptance_criteria>
+  </story>
+
+  <database_schema>
+    <table name="tax_codes">
+      <description>Store tax/VAT codes per organization, seeded based on country</description>
+      <columns>
+        <column name="id" type="UUID" nullable="false" default="gen_random_uuid()" description="Primary key" />
+        <column name="org_id" type="UUID" nullable="false" description="FK → organizations" />
+        <column name="code" type="VARCHAR(50)" nullable="false" description="Unique code (A-Z0-9-)" />
+        <column name="description" type="VARCHAR(200)" nullable="false" description="Description (1-200 chars)" />
+        <column name="rate" type="NUMERIC(5,2)" nullable="false" description="Tax rate 0.00-100.00 (23.00 = 23%)" />
+        <column name="created_at" type="TIMESTAMPTZ" nullable="false" default="now()" />
+        <column name="updated_at" type="TIMESTAMPTZ" nullable="false" default="now()" />
+      </columns>
+      <constraints>
+        <unique>(org_id, code)</unique>
+        <check>code ~ '^[A-Z0-9-]+$'</check>
+        <check>char_length(description) &gt;= 1 AND char_length(description) &lt;= 200</check>
+        <check>rate &gt;= 0 AND rate &lt;= 100</check>
+      </constraints>
+      <indexes>
+        <index>tax_codes_org_id_idx (org_id)</index>
+        <index>tax_codes_rate_idx (rate)</index>
+      </indexes>
+      <rls_policy>
+        CREATE POLICY "tax_codes_tenant_isolation" ON tax_codes
+          FOR ALL
+          USING (org_id = (auth.jwt() -&gt;&gt; 'org_id')::uuid);
+      </rls_policy>
+    </table>
+
+    <seed_function>
+      <name>seed_tax_codes</name>
+      <parameters>p_org_id UUID, p_country VARCHAR</parameters>
+      <description>Seed tax codes based on organization country</description>
+      <seed_data>
+        <country code="PL" name="Poland">
+          <tax_code code="VAT23" description="VAT 23%" rate="23.00" />
+          <tax_code code="VAT8" description="VAT 8%" rate="8.00" />
+          <tax_code code="VAT5" description="VAT 5%" rate="5.00" />
+          <tax_code code="VAT0" description="VAT 0%" rate="0.00" />
+        </country>
+        <country code="UK" name="United Kingdom">
+          <tax_code code="STD20" description="Standard Rate 20%" rate="20.00" />
+          <tax_code code="RED5" description="Reduced Rate 5%" rate="5.00" />
+          <tax_code code="ZERO" description="Zero Rate 0%" rate="0.00" />
+        </country>
+        <country code="DEFAULT" name="Other Countries">
+          <tax_code code="VAT0" description="Zero VAT" rate="0.00" />
+        </country>
+      </seed_data>
+      <implementation>
+        CREATE OR REPLACE FUNCTION seed_tax_codes(p_org_id UUID, p_country VARCHAR)
+        RETURNS void AS $$
+        BEGIN
+          IF p_country = 'PL' THEN
+            INSERT INTO tax_codes (org_id, code, description, rate)
+            VALUES
+              (p_org_id, 'VAT23', 'VAT 23%', 23.00),
+              (p_org_id, 'VAT8', 'VAT 8%', 8.00),
+              (p_org_id, 'VAT5', 'VAT 5%', 5.00),
+              (p_org_id, 'VAT0', 'VAT 0%', 0.00)
+            ON CONFLICT (org_id, code) DO NOTHING;
+          ELSIF p_country = 'UK' THEN
+            INSERT INTO tax_codes (org_id, code, description, rate)
+            VALUES
+              (p_org_id, 'STD20', 'Standard Rate 20%', 20.00),
+              (p_org_id, 'RED5', 'Reduced Rate 5%', 5.00),
+              (p_org_id, 'ZERO', 'Zero Rate 0%', 0.00)
+            ON CONFLICT (org_id, code) DO NOTHING;
+          ELSE
+            INSERT INTO tax_codes (org_id, code, description, rate)
+            VALUES (p_org_id, 'VAT0', 'Zero VAT', 0.00)
+            ON CONFLICT (org_id, code) DO NOTHING;
+          END IF;
+        END;
+        $$ LANGUAGE plpgsql;
+      </implementation>
+    </seed_function>
+  </database_schema>
+
+  <api_patterns>
+    <endpoint method="GET" path="/api/settings/tax-codes">
+      <auth>Authenticated</auth>
+      <query_params>
+        <param name="search" type="string" optional="true" description="Search by code or description" />
+      </query_params>
+      <response>
+        {
+          "tax_codes": Array&lt;{
+            id: string
+            org_id: string
+            code: string
+            description: string
+            rate: number  // 23.00 = 23%
+            po_line_count: number  // Epic 3 JOIN
+            created_at: string
+            updated_at: string
+          }&gt;
+        }
+      </response>
+      <cache>10 min TTL (Redis: `tax_codes:{org_id}`)</cache>
+    </endpoint>
+
+    <endpoint method="POST" path="/api/settings/tax-codes">
+      <auth>Admin only</auth>
+      <body>
+        {
+          code: string         // A-Z0-9-, min 2, max 50
+          description: string  // min 1, max 200
+          rate: number         // 0-100, decimal
+        }
+      </body>
+      <response>
+        {
+          "tax_code": {
+            id: string
+            org_id: string
+            code: string
+            description: string
+            rate: number
+            created_at: string
+            updated_at: string
+          }
+        }
+      </response>
+      <events>Emit `tax_code.created`</events>
+    </endpoint>
+
+    <endpoint method="PUT" path="/api/settings/tax-codes/:id">
+      <auth>Admin only</auth>
+      <body>Same as POST</body>
+      <warning>If rate changes and PO usage exists, warn user</warning>
+      <events>Emit `tax_code.updated`</events>
+    </endpoint>
+
+    <endpoint method="DELETE" path="/api/settings/tax-codes/:id">
+      <auth>Admin only</auth>
+      <validation>Check not used in `po_lines` (FK constraint)</validation>
+      <errors>
+        <error code="409">Cannot delete - used by X PO lines</error>
+      </errors>
+      <events>Emit `tax_code.deleted`</events>
+    </endpoint>
+  </api_patterns>
+
+  <ui_components>
+    <route path="/settings/production">
+      <description>Production settings page with Tax Codes tab</description>
+      <component name="ProductionSettingsPage">
+        <file>apps/frontend/app/settings/production/page.tsx</file>
+        <features>
+          <feature>Tab navigation: Allergens, Tax Codes</feature>
+          <feature>Table columns: Code, Description, Rate (%), POs (count), Actions</feature>
+          <feature>Rate column: formatted as "23.00%"</feature>
+          <feature>Search by code/description</feature>
+          <feature>Sort by code, rate, description</feature>
+        </features>
+      </component>
+
+      <component name="TaxCodesTable">
+        <file>apps/frontend/components/settings/TaxCodesTable.tsx</file>
+        <features>
+          <feature>Similar to AllergensTable</feature>
+          <feature>Rate change warning modal (if PO usage exists)</feature>
+          <feature>Delete confirmation with PO usage check</feature>
+        </features>
+        <fetch>GET /api/settings/tax-codes (SWR)</fetch>
+      </component>
+
+      <component name="TaxCodeFormModal">
+        <file>apps/frontend/components/settings/TaxCodeFormModal.tsx</file>
+        <fields>
+          <field name="code" type="text" validation="A-Z0-9-, min 2, max 50" />
+          <field name="description" type="text" validation="min 1, max 200" />
+          <field name="rate" type="number" validation="0-100, decimal" suffix="%" />
+        </fields>
+        <validation>Zod schema (lib/validation/tax-code-schemas.ts)</validation>
+      </component>
+    </route>
+  </ui_components>
+
+  <validation_schemas>
+    <file>apps/frontend/lib/validation/tax-code-schemas.ts</file>
+    <schema name="CreateTaxCodeSchema">
+      import { z } from 'zod'
+
+      export const CreateTaxCodeSchema = z.object({
+        code: z.string()
+          .regex(/^[A-Z0-9-]+$/, 'Code must be uppercase alphanumeric with hyphens')
+          .min(2, 'Code must be at least 2 characters')
+          .max(50, 'Code must be at most 50 characters'),
+        description: z.string()
+          .min(1, 'Description is required')
+          .max(200, 'Description must be at most 200 characters'),
+        rate: z.number()
+          .min(0, 'Rate must be at least 0')
+          .max(100, 'Rate must be at most 100')
+      })
+
+      export const UpdateTaxCodeSchema = CreateTaxCodeSchema
+
+      export type CreateTaxCodeInput = z.infer&lt;typeof CreateTaxCodeSchema&gt;
+      export type UpdateTaxCodeInput = z.infer&lt;typeof UpdateTaxCodeSchema&gt;
+    </schema>
+  </validation_schemas>
+
+  <service_layer>
+    <service name="TaxCodeService">
+      <file>apps/frontend/lib/services/tax-code-service.ts</file>
+      <methods>
+        <method name="seedTaxCodes">
+          <signature>seedTaxCodes(orgId: string, country: string)</signature>
+          <description>Determine tax codes based on country and bulk insert with ON CONFLICT DO NOTHING</description>
+        </method>
+
+        <method name="createTaxCode">
+          <signature>createTaxCode(input: CreateTaxCodeInput)</signature>
+          <validation>
+            - Code unique per org
+            - Rate &gt;= 0
+          </validation>
+          <events>Emit 'tax_code.created'</events>
+        </method>
+
+        <method name="updateTaxCode">
+          <signature>updateTaxCode(id: string, input: UpdateTaxCodeInput)</signature>
+          <validation>
+            - Tax code exists, belongs to org
+            - Code still unique if changed
+            - Check if rate changing: query PO usage, warn user
+          </validation>
+          <events>Emit 'tax_code.updated'</events>
+        </method>
+
+        <method name="getTaxCodes">
+          <signature>getTaxCodes(orgId: string, filters?: TaxCodeFilters)</signature>
+          <description>
+            - Query tax_codes WHERE org_id = orgId
+            - Apply filters: search (code/description)
+            - Include PO line count (JOIN po_lines - Epic 3)
+            - Sort by code, rate, description
+          </description>
+        </method>
+
+        <method name="deleteTaxCode">
+          <signature>deleteTaxCode(id: string, orgId: string)</signature>
+          <validation>Check not used in PO lines (query po_lines.tax_code_id)</validation>
+          <error_handling>Catch FK constraint error → friendly message</error_handling>
+          <events>Emit 'tax_code.deleted'</events>
+        </method>
+      </methods>
+    </service>
+  </service_layer>
+
+  <testing_strategy>
+    <unit_tests>
+      <file>apps/frontend/lib/validation/tax-code-schemas.test.ts</file>
+      <tests>
+        <test>Valid tax code creation</test>
+        <test>Invalid code format (lowercase, spaces)</test>
+        <test>Rate validation (negative, &gt; 100)</test>
+        <test>Description length validation</test>
+      </tests>
+    </unit_tests>
+
+    <integration_tests>
+      <file>apps/frontend/lib/services/tax-code-service.test.ts</file>
+      <tests>
+        <test>Seed tax codes for Poland org → 4 codes</test>
+        <test>Seed tax codes for UK org → 3 codes</test>
+        <test>Create custom tax code → saved</test>
+        <test>Delete tax code in use → FK error</test>
+        <test>Update rate → warning if PO usage</test>
+        <test>RLS policy check (org isolation)</test>
+      </tests>
+    </integration_tests>
+
+    <e2e_tests>
+      <file>tests/e2e/tax-codes.spec.ts</file>
+      <tests>
+        <test>Navigate to /settings/production → Tax Codes tab</test>
+        <test>Create custom tax code → appears in table</test>
+        <test>Edit tax code → changes saved</test>
+        <test>Delete unused tax code → success</test>
+        <test>Delete tax code in use → error toast</test>
+        <test>Search tax codes by code/description</test>
+      </tests>
+    </e2e_tests>
+  </testing_strategy>
+
+  <key_technical_decisions>
+    <decision>
+      <title>Country-Based Seeding</title>
+      <rationale>Tax rates are country-specific, not global standards</rationale>
+      <implementation>
+        - Poland: 4 VAT rates (23%, 8%, 5%, 0%)
+        - UK: 3 rates (Standard 20%, Reduced 5%, Zero 0%)
+        - Other countries: default VAT 0% (user adds their own)
+      </implementation>
+    </decision>
+
+    <decision>
+      <title>Rate Storage</title>
+      <rationale>Store as decimal percentage for precision and clarity</rationale>
+      <implementation>
+        - Decimal(5,2): supports 0.00 to 999.99%
+        - Stored as 23.00 (not 0.23)
+        - Displayed as "23.00%"
+      </implementation>
+    </decision>
+
+    <decision>
+      <title>Edit vs Create New</title>
+      <rationale>Editing rate affects historical PO data</rationale>
+      <implementation>
+        - Warning shown if PO usage exists
+        - Recommendation: create new tax code for rate changes
+      </implementation>
+    </decision>
+
+    <decision>
+      <title>Tax Codes CAN Be Deleted (Unlike Allergens)</title>
+      <rationale>Tax codes are country-specific, not mandatory global standards</rationale>
+      <implementation>FK constraint check on po_lines table</implementation>
+    </decision>
+  </key_technical_decisions>
+
+  <data_model>
+    <typescript_interface>
+      interface TaxCode {
+        id: string
+        org_id: string                // RLS key
+        code: string                  // Unique per org (e.g., VAT23, STD20)
+        description: string           // Display description
+        rate: number                  // Decimal % (23.00 for 23%)
+        created_at: Date
+        updated_at: Date
+      }
+
+      // Unique: (org_id, code)
+      // Check: rate &gt;= 0
+      // Indexes: org_id, rate
+      // RLS: org_id = auth.jwt()-&gt;&gt;'org_id'
+    </typescript_interface>
+  </data_model>
+
+  <migration_files>
+    <migration name="012_create_tax_codes_table.sql">
+      CREATE TABLE tax_codes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        code VARCHAR(50) NOT NULL,
+        description VARCHAR(200) NOT NULL,
+        rate NUMERIC(5,2) NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT tax_codes_org_code_unique UNIQUE (org_id, code),
+        CONSTRAINT tax_codes_code_format CHECK (code ~ '^[A-Z0-9-]+$'),
+        CONSTRAINT tax_codes_description_length CHECK (char_length(description) &gt;= 1 AND char_length(description) &lt;= 200),
+        CONSTRAINT tax_codes_rate_range CHECK (rate &gt;= 0 AND rate &lt;= 100)
+      );
+
+      CREATE INDEX tax_codes_org_id_idx ON tax_codes(org_id);
+      CREATE INDEX tax_codes_rate_idx ON tax_codes(rate);
+
+      ALTER TABLE tax_codes ENABLE ROW LEVEL SECURITY;
+
+      CREATE POLICY "tax_codes_tenant_isolation" ON tax_codes
+        FOR ALL
+        USING (org_id = (auth.jwt() -&gt;&gt; 'org_id')::uuid);
+    </migration>
+
+    <migration name="013_seed_tax_codes_function.sql">
+      See seed_function section above
+    </migration>
+  </migration_files>
+
+  <organization_creation_hook>
+    <description>Add tax code seeding to organization creation workflow</description>
+    <implementation>
+      - After creating org → call TaxCodeService.seedTaxCodes(orgId, country)
+      - Or: Supabase trigger on organizations.INSERT → seed tax codes
+      - Ensure idempotent
+    </implementation>
+  </organization_creation_hook>
+
+  <cache_invalidation>
+    <description>Emit events on tax code create/update/delete</description>
+    <implementation>
+      - Invalidate Redis cache: `tax_codes:{org_id}`
+      - Epic 3 subscribes to events
+      - Cache TTL: 10 min
+    </implementation>
+  </cache_invalidation>
+
+  <references>
+    <source>docs/epics/epic-1-settings.md#Story-1.10</source>
+    <source>docs/sprint-artifacts/tech-spec-epic-1.md#FR-SET-009</source>
+    <source>docs/batches/01C-master-data/stories/1.10-tax-code-configuration.md</source>
+    <source>docs/batches/01C-master-data/tech-spec.md</source>
+  </references>
+</story-context>

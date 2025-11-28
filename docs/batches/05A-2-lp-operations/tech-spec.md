@@ -19,49 +19,67 @@ This batch covers inventory operations on License Plates:
 
 ## Database Schema
 
-### lp_genealogy Table
+### EXISTING `lp_genealogy` Table (STUB from Epic 2)
 
+**Current schema in database:**
 ```sql
-CREATE TABLE lp_genealogy (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  parent_lp_id UUID NOT NULL REFERENCES license_plates(id),
-  child_lp_id UUID NOT NULL REFERENCES license_plates(id),
-  wo_id UUID REFERENCES work_orders(id),
-  operation_type VARCHAR(20) NOT NULL,
-    -- Enum: 'split', 'merge', 'consume', 'produce'
-  created_at TIMESTAMP DEFAULT now(),
-  created_by_user_id UUID NOT NULL REFERENCES users(id),
-
-  UNIQUE(parent_lp_id, child_lp_id),
-  INDEX(org_id),
-  INDEX(parent_lp_id),
-  INDEX(child_lp_id),
-  INDEX(created_at)
-);
-
--- RLS: Standard org_id isolation
-ALTER TABLE lp_genealogy ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable read for authenticated users"
-  ON lp_genealogy FOR SELECT
-  TO authenticated
-  USING (org_id = auth.jwt() ->> 'org_id');
--- ... (standard INSERT, UPDATE, DELETE policies with org_id isolation)
+-- Already exists with these columns:
+lp_genealogy (
+  id UUID PRIMARY KEY,
+  parent_lp_id UUID REFERENCES license_plates(id),
+  child_lp_id UUID REFERENCES license_plates(id),
+  relationship_type VARCHAR CHECK IN ('split', 'combine', 'transform'),
+  work_order_id UUID REFERENCES work_orders(id),
+  transfer_order_id UUID REFERENCES transfer_orders(id),
+  quantity_from_parent DECIMAL CHECK > 0,
+  uom VARCHAR,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ
+)
 ```
 
-**Constraints:**
-- `UNIQUE(parent_lp_id, child_lp_id)`: Prevent duplicate genealogy links
+### Migration: Add `org_id` and indexes
+
+```sql
+-- Add org_id for RLS (if not exists)
+ALTER TABLE lp_genealogy
+  ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id);
+
+-- Backfill org_id from parent LP
+UPDATE lp_genealogy g
+SET org_id = lp.org_id
+FROM license_plates lp
+WHERE g.parent_lp_id = lp.id AND g.org_id IS NULL;
+
+-- Make org_id NOT NULL after backfill
+ALTER TABLE lp_genealogy ALTER COLUMN org_id SET NOT NULL;
+
+-- Add indexes
+CREATE INDEX IF NOT EXISTS idx_lp_genealogy_org ON lp_genealogy(org_id);
+CREATE INDEX IF NOT EXISTS idx_lp_genealogy_parent ON lp_genealogy(parent_lp_id);
+CREATE INDEX IF NOT EXISTS idx_lp_genealogy_child ON lp_genealogy(child_lp_id);
+CREATE INDEX IF NOT EXISTS idx_lp_genealogy_created ON lp_genealogy(created_at);
+
+-- RLS (if not exists)
+ALTER TABLE lp_genealogy ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Enable all for authenticated users" ON lp_genealogy;
+CREATE POLICY "Enable all for authenticated users"
+  ON lp_genealogy FOR ALL TO authenticated
+  USING (org_id = (auth.jwt() ->> 'org_id')::uuid)
+  WITH CHECK (org_id = (auth.jwt() ->> 'org_id')::uuid);
+```
+
+**Constraints (existing):**
 - `parent_lp_id != child_lp_id`: No self-links
 - Both LPs must belong to same `org_id`
 - No circular dependencies (enforced via transaction logic)
 
-**Operation Types:**
+**Relationship Types (existing - use these!):**
 | Type | Meaning | Use Case |
 |------|---------|----------|
 | **split** | Original LP → New split LPs | Divide 100 kg into 2x50 kg |
-| **merge** | Multiple source LPs → Merged LP | Consolidate 2x50 kg into 100 kg |
-| **consume** | Input LP → Output LP (WO) | Flour LP → Bread LP |
-| **produce** | Same as consume (legacy) | Flour LP → Bread LP |
+| **combine** | Multiple source LPs → Combined LP | Consolidate 2x50 kg into 100 kg (alias: merge) |
+| **transform** | Input LP → Output LP (WO) | Flour LP → Bread LP (production consumption)
 
 ---
 
@@ -84,12 +102,13 @@ CREATE POLICY "Enable read for authenticated users"
 ```json
 {
   "parent_lp_id": "UUID",
-  "parent_lp_number": "LP-20250120-0001",
+  "parent_lp_number": "LP-WH01-20250120-0001",
   "parent_remaining_qty": 50,
   "child_lp_id": "UUID",
-  "child_lp_number": "LP-20250120-0002",
+  "child_lp_number": "LP-WH01-20250120-0002",
   "child_qty": 50,
-  "genealogy_id": "UUID"
+  "genealogy_id": "UUID",
+  "relationship_type": "split"
 }
 ```
 
@@ -118,12 +137,12 @@ CREATE POLICY "Enable read for authenticated users"
 ```json
 {
   "target_lp_id": "UUID",
-  "target_lp_number": "LP-20250120-0001",
+  "target_lp_number": "LP-WH01-20250120-0001",
   "total_qty_merged": 150,
   "genealogy_records": [
-    { "source_lp": "UUID1", "operation_type": "merge", "genealogy_id": "UUID" },
-    { "source_lp": "UUID2", "operation_type": "merge", "genealogy_id": "UUID" },
-    { "source_lp": "UUID3", "operation_type": "merge", "genealogy_id": "UUID" }
+    { "source_lp": "UUID1", "relationship_type": "combine", "genealogy_id": "UUID" },
+    { "source_lp": "UUID2", "relationship_type": "combine", "genealogy_id": "UUID" },
+    { "source_lp": "UUID3", "relationship_type": "combine", "genealogy_id": "UUID" }
   ]
 }
 ```
@@ -155,20 +174,21 @@ CREATE POLICY "Enable read for authenticated users"
 ```json
 {
   "lp_id": "UUID",
-  "lp_number": "LP-20250120-0001",
+  "lp_number": "LP-WH01-20250120-0001",
   "descendants": [
     {
       "lp_id": "UUID",
-      "lp_number": "LP-20250120-0002",
-      "operation_type": "split",
+      "lp_number": "LP-WH01-20250120-0002",
+      "relationship_type": "split",
+      "quantity_from_parent": 50,
       "depth": 1,
       "created_at": "2025-01-20T10:00:00Z"
     },
     {
       "lp_id": "UUID",
-      "lp_number": "LP-20250120-0003",
-      "operation_type": "consume",
-      "wo_id": "UUID",
+      "lp_number": "LP-WH01-20250120-0003",
+      "relationship_type": "transform",
+      "work_order_id": "UUID",
       "depth": 2,
       "created_at": "2025-01-20T11:00:00Z"
     }
@@ -181,12 +201,13 @@ CREATE POLICY "Enable read for authenticated users"
 ```json
 {
   "lp_id": "UUID",
-  "lp_number": "LP-20250120-0001",
+  "lp_number": "LP-WH01-20250120-0001",
   "ancestors": [
     {
       "lp_id": "UUID",
-      "lp_number": "LP-20250120-0000",
-      "operation_type": "merge",
+      "lp_number": "LP-WH01-20250120-0000",
+      "relationship_type": "combine",
+      "quantity_from_parent": 100,
       "depth": 1,
       "created_at": "2025-01-20T08:00:00Z"
     }

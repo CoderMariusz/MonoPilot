@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.5</id>
+    <title>Product Types</title>
+    <batch>02A-1</batch>
+    <points>2</points>
+    <effort_hours>3-4</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Configurable product categorization with default types (RM, WIP, FG, PKG, BP) and custom types.</description>
+
+  <dependencies>
+    <requires>
+      <story id="2.1">Product CRUD</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>product_type_config</name>
+        <columns>
+          <column name="id" type="UUID" pk="true"/>
+          <column name="code" type="TEXT">Short code (e.g., SFG)</column>
+          <column name="name" type="TEXT">Display name</column>
+          <column name="is_default" type="BOOLEAN">true for RM, WIP, FG, PKG, BP</column>
+          <column name="is_active" type="BOOLEAN" default="true"/>
+          <column name="org_id" type="UUID"/>
+          <column name="created_at" type="TIMESTAMPTZ"/>
+          <column name="updated_at" type="TIMESTAMPTZ"/>
+        </columns>
+        <constraints>
+          <unique>org_id, code</unique>
+        </constraints>
+      </table>
+    </tables>
+
+    <default_types>
+      <type code="RM" name="Raw Material" is_default="true"/>
+      <type code="WIP" name="Work in Progress" is_default="true"/>
+      <type code="FG" name="Finished Good" is_default="true"/>
+      <type code="PKG" name="Packaging" is_default="true"/>
+      <type code="BP" name="By-Product" is_default="true"/>
+    </default_types>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/product-types">
+        <description>Get all product types (default + custom)</description>
+      </endpoint>
+      <endpoint method="POST" path="/api/technical/product-types">
+        <description>Create custom product type</description>
+        <body>{ code, name }</body>
+        <validation>Code must not conflict with defaults</validation>
+      </endpoint>
+      <endpoint method="PUT" path="/api/technical/product-types/:id">
+        <description>Update or deactivate custom type</description>
+        <note>Cannot edit default types</note>
+      </endpoint>
+    </api_endpoints>
+
+    <frontend_routes>
+      <route path="/technical/product-types" component="ProductTypesPage"/>
+    </frontend_routes>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.5.1">Default Types - RM, WIP, FG, PKG, BP always available</ac>
+    <ac id="2.5.2">Custom Types - admin can add custom types (e.g., SFG)</ac>
+    <ac id="2.5.3">Type Management - list, create, edit, deactivate types</ac>
+    <ac id="2.5.4">No Delete - deactivate instead (preserve data)</ac>
+    <ac id="2.5.5">Code Validation - uppercase alphanumeric only</ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <integration_tests>
+      <test>GET /api/technical/product-types returns defaults</test>
+      <test>POST custom type → appears in list</test>
+      <test>Cannot edit default type (RM, WIP, etc.)</test>
+    </integration_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="high">Default types seeded on org creation</note>
+    <note priority="medium">Deactivated types hidden from UI but preserved</note>
+  </implementation_notes>
+</story>

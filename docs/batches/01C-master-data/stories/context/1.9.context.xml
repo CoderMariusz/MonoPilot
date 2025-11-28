@@ -1,0 +1,689 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story_id>1.9</story_id>
+    <story_title>Allergen Management</story_title>
+    <batch>01C-master-data</batch>
+    <epic>1 - Foundation & Settings</epic>
+    <status>done</status>
+    <priority>P0</priority>
+    <created_date>2025-11-20</created_date>
+    <completed_date>2025-11-22</completed_date>
+    <model_used>Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)</model_used>
+    <test_coverage>62 tests (30 unit + 14 service + 18 E2E)</test_coverage>
+  </metadata>
+
+  <user_story>
+    <role>Admin</role>
+    <goal>manage the allergen library</goal>
+    <reason>so that products can have proper allergen declarations</reason>
+  </user_story>
+
+  <acceptance_criteria>
+    <criterion id="AC-008.1" title="14 EU major allergens preloaded">
+      <requirement>On organization creation: seed 14 EU major allergens</requirement>
+      <allergen_list>
+        <allergen code="MILK" name="Milk"/>
+        <allergen code="EGGS" name="Eggs"/>
+        <allergen code="FISH" name="Fish"/>
+        <allergen code="SHELLFISH" name="Crustaceans"/>
+        <allergen code="TREENUTS" name="Tree Nuts"/>
+        <allergen code="PEANUTS" name="Peanuts"/>
+        <allergen code="WHEAT" name="Gluten (Wheat)"/>
+        <allergen code="SOYBEANS" name="Soybeans"/>
+        <allergen code="SESAME" name="Sesame Seeds"/>
+        <allergen code="MUSTARD" name="Mustard"/>
+        <allergen code="CELERY" name="Celery"/>
+        <allergen code="LUPIN" name="Lupin"/>
+        <allergen code="SULPHITES" name="Sulphur Dioxide/Sulphites"/>
+        <allergen code="MOLLUSCS" name="Molluscs"/>
+      </allergen_list>
+      <fields>
+        <field name="code" example="MILK, EGGS" type="VARCHAR(50)"/>
+        <field name="name" example="Mleko, Jaja" type="VARCHAR(100)" localized="true"/>
+        <field name="is_major" value="true" type="BOOLEAN"/>
+        <field name="is_custom" value="false" type="BOOLEAN"/>
+      </fields>
+      <constraints>
+        <constraint>Preloaded allergens cannot be deleted (FK constraints, UI disabled)</constraint>
+        <constraint>Can be edited (e.g., change name translation)</constraint>
+      </constraints>
+    </criterion>
+
+    <criterion id="AC-008.2" title="Preloaded allergens non-deletable">
+      <ui_behavior>
+        <delete_button state="disabled" condition="is_custom = false"/>
+        <tooltip text="Cannot delete EU major allergen"/>
+      </ui_behavior>
+      <constraints>
+        <fk_constraint table="product_allergens" description="Epic 2 - used in products"/>
+      </constraints>
+      <error_message condition="deletion_attempted">This allergen is in use by X products</error_message>
+    </criterion>
+
+    <criterion id="AC-008.3" title="Admin może dodać custom allergens">
+      <navigation>
+        <route>/settings/production</route>
+        <tab>Allergens</tab>
+        <action>Click "Add Allergen" button</action>
+      </navigation>
+      <form_fields>
+        <field name="code" required="true" unique="per org" format="uppercase" example="CUSTOM-01"/>
+        <field name="name" required="true" max_length="100"/>
+        <field name="is_major" type="toggle" default="false" description="for custom allergens"/>
+      </form_fields>
+      <on_save>
+        <action>Create allergen with is_custom = true</action>
+        <result>Custom allergens appear in product allergen assignment (Epic 2)</result>
+      </on_save>
+    </criterion>
+
+    <criterion id="AC-008.4" title="Custom allergens editable and deletable">
+      <edit_fields>
+        <field name="code"/>
+        <field name="name"/>
+        <field name="is_major"/>
+      </edit_fields>
+      <delete_behavior>
+        <condition>Only if not used in products (FK constraint check)</condition>
+        <confirmation_message>Delete custom allergen? This cannot be undone.</confirmation_message>
+        <error_message condition="used_in_products">Cannot delete - used by X products</error_message>
+      </delete_behavior>
+    </criterion>
+
+    <criterion id="AC-008.5" title="Allergens list view">
+      <table_columns>
+        <column name="Code"/>
+        <column name="Name"/>
+        <column name="Is Major">
+          <badge value="Yes" color="orange"/>
+          <badge value="No" color="gray"/>
+        </column>
+        <column name="Is Custom">
+          <badge value="Custom" color="blue"/>
+          <badge value="Standard" color="gray"/>
+        </column>
+        <column name="Products" type="count" description="Epic 2 JOIN"/>
+        <column name="Actions"/>
+      </table_columns>
+      <features>
+        <search fields="code, name"/>
+        <filters>
+          <filter name="All"/>
+          <filter name="Major only"/>
+          <filter name="Custom only"/>
+        </filters>
+        <sort fields="code, name, is_major"/>
+      </features>
+    </criterion>
+
+    <criterion id="AC-008.6" title="Allergen localization (optional - Phase 2)">
+      <fields>
+        <field name="name_pl" type="VARCHAR(100)"/>
+        <field name="name_en" type="VARCHAR(100)"/>
+      </fields>
+      <default>Use English names for preload</default>
+      <admin_action>Can edit translations</admin_action>
+      <display_logic>Based on organization.default_language</display_logic>
+    </criterion>
+
+    <criterion id="AC-008.7" title="Allergen seed migration">
+      <trigger>
+        <option>On organization creation (trigger)</option>
+        <option>Manual seed</option>
+      </trigger>
+      <properties>
+        <idempotent>ON CONFLICT DO NOTHING (safe to re-run)</idempotent>
+        <content>Seed script includes all 14 EU allergens with codes and names</content>
+      </properties>
+    </criterion>
+
+    <criterion id="AC-008.8" title="Cache invalidation events">
+      <events>
+        <event name="allergen.created" action="create"/>
+        <event name="allergen.updated" action="update"/>
+        <event name="allergen.deleted" action="delete"/>
+      </events>
+      <subscribers>
+        <subscriber epic="2" description="Product allergen refetch"/>
+        <subscriber epic="8" description="NPD formulation refetch"/>
+      </subscribers>
+      <cache_config>
+        <backend>Redis</backend>
+        <ttl>10 minutes</ttl>
+        <rationale>Master data, rarely changes</rationale>
+        <key_pattern>allergens:{org_id}</key_pattern>
+      </cache_config>
+    </criterion>
+  </acceptance_criteria>
+
+  <database_schema>
+    <table name="allergens" migration="010_create_allergens_table.sql">
+      <columns>
+        <column name="id" type="UUID" primary_key="true" default="gen_random_uuid()"/>
+        <column name="org_id" type="UUID" nullable="false" foreign_key="organizations(id)"/>
+        <column name="code" type="VARCHAR(50)" nullable="false" unique="(org_id, code)"/>
+        <column name="name" type="VARCHAR(100)" nullable="false"/>
+        <column name="is_major" type="BOOLEAN" nullable="false" default="false"/>
+        <column name="is_custom" type="BOOLEAN" nullable="false" default="true"/>
+        <column name="created_at" type="TIMESTAMPTZ" nullable="false" default="now()"/>
+        <column name="updated_at" type="TIMESTAMPTZ" nullable="false" default="now()"/>
+      </columns>
+      <constraints>
+        <unique_constraint name="allergens_org_code_unique" columns="org_id, code"/>
+      </constraints>
+      <indexes>
+        <index name="allergens_org_id_idx" columns="org_id"/>
+        <index name="allergens_is_major_idx" columns="is_major"/>
+        <index name="allergens_is_custom_idx" columns="is_custom"/>
+      </indexes>
+      <rls_policy name="allergens_tenant_isolation">
+        <rule>
+          FOR ALL
+          USING (
+            current_setting('request.jwt.claims', true)::json->>'role' = 'service_role'
+            OR org_id = (auth.jwt() ->> 'org_id')::uuid
+          )
+        </rule>
+      </rls_policy>
+    </table>
+
+    <seed_function name="seed_eu_allergens" migration="011_seed_eu_allergens_function.sql">
+      <parameters>
+        <parameter name="p_org_id" type="UUID"/>
+      </parameters>
+      <behavior>
+        <idempotent>ON CONFLICT (org_id, code) DO NOTHING</idempotent>
+        <inserts>14 EU major allergens</inserts>
+        <fields>
+          <field name="is_major" value="true"/>
+          <field name="is_custom" value="false"/>
+        </fields>
+      </behavior>
+    </seed_function>
+
+    <relationships>
+      <relationship type="1:N" from="organizations" to="allergens" key="org_id"/>
+      <relationship type="N:M" from="products" to="allergens" through="product_allergens" epic="2"/>
+    </relationships>
+  </database_schema>
+
+  <api_endpoints>
+    <endpoint method="GET" path="/api/settings/allergens">
+      <auth>Authenticated</auth>
+      <query_params>
+        <param name="is_major" type="boolean" optional="true"/>
+        <param name="is_custom" type="boolean" optional="true"/>
+        <param name="search" type="string" optional="true"/>
+      </query_params>
+      <response>
+        <field name="allergens" type="array">
+          <item>
+            <field name="id" type="string"/>
+            <field name="org_id" type="string"/>
+            <field name="code" type="string"/>
+            <field name="name" type="string"/>
+            <field name="is_major" type="boolean"/>
+            <field name="is_custom" type="boolean"/>
+            <field name="product_count" type="number" description="Epic 2 JOIN"/>
+            <field name="created_at" type="string"/>
+            <field name="updated_at" type="string"/>
+          </item>
+        </field>
+      </response>
+      <cache>
+        <ttl>10 minutes</ttl>
+        <key>allergens:{org_id}</key>
+      </cache>
+      <implementation>apps/frontend/app/api/settings/allergens/route.ts</implementation>
+    </endpoint>
+
+    <endpoint method="POST" path="/api/settings/allergens">
+      <auth>Admin only</auth>
+      <body>
+        <field name="code" type="string" validation="A-Z0-9-, min 2, max 50"/>
+        <field name="name" type="string" validation="min 1, max 100"/>
+        <field name="is_major" type="boolean" default="false"/>
+      </body>
+      <response>
+        <field name="allergen" type="object">
+          <field name="id" type="string"/>
+          <field name="org_id" type="string"/>
+          <field name="code" type="string"/>
+          <field name="name" type="string"/>
+          <field name="is_major" type="boolean"/>
+          <field name="is_custom" type="boolean" value="true"/>
+          <field name="created_at" type="string"/>
+          <field name="updated_at" type="string"/>
+        </field>
+      </response>
+      <events>
+        <event name="allergen.created" channel="org:{org_id}"/>
+      </events>
+      <implementation>apps/frontend/app/api/settings/allergens/route.ts</implementation>
+    </endpoint>
+
+    <endpoint method="GET" path="/api/settings/allergens/:id">
+      <auth>Authenticated</auth>
+      <response>Same as POST response</response>
+      <implementation>apps/frontend/app/api/settings/allergens/[id]/route.ts</implementation>
+    </endpoint>
+
+    <endpoint method="PUT" path="/api/settings/allergens/:id">
+      <auth>Admin only</auth>
+      <body>Same as POST</body>
+      <events>
+        <event name="allergen.updated" channel="org:{org_id}"/>
+      </events>
+      <implementation>apps/frontend/app/api/settings/allergens/[id]/route.ts</implementation>
+    </endpoint>
+
+    <endpoint method="DELETE" path="/api/settings/allergens/:id">
+      <auth>Admin only</auth>
+      <validation>
+        <check>is_custom = true (cannot delete EU allergens)</check>
+        <check>not used in product_allergens (FK constraint)</check>
+      </validation>
+      <response>
+        <field name="success" type="boolean" value="true"/>
+        <field name="message" type="string" value="Allergen deleted"/>
+      </response>
+      <errors>
+        <error code="403" message="Cannot delete EU major allergen"/>
+        <error code="409" message="Cannot delete - used by X products"/>
+      </errors>
+      <events>
+        <event name="allergen.deleted" channel="org:{org_id}"/>
+      </events>
+      <implementation>apps/frontend/app/api/settings/allergens/[id]/route.ts</implementation>
+    </endpoint>
+  </api_endpoints>
+
+  <validation_schemas>
+    <schema name="CreateAllergenSchema" file="apps/frontend/lib/validation/allergen-schemas.ts">
+      <field name="code">
+        <rule>regex: /^[A-Z0-9-]+$/</rule>
+        <rule>min: 2</rule>
+        <rule>max: 50</rule>
+        <error_message>Code must be uppercase alphanumeric with hyphens</error_message>
+      </field>
+      <field name="name">
+        <rule>min: 1</rule>
+        <rule>max: 100</rule>
+        <error_message>Name is required</error_message>
+      </field>
+      <field name="is_major">
+        <rule>boolean</rule>
+        <rule>default: false</rule>
+      </field>
+    </schema>
+
+    <schema name="UpdateAllergenSchema" file="apps/frontend/lib/validation/allergen-schemas.ts">
+      <extends>CreateAllergenSchema</extends>
+    </schema>
+
+    <constants name="EU_MAJOR_ALLERGENS" file="apps/frontend/lib/validation/allergen-schemas.ts">
+      <constant code="MILK" name="Milk"/>
+      <constant code="EGGS" name="Eggs"/>
+      <constant code="FISH" name="Fish"/>
+      <constant code="SHELLFISH" name="Crustaceans"/>
+      <constant code="TREENUTS" name="Tree Nuts"/>
+      <constant code="PEANUTS" name="Peanuts"/>
+      <constant code="WHEAT" name="Gluten (Wheat)"/>
+      <constant code="SOYBEANS" name="Soybeans"/>
+      <constant code="SESAME" name="Sesame Seeds"/>
+      <constant code="MUSTARD" name="Mustard"/>
+      <constant code="CELERY" name="Celery"/>
+      <constant code="LUPIN" name="Lupin"/>
+      <constant code="SULPHITES" name="Sulphur Dioxide/Sulphites"/>
+      <constant code="MOLLUSCS" name="Molluscs"/>
+    </constants>
+  </validation_schemas>
+
+  <service_layer>
+    <service name="AllergenService" file="apps/frontend/lib/services/allergen-service.ts">
+      <methods>
+        <method name="seedEuAllergens">
+          <parameters>
+            <parameter name="orgId" type="string"/>
+          </parameters>
+          <behavior>
+            <action>Call Postgres function seed_eu_allergens(org_id)</action>
+            <action>Bulk insert 14 EU allergens for org</action>
+            <action>Set is_custom = false, is_major = true</action>
+            <action>ON CONFLICT DO NOTHING (idempotent)</action>
+          </behavior>
+        </method>
+
+        <method name="createAllergen">
+          <parameters>
+            <parameter name="input" type="CreateAllergenInput"/>
+          </parameters>
+          <validation>
+            <check>Code unique per org</check>
+          </validation>
+          <behavior>
+            <action>Insert allergen with is_custom = true</action>
+            <action>Return allergen object</action>
+            <action>Emit cache event: allergen.created</action>
+          </behavior>
+        </method>
+
+        <method name="updateAllergen">
+          <parameters>
+            <parameter name="id" type="string"/>
+            <parameter name="input" type="UpdateAllergenInput"/>
+          </parameters>
+          <validation>
+            <check>Allergen exists, belongs to org</check>
+            <check>Code still unique if changed</check>
+          </validation>
+          <behavior>
+            <action>Update allergen record</action>
+            <action>Return updated allergen</action>
+            <action>Emit cache event: allergen.updated</action>
+          </behavior>
+        </method>
+
+        <method name="listAllergens">
+          <parameters>
+            <parameter name="orgId" type="string"/>
+            <parameter name="filters" type="AllergenFilters" optional="true"/>
+          </parameters>
+          <behavior>
+            <action>Query allergens WHERE org_id = orgId</action>
+            <action>Apply filters: is_major, is_custom, search</action>
+            <action>Include product count (JOIN product_allergens - Epic 2)</action>
+            <action>Sort by code, name, is_major</action>
+            <action>Return allergens array</action>
+          </behavior>
+        </method>
+
+        <method name="getAllergenById">
+          <parameters>
+            <parameter name="id" type="string"/>
+            <parameter name="orgId" type="string"/>
+          </parameters>
+          <behavior>
+            <action>Query single allergen with product count</action>
+            <action>Return allergen object</action>
+          </behavior>
+        </method>
+
+        <method name="deleteAllergen">
+          <parameters>
+            <parameter name="id" type="string"/>
+            <parameter name="orgId" type="string"/>
+          </parameters>
+          <validation>
+            <check>is_custom = true (cannot delete preloaded)</check>
+            <check>Not used in products (query product_allergens)</check>
+          </validation>
+          <behavior>
+            <action>Try DELETE</action>
+            <action>Catch FK constraint error → friendly message</action>
+            <action>Emit cache event: allergen.deleted</action>
+          </behavior>
+        </method>
+      </methods>
+    </service>
+  </service_layer>
+
+  <ui_components>
+    <page route="/settings/allergens" file="apps/frontend/app/settings/allergens/page.tsx">
+      <features>
+        <search>
+          <fields>code, name</fields>
+          <debounce>300ms</debounce>
+        </search>
+        <filters>
+          <filter name="is_major" label="Major allergens"/>
+          <filter name="is_custom" label="Custom allergens"/>
+          <filter name="source" label="Source (Standard/Custom)"/>
+        </filters>
+        <sorting>
+          <column name="Code" sortable="true"/>
+          <column name="Name" sortable="true"/>
+          <column name="Is Major" sortable="true"/>
+        </sorting>
+        <table_columns>
+          <column name="Code"/>
+          <column name="Name"/>
+          <column name="Is Major">
+            <badge value="Yes" color="orange"/>
+            <badge value="No" color="gray"/>
+          </column>
+          <column name="Is Custom">
+            <badge value="Custom" color="blue"/>
+            <badge value="Standard" color="gray"/>
+          </column>
+          <column name="Products" type="count" description="Epic 2 JOIN"/>
+          <column name="Actions">
+            <action name="Edit"/>
+            <action name="Delete" disabled="is_custom = false"/>
+          </column>
+        </table_columns>
+      </features>
+      <modals>
+        <modal name="AllergenFormModal" mode="create/edit"/>
+        <modal name="DeleteConfirmation" warning="product usage"/>
+      </modals>
+    </page>
+
+    <component name="AllergenFormModal" file="apps/frontend/components/settings/AllergenFormModal.tsx">
+      <modes>
+        <mode name="create" title="Add Allergen"/>
+        <mode name="edit" title="Edit Allergen"/>
+      </modes>
+      <fields>
+        <field name="code">
+          <type>text</type>
+          <uppercase>true</uppercase>
+          <disabled condition="is_custom = false">For preloaded allergens</disabled>
+          <validation>A-Z0-9-, min 2, max 50</validation>
+        </field>
+        <field name="name">
+          <type>text</type>
+          <max_length>100</max_length>
+        </field>
+        <field name="is_major">
+          <type>toggle</type>
+          <default>false</default>
+        </field>
+      </fields>
+      <validation>
+        <library>Zod</library>
+        <inline_errors>true</inline_errors>
+        <error_handling>
+          <error code="409" message="Code already exists"/>
+          <error code="403" message="Cannot modify EU major allergen"/>
+        </error_handling>
+      </validation>
+      <ui_elements>
+        <banner type="info" condition="editing EU allergen">
+          This is an EU major allergen. You can edit the name but cannot delete it.
+        </banner>
+      </ui_elements>
+    </component>
+  </ui_components>
+
+  <testing_strategy>
+    <unit_tests file="apps/frontend/lib/validation/allergen-schemas.test.ts">
+      <test_suite name="Allergen Validation Schemas">
+        <test>Valid allergen creation</test>
+        <test>Invalid code format (lowercase, spaces, special chars)</test>
+        <test>Code length validation (min 2, max 50)</test>
+        <test>Name validation (empty, too long)</test>
+        <test>is_major default value</test>
+      </test_suite>
+      <coverage>30 unit tests</coverage>
+    </unit_tests>
+
+    <service_tests file="apps/frontend/lib/services/allergen-service.test.ts">
+      <test_suite name="AllergenService">
+        <test>Seed EU allergens for org → 14 inserted</test>
+        <test>Re-run seed → idempotent (no duplicates)</test>
+        <test>Create custom allergen → saved</test>
+        <test>Create allergen with duplicate code → error</test>
+        <test>Update allergen → changes saved</test>
+        <test>Update allergen code → unique check</test>
+        <test>Delete preloaded allergen → error (is_custom = false)</test>
+        <test>Delete custom allergen → success</test>
+        <test>Delete allergen in use → FK error</test>
+        <test>List allergens → all returned</test>
+        <test>List allergens with filters → filtered results</test>
+        <test>Get allergen by ID → single allergen with product count</test>
+        <test>RLS policy check (org isolation)</test>
+        <test>Cache events emitted on create/update/delete</test>
+      </test_suite>
+      <coverage>14 service tests</coverage>
+    </service_tests>
+
+    <e2e_tests file="tests/e2e/allergens.spec.ts">
+      <test_suite name="Allergen Management E2E">
+        <test>Navigate to /settings/allergens → page loads</test>
+        <test>14 EU allergens visible after org creation</test>
+        <test>Create custom allergen → appears in table</test>
+        <test>Edit custom allergen → changes saved</test>
+        <test>Delete custom allergen → success toast</test>
+        <test>Delete button disabled for EU allergens</test>
+        <test>Hover delete button → tooltip "Cannot delete EU major allergen"</test>
+        <test>Search allergens by code → filtered results</test>
+        <test>Search allergens by name → filtered results</test>
+        <test>Filter: Major allergens only → 14 EU allergens</test>
+        <test>Filter: Custom allergens only → custom allergens</test>
+        <test>Sort by Code → sorted ascending/descending</test>
+        <test>Sort by Name → sorted ascending/descending</test>
+        <test>Edit EU allergen name → allowed</test>
+        <test>Try to change EU allergen code → disabled field</test>
+        <test>Create allergen with duplicate code → error toast</test>
+        <test>Delete allergen in use → error toast "used by X products"</test>
+        <test>Product count column displays correctly (Epic 2)</test>
+      </test_suite>
+      <coverage>18 E2E tests</coverage>
+      <browsers>
+        <browser>Chromium</browser>
+        <browser>Firefox</browser>
+        <browser>WebKit</browser>
+      </browsers>
+    </e2e_tests>
+
+    <total_coverage>
+      <unit>30 tests</unit>
+      <service>14 tests</service>
+      <e2e>18 tests</e2e>
+      <total>62 tests</total>
+    </total_coverage>
+  </testing_strategy>
+
+  <technical_decisions>
+    <decision id="EU_ALLERGENS_NON_DELETABLE">
+      <rationale>14 EU allergens are mandatory for food regulation compliance (EU Regulation 1169/2011)</rationale>
+      <implementation>
+        <db>is_custom = false flag</db>
+        <ui>Delete button disabled</ui>
+        <api>FK constraint check on product_allergens table</api>
+      </implementation>
+    </decision>
+
+    <decision id="CUSTOM_ALLERGENS_DELETABLE">
+      <rationale>Organizations may add custom allergens for internal tracking (e.g., additives, spices)</rationale>
+      <implementation>
+        <db>is_custom = true flag</db>
+        <api>FK constraint check before delete</api>
+        <ui>Delete enabled if not used in products</ui>
+      </implementation>
+    </decision>
+
+    <decision id="ALLERGEN_CODE_CONVENTION">
+      <preloaded>MILK, EGGS, FISH, etc. (English names, uppercase)</preloaded>
+      <custom>CUSTOM-01, ADDITIVE-X, etc. (org-defined)</custom>
+    </decision>
+
+    <decision id="SEED_STRATEGY">
+      <trigger>On organization creation</trigger>
+      <idempotent>ON CONFLICT DO NOTHING</idempotent>
+      <future>Support multiple languages (name_pl, name_en)</future>
+    </decision>
+
+    <decision id="CACHE_EVENTS">
+      <mechanism>Supabase Realtime channels</mechanism>
+      <channel>org:{org_id}</channel>
+      <events>allergen.created, allergen.updated, allergen.deleted</events>
+      <subscribers>Epic 2 (Products), Epic 8 (NPD Formulation)</subscribers>
+    </decision>
+  </technical_decisions>
+
+  <dependencies>
+    <prerequisites>
+      <story id="1.1" title="Organization Configuration">
+        <requirement>organizations table exists</requirement>
+        <requirement>org_id FK for allergens table</requirement>
+        <requirement>Org creation workflow for seeding</requirement>
+      </story>
+      <story id="1.2" title="User Management">
+        <requirement>users table exists</requirement>
+        <requirement>Role-based access control (admin role)</requirement>
+      </story>
+    </prerequisites>
+
+    <downstream>
+      <epic id="2" title="Technical Module">
+        <requirement>product_allergens table uses allergens table</requirement>
+        <requirement>Product allergen assignment UI (Story 2.4)</requirement>
+        <requirement>Allergen aggregation in BOM (Story 2.10)</requirement>
+      </epic>
+      <epic id="8" title="NPD Module">
+        <requirement>Formulation auto-aggregates allergens from ingredients</requirement>
+      </epic>
+    </downstream>
+  </dependencies>
+
+  <implementation_files>
+    <backend>
+      <migration>apps/frontend/lib/supabase/migrations/010_create_allergens_table.sql</migration>
+      <migration>apps/frontend/lib/supabase/migrations/011_seed_eu_allergens_function.sql</migration>
+      <service>apps/frontend/lib/services/allergen-service.ts</service>
+      <validation>apps/frontend/lib/validation/allergen-schemas.ts</validation>
+      <api>apps/frontend/app/api/settings/allergens/route.ts</api>
+      <api>apps/frontend/app/api/settings/allergens/[id]/route.ts</api>
+      <script>scripts/apply-migration-010.mjs</script>
+    </backend>
+
+    <frontend>
+      <page>apps/frontend/app/settings/allergens/page.tsx</page>
+      <component>apps/frontend/components/settings/AllergenFormModal.tsx</component>
+    </frontend>
+
+    <tests>
+      <unit>apps/frontend/lib/validation/allergen-schemas.test.ts</unit>
+      <service>apps/frontend/lib/services/allergen-service.test.ts</service>
+      <e2e>tests/e2e/allergens.spec.ts</e2e>
+    </tests>
+
+    <documentation>
+      <story>docs/batches/01C-master-data/stories/1.9-allergen-management.md</story>
+      <tech_spec>docs/batches/01C-master-data/tech-spec.md</tech_spec>
+      <context>docs/batches/01C-master-data/stories/context/1.9.context.xml</context>
+    </documentation>
+  </implementation_files>
+
+  <deferred_items>
+    <item task="8" title="Organization Creation Hook">
+      <reason>Deferred to Story 1.14 (Epic 1 Polish and Cleanup)</reason>
+      <description>Add allergen seeding to organization creation workflow</description>
+    </item>
+    <item task="10" title="Comprehensive Testing">
+      <reason>Deferred to Story 1.14 (Epic 1 Polish and Cleanup)</reason>
+      <description>Full integration and E2E test suite expansion</description>
+    </item>
+  </deferred_items>
+
+  <references>
+    <regulation>EU Regulation 1169/2011: Food Allergen Labeling</regulation>
+    <epic_doc>docs/epics/epic-1-settings.md#Story-1.9</epic_doc>
+    <tech_spec>docs/sprint-artifacts/tech-spec-epic-1.md#FR-SET-008</tech_spec>
+    <database_schema>docs/reference/database-schema.md</database_schema>
+    <rls_best_practices>docs/RLS_AND_SUPABASE_CLIENTS.md</rls_best_practices>
+  </references>
+</story-context>
