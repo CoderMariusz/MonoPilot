@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.30</id>
+    <title>Source Document Linking</title>
+    <batch>5C-2</batch>
+    <points>5</points>
+    <effort_hours>5-6</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>Link LPs to originating source documents (GRN, WO, TO, PO) for complete traceability chain</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.1">License Plate Creation</story>
+      <story id="5.11">GRN and LP Creation</story>
+      <story id="4.12">WO Output Recording</story>
+      <story id="5.33">Receive from TO</story>
+    </requires>
+    <enables>
+      <story id="5.28">Forward/Backward Traceability</story>
+    </enables>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>license_plates</name>
+        <columns_to_add>
+          <column name="source_type" type="VARCHAR(20)" constraint="CHECK IN ('receiving','production','transfer','manual')"/>
+          <column name="source_grn_id" type="UUID" constraint="FK grn(id)"/>
+          <column name="source_wo_id" type="UUID" constraint="FK work_orders(id)"/>
+          <column name="source_to_id" type="UUID" constraint="FK transfer_orders(id)"/>
+          <column name="source_po_id" type="UUID" constraint="FK purchase_orders(id)"/>
+        </columns_to_add>
+        <indexes_to_add>
+          <index name="idx_lp_source_grn" columns="source_grn_id"/>
+          <index name="idx_lp_source_wo" columns="source_wo_id"/>
+          <index name="idx_lp_source_to" columns="source_to_id"/>
+          <index name="idx_lp_source_po" columns="source_po_id"/>
+        </indexes_to_add>
+      </table>
+    </tables>
+
+    <services>
+      <service name="LPService">
+        <method name="getLPsFromSource" params="source_type, source_id" return="LP[]"/>
+        <method name="getLPSource" params="lp_id" return="SourceDocument"/>
+      </service>
+    </services>
+  </technical_context>
+
+  <acceptance_criteria>
+    <criterion id="AC1">Store source type for each LP (receiving, production, transfer, manual)</criterion>
+    <criterion id="AC2">Store source document ID based on source type</criterion>
+    <criterion id="AC3">Display source info in LP detail with clickable link</criterion>
+    <criterion id="AC4">Navigate to source document from LP</criterion>
+    <criterion id="AC5">Reverse lookup: view all LPs from source document</criterion>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test name="Source type assignment for GRN, WO, TO, manual"/>
+      <test name="Source ID correctly stored for each type"/>
+      <test name="Reverse lookup finds all LPs from source"/>
+    </unit_tests>
+    <e2e_tests>
+      <test name="Create GRN → LPs created → view LP detail → see 'Received from GRN #X'"/>
+      <test name="Click source link → navigate to GRN"/>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="critical">Polymorphic FK: source_type determines which source_*_id to use</note>
+    <note priority="critical">Never update source_* fields after creation (immutable origin)</note>
+    <note priority="high">FDA compliance: Complete source chain required for traceability</note>
+  </implementation_notes>
+</story>
