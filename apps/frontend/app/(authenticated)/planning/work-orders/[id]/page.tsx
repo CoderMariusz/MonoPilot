@@ -38,6 +38,7 @@ import { useToast } from '@/hooks/use-toast'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
 import { WOOperationsList } from '@/components/planning/WOOperationsList'
 import { MaterialReservationsTable } from '@/components/production/MaterialReservationsTable'
+import WOStartModal from '@/components/production/WOStartModal'
 
 interface Product {
   id: string
@@ -122,6 +123,7 @@ export default function WorkOrderDetailsPage({
   const [loading, setLoading] = useState(true)
   const [paramsId, setParamsId] = useState<string>('')
   const [statusChanging, setStatusChanging] = useState(false)
+  const [startModalOpen, setStartModalOpen] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -276,17 +278,28 @@ export default function WorkOrderDetailsPage({
 
       <div className="px-6 py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/planning/work-orders')}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          <h1 className="text-2xl font-bold font-mono">{wo.wo_number}</h1>
-          {getStatusBadge(wo.status)}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4 flex-wrap">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/planning/work-orders')}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <h1 className="text-2xl font-bold font-mono">{wo.wo_number}</h1>
+            {getStatusBadge(wo.status)}
+          </div>
+          {wo.status === 'released' && (
+            <Button
+              onClick={() => setStartModalOpen(true)}
+              className="gap-2"
+            >
+              <Factory className="h-4 w-4" />
+              Start Production
+            </Button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -617,6 +630,17 @@ export default function WorkOrderDetailsPage({
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Start Production Modal - Story 4.2 */}
+      <WOStartModal
+        woId={wo.id}
+        open={startModalOpen}
+        onOpenChange={setStartModalOpen}
+        onSuccess={() => {
+          setStartModalOpen(false)
+          fetchWO()
+        }}
+      />
     </div>
   )
 }
