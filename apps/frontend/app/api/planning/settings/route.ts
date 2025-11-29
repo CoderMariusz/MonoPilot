@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
-import { planningSettingsSchema, type PlanningSettingsInput } from '@/lib/validation/planning-schemas'
+import { planningSettingsSchema, woSettingsSchema, type PlanningSettingsInput, type WOSettingsInput } from '@/lib/validation/planning-schemas'
 import { ZodError } from 'zod'
 
 // GET /api/planning/settings - Get planning settings
@@ -109,26 +109,70 @@ export async function PUT(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json()
-    const validatedData: PlanningSettingsInput = planningSettingsSchema.parse(body)
 
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // Verify po_default_status matches one of the status codes
-    const defaultStatusExists = validatedData.po_statuses.some(
-      status => status.code === validatedData.po_default_status
-    )
-
-    if (!defaultStatusExists) {
-      return NextResponse.json(
-        { error: 'Default status must match one of the configured statuses' },
-        { status: 400 }
-      )
+    // Build update data - support both PO and WO settings
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
     }
 
-    // Update settings
-    const updateData = {
-      ...validatedData,
-      updated_at: new Date().toISOString(),
+    // Validate PO settings if present
+    if (body.po_statuses !== undefined) {
+      const poData = planningSettingsSchema.parse(body)
+
+      // Verify po_default_status matches one of the status codes
+      const poDefaultExists = poData.po_statuses.some(
+        status => status.code === poData.po_default_status
+      )
+      if (!poDefaultExists) {
+        return NextResponse.json(
+          { error: 'PO default status must match one of the configured statuses' },
+          { status: 400 }
+        )
+      }
+
+      Object.assign(updateData, {
+        po_statuses: poData.po_statuses,
+        po_default_status: poData.po_default_status,
+        po_require_approval: poData.po_require_approval,
+        po_approval_threshold: poData.po_approval_threshold,
+        po_payment_terms_visible: poData.po_payment_terms_visible,
+        po_shipping_method_visible: poData.po_shipping_method_visible,
+        po_notes_visible: poData.po_notes_visible,
+      })
+    }
+
+    // Validate WO settings if present (Story 3.15)
+    if (body.wo_statuses !== undefined) {
+      const woData = woSettingsSchema.parse(body)
+
+      // Verify wo_default_status matches one of the status codes
+      const woDefaultExists = woData.wo_statuses.some(
+        status => status.code === woData.wo_default_status
+      )
+      if (!woDefaultExists) {
+        return NextResponse.json(
+          { error: 'WO default status must match one of the configured statuses' },
+          { status: 400 }
+        )
+      }
+
+      Object.assign(updateData, {
+        wo_statuses: woData.wo_statuses,
+        wo_default_status: woData.wo_default_status,
+        wo_status_expiry_days: woData.wo_status_expiry_days,
+      })
+    }
+
+    // Handle wo_status_expiry_days update alone
+    if (body.wo_status_expiry_days !== undefined && body.wo_statuses === undefined) {
+      updateData.wo_status_expiry_days = body.wo_status_expiry_days
+    }
+
+    // Handle wo_source_of_demand toggle (Story 3.16)
+    if (body.wo_source_of_demand !== undefined) {
+      updateData.wo_source_of_demand = body.wo_source_of_demand
     }
 
     const { data, error: updateError } = await supabaseAdmin

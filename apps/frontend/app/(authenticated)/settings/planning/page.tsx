@@ -88,12 +88,11 @@ interface PlanningSettings {
   to_statuses?: POStatus[]
   to_allow_partial?: boolean
   to_require_lp_selection?: boolean
-  // WO Settings (to be added in migration)
+  // WO Settings (Story 3.15, 3.16)
   wo_statuses?: POStatus[]
-  wo_status_expiry?: number
-  wo_source_of_demand?: string
-  wo_material_check?: boolean
-  wo_copy_routing?: boolean
+  wo_default_status?: string
+  wo_status_expiry_days?: number | null
+  wo_source_of_demand?: boolean
 }
 
 const COLORS = [
@@ -104,6 +103,7 @@ const COLORS = [
   { value: 'red', label: 'Red', class: 'bg-red-100 text-red-800' },
   { value: 'purple', label: 'Purple', class: 'bg-purple-100 text-purple-800' },
   { value: 'orange', label: 'Orange', class: 'bg-orange-100 text-orange-800' },
+  { value: 'indigo', label: 'Indigo', class: 'bg-indigo-100 text-indigo-800' },
 ]
 
 export default function PlanningSettingsPage() {
@@ -115,6 +115,17 @@ export default function PlanningSettingsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingStatus, setDeletingStatus] = useState<POStatus | null>(null)
   const [statusForm, setStatusForm] = useState({
+    code: '',
+    label: '',
+    color: 'gray',
+    is_default: false,
+  })
+  // WO Status states (Story 3.15)
+  const [woStatusModalOpen, setWoStatusModalOpen] = useState(false)
+  const [editingWoStatus, setEditingWoStatus] = useState<POStatus | null>(null)
+  const [deleteWoDialogOpen, setDeleteWoDialogOpen] = useState(false)
+  const [deletingWoStatus, setDeletingWoStatus] = useState<POStatus | null>(null)
+  const [woStatusForm, setWoStatusForm] = useState({
     code: '',
     label: '',
     color: 'gray',
@@ -358,6 +369,173 @@ export default function PlanningSettingsPage() {
     })
   }
 
+  // ===== WO Status Functions (Story 3.15) =====
+
+  // Open add WO status modal
+  const openAddWoStatusModal = () => {
+    setEditingWoStatus(null)
+    setWoStatusForm({
+      code: '',
+      label: '',
+      color: 'gray',
+      is_default: false,
+    })
+    setWoStatusModalOpen(true)
+  }
+
+  // Open edit WO status modal
+  const openEditWoStatusModal = (status: POStatus) => {
+    setEditingWoStatus(status)
+    setWoStatusForm({
+      code: status.code,
+      label: status.label,
+      color: status.color,
+      is_default: status.is_default,
+    })
+    setWoStatusModalOpen(true)
+  }
+
+  // Handle WO status form submit
+  const handleWoStatusSubmit = async () => {
+    if (!settings || !settings.wo_statuses) return
+
+    const code = woStatusForm.code.toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+
+    if (!code || !woStatusForm.label) {
+      toast({
+        title: 'Error',
+        description: 'Code and label are required',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    let newStatuses = [...settings.wo_statuses]
+
+    if (editingWoStatus) {
+      // Update existing status
+      const index = newStatuses.findIndex((s) => s.code === editingWoStatus.code)
+      if (index !== -1) {
+        newStatuses[index] = {
+          ...newStatuses[index],
+          label: woStatusForm.label,
+          color: woStatusForm.color,
+          is_default: woStatusForm.is_default,
+        }
+      }
+    } else {
+      // Check for duplicate code
+      if (newStatuses.some((s) => s.code === code)) {
+        toast({
+          title: 'Error',
+          description: 'Status code already exists',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      // Add new status
+      const maxSequence = Math.max(...newStatuses.map((s) => s.sequence), 0)
+      newStatuses.push({
+        code,
+        label: woStatusForm.label,
+        color: woStatusForm.color,
+        is_default: woStatusForm.is_default,
+        sequence: maxSequence + 1,
+      })
+    }
+
+    // Handle default status
+    if (woStatusForm.is_default) {
+      newStatuses = newStatuses.map((s) => ({
+        ...s,
+        is_default: s.code === code,
+      }))
+    }
+
+    // Ensure at least one default
+    if (!newStatuses.some((s) => s.is_default)) {
+      newStatuses[0].is_default = true
+    }
+
+    const defaultStatus = newStatuses.find((s) => s.is_default)?.code || newStatuses[0]?.code
+
+    await saveSettings({
+      wo_statuses: newStatuses,
+      wo_default_status: defaultStatus,
+    })
+
+    setWoStatusModalOpen(false)
+  }
+
+  // Open delete WO status dialog
+  const openDeleteWoDialog = (status: POStatus) => {
+    setDeletingWoStatus(status)
+    setDeleteWoDialogOpen(true)
+  }
+
+  // Handle delete WO status
+  const handleDeleteWoStatus = async () => {
+    if (!settings || !settings.wo_statuses || !deletingWoStatus) return
+
+    // Don't allow deleting the last status
+    if (settings.wo_statuses.length <= 1) {
+      toast({
+        title: 'Error',
+        description: 'Cannot delete the last status',
+        variant: 'destructive',
+      })
+      setDeleteWoDialogOpen(false)
+      return
+    }
+
+    let newStatuses = settings.wo_statuses.filter((s) => s.code !== deletingWoStatus.code)
+
+    // If we deleted the default, set first one as default
+    if (deletingWoStatus.is_default && newStatuses.length > 0) {
+      newStatuses[0].is_default = true
+    }
+
+    // Resequence
+    newStatuses = newStatuses.map((s, i) => ({ ...s, sequence: i + 1 }))
+
+    const defaultStatus = newStatuses.find((s) => s.is_default)?.code || newStatuses[0]?.code
+
+    await saveSettings({
+      wo_statuses: newStatuses,
+      wo_default_status: defaultStatus,
+    })
+
+    setDeleteWoDialogOpen(false)
+    setDeletingWoStatus(null)
+  }
+
+  // Handle set WO default status
+  const handleSetWoDefault = async (status: POStatus) => {
+    if (!settings || !settings.wo_statuses) return
+
+    const newStatuses = settings.wo_statuses.map((s) => ({
+      ...s,
+      is_default: s.code === status.code,
+    }))
+
+    await saveSettings({
+      wo_statuses: newStatuses,
+      wo_default_status: status.code,
+    })
+  }
+
+  // Handle WO expiry days change
+  const handleWoExpiryChange = (value: string) => {
+    if (!settings) return
+    const days = parseInt(value, 10)
+    if (value === '' || value === '0') {
+      saveSettings({ wo_status_expiry_days: null })
+    } else if (!isNaN(days) && days > 0) {
+      saveSettings({ wo_status_expiry_days: days })
+    }
+  }
+
   // Get color badge class
   const getColorClass = (color: string) => {
     return COLORS.find((c) => c.value === color)?.class || COLORS[0].class
@@ -582,16 +760,135 @@ export default function PlanningSettingsPage() {
           </div>
         </TabsContent>
 
-        {/* WO Settings Tab */}
+        {/* WO Settings Tab - Story 3.15, 3.16 */}
         <TabsContent value="wo" className="space-y-6">
-          <div className="border rounded-lg p-6">
-            <div className="text-center py-8">
-              <Factory className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Work Order Settings</h3>
-              <p className="text-gray-500">
-                Work Order settings will be available in a future update.
-              </p>
+          {/* Source of Demand - Story 3.16 */}
+          <div className="border rounded-lg p-6 space-y-6">
+            <h2 className="text-lg font-semibold">Source of Demand</h2>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="wo-source-demand">Enable Source of Demand Tracking</Label>
+                <p className="text-sm text-gray-500">
+                  When enabled, planners can specify why a WO was created (PO, Customer Order, Manual, Forecast, etc.)
+                </p>
+              </div>
+              <Switch
+                id="wo-source-demand"
+                checked={settings.wo_source_of_demand || false}
+                onCheckedChange={(checked) =>
+                  saveSettings({ wo_source_of_demand: checked })
+                }
+              />
             </div>
+          </div>
+
+          {/* WO Status Expiry */}
+          <div className="border rounded-lg p-6 space-y-6">
+            <h2 className="text-lg font-semibold">WO Auto-Close</h2>
+
+            <div className="flex items-center gap-4">
+              <div className="flex-1 max-w-xs">
+                <Label htmlFor="wo-expiry-days">Auto-close Completed WOs after</Label>
+                <div className="flex items-center gap-2 mt-2">
+                  <Input
+                    id="wo-expiry-days"
+                    type="number"
+                    value={settings.wo_status_expiry_days || ''}
+                    onChange={(e) => handleWoExpiryChange(e.target.value)}
+                    placeholder="Leave empty to disable"
+                    min="0"
+                    step="1"
+                  />
+                  <span className="text-sm text-gray-500">days</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Completed WOs will auto-transition to Closed after this period. Leave empty to disable.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* WO Statuses */}
+          <div className="border rounded-lg p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">WO Statuses</h2>
+              <Button onClick={openAddWoStatusModal} size="sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Status
+              </Button>
+            </div>
+
+            {settings.wo_statuses && settings.wo_statuses.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8"></TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Label</TableHead>
+                    <TableHead>Color</TableHead>
+                    <TableHead>Default</TableHead>
+                    <TableHead>Seq</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {settings.wo_statuses
+                    .sort((a, b) => a.sequence - b.sequence)
+                    .map((status) => (
+                      <TableRow key={status.code}>
+                        <TableCell>
+                          <GripVertical className="h-4 w-4 text-gray-400" />
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{status.code}</TableCell>
+                        <TableCell>{status.label}</TableCell>
+                        <TableCell>
+                          <Badge className={getColorClass(status.color)}>
+                            {status.color}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {status.is_default ? (
+                            <Badge variant="default">Default</Badge>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSetWoDefault(status)}
+                            >
+                              Set Default
+                            </Button>
+                          )}
+                        </TableCell>
+                        <TableCell>{status.sequence}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditWoStatusModal(status)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openDeleteWoDialog(status)}
+                              disabled={settings.wo_statuses!.length <= 1}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                No WO statuses configured. Click &quot;Add Status&quot; to create one.
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -713,6 +1010,127 @@ export default function PlanningSettingsPage() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteStatus}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add/Edit WO Status Modal - Story 3.15 */}
+      <Dialog open={woStatusModalOpen} onOpenChange={setWoStatusModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingWoStatus ? 'Edit WO Status' : 'Add WO Status'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingWoStatus
+                ? 'Update the WO status configuration'
+                : 'Create a new Work Order status'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="wo-status-code">Code</Label>
+              <Input
+                id="wo-status-code"
+                value={woStatusForm.code}
+                onChange={(e) =>
+                  setWoStatusForm((prev) => ({
+                    ...prev,
+                    code: e.target.value.toLowerCase(),
+                  }))
+                }
+                placeholder="e.g., on_hold"
+                disabled={!!editingWoStatus}
+              />
+              <p className="text-xs text-gray-500">
+                Lowercase letters, numbers, underscores, and hyphens only
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="wo-status-label">Label</Label>
+              <Input
+                id="wo-status-label"
+                value={woStatusForm.label}
+                onChange={(e) =>
+                  setWoStatusForm((prev) => ({ ...prev, label: e.target.value }))
+                }
+                placeholder="e.g., On Hold"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="wo-status-color">Color</Label>
+              <Select
+                value={woStatusForm.color}
+                onValueChange={(value) =>
+                  setWoStatusForm((prev) => ({ ...prev, color: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COLORS.map((color) => (
+                    <SelectItem key={color.value} value={color.value}>
+                      <div className="flex items-center gap-2">
+                        <Badge className={color.class}>{color.label}</Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="wo-status-default">Set as Default</Label>
+              <Switch
+                id="wo-status-default"
+                checked={woStatusForm.is_default}
+                onCheckedChange={(checked) =>
+                  setWoStatusForm((prev) => ({ ...prev, is_default: checked }))
+                }
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWoStatusModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleWoStatusSubmit} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete WO Status Dialog - Story 3.15 */}
+      <AlertDialog open={deleteWoDialogOpen} onOpenChange={setDeleteWoDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete WO Status</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the WO status &quot;{deletingWoStatus?.label}&quot;?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingWoStatus(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteWoStatus}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,13 +1,14 @@
 /**
  * Work Order Form Modal Component
  * Story 3.10: Work Order CRUD
+ * Story 3.13: Material Availability Check
  * AC-3.10.2: Create/Edit WO with product and production line selection
  * AC-3.10.3: Auto-generate WO number
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,6 +29,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { MaterialAvailabilityPanel } from './MaterialAvailabilityPanel'
 
 interface Product {
   id: string
@@ -51,7 +53,18 @@ interface WorkOrder {
   production_line_id: string | null
   status: string
   notes?: string | null
+  source_type?: string | null
+  source_reference?: string | null
 }
+
+// Source types for WO (Story 3.16)
+const SOURCE_TYPES = [
+  { code: 'manual', label: 'Manual' },
+  { code: 'po', label: 'Purchase Order' },
+  { code: 'customer_order', label: 'Customer Order' },
+  { code: 'forecast', label: 'Forecast' },
+  { code: 'stock_replenishment', label: 'Stock Replenishment' },
+]
 
 interface WorkOrderFormModalProps {
   open: boolean
@@ -78,6 +91,8 @@ export function WorkOrderFormModal({
     production_line_id: workOrder?.production_line_id || '',
     status: workOrder?.status || 'draft',
     notes: workOrder?.notes || '',
+    source_type: workOrder?.source_type || '',
+    source_reference: workOrder?.source_reference || '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -85,6 +100,10 @@ export function WorkOrderFormModal({
   const [machines, setMachines] = useState<Machine[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [loadingMachines, setLoadingMachines] = useState(true)
+  // Story 3.13: Material Availability
+  const [activeBomId, setActiveBomId] = useState<string | null>(null)
+  const [hasAvailabilityWarnings, setHasAvailabilityWarnings] = useState(false)
+  const [sourceOfDemandEnabled, setSourceOfDemandEnabled] = useState(false)
   const { toast } = useToast()
 
   const isEditMode = !!workOrder
@@ -120,6 +139,25 @@ export function WorkOrderFormModal({
     }
   }, [open])
 
+  // Story 3.16: Fetch planning settings for source of demand toggle
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch('/api/planning/settings')
+        if (response.ok) {
+          const data = await response.json()
+          setSourceOfDemandEnabled(data.settings?.wo_source_of_demand || false)
+        }
+      } catch (error) {
+        console.error('Error fetching planning settings:', error)
+      }
+    }
+
+    if (open) {
+      fetchSettings()
+    }
+  }, [open])
+
   // Fetch production lines (machines)
   useEffect(() => {
     const fetchMachines = async () => {
@@ -150,6 +188,40 @@ export function WorkOrderFormModal({
       fetchMachines()
     }
   }, [open])
+
+  // Story 3.13: Fetch active BOM for material availability check
+  useEffect(() => {
+    const fetchActiveBom = async () => {
+      if (!formData.product_id || isEditMode) {
+        setActiveBomId(null)
+        return
+      }
+
+      try {
+        const date = formData.planned_start_date || new Date().toISOString().split('T')[0]
+        const response = await fetch(
+          `/api/planning/products/${formData.product_id}/active-bom?date=${date}`
+        )
+
+        if (response.ok) {
+          const data = await response.json()
+          setActiveBomId(data.bom?.id || null)
+        } else {
+          setActiveBomId(null)
+        }
+      } catch (error) {
+        console.error('Error fetching active BOM:', error)
+        setActiveBomId(null)
+      }
+    }
+
+    fetchActiveBom()
+  }, [formData.product_id, formData.planned_start_date, isEditMode])
+
+  // Story 3.13: Handle availability warnings callback
+  const handleAvailabilityChange = useCallback((hasWarnings: boolean) => {
+    setHasAvailabilityWarnings(hasWarnings)
+  }, [])
 
   // Handle input change
   const handleChange = (field: string, value: string) => {
@@ -213,6 +285,9 @@ export function WorkOrderFormModal({
         planned_end_date: formData.planned_end_date || null,
         production_line_id: formData.production_line_id || null,
         notes: formData.notes || null,
+        // Story 3.16: Source of Demand fields
+        source_type: formData.source_type || null,
+        source_reference: formData.source_reference || null,
       }
 
       if (isEditMode) {
@@ -381,6 +456,52 @@ export function WorkOrderFormModal({
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {/* Story 3.13: Material Availability Panel */}
+          {!isEditMode && activeBomId && (
+            <MaterialAvailabilityPanel
+              bomId={activeBomId}
+              plannedQuantity={parseFloat(formData.planned_quantity) || 0}
+              onAvailabilityChange={handleAvailabilityChange}
+            />
+          )}
+
+          {/* Story 3.16: Source of Demand */}
+          {sourceOfDemandEnabled && (
+            <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
+              <h4 className="text-sm font-medium text-gray-700">Source of Demand</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="source_type">Source Type</Label>
+                  <Select
+                    value={formData.source_type}
+                    onValueChange={(value) => handleChange('source_type', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select source..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SOURCE_TYPES.map((type) => (
+                        <SelectItem key={type.code} value={type.code}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="source_reference">Reference</Label>
+                  <Input
+                    id="source_reference"
+                    value={formData.source_reference}
+                    onChange={(e) => handleChange('source_reference', e.target.value)}
+                    placeholder="e.g., PO-001, ORD-123"
+                    maxLength={100}
+                  />
+                </div>
+              </div>
             </div>
           )}
 

@@ -141,3 +141,31 @@ export const planningSettingsSchema = z.object({
 })
 
 export type PlanningSettingsInput = z.input<typeof planningSettingsSchema>
+
+// ===== WO Status Schemas (Story 3.15) =====
+
+export const woStatusSchema = z.object({
+  code: z.string().min(1).regex(/^[a-z0-9_-]+$/, 'Status code must be lowercase letters, numbers, underscores, and hyphens'),
+  label: z.string().min(1).max(50),
+  color: z.enum(['gray', 'blue', 'green', 'yellow', 'red', 'purple', 'orange', 'indigo']),
+  is_default: z.boolean(),
+  sequence: z.number().int().min(1),
+})
+
+export type WOStatusInput = z.input<typeof woStatusSchema>
+
+export const woSettingsSchema = z.object({
+  wo_statuses: z.array(woStatusSchema).min(1).refine(statuses => {
+    const defaults = statuses.filter(s => s.is_default)
+    return defaults.length === 1
+  }, 'Exactly one default status required'),
+  wo_default_status: z.string(),
+  wo_status_expiry_days: z.number().int().positive().nullable().optional(),
+})
+
+export type WOSettingsInput = z.input<typeof woSettingsSchema>
+
+// Extended planning settings with WO configuration
+export const planningSettingsWithWOSchema = planningSettingsSchema.merge(woSettingsSchema.partial())
+
+export type PlanningSettingsWithWOInput = z.input<typeof planningSettingsWithWOSchema>

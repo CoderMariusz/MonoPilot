@@ -31,9 +31,11 @@ import {
   Calendar,
   Package,
   Clock,
+  Cog,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
+import { WOOperationsList } from '@/components/planning/WOOperationsList'
 
 interface Product {
   id: string
@@ -77,6 +79,18 @@ interface WorkOrder {
   products?: Product
   machines?: Machine
   boms?: BOM
+  // Story 3.16: Source of Demand
+  source_type?: string | null
+  source_reference?: string | null
+}
+
+// Source type labels for display (Story 3.16)
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  manual: 'Manual',
+  po: 'Purchase Order',
+  customer_order: 'Customer Order',
+  forecast: 'Forecast',
+  stock_replenishment: 'Stock Replenishment',
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -284,6 +298,10 @@ export default function WorkOrderDetailsPage({
               <Factory className="h-4 w-4" />
               Production
             </TabsTrigger>
+            <TabsTrigger value="operations" className="gap-2">
+              <Cog className="h-4 w-4" />
+              Operations
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -448,6 +466,18 @@ export default function WorkOrderDetailsPage({
                     <dd className="text-sm bg-gray-50 p-3 rounded">{wo.notes}</dd>
                   </div>
                 )}
+                {/* Story 3.16: Source of Demand */}
+                {wo.source_type && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600">Source:</dt>
+                    <dd className="font-medium">
+                      {SOURCE_TYPE_LABELS[wo.source_type] || wo.source_type}
+                      {wo.source_reference && (
+                        <span className="text-gray-500 ml-2">({wo.source_reference})</span>
+                      )}
+                    </dd>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <dt className="text-gray-600">Created:</dt>
                   <dd className="font-medium text-sm">{formatDateTime(wo.created_at)}</dd>
@@ -562,6 +592,11 @@ export default function WorkOrderDetailsPage({
                 </p>
               </div>
             )}
+          </TabsContent>
+
+          {/* Operations Tab - Story 3.14 */}
+          <TabsContent value="operations" className="space-y-6">
+            <WOOperationsList woId={wo.id} woStatus={wo.status} />
           </TabsContent>
         </Tabs>
       </div>

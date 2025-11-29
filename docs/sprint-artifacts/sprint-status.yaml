@@ -77,18 +77,57 @@ development_status:
   batch-01E-retrospective: completed
 
   # ============================================
-  # EPIC 2: Products Module (Batch 02A)
+  # EPIC 2: Technical Module (Batches 02A-02E) - COMPLETED
   # ============================================
 
   # Batch 02A-1: Products Core
   batch-02A-1-products-core: contexted
-  2-1-product-crud: ready-for-dev
-  2-2-product-versioning: ready-for-dev
-  2-3-product-history: ready-for-dev
-  2-4-product-allergens: ready-for-dev
-  2-5-product-types: ready-for-dev
-  2-22-technical-settings: ready-for-dev
-  batch-02A-1-retrospective: optional
+  2-1-product-crud: done
+  2-2-product-versioning: done
+  2-3-product-history: done
+  2-4-product-allergens: done
+  2-5-product-types: done
+  2-22-technical-settings: done
+  batch-02A-1-retrospective: completed
+
+  # Batch 02B-1: BOM Core
+  batch-02B-1-bom-core: contexted
+  2-6-bom-crud: done
+  2-7-bom-items: done
+  2-8-date-validation: done
+  2-9-timeline-viz: done
+  batch-02B-1-retrospective: completed
+
+  # Batch 02B-2: BOM Advanced
+  batch-02B-2-bom-advanced: contexted
+  2-10-bom-compare: done
+  2-11-bom-clone: done
+  2-12-conditional-items: done
+  2-13-by-products: done
+  batch-02B-2-retrospective: completed
+
+  # Batch 02C-1: Routing
+  batch-02C-1-routing: contexted
+  2-15-routing-crud: done
+  2-16-routing-operations: done
+  2-17-routing-product-assignment: done
+  batch-02C-1-retrospective: completed
+
+  # Batch 02D-1: Traceability
+  batch-02D-1-traceability: contexted
+  2-18-forward-trace: done
+  2-19-backward-trace: done
+  2-20-recall-simulation: done
+  batch-02D-1-retrospective: completed
+
+  # Batch 02E-1: Dashboard & Allergen
+  batch-02E-1-dashboard-allergen: contexted
+  2-21-allergen-matrix: done
+  batch-02E-1-retrospective: completed
+
+  # Batch 02E-2: Technical UI
+  batch-02E-2-technical-ui: contexted
+  batch-02E-2-retrospective: completed
 
   # ============================================
   # EPIC 3: Purchase Orders Module (Batch 03A)
@@ -102,6 +141,21 @@ development_status:
   3-4-po-approval: ready-for-dev
   3-5-po-statuses: ready-for-dev
   batch-03A-1-retrospective: optional
+
+  # Batch 03C-1: Work Orders Core
+  batch-03C-1-work-orders-core: contexted
+  3-10-wo-crud: done
+  3-11-bom-auto-selection: done
+  3-12-wo-materials-snapshot: done
+  3-13-material-availability: done
+  batch-03C-1-retrospective: optional
+
+  # Batch 03C-2: Work Orders Advanced
+  batch-03C-2-work-orders-advanced: contexted
+  3-14-routing-copy-to-wo: done
+  3-15-wo-statuses: done
+  3-16-wo-source-demand: done
+  batch-03C-2-retrospective: optional
 
   # ============================================
   # EPIC 4: Production Module (Batches 04A-04C)
@@ -141,7 +195,7 @@ development_status:
 
   # Batch 04C-1: Config & Traceability
   batch-04C-1-config-traceability: contexted
-  4-17-production-settings: ready-for-dev
+  4-17-production-settings: review
   4-18-lp-updates-consumption: ready-for-dev
   4-19-genealogy-creation: ready-for-dev
   4-20-operation-timeline: ready-for-dev

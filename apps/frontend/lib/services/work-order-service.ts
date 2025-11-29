@@ -242,6 +242,34 @@ export async function createWorkOrder(
       }
     }
 
+    // Story 3.12: Copy BOM materials to WO (if product has BOM)
+    if (workOrder && bomId) {
+      const bomCopyResult = await copyBOMToWOMaterials(
+        workOrder.id,
+        bomId,
+        input.planned_quantity,
+        orgId
+      )
+      if (!bomCopyResult.success) {
+        console.warn('Failed to copy BOM materials:', bomCopyResult.error)
+      }
+    }
+
+    // Story 3.14: Copy routing operations to WO (if product has routing)
+    if (workOrder) {
+      const routingResult = await getProductRouting(input.product_id)
+      if (routingResult.success && routingResult.data) {
+        const copyResult = await copyRoutingToWO(
+          workOrder.id,
+          routingResult.data,
+          orgId
+        )
+        if (!copyResult.success) {
+          console.warn('Failed to copy routing operations:', copyResult.error)
+        }
+      }
+    }
+
     return {
       success: true,
       data: workOrder as WorkOrder,
@@ -547,5 +575,248 @@ export async function deleteWorkOrder(woId: string): Promise<ServiceResult> {
       error: error instanceof Error ? error.message : 'Unexpected error occurred',
       code: 'DATABASE_ERROR',
     }
+  }
+}
+
+// =============================================================================
+// Story 3.14: Routing Copy to WO
+// =============================================================================
+
+/**
+ * Copy BOM items to WO materials
+ * Story 3.12: Snapshot BOM items at WO creation time with quantity scaling
+ *
+ * AC-3.12.1: Copy BOM items and scale quantities
+ * AC-3.12.2: Calculate scaled qty = bom_item.qty × (wo.qty / bom.output_qty)
+ * AC-3.12.3: Store BOM item reference and version for immutability tracking
+ */
+export async function copyBOMToWOMaterials(
+  woId: string,
+  bomId: string,
+  woQty: number,
+  orgId: string
+): Promise<ServiceResult> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Get BOM with items and product names
+    const { data: bom, error: bomError } = await supabaseAdmin
+      .from('boms')
+      .select(`
+        id,
+        version,
+        output_qty,
+        bom_items (
+          id,
+          product_id,
+          quantity,
+          uom,
+          scrap_percent,
+          sequence,
+          consume_whole_lp,
+          is_by_product,
+          yield_percent,
+          condition_flags,
+          notes,
+          product:products!product_id (name)
+        )
+      `)
+      .eq('id', bomId)
+      .single()
+
+    if (bomError || !bom) {
+      console.error('Error fetching BOM:', bomError)
+      return {
+        success: false,
+        error: 'Failed to fetch BOM',
+        code: 'DATABASE_ERROR',
+      }
+    }
+
+    const bomItems = bom.bom_items || []
+
+    if (bomItems.length === 0) {
+      // No items to copy - this is not an error
+      return { success: true, data: [] }
+    }
+
+    // Prepare wo_materials records with quantity scaling
+    // Formula: scaled_qty = bom_item.qty × (wo.qty / bom.output_qty)
+    const woMaterials = bomItems.map((item: any) => ({
+      wo_id: woId,
+      organization_id: orgId,
+      product_id: item.product_id,
+      material_name: item.product?.name || 'Unknown Material',
+      required_qty: (item.quantity || 0) * (woQty / (bom.output_qty || 1)),
+      consumed_qty: 0,
+      uom: item.uom,
+      sequence: item.sequence || 0,
+      consume_whole_lp: item.consume_whole_lp || false,
+      is_by_product: item.is_by_product || false,
+      yield_percent: item.yield_percent || null,
+      scrap_percent: item.scrap_percent || 0,
+      condition_flags: item.condition_flags || null,
+      bom_item_id: item.id,
+      bom_version: bom.version,
+      notes: item.notes || null,
+    }))
+
+    // Insert wo_materials records
+    const { data: inserted, error: insertError } = await supabaseAdmin
+      .from('wo_materials')
+      .insert(woMaterials)
+      .select()
+
+    if (insertError) {
+      console.error('Error inserting WO materials:', insertError)
+      return {
+        success: false,
+        error: 'Failed to copy BOM items to work order',
+        code: 'DATABASE_ERROR',
+      }
+    }
+
+    return { success: true, data: inserted }
+  } catch (error) {
+    console.error('Unexpected error in copyBOMToWOMaterials:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unexpected error',
+      code: 'DATABASE_ERROR',
+    }
+  }
+}
+
+/**
+ * Copy routing operations to WO
+ * Story 3.14: Creates wo_operations from routing_operations
+ */
+export async function copyRoutingToWO(
+  woId: string,
+  routingId: string,
+  orgId: string
+): Promise<ServiceResult> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Get routing operations
+    const { data: routingOps, error: routingError } = await supabaseAdmin
+      .from('routing_operations')
+      .select('*')
+      .eq('routing_id', routingId)
+      .order('sequence', { ascending: true })
+
+    if (routingError) {
+      console.error('Error fetching routing operations:', routingError)
+      return {
+        success: false,
+        error: 'Failed to fetch routing operations',
+        code: 'DATABASE_ERROR',
+      }
+    }
+
+    if (!routingOps || routingOps.length === 0) {
+      // No operations to copy - this is not an error
+      return { success: true, data: [] }
+    }
+
+    // Prepare wo_operations records
+    const woOperations = routingOps.map((op) => ({
+      wo_id: woId,
+      organization_id: orgId,
+      sequence: op.sequence,
+      operation_name: op.operation_name,
+      machine_id: op.machine_id || null,
+      line_id: op.line_id || null,
+      expected_duration_minutes: op.expected_duration_minutes || null,
+      expected_yield_percent: op.expected_yield_percent || 100,
+      status: 'pending',
+      notes: null,
+    }))
+
+    // Insert all operations
+    const { data: inserted, error: insertError } = await supabaseAdmin
+      .from('wo_operations')
+      .insert(woOperations)
+      .select()
+
+    if (insertError) {
+      console.error('Error inserting WO operations:', insertError)
+      return {
+        success: false,
+        error: 'Failed to copy routing operations',
+        code: 'DATABASE_ERROR',
+      }
+    }
+
+    return { success: true, data: inserted }
+  } catch (error) {
+    console.error('Unexpected error in copyRoutingToWO:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unexpected error',
+      code: 'DATABASE_ERROR',
+    }
+  }
+}
+
+/**
+ * Get WO operations
+ * Story 3.14: Fetches operations for a Work Order
+ */
+export async function getWOOperations(woId: string): Promise<ListResult<any>> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    const { data, error } = await supabaseAdmin
+      .from('wo_operations')
+      .select(`
+        *,
+        machines:machine_id (
+          id,
+          code,
+          name
+        )
+      `)
+      .eq('wo_id', woId)
+      .order('sequence', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching WO operations:', error)
+      return { success: false, error: 'Failed to fetch operations' }
+    }
+
+    return { success: true, data: data || [], total: data?.length || 0 }
+  } catch (error) {
+    console.error('Unexpected error in getWOOperations:', error)
+    return { success: false, error: 'Unexpected error' }
+  }
+}
+
+/**
+ * Get product's default routing
+ * Story 3.14: Gets the routing assigned to a product
+ */
+export async function getProductRouting(productId: string): Promise<ServiceResult<string | null>> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Check product_routings for assigned routing
+    const { data, error } = await supabaseAdmin
+      .from('product_routings')
+      .select('routing_id')
+      .eq('product_id', productId)
+      .eq('is_default', true)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+      console.error('Error fetching product routing:', error)
+      return { success: false, error: 'Failed to fetch product routing' }
+    }
+
+    return { success: true, data: data?.routing_id || null }
+  } catch (error) {
+    console.error('Unexpected error in getProductRouting:', error)
+    return { success: false, error: 'Unexpected error' }
   }
 }
