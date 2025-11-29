@@ -127,15 +127,23 @@ export async function getWOForStartModal(woId: string, orgId: string): Promise<W
       }
     }
 
+    // Handle Supabase join results (may be arrays)
+    type ProductData = { name: string } | { name: string }[] | null
+    type MachineData = { name: string } | { name: string }[] | null
+    const productData = wo.products as unknown as ProductData
+    const machineData = wo.machines as unknown as MachineData
+    const productName = Array.isArray(productData) ? productData[0]?.name : productData?.name
+    const lineName = Array.isArray(machineData) ? machineData[0]?.name : machineData?.name
+
     return {
       id: wo.id,
       wo_number: wo.wo_number,
-      product_name: wo.products?.name || 'Unknown',
+      product_name: productName || 'Unknown',
       planned_qty: wo.planned_quantity,
       uom: wo.uom,
       scheduled_date: wo.scheduled_date,
       production_line_id: wo.production_line_id,
-      line_name: wo.machines?.name,
+      line_name: lineName,
       materials,
     }
   } catch (error) {
@@ -233,6 +241,11 @@ export async function startWorkOrder(
       console.error('Error creating activity log:', logError)
     }
 
+    // Handle Supabase join results (may be arrays)
+    type UserData = { id: string; email: string; first_name?: string; last_name?: string }
+    const userData = updatedWO.users as unknown as UserData | UserData[] | null
+    const user = Array.isArray(userData) ? userData[0] : userData
+
     return {
       id: updatedWO.id,
       wo_number: updatedWO.wo_number,
@@ -240,10 +253,10 @@ export async function startWorkOrder(
       started_at: updatedWO.started_at,
       started_by_user_id: updatedWO.started_by_user_id,
       started_by_user: {
-        id: updatedWO.users?.id || userId,
-        email: updatedWO.users?.email || '',
-        first_name: updatedWO.users?.first_name,
-        last_name: updatedWO.users?.last_name,
+        id: user?.id || userId,
+        email: user?.email || '',
+        first_name: user?.first_name,
+        last_name: user?.last_name,
       },
     }
   } catch (error) {

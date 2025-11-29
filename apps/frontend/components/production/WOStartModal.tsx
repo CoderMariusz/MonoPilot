@@ -1,22 +1,56 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, AlertTriangle } from 'lucide-react'
-import type { WOStartModalData } from '@/lib/services/wo-start-service'
+
+interface MaterialAvailability {
+  id: string
+  material_name: string
+  product_id: string
+  required_qty: number
+  available_qty: number
+  available_pct: number
+  uom: string
+  has_shortage: boolean
+}
+
+interface WOStartModalData {
+  id: string
+  wo_number: string
+  product_name: string
+  planned_qty: number
+  uom: string
+  scheduled_date?: string
+  production_line_id?: string
+  line_name?: string
+  materials: MaterialAvailability[]
+}
 
 interface WOStartModalProps {
   woId: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSuccess?: (woData: any) => void
+  onSuccess?: (woData: unknown) => void
 }
 
-export default function WOStartModal({ woId, open, onOpenChange, onSuccess }: WOStartModalProps) {
+export default function WOStartModal({
+  woId,
+  open,
+  onOpenChange,
+  onSuccess,
+}: WOStartModalProps) {
   const [woData, setWoData] = useState<WOStartModalData | null>(null)
   const [loading, setLoading] = useState(true)
   const [confirming, setConfirming] = useState(false)
@@ -142,7 +176,9 @@ export default function WOStartModal({ woId, open, onOpenChange, onSuccess }: WO
                   {woData.scheduled_date && (
                     <div>
                       <span className="text-gray-600">Scheduled Date:</span>
-                      <p className="font-medium">{new Date(woData.scheduled_date).toLocaleDateString()}</p>
+                      <p className="font-medium">
+                        {new Date(woData.scheduled_date).toLocaleDateString()}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -188,7 +224,9 @@ export default function WOStartModal({ woId, open, onOpenChange, onSuccess }: WO
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-right">
-                          <p className="text-sm font-medium">{material.available_pct.toFixed(0)}%</p>
+                          <p className="text-sm font-medium">
+                            {material.available_pct.toFixed(0)}%
+                          </p>
                         </div>
                         {material.has_shortage && (
                           <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
