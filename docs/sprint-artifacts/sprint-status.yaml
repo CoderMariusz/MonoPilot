@@ -163,7 +163,7 @@ development_status:
 
   # Batch 04A-1: Work Order Lifecycle
   batch-04A-1-wo-lifecycle: contexted
-  4-1-production-dashboard: ready-for-dev
+  4-1-production-dashboard: review
   4-2-wo-start: ready-for-dev
   4-3-wo-pause-resume: ready-for-dev
   4-4-operation-start: ready-for-dev

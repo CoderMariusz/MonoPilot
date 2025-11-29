@@ -32,10 +32,12 @@ import {
   Package,
   Clock,
   Cog,
+  Boxes,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
 import { WOOperationsList } from '@/components/planning/WOOperationsList'
+import { MaterialReservationsTable } from '@/components/production/MaterialReservationsTable'
 
 interface Product {
   id: string
@@ -301,6 +303,10 @@ export default function WorkOrderDetailsPage({
             <TabsTrigger value="operations" className="gap-2">
               <Cog className="h-4 w-4" />
               Operations
+            </TabsTrigger>
+            <TabsTrigger value="materials" className="gap-2">
+              <Boxes className="h-4 w-4" />
+              Materials
             </TabsTrigger>
           </TabsList>
 
@@ -597,6 +603,17 @@ export default function WorkOrderDetailsPage({
           {/* Operations Tab - Story 3.14 */}
           <TabsContent value="operations" className="space-y-6">
             <WOOperationsList woId={wo.id} woStatus={wo.status} />
+          </TabsContent>
+
+          {/* Materials Tab - Story 4.7 */}
+          <TabsContent value="materials" className="space-y-6">
+            <div className="border rounded-lg p-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Boxes className="h-5 w-5" />
+                Material Reservations
+              </h2>
+              <MaterialReservationsTable woId={wo.id} woStatus={wo.status} />
+            </div>
           </TabsContent>
         </Tabs>
       </div>

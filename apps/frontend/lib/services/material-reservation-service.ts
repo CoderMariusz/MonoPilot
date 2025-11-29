@@ -172,19 +172,27 @@ export class MaterialReservationService {
     const materialsWithReservations: MaterialWithReservations[] = (materials || []).map((material) => {
       const materialReservations = (reservations || [])
         .filter((r) => r.material_id === material.id)
-        .map((r) => ({
-          id: r.id,
-          lp_id: r.lp_id,
-          lp_number: (r.license_plates as { lp_number: string })?.lp_number || '',
-          reserved_qty: r.reserved_qty,
-          sequence_number: r.sequence_number,
-          status: r.status,
-          reserved_at: r.reserved_at,
-          reserved_by_user: {
-            id: (r.users as { id: string })?.id || '',
-            name: `${(r.users as { first_name?: string })?.first_name || ''} ${(r.users as { last_name?: string })?.last_name || ''}`.trim(),
-          },
-        }))
+        .map((r) => {
+          // Handle Supabase join results (can be object or array)
+          const lpData = r.license_plates as unknown as { lp_number: string } | { lp_number: string }[]
+          const lpNumber = Array.isArray(lpData) ? lpData[0]?.lp_number : lpData?.lp_number
+          const userData = r.users as unknown as { id: string; first_name?: string; last_name?: string } | { id: string; first_name?: string; last_name?: string }[]
+          const user = Array.isArray(userData) ? userData[0] : userData
+
+          return {
+            id: r.id,
+            lp_id: r.lp_id,
+            lp_number: lpNumber || '',
+            reserved_qty: r.reserved_qty,
+            sequence_number: r.sequence_number,
+            status: r.status,
+            reserved_at: r.reserved_at,
+            reserved_by_user: {
+              id: user?.id || '',
+              name: `${user?.first_name || ''} ${user?.last_name || ''}`.trim(),
+            },
+          }
+        })
 
       return {
         ...material,
@@ -629,8 +637,10 @@ export class MaterialReservationService {
       .eq('id', reservation.lp_id)
 
     // Update wo_materials reserved_qty
-    const material = reservation.wo_materials as { id: string; material_name: string; reserved_qty: number }
-    const newReservedQty = Math.max(0, Number(material.reserved_qty || 0) - reservation.reserved_qty)
+    // Handle Supabase join results (can be object or array)
+    const materialData = reservation.wo_materials as unknown as { id: string; material_name: string; reserved_qty: number } | { id: string; material_name: string; reserved_qty: number }[]
+    const material = Array.isArray(materialData) ? materialData[0] : materialData
+    const newReservedQty = Math.max(0, Number(material?.reserved_qty || 0) - reservation.reserved_qty)
     await this.supabase
       .from('wo_materials')
       .update({
@@ -645,15 +655,17 @@ export class MaterialReservationService {
       .delete()
       .eq('wo_material_reservation_id', reservationId)
 
-    const lpData = reservation.license_plates as { lp_number: string }
+    // Handle Supabase join results for LP
+    const lpRaw = reservation.license_plates as unknown as { lp_number: string } | { lp_number: string }[]
+    const lpData = Array.isArray(lpRaw) ? lpRaw[0] : lpRaw
 
     return {
       data: {
         material_id: reservation.material_id,
-        material_name: material.material_name,
+        material_name: material?.material_name || '',
         reserved_qty: reservation.reserved_qty,
         lp_id: reservation.lp_id,
-        lp_number: lpData.lp_number,
+        lp_number: lpData?.lp_number || '',
       },
       error: null,
     }
@@ -716,15 +728,21 @@ export class MaterialReservationService {
     }
 
     return {
-      data: (data || []).map((lp) => ({
-        id: lp.id,
-        lp_number: lp.lp_number,
-        quantity: lp.quantity,
-        current_qty: lp.current_qty ?? lp.quantity,
-        uom: lp.uom,
-        expiry_date: lp.expiry_date,
-        location_name: (lp.locations as { name: string } | null)?.name || null,
-      })),
+      data: (data || []).map((lp) => {
+        // Handle Supabase join results for locations
+        const locRaw = lp.locations as unknown as { name: string } | { name: string }[] | null
+        const location = Array.isArray(locRaw) ? locRaw[0] : locRaw
+
+        return {
+          id: lp.id,
+          lp_number: lp.lp_number,
+          quantity: lp.quantity,
+          current_qty: lp.current_qty ?? lp.quantity,
+          uom: lp.uom,
+          expiry_date: lp.expiry_date,
+          location_name: location?.name || null,
+        }
+      }),
       error: null,
     }
   }
