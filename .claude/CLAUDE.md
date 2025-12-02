@@ -1,249 +1,199 @@
-# MonoPilot - Optymalizacja Tokenów
+# MonoPilot - AI Guide
 
-## Priorytet: Efektywność i Minimalizacja Kosztów
+## Priorytet: Efektywność Tokenów
 
-### Podstawowe Zasady
-- **NIE czytaj plików bez wyraźnej potrzeby** - zawsze pytaj czy plik jest potrzebny
-- **NIE używaj Task/Explore agent** bez konieczności - najpierw użyj Grep/Glob
-- **NIE generuj długich odpowiedzi** - bądź zwięzły i konkretny
-- **NIE powtarzaj kodu** - pokaż tylko zmienione fragmenty
-- **Używaj Haiku** dla prostych zadań zamiast Sonnet
+### Zasady Podstawowe
+- **NIE czytaj plików bez potrzeby** - pytaj o lokalizację
+- **NIE używaj Task/Explore** - najpierw Grep/Glob
+- **NIE generuj długich odpowiedzi** - zwięźle i konkretnie
+- **Pokazuj TYLKO zmiany**, nie cały plik
+- **Używaj Haiku** dla prostych zadań (docs, review, testy)
 
-### Stack Technologiczny (NIE czytaj tych plików bez pytania)
-- **Frontend**: Next.js 15, React, TypeScript, Tailwind CSS, shadcn/ui
-- **Backend**: Supabase (PostgreSQL, Auth, RLS)
-- **Deployment**: Vercel
-- **Testing**: Playwright (E2E), Vitest (Unit)
-- **Package Manager**: pnpm
+---
 
-### Struktura Projektu - Zapamiętaj (NIE skanuj bez potrzeby)
+## Quick Reference
+
+### Stack
+`Next.js 15` | `React` | `TypeScript` | `Tailwind` | `shadcn/ui` | `Supabase` | `pnpm`
+
+### Struktura
 ```
-apps/frontend/       # Główna aplikacja Next.js
-  src/
-    app/            # App Router (Next.js 15)
-    components/     # Komponenty React
-    lib/            # Utilities, Supabase client
-    types/          # TypeScript types
-    hooks/          # React hooks
-scripts/            # Skrypty migracji/seeding
-__tests__/          # Testy (unit + E2E)
-supabase/           # Konfiguracja Supabase
-.bmad/              # BMAD Method workflow files
+apps/frontend/src/     # Next.js App Router
+  app/                 # Routes + API
+  components/          # React components
+  lib/supabase/        # client.ts + server.ts
+docs/sprint-artifacts/ # Sprint status + stories
+.bmad/                 # BMAD workflows
 ```
 
-### Kluczowe Komendy (Użyj TYLKO gdy potrzeba)
+### Komendy
 ```bash
-pnpm dev              # Start dev server
-pnpm build            # Build produkcyjny
-pnpm type-check       # TypeScript check
-pnpm test             # Run tests
-pnpm test:unit        # Unit tests only
-pnpm test:e2e         # E2E tests only
-```
-
-### MCP Servers - Dostępne (NIE listuj bez pytania)
-- **Supabase**: Migracje, SQL, tables, logs, advisors
-- **Vercel**: Deployments, projekty, logi buildów
-
-### Optymalizacja Workflow
-
-#### 1. Zamiast czytać wiele plików:
-❌ NIE: Read każdego pliku osobno
-✅ TAK: Grep pattern w całym projekcie, Read TYLKO znalezione
-
-#### 2. Przy migracjach bazy:
-❌ NIE: Czytaj wszystkie poprzednie migracje
-✅ TAK: Użyj `mcp__supabase__list_tables` i `mcp__supabase__execute_sql`
-
-#### 3. Przy dodawaniu komponentów:
-❌ NIE: Czytaj wszystkie podobne komponenty
-✅ TAK: Pytaj o lokalizację, czytaj TYLKO jeden przykład
-
-#### 4. Przy debugowaniu:
-❌ NIE: Czytaj cały stack trace i wszystkie pliki
-✅ TAK: Znajdź błąd Grep, czytaj TYLKO plik z błędem
-
-#### 5. Przy code review:
-❌ NIE: Używaj `/bmad:bmm:workflows:code-review` dla małych zmian
-✅ TAK: Przejrzyj tylko zmienione linie z `git diff`
-
-### RLS Policies - Zapamiętaj Pattern
-Wszystkie tabele mają standardowy pattern RLS:
-```sql
--- Enable RLS
-ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
-
--- Standard policies (authenticated users)
-CREATE POLICY "Enable read for authenticated users"
-  ON table_name FOR SELECT
-  TO authenticated
-  USING (true);
-
-CREATE POLICY "Enable insert for authenticated users"
-  ON table_name FOR INSERT
-  TO authenticated
-  WITH CHECK (true);
-
-CREATE POLICY "Enable update for authenticated users"
-  ON table_name FOR UPDATE
-  TO authenticated
-  USING (true)
-  WITH CHECK (true);
-
-CREATE POLICY "Enable delete for authenticated users"
-  ON table_name FOR DELETE
-  TO authenticated
-  USING (true);
-```
-**NIE czytaj istniejących migracji** - użyj tego wzorca.
-
-### API Routes Pattern - Zapamiętaj
-```typescript
-// apps/frontend/src/app/api/[resource]/route.ts
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-
-export async function GET() {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('table_name')
-    .select('*')
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
-}
-```
-**NIE czytaj innych routes** - użyj tego wzorca.
-
-### Component Pattern - Zapamiętaj
-```typescript
-'use client'
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-
-export default function Component() {
-  const [data, setData] = useState([])
-  const supabase = createClient()
-
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  async function fetchData() {
-    const { data } = await supabase.from('table').select('*')
-    setData(data || [])
-  }
-
-  return <div>{/* UI */}</div>
-}
-```
-**NIE czytaj innych komponentów** - użyj tego wzorca.
-
-### Testing Pattern - Zapamiętaj
-
-#### Playwright E2E (tests/e2e/**/*.spec.ts)
-```typescript
-import { test, expect } from '@playwright/test'
-import { createTestOrganization, createTestUser, createTestWarehouses } from './fixtures/test-setup'
-
-test.describe('Feature X', () => {
-  test('should do something', async ({ page, context, baseURL }) => {
-    const { orgId } = await createTestOrganization()
-    const { userId, token } = await createTestUser(orgId)
-
-    // Set auth cookie
-    await context.addCookies([{
-      name: 'sb-auth',
-      value: token,
-      domain: new URL(baseURL!).hostname,
-      path: '/',
-    }])
-
-    // Navigate and test
-    await page.goto('/page-url')
-    await expect(page.locator('selector')).toBeVisible()
-  })
-})
-```
-
-#### Test Setup Fixtures (test-setup.ts)
-- `createTestOrganization()` - zwraca orgId z .env.test
-- `createTestUser(orgId)` - tworzy auth user + JWT
-- `createTestWarehouses(orgId)` - tworzy 2 magazyny
-- `createTestProducts(orgId, count)` - tworzy produkty
-- `cleanupTestData(orgId)` - czyści dane po teście
-
-#### Konfiguracja (playwright.config.ts)
-- Testy z 3 przeglądarkami (chromium, firefox, webkit)
-- timeout: 60s, expect: 15s, actionTimeout: 15s, navigationTimeout: 30s
-- baseURL: env NEXT_PUBLIC_APP_URL lub http://localhost:5000
-- Automatyczne starty dev servera: `cd apps/frontend && pnpm dev`
-- Screenshoty/videa tylko na failure
-- Traces retain-on-failure
-
-#### Komendy Testów
-```bash
-pnpm test              # Playwright E2E (wszystkie przeglądarki)
-pnpm test:e2e          # Alias dla Playwright
-pnpm test -- --headed  # Z interfejsem
-pnpm test -- --debug   # Debug mode
-pnpm test -- --project=chromium  # Konkretna przeglądarka
-```
-
-#### .env.test wymagane
-```
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-TEST_ORG_ID=...  # ID istniejącej organizacji do testów
-NEXT_PUBLIC_APP_URL=http://localhost:5000
-BASE_URL=http://localhost:5000
-```
-
-**NIE tworz nowych fixture'ów** - użyj istniejących z test-setup.ts.
-
-### Gdy NIE wiesz - PYTAJ, NIE szukaj
-Jeśli nie znasz:
-- Struktury bazy danych → PYTAJ użytkownika
-- Nazwy komponentu → PYTAJ gdzie jest
-- Business logic → PYTAJ o wymagania
-
-### BMAD Workflows - Użyj TYLKO gdy użytkownik prosi
-- `/bmad:bmm:workflows:workflow-status` - Status projektu
-- `/bmad:bmm:workflows:code-review` - Code review (TYLKO dla dużych zmian)
-- `/bmad:bmm:workflows:sprint-planning` - Sprint planning
-- **Inne workflows** - TYLKO na wyraźne żądanie
-
-### Komunikacja
-- Odpowiedzi ZAWSZE w języku polskim
-- Maksymalnie zwięźle
-- Bez powtarzania kodu użytkownika
-- Bez niepotrzebnych wyjaśnień
-- Pokazuj TYLKO zmiany, nie cały plik
-
-### Przykład Dobrej Odpowiedzi
-```
-Dodam endpoint dla produktów.
-
-Zmiany w apps/frontend/src/app/api/products/route.ts:15-20:
-+ export async function POST(request: Request) {
-+   const body = await request.json()
-+   // ... implementacja
-+ }
-
-Gotowe. Endpoint dostępny pod /api/products.
-```
-
-### Przykład Złej Odpowiedzi (UNIKAJ)
-```
-Oczywiście! Najpierw przeczytam strukturę projektu...
-[czyta 10 plików]
-Teraz przeanalizuję podobne endpointy...
-[czyta kolejne 5 plików]
-Oto pełna implementacja z wyjaśnieniami...
-[300 linii kodu z komentarzami]
+pnpm dev        # Dev server
+pnpm build      # Build
+pnpm type-check # TypeScript
+pnpm test       # Playwright E2E
 ```
 
 ---
 
-**Pamiętaj**: Każdy token kosztuje. Pytaj, nie zgaduj. Czytaj minimum, pisz konkretnie.
+## Po każdym COMMICIE - Aktualizuj Status
+
+### 1. Sprawdź co zrobiłeś
+```bash
+git log -1 --oneline
+```
+
+### 2. Zaktualizuj sprint-status.yaml
+Lokalizacja: `docs/sprint-artifacts/sprint-status.yaml`
+
+Statusy story:
+- `backlog` → `drafted` → `ready-for-dev` → `in-progress` → `review` → `done`
+
+**Przykład zmiany:**
+```yaml
+# PRZED
+4-1-production-dashboard: ready-for-dev
+
+# PO (gdy ukończone)
+4-1-production-dashboard: done
+```
+
+### 3. Jeśli story ukończone - Update story file
+Lokalizacja: `docs/sprint-artifacts/batch-XXX/stories/`
+- Zmień status na `done`
+- Dodaj datę ukończenia
+
+---
+
+## Quick Status Check
+
+**Aby sprawdzić aktualny status projektu:**
+```bash
+# Szybki podgląd sprint-status
+cat docs/sprint-artifacts/sprint-status.yaml | head -60
+```
+
+**Lub użyj workflow:**
+`/bmad:bmm:workflows:workflow-status`
+
+---
+
+## Optymalizacja Tokenów
+
+### 1. Szukanie kodu
+```
+❌ Task/Explore agent
+✅ Grep pattern → Read TYLKO znalezione pliki
+```
+
+### 2. Baza danych
+```
+❌ Czytaj migracje
+✅ mcp__supabase__list_tables lub mcp__supabase__execute_sql
+```
+
+### 3. Wzorce kodu
+```
+❌ Czytaj podobne pliki
+✅ Przeczytaj .claude/PATTERNS.md (tylko gdy tworzysz nowy API/component/test)
+```
+
+### 4. Debugowanie
+```
+❌ Czytaj cały stack
+✅ Grep błąd → Read TYLKO plik z błędem
+```
+
+### 5. Code review
+```
+❌ /bmad:bmm:workflows:code-review (dla małych zmian)
+✅ git diff --stat, git diff [plik]
+```
+
+---
+
+## Kiedy czytać PATTERNS.md?
+
+Przeczytaj `.claude/PATTERNS.md` TYLKO gdy:
+- [ ] Tworzysz **nowy API endpoint**
+- [ ] Tworzysz **nową migrację/RLS**
+- [ ] Tworzysz **nowy komponent z Supabase**
+- [ ] Piszesz **nowe testy E2E**
+
+W innych przypadkach - NIE czytaj.
+
+---
+
+## BMAD Workflows
+
+### Używaj TYLKO gdy potrzebujesz:
+| Workflow | Kiedy |
+|----------|-------|
+| `workflow-status` | Sprawdzenie statusu projektu |
+| `dev-story` | Implementacja całego story |
+| `code-review` | Review DUŻYCH zmian (>5 plików) |
+| `sprint-planning` | Planowanie sprintu |
+
+### NIE używaj gdy:
+- Mała zmiana (1-2 pliki) → po prostu zrób
+- Prosty bug fix → po prostu napraw
+- Dokumentacja → ręcznie lub `/quick-docs`
+
+---
+
+## Quick Commands (Haiku-friendly)
+
+Dla prostych zadań użyj Haiku:
+- `/quick-docs` - Update dokumentacji
+- `/quick-test` - Generowanie testów
+- `/quick-review` - Szybkie code review
+
+---
+
+## Komunikacja
+
+- Odpowiedzi w **języku polskim**
+- **Zwięźle** - bez zbędnych wyjaśnień
+- Pokazuj **tylko diff**, nie cały plik
+- **Pytaj** zamiast zgadywać
+
+### Dobra odpowiedź:
+```
+Dodam endpoint.
+
+apps/frontend/src/app/api/products/route.ts:15:
++ export async function POST(req: Request) { ... }
+
+Gotowe.
+```
+
+### Zła odpowiedź:
+```
+Oczywiście! Najpierw przeczytam całą strukturę...
+[czyta 10 plików]
+Oto pełna implementacja z komentarzami...
+[300 linii]
+```
+
+---
+
+## Index Plików Projektu
+
+### Dokumentacja
+| Plik | Opis |
+|------|------|
+| `docs/sprint-artifacts/sprint-status.yaml` | Aktualny status wszystkich stories |
+| `docs/sprint-artifacts/batch-*/` | Batche z stories |
+| `.claude/PATTERNS.md` | Wzorce kodu (API, RLS, Component, Test) |
+| `.claude/WORKFLOW-GUIDE.md` | Multi-model workflow (Haiku/Sonnet/Opus) |
+
+### Konfiguracja
+| Plik | Opis |
+|------|------|
+| `apps/frontend/package.json` | Dependencies |
+| `playwright.config.ts` | E2E config |
+| `supabase/` | Migracje i konfiguracja |
+
+---
+
+**Pamiętaj: Każdy token kosztuje. Pytaj, nie zgaduj. Czytaj minimum.**
