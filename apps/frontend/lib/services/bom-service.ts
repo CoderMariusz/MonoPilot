@@ -160,6 +160,7 @@ export async function getBOMs(filters: BOMFilters = {}): Promise<BOMWithProduct[
 
 /**
  * Get single BOM by ID
+ * AC-2.25.6: Include production_lines in response
  */
 export async function getBOMById(id: string, include_items = false): Promise<BOMWithProduct | null> {
   const supabase = await createServerSupabase()
@@ -184,6 +185,15 @@ export async function getBOMById(id: string, include_items = false): Promise<BOM
           uom
         )
       ),
+      production_lines:bom_production_lines (
+        id,
+        line_id,
+        labor_cost_per_hour,
+        line:production_lines (
+          id,
+          name
+        )
+      ),
       created_by_user:users!created_by (
         id,
         first_name,
@@ -205,6 +215,15 @@ export async function getBOMById(id: string, include_items = false): Promise<BOM
         name,
         type,
         uom
+      ),
+      production_lines:bom_production_lines (
+        id,
+        line_id,
+        labor_cost_per_hour,
+        line:production_lines (
+          id,
+          name
+        )
       ),
       created_by_user:users!created_by (
         id,
@@ -415,4 +434,264 @@ export async function getBOMCountForProduct(productId: string): Promise<number> 
   }
 
   return count || 0
+}
+
+// ============================================================================
+// BOM PRODUCTION LINES - Story 2.25
+// ============================================================================
+
+export interface BomProductionLine {
+  id: string
+  bom_id: string
+  line_id: string
+  line?: {
+    id: string
+    name: string
+    warehouse_id: string
+    warehouse?: { id: string; name: string }
+  }
+  labor_cost_per_hour: number | null
+  created_at: string
+}
+
+export interface SetBomLinesInput {
+  lines: Array<{
+    line_id: string
+    labor_cost_per_hour?: number
+  }>
+}
+
+/**
+ * Get production lines assigned to a BOM
+ * AC-2.25.3: GET /api/technical/boms/:id/lines
+ */
+export async function getProductionLines(bomId: string): Promise<BomProductionLine[]> {
+  const supabase = await createServerSupabase()
+
+  const { data, error } = await supabase
+    .from('bom_production_lines')
+    .select(`
+      *,
+      line:production_lines (
+        id,
+        name,
+        warehouse_id,
+        warehouse:warehouses (id, name)
+      )
+    `)
+    .eq('bom_id', bomId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching BOM production lines:', error)
+    throw new Error(`Failed to fetch production lines: ${error.message}`)
+  }
+
+  return (data || []) as unknown as BomProductionLine[]
+}
+
+/**
+ * Set production lines for a BOM (bulk replace)
+ * AC-2.25.4: PUT /api/technical/boms/:id/lines
+ */
+export async function setProductionLines(
+  bomId: string,
+  input: SetBomLinesInput
+): Promise<BomProductionLine[]> {
+  const userInfo = await getCurrentUserOrgId()
+  if (!userInfo) {
+    throw new Error('Unauthorized or no organization found for user')
+  }
+
+  const supabaseAdmin = createServerSupabaseAdmin()
+
+  // Validate BOM exists and belongs to user's org
+  const { data: bom, error: bomError } = await supabaseAdmin
+    .from('boms')
+    .select('id, org_id')
+    .eq('id', bomId)
+    .single()
+
+  if (bomError || !bom) {
+    throw new Error('BOM_NOT_FOUND')
+  }
+
+  if (bom.org_id !== userInfo.orgId) {
+    throw new Error('BOM_NOT_FOUND') // Security: don't reveal existence
+  }
+
+  // Validate all line_ids exist and belong to same org
+  if (input.lines.length > 0) {
+    const lineIds = input.lines.map(l => l.line_id)
+
+    const { data: validLines, error: lineError } = await supabaseAdmin
+      .from('production_lines')
+      .select('id, org_id')
+      .in('id', lineIds)
+
+    if (lineError) {
+      throw new Error(`Failed to validate lines: ${lineError.message}`)
+    }
+
+    // Check all lines exist
+    const foundIds = new Set(validLines?.map(l => l.id) || [])
+    for (const lineId of lineIds) {
+      if (!foundIds.has(lineId)) {
+        throw new Error(`INVALID_LINE:${lineId}`)
+      }
+    }
+
+    // Check all lines belong to same org
+    for (const line of validLines || []) {
+      if (line.org_id !== userInfo.orgId) {
+        throw new Error(`INVALID_LINE_ORG:${line.id}`)
+      }
+    }
+  }
+
+  // Delete existing assignments
+  const { error: deleteError } = await supabaseAdmin
+    .from('bom_production_lines')
+    .delete()
+    .eq('bom_id', bomId)
+
+  if (deleteError) {
+    throw new Error(`Failed to clear existing lines: ${deleteError.message}`)
+  }
+
+  // Insert new assignments
+  if (input.lines.length > 0) {
+    const insertData = input.lines.map(l => ({
+      bom_id: bomId,
+      line_id: l.line_id,
+      labor_cost_per_hour: l.labor_cost_per_hour ?? null
+    }))
+
+    const { error: insertError } = await supabaseAdmin
+      .from('bom_production_lines')
+      .insert(insertData)
+
+    if (insertError) {
+      if (insertError.code === '23505') {
+        throw new Error('DUPLICATE_LINE')
+      }
+      throw new Error(`Failed to insert lines: ${insertError.message}`)
+    }
+  }
+
+  // Return updated list
+  return getProductionLines(bomId)
+}
+
+/**
+ * Get labor cost for specific line assignment
+ * AC-2.25.7: Helper method
+ */
+export async function getLaborCostForLine(bomId: string, lineId: string): Promise<number | null> {
+  const supabase = await createServerSupabase()
+
+  const { data, error } = await supabase
+    .from('bom_production_lines')
+    .select('labor_cost_per_hour')
+    .eq('bom_id', bomId)
+    .eq('line_id', lineId)
+    .single()
+
+  if (error || !data) {
+    return null
+  }
+
+  return data.labor_cost_per_hour
+}
+
+/**
+ * Get all production lines available for BOM assignment (org-filtered)
+ * AC-2.25.7: Helper method
+ */
+export async function getAvailableLines(): Promise<Array<{ id: string; name: string; warehouse_id: string }>> {
+  const userInfo = await getCurrentUserOrgId()
+  if (!userInfo) {
+    throw new Error('Unauthorized or no organization found for user')
+  }
+
+  const supabase = await createServerSupabase()
+
+  const { data, error } = await supabase
+    .from('production_lines')
+    .select('id, name, warehouse_id')
+    .eq('org_id', userInfo.orgId)
+    .eq('status', 'active')
+    .order('name', { ascending: true })
+
+  if (error) {
+    throw new Error(`Failed to fetch production lines: ${error.message}`)
+  }
+
+  return data || []
+}
+
+/**
+ * Calculate total labor cost for BOM on specific line
+ * AC-2.25.10: Labor cost calculation helper
+ */
+export async function calculateLaborCost(
+  bomId: string,
+  lineId: string,
+  batchSize: number = 1
+): Promise<{
+  total_labor_cost: number
+  breakdown: Array<{
+    operation_seq: number
+    operation_name: string
+    duration_minutes: number
+    cost_per_hour: number
+    cost: number
+  }>
+}> {
+  const supabase = await createServerSupabase()
+
+  // Get BOM with routing
+  const { data: bom, error: bomError } = await supabase
+    .from('boms')
+    .select('id, routing_id')
+    .eq('id', bomId)
+    .single()
+
+  if (bomError || !bom || !bom.routing_id) {
+    return { total_labor_cost: 0, breakdown: [] }
+  }
+
+  // Get line-specific labor cost override
+  const lineLaborCost = await getLaborCostForLine(bomId, lineId)
+
+  // Get routing operations
+  const { data: operations, error: opsError } = await supabase
+    .from('routing_operations')
+    .select('sequence, name, estimated_duration_minutes, labor_cost_per_hour')
+    .eq('routing_id', bom.routing_id)
+    .order('sequence', { ascending: true })
+
+  if (opsError || !operations) {
+    return { total_labor_cost: 0, breakdown: [] }
+  }
+
+  const breakdown = operations.map(op => {
+    const durationMinutes = op.estimated_duration_minutes || 0
+    // Line override > operation default > 0
+    const costPerHour = lineLaborCost ?? op.labor_cost_per_hour ?? 0
+    const hours = durationMinutes / 60
+    const cost = Math.round(hours * costPerHour * batchSize * 100) / 100
+
+    return {
+      operation_seq: op.sequence,
+      operation_name: op.name,
+      duration_minutes: durationMinutes,
+      cost_per_hour: costPerHour,
+      cost
+    }
+  })
+
+  const total_labor_cost = breakdown.reduce((sum, op) => sum + op.cost, 0)
+
+  return { total_labor_cost, breakdown }
 }

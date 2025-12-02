@@ -3,7 +3,6 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import {
   createRoutingSchema,
   routingFiltersSchema,
-  type RoutingFilters,
 } from '@/lib/validation/routing-schemas'
 import {
   createRouting,
@@ -12,15 +11,14 @@ import {
 import { ZodError } from 'zod'
 
 /**
- * Routing API Routes
- * Story: 2.15 Routing CRUD
+ * Routing API Routes - Story 2.24
  *
  * GET /api/technical/routings - List routings with filters
  * POST /api/technical/routings - Create new routing
  */
 
 // ============================================================================
-// GET /api/technical/routings - List Routings (AC-015.2)
+// GET /api/technical/routings - List Routings (AC-2.24.5)
 // ============================================================================
 
 export async function GET(request: NextRequest) {
@@ -37,33 +35,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get current user to check role and org_id
-    const { data: currentUser, error: userError } = await supabase
-      .from('users')
-      .select('role, org_id')
-      .eq('id', session.user.id)
-      .single()
-
-    if (userError || !currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Note: GET is allowed for all authenticated users (view routings)
-    // Admin/Technical restriction only applies to POST/PUT/DELETE
-
-    // Parse query parameters for filtering and sorting (AC-015.3)
+    // Parse query parameters for filtering
     const searchParams = request.nextUrl.searchParams
-    const status = searchParams.get('status')
-    const search = searchParams.get('search')
-    const sortBy = searchParams.get('sort_by')
-    const sortDirection = searchParams.get('sort_direction')
+    const isActive = searchParams.get('is_active')
 
     // Validate filters
-    const filters: RoutingFilters = routingFiltersSchema.parse({
-      status: status || undefined,
-      search: search || undefined,
-      sort_by: sortBy || undefined,
-      sort_direction: sortDirection || undefined,
+    const filters = routingFiltersSchema.parse({
+      is_active: isActive || undefined,
     })
 
     // Call service method
@@ -101,7 +79,7 @@ export async function GET(request: NextRequest) {
 }
 
 // ============================================================================
-// POST /api/technical/routings - Create Routing (AC-015.1)
+// POST /api/technical/routings - Create Routing (AC-2.24.5)
 // ============================================================================
 
 export async function POST(request: NextRequest) {
@@ -129,7 +107,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Check authorization: Admin or Technical only (AC-015.5)
+    // Check authorization: Admin or Technical only
     if (!['admin', 'technical'].includes(currentUser.role)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin or Technical role required' },
@@ -146,10 +124,10 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       // Handle specific error codes
-      if (result.code === 'DUPLICATE_CODE') {
+      if (result.code === 'DUPLICATE_NAME') {
         return NextResponse.json(
-          { error: result.error || 'Routing code already exists' },
-          { status: 409 }
+          { error: result.error || 'Routing name already exists' },
+          { status: 400 }
         )
       }
 

@@ -346,7 +346,7 @@ export async function getLocations(
       .select(
         `
         *,
-        warehouse:warehouses!inner(code, name)
+        warehouse:warehouses!locations_warehouse_id_fkey(code, name)
       `
       )
       .eq('org_id', orgId)
@@ -416,7 +416,7 @@ export async function getLocationById(
       .select(
         `
         *,
-        warehouse:warehouses!inner(code, name)
+        warehouse:warehouses!locations_warehouse_id_fkey(code, name)
       `
       )
       .eq('id', id)

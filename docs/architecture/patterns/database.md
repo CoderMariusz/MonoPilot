@@ -76,28 +76,57 @@ CREATE INDEX idx_audit_log_org_table ON audit_log(org_id, table_name, changed_at
 CREATE INDEX idx_audit_log_record ON audit_log(record_id, changed_at);
 ```
 
-### Soft Delete Strategy
-Per-table configuration based on business needs:
+### Soft Delete Strategy ✅ IMPLEMENTED
 
-| Table | Soft Delete | Reason |
-|-------|-------------|--------|
-| work_orders | Yes | Historical reference |
-| license_plates | Yes | Traceability |
-| products | Yes | BOM references |
-| boms | Yes | WO snapshots |
-| po_header | Yes | Audit trail |
-| stock_moves | No | Archive instead |
-| notifications | No | Cleanup after read |
+**Decision:** NO soft delete - hard delete with FK constraints
+
+**Rationale:**
+- Simpler queries (no WHERE deleted_at IS NULL everywhere)
+- FK constraints prevent deletion if dependencies exist
+- Version history tables preserve audit trail
+- ON DELETE RESTRICT for critical tables (products, warehouses)
+- ON DELETE CASCADE for child records (bom_items, wo_materials)
+
+**Implementation:**
+
+| Table | Delete Strategy | Reason |
+|-------|-----------------|--------|
+| work_orders | Hard delete + FK RESTRICT | Prevents delete if has outputs/genealogy |
+| license_plates | Hard delete + FK RESTRICT | Traceability via lp_genealogy table |
+| products | Hard delete + FK RESTRICT | Cannot delete if used in BOMs/WOs |
+| boms | Hard delete + CASCADE to items | Only draft BOMs deletable |
+| warehouses | Hard delete + FK RESTRICT | Cannot delete if has locations |
+| users | Status = 'inactive' | Preserves audit trail (created_by refs) |
 
 ## Versioning Patterns
 
-### Date-Based BOM Versioning
+### Date-Based BOM Versioning ✅ IMPLEMENTED
+
 ```sql
 CREATE TABLE boms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_id UUID NOT NULL REFERENCES products(id),
-  version INTEGER NOT NULL,
-  status bom_status NOT NULL DEFAULT 'draft',
+  org_id UUID NOT NULL REFERENCES organizations(id),
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  version TEXT NOT NULL,              -- "1.0", "1.1", "2.0" (not INTEGER)
+  effective_from DATE NOT NULL,
+  effective_to DATE,
+  status TEXT NOT NULL DEFAULT 'draft',  -- Draft/Active/Phased Out/Inactive
+  output_qty NUMERIC NOT NULL DEFAULT 1.0,
+  output_uom TEXT NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
+
+  UNIQUE (org_id, product_id, version)
+);
+
+-- Date overlap validation trigger (prevents overlapping BOM date ranges)
+CREATE TRIGGER trigger_check_bom_date_overlap
+  BEFORE INSERT OR UPDATE ON boms
+  FOR EACH ROW
+  EXECUTE FUNCTION check_bom_date_overlap();
   effective_from DATE NOT NULL,
   effective_to DATE, -- NULL = no end date
 

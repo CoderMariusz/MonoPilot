@@ -89,13 +89,18 @@ CREATE TABLE boms (
   version INTEGER NOT NULL,
   status bom_status NOT NULL DEFAULT 'draft',
 
+  -- Routing assignment (defines operations for WO)
+  routing_id UUID REFERENCES routings(id),
+
   -- Date-based versioning
   effective_from DATE NOT NULL,
   effective_to DATE,
 
-  -- Metadata
+  -- Output & Packaging
   batch_size DECIMAL(15,4) NOT NULL,
   batch_uom TEXT NOT NULL,
+  units_per_box INTEGER,          -- How many units fit in one box/carton
+  boxes_per_pallet INTEGER,       -- How many boxes fit on one pallet
   notes TEXT,
 
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -108,23 +113,42 @@ CREATE TABLE boms (
 
 CREATE TYPE bom_status AS ENUM ('draft', 'active', 'phased_out', 'inactive');
 
--- BOM Items
+-- BOM Production Lines (Many-to-Many: one BOM can be produced on multiple lines)
+CREATE TABLE bom_production_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bom_id UUID NOT NULL REFERENCES boms(id) ON DELETE CASCADE,
+  line_id UUID NOT NULL REFERENCES production_lines(id),
+  labor_cost_per_hour DECIMAL(10,2), -- Optional override for this line
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(bom_id, line_id)
+);
+
+-- BOM Items (inputs and outputs per operation)
 CREATE TABLE bom_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   bom_id UUID NOT NULL REFERENCES boms(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id),
+  component_id UUID NOT NULL REFERENCES products(id),
+
+  -- Operation assignment (which routing operation this item belongs to)
+  operation_seq INTEGER NOT NULL DEFAULT 1,
+  is_output BOOLEAN DEFAULT false,  -- true = output of operation, false = input
+
+  -- Quantity
   quantity DECIMAL(15,4) NOT NULL,
   uom TEXT NOT NULL,
   scrap_percent DECIMAL(5,2) DEFAULT 0,
 
+  -- Alternatives priority (items with same operation_seq + sequence are alternatives)
+  sequence INTEGER DEFAULT 1,  -- 1 = primary, 2+ = alternatives (sorted by reserved_at in WO)
+
+  -- Line-specific components (NULL = used on ALL lines assigned to BOM)
+  line_ids UUID[],  -- Array of line IDs where this item is used
+
   -- Consumption rules
   consume_whole_lp BOOLEAN DEFAULT false,
-  is_phantom BOOLEAN DEFAULT false, -- Explode to child BOM
 
-  -- Sequencing
-  sequence INTEGER NOT NULL DEFAULT 0,
-
-  notes TEXT
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- BOM By-Products
@@ -174,28 +198,30 @@ CREATE TABLE spec_attributes (
   sequence INTEGER DEFAULT 0
 );
 
--- Routings (Future versioning)
+-- Routings (assigned to BOM, not product directly)
 CREATE TABLE routings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID NOT NULL REFERENCES organizations(id),
-  product_id UUID NOT NULL REFERENCES products(id),
   name TEXT NOT NULL,
-  is_default BOOLEAN DEFAULT false,
+  description TEXT,
   is_active BOOLEAN DEFAULT true,
-
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(org_id, name)
 );
 
--- Routing Operations
+-- Routing Operations (sequence of operations)
 CREATE TABLE routing_operations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   routing_id UUID NOT NULL REFERENCES routings(id) ON DELETE CASCADE,
   sequence INTEGER NOT NULL,
   name TEXT NOT NULL,
-  work_center_id UUID REFERENCES machines(id),
-  setup_time_minutes INTEGER DEFAULT 0,
-  run_time_minutes INTEGER DEFAULT 0,
-  description TEXT
+  description TEXT,
+  machine_id UUID REFERENCES machines(id),
+  estimated_duration_minutes INTEGER,
+  labor_cost_per_hour DECIMAL(10,2),  -- Default cost, can be overridden in bom_production_lines
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(routing_id, sequence)
 );
 ```
 
@@ -210,9 +236,20 @@ CREATE INDEX idx_products_active ON products(org_id, is_active) WHERE is_active 
 
 -- BOMs
 CREATE INDEX idx_boms_product ON boms(product_id);
+CREATE INDEX idx_boms_routing ON boms(routing_id);
 CREATE INDEX idx_boms_active ON boms(product_id, status, effective_from, effective_to);
 CREATE INDEX idx_bom_items_bom ON bom_items(bom_id);
-CREATE INDEX idx_bom_items_product ON bom_items(product_id);
+CREATE INDEX idx_bom_items_component ON bom_items(component_id);
+CREATE INDEX idx_bom_items_operation ON bom_items(bom_id, operation_seq);
+CREATE INDEX idx_bom_items_line_ids ON bom_items USING GIN(line_ids);
+
+-- Routings
+CREATE INDEX idx_routings_org ON routings(org_id);
+CREATE INDEX idx_routing_operations_routing ON routing_operations(routing_id);
+
+-- BOM Production Lines
+CREATE INDEX idx_bom_production_lines_bom ON bom_production_lines(bom_id);
+CREATE INDEX idx_bom_production_lines_line ON bom_production_lines(line_id);
 
 -- Specs
 CREATE INDEX idx_specs_product ON product_specs(product_id);
@@ -452,12 +489,25 @@ async function getActiveBOM(productId: string, date: Date = new Date()) {
 }
 ```
 
-### BOM Snapshot for WO
+### BOM Snapshot for WO (with Line Filtering)
 ```typescript
 // When WO is created, snapshot BOM into wo_materials
-async function snapshotBOMForWO(woId: string, bomId: string, quantity: number) {
+// IMPORTANT: Filter items by selected production line
+async function snapshotBOMForWO(
+  woId: string,
+  bomId: string,
+  quantity: number,
+  selectedLineId: string  // Line selected by planner
+) {
   const bom = await BomsAPI.getById(bomId)
-  const items = await BomsAPI.getItems(bomId)
+  const allItems = await BomsAPI.getItems(bomId)
+
+  // Filter items by selected line:
+  // - Include if line_ids is NULL (item used on ALL lines)
+  // - Include if line_ids contains the selected line
+  const items = allItems.filter(item =>
+    item.line_ids === null || item.line_ids.includes(selectedLineId)
+  )
 
   const materials = items.map(item => ({
     wo_id: woId,
@@ -475,6 +525,18 @@ async function snapshotBOMForWO(woId: string, bomId: string, quantity: number) {
   }))
 
   return db.from('wo_materials').insert(materials)
+}
+
+// Validate that selected line is assigned to BOM
+async function validateLineForBOM(bomId: string, lineId: string): Promise<boolean> {
+  const { data } = await db
+    .from('bom_production_lines')
+    .select('id')
+    .eq('bom_id', bomId)
+    .eq('line_id', lineId)
+    .single()
+
+  return !!data
 }
 ```
 

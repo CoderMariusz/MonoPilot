@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.25</id>
+    <title>Quality Settings Configuration</title>
+    <batch>06C-3</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Configure Quality module behavior to match organization process</description>
+
+  <dependencies>
+    <requires>
+      <epic id="1">Organization Setup</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>quality_settings</name>
+        <columns>
+          <column>id uuid PRIMARY KEY</column>
+          <column>organization_id uuid NOT NULL REFERENCES organizations(id)</column>
+          <column>allow_consume_pending boolean DEFAULT true</column>
+          <column>enable_hold_notifications boolean DEFAULT true</column>
+          <column>require_hold_release_approval boolean DEFAULT false</column>
+          <column>default_qa_status text DEFAULT 'pending'</column>
+          <column>auto_fail_on_out_of_spec boolean DEFAULT true</column>
+          <column>ncr_number_prefix text DEFAULT 'NCR-'</column>
+          <column>hold_number_prefix text DEFAULT 'HOLD-'</column>
+          <column>updated_by uuid REFERENCES profiles(id)</column>
+          <column>updated_at timestamptz DEFAULT now()</column>
+        </columns>
+      </table>
+    </tables>
+
+    <frontend_routes>
+      <route path="/settings/quality">Quality Settings page</route>
+    </frontend_routes>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/quality/settings">Get quality settings</endpoint>
+      <endpoint method="PUT" path="/api/quality/settings">Update quality settings (admin)</endpoint>
+    </api_endpoints>
+
+    <settings>
+      <setting name="allow_consume_pending" type="toggle">Allow consume from pending QA status</setting>
+      <setting name="enable_hold_notifications" type="toggle">Send notifications for holds</setting>
+      <setting name="require_hold_release_approval" type="toggle">Require approval for hold release</setting>
+      <setting name="default_qa_status" type="dropdown">Default QA status for new LP</setting>
+      <setting name="auto_fail_on_out_of_spec" type="toggle">Auto-fail tests out of spec</setting>
+      <setting name="ncr_number_prefix" type="text">NCR number prefix</setting>
+      <setting name="hold_number_prefix" type="text">Hold number prefix</setting>
+    </settings>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Settings page at /settings/quality</ac>
+    <ac id="2">Toggle: allow_consume_pending</ac>
+    <ac id="3">Toggle: enable_hold_notifications</ac>
+    <ac id="4">Toggle: require_hold_release_approval</ac>
+    <ac id="5">Dropdown: default_qa_status</ac>
+    <ac id="6">Toggle: auto_fail_on_out_of_spec</ac>
+    <ac id="7">Text: ncr_number_prefix</ac>
+    <ac id="8">Text: hold_number_prefix</ac>
+    <ac id="9">Admin-only access</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-01">System shall allow configuring quality settings</fr>
+  </functional_requirements>
+</story>

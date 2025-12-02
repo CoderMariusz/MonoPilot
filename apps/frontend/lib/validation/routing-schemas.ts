@@ -1,31 +1,22 @@
 import { z } from 'zod'
 
 /**
- * Routing Validation Schemas
- * Stories: 2.15, 2.16, 2.17
+ * Routing Validation Schemas - Story 2.24
  *
- * Zod validation schemas for:
- * - Routing CRUD (Story 2.15)
- * - Routing Operations (Story 2.16)
- * - Product-Routing Assignments (Story 2.17)
+ * Restructured routing system validation:
+ * - Routings use name (unique per org) instead of code
+ * - Operations have labor_cost_per_hour
  */
 
 // ============================================================================
-// ROUTING SCHEMAS (Story 2.15)
+// ROUTING SCHEMAS (AC-2.24.10)
 // ============================================================================
 
 /**
  * Create Routing Schema
- * AC-015.1: Code, name, status, is_reusable validation
+ * AC-2.24.7: name required, 1-100 chars, unique per org
  */
 export const createRoutingSchema = z.object({
-  code: z
-    .string()
-    .min(2, 'Code must be at least 2 characters')
-    .max(50, 'Code must be at most 50 characters')
-    .regex(/^[A-Z0-9-]+$/, 'Code must contain only uppercase letters, numbers, and hyphens')
-    .transform(val => val.toUpperCase()),
-
   name: z
     .string()
     .min(1, 'Name is required')
@@ -33,19 +24,16 @@ export const createRoutingSchema = z.object({
 
   description: z
     .string()
-    .max(1000, 'Description must be at most 1000 characters')
+    .max(500, 'Description must be at most 500 characters')
     .optional(),
 
-  status: z.enum(['active', 'inactive']).optional().default('active'),
-
-  is_reusable: z.boolean().optional().default(true),
+  is_active: z.boolean().optional().default(true)
 })
 
-export type CreateRoutingInput = z.input<typeof createRoutingSchema>
+export type CreateRoutingInput = z.infer<typeof createRoutingSchema>
 
 /**
  * Update Routing Schema
- * AC-015.5: Edit routing (code cannot be updated)
  */
 export const updateRoutingSchema = z.object({
   name: z
@@ -56,37 +44,22 @@ export const updateRoutingSchema = z.object({
 
   description: z
     .string()
-    .max(1000, 'Description must be at most 1000 characters')
-    .optional()
-    .nullable(),
+    .max(500, 'Description must be at most 500 characters')
+    .nullable()
+    .optional(),
 
-  status: z.enum(['active', 'inactive']).optional(),
-
-  is_reusable: z.boolean().optional(),
+  is_active: z.boolean().optional()
 })
 
-export type UpdateRoutingInput = z.input<typeof updateRoutingSchema>
-
-/**
- * Routing Filters Schema
- * AC-015.3: Search and filter routings
- */
-export const routingFiltersSchema = z.object({
-  status: z.enum(['active', 'inactive', 'all']).optional(),
-  search: z.string().optional(),
-  sort_by: z.enum(['code', 'name', 'status', 'created_at']).optional(),
-  sort_direction: z.enum(['asc', 'desc']).optional(),
-})
-
-export type RoutingFilters = z.infer<typeof routingFiltersSchema>
+export type UpdateRoutingInput = z.infer<typeof updateRoutingSchema>
 
 // ============================================================================
-// ROUTING OPERATION SCHEMAS (Story 2.16)
+// ROUTING OPERATION SCHEMAS (AC-2.24.10)
 // ============================================================================
 
 /**
  * Create Operation Schema
- * AC-016.1: Add operation with all required/optional fields
+ * AC-2.24.7: sequence positive integer, name required, labor_cost_per_hour 0-9999.99
  */
 export const createOperationSchema = z.object({
   sequence: z
@@ -94,46 +67,39 @@ export const createOperationSchema = z.object({
     .int('Sequence must be an integer')
     .positive('Sequence must be positive'),
 
-  operation_name: z
+  name: z
     .string()
-    .min(1, 'Operation name is required')
-    .max(100, 'Operation name must be at most 100 characters'),
+    .min(1, 'Name is required')
+    .max(100, 'Name must be at most 100 characters'),
 
-  machine_id: z.string().uuid('Invalid machine ID').optional().nullable(),
+  description: z
+    .string()
+    .max(500, 'Description must be at most 500 characters')
+    .optional(),
 
-  line_id: z.string().uuid('Invalid line ID').optional().nullable(),
+  machine_id: z
+    .string()
+    .uuid('Invalid machine ID')
+    .optional(),
 
-  expected_duration_minutes: z
+  estimated_duration_minutes: z
     .number()
     .int('Duration must be an integer')
-    .positive('Duration must be positive'),
+    .min(0, 'Duration cannot be negative')
+    .max(10000, 'Duration cannot exceed 10000 minutes')
+    .optional(),
 
-  expected_yield_percent: z
+  labor_cost_per_hour: z
     .number()
-    .min(0.01, 'Yield must be at least 0.01%')
-    .max(100, 'Yield cannot exceed 100%')
+    .min(0, 'Labor cost cannot be negative')
+    .max(9999.99, 'Labor cost cannot exceed 9999.99')
     .optional()
-    .default(100.00),
-
-  setup_time_minutes: z
-    .number()
-    .int('Setup time must be an integer')
-    .nonnegative('Setup time cannot be negative')
-    .optional()
-    .default(0),
-
-  labor_cost: z
-    .number()
-    .nonnegative('Labor cost cannot be negative')
-    .optional()
-    .nullable(),
 })
 
-export type CreateOperationInput = z.input<typeof createOperationSchema>
+export type CreateOperationInput = z.infer<typeof createOperationSchema>
 
 /**
  * Update Operation Schema
- * AC-016.4: Edit operation
  */
 export const updateOperationSchema = z.object({
   sequence: z
@@ -142,80 +108,51 @@ export const updateOperationSchema = z.object({
     .positive('Sequence must be positive')
     .optional(),
 
-  operation_name: z
+  name: z
     .string()
-    .min(1, 'Operation name is required')
-    .max(100, 'Operation name must be at most 100 characters')
+    .min(1, 'Name is required')
+    .max(100, 'Name must be at most 100 characters')
     .optional(),
 
-  machine_id: z.string().uuid('Invalid machine ID').optional().nullable(),
+  description: z
+    .string()
+    .max(500, 'Description must be at most 500 characters')
+    .nullable()
+    .optional(),
 
-  line_id: z.string().uuid('Invalid line ID').optional().nullable(),
+  machine_id: z
+    .string()
+    .uuid('Invalid machine ID')
+    .nullable()
+    .optional(),
 
-  expected_duration_minutes: z
+  estimated_duration_minutes: z
     .number()
     .int('Duration must be an integer')
-    .positive('Duration must be positive')
+    .min(0, 'Duration cannot be negative')
+    .max(10000, 'Duration cannot exceed 10000 minutes')
+    .nullable()
     .optional(),
 
-  expected_yield_percent: z
+  labor_cost_per_hour: z
     .number()
-    .min(0.01, 'Yield must be at least 0.01%')
-    .max(100, 'Yield cannot exceed 100%')
-    .optional(),
-
-  setup_time_minutes: z
-    .number()
-    .int('Setup time must be an integer')
-    .nonnegative('Setup time cannot be negative')
-    .optional(),
-
-  labor_cost: z
-    .number()
-    .nonnegative('Labor cost cannot be negative')
+    .min(0, 'Labor cost cannot be negative')
+    .max(9999.99, 'Labor cost cannot exceed 9999.99')
+    .nullable()
     .optional()
-    .nullable(),
 })
 
-export type UpdateOperationInput = z.input<typeof updateOperationSchema>
-
-/**
- * Reorder Operations Schema
- * AC-016.3: Drag-drop reordering
- */
-export const reorderOperationsSchema = z.object({
-  operations: z.array(
-    z.object({
-      id: z.string().uuid('Invalid operation ID'),
-      sequence: z.number().int('Sequence must be an integer').positive('Sequence must be positive'),
-    })
-  ),
-})
-
-export type ReorderOperationsInput = z.input<typeof reorderOperationsSchema>
+export type UpdateOperationInput = z.infer<typeof updateOperationSchema>
 
 // ============================================================================
-// PRODUCT-ROUTING ASSIGNMENT SCHEMAS (Story 2.17)
+// QUERY PARAMS SCHEMAS
 // ============================================================================
 
-/**
- * Assign Products to Routing Schema
- * AC-017: Product-routing assignment
- */
-export const assignProductsSchema = z.object({
-  product_ids: z.array(z.string().uuid('Invalid product ID')),
-  default_product_id: z.string().uuid('Invalid product ID').optional(),
+export const routingFiltersSchema = z.object({
+  is_active: z
+    .string()
+    .transform(val => val === 'true')
+    .optional()
 })
 
-export type AssignProductsInput = z.input<typeof assignProductsSchema>
-
-/**
- * Assign Routings to Product Schema
- * AC-017.5: Product edit shows assigned routings
- */
-export const assignRoutingsSchema = z.object({
-  routing_ids: z.array(z.string().uuid('Invalid routing ID')),
-  default_routing_id: z.string().uuid('Invalid routing ID').optional(),
-})
-
-export type AssignRoutingsInput = z.input<typeof assignRoutingsSchema>
+export type RoutingFilters = z.infer<typeof routingFiltersSchema>

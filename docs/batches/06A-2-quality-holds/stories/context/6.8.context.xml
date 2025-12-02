@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.8</id>
+    <title>Quality Hold Release Approval</title>
+    <batch>06A-2</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Require approval for releasing holds to ensure proper authorization</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.6">Quality Hold Creation</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <settings>
+      <setting name="require_hold_release_approval" type="boolean" default="true">
+        Toggle in quality_settings table
+      </setting>
+    </settings>
+
+    <api_endpoints>
+      <endpoint method="PUT" path="/api/quality/holds/:id/release">
+        <description>Request release (QC user)</description>
+        <request>{ target_qa_status: 'passed' | 'pending' }</request>
+      </endpoint>
+      <endpoint method="PUT" path="/api/quality/holds/:id/approve">
+        <description>Approve release (Manager only)</description>
+      </endpoint>
+      <endpoint method="PUT" path="/api/quality/holds/:id/reject">
+        <description>Reject release (Manager only)</description>
+      </endpoint>
+    </api_endpoints>
+
+    <workflow>
+      <if condition="require_hold_release_approval = true">
+        <step>QC clicks "Release" → status = 'pending_release'</step>
+        <step>Manager sees pending in dashboard</step>
+        <step>Manager approves → status = 'released', LP.qa_status updated</step>
+        <step>Manager rejects → status = 'open' (back to investigation)</step>
+      </if>
+      <if condition="require_hold_release_approval = false">
+        <step>QC clicks "Release" → immediate release</step>
+        <step>status = 'released', LP.qa_status updated</step>
+      </if>
+    </workflow>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">If approval ENABLED: QC clicks Release → pending_release → Manager approves/rejects</ac>
+    <ac id="2">If approval DISABLED: QC clicks Release → immediate release</ac>
+    <ac id="3">LP.qa_status after release: user chooses 'passed' or 'pending' (re-test needed)</ac>
+    <ac id="4">Approval/release recorded with timestamp and user</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-09">System shall require approval for hold release when enabled</fr>
+  </functional_requirements>
+</story>

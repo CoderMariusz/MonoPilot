@@ -15,6 +15,8 @@ export const productionSettingsSchema = z.object({
     .int()
     .min(30, 'Minimum 30 seconds to prevent server overload')
     .max(300, 'Maximum 300 seconds'),
+  // Story 4.11: Over-Consumption Control
+  allow_over_consumption: z.boolean().optional(),
 })
 
 export type ProductionSettingsInput = z.infer<typeof productionSettingsSchema>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.15b</id>
+    <title>Movement Audit Trail - Statistics &amp; Reporting</title>
+    <batch>05B-1</batch>
+    <status>drafted</status>
+    <predecessor>5.15</predecessor>
+  </metadata>
+
+  <description>Movement statistics dashboard with trends, top movers, and export capabilities</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.15">Movement Audit Trail - List &amp; Filters</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <frontend_routes>
+      <route path="/warehouse/stock-moves/statistics">Statistics Dashboard</route>
+    </frontend_routes>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/warehouse/stock-moves/stats">Summary statistics</endpoint>
+      <endpoint method="GET" path="/api/warehouse/stock-moves/stats/by-type">Per-type breakdown</endpoint>
+      <endpoint method="GET" path="/api/warehouse/stock-moves/stats/trends">Daily trends (7/14/30/60/90 days)</endpoint>
+      <endpoint method="GET" path="/api/warehouse/stock-moves/stats/users">Top 10 users</endpoint>
+      <endpoint method="GET" path="/api/warehouse/stock-moves/stats/locations">Top 10 locations</endpoint>
+      <endpoint method="GET" path="/api/warehouse/stock-moves/stats/lp-movements">LP movement metrics</endpoint>
+      <endpoint method="POST" path="/api/warehouse/stock-moves/export/csv">Export to CSV</endpoint>
+      <endpoint method="POST" path="/api/warehouse/stock-moves/export/pdf">Export to PDF</endpoint>
+    </api_endpoints>
+
+    <dashboard_sections>
+      <section>Movement type breakdown (pie chart)</section>
+      <section>Top users chart (bar)</section>
+      <section>Top locations chart (bar)</section>
+      <section>Trend analysis (line chart)</section>
+      <section>Average LP movements metrics</section>
+    </dashboard_sections>
+
+    <export_libraries>
+      <library>jsPDF for PDF generation</library>
+      <library>xlsx (SheetJS) for Excel</library>
+    </export_libraries>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Movement type breakdown displayed (pie chart)</ac>
+    <ac id="2">Top users chart with count and activity</ac>
+    <ac id="3">Top locations chart with in/out breakdown</ac>
+    <ac id="4">Trend analysis (7/14/30/60/90 days)</ac>
+    <ac id="5">Average LP movements metrics</ac>
+    <ac id="6">Export to CSV with filtered data</ac>
+    <ac id="7">Export to PDF with charts</ac>
+    <ac id="8">Email scheduling for recurring reports</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="WH-FR-15">System shall provide movement statistics and reporting</fr>
+  </functional_requirements>
+</story>

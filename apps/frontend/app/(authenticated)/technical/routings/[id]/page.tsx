@@ -1,9 +1,7 @@
 /**
  * Routing Detail Page
- * Story: 2.15, 2.16, 2.17
- * AC-015.5: Routing detail view
- * AC-016.2: Operations list
- * AC-017.4: Assigned products
+ * Story: 2.24 Routing Restructure
+ * Routings are now independent templates (no product binding)
  */
 
 'use client'
@@ -13,12 +11,11 @@ import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Edit, Trash2, Plus } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { Routing } from '@/lib/services/routing-service'
 import { EditRoutingDrawer } from '@/components/technical/routings/edit-routing-drawer'
 import { OperationsTable } from '@/components/technical/routings/operations-table'
-import { AssignedProductsTable } from '@/components/technical/routings/assigned-products-table'
 
 export default function RoutingDetailPage() {
   const params = useParams()
@@ -31,7 +28,7 @@ export default function RoutingDetailPage() {
   const [loading, setLoading] = useState(true)
   const [showEditDrawer, setShowEditDrawer] = useState(false)
 
-  // AC-015.5: Fetch routing details
+  // Fetch routing details with operations
   const fetchRouting = async () => {
     try {
       setLoading(true)
@@ -60,11 +57,11 @@ export default function RoutingDetailPage() {
     fetchRouting()
   }, [routingId])
 
-  // AC-015.7: Delete routing
+  // Delete routing
   const handleDelete = async () => {
     if (!routing) return
 
-    if (!confirm(`Delete routing "${routing.code}"? This will also delete all operations and product assignments. This action cannot be undone.`)) {
+    if (!confirm(`Delete routing "${routing.name}"? This will also delete all operations. This action cannot be undone.`)) {
       return
     }
 
@@ -74,7 +71,8 @@ export default function RoutingDetailPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to delete routing')
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete routing')
       }
 
       toast({
@@ -87,7 +85,7 @@ export default function RoutingDetailPage() {
       console.error('Error deleting routing:', error)
       toast({
         title: 'Error',
-        description: 'Failed to delete routing',
+        description: error instanceof Error ? error.message : 'Failed to delete routing',
         variant: 'destructive',
       })
     }
@@ -109,14 +107,6 @@ export default function RoutingDetailPage() {
     )
   }
 
-  const getStatusBadge = (status: string) => {
-    return status === 'active' ? (
-      <Badge variant="default" className="bg-green-600">Active</Badge>
-    ) : (
-      <Badge variant="secondary">Inactive</Badge>
-    )
-  }
-
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Back Button */}
@@ -125,17 +115,15 @@ export default function RoutingDetailPage() {
         Back to Routings
       </Button>
 
-      {/* Header Section (AC-015.5) */}
+      {/* Header Section */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-4xl font-bold font-mono">{routing.code}</h1>
-          <p className="text-xl text-muted-foreground mt-1">{routing.name}</p>
+          <h1 className="text-4xl font-bold">{routing.name}</h1>
           <div className="flex gap-2 mt-3">
-            {getStatusBadge(routing.status)}
-            {routing.is_reusable ? (
-              <Badge variant="outline">Reusable</Badge>
+            {routing.is_active ? (
+              <Badge variant="default" className="bg-green-600">Active</Badge>
             ) : (
-              <Badge variant="secondary">Non-Reusable</Badge>
+              <Badge variant="secondary">Inactive</Badge>
             )}
           </div>
         </div>
@@ -180,18 +168,10 @@ export default function RoutingDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Operations Section (AC-016.2) */}
+      {/* Operations Section */}
       <OperationsTable routingId={routingId} />
 
-      {/* Assigned Products Section (AC-017.4) */}
-      <AssignedProductsTable
-        routingId={routingId}
-        routingCode={routing.code}
-        routingName={routing.name}
-        isReusable={routing.is_reusable}
-      />
-
-      {/* Edit Drawer (AC-015.6) */}
+      {/* Edit Drawer */}
       <EditRoutingDrawer
         routing={routing}
         open={showEditDrawer}

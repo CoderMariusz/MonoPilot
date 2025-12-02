@@ -90,10 +90,10 @@ export default function ModulesPage() {
       setSubmitting(true)
 
       const response = await fetch('/api/settings/modules', {
-        method: 'PUT',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: module.code,
+          module: module.code,
           enabled: newState,
         }),
       })
@@ -106,12 +106,13 @@ export default function ModulesPage() {
 
       toast({
         title: 'Success',
-        description: `Module "${module.name}" ${newState ? 'enabled' : 'disabled'} successfully`,
+        description: `Module "${module.name}" ${newState ? 'enabled' : 'disabled'} successfully. Reloading page...`,
       })
 
-      // Refresh module statuses
-      fetchModuleStatuses()
-      setConfirmToggle(null)
+      // Reload page to refresh navigation
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
     } catch (error) {
       console.error('Error toggling module:', error)
       toast({

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.4</id>
+    <title>Control Consumption of Pending LPs</title>
+    <batch>06A-1</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Allow Admin to configure if pending LPs can be consumed in production</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.1">LP QA Status Management</story>
+    </requires>
+    <integration>
+      <story id="4.9">Consumption Enforcement (Epic 4)</story>
+    </integration>
+  </dependencies>
+
+  <technical_context>
+    <settings>
+      <setting name="allow_consume_pending" type="boolean" default="false">
+        Toggle in quality_settings table
+      </setting>
+    </settings>
+
+    <services>
+      <service name="getQualitySettings">
+        <output>{ allow_consume_pending: boolean, ... }</output>
+      </service>
+      <service name="validateLPForConsumption">
+        <input>lpId: uuid</input>
+        <output>{ allowed: boolean, warning?: string }</output>
+        <logic>
+          - If qa_status = 'passed': allowed = true
+          - If qa_status = 'pending' AND allow_consume_pending = true: allowed = true, warning = "LP not yet inspected"
+          - If qa_status = 'failed' or 'quarantine': allowed = false
+        </logic>
+      </service>
+    </services>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Toggle: quality_settings.allow_consume_pending</ac>
+    <ac id="2">ON: production can consume pending LPs (with warning displayed)</ac>
+    <ac id="3">OFF: only passed LPs can be consumed (failed/quarantine always blocked)</ac>
+    <ac id="4">Default = OFF (strict mode)</ac>
+    <ac id="5">Warning message when consuming pending: "Warning: LP {number} has QA status 'pending' - not yet inspected"</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-04">System shall control consumption of pending LPs via settings</fr>
+  </functional_requirements>
+</story>

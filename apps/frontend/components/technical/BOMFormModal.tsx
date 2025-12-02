@@ -1,9 +1,8 @@
 /**
  * BOM Form Modal Component
- * Story: 2.6 BOM CRUD
+ * Story: 2.6 BOM CRUD + Story 2.29 UI Updates
  * AC-2.6.2: Create BOM with auto-versioning
- * AC-2.6.3: Version auto-assignment
- * AC-2.6.4: Update BOM
+ * AC-2.29.5: Add routing, production lines, packaging
  */
 
 'use client'
@@ -13,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -31,6 +31,24 @@ interface Product {
   name: string
   uom: string
   type: string
+}
+
+interface Routing {
+  id: string
+  name: string
+  description: string | null
+  is_active: boolean
+}
+
+interface ProductionLine {
+  id: string
+  name: string
+  warehouse?: { id: string; name: string }
+}
+
+interface SelectedLine {
+  line_id: string
+  labor_cost_per_hour?: number
 }
 
 interface BOMFormModalProps {
@@ -56,43 +74,73 @@ export function BOMFormModal({ bom, onClose, onSuccess }: BOMFormModalProps) {
     output_qty: bom?.output_qty?.toString() || '1',
     output_uom: bom?.output_uom || '',
     notes: bom?.notes || '',
+    // Story 2.29: New fields
+    routing_id: (bom as any)?.routing_id || '',
+    units_per_box: (bom as any)?.units_per_box?.toString() || '',
+    boxes_per_pallet: (bom as any)?.boxes_per_pallet?.toString() || '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
+  const [routings, setRoutings] = useState<Routing[]>([])
+  const [productionLines, setProductionLines] = useState<ProductionLine[]>([])
+  const [selectedLines, setSelectedLines] = useState<SelectedLine[]>([])
   const { toast } = useToast()
 
   const isEditMode = !!bom
 
-  // Fetch products on mount (AC-2.6.2: Select product)
+  // Fetch products, routings, and production lines on mount
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
         setLoadingProducts(true)
-        const response = await fetch('/api/technical/products?limit=1000')
+        const [productsRes, routingsRes, linesRes] = await Promise.all([
+          fetch('/api/technical/products?limit=1000'),
+          fetch('/api/technical/routings?limit=1000'),
+          fetch('/api/settings/production-lines?limit=1000'),
+        ])
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch products')
+        if (productsRes.ok) {
+          const data = await productsRes.json()
+          setProducts(data.data || [])
         }
 
-        const data = await response.json()
-        setProducts(data.data || [])
+        if (routingsRes.ok) {
+          const data = await routingsRes.json()
+          setRoutings(data.data || [])
+        }
+
+        if (linesRes.ok) {
+          const data = await linesRes.json()
+          setProductionLines(data.data || [])
+        }
+
+        // If editing, load existing production lines
+        if (bom?.id) {
+          const bomLinesRes = await fetch(`/api/technical/boms/${bom.id}/lines`)
+          if (bomLinesRes.ok) {
+            const bomLinesData = await bomLinesRes.json()
+            setSelectedLines(bomLinesData.data?.map((l: any) => ({
+              line_id: l.line_id,
+              labor_cost_per_hour: l.labor_cost_per_hour
+            })) || [])
+          }
+        }
       } catch (error) {
-        console.error('Error fetching products:', error)
+        console.error('Error fetching data:', error)
         toast({
           title: 'Warning',
-          description: 'Failed to load products. Product selection will be unavailable.',
+          description: 'Failed to load some data.',
           variant: 'destructive',
         })
-        setProducts([])
       } finally {
         setLoadingProducts(false)
       }
     }
 
-    fetchProducts()
-  }, [])
+    fetchData()
+  }, [bom?.id])
 
   // When product is selected, auto-fill output_uom
   useEffect(() => {
@@ -179,6 +227,10 @@ export function BOMFormModal({ bom, onClose, onSuccess }: BOMFormModalProps) {
         output_qty: parseFloat(formData.output_qty),
         output_uom: formData.output_uom,
         notes: formData.notes || null,
+        // Story 2.29: New fields
+        routing_id: formData.routing_id || null,
+        units_per_box: formData.units_per_box ? parseInt(formData.units_per_box) : null,
+        boxes_per_pallet: formData.boxes_per_pallet ? parseInt(formData.boxes_per_pallet) : null,
       }
 
       if (!isEditMode) {
@@ -217,6 +269,16 @@ export function BOMFormModal({ bom, onClose, onSuccess }: BOMFormModalProps) {
       }
 
       const data = await response.json()
+      const bomId = data.data?.id || bom?.id
+
+      // Save production lines if any selected
+      if (bomId && selectedLines.length > 0) {
+        await fetch(`/api/technical/boms/${bomId}/lines`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lines: selectedLines }),
+        })
+      }
 
       toast({
         title: 'Success',
@@ -384,6 +446,117 @@ export function BOMFormModal({ bom, onClose, onSuccess }: BOMFormModalProps) {
               </p>
             </div>
           </div>
+
+          {/* Routing Selection (Story 2.29) */}
+          <div className="space-y-2">
+            <Label htmlFor="routing_id">Routing</Label>
+            <Select
+              value={formData.routing_id}
+              onValueChange={(value) => handleChange('routing_id', value === 'none' ? '' : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select routing (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No routing</SelectItem>
+                {routings.filter(r => r.is_active).map((routing) => (
+                  <SelectItem key={routing.id} value={routing.id}>
+                    {routing.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-gray-500">
+              Assign a routing to define production operations
+            </p>
+          </div>
+
+          {/* Production Lines (Story 2.29) */}
+          <div className="space-y-2">
+            <Label>Production Lines</Label>
+            <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+              {productionLines.length === 0 ? (
+                <p className="text-sm text-gray-500">No production lines available</p>
+              ) : (
+                productionLines.map((line) => {
+                  const isSelected = selectedLines.some(l => l.line_id === line.id)
+                  const selectedLine = selectedLines.find(l => l.line_id === line.id)
+                  return (
+                    <div key={line.id} className="flex items-center gap-3">
+                      <Checkbox
+                        id={`line-${line.id}`}
+                        checked={isSelected}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedLines([...selectedLines, { line_id: line.id }])
+                          } else {
+                            setSelectedLines(selectedLines.filter(l => l.line_id !== line.id))
+                          }
+                        }}
+                      />
+                      <label htmlFor={`line-${line.id}`} className="text-sm flex-1">
+                        {line.name} {line.warehouse && `(${line.warehouse.name})`}
+                      </label>
+                      {isSelected && (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Labor $/hr"
+                          className="w-24 h-7 text-xs"
+                          value={selectedLine?.labor_cost_per_hour || ''}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseFloat(e.target.value) : undefined
+                            setSelectedLines(selectedLines.map(l =>
+                              l.line_id === line.id
+                                ? { ...l, labor_cost_per_hour: value }
+                                : l
+                            ))
+                          }}
+                        />
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+            <p className="text-sm text-gray-500">
+              Select which production lines can produce this BOM
+            </p>
+          </div>
+
+          {/* Packaging (Story 2.28/2.29) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="units_per_box">Units per Box</Label>
+              <Input
+                id="units_per_box"
+                type="number"
+                min="1"
+                max="10000"
+                value={formData.units_per_box}
+                onChange={(e) => handleChange('units_per_box', e.target.value)}
+                placeholder="e.g., 24"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="boxes_per_pallet">Boxes per Pallet</Label>
+              <Input
+                id="boxes_per_pallet"
+                type="number"
+                min="1"
+                max="200"
+                value={formData.boxes_per_pallet}
+                onChange={(e) => handleChange('boxes_per_pallet', e.target.value)}
+                placeholder="e.g., 40"
+              />
+            </div>
+          </div>
+          {formData.units_per_box && formData.boxes_per_pallet && (
+            <p className="text-sm text-blue-600">
+              = {parseInt(formData.units_per_box) * parseInt(formData.boxes_per_pallet)} units/pallet
+            </p>
+          )}
 
           {/* Notes (AC-2.6.2) */}
           <div className="space-y-2">

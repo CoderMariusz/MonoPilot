@@ -59,6 +59,21 @@ export async function DELETE(
       )
     }
 
+    // Broadcast realtime event for material.unreserved
+    try {
+      await supabaseAdmin.channel(`wo:${woId}`).send({
+        type: 'broadcast',
+        event: 'material.unreserved',
+        payload: {
+          wo_id: woId,
+          reservation_id: reservationId,
+          unreserved: data,
+        },
+      })
+    } catch (broadcastError) {
+      console.error('Error broadcasting material.unreserved:', broadcastError)
+    }
+
     return NextResponse.json({
       data,
       message: 'Reservation cancelled successfully',

@@ -33,12 +33,20 @@ import {
   Clock,
   Cog,
   Boxes,
+  PauseCircle,
+  PlayCircle,
+  CheckCircle2,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
 import { WOOperationsList } from '@/components/planning/WOOperationsList'
 import { MaterialReservationsTable } from '@/components/production/MaterialReservationsTable'
 import WOStartModal from '@/components/production/WOStartModal'
+import WOPauseModal from '@/components/production/WOPauseModal'
+import WOResumeModal from '@/components/production/WOResumeModal'
+import PauseHistoryPanel from '@/components/production/PauseHistoryPanel'
+import { WOCompleteModal } from '@/components/production/WOCompleteModal'
+import { OperationTimelinePanel } from '@/components/production/OperationTimelinePanel'
 
 interface Product {
   id: string
@@ -85,6 +93,9 @@ interface WorkOrder {
   // Story 3.16: Source of Demand
   source_type?: string | null
   source_reference?: string | null
+  // Story 4.3: Pause/Resume
+  paused_at?: string | null
+  paused_by_user_id?: string | null
 }
 
 // Source type labels for display (Story 3.16)
@@ -100,6 +111,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'gray' },
   released: { label: 'Released', color: 'blue' },
   in_progress: { label: 'In Progress', color: 'yellow' },
+  paused: { label: 'Paused', color: 'orange' },
   completed: { label: 'Completed', color: 'green' },
   closed: { label: 'Closed', color: 'purple' },
   cancelled: { label: 'Cancelled', color: 'red' },
@@ -108,7 +120,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 const STATUS_TRANSITIONS: Record<string, string[]> = {
   draft: ['released', 'cancelled'],
   released: ['in_progress', 'cancelled'],
-  in_progress: ['completed'],
+  in_progress: ['paused', 'completed'],
+  paused: ['in_progress', 'completed'],
   completed: ['closed'],
   closed: [],
   cancelled: [],
@@ -124,6 +137,10 @@ export default function WorkOrderDetailsPage({
   const [paramsId, setParamsId] = useState<string>('')
   const [statusChanging, setStatusChanging] = useState(false)
   const [startModalOpen, setStartModalOpen] = useState(false)
+  const [pauseModalOpen, setPauseModalOpen] = useState(false)
+  const [resumeModalOpen, setResumeModalOpen] = useState(false)
+  const [completeModalOpen, setCompleteModalOpen] = useState(false)
+  const [pauseEnabled, setPauseEnabled] = useState(true)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -164,6 +181,23 @@ export default function WorkOrderDetailsPage({
     fetchWO()
   }, [fetchWO])
 
+  // Check if pause is enabled
+  useEffect(() => {
+    const checkPauseEnabled = async () => {
+      try {
+        const response = await fetch('/api/production/settings')
+        if (response.ok) {
+          const { data } = await response.json()
+          setPauseEnabled(data?.allow_pause_wo ?? true)
+        }
+      } catch {
+        // Default to true if fetch fails
+        setPauseEnabled(true)
+      }
+    }
+    checkPauseEnabled()
+  }, [])
+
   // Format date
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-'
@@ -199,6 +233,7 @@ export default function WorkOrderDetailsPage({
       blue: 'bg-blue-100 text-blue-800',
       green: 'bg-green-100 text-green-800',
       yellow: 'bg-yellow-100 text-yellow-800',
+      orange: 'bg-orange-100 text-orange-800',
       red: 'bg-red-100 text-red-800',
       purple: 'bg-purple-100 text-purple-800',
     }
@@ -291,15 +326,50 @@ export default function WorkOrderDetailsPage({
             <h1 className="text-2xl font-bold font-mono">{wo.wo_number}</h1>
             {getStatusBadge(wo.status)}
           </div>
-          {wo.status === 'released' && (
-            <Button
-              onClick={() => setStartModalOpen(true)}
-              className="gap-2"
-            >
-              <Factory className="h-4 w-4" />
-              Start Production
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Start Production - only for released */}
+            {wo.status === 'released' && (
+              <Button
+                onClick={() => setStartModalOpen(true)}
+                className="gap-2"
+              >
+                <Factory className="h-4 w-4" />
+                Start Production
+              </Button>
+            )}
+            {/* Pause - only for in_progress and if pause enabled */}
+            {wo.status === 'in_progress' && pauseEnabled && (
+              <Button
+                onClick={() => setPauseModalOpen(true)}
+                variant="outline"
+                className="gap-2 border-orange-500 text-orange-600 hover:bg-orange-50"
+              >
+                <PauseCircle className="h-4 w-4" />
+                Pause
+              </Button>
+            )}
+            {/* Resume - only for paused */}
+            {wo.status === 'paused' && (
+              <Button
+                onClick={() => setResumeModalOpen(true)}
+                className="gap-2 bg-green-500 hover:bg-green-600"
+              >
+                <PlayCircle className="h-4 w-4" />
+                Resume
+              </Button>
+            )}
+            {/* Complete WO - for in_progress or paused */}
+            {(wo.status === 'in_progress' || wo.status === 'paused') && (
+              <Button
+                onClick={() => setCompleteModalOpen(true)}
+                variant="outline"
+                className="gap-2 border-green-500 text-green-600 hover:bg-green-50"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Complete WO
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Tabs */}
@@ -577,6 +647,14 @@ export default function WorkOrderDetailsPage({
                 </div>
               )}
 
+              {wo.status === 'paused' && (
+                <div className="bg-orange-50 rounded-lg p-4 text-center">
+                  <p className="text-orange-700">
+                    Production is paused. Click Resume to continue production.
+                  </p>
+                </div>
+              )}
+
               {wo.status === 'completed' && (
                 <div className="bg-green-50 rounded-lg p-4 text-center">
                   <p className="text-green-600">
@@ -601,6 +679,12 @@ export default function WorkOrderDetailsPage({
                 </div>
               )}
             </div>
+
+            {/* Operation Timeline - Story 4.20 */}
+            <OperationTimelinePanel woId={wo.id} />
+
+            {/* Pause History Panel - Story 4.3 */}
+            <PauseHistoryPanel woId={wo.id} />
 
             {/* BOM/Routing Info placeholder */}
             {wo.routing_id && (
@@ -638,6 +722,43 @@ export default function WorkOrderDetailsPage({
         onOpenChange={setStartModalOpen}
         onSuccess={() => {
           setStartModalOpen(false)
+          fetchWO()
+        }}
+      />
+
+      {/* Pause Modal - Story 4.3 */}
+      <WOPauseModal
+        woId={wo.id}
+        woNumber={wo.wo_number}
+        open={pauseModalOpen}
+        onOpenChange={setPauseModalOpen}
+        onSuccess={() => {
+          setPauseModalOpen(false)
+          fetchWO()
+        }}
+      />
+
+      {/* Resume Modal - Story 4.3 */}
+      <WOResumeModal
+        woId={wo.id}
+        woNumber={wo.wo_number}
+        pausedAt={wo.paused_at || undefined}
+        open={resumeModalOpen}
+        onOpenChange={setResumeModalOpen}
+        onSuccess={() => {
+          setResumeModalOpen(false)
+          fetchWO()
+        }}
+      />
+
+      {/* Complete WO Modal - Story 4.6 */}
+      <WOCompleteModal
+        woId={wo.id}
+        woNumber={wo.wo_number}
+        open={completeModalOpen}
+        onOpenChange={setCompleteModalOpen}
+        onSuccess={() => {
+          setCompleteModalOpen(false)
           fetchWO()
         }}
       />

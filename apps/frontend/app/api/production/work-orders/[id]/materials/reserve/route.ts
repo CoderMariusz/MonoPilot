@@ -87,6 +87,21 @@ export async function POST(
       )
     }
 
+    // Broadcast realtime event for material.reserved
+    try {
+      await supabaseAdmin.channel(`wo:${woId}`).send({
+        type: 'broadcast',
+        event: 'material.reserved',
+        payload: {
+          wo_id: woId,
+          material_id: material_id,
+          reservation: data,
+        },
+      })
+    } catch (broadcastError) {
+      console.error('Error broadcasting material.reserved:', broadcastError)
+    }
+
     return NextResponse.json({
       data,
       message: 'Material reserved successfully',

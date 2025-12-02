@@ -79,7 +79,7 @@ export default function ProductionLinesPage() {
       params.append('sort_by', sortBy)
       params.append('sort_direction', sortDirection)
 
-      const response = await fetch(`/api/settings/production-lines?${params.toString()}`)
+      const response = await fetch(`/api/settings/lines?${params.toString()}`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch production lines')
@@ -126,7 +126,7 @@ export default function ProductionLinesPage() {
   // Delete handler (AC-007.2)
   const handleDelete = async (line: ProductionLine) => {
     try {
-      const response = await fetch(`/api/settings/production-lines/${line.id}`, {
+      const response = await fetch(`/api/settings/lines/${line.id}`, {
         method: 'DELETE',
       })
 

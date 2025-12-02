@@ -1,18 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabase } from '@/lib/supabase/server';
-import { UpdateBOMItemSchema } from '@/lib/validation/bom-schemas';
-import { ZodError } from 'zod';
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabase } from '@/lib/supabase/server'
+import { UpdateBOMItemSchema } from '@/lib/validation/bom-schemas'
+import { updateBomItem, deleteBomItem } from '@/lib/services/bom-item-service'
+import { ZodError } from 'zod'
 
 /**
- * Individual BOM Item API Routes
- * Story: 2.7 BOM Items Management
+ * BOM Item API Routes - Story 2.26
  *
  * PUT /api/technical/boms/:id/items/:itemId - Update BOM item
  * DELETE /api/technical/boms/:id/items/:itemId - Delete BOM item
  */
 
 // ============================================================================
-// PUT /api/technical/boms/:id/items/:itemId - Update item (AC-2.7.4)
+// PUT /api/technical/boms/:id/items/:itemId - Update item (AC-2.26.5)
 // ============================================================================
 
 export async function PUT(
@@ -21,13 +21,13 @@ export async function PUT(
 ) {
   try {
     const { id, itemId } = await params
-    const supabase = await createServerSupabase();
+    const supabase = await createServerSupabase()
 
     // Check authentication
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
     if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get current user to check role
@@ -35,10 +35,10 @@ export async function PUT(
       .from('users')
       .select('role, org_id')
       .eq('id', session.user.id)
-      .single();
+      .single()
 
     if (userError || !currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Check authorization: Admin or Technical only
@@ -46,73 +46,80 @@ export async function PUT(
       return NextResponse.json(
         { error: 'Forbidden: Admin or Technical role required' },
         { status: 403 }
-      );
-    }
-
-    // Verify item exists and belongs to this BOM
-    const { data: existingItem, error: itemError } = await supabase
-      .from('bom_items')
-      .select('id, bom_id')
-      .eq('id', itemId)
-      .eq('bom_id', id)
-      .single();
-
-    if (itemError || !existingItem) {
-      return NextResponse.json({ error: 'BOM item not found' }, { status: 404 });
+      )
     }
 
     // Parse and validate request body
-    const body = await request.json();
-    const validatedData = UpdateBOMItemSchema.parse(body);
+    const body = await request.json()
+    const validatedData = UpdateBOMItemSchema.parse(body)
 
-    // Update BOM item
-    const { data: item, error: updateError } = await supabase
-      .from('bom_items')
-      .update(validatedData)
-      .eq('id', itemId)
-      .select(`
-        *,
-        product:products!product_id (
-          id,
-          code,
-          name,
-          type,
-          uom
-        )
-      `)
-      .single();
-
-    if (updateError) {
-      console.error('Error updating BOM item:', updateError);
-      throw new Error(`Failed to update BOM item: ${updateError.message}`);
-    }
+    // Update item via service
+    const item = await updateBomItem(id, itemId, validatedData)
 
     return NextResponse.json(
       {
-        item,
+        data: item,
         message: 'BOM item updated successfully',
       },
       { status: 200 }
-    );
+    )
   } catch (error) {
-    console.error('Error in PUT /api/technical/boms/[id]/items/[itemId]:', error);
+    console.error('Error in PUT /api/technical/boms/[id]/items/[itemId]:', error)
 
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: 'Invalid request data', details: error.errors },
         { status: 400 }
-      );
+      )
+    }
+
+    const message = error instanceof Error ? error.message : 'Unknown error'
+
+    if (message === 'BOM_NOT_FOUND') {
+      return NextResponse.json({ error: 'BOM_NOT_FOUND' }, { status: 404 })
+    }
+
+    if (message === 'ITEM_NOT_FOUND') {
+      return NextResponse.json({ error: 'ITEM_NOT_FOUND' }, { status: 404 })
+    }
+
+    if (message === 'INVALID_COMPONENT') {
+      return NextResponse.json(
+        { error: 'INVALID_COMPONENT', message: 'Component not found' },
+        { status: 400 }
+      )
+    }
+
+    if (message === 'SELF_REFERENCE') {
+      return NextResponse.json(
+        { error: 'SELF_REFERENCE', message: 'Input item cannot reference BOM product' },
+        { status: 400 }
+      )
+    }
+
+    if (message === 'OPERATION_NOT_FOUND') {
+      return NextResponse.json(
+        { error: 'INVALID_OPERATION_SEQ', message: 'Operation sequence not found in routing' },
+        { status: 400 }
+      )
+    }
+
+    if (message === 'LINE_NOT_IN_BOM') {
+      return NextResponse.json(
+        { error: 'LINE_NOT_IN_BOM', message: 'Line not assigned to BOM' },
+        { status: 400 }
+      )
     }
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
-    );
+    )
   }
 }
 
 // ============================================================================
-// DELETE /api/technical/boms/:id/items/:itemId - Delete item (AC-2.7.4)
+// DELETE /api/technical/boms/:id/items/:itemId - Delete item (AC-2.26.6)
 // ============================================================================
 
 export async function DELETE(
@@ -121,13 +128,13 @@ export async function DELETE(
 ) {
   try {
     const { id, itemId } = await params
-    const supabase = await createServerSupabase();
+    const supabase = await createServerSupabase()
 
     // Check authentication
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
 
     if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get current user to check role
@@ -135,10 +142,10 @@ export async function DELETE(
       .from('users')
       .select('role, org_id')
       .eq('id', session.user.id)
-      .single();
+      .single()
 
     if (userError || !currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Check authorization: Admin or Technical only
@@ -146,42 +153,32 @@ export async function DELETE(
       return NextResponse.json(
         { error: 'Forbidden: Admin or Technical role required' },
         { status: 403 }
-      );
+      )
     }
 
-    // Verify item exists and belongs to this BOM
-    const { data: existingItem, error: itemError } = await supabase
-      .from('bom_items')
-      .select('id, bom_id')
-      .eq('id', itemId)
-      .eq('bom_id', id)
-      .single();
-
-    if (itemError || !existingItem) {
-      return NextResponse.json({ error: 'BOM item not found' }, { status: 404 });
-    }
-
-    // Delete BOM item
-    const { error: deleteError } = await supabase
-      .from('bom_items')
-      .delete()
-      .eq('id', itemId);
-
-    if (deleteError) {
-      console.error('Error deleting BOM item:', deleteError);
-      throw new Error(`Failed to delete BOM item: ${deleteError.message}`);
-    }
+    // Delete item via service
+    await deleteBomItem(id, itemId)
 
     return NextResponse.json(
       { message: 'BOM item deleted successfully' },
       { status: 200 }
-    );
+    )
   } catch (error) {
-    console.error('Error in DELETE /api/technical/boms/[id]/items/[itemId]:', error);
+    console.error('Error in DELETE /api/technical/boms/[id]/items/[itemId]:', error)
+
+    const message = error instanceof Error ? error.message : 'Unknown error'
+
+    if (message === 'BOM_NOT_FOUND') {
+      return NextResponse.json({ error: 'BOM_NOT_FOUND' }, { status: 404 })
+    }
+
+    if (message === 'ITEM_NOT_FOUND') {
+      return NextResponse.json({ error: 'ITEM_NOT_FOUND' }, { status: 404 })
+    }
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
-    );
+    )
   }
 }

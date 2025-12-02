@@ -38,7 +38,7 @@ export async function POST(
     }
 
     // AC-4.2.7: Role-based authorization
-    const allowedRoles = ['admin', 'manager', 'production_manager']
+    const allowedRoles = ['admin', 'manager', 'production_manager', 'operator']
     if (!allowedRoles.includes(currentUser.role)) {
       return NextResponse.json(
         {

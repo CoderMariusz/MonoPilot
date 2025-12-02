@@ -1,14 +1,24 @@
 # Technical Module - PRD Specification
 
-**Status:** To Be Implemented (Clean Slate)
-**Priority:** P0 - Foundation Module (after Settings)
-**Effort Estimate:** 3-4 weeks
+**Status:** ✅ IMPLEMENTED (Epic 2 Complete - 28 stories DONE)
+**Priority:** P0 - Foundation Module
+**Implementation:** Batch 02A-02E (2025-11-23 to 2025-11-27)
 
 ---
 
 ## Overview
 
-Technical module definiuje "co produkujemy" - produkty, receptury (BOMs), operacje (routings) i śledzenie (tracing). Jest fundamentem dla Planning i Production.
+Technical module definiuje "co produkujemy" - produkty, receptury (BOMs), operacje (routings) i śledzenie (tracing). **Epic 2 zakończony** - zaimplementowano 28 stories w 5 batchach (02A-02E):
+
+- **02A-1:** Products Core (6 stories - CRUD, versioning, history, allergens, types, settings)
+- **02B-1:** BOM Core (4 stories - CRUD, items, date validation, timeline viz)
+- **02B-2:** BOM Advanced (5 stories - clone, compare, conditionals, by-products, allergen inheritance)
+- **02C-1:** Routing (3 stories - CRUD, operations, product assignment)
+- **02D-1:** Traceability (4 stories - forward, backward, recall, genealogy tree)
+- **02E-1:** Dashboard & Allergen Matrix (2 stories)
+- **02E-2:** Technical UI Redesign (4 stories)
+
+**Test Coverage:** 150+ unit tests, 80+ integration tests, 100+ E2E tests
 
 ## Dependencies
 
@@ -178,27 +188,89 @@ Przed użyciem Technical module, user konfiguruje:
 | `product_id` | FK | Yes | Produkt parent (co produkujemy) |
 | `version` | string | Yes | Wersja BOM (np. 1.0, 1.1) |
 | `bom_type` | enum | Yes | Standard, Engineering, Configurable |
+| `routing_id` | FK | No | Routing przypisany do BOM (definiuje operacje) |
 | `effective_from` | date | Yes | Data od kiedy obowiązuje |
 | `effective_to` | date | No | Data do kiedy obowiązuje (null = infinity) |
 | `status` | enum | Yes | Draft, Active, Phased Out, Inactive |
 | `output_qty` | decimal | Yes | Ilość wyjściowa z tego BOM |
 | `output_uom` | enum | Yes | Jednostka wyjściowa |
+| `units_per_box` | integer | No | Ile jednostek w karton/opakowanie zbiorcze |
+| `boxes_per_pallet` | integer | No | Ile kartonów na paletę |
 | `notes` | text | No | Notatki |
 
-### 2.2 BOM Item (Line)
+### 2.2 BOM Production Lines (Many-to-Many)
+
+**Koncepcja:** Jeden BOM może być produkowany na wielu liniach produkcyjnych.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `product_id` | FK | Yes | Komponent (co wchodzi) |
-| `quantity` | decimal | Yes | Ilość |
-| `uom` | enum | Yes | Jednostka |
-| `scrap_percent` | decimal | No | % strat (default 0) |
-| `sequence` | number | Yes | Kolejność |
-| `consume_whole_lp` | boolean | No | Flag: konsumuj całą LP (1:1) |
-| `is_by_product` | boolean | No | Flag: czy to by-product |
-| `yield_percent` | decimal | No | % yield dla by-product |
+| `bom_id` | FK | Yes | BOM |
+| `line_id` | FK | Yes | Linia produkcyjna |
+| `labor_cost_per_hour` | decimal | No | Override kosztu pracy dla tej linii (opcjonalnie) |
 
-### 2.3 Conditional Flags (per BOM Item)
+**Przykład:**
+- BOM FG-001 v1.0 może być produkowany na Line 4, Line 7, Line 10
+- Każda linia może mieć inny koszt pracy
+
+### 2.3 BOM Item
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `component_id` | FK | Yes | Komponent (produkt wchodzący lub wychodzący) |
+| `operation_seq` | number | Yes | Do której operacji routingu należy (1, 2, 3...) |
+| `is_output` | boolean | No | Czy to OUTPUT z operacji (default: false = input) |
+| `quantity` | decimal | Yes | Ilość per batch |
+| `uom` | enum | Yes | Jednostka |
+| `sequence` | number | No | Priorytet alternatyw (1 = primary, 2+ = alternative) |
+| `line_ids` | UUID[] | No | Linie na których używany (NULL = ALL) |
+| `scrap_percent` | decimal | No | % strat (default 0) |
+| `consume_whole_lp` | boolean | No | Flag: konsumuj całą LP (1:1) |
+| `notes` | text | No | Notatki |
+
+**Operation Assignment (`operation_seq`):**
+- Każdy BOM Item jest przypisany do konkretnej operacji z routingu
+- Input: komponent konsumowany w tej operacji
+- Output (`is_output=true`): produkt wytwarzany przez tę operację
+
+**Przykład (Routing: Dice→Smoke→Pack):**
+```
+BOM FG-001:
+├── Operation 1 (Dice):
+│   ├── Input: MEAT-001 (10kg)
+│   └── Output: WIP-DICED (is_output=true, 9.5kg)
+├── Operation 2 (Smoke):
+│   ├── Input: WIP-DICED (auto z op.1)
+│   └── Output: WIP-SMOKED (is_output=true, 9kg)
+└── Operation 3 (Pack):
+    ├── Input: WIP-SMOKED (auto z op.2)
+    ├── Input: BOX-001 (sequence=1, line_ids=[Line4])
+    ├── Input: BOX-002 (sequence=1, line_ids=[Line7])
+    └── Output: FG-001 (is_output=true, final product)
+```
+
+**Alternatives (`sequence`):**
+- Items z tym samym `operation_seq` i `sequence` są alternatywami
+- System wybiera wg kolejności rezerwacji w WO (`reserved_at`)
+- Przykład: BOX-001 i BOX-002 oba mają sequence=1, różnią się line_ids
+
+**Line-specific Components (`line_ids`):**
+- `NULL` → używany na WSZYSTKICH liniach
+- `[line_4_id]` → używany TYLKO na Line 4
+- Pozwala na różne opakowania per linia
+
+**Snapshot Logic (WO creation):**
+```typescript
+// Planner wybiera Line 7
+const woItems = bomItems
+  .filter(item => item.line_ids === null || item.line_ids.includes(lineId))
+  .map(item => ({
+    ...item,
+    for_operation_seq: item.operation_seq,
+    source: item.is_output ? null : 'inventory' // outputs nie są źródłem
+  }));
+```
+
+### 2.4 Conditional Flags (per BOM Item)
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -215,14 +287,14 @@ Przed użyciem Technical module, user konfiguruje:
 
 Komponent jest włączony tylko gdy zamówienie ma OBE flagi: organic AND gluten_free.
 
-### 2.4 By-Products
+### 2.5 By-Products
 
 - **Unlimited count** per BOM
 - Each by-product has `yield_percent` (np. 15% = 15kg by-product z 100kg main output)
 - By-product inherits batch from main output
 - Automatic LP creation for by-products
 
-### 2.5 BOM Versioning
+### 2.6 BOM Versioning
 
 | Feature | Description |
 |---------|-------------|
@@ -231,7 +303,7 @@ Komponent jest włączony tylko gdy zamówienie ma OBE flagi: organic AND gluten
 | Compare versions | Diff view: added/removed/changed items |
 | Max versions | Configured in Settings (default: unlimited) |
 
-### 2.6 Allergen Inheritance
+### 2.7 Allergen Inheritance
 
 **Automatic rollup:**
 - BOM inherits allergens from ALL BOM items
@@ -240,19 +312,22 @@ Komponent jest włączony tylko gdy zamówienie ma OBE flagi: organic AND gluten
 - Displayed on BOM detail page
 - Warning if BOM allergens differ from Product allergens
 
-### 2.7 BOM Timeline Visualization
+### 2.8 BOM Timeline Visualization
 
 - Horizontal Gantt-style timeline
 - Each bar = one BOM version
 - Color by status (green=Active, gray=Draft, orange=Phased Out)
 - Click bar to view/edit
 
-### 2.8 UI Components
+### 2.9 UI Components
 
 - BOMs table with search, filter by product/status
 - BOM timeline per product
 - Create/Edit BOM form with items table
-- Add BOM Item modal
+- **Production Lines selector** (multi-select linii na których BOM może być produkowany)
+- **Routing selector** (wybór routingu dla BOM)
+- **Packaging fields** (units_per_box, boxes_per_pallet)
+- Add BOM Item modal with **line assignment** (wybór linii dla komponentu)
 - Conditional flags selector
 - Allergen rollup display
 - Version comparison modal
@@ -264,55 +339,56 @@ Komponent jest włączony tylko gdy zamówienie ma OBE flagi: organic AND gluten
 
 **Route:** `/technical/routings`
 
+**Koncepcja:** Routing definiuje sekwencję operacji produkcyjnych. Routing jest przypisywany do BOM (nie do produktu bezpośrednio). Jeden routing może być używany przez wiele BOM-ów.
+
 ### 3.1 Routing Header
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `code` | string | Yes | Kod routingu (np. DICE-01) |
-| `name` | string | Yes | Nazwa (np. "Krojenie w kostkę") |
-| `description` | text | No | Opis |
-| `status` | enum | Yes | Active, Inactive |
-| `is_reusable` | boolean | Yes | Czy może być używany przez wiele produktów |
+| `name` | string | Yes | Nazwa routingu (np. "Dice and Smoke") |
+| `description` | text | No | Opis procesu |
+| `is_active` | boolean | Yes | Status aktywności |
+
+**Uwaga:** Routing NIE ma przypisania do produktu. Przypisanie następuje przez BOM (`bom.routing_id`).
 
 ### 3.2 Routing Operation
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `sequence` | number | Yes | Kolejność operacji |
-| `operation_name` | string | Yes | Nazwa operacji (np. "Mieszanie") |
-| `machine_id` | FK | No | Maszyna (opcjonalnie) |
-| `line_id` | FK | No | Linia (opcjonalnie) |
-| `expected_duration_minutes` | number | Yes | Oczekiwany czas (minuty) |
-| `expected_yield_percent` | decimal | Yes | Oczekiwany yield % |
-| `setup_time_minutes` | number | No | Czas przygotowania |
-| `labor_cost` | decimal | No | Koszt pracy |
+| `sequence` | number | Yes | Kolejność operacji (1, 2, 3...) |
+| `name` | string | Yes | Nazwa operacji (np. "Dice", "Smoke", "Pack") |
+| `description` | text | No | Opis operacji |
+| `machine_id` | FK | No | Maszyna przypisana do operacji |
+| `estimated_duration_minutes` | number | No | Szacowany czas trwania |
+| `labor_cost_per_hour` | decimal | No | Domyślny koszt pracy/h (może być override w BOM) |
 
-### 3.3 Reusable Routings
+### 3.3 Routing ↔ BOM Relationship
 
-**Koncepcja:** Routing może być przypisany do wielu produktów.
+```
+Routing "DICE-SMOKE" (id: R1)
+├── Operation 1: Dice (30 min)
+├── Operation 2: Smoke (120 min)
+└── Operation 3: Pack (15 min)
 
-**Przykład:** Routing "DICE" (krojenie w kostkę) używany przez:
-- Carrot Diced
-- Potato Diced
-- Onion Diced
-- ... (10+ produktów)
+BOM "FG-001 v1.0" → routing_id: R1
+BOM "FG-002 v1.0" → routing_id: R1  (ten sam routing, różne produkty)
+BOM "FG-003 v1.0" → routing_id: R2  (inny routing)
+```
 
-**Przypisanie:** Product ↔ Routing (many-to-many)
+### 3.4 Cost Calculation
 
-### 3.4 Routing Usage (Calculation)
+Koszt pracy WO = Σ (operation.estimated_duration × labor_cost_per_hour)
 
-Routings używane do:
-- **Time calculation:** Planowanie czasu produkcji
-- **Cost calculation:** Labor cost per WO
-- **Capacity planning:** Machine/line availability
+- `labor_cost_per_hour` pobierany z:
+  1. `bom_production_lines.labor_cost_per_hour` (jeśli override dla linii)
+  2. `routing_operations.labor_cost_per_hour` (domyślny)
 
 ### 3.5 UI Components
 
-- Routings table with search
-- Create/Edit Routing form
-- Operations table (drag-drop reorder)
-- Add Operation modal
-- Product assignment (multi-select products)
+- Routings table with search, filter by status
+- Create/Edit Routing form (name, description)
+- Operations table (drag-drop reorder sequence)
+- Add/Edit Operation modal (name, machine, duration, labor_cost)
 
 ---
 

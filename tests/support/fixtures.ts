@@ -42,6 +42,7 @@ export interface UserFactory {
 export interface AuthHelper {
   login(page: any, email: string, password: string): Promise<void>
   logout(page: any): Promise<void>
+  getAuthToken(page: any): Promise<string | null>
 }
 
 // User Factory Implementation
@@ -170,6 +171,14 @@ class AuthHelperImpl implements AuthHelper {
 
     // Wait for redirect to login
     await page.waitForURL('/auth/sign-in', { timeout: 5000 })
+  }
+
+  async getAuthToken(page: any): Promise<string | null> {
+    // Get auth token from localStorage
+    const token = await page.evaluate(() => {
+      return localStorage.getItem('sb-auth-token')
+    })
+    return token
   }
 }
 

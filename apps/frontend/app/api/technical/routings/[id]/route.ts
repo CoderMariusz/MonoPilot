@@ -9,16 +9,15 @@ import {
 import { ZodError } from 'zod'
 
 /**
- * Routing Detail API Routes
- * Story: 2.15 Routing CRUD
+ * Routing Detail API Routes - Story 2.24
  *
- * GET /api/technical/routings/:id - Get routing details
+ * GET /api/technical/routings/:id - Get routing details with operations
  * PUT /api/technical/routings/:id - Update routing
- * DELETE /api/technical/routings/:id - Delete routing
+ * DELETE /api/technical/routings/:id - Delete routing (fails if used by BOMs)
  */
 
 // ============================================================================
-// GET /api/technical/routings/:id - Get Routing (AC-015.2)
+// GET /api/technical/routings/:id - Get Routing (AC-2.24.5)
 // ============================================================================
 
 export async function GET(
@@ -73,7 +72,7 @@ export async function GET(
 }
 
 // ============================================================================
-// PUT /api/technical/routings/:id - Update Routing (AC-015.5)
+// PUT /api/technical/routings/:id - Update Routing (AC-2.24.5)
 // ============================================================================
 
 export async function PUT(
@@ -105,7 +104,7 @@ export async function PUT(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Check authorization: Admin or Technical only (AC-015.5)
+    // Check authorization: Admin or Technical only
     if (!['admin', 'technical'].includes(currentUser.role)) {
       return NextResponse.json(
         { error: 'Forbidden: Admin or Technical role required' },
@@ -125,6 +124,13 @@ export async function PUT(
         return NextResponse.json(
           { error: 'Routing not found' },
           { status: 404 }
+        )
+      }
+
+      if (result.code === 'DUPLICATE_NAME') {
+        return NextResponse.json(
+          { error: result.error || 'Routing name already exists' },
+          { status: 400 }
         )
       }
 
@@ -159,7 +165,7 @@ export async function PUT(
 }
 
 // ============================================================================
-// DELETE /api/technical/routings/:id - Delete Routing (AC-015.5)
+// DELETE /api/technical/routings/:id - Delete Routing (AC-2.24.5)
 // ============================================================================
 
 export async function DELETE(
@@ -191,10 +197,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Check authorization: Admin only (AC-015.5)
-    if (currentUser.role !== 'admin') {
+    // Check authorization: Admin or Technical only
+    if (!['admin', 'technical'].includes(currentUser.role)) {
       return NextResponse.json(
-        { error: 'Forbidden: Admin role required' },
+        { error: 'Forbidden: Admin or Technical role required' },
         { status: 403 }
       )
     }
@@ -207,6 +213,13 @@ export async function DELETE(
         return NextResponse.json(
           { error: 'Routing not found' },
           { status: 404 }
+        )
+      }
+
+      if (result.code === 'IN_USE') {
+        return NextResponse.json(
+          { error: result.error || 'Routing is in use' },
+          { status: 400 }
         )
       }
 

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.16</id>
+    <title>NCR Lifecycle Tracking</title>
+    <batch>06B-2</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Track NCR through its lifecycle for resolution monitoring</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.15">NCR Creation</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>ncr_notes</name>
+        <columns>
+          <column>id uuid PRIMARY KEY</column>
+          <column>ncr_id uuid NOT NULL REFERENCES non_conformance_reports(id) ON DELETE CASCADE</column>
+          <column>note_type text NOT NULL</column>
+          <column>content text NOT NULL</column>
+          <column>created_by uuid NOT NULL REFERENCES profiles(id)</column>
+          <column>created_at timestamptz DEFAULT now()</column>
+        </columns>
+      </table>
+    </tables>
+
+    <status_flow>
+      <transition from="open" to="investigating"/>
+      <transition from="investigating" to="corrective_action"/>
+      <transition from="corrective_action" to="closed"/>
+    </status_flow>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Status flow: open → investigating → corrective_action → closed</ac>
+    <ac id="2">Status changes recorded with timestamp</ac>
+    <ac id="3">Notes per status change</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-18">System shall track NCR lifecycle</fr>
+  </functional_requirements>
+</story>

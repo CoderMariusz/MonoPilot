@@ -1,7 +1,7 @@
 /**
  * Create Routing Modal
- * Story: 2.15 Routing CRUD
- * AC-015.3: Create routing modal with validation
+ * Story: 2.24 Routing Restructure
+ * AC-2.24.5: Create routing with name (unique per org)
  */
 
 'use client'
@@ -9,7 +9,9 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { createRoutingSchema, type CreateRoutingInput } from '@/lib/validation/routing-schemas'
+import { z } from 'zod'
+import { createRoutingSchema } from '@/lib/validation/routing-schemas'
+
 import {
   Dialog,
   DialogContent,
@@ -29,16 +31,12 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+
+// Use z.input type for form (before zod transforms)
+type FormInput = z.input<typeof createRoutingSchema>
 
 interface CreateRoutingModalProps {
   open: boolean
@@ -50,18 +48,16 @@ export function CreateRoutingModal({ open, onClose, onSuccess }: CreateRoutingMo
   const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
 
-  const form = useForm<CreateRoutingInput>({
+  const form = useForm<FormInput>({
     resolver: zodResolver(createRoutingSchema),
     defaultValues: {
-      code: '',
       name: '',
       description: '',
-      status: 'active',
-      is_reusable: true,
+      is_active: true,
     },
   })
 
-  const onSubmit = async (data: CreateRoutingInput) => {
+  const onSubmit = async (data: FormInput) => {
     try {
       setSubmitting(true)
 
@@ -74,10 +70,10 @@ export function CreateRoutingModal({ open, onClose, onSuccess }: CreateRoutingMo
       if (!response.ok) {
         const error = await response.json()
 
-        // AC-015.4: Handle duplicate code
-        if (response.status === 409) {
-          form.setError('code', {
-            message: error.error || 'Routing code already exists',
+        // Handle duplicate name
+        if (error.error?.includes('name already exists')) {
+          form.setError('name', {
+            message: error.error || 'Routing name already exists',
           })
           return
         }
@@ -115,38 +111,12 @@ export function CreateRoutingModal({ open, onClose, onSuccess }: CreateRoutingMo
         <DialogHeader>
           <DialogTitle>Create Routing</DialogTitle>
           <DialogDescription>
-            Define a new production routing with operations and resource assignments.
+            Define a new production routing template. Routings can be assigned to BOMs.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Code Field (AC-015.1) */}
-            <FormField
-              control={form.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code *</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="e.g., RTG-BREAD-01"
-                      className="font-mono"
-                      onChange={(e) => {
-                        // AC-015.3: Auto-uppercase
-                        field.onChange(e.target.value.toUpperCase())
-                      }}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Routing code must be unique per organization (2-50 chars, uppercase alphanumeric + hyphens)
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             {/* Name Field */}
             <FormField
               control={form.control}
@@ -157,7 +127,9 @@ export function CreateRoutingModal({ open, onClose, onSuccess }: CreateRoutingMo
                   <FormControl>
                     <Input {...field} placeholder="e.g., Standard Bread Production" />
                   </FormControl>
-                  <FormDescription>1-100 characters</FormDescription>
+                  <FormDescription>
+                    1-100 characters, must be unique within organization
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -177,55 +149,30 @@ export function CreateRoutingModal({ open, onClose, onSuccess }: CreateRoutingMo
                       rows={3}
                     />
                   </FormControl>
-                  <FormDescription>Optional, max 1000 characters</FormDescription>
+                  <FormDescription>Optional, max 500 characters</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Status Field */}
+            {/* Active Switch */}
             <FormField
               control={form.control}
-              name="status"
+              name="is_active"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Reusable Checkbox (AC-015.1) */}
-            <FormField
-              control={form.control}
-              name="is_reusable"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                <FormItem className="flex flex-row items-center justify-between rounded-md border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Active</FormLabel>
+                    <FormDescription>
+                      Active routings can be assigned to BOMs
+                    </FormDescription>
+                  </div>
                   <FormControl>
-                    <Checkbox
+                    <Switch
                       checked={field.value}
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      This routing can be assigned to multiple products
-                    </FormLabel>
-                    <FormDescription>
-                      If unchecked, routing can only be assigned to one product
-                    </FormDescription>
-                  </div>
                 </FormItem>
               )}
             />

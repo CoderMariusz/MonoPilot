@@ -1,7 +1,7 @@
 /**
  * Routings List Page
- * Story: 2.15 Routing CRUD
- * AC-015.1: Routing list view with search, filters, and actions
+ * Story: 2.24 Routing Restructure
+ * Routings are now independent templates (no product binding)
  */
 
 'use client'
@@ -26,7 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Search, Edit, Trash2, Eye, Plus } from 'lucide-react'
+import { Search, Trash2, Eye, Plus } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import type { Routing } from '@/lib/services/routing-service'
@@ -38,23 +38,18 @@ export default function RoutingsPage() {
   const [routings, setRoutings] = useState<Routing[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [activeFilter, setActiveFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [sortBy, setSortBy] = useState<'code' | 'name' | 'status' | 'created_at'>('code')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   const { toast } = useToast()
 
-  // AC-015.2: Fetch routings with filters
+  // Fetch routings with filters
   const fetchRoutings = async () => {
     try {
       setLoading(true)
 
       const params = new URLSearchParams()
-      if (searchTerm) params.append('search', searchTerm)
-      if (statusFilter !== 'all') params.append('status', statusFilter)
-      params.append('sort_by', sortBy)
-      params.append('sort_direction', sortDirection)
+      if (activeFilter !== 'all') params.append('is_active', activeFilter)
 
       const response = await fetch(`/api/technical/routings?${params.toString()}`)
 
@@ -78,9 +73,9 @@ export default function RoutingsPage() {
 
   useEffect(() => {
     fetchRoutings()
-  }, [statusFilter, sortBy, sortDirection])
+  }, [activeFilter])
 
-  // AC-015.3: Debounced search (300ms)
+  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchRoutings()
@@ -89,9 +84,9 @@ export default function RoutingsPage() {
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  // AC-015.7: Delete routing
+  // Delete routing
   const handleDelete = async (routing: Routing) => {
-    if (!confirm(`Delete routing "${routing.code}"? This will also delete all operations and product assignments. This action cannot be undone.`)) {
+    if (!confirm(`Delete routing "${routing.name}"? This will also delete all operations. This action cannot be undone.`)) {
       return
     }
 
@@ -101,7 +96,8 @@ export default function RoutingsPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to delete routing')
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete routing')
       }
 
       toast({
@@ -114,7 +110,7 @@ export default function RoutingsPage() {
       console.error('Error deleting routing:', error)
       toast({
         title: 'Error',
-        description: 'Failed to delete routing',
+        description: error instanceof Error ? error.message : 'Failed to delete routing',
         variant: 'destructive',
       })
     }
@@ -126,165 +122,138 @@ export default function RoutingsPage() {
     fetchRoutings()
   }
 
-  // Status badge (AC-015.2)
-  const getStatusBadge = (status: string) => {
-    return status === 'active' ? (
-      <Badge variant="default" className="bg-green-600">Active</Badge>
-    ) : (
-      <Badge variant="secondary">Inactive</Badge>
+  // Filter by search term (client-side)
+  const filteredRoutings = routings.filter((routing) => {
+    if (!searchTerm) return true
+    const term = searchTerm.toLowerCase()
+    return (
+      routing.name.toLowerCase().includes(term) ||
+      (routing.description && routing.description.toLowerCase().includes(term))
     )
-  }
+  })
 
   return (
     <div>
       <TechnicalHeader currentPage="routings" />
       <div className="px-4 md:px-6 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Routings</h1>
-          <p className="text-muted-foreground">Manage production routings and operations</p>
-        </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Routing
-        </Button>
-      </div>
-
-      {/* Filters Card (AC-015.3) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by code or name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
-            {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Sort By */}
-            <Select value={sortBy} onValueChange={(val) => setSortBy(val as any)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="code">Code</SelectItem>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="status">Status</SelectItem>
-                <SelectItem value="created_at">Created Date</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Sort Direction */}
-            <Select value={sortDirection} onValueChange={(val) => setSortDirection(val as any)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="asc">Ascending</SelectItem>
-                <SelectItem value="desc">Descending</SelectItem>
-              </SelectContent>
-            </Select>
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Routings</h1>
+            <p className="text-muted-foreground">Manage production routings and operations</p>
           </div>
-        </CardContent>
-      </Card>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Routing
+          </Button>
+        </div>
 
-      {/* Routings Table (AC-015.2) */}
-      <Card>
-        <CardContent className="pt-6">
-          {loading ? (
-            <div className="text-center py-8">Loading routings...</div>
-          ) : routings.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No routings found. Create your first routing to get started.
+        {/* Filters Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Filters</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              {/* Search */}
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              {/* Active Filter */}
+              <Select value={activeFilter} onValueChange={setActiveFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="true">Active</SelectItem>
+                  <SelectItem value="false">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Reusable</TableHead>
-                  <TableHead>Products</TableHead>
-                  <TableHead>Operations</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {routings.map((routing) => (
-                  <TableRow key={routing.id}>
-                    <TableCell className="font-mono font-semibold">{routing.code}</TableCell>
-                    <TableCell>{routing.name}</TableCell>
-                    <TableCell>{getStatusBadge(routing.status)}</TableCell>
-                    <TableCell>
-                      {routing.is_reusable ? (
-                        <Badge variant="outline">Yes</Badge>
-                      ) : (
-                        <Badge variant="secondary">No</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{routing.products_count || 0}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{routing.operations?.length || 0}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => router.push(`/technical/routings/${routing.id}`)}
-                          title="View details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(routing)}
-                          title="Delete routing"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Create Routing Modal (AC-015.3) */}
-      <CreateRoutingModal
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={handleCreateSuccess}
-      />
+        {/* Routings Table */}
+        <Card>
+          <CardContent className="pt-6">
+            {loading ? (
+              <div className="text-center py-8">Loading routings...</div>
+            ) : filteredRoutings.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No routings found. Create your first routing to get started.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Operations</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRoutings.map((routing) => (
+                    <TableRow key={routing.id}>
+                      <TableCell className="font-semibold">{routing.name}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {routing.description || '-'}
+                      </TableCell>
+                      <TableCell>
+                        {routing.is_active ? (
+                          <Badge variant="default" className="bg-green-600">Active</Badge>
+                        ) : (
+                          <Badge variant="secondary">Inactive</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{routing.operations_count || 0}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => router.push(`/technical/routings/${routing.id}`)}
+                            title="View details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(routing)}
+                            title="Delete routing"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Create Routing Modal */}
+        <CreateRoutingModal
+          open={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={handleCreateSuccess}
+        />
       </div>
     </div>
   )

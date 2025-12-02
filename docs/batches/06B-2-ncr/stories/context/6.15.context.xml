@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.15</id>
+    <title>NCR Creation</title>
+    <batch>06B-2</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Create Non-Conformance Reports to document quality issues</description>
+
+  <dependencies>
+    <blocks>
+      <story id="6.16">NCR Lifecycle Tracking</story>
+      <story id="6.17">Link NCRs to Source Documents</story>
+      <story id="6.18">Root Cause and Corrective Actions</story>
+      <story id="6.27">NCR Workflow</story>
+    </blocks>
+    <requires>
+      <epic id="1">Organizations, Users</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>non_conformance_reports</name>
+        <columns>
+          <column>id uuid PRIMARY KEY</column>
+          <column>organization_id uuid NOT NULL REFERENCES organizations(id)</column>
+          <column>ncr_number text NOT NULL</column>
+          <column>issue_type text NOT NULL CHECK (issue_type IN ('material', 'process', 'product', 'other'))</column>
+          <column>description text NOT NULL</column>
+          <column>severity text NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical'))</column>
+          <column>status text DEFAULT 'open' CHECK (status IN ('open', 'investigating', 'corrective_action', 'closed'))</column>
+          <column>source_lp_id uuid REFERENCES license_plates(id)</column>
+          <column>source_wo_id uuid REFERENCES work_orders(id)</column>
+          <column>source_po_id uuid REFERENCES purchase_orders(id)</column>
+          <column>detected_by uuid NOT NULL REFERENCES profiles(id)</column>
+          <column>assigned_to uuid REFERENCES profiles(id)</column>
+          <column>root_cause_analysis text</column>
+          <column>corrective_actions text</column>
+          <column>preventive_actions text</column>
+          <column>responsible_person uuid REFERENCES profiles(id)</column>
+          <column>target_date date</column>
+          <column>actual_completion_date date</column>
+          <column>closed_by uuid REFERENCES profiles(id)</column>
+          <column>closed_at timestamptz</column>
+          <column>created_at timestamptz DEFAULT now()</column>
+          <column>updated_at timestamptz DEFAULT now()</column>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="POST" path="/api/quality/ncrs">Create NCR</endpoint>
+    </api_endpoints>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Modal: ncr_number (auto), issue_type, description, severity, source IDs, detected_by</ac>
+    <ac id="2">NCR created with status = 'open'</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-17">System shall create NCRs for quality issues</fr>
+  </functional_requirements>
+</story>

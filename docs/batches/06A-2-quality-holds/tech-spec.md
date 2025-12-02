@@ -55,4 +55,6 @@ CREATE INDEX idx_quality_holds_status ON quality_holds(organization_id, status);
 - GET /api/quality/holds/:id
 - PUT /api/quality/holds/:id
 - PUT /api/quality/holds/:id/release
+- PUT /api/quality/holds/:id/approve (Manager only)
+- PUT /api/quality/holds/:id/reject (Manager only)
 - POST /api/quality/holds/:id/notes

@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.29</id>
+    <title>Update Existing BOM/Routing UI</title>
+    <batch>02A-2-bom-restructure</batch>
+    <points>5</points>
+    <effort_hours>16-24</effort_hours>
+    <priority>P0</priority>
+    <status>todo</status>
+  </metadata>
+
+  <description>
+    Update all existing BOM and Routing UI components to support new schema features:
+    routing independence, production lines, operation assignment, alternatives, packaging.
+  </description>
+
+  <dependencies>
+    <blocks>
+      <story>User acceptance testing for batch 02A-2</story>
+    </blocks>
+    <requires>
+      <story id="2.24">Routing Restructure (API)</story>
+      <story id="2.25">BOM Production Lines (API)</story>
+      <story id="2.26">BOM Items with Operation Assignment (API)</story>
+      <story id="2.27">BOM Item Alternatives (API)</story>
+      <story id="2.28">BOM Packaging Fields (API)</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <components_to_modify>
+      <component path="apps/frontend/components/technical/RoutingForm.tsx">
+        <changes>
+          <change>Remove product selector field</change>
+          <change>Add labor_cost_per_hour to operation rows</change>
+          <change>Create inline operation editor</change>
+          <change>Add drag-to-reorder operations</change>
+        </changes>
+      </component>
+
+      <component path="apps/frontend/components/technical/RoutingList.tsx">
+        <changes>
+          <change>Remove product column</change>
+          <change>Add operations count column</change>
+          <change>Add status badge column</change>
+        </changes>
+      </component>
+
+      <component path="apps/frontend/components/technical/BOMForm.tsx">
+        <changes>
+          <change>Add routing dropdown selector</change>
+          <change>Add ProductionLinesSelect multi-select</change>
+          <change>Add packaging fields section</change>
+          <change>Show calculated units_per_pallet</change>
+        </changes>
+      </component>
+
+      <component path="apps/frontend/components/technical/BOMList.tsx">
+        <changes>
+          <change>Add routing column</change>
+          <change>Add production lines count column</change>
+        </changes>
+      </component>
+
+      <component path="apps/frontend/components/technical/BOMItemModal.tsx">
+        <changes>
+          <change>Add operation dropdown</change>
+          <change>Add sequence field</change>
+          <change>Add is_output radio buttons</change>
+          <change>Add line assignment selector</change>
+          <change>Add consume_whole_lp checkbox</change>
+          <change>Add alternatives section</change>
+        </changes>
+      </component>
+
+      <component path="apps/frontend/app/(authenticated)/technical/boms/[id]/page.tsx">
+        <changes>
+          <change>Add routing section</change>
+          <change>Add production lines section</change>
+          <change>Add packaging section</change>
+          <change>Use BOMItemsGrouped component</change>
+        </changes>
+      </component>
+    </components_to_modify>
+
+    <components_to_create>
+      <component path="apps/frontend/components/technical/ProductionLinesSelect.tsx">
+        <description>Multi-select for production lines with optional labor cost override per line</description>
+        <props>
+          <prop name="selectedLines" type="Array&lt;{ line_id: string; labor_cost_per_hour?: number }&gt;"/>
+          <prop name="onChange" type="function"/>
+          <prop name="availableLines" type="ProductionLine[]"/>
+        </props>
+        <features>
+          <feature>Checkbox list or tag-style multi-select</feature>
+          <feature>Labor cost input per selected line</feature>
+          <feature>Select All / Clear All buttons</feature>
+          <feature>Group by warehouse (optional)</feature>
+        </features>
+      </component>
+
+      <component path="apps/frontend/components/technical/OperationDropdown.tsx">
+        <description>Dropdown for selecting routing operation</description>
+        <props>
+          <prop name="routingId" type="string | null"/>
+          <prop name="value" type="number"/>
+          <prop name="onChange" type="function"/>
+        </props>
+        <behavior>
+          <when condition="no routing">Show "Default (1)" option only</when>
+          <when condition="has routing">Show all operations: "1: Mixing", "2: Baking"</when>
+        </behavior>
+      </component>
+
+      <component path="apps/frontend/components/technical/BOMItemsGrouped.tsx">
+        <description>Display BOM items grouped by operation with inputs/outputs separation</description>
+        <props>
+          <prop name="items" type="BomItem[]"/>
+          <prop name="routing" type="Routing | null"/>
+          <prop name="onEdit" type="function"/>
+          <prop name="onDelete" type="function"/>
+        </props>
+        <features>
+          <feature>Collapsible operation sections</feature>
+          <feature>Inputs and Outputs separated</feature>
+          <feature>Operation name from routing</feature>
+          <feature>Sequence within operation</feature>
+        </features>
+      </component>
+
+      <component path="apps/frontend/components/technical/AlternativesManager.tsx">
+        <description>Inline management of BOM item alternatives</description>
+        <props>
+          <prop name="alternatives" type="BomItemAlternative[]"/>
+          <prop name="onAdd" type="function"/>
+          <prop name="onUpdate" type="function"/>
+          <prop name="onDelete" type="function"/>
+          <prop name="primaryComponentId" type="string"/>
+        </props>
+        <features>
+          <feature>List with priority numbers</feature>
+          <feature>Add via product search</feature>
+          <feature>Edit ratio inline</feature>
+          <feature>Delete with confirmation</feature>
+          <feature>Drag to reorder (updates priority)</feature>
+        </features>
+      </component>
+
+      <component path="apps/frontend/components/technical/OperationRow.tsx">
+        <description>Inline editable row for routing operation</description>
+        <props>
+          <prop name="operation" type="RoutingOperation"/>
+          <prop name="onUpdate" type="function"/>
+          <prop name="onDelete" type="function"/>
+          <prop name="machines" type="Machine[]"/>
+        </props>
+        <fields>
+          <field>Sequence (number, auto-increment)</field>
+          <field>Name (text, required)</field>
+          <field>Machine (dropdown, optional)</field>
+          <field>Duration (number, minutes)</field>
+          <field>Labor Cost/Hour (currency)</field>
+          <field>Delete button</field>
+        </fields>
+      </component>
+    </components_to_create>
+
+    <ui_layouts>
+      <layout name="RoutingForm">
+        <ascii>
+┌─────────────────────────────────────────────────┐
+│ Routing Form                                     │
+├─────────────────────────────────────────────────┤
+│ Name*: [________________]                        │
+│ Description: [________________]                  │
+│ Active: [✓]                                     │
+│                                                  │
+│ ───────── Operations ─────────                  │
+│ [+ Add Operation]                               │
+│ ┌───┬──────────┬──────────┬──────────┬─────┐   │
+│ │Seq│ Name*    │ Machine  │ Duration │Labor│   │
+│ ├───┼──────────┼──────────┼──────────┼─────┤   │
+│ │ 1 │ Mixing   │ Mixer A  │ 30 min   │$25  │   │
+│ │ 2 │ Baking   │ Oven 1   │ 45 min   │$20  │   │
+│ └───┴──────────┴──────────┴──────────┴─────┘   │
+│ [Cancel] [Save Routing]                         │
+└─────────────────────────────────────────────────┘
+        </ascii>
+      </layout>
+
+      <layout name="BOMForm">
+        <ascii>
+┌─────────────────────────────────────────────────┐
+│ BOM Form                                         │
+├─────────────────────────────────────────────────┤
+│ Product*: [Dropdown_____________▼]              │
+│ Version*: [1__] Name: [________________]        │
+│ Routing: [Select routing...____▼]               │
+│                                                  │
+│ ───────── Production Lines ─────────            │
+│ ☑ Line 1 - Warehouse A                          │
+│ ☑ Line 2 - Warehouse A  [Labor: $22/hr]        │
+│                                                  │
+│ ───────── Packaging ─────────                   │
+│ Units/Box: [24__] Boxes/Pallet: [40__]         │
+│ → 960 units per pallet                          │
+│                                                  │
+│ [Cancel] [Save BOM]                             │
+└─────────────────────────────────────────────────┘
+        </ascii>
+      </layout>
+
+      <layout name="BOMItemsGrouped">
+        <ascii>
+┌─────────────────────────────────────────────────┐
+│ BOM Items                        [+ Add Item]   │
+├─────────────────────────────────────────────────┤
+│ ▼ Operation 1: Mixing                           │
+│   INPUTS:                                        │
+│   │ 1 │ Flour        │ 10 kg │ 2%    │ ✎ │     │
+│   │ 2 │ Sugar        │ 5 kg  │ 0%    │ ✎ │     │
+│   OUTPUTS: (none)                               │
+│                                                  │
+│ ▼ Operation 2: Baking                           │
+│   INPUTS:                                        │
+│   │ 1 │ Dough (op 1) │ 15 kg │ 5%    │ ✎ │     │
+│   OUTPUTS:                                       │
+│   │ 1 │ Crumbs (by)  │ 0.5kg │ -     │ ✎ │     │
+└─────────────────────────────────────────────────┘
+        </ascii>
+      </layout>
+
+      <layout name="BOMItemModal">
+        <ascii>
+┌─────────────────────────────────────────────────┐
+│ Add/Edit BOM Item                               │
+├─────────────────────────────────────────────────┤
+│ Component*: [Search products...____▼]           │
+│ Operation*: [Op 1: Mixing_________▼]            │
+│ Sequence:   [1__]                               │
+│ Quantity*: [10____] UOM*: [kg_▼]               │
+│ Scrap %:   [2__]%                               │
+│                                                  │
+│ ○ Input (consume)  ● Output (produce)           │
+│                                                  │
+│ ○ All production lines                          │
+│ ● Specific lines: ☑ Line 1  ☐ Line 2           │
+│                                                  │
+│ ☐ Consume whole License Plate                   │
+│                                                  │
+│ ───────── Alternatives ─────────                │
+│ [+ Add Alternative]                             │
+│ 1. Alt Flour (ratio: 1.0)  [×]                 │
+│ 2. Generic Flour (ratio: 1.1) [×]              │
+│                                                  │
+│ [Cancel] [Save Item]                            │
+└─────────────────────────────────────────────────┘
+        </ascii>
+      </layout>
+    </ui_layouts>
+
+    <component_hierarchy>
+      <tree>
+BOMDetail
+├── BOMHeader
+├── BOMRoutingSection
+├── BOMProductionLinesSection
+├── BOMPackagingSection
+├── BOMItemsGrouped
+│   └── OperationGroup (per operation_seq)
+│       ├── InputItemsTable
+│       │   └── ItemRow
+│       └── OutputItemsTable
+│           └── ItemRow
+└── BOMNotesSection
+
+BOMItemModal
+├── ComponentSearch
+├── OperationDropdown
+├── QuantityInputs
+├── TypeRadio
+├── LineAssignmentSelect
+├── ConsumeWholeLPCheckbox
+└── AlternativesManager
+    ├── AlternativesList
+    └── AddAlternativeButton
+      </tree>
+    </component_hierarchy>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.29.1">Routing list removes product column, adds operations count and status</ac>
+    <ac id="2.29.2">Routing form removes product selector, adds labor cost per operation</ac>
+    <ac id="2.29.3">Routing operation row enables inline editing with all fields</ac>
+    <ac id="2.29.4">BOM list adds routing and production lines count columns</ac>
+    <ac id="2.29.5">BOM form adds routing dropdown, production lines multi-select, packaging</ac>
+    <ac id="2.29.6">ProductionLinesSelect provides multi-select with labor cost override</ac>
+    <ac id="2.29.7">BOM items table groups by operation with inputs/outputs separation</ac>
+    <ac id="2.29.8">BOM item modal includes all new fields (operation, sequence, is_output, lines, etc.)</ac>
+    <ac id="2.29.9">AlternativesManager enables inline CRUD for alternatives</ac>
+    <ac id="2.29.10">OperationDropdown shows routing operations or default</ac>
+    <ac id="2.29.11">BOM detail page shows routing, lines, packaging sections</ac>
+    <ac id="2.29.12">Proper validation error messages displayed</ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests target="80%">
+      <test>RoutingForm without product field</test>
+      <test>ProductionLinesSelect multi-select behavior</test>
+      <test>BOMItemsGrouped grouping logic</test>
+      <test>OperationDropdown states (no routing vs has routing)</test>
+      <test>AlternativesManager CRUD operations</test>
+      <test>BOMItemModal new fields</test>
+    </unit_tests>
+
+    <integration_tests target="70%">
+      <test>Routing create/edit flow</test>
+      <test>BOM create with all new fields</test>
+      <test>BOM item create with operation/lines</test>
+      <test>Alternatives management</test>
+    </integration_tests>
+
+    <e2e_tests>
+      <test>Create routing with 3 operations + labor costs</test>
+      <test>Create BOM with routing and 2 production lines</test>
+      <test>Add item to operation 1 with line assignment</test>
+      <test>Add output item (byproduct) to operation 2</test>
+      <test>Add 2 alternatives to an item</test>
+      <test>Verify grouped display on BOM detail</test>
+      <test>Update BOM packaging fields</test>
+      <test>Verify all data persists correctly</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note type="pattern">Component composition - small reusable components</note>
+    <note type="pattern">Inline editing for operations and alternatives</note>
+    <note type="pattern">Grouped display for BOM items by operation</note>
+    <note type="dependency">Operation dropdown requires routing to be selected first</note>
+    <note type="dependency">Line assignment requires BOM lines to be assigned first</note>
+    <note type="constraint">Output items cannot have alternatives</note>
+  </implementation_notes>
+
+  <error_messages>
+    <error trigger="Duplicate routing name">"A routing with this name already exists"</error>
+    <error trigger="Invalid operation sequence">"Operation sequence {seq} not found in routing"</error>
+    <error trigger="Line not in BOM">"Line must be assigned to this BOM first"</error>
+    <error trigger="Self-reference input">"Cannot use the BOM's product as an input"</error>
+    <error trigger="Duplicate alternative">"This component is already an alternative"</error>
+  </error_messages>
+</story>

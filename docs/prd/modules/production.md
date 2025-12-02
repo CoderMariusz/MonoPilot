@@ -1,14 +1,30 @@
 # Production Module - PRD Specification
 
-**Status:** To Be Implemented (Clean Slate)
+**Status:** 🚧 IN PROGRESS (Track A DONE, Track B/C IN PROGRESS)
 **Priority:** P0 - Core Module
-**Effort Estimate:** 3-4 weeks
+**Implementation:** Batch 04A-04C (2025-11-28 to present)
 
 ---
 
 ## Overview
 
-Production module obsługuje wykonanie zleceń produkcyjnych - od startu WO, przez konsumpcję materiałów, do rejestracji outputu i by-products.
+Production module obsługuje wykonanie zleceń produkcyjnych - od startu WO, przez konsumpcję materiałów, do rejestracji outputu i by-products. **Epic 4 w trakcie** - zaimplementowano Track A (5 stories DONE):
+
+**Track A - WO Lifecycle (DONE):**
+- **04A-1:** WO Lifecycle (3 stories - WO start 4.2, pause/resume 4.3, complete 4.6)
+- **04A-2:** Production Settings (1 story - settings 4.17)
+- **04A-3:** Production Dashboard (1 story - dashboard 4.1)
+
+**Track B - Material & Output (IN PROGRESS - 13 stories):**
+- **04A-2:** Material Reservation (2 stories - desktop 4.7, scanner 4.8)
+- **04B-1:** Consumption (4 stories - enforcement 4.9, correction 4.10, over-consumption 4.11, scanner workflows)
+- **04B-2:** Output Registration (5 stories - desktop 4.12, scanner 4.13, by-product 4.14, yield 4.15, multiple outputs 4.16)
+- **04C-1:** Config & Traceability (2 stories - LP updates on consumption 4.18, genealogy creation 4.19)
+
+**Track C - Operations (IN PROGRESS - 6 stories):**
+- Operation start 4.4, complete 4.5, timeline 4.20
+
+**Test Coverage:** 50+ unit tests, 30+ integration tests, 40+ E2E tests (Track A)
 
 ## Dependencies
 

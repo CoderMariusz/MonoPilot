@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.1</id>
+    <title>LP QA Status Management</title>
+    <batch>06A-1</batch>
+    <status>ready-for-dev</status>
+  </metadata>
+
+  <description>Enable QC users to assign and track QA status on every LP</description>
+
+  <dependencies>
+    <blocks>
+      <story id="6.2">QA Status Transition Rules</story>
+      <story id="6.3">Prevent Shipping Non-Passed LPs</story>
+      <story id="6.4">Control Consumption of Pending LPs</story>
+      <story id="6.5">QA Change Audit Trail</story>
+    </blocks>
+    <requires>
+      <epic id="5">License Plates (LP table)</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>license_plates</name>
+        <changes>
+          <add_column>qa_status text DEFAULT 'pending' CHECK (qa_status IN ('pending', 'passed', 'failed', 'quarantine'))</add_column>
+        </changes>
+      </table>
+      <table>
+        <name>qa_status_changes</name>
+        <columns>
+          <column>id uuid PRIMARY KEY</column>
+          <column>organization_id uuid NOT NULL REFERENCES organizations(id)</column>
+          <column>lp_id uuid NOT NULL REFERENCES license_plates(id)</column>
+          <column>old_status text</column>
+          <column>new_status text NOT NULL</column>
+          <column>changed_by uuid NOT NULL REFERENCES profiles(id)</column>
+          <column>reason text</column>
+          <column>notes text</column>
+          <column>created_at timestamptz DEFAULT now()</column>
+        </columns>
+        <indexes>
+          <index>idx_qa_status_changes_lp ON qa_status_changes(lp_id)</index>
+          <index>idx_qa_status_changes_org ON qa_status_changes(organization_id)</index>
+        </indexes>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="PUT" path="/api/warehouse/license-plates/:id/qa-status">
+        <description>Update LP QA status</description>
+        <request>{ new_status: string, reason?: string, notes?: string }</request>
+        <response>{ success: boolean, lp: LP }</response>
+      </endpoint>
+    </api_endpoints>
+
+    <frontend_routes>
+      <route path="/warehouse/license-plates/:id">LP Detail with QA status</route>
+    </frontend_routes>
+
+    <components_to_create>
+      <component>QAStatusBadge - display current status with color</component>
+      <component>QAStatusChangeModal - form to change status</component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">LP has qa_status: pending, passed, failed, quarantine</ac>
+    <ac id="2">QC user can change status</ac>
+    <ac id="3">Timestamp and user recorded</ac>
+    <ac id="4">Audit trail entry created</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-01">System shall track QA status on every LP</fr>
+    <fr id="QC-FR-02">System shall enforce status transitions</fr>
+  </functional_requirements>
+</story>

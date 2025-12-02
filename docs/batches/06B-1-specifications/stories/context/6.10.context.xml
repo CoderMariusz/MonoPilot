@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.10</id>
+    <title>Product Specification Management</title>
+    <batch>06B-1</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Allow QC users to define specifications per product</description>
+
+  <dependencies>
+    <blocks>
+      <story id="6.11">Auto-Calculate Pass/Fail</story>
+      <story id="6.12">Record Test Results</story>
+      <story id="6.28">Quality Test Templates</story>
+    </blocks>
+    <requires>
+      <epic id="2">Products</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>product_specifications</name>
+        <columns>
+          <column>id uuid PRIMARY KEY</column>
+          <column>organization_id uuid NOT NULL REFERENCES organizations(id)</column>
+          <column>product_id uuid NOT NULL REFERENCES products(id)</column>
+          <column>test_name text NOT NULL</column>
+          <column>spec_type text NOT NULL CHECK (spec_type IN ('numeric', 'text', 'boolean'))</column>
+          <column>min_value decimal</column>
+          <column>max_value decimal</column>
+          <column>expected_value text</column>
+          <column>is_required boolean DEFAULT false</column>
+          <column>test_method text</column>
+          <column>sequence int DEFAULT 0</column>
+          <column>created_at timestamptz DEFAULT now()</column>
+          <column>updated_at timestamptz DEFAULT now()</column>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="POST" path="/api/quality/specifications">Create specification</endpoint>
+      <endpoint method="PUT" path="/api/quality/specifications/:id">Update specification</endpoint>
+      <endpoint method="GET" path="/api/quality/specifications?product_id=X">Get product specs</endpoint>
+    </api_endpoints>
+
+    <frontend_routes>
+      <route path="/technical/products/:id">Product detail → Specifications tab</route>
+    </frontend_routes>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Product detail → Specifications tab</ac>
+    <ac id="2">Add spec: test_name, spec_type (numeric/text/boolean), min/max, expected_value, is_required, test_method</ac>
+    <ac id="3">Specs linked to product</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-11">System shall define specifications per product</fr>
+    <fr id="QC-FR-12">System shall support numeric, text, boolean specs</fr>
+  </functional_requirements>
+</story>

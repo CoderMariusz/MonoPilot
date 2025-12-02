@@ -12,10 +12,10 @@ MonoPilot is a Manufacturing Execution System (MES) for food manufacturing. This
 
 | Module | Purpose | Dependencies | Status |
 |--------|---------|--------------|--------|
-| [Settings](./modules/settings.md) | Organization setup, users, warehouses, configurations | None (foundation) | Draft |
-| [Technical](./modules/technical.md) | Products, BOMs, Routings, Allergens, Tracing | Settings | Draft |
-| [Planning](./modules/planning.md) | Purchase Orders, Transfer Orders, Work Orders, MRP | Settings, Technical | Draft |
-| [Production](./modules/production.md) | WO execution, consumption, outputs, yield | Settings, Technical, Planning | Draft |
+| [Settings](./modules/settings.md) | Organization setup, users, warehouses, configurations | None (foundation) | ✅ DONE (19 stories) |
+| [Technical](./modules/technical.md) | Products, BOMs, Routings, Allergens, Tracing | Settings | ✅ DONE (28 stories) |
+| [Planning](./modules/planning.md) | Purchase Orders, Transfer Orders, Work Orders, MRP | Settings, Technical | ✅ DONE (30 stories) |
+| [Production](./modules/production.md) | WO execution, consumption, outputs, yield | Settings, Technical, Planning | 🚧 Track A DONE (5 stories), Track B/C IN PROGRESS |
 | [Warehouse](./modules/warehouse.md) | License Plates, ASN, GRN, Stock Movements, Scanner | Settings, Technical, Planning | Draft |
 | [Quality](./modules/quality.md) | QA status, holds, specifications, NCR, CoA | Settings, Technical, Warehouse | Draft |
 | [Shipping](./modules/shipping.md) | Sales Orders, picking, packing, delivery | Settings, Warehouse, Quality | Draft |
@@ -223,9 +223,10 @@ For new team members:
 ## Status Summary
 
 - **Total Modules**: 9
-- **Draft**: 8
-- **Placeholder**: 1 (Finance)
-- **Overall Progress**: 0% (Clean Slate)
+- **Completed**: 3 (Settings, Technical, Planning)
+- **In Progress**: 1 (Production - Track A done, B/C in progress)
+- **Planned**: 5 (Warehouse, Quality, Shipping, NPD, Finance)
+- **Overall Progress**: ~65% (82 stories DONE out of ~140 total MVP stories)
 
 ---
 

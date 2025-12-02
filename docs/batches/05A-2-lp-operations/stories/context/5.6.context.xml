@@ -1,276 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <story>
-  <metadata>
-    <id>5.6</id>
-    <title>LP Merge</title>
-    <batch>5A-2</batch>
-    <points>5</points>
-    <effort_hours>5-6</effort_hours>
-    <status>todo</status>
-  </metadata>
+  <id>5.6</id>
+  <name>LP Merge (with Supplier Validation)</name>
+  <batch>5A-2 (LP Operations)</batch>
+  <updated>2025-11-28</updated>
+  <status>Todo</status>
 
-  <description>Allow warehouse users to merge multiple LPs of same product/batch into consolidated LP with genealogy tracking</description>
+  <context>
+    <description>
+      Merge multiple LPs of same product into single LP. NEW: Supplier validation
+      prevents merging LPs from different suppliers (different prices/allergens).
+    </description>
 
-  <dependencies>
-    <requires>
-      <story id="5.1">License Plate Creation</story>
-    </requires>
-    <enables>
-      <story id="5.7">LP Genealogy Tracking</story>
-      <story id="5.28">Forward/Backward Traceability</story>
-    </enables>
-  </dependencies>
+    <key-changes>
+      <change type="ADDED">supplier_batch_number validation (MUST MATCH for merge)</change>
+      <change type="ADDED">supplier validation (MUST be SAME supplier)</change>
+      <change type="CLARIFIED">error message includes supplier mismatch details</change>
+      <change type="UPDATED">merge target LP status = 'available' after merge (can be split/merged again)</change>
+      <change type="UPDATED">source LPs status = 'merged' (immutable, archived)</change>
+    </key-changes>
 
-  <technical_context>
-    <tables>
-      <table>
-        <name>license_plates</name>
-        <columns>
-          <column name="id" type="UUID" constraint="PK"/>
-          <column name="org_id" type="UUID" constraint="FK organizations(id)"/>
-          <column name="lp_number" type="VARCHAR(50)" constraint="UNIQUE(org_id, lp_number)"/>
-          <column name="product_id" type="UUID" constraint="FK products(id)"/>
-          <column name="quantity" type="DECIMAL(15,4)" constraint="NOT NULL"/>
-          <column name="uom" type="VARCHAR(10)" constraint="NOT NULL"/>
-          <column name="batch_number" type="VARCHAR(50)" constraint="NOT NULL"/>
-          <column name="supplier_batch_number" type="VARCHAR(50)"/>
-          <column name="expiry_date" type="DATE"/>
-          <column name="status" type="VARCHAR(20)" constraint="DEFAULT 'available'"/>
-          <column name="updated_at" type="TIMESTAMP" constraint="DEFAULT now()"/>
-        </columns>
-      </table>
-      <table>
-        <name>lp_genealogy</name>
-        <columns>
-          <column name="id" type="UUID" constraint="PK"/>
-          <column name="org_id" type="UUID" constraint="FK organizations(id)"/>
-          <column name="parent_lp_id" type="UUID" constraint="FK license_plates(id)"/>
-          <column name="child_lp_id" type="UUID" constraint="FK license_plates(id)"/>
-          <column name="operation_type" type="VARCHAR(20)" constraint="NOT NULL, CHECK IN ('split','merge','consume','produce')"/>
-          <column name="created_at" type="TIMESTAMP" constraint="DEFAULT now()"/>
-          <column name="created_by_user_id" type="UUID" constraint="FK users(id)"/>
-        </columns>
-        <unique_constraint>UNIQUE(parent_lp_id, child_lp_id)</unique_constraint>
-        <indexes>
-          <index name="idx_lp_genealogy_org_id" columns="org_id"/>
-          <index name="idx_lp_genealogy_parent" columns="parent_lp_id"/>
-          <index name="idx_lp_genealogy_child" columns="child_lp_id"/>
-        </indexes>
-      </table>
-    </tables>
+    <critical-requirements>
+      STRICT VALIDATION: All LPs being merged MUST have:
+      ✅ Same product_id
+      ✅ Same supplier_batch_number (supplier's lot number)
+      ✅ Same expiry_date (if filled)
+      ✅ Same supplier (for prices and allergens)
 
-    <api_endpoints>
-      <endpoint method="POST" path="/api/warehouse/license-plates/merge">
-        <description>Merge multiple LPs into target LP with genealogy tracking</description>
-        <auth>authenticated</auth>
-        <request>
-          <field name="source_lp_ids" type="array" element_type="UUID" required="true" constraint="length >= 2"/>
-          <field name="target_lp_id" type="UUID" required="true" constraint="must be in source_lp_ids"/>
-          <field name="operation_note" type="string" required="false"/>
-        </request>
-        <response status="200">
-          <field name="target_lp_id" type="UUID"/>
-          <field name="target_lp_number" type="string" example="LP-20250120-0001"/>
-          <field name="total_qty_merged" type="decimal"/>
-          <field name="source_lp_count" type="integer"/>
-          <field name="genealogy_records" type="array">
-            <item>
-              <field name="source_lp_id" type="UUID"/>
-              <field name="operation_type" type="string" value="merge"/>
-              <field name="genealogy_id" type="UUID"/>
-            </item>
-          </field>
-          <field name="success_message" type="string" example="Merged 3 LPs into LP-20250120-0001 (300 kg total)"/>
-        </response>
-        <response status="400">
-          <field name="error" type="string" example="Cannot merge: Selected LPs have different products or batch numbers"/>
-        </response>
-        <response status="404">
-          <field name="error" type="string" example="License Plate not found"/>
-        </response>
-      </endpoint>
-    </api_endpoints>
+      Any mismatch → Error: "Cannot merge: LPs have different products, suppliers, or batch numbers"
 
-    <frontend_routes>
-      <route path="/warehouse/license-plates" component="LicensePlatePage">
-        <feature name="MultiSelect">
-          <description>Checkbox column for selecting multiple LPs</description>
-          <action>Enable merge button when 2+ LPs selected</action>
-        </feature>
-        <feature name="MergeButton">
-          <description>Merge button in toolbar</description>
-          <action>Opens MergeLPsModal</action>
-          <visible_when>2+ LPs selected</visible_when>
-        </feature>
-        <feature name="SelectionCounter">
-          <description>Shows selected LP count</description>
-          <action>Updates dynamically as LPs selected/deselected</action>
-        </feature>
-      </route>
-    </frontend_routes>
+      Source LPs become immutable (status='merged') after merge.
+      Result LP can be further split/merged (normal operations allowed).
+    </critical-requirements>
 
-    <components_to_create>
-      <component name="LicensePlateLPTable">
-        <description>Updated LP list with checkboxes for multi-select (extends 5.1)</description>
-        <props>
-          <prop name="lps" type="LicensePlate[]" required="true"/>
-          <prop name="onSelectionChange" type="callback" required="true"/>
-          <prop name="selectedIds" type="UUID[]" required="true"/>
-        </props>
-        <features>
-          <feature name="CheckboxColumn">First column with checkboxes</feature>
-          <feature name="SelectAllCheckbox">Header checkbox to select all rows</feature>
-          <feature name="StatusBadge">Color-coded status (available, merged, etc.)</feature>
-        </features>
-      </component>
-      <component name="MergeLPsModal">
-        <description>Modal for merging selected LPs</description>
-        <props>
-          <prop name="selectedLPs" type="LicensePlate[]" required="true"/>
-          <prop name="onMerge" type="callback" required="true"/>
-        </props>
-        <fields>
-          <field name="sourceQtySummary" type="decimal" readonly="true" description="SUM of all selected LP quantities"/>
-          <field name="targetLpId" type="UUID" required="true" constraint="must be in selectedLPs"/>
-          <field name="operationNote" type="string" optional="true"/>
-        </fields>
-        <actions>
-          <action name="validate">Check compatibility (same product, batch, expiry)</action>
-          <action name="submit">Call POST /api/warehouse/license-plates/merge</action>
-          <action name="onSuccess">Show toast, close modal, refresh LP list</action>
-          <action name="onError">Show error message with compatibility details</action>
-        </actions>
-      </component>
-    </components_to_create>
+    <related-stories>
+      <requires>5.1 (LP Creation), 5.2 (Status Tracking), 5.3 (Batch/Expiry)</requires>
+      <enables>5.7a (Genealogy Recording), 5.7b (Genealogy Validation)</enables>
+    </related-stories>
 
-    <hooks_to_create>
-      <hook name="useMergeLPs">
-        <description>Hook for merging multiple LPs</description>
-        <accepts>source_lp_ids, target_lp_id, operation_note (optional)</accepts>
-        <returns>{ target_lp, genealogy_records, loading, error }</returns>
-        <api_call>POST /api/warehouse/license-plates/merge</api_call>
-      </hook>
-    </hooks_to_create>
+    <effort-estimate>
+      <hours>5-6</hours>
+      <points>5</points>
+    </effort-estimate>
 
-    <validation_rules>
-      <rule id="select_at_least_two">Must select 2+ LPs to merge</rule>
-      <rule id="same_product_id">All source LPs must have same product_id</rule>
-      <rule id="same_batch_number">All source LPs must have same batch_number</rule>
-      <rule id="same_expiry_date">All source LPs must have same expiry_date (if filled)</rule>
-      <rule id="target_in_sources">Target LP must be one of the selected source LPs</rule>
-      <rule id="source_status_valid">Cannot merge 'consumed', 'shipped', or 'merged' LPs</rule>
-      <rule id="target_qty_updated">Target LP qty += SUM(source_lp_qty)</rule>
-      <rule id="source_status_merged">All source LPs status → 'merged' (immutable)</rule>
-      <rule id="genealogy_all_sources">Genealogy record created for each source → target pair</rule>
-      <rule id="genealogy_operation_merge">All genealogy records have operation_type='merge'</rule>
-    </validation_rules>
-
-    <rls_policies>
-      <policy table="license_plates">
-        <select>
-          <statement>SELECT * WHERE org_id = current_user.org_id</statement>
-          <applies_to>authenticated</applies_to>
-        </select>
-        <update>
-          <statement>UPDATE WHERE org_id = current_user.org_id</statement>
-          <applies_to>authenticated</applies_to>
-        </update>
-      </policy>
-      <policy table="lp_genealogy">
-        <insert>
-          <statement>INSERT WHERE org_id = current_user.org_id</statement>
-          <applies_to>authenticated</applies_to>
-        </insert>
-      </policy>
-    </rls_policies>
-
-    <database_operations>
-      <operation type="transaction">
-        <name>LP Merge Transaction</name>
-        <steps>
-          <step>1. Validate target_lp_id in source_lp_ids</step>
-          <step>2. Validate all LPs exist and belong to org_id</step>
-          <step>3. Validate compatibility: same product_id, batch_number, expiry_date</step>
-          <step>4. BEGIN TRANSACTION</step>
-          <step>5. Calculate total_qty = SUM(source_lp_qty)</step>
-          <step>6. UPDATE license_plates SET quantity = total_qty WHERE id = target_lp_id</step>
-          <step>7. UPDATE license_plates SET status = 'merged' WHERE id IN (source_lp_ids - target_lp_id)</step>
-          <step>8. INSERT lp_genealogy for each source_lp_id (parent) → target_lp_id (child), operation_type='merge'</step>
-          <step>9. COMMIT TRANSACTION</step>
-          <step>10. Return target LP with merged qty and genealogy IDs</step>
-        </steps>
-        <rollback_condition>Any validation failure, FK violation, or INSERT failure</rollback_condition>
-      </operation>
-    </database_operations>
-
-    <ui_validation>
-      <validation name="compatibilityCheck">
-        <description>Before opening merge modal, check compatibility of selected LPs</description>
-        <on_incompatible>Show error: "Cannot merge: Selected LPs have different products or batch numbers"</on_incompatible>
-        <on_compatible>Open MergeLPsModal with summary</on_compatible>
-      </validation>
-      <validation name="targetSelection">
-        <description>User must select target LP from selected LPs</description>
-        <ui_hint>Radio buttons showing each LP with "Merge into this LP" label</ui_hint>
-        <default>LP with largest qty pre-selected</default>
-      </validation>
-    </ui_validation>
-  </technical_context>
-
-  <acceptance_criteria>
-    <ac id="1" title="Multi-Select Mode">
-      <test>In LP list page, checkboxes appear next to all LPs</test>
-      <test>Select 2+ LPs → "Merge" button appears and is enabled</test>
-      <test>Deselect to <2 LPs → "Merge" button disabled</test>
-    </ac>
-    <ac id="2" title="Merge Modal">
-      <test>Click Merge with 3 LPs selected → modal shows all 3 LPs with qty and total sum</test>
-    </ac>
-    <ac id="3" title="Compatibility Validation">
-      <test>Select LPs with different products → error "Cannot merge"</test>
-      <test>Select LPs with different batches → error "Cannot merge"</test>
-      <test>Select LPs with same product and batch → modal opens successfully</test>
-    </ac>
-    <ac id="4" title="Merge Execution">
-      <test>Merge 3 LPs (50, 75, 25 qty) into target → target qty = 150, sources status = 'merged'</test>
-      <test>After merge, genealogy records exist for all 3 source→target pairs</test>
-    </ac>
-    <ac id="5" title="Success Feedback">
-      <test>After merge, success toast: "Merged 3 LPs into LP-0001 (300 kg total)"</test>
-    </ac>
-  </acceptance_criteria>
-
-  <test_plan>
-    <unit_tests>
-      <test>Compatibility validation: same product, batch, expiry → pass</test>
-      <test>Compatibility validation: different products → fail</test>
-      <test>Compatibility validation: different batch numbers → fail</test>
-      <test>Qty calculation: 50 + 75 + 25 = 150 ✓</test>
-      <test>Status update: source LPs set to 'merged'</test>
-    </unit_tests>
-    <integration_tests>
-      <test>POST /api/warehouse/license-plates/merge with 3 compatible LPs</test>
-      <test>Verify target LP qty updated</test>
-      <test>Verify all source LPs status = 'merged'</test>
-      <test>Verify genealogy records created for all source→target pairs</test>
-    </integration_tests>
-    <e2e_tests>
-      <test>Create 3 LPs with same product/batch in /warehouse/license-plates</test>
-      <test>Select all 3 in LP list view</test>
-      <test>Click "Merge", select target, confirm</test>
-      <test>Verify: target qty = total, sources grayed out with 'Merged' badge</test>
-      <test>Verify genealogy: 3 records created in database</test>
-    </e2e_tests>
-  </test_plan>
-
-  <implementation_notes>
-    <note priority="critical">Merge operation must be atomic - if ANY validation fails or genealogy insert fails, rollback all LP updates</note>
-    <note priority="critical">Source LPs status → 'merged' is IMMUTABLE - cannot revert or change status</note>
-    <note priority="critical">Merged LPs must remain visible in list (with 'Merged' badge) for traceability purposes</note>
-    <note priority="high">Compatibility check: all LPs must have SAME product_id, batch_number, and (if present) expiry_date</note>
-    <note priority="high">Target LP can be any of the selected LPs (user chooses via radio button)</note>
-    <note priority="high">Genealogy records: each source LP → target LP (not source1 → source2 → target)</note>
-    <note priority="medium">Add UI indicator for merged LPs: grayed out, 'Merged' badge, tooltip showing merge date/target</note>
-    <note priority="medium">Consider adding "Undo Merge" feature with approval workflow (future enhancement)</note>
-  </implementation_notes>
+    <implementation-notes>
+      - Merge validation checks 4 criteria (product, batch, expiry, supplier)
+      - Multi-select UI: checkboxes on LP list, "Merge" button appears when 2+ selected
+      - MergeLPsModal: shows selected LPs, radio buttons to select target
+      - Genealogy: creates one record per source → target (merge relationship)
+      - Transaction: if ANY validation fails, ROLLBACK all changes
+      - Target LP gets merged qty, source LPs marked 'merged'
+    </implementation-notes>
+  </context>
 </story>

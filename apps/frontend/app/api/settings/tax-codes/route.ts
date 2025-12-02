@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      tax_codes: result.data,
+      taxCodes: result.data,
       total: result.total,
     })
   } catch (error) {

@@ -1,7 +1,7 @@
 /**
  * Edit Operation Drawer
- * Story: 2.16 Routing Operations
- * AC-016.4: Edit operation
+ * Story: 2.24 Routing Restructure
+ * AC-2.24.6: Edit operation with labor_cost_per_hour
  */
 
 'use client'
@@ -29,6 +29,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -53,12 +54,6 @@ interface Machine {
   name: string
 }
 
-interface ProductionLine {
-  id: string
-  code: string
-  name: string
-}
-
 export function EditOperationDrawer({
   routingId,
   operation,
@@ -68,45 +63,36 @@ export function EditOperationDrawer({
 }: EditOperationDrawerProps) {
   const [submitting, setSubmitting] = useState(false)
   const [machines, setMachines] = useState<Machine[]>([])
-  const [lines, setLines] = useState<ProductionLine[]>([])
   const { toast } = useToast()
 
   const form = useForm<UpdateOperationInput>({
     resolver: zodResolver(updateOperationSchema),
     defaultValues: {
       sequence: operation.sequence,
-      operation_name: operation.operation_name,
-      machine_id: operation.machine_id,
-      line_id: operation.line_id,
-      expected_duration_minutes: operation.expected_duration_minutes,
-      expected_yield_percent: operation.expected_yield_percent,
-      setup_time_minutes: operation.setup_time_minutes,
-      labor_cost: operation.labor_cost,
+      name: operation.name,
+      description: operation.description || '',
+      machine_id: operation.machine_id || undefined,
+      estimated_duration_minutes: operation.estimated_duration_minutes ?? undefined,
+      labor_cost_per_hour: operation.labor_cost_per_hour ?? undefined,
     },
   })
 
-  // Fetch resources
+  // Fetch machines
   useEffect(() => {
-    const fetchResources = async () => {
+    const fetchMachines = async () => {
       try {
         const machinesRes = await fetch('/api/settings/machines?status=active')
         if (machinesRes.ok) {
           const machinesData = await machinesRes.json()
           setMachines(machinesData.machines || [])
         }
-
-        const linesRes = await fetch('/api/settings/lines?status=active')
-        if (linesRes.ok) {
-          const linesData = await linesRes.json()
-          setLines(linesData.lines || [])
-        }
       } catch (error) {
-        console.error('Error fetching resources:', error)
+        console.error('Error fetching machines:', error)
       }
     }
 
     if (open) {
-      fetchResources()
+      fetchMachines()
     }
   }, [open])
 
@@ -114,13 +100,11 @@ export function EditOperationDrawer({
   useEffect(() => {
     form.reset({
       sequence: operation.sequence,
-      operation_name: operation.operation_name,
-      machine_id: operation.machine_id,
-      line_id: operation.line_id,
-      expected_duration_minutes: operation.expected_duration_minutes,
-      expected_yield_percent: operation.expected_yield_percent,
-      setup_time_minutes: operation.setup_time_minutes,
-      labor_cost: operation.labor_cost,
+      name: operation.name,
+      description: operation.description || '',
+      machine_id: operation.machine_id || undefined,
+      estimated_duration_minutes: operation.estimated_duration_minutes ?? undefined,
+      labor_cost_per_hour: operation.labor_cost_per_hour ?? undefined,
     })
   }, [operation, form])
 
@@ -137,7 +121,7 @@ export function EditOperationDrawer({
       if (!response.ok) {
         const error = await response.json()
 
-        if (error.code === 'DUPLICATE_SEQUENCE') {
+        if (error.error?.includes('Sequence')) {
           form.setError('sequence', {
             message: error.error || 'Sequence already exists',
           })
@@ -171,7 +155,7 @@ export function EditOperationDrawer({
         <SheetHeader>
           <SheetTitle>Edit Operation</SheetTitle>
           <SheetDescription>
-            Update operation details and assignments.
+            Update operation details.
           </SheetDescription>
         </SheetHeader>
 
@@ -202,13 +186,35 @@ export function EditOperationDrawer({
             {/* Operation Name */}
             <FormField
               control={form.control}
-              name="operation_name"
+              name="name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Operation Name *</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="e.g., Mixing" />
                   </FormControl>
+                  <FormDescription>1-100 characters</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Description Field */}
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      value={field.value ?? ''}
+                      placeholder="Describe the operation..."
+                      rows={3}
+                    />
+                  </FormControl>
+                  <FormDescription>Optional, max 500 characters</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -222,8 +228,8 @@ export function EditOperationDrawer({
                 <FormItem>
                   <FormLabel>Machine</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
-                    value={field.value || undefined}
+                    onValueChange={(value) => field.onChange(value === 'none' ? null : value)}
+                    value={field.value || 'none'}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -244,116 +250,52 @@ export function EditOperationDrawer({
               )}
             />
 
-            {/* Production Line */}
-            <FormField
-              control={form.control}
-              name="line_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Production Line</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || undefined}
-                  >
+            <div className="grid grid-cols-2 gap-4">
+              {/* Estimated Duration */}
+              <FormField
+                control={form.control}
+                name="estimated_duration_minutes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estimated Duration (min)</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select line (optional)" />
-                      </SelectTrigger>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                      />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {lines.map((line) => (
-                        <SelectItem key={line.id} value={line.id}>
-                          {line.code} - {line.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormDescription>0-10000 minutes</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Expected Duration */}
-            <FormField
-              control={form.control}
-              name="expected_duration_minutes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Expected Duration (min) *</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Setup Time */}
-            <FormField
-              control={form.control}
-              name="setup_time_minutes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Setup Time (min)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Expected Yield */}
-            <FormField
-              control={form.control}
-              name="expected_yield_percent"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Expected Yield (%)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Labor Cost */}
-            <FormField
-              control={form.control}
-              name="labor_cost"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Labor Cost</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      {...field}
-                      value={field.value || ''}
-                      onChange={(e) =>
-                        field.onChange(e.target.value ? parseFloat(e.target.value) : null)
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              {/* Labor Cost Per Hour */}
+              <FormField
+                control={form.control}
+                name="labor_cost_per_hour"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Labor Cost Per Hour</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.value ? parseFloat(e.target.value) : null)
+                        }
+                      />
+                    </FormControl>
+                    <FormDescription>0-9999.99</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <SheetFooter>
               <Button type="button" variant="outline" onClick={onClose}>

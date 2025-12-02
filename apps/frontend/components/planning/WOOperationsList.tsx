@@ -7,7 +7,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, Cog, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
+import { Loader2, Cog, AlertTriangle, Clock, CheckCircle, PlayCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { OperationStartModal } from '@/components/production/OperationStartModal'
 import {
   Table,
   TableBody,
@@ -49,6 +51,10 @@ export function WOOperationsList({ woId, woStatus }: WOOperationsListProps) {
   const [operations, setOperations] = useState<WOOperation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sequenceRequired, setSequenceRequired] = useState(false)
+  const [startModalOpen, setStartModalOpen] = useState(false)
+  const [selectedOperation, setSelectedOperation] = useState<WOOperation | null>(null)
+  const [woNumber, setWoNumber] = useState('')
 
   useEffect(() => {
     async function fetchOperations() {
@@ -56,7 +62,13 @@ export function WOOperationsList({ woId, woStatus }: WOOperationsListProps) {
         setLoading(true)
         setError(null)
 
-        const response = await fetch(`/api/planning/work-orders/${woId}/operations`)
+        // Try production API first (Story 4.4), fallback to planning API
+        let response = await fetch(`/api/production/work-orders/${woId}/operations`)
+
+        if (!response.ok) {
+          // Fallback to planning API
+          response = await fetch(`/api/planning/work-orders/${woId}/operations`)
+        }
 
         if (!response.ok) {
           throw new Error('Failed to fetch operations')
@@ -64,6 +76,8 @@ export function WOOperationsList({ woId, woStatus }: WOOperationsListProps) {
 
         const data = await response.json()
         setOperations(data.data || [])
+        setSequenceRequired(data.sequence_required ?? false)
+        setWoNumber(data.wo_number || '')
       } catch (err) {
         console.error('Error fetching operations:', err)
         setError(err instanceof Error ? err.message : 'Failed to load operations')
@@ -76,6 +90,42 @@ export function WOOperationsList({ woId, woStatus }: WOOperationsListProps) {
       fetchOperations()
     }
   }, [woId])
+
+  // Check if operation can be started (Story 4.4)
+  const canStartOperation = (op: WOOperation, index: number): boolean => {
+    // Can only start if WO is in_progress
+    if (woStatus !== 'in_progress') return false
+    // Can only start pending operations
+    if (op.status !== 'pending') return false
+    // If sequence required, check previous operations are completed
+    if (sequenceRequired && index > 0) {
+      const previousOps = operations.slice(0, index)
+      const allPreviousCompleted = previousOps.every((o) => o.status === 'completed')
+      if (!allPreviousCompleted) return false
+    }
+    return true
+  }
+
+  const handleStartClick = (op: WOOperation) => {
+    setSelectedOperation(op)
+    setStartModalOpen(true)
+  }
+
+  const fetchOperations = async () => {
+    try {
+      let response = await fetch(`/api/production/work-orders/${woId}/operations`)
+      if (!response.ok) {
+        response = await fetch(`/api/planning/work-orders/${woId}/operations`)
+      }
+      if (response.ok) {
+        const data = await response.json()
+        setOperations(data.data || [])
+        setSequenceRequired(data.sequence_required ?? false)
+      }
+    } catch {
+      // silent
+    }
+  }
 
   // Format duration
   const formatDuration = (minutes: number | null) => {
@@ -169,10 +219,11 @@ export function WOOperationsList({ woId, woStatus }: WOOperationsListProps) {
               <TableHead className="text-right">Duration</TableHead>
               <TableHead className="text-right">Yield %</TableHead>
               <TableHead className="text-center">Status</TableHead>
+              {woStatus === 'in_progress' && <TableHead className="text-center">Action</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {operations.map((operation) => (
+            {operations.map((operation, index) => (
               <TableRow key={operation.id}>
                 <TableCell className="text-gray-500 font-mono">
                   {operation.sequence}
@@ -213,6 +264,26 @@ export function WOOperationsList({ woId, woStatus }: WOOperationsListProps) {
                 <TableCell className="text-center">
                   {getStatusBadge(operation.status)}
                 </TableCell>
+                {woStatus === 'in_progress' && (
+                  <TableCell className="text-center">
+                    {canStartOperation(operation, index) ? (
+                      <Button
+                        size="sm"
+                        onClick={() => handleStartClick(operation)}
+                        className="gap-1"
+                      >
+                        <PlayCircle className="h-4 w-4" />
+                        Start
+                      </Button>
+                    ) : operation.status === 'in_progress' ? (
+                      <span className="text-blue-600 text-sm">Running</span>
+                    ) : operation.status === 'completed' ? (
+                      <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />
+                    ) : (
+                      <span className="text-gray-400 text-sm">-</span>
+                    )}
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
@@ -228,6 +299,16 @@ export function WOOperationsList({ woId, woStatus }: WOOperationsListProps) {
           )}
         </span>
       </div>
+
+      {/* Start Operation Modal - Story 4.4 */}
+      <OperationStartModal
+        open={startModalOpen}
+        onOpenChange={setStartModalOpen}
+        woId={woId}
+        woNumber={woNumber}
+        operation={selectedOperation}
+        onSuccess={fetchOperations}
+      />
     </div>
   )
 }

@@ -86,6 +86,10 @@ interface BOM {
   output_qty: number
   output_uom: string
   notes: string | null
+  // Story 2.28/2.29: New fields
+  routing_id?: string | null
+  units_per_box: number | null
+  boxes_per_pallet: number | null
   created_by: string
   updated_by: string
   created_at: string | Date

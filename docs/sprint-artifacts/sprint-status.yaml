@@ -1,4 +1,4 @@
-# generated: 2025-11-28
+# generated: 2025-11-29
 # project: MonoPilot
 # project_key: monopilot
 # tracking_system: file-system
@@ -25,7 +25,7 @@
 # - Epic 1 (batches 01A-01E) is mostly complete (done)
 # - Epic 2-5 are in various stages of planning
 
-generated: 2025-11-28
+generated: 2025-11-29
 project: MonoPilot
 project_key: monopilot
 tracking_system: file-system
@@ -129,6 +129,16 @@ development_status:
   batch-02E-2-technical-ui: contexted
   batch-02E-2-retrospective: completed
 
+  # Batch 02A-2: BOM & Routing Restructure
+  batch-02A-2-bom-restructure: ready-for-dev
+  2-24-routing-restructure: done
+  2-25-bom-production-lines: done
+  2-26-bom-items-operation-assignment: review
+  2-27-bom-item-alternatives: review
+  2-28-bom-packaging-fields: review
+  2-29-bom-routing-ui-update: review
+  batch-02A-2-retrospective: optional
+
   # ============================================
   # EPIC 3: Purchase Orders Module (Batch 03A)
   # ============================================
@@ -136,10 +146,10 @@ development_status:
   # Batch 03A-1: Purchase Orders
   batch-03A-1-purchase-orders: contexted
   3-1-po-crud: done
-  3-2-po-lines: ready-for-dev
-  3-3-bulk-po: drafted
-  3-4-po-approval: ready-for-dev
-  3-5-po-statuses: ready-for-dev
+  3-2-po-lines: review
+  3-3-bulk-po: deferred
+  3-4-po-approval: review
+  3-5-po-statuses: review
   batch-03A-1-retrospective: optional
 
   # Batch 03C-1: Work Orders Core
@@ -165,10 +175,10 @@ development_status:
   batch-04A-1-wo-lifecycle: contexted
   4-1-production-dashboard: review
   4-2-wo-start: review
-  4-3-wo-pause-resume: ready-for-dev
-  4-4-operation-start: ready-for-dev
-  4-5-operation-complete: ready-for-dev
-  4-6-wo-complete: ready-for-dev
+  4-3-wo-pause-resume: review
+  4-4-operation-start: review
+  4-5-operation-complete: review
+  4-6-wo-complete: review
   batch-04A-1-retrospective: optional
 
   # Batch 04A-2: Material Reservation
@@ -255,3 +265,63 @@ development_status:
   5-26-scanner-operations-menu: ready-for-dev
   5-27-scanner-session-timeout: ready-for-dev
   batch-05C-1-retrospective: optional
+
+  # ============================================
+  # EPIC 6: Quality Module (Batches 06A-06C)
+  # ============================================
+
+  # Batch 06A-1: QA Status
+  batch-06A-1-qa-status: contexted
+  6-1-lp-qa-status: ready-for-dev
+  6-2-qa-transitions: ready-for-dev
+  6-3-prevent-shipping: ready-for-dev
+  6-4-consume-pending: ready-for-dev
+  6-5-qa-audit: ready-for-dev
+  batch-06A-1-retrospective: optional
+
+  # Batch 06A-2: Quality Holds
+  batch-06A-2-quality-holds: contexted
+  6-6-hold-creation: ready-for-dev
+  6-7-hold-notifications: ready-for-dev
+  6-8-hold-release: ready-for-dev
+  6-9-hold-investigation: ready-for-dev
+  6-26-hold-workflow: ready-for-dev
+  batch-06A-2-retrospective: optional
+
+  # Batch 06B-1: Specifications & Testing
+  batch-06B-1-specifications: contexted
+  6-10-product-specs: ready-for-dev
+  6-11-auto-pass-fail: ready-for-dev
+  6-12-test-results: ready-for-dev
+  6-13-test-history: ready-for-dev
+  6-14-compare-results: ready-for-dev
+  6-28-test-templates: ready-for-dev
+  batch-06B-1-retrospective: optional
+
+  # Batch 06B-2: NCR (Non-Conformance Reports)
+  batch-06B-2-ncr: contexted
+  6-15-ncr-creation: ready-for-dev
+  6-16-ncr-lifecycle: ready-for-dev
+  6-17-ncr-links: ready-for-dev
+  6-18-ncr-rca: ready-for-dev
+  6-27-ncr-workflow: ready-for-dev
+  batch-06B-2-retrospective: optional
+
+  # Batch 06C-1: Certificate of Analysis
+  batch-06C-1-coa: contexted
+  6-19-coa-upload: ready-for-dev
+  6-20-require-coa: ready-for-dev
+  6-21-coa-verification: ready-for-dev
+  batch-06C-1-retrospective: optional
+
+  # Batch 06C-2: Quality Reporting
+  batch-06C-2-reporting: contexted
+  6-22-quality-dashboard: ready-for-dev
+  6-23-quality-reports: ready-for-dev
+  6-24-export-reports: ready-for-dev
+  batch-06C-2-retrospective: optional
+
+  # Batch 06C-3: Quality Settings
+  batch-06C-3-config: contexted
+  6-25-quality-settings: ready-for-dev
+  batch-06C-3-retrospective: optional

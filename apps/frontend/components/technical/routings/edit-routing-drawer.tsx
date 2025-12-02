@@ -1,7 +1,7 @@
 /**
  * Edit Routing Drawer
- * Story: 2.15 Routing CRUD
- * AC-015.6: Edit routing drawer (code immutable)
+ * Story: 2.24 Routing Restructure
+ * AC-2.24.5: Update routing (name can be changed)
  */
 
 'use client'
@@ -30,14 +30,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 
@@ -57,8 +50,7 @@ export function EditRoutingDrawer({ routing, open, onClose, onSuccess }: EditRou
     defaultValues: {
       name: routing.name,
       description: routing.description || '',
-      status: routing.status,
-      is_reusable: routing.is_reusable,
+      is_active: routing.is_active,
     },
   })
 
@@ -67,8 +59,7 @@ export function EditRoutingDrawer({ routing, open, onClose, onSuccess }: EditRou
     form.reset({
       name: routing.name,
       description: routing.description || '',
-      status: routing.status,
-      is_reusable: routing.is_reusable,
+      is_active: routing.is_active,
     })
   }, [routing, form])
 
@@ -84,6 +75,15 @@ export function EditRoutingDrawer({ routing, open, onClose, onSuccess }: EditRou
 
       if (!response.ok) {
         const error = await response.json()
+
+        // Handle duplicate name
+        if (error.error?.includes('name already exists')) {
+          form.setError('name', {
+            message: error.error || 'Routing name already exists',
+          })
+          return
+        }
+
         throw new Error(error.error || 'Failed to update routing')
       }
 
@@ -111,21 +111,12 @@ export function EditRoutingDrawer({ routing, open, onClose, onSuccess }: EditRou
         <SheetHeader>
           <SheetTitle>Edit Routing</SheetTitle>
           <SheetDescription>
-            Update routing details. Code cannot be changed after creation.
+            Update routing details.
           </SheetDescription>
         </SheetHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-6">
-            {/* Code Field (Disabled - AC-015.6) */}
-            <FormItem>
-              <FormLabel>Code</FormLabel>
-              <FormControl>
-                <Input value={routing.code} disabled className="font-mono bg-muted" />
-              </FormControl>
-              <FormDescription>Code cannot be changed after creation</FormDescription>
-            </FormItem>
-
             {/* Name Field */}
             <FormField
               control={form.control}
@@ -136,7 +127,7 @@ export function EditRoutingDrawer({ routing, open, onClose, onSuccess }: EditRou
                   <FormControl>
                     <Input {...field} placeholder="e.g., Standard Bread Production" />
                   </FormControl>
-                  <FormDescription>1-100 characters</FormDescription>
+                  <FormDescription>1-100 characters, must be unique</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -157,55 +148,30 @@ export function EditRoutingDrawer({ routing, open, onClose, onSuccess }: EditRou
                       rows={3}
                     />
                   </FormControl>
-                  <FormDescription>Optional, max 1000 characters</FormDescription>
+                  <FormDescription>Optional, max 500 characters</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Status Field */}
+            {/* Active Switch */}
             <FormField
               control={form.control}
-              name="status"
+              name="is_active"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Reusable Checkbox */}
-            <FormField
-              control={form.control}
-              name="is_reusable"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                <FormItem className="flex flex-row items-center justify-between rounded-md border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Active</FormLabel>
+                    <FormDescription>
+                      Active routings can be assigned to BOMs
+                    </FormDescription>
+                  </div>
                   <FormControl>
-                    <Checkbox
+                    <Switch
                       checked={field.value}
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      This routing can be assigned to multiple products
-                    </FormLabel>
-                    <FormDescription>
-                      If unchecked, routing can only be assigned to one product
-                    </FormDescription>
-                  </div>
                 </FormItem>
               )}
             />

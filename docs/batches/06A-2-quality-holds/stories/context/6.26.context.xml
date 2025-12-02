@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.26</id>
+    <title>Quality Hold Workflow</title>
+    <batch>06A-2</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Provide streamlined UX for managing quality holds</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.6">Quality Hold Creation</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <frontend_routes>
+      <route path="/quality/holds">Quality Holds list page</route>
+      <route path="/quality/holds/:id">Hold detail page</route>
+    </frontend_routes>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/quality/holds">
+        <description>List holds with filters</description>
+        <query_params>status, severity, product, date_from, date_to</query_params>
+      </endpoint>
+      <endpoint method="GET" path="/api/quality/holds/:id">
+        <description>Get hold details with notes</description>
+      </endpoint>
+    </api_endpoints>
+
+    <components_to_create>
+      <component>HoldsListPage - table with filters</component>
+      <component>HoldDetailPage - all fields, notes, timeline, actions</component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">/quality/holds shows list: Hold#, LP#, Product, Severity, Status, Date</ac>
+    <ac id="2">Filters: status, severity, product, date</ac>
+    <ac id="3">Detail view: all fields, investigation notes, timeline</ac>
+    <ac id="4">Actions: Investigate, Release, Escalate</ac>
+  </acceptance_criteria>
+</story>

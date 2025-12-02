@@ -1,7 +1,7 @@
 /**
  * Create Operation Modal
- * Story: 2.16 Routing Operations
- * AC-016.1: Add operation with machine/line assignment
+ * Story: 2.24 Routing Restructure
+ * AC-2.24.6: Add operation with labor_cost_per_hour
  */
 
 'use client'
@@ -28,6 +28,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -51,56 +52,39 @@ interface Machine {
   name: string
 }
 
-interface ProductionLine {
-  id: string
-  code: string
-  name: string
-}
-
 export function CreateOperationModal({ routingId, open, onClose, onSuccess }: CreateOperationModalProps) {
   const [submitting, setSubmitting] = useState(false)
   const [machines, setMachines] = useState<Machine[]>([])
-  const [lines, setLines] = useState<ProductionLine[]>([])
   const { toast } = useToast()
 
   const form = useForm<CreateOperationInput>({
     resolver: zodResolver(createOperationSchema),
     defaultValues: {
       sequence: 1,
-      operation_name: '',
-      machine_id: null,
-      line_id: null,
-      expected_duration_minutes: 60,
-      expected_yield_percent: 100.00,
-      setup_time_minutes: 0,
-      labor_cost: null,
+      name: '',
+      description: '',
+      machine_id: undefined,
+      estimated_duration_minutes: undefined,
+      labor_cost_per_hour: undefined,
     },
   })
 
-  // AC-016.7: Fetch machines and lines for dropdowns
+  // Fetch machines for dropdown
   useEffect(() => {
-    const fetchResources = async () => {
+    const fetchMachines = async () => {
       try {
-        // Fetch machines
         const machinesRes = await fetch('/api/settings/machines?status=active')
         if (machinesRes.ok) {
           const machinesData = await machinesRes.json()
           setMachines(machinesData.machines || [])
         }
-
-        // Fetch production lines
-        const linesRes = await fetch('/api/settings/lines?status=active')
-        if (linesRes.ok) {
-          const linesData = await linesRes.json()
-          setLines(linesData.lines || [])
-        }
       } catch (error) {
-        console.error('Error fetching resources:', error)
+        console.error('Error fetching machines:', error)
       }
     }
 
     if (open) {
-      fetchResources()
+      fetchMachines()
     }
   }, [open])
 
@@ -117,8 +101,8 @@ export function CreateOperationModal({ routingId, open, onClose, onSuccess }: Cr
       if (!response.ok) {
         const error = await response.json()
 
-        // AC-016.6: Handle duplicate sequence
-        if (error.code === 'DUPLICATE_SEQUENCE') {
+        // Handle duplicate sequence
+        if (error.error?.includes('Sequence')) {
           form.setError('sequence', {
             message: error.error || 'Sequence already exists',
           })
@@ -189,7 +173,7 @@ export function CreateOperationModal({ routingId, open, onClose, onSuccess }: Cr
             {/* Operation Name Field */}
             <FormField
               control={form.control}
-              name="operation_name"
+              name="name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Operation Name *</FormLabel>
@@ -202,151 +186,97 @@ export function CreateOperationModal({ routingId, open, onClose, onSuccess }: Cr
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* Machine Dropdown (AC-016.7) */}
-              <FormField
-                control={form.control}
-                name="machine_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Machine</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value || undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select machine (optional)" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {machines.map((machine) => (
-                          <SelectItem key={machine.id} value={machine.id}>
-                            {machine.code} - {machine.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Description Field */}
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="Describe the operation..."
+                      rows={3}
+                    />
+                  </FormControl>
+                  <FormDescription>Optional, max 500 characters</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              {/* Production Line Dropdown */}
-              <FormField
-                control={form.control}
-                name="line_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Production Line</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value || undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select line (optional)" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {lines.map((line) => (
-                          <SelectItem key={line.id} value={line.id}>
-                            {line.code} - {line.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            {/* Machine Dropdown */}
+            <FormField
+              control={form.control}
+              name="machine_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Machine</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(value === 'none' ? undefined : value)}
+                    value={field.value || 'none'}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select machine (optional)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {machines.map((machine) => (
+                        <SelectItem key={machine.id} value={machine.id}>
+                          {machine.code} - {machine.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-2 gap-4">
-              {/* Expected Duration */}
+              {/* Estimated Duration */}
               <FormField
                 control={form.control}
-                name="expected_duration_minutes"
+                name="estimated_duration_minutes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Expected Duration (min) *</FormLabel>
+                    <FormLabel>Estimated Duration (min)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                       />
                     </FormControl>
-                    <FormDescription>Time to complete operation</FormDescription>
+                    <FormDescription>0-10000 minutes</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Setup Time */}
+              {/* Labor Cost Per Hour */}
               <FormField
                 control={form.control}
-                name="setup_time_minutes"
+                name="labor_cost_per_hour"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Setup Time (min)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormDescription>Time to prepare</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Expected Yield */}
-              <FormField
-                control={form.control}
-                name="expected_yield_percent"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Expected Yield (%)</FormLabel>
+                    <FormLabel>Labor Cost Per Hour</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.01"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormDescription>0.01 - 100.00</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Labor Cost */}
-              <FormField
-                control={form.control}
-                name="labor_cost"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Labor Cost</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        {...field}
-                        value={field.value || ''}
+                        value={field.value ?? ''}
                         onChange={(e) =>
-                          field.onChange(e.target.value ? parseFloat(e.target.value) : null)
+                          field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
                         }
                       />
                     </FormControl>
-                    <FormDescription>Optional</FormDescription>
+                    <FormDescription>0-9999.99</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

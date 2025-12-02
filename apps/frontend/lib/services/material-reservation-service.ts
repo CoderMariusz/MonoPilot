@@ -480,7 +480,7 @@ export class MaterialReservationService {
     const { error: genealogyError } = await this.supabase.from('lp_genealogy').insert({
       parent_lp_id: lpId,
       child_lp_id: null, // Will be filled in Story 4.12 output registration
-      relationship_type: 'consume',
+      relationship_type: 'production',
       work_order_id: woId,
       quantity_from_parent: reservedQty,
       uom: material.uom,

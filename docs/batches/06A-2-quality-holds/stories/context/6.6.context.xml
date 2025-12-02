@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.6</id>
+    <title>Quality Hold Creation</title>
+    <batch>06A-2</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Allow QC users to create quality holds on LPs to flag problematic inventory</description>
+
+  <dependencies>
+    <blocks>
+      <story id="6.7">Quality Hold Notifications</story>
+      <story id="6.8">Quality Hold Release Approval</story>
+      <story id="6.9">Hold Investigation Tracking</story>
+      <story id="6.26">Quality Hold Workflow</story>
+    </blocks>
+    <requires>
+      <story id="6.1">LP QA Status Management</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>quality_holds</name>
+        <columns>
+          <column>id uuid PRIMARY KEY</column>
+          <column>organization_id uuid NOT NULL REFERENCES organizations(id)</column>
+          <column>hold_number text NOT NULL</column>
+          <column>lp_id uuid NOT NULL REFERENCES license_plates(id)</column>
+          <column>hold_reason text NOT NULL</column>
+          <column>description text NOT NULL</column>
+          <column>severity text NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical'))</column>
+          <column>status text DEFAULT 'open' CHECK (status IN ('open', 'investigating', 'pending_release', 'released', 'closed'))</column>
+          <column>notify_users uuid[]</column>
+          <column>root_cause text</column>
+          <column>corrective_action text</column>
+          <column>preventive_action text</column>
+          <column>investigation_by uuid REFERENCES profiles(id)</column>
+          <column>released_by uuid REFERENCES profiles(id)</column>
+          <column>released_at timestamptz</column>
+          <column>approved_by uuid REFERENCES profiles(id)</column>
+          <column>approved_at timestamptz</column>
+          <column>created_by uuid NOT NULL REFERENCES profiles(id)</column>
+          <column>created_at timestamptz DEFAULT now()</column>
+          <column>updated_at timestamptz DEFAULT now()</column>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="POST" path="/api/quality/holds">
+        <description>Create quality hold</description>
+        <request>{ lp_id, hold_reason, description, severity, notify_users? }</request>
+      </endpoint>
+    </api_endpoints>
+
+    <components_to_create>
+      <component>CreateHoldModal - form with hold_reason dropdown+custom, description, severity, notify_users</component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">"Create Hold" button on LP opens modal</ac>
+    <ac id="2">Fields: hold_reason (dropdown+custom), description, severity (Low/Medium/High/Critical), notify_users</ac>
+    <ac id="3">On save: quality_hold created, LP.qa_status → quarantine, LP blocked</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-06">System shall create quality holds for LPs</fr>
+    <fr id="QC-FR-07">System shall move held LPs to quarantine status</fr>
+  </functional_requirements>
+</story>

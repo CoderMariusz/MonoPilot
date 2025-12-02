@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.18</id>
+    <title>Root Cause and Corrective Actions</title>
+    <batch>06B-2</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Document root cause analysis and CAPA for NCRs</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.15">NCR Creation</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <fields>
+      <field name="root_cause_analysis" type="text">5 Whys or fishbone analysis</field>
+      <field name="corrective_actions" type="text">Actions to fix current issue</field>
+      <field name="preventive_actions" type="text">Actions to prevent recurrence</field>
+      <field name="responsible_person" type="uuid">Person responsible for actions</field>
+      <field name="target_date" type="date">Due date for completion</field>
+      <field name="actual_completion_date" type="date">When actually completed</field>
+    </fields>
+
+    <components_to_create>
+      <component>NCRCAPAForm - form for root cause and actions</component>
+      <component>NCRTimeline - shows all updates chronologically</component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Fields: root_cause_analysis, corrective_actions, preventive_actions</ac>
+    <ac id="2">responsible_person, target_date, actual_completion_date</ac>
+    <ac id="3">Timeline shows updates</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-20">System shall capture root cause and corrective actions</fr>
+  </functional_requirements>
+</story>
