@@ -98,7 +98,7 @@ export function BOMFormModal({ bom, onClose, onSuccess }: BOMFormModalProps) {
         const [productsRes, routingsRes, linesRes] = await Promise.all([
           fetch('/api/technical/products?limit=1000'),
           fetch('/api/technical/routings?limit=1000'),
-          fetch('/api/settings/production-lines?limit=1000'),
+          fetch('/api/settings/lines?limit=1000'),
         ])
 
         if (productsRes.ok) {

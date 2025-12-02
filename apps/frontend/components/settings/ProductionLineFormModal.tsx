@@ -179,8 +179,8 @@ export function ProductionLineFormModal({ line, onClose, onSuccess }: Production
 
       // Call API
       const url = isEditMode
-        ? `/api/settings/production-lines/${line.id}`
-        : '/api/settings/production-lines'
+        ? `/api/settings/lines/${line.id}`
+        : '/api/settings/lines'
 
       const method = isEditMode ? 'PUT' : 'POST'
 
