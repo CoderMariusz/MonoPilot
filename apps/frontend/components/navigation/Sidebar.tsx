@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Truck,
   Lightbulb,
+  ScanBarcode,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -84,6 +85,13 @@ const allModules: SidebarModule[] = [
     icon: Lightbulb,
     href: '/npd',
     color: 'text-pink-600',
+  },
+  {
+    key: 'scanner',
+    name: 'Scanner',
+    icon: ScanBarcode,
+    href: '/scanner',
+    color: 'text-cyan-600',
   },
 ]
 

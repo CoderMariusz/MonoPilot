@@ -419,8 +419,8 @@ export function WorkOrderFormModal({
           <div className="space-y-2">
             <Label htmlFor="production_line_id">Production Line (Optional)</Label>
             <Select
-              value={formData.production_line_id}
-              onValueChange={(value) => handleChange('production_line_id', value)}
+              value={formData.production_line_id || 'none'}
+              onValueChange={(value) => handleChange('production_line_id', value === 'none' ? '' : value)}
               disabled={loadingMachines}
             >
               <SelectTrigger id="production_line_id">
@@ -429,7 +429,7 @@ export function WorkOrderFormModal({
                 />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {machines.map((machine) => (
                   <SelectItem key={machine.id} value={machine.id}>
                     {machine.code} - {machine.name}

@@ -96,7 +96,7 @@ export async function startOperation(
     )
   }
 
-  // Get the operation
+  // Get the operation (DB uses: wo_id, sequence, organization_id)
   const { data: operation, error: opError } = await supabase
     .from('wo_operations')
     .select('id, wo_id, sequence, operation_name, status, organization_id')
@@ -214,6 +214,7 @@ export async function getWOOperations(
 }[]> {
   const supabase = await createServerSupabase()
 
+  // DB schema uses: wo_id, organization_id, sequence, expected_duration_minutes
   const { data, error } = await supabase
     .from('wo_operations')
     .select(`
@@ -225,8 +226,7 @@ export async function getWOOperations(
       completed_at,
       expected_duration_minutes,
       actual_duration_minutes,
-      actual_yield_percent,
-      started_by_user_id
+      expected_yield_percent
     `)
     .eq('wo_id', woId)
     .eq('organization_id', orgId)
@@ -236,28 +236,7 @@ export async function getWOOperations(
     return []
   }
 
-  // Get user info for started_by
   const operations = data || []
-  const userIds = [...new Set(operations.map((op) => op.started_by_user_id).filter(Boolean))]
-
-  let usersMap: Record<string, { first_name: string | null; last_name: string | null }> = {}
-
-  if (userIds.length > 0) {
-    const { data: users } = await supabase
-      .from('users')
-      .select('id, first_name, last_name')
-      .in('id', userIds)
-
-    if (users) {
-      usersMap = users.reduce(
-        (acc, user) => {
-          acc[user.id] = { first_name: user.first_name, last_name: user.last_name }
-          return acc
-        },
-        {} as Record<string, { first_name: string | null; last_name: string | null }>,
-      )
-    }
-  }
 
   return operations.map((op) => ({
     id: op.id,
@@ -266,10 +245,10 @@ export async function getWOOperations(
     status: op.status,
     started_at: op.started_at,
     completed_at: op.completed_at,
-    expected_duration_minutes: op.expected_duration_minutes || 30,
+    expected_duration_minutes: Number(op.expected_duration_minutes || 0) || 30,
     actual_duration_minutes: op.actual_duration_minutes,
-    actual_yield_percent: op.actual_yield_percent ? Number(op.actual_yield_percent) : null,
-    started_by_user: op.started_by_user_id ? usersMap[op.started_by_user_id] || null : null,
+    actual_yield_percent: op.expected_yield_percent,
+    started_by_user: null,
   }))
 }
 
@@ -309,7 +288,7 @@ export async function calculateYield(
 ): Promise<{ average_yield: number | null; breakdown: YieldBreakdown[] }> {
   const supabase = await createServerSupabase()
 
-  // Get BOM materials for this WO
+  // Get BOM materials for this WO (DB uses: wo_id, organization_id, required_qty)
   const { data: materials } = await supabase
     .from('wo_materials')
     .select('product_id, required_qty, products:product_id(code, name)')
@@ -378,7 +357,7 @@ export async function completeOperation(
     )
   }
 
-  // Get the operation
+  // Get the operation (DB uses: wo_id, sequence, organization_id)
   const { data: operation, error: opError } = await supabase
     .from('wo_operations')
     .select('id, wo_id, sequence, operation_name, status, organization_id, started_at')
@@ -439,7 +418,7 @@ export async function completeOperation(
     throw new OperationError('INTERNAL_ERROR', 500, 'Failed to complete operation')
   }
 
-  // Find next operation
+  // Find next operation (DB uses: wo_id, organization_id, sequence)
   const { data: nextOp } = await supabase
     .from('wo_operations')
     .select('id, sequence, operation_name, status')
@@ -479,7 +458,7 @@ export async function completeOperation(
     actual_duration_minutes: duration,
     actual_yield_percent: average_yield,
     notes: notes || null,
-    next_operation: nextOp || undefined,
+    next_operation: nextOp ? { ...nextOp, sequence: nextOp.sequence } : undefined,
   }
 }
 

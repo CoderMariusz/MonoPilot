@@ -108,12 +108,12 @@ export function BOMFormModal({ bom, onClose, onSuccess }: BOMFormModalProps) {
 
         if (routingsRes.ok) {
           const data = await routingsRes.json()
-          setRoutings(data.data || [])
+          setRoutings(data.routings || data.data || [])
         }
 
         if (linesRes.ok) {
           const data = await linesRes.json()
-          setProductionLines(data.data || [])
+          setProductionLines(data.lines || data.data || [])
         }
 
         // If editing, load existing production lines

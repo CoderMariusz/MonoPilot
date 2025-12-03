@@ -36,11 +36,13 @@ import {
   PauseCircle,
   PlayCircle,
   CheckCircle2,
+  History,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
 import { WOOperationsList } from '@/components/planning/WOOperationsList'
 import { MaterialReservationsTable } from '@/components/production/MaterialReservationsTable'
+import { ConsumptionHistoryTable } from '@/components/production/ConsumptionHistoryTable'
 import WOStartModal from '@/components/production/WOStartModal'
 import WOPauseModal from '@/components/production/WOPauseModal'
 import WOResumeModal from '@/components/production/WOResumeModal'
@@ -702,7 +704,7 @@ export default function WorkOrderDetailsPage({
             <WOOperationsList woId={wo.id} woStatus={wo.status} />
           </TabsContent>
 
-          {/* Materials Tab - Story 4.7 */}
+          {/* Materials Tab - Story 4.7, 4.10 */}
           <TabsContent value="materials" className="space-y-6">
             <div className="border rounded-lg p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -710,6 +712,15 @@ export default function WorkOrderDetailsPage({
                 Material Reservations
               </h2>
               <MaterialReservationsTable woId={wo.id} woStatus={wo.status} />
+            </div>
+
+            {/* Consumption History - Story 4.10 */}
+            <div className="border rounded-lg p-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <History className="h-5 w-5" />
+                Consumption History
+              </h2>
+              <ConsumptionHistoryTable woId={wo.id} woStatus={wo.status} />
             </div>
           </TabsContent>
         </Tabs>

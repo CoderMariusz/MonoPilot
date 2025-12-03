@@ -224,8 +224,10 @@ created_at, updated_at
 
 ### wo_materials
 ```
-id, wo_id, product_id, planned_qty, consumed_qty,
-status, created_at, updated_at
+id, org_id, work_order_id, product_id, product_code, product_name,
+quantity_per, quantity_required, quantity_issued, consumed_qty, uom,
+bom_id, bom_item_id, line_number, consume_whole_lp,
+created_at, updated_at
 ```
 
 ### wo_operations
@@ -233,6 +235,23 @@ status, created_at, updated_at
 id, wo_id, operation_id, sequence, status,
 planned_duration, actual_duration,
 started_at, completed_at, created_at, updated_at
+```
+
+### wo_consumption
+```
+id, org_id, wo_id, material_id, reservation_id, lp_id,
+consumed_qty, uom, consumed_by_user_id, consumed_at,
+operation_id, status (consumed/reversed),
+reversed_at, reversed_by_user_id, reverse_reason,
+notes, created_at, updated_at
+```
+
+### lp_movements
+```
+id, org_id, lp_id, movement_type,
+qty_change, qty_before, qty_after, uom,
+wo_id, po_id, consumption_id,
+created_by_user_id, created_at, notes
 ```
 
 ### transfer_orders

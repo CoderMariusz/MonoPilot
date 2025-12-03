@@ -104,6 +104,7 @@ export class MaterialReservationService {
     orgId: string
   ): Promise<{ data: MaterialWithReservations[] | null; error: ReservationError | null }> {
     // Get materials from wo_materials
+    // DB uses: wo_id, organization_id, material_name, required_qty, consumed_qty, sequence
     const { data: materials, error: materialsError } = await this.supabase
       .from('wo_materials')
       .select(`
@@ -111,15 +112,12 @@ export class MaterialReservationService {
         product_id,
         material_name,
         required_qty,
-        reserved_qty,
         consumed_qty,
         uom,
-        consume_whole_lp,
         sequence
       `)
       .eq('wo_id', woId)
       .eq('organization_id', orgId)
-      .eq('is_by_product', false)
       .order('sequence', { ascending: true })
 
     if (materialsError) {
@@ -140,6 +138,7 @@ export class MaterialReservationService {
         material_id,
         lp_id,
         reserved_qty,
+        uom,
         sequence_number,
         status,
         reserved_at,
@@ -154,7 +153,6 @@ export class MaterialReservationService {
         )
       `)
       .eq('wo_id', woId)
-      .eq('org_id', orgId)
       .eq('status', 'reserved')
       .order('sequence_number', { ascending: true })
 
@@ -184,7 +182,7 @@ export class MaterialReservationService {
             lp_id: r.lp_id,
             lp_number: lpNumber || '',
             reserved_qty: r.reserved_qty,
-            sequence_number: r.sequence_number,
+            sequence_number: r.sequence_number || 0,
             status: r.status,
             reserved_at: r.reserved_at,
             reserved_by_user: {
@@ -194,8 +192,18 @@ export class MaterialReservationService {
           }
         })
 
+      // Calculate reserved_qty from reservations
+      const totalReserved = materialReservations.reduce((sum, r) => sum + Number(r.reserved_qty), 0)
+
       return {
-        ...material,
+        id: material.id,
+        product_id: material.product_id,
+        material_name: material.material_name,
+        required_qty: Number(material.required_qty),
+        reserved_qty: totalReserved,
+        consumed_qty: Number(material.consumed_qty || 0),
+        uom: material.uom,
+        consume_whole_lp: false, // TODO: Get from bom_items if needed
         reservations: materialReservations,
       }
     })
@@ -262,9 +270,18 @@ export class MaterialReservationService {
     }
 
     // 2. Validate material exists in WO BOM
+    // DB uses: wo_id, material_name, required_qty, consumed_qty, consume_whole_lp
     const { data: material, error: materialError } = await this.supabase
       .from('wo_materials')
-      .select('id, product_id, material_name, required_qty, reserved_qty, uom, consume_whole_lp')
+      .select(`
+        id,
+        product_id,
+        material_name,
+        required_qty,
+        consumed_qty,
+        uom,
+        consume_whole_lp
+      `)
       .eq('id', materialId)
       .eq('wo_id', woId)
       .single()
@@ -371,7 +388,8 @@ export class MaterialReservationService {
     }
 
     // 9. Validate consume_whole_lp constraint (AC-4.7.2)
-    if (material.consume_whole_lp && reservedQty !== availableQty) {
+    const consumeWholeLp = material.consume_whole_lp || false
+    if (consumeWholeLp && reservedQty !== availableQty) {
       return {
         data: null,
         error: {
@@ -453,30 +471,8 @@ export class MaterialReservationService {
       }
     }
 
-    // Update wo_materials reserved_qty
-    const newReservedQty = Number(material.reserved_qty || 0) + reservedQty
-    const { error: materialUpdateError } = await this.supabase
-      .from('wo_materials')
-      .update({
-        reserved_qty: newReservedQty,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', materialId)
-
-    if (materialUpdateError) {
-      // Rollback
-      await this.supabase.from('wo_material_reservations').delete().eq('id', reservation.id)
-      await this.supabase.from('license_plates').update({ status: 'available' }).eq('id', lpId)
-      return {
-        data: null,
-        error: {
-          code: ReservationErrorCodes.VALIDATION_ERROR,
-          message: 'Failed to update material reserved qty',
-        },
-      }
-    }
-
     // Create genealogy record (AC-4.7.10)
+    // Note: reserved_qty is calculated from wo_material_reservations, not stored on wo_materials
     const { error: genealogyError } = await this.supabase.from('lp_genealogy').insert({
       parent_lp_id: lpId,
       child_lp_id: null, // Will be filled in Story 4.12 output registration
@@ -494,10 +490,6 @@ export class MaterialReservationService {
       // Rollback all
       await this.supabase.from('wo_material_reservations').delete().eq('id', reservation.id)
       await this.supabase.from('license_plates').update({ status: 'available' }).eq('id', lpId)
-      await this.supabase
-        .from('wo_materials')
-        .update({ reserved_qty: material.reserved_qty })
-        .eq('id', materialId)
       return {
         data: null,
         error: {
@@ -557,6 +549,7 @@ export class MaterialReservationService {
     }
 
     // Get reservation
+    // DB uses: wo_id, material_name
     const { data: reservation, error: reservationError } = await this.supabase
       .from('wo_material_reservations')
       .select(`
@@ -570,8 +563,7 @@ export class MaterialReservationService {
         status,
         wo_materials!inner (
           id,
-          material_name,
-          reserved_qty
+          material_name
         ),
         license_plates!inner (
           lp_number
@@ -636,18 +628,10 @@ export class MaterialReservationService {
       })
       .eq('id', reservation.lp_id)
 
-    // Update wo_materials reserved_qty
+    // Get material data for response
     // Handle Supabase join results (can be object or array)
-    const materialData = reservation.wo_materials as unknown as { id: string; material_name: string; reserved_qty: number } | { id: string; material_name: string; reserved_qty: number }[]
+    const materialData = reservation.wo_materials as unknown as { id: string; material_name: string } | { id: string; material_name: string }[]
     const material = Array.isArray(materialData) ? materialData[0] : materialData
-    const newReservedQty = Math.max(0, Number(material?.reserved_qty || 0) - reservation.reserved_qty)
-    await this.supabase
-      .from('wo_materials')
-      .update({
-        reserved_qty: newReservedQty,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', reservation.material_id)
 
     // Delete genealogy record
     await this.supabase

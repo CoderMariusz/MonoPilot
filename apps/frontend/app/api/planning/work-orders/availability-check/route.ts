@@ -46,18 +46,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get org_id from user profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('organization_id')
+    // Get org_id from users table
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('org_id')
       .eq('id', session.user.id)
       .single()
 
-    if (!profile?.organization_id) {
+    if (userError || !currentUser?.org_id) {
       return NextResponse.json({ error: 'No organization found' }, { status: 400 })
     }
 
-    const orgId = profile.organization_id
+    const orgId = currentUser.org_id
 
     // Parse request body
     const body = await request.json()
@@ -86,18 +86,18 @@ export async function POST(request: NextRequest) {
       .from('bom_items')
       .select(`
         id,
-        product_id,
+        component_id,
         quantity,
         uom,
-        is_by_product,
-        products:product_id (
+        is_output,
+        products:component_id (
           id,
           code,
           name
         )
       `)
       .eq('bom_id', bom_id)
-      .eq('is_by_product', false) // Only input materials, not by-products
+      .eq('is_output', false) // Only input materials, not outputs
       .order('sequence', { ascending: true })
 
     if (itemsError) {
@@ -119,15 +119,14 @@ export async function POST(request: NextRequest) {
     const scaleFactor = planned_quantity / (bom.output_qty || 1)
 
     // Get available quantities from license_plates
-    const productIds = bomItems.map((item) => item.product_id)
+    const productIds = bomItems.map((item) => item.component_id)
 
     const { data: lpSummary, error: lpError } = await supabaseAdmin
       .from('license_plates')
       .select('product_id, current_qty')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .in('product_id', productIds)
       .eq('status', 'available')
-      .is('deleted_at', null)
 
     if (lpError) {
       console.error('Error fetching LP quantities:', lpError)
@@ -146,7 +145,7 @@ export async function POST(request: NextRequest) {
     const materials: MaterialAvailability[] = bomItems.map((item) => {
       const product = item.products as any
       const requiredQty = Number((item.quantity * scaleFactor).toFixed(3))
-      const availableQty = availableByProduct[item.product_id] || 0
+      const availableQty = availableByProduct[item.component_id] || 0
       const coveragePercent = requiredQty > 0 ? (availableQty / requiredQty) * 100 : 100
 
       let status: 'green' | 'yellow' | 'red'
@@ -159,7 +158,7 @@ export async function POST(request: NextRequest) {
       }
 
       return {
-        product_id: item.product_id,
+        product_id: item.component_id,
         product_code: product?.code || 'N/A',
         product_name: product?.name || 'Unknown',
         required_qty: requiredQty,

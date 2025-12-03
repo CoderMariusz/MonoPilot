@@ -101,7 +101,7 @@ export async function POST(
       .from('wo_consumption')
       .select(`
         id, wo_id, material_id, reservation_id, lp_id, consumed_qty, uom, status,
-        wo_materials(material_name),
+        wo_materials(product_name),
         license_plates(id, lp_number, current_qty, status)
       `)
       .eq('id', consumption_id)
@@ -123,7 +123,7 @@ export async function POST(
     }
 
     // Handle Supabase join results
-    type MaterialType = { material_name: string }
+    type MaterialType = { product_name: string }
     type LpType = { id: string; lp_number: string; current_qty: number }
     const material = Array.isArray(consumption.wo_materials)
       ? (consumption.wo_materials as MaterialType[])[0]
@@ -220,7 +220,7 @@ export async function POST(
         entity_type: 'wo_consumption',
         entity_id: consumption_id,
         entity_code: workOrder.wo_number,
-        description: `Reversed consumption of ${consumption.consumed_qty} ${consumption.uom} of ${material?.material_name || 'material'}. Reason: ${reason}`,
+        description: `Reversed consumption of ${consumption.consumed_qty} ${consumption.uom} of ${material?.product_name || 'material'}. Reason: ${reason}`,
       })
     } catch (logError) {
       console.error('Error creating audit log:', logError)
@@ -231,7 +231,7 @@ export async function POST(
       consumption_id,
       reversed_qty: consumption.consumed_qty,
       uom: consumption.uom,
-      material_name: material?.material_name,
+      product_name: material?.product_name,
       lp_number: lp?.lp_number,
     })
   } catch (error) {

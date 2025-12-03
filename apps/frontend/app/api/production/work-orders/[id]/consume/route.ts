@@ -102,6 +102,7 @@ export async function POST(
     }
 
     // Get reservation with material and LP details
+    // DB uses: material_name, required_qty (not product_name, quantity_required)
     const { data: reservation, error: resError } = await supabaseAdmin
       .from('wo_material_reservations')
       .select(`
@@ -310,7 +311,7 @@ export async function GET(
         reversed_at, reverse_reason,
         wo_materials(material_name, product_id),
         license_plates(lp_number),
-        users(first_name, last_name, email)
+        consumed_by_user:users!wo_consumption_consumed_by_user_id_fkey(first_name, last_name, email)
       `)
       .eq('wo_id', woId)
       .eq('org_id', currentUser.org_id)

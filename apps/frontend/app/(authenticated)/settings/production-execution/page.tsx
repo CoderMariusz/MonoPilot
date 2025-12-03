@@ -15,6 +15,8 @@ interface ProductionSettings {
   require_qa_on_output: boolean
   auto_create_by_product_lp: boolean
   dashboard_refresh_seconds: number
+  // Story 4.11: Over-Consumption Control
+  allow_over_consumption: boolean
 }
 
 export default function ProductionSettingsPage() {
@@ -241,6 +243,28 @@ export default function ProductionSettingsPage() {
               id="auto-create-by-product-lp"
               checked={settings.auto_create_by_product_lp}
               onCheckedChange={(value) => handleToggle('auto_create_by_product_lp', value)}
+              disabled={saving}
+            />
+          </div>
+
+          {/* Story 4.11: Allow Over-Consumption Toggle */}
+          <div className="flex items-center justify-between border-t pt-6">
+            <div>
+              <Label htmlFor="allow-over-consumption" className="text-base">
+                Allow Over-Consumption
+              </Label>
+              <p className="text-sm text-gray-600 mt-1">
+                Controls over-consumption warning behavior during output registration.
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                When OFF: Operators see a warning and must confirm to over-consume.
+                When ON: Warning still shown, but more permissive messaging.
+              </p>
+            </div>
+            <Switch
+              id="allow-over-consumption"
+              checked={settings.allow_over_consumption ?? false}
+              onCheckedChange={(value) => handleToggle('allow_over_consumption', value)}
               disabled={saving}
             />
           </div>

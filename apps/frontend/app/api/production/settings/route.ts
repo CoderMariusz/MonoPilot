@@ -56,6 +56,8 @@ export async function GET(request: NextRequest) {
             require_qa_on_output: true,
             auto_create_by_product_lp: false,
             dashboard_refresh_seconds: 30,
+            // Story 4.11: Over-Consumption Control (default: false - conservative)
+            allow_over_consumption: false,
           })
           .select()
           .single()

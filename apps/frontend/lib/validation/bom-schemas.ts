@@ -25,9 +25,11 @@ export const CreateBOMSchema = z.object({
   output_qty: z.number().positive('Output quantity must be positive').optional().default(1.0),
   output_uom: z.string().min(1, 'Unit of measure is required'),
   notes: z.string().optional().nullable(),
+  // Story 2.29: Routing reference
+  routing_id: z.string().uuid('Invalid routing ID').optional().nullable(),
   // Story 2.28: Packaging fields
-  units_per_box: z.number().int().positive().max(10000, 'Max 10000 units per box').optional(),
-  boxes_per_pallet: z.number().int().positive().max(200, 'Max 200 boxes per pallet').optional()
+  units_per_box: z.number().int().positive().max(10000, 'Max 10000 units per box').optional().nullable(),
+  boxes_per_pallet: z.number().int().positive().max(200, 'Max 200 boxes per pallet').optional().nullable()
 })
 
 export type CreateBOMInput = z.input<typeof CreateBOMSchema>
@@ -56,6 +58,8 @@ export interface BOM {
   output_qty: number
   output_uom: string
   notes: string | null
+  // Story 2.29: Routing reference
+  routing_id?: string | null
   // Story 2.28: Packaging fields
   units_per_box: number | null
   boxes_per_pallet: number | null

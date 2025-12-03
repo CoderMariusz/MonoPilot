@@ -1,7 +1,8 @@
 /**
  * Output Registration Modal
  * Story 4.12: Output Registration Desktop
- * AC-4.12.1, AC-4.12.6, AC-4.12.8
+ * Story 4.14: By-Product Registration integration
+ * AC-4.12.1, AC-4.12.6, AC-4.12.8, AC-4.14.1
  */
 
 'use client'
@@ -29,6 +30,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Package, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { ByProductRegistrationDialog } from './ByProductRegistrationDialog'
 
 interface OutputRegistrationModalProps {
   open: boolean
@@ -76,6 +78,10 @@ export function OutputRegistrationModal({
   const [preview, setPreview] = useState<AllocationPreview | null>(null)
   const [showOverProductionDialog, setShowOverProductionDialog] = useState(false)
   const [selectedParentLpId, setSelectedParentLpId] = useState<string>('')
+  // By-product state (Story 4.14)
+  const [showByProductDialog, setShowByProductDialog] = useState(false)
+  const [lastOutputId, setLastOutputId] = useState<string>('')
+  const [lastOutputQty, setLastOutputQty] = useState<number>(0)
   const { toast } = useToast()
 
   // Calculate remaining qty
@@ -193,6 +199,25 @@ export function OutputRegistrationModal({
         title: 'Success',
         description: `Output registered: ${result.data.output.lp_number}`,
       })
+
+      // Store output info for by-product dialog (AC-4.14.1)
+      setLastOutputId(result.data.output.id)
+      setLastOutputQty(qtyNum)
+
+      // Check if WO has by-products (AC-4.14.1)
+      try {
+        const bpResponse = await fetch(`/api/production/work-orders/${woId}/by-products`)
+        if (bpResponse.ok) {
+          const { data: byProducts } = await bpResponse.json()
+          if (byProducts && byProducts.length > 0) {
+            // Show by-product dialog
+            setShowByProductDialog(true)
+            return // Don't close main modal yet
+          }
+        }
+      } catch (err) {
+        console.error('Failed to check by-products:', err)
+      }
 
       onSuccess()
       onOpenChange(false)
@@ -384,6 +409,22 @@ export function OutputRegistrationModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* By-Product Registration Dialog (Story 4.14) */}
+      <ByProductRegistrationDialog
+        open={showByProductDialog}
+        onOpenChange={setShowByProductDialog}
+        woId={woId}
+        woNumber={woNumber}
+        mainOutputId={lastOutputId}
+        mainOutputQty={lastOutputQty}
+        requireQaStatus={requireQaStatus}
+        onComplete={() => {
+          setShowByProductDialog(false)
+          onSuccess()
+          onOpenChange(false)
+        }}
+      />
     </Dialog>
   )
 }

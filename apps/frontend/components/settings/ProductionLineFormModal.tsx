@@ -318,8 +318,8 @@ export function ProductionLineFormModal({ line, onClose, onSuccess }: Production
               Default Output Location (Optional)
             </Label>
             <Select
-              value={formData.default_output_location_id}
-              onValueChange={(value) => handleChange('default_output_location_id', value)}
+              value={formData.default_output_location_id || 'none'}
+              onValueChange={(value) => handleChange('default_output_location_id', value === 'none' ? '' : value)}
               disabled={!formData.warehouse_id || loadingLocations}
             >
               <SelectTrigger className={errors.default_output_location_id ? 'border-destructive' : ''}>
@@ -332,7 +332,7 @@ export function ProductionLineFormModal({ line, onClose, onSuccess }: Production
                 } />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {locations.map((location) => (
                   <SelectItem key={location.id} value={location.id}>
                     {location.code} - {location.name}

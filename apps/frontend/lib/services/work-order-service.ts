@@ -255,13 +255,19 @@ export async function createWorkOrder(
       }
     }
 
-    // Story 3.14: Copy routing operations to WO (if product has routing)
-    if (workOrder) {
-      const routingResult = await getProductRouting(input.product_id)
-      if (routingResult.success && routingResult.data) {
+    // Story 3.14: Copy routing operations to WO (if BOM has routing)
+    if (workOrder && bomId) {
+      // Get routing_id from BOM
+      const { data: bomData, error: bomFetchError } = await supabaseAdmin
+        .from('boms')
+        .select('routing_id')
+        .eq('id', bomId)
+        .single()
+
+      if (!bomFetchError && bomData?.routing_id) {
         const copyResult = await copyRoutingToWO(
           workOrder.id,
-          routingResult.data,
+          bomData.routing_id,
           orgId
         )
         if (!copyResult.success) {
@@ -642,6 +648,7 @@ export async function copyBOMToWOMaterials(
 
     // Prepare wo_materials records with quantity scaling
     // Formula: scaled_qty = bom_item.qty × (wo.qty / bom.output_qty)
+    // DB uses: material_name, required_qty
     const woMaterials = bomItems.map((item: any) => ({
       wo_id: woId,
       organization_id: orgId,
@@ -720,18 +727,17 @@ export async function copyRoutingToWO(
       return { success: true, data: [] }
     }
 
-    // Prepare wo_operations records
+    // Prepare wo_operations records (mapping routing_operations → wo_operations)
+    // Actual DB schema uses: wo_id, organization_id, sequence, expected_duration_minutes
     const woOperations = routingOps.map((op) => ({
-      wo_id: woId,
       organization_id: orgId,
+      wo_id: woId,
       sequence: op.sequence,
-      operation_name: op.operation_name,
+      operation_name: op.name,
       machine_id: op.machine_id || null,
-      line_id: op.line_id || null,
-      expected_duration_minutes: op.expected_duration_minutes || null,
-      expected_yield_percent: op.expected_yield_percent || 100,
+      expected_duration_minutes: op.duration || 0,
+      expected_yield_percent: null,
       status: 'pending',
-      notes: null,
     }))
 
     // Insert all operations
@@ -768,10 +774,22 @@ export async function getWOOperations(woId: string): Promise<ListResult<any>> {
   try {
     const supabaseAdmin = createServerSupabaseAdmin()
 
+    // DB schema uses: wo_id, sequence, expected_duration_minutes, expected_yield_percent
     const { data, error } = await supabaseAdmin
       .from('wo_operations')
       .select(`
-        *,
+        id,
+        wo_id,
+        sequence,
+        operation_name,
+        machine_id,
+        line_id,
+        expected_duration_minutes,
+        expected_yield_percent,
+        actual_duration_minutes,
+        status,
+        started_at,
+        completed_at,
         machines:machine_id (
           id,
           code,

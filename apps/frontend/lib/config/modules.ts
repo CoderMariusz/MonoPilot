@@ -69,6 +69,13 @@ export const MODULES: Module[] = [
     defaultEnabled: false,
     epic: null,
   },
+  {
+    code: 'scanner',
+    name: 'Scanner',
+    description: 'Barcode Terminal',
+    defaultEnabled: true,
+    epic: null,
+  },
 ]
 
 export const DEFAULT_MODULES = MODULES.filter(m => m.defaultEnabled).map(m => m.code)

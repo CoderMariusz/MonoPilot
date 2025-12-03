@@ -293,6 +293,9 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
       output_qty: input.output_qty || 1.0,
       output_uom: input.output_uom,
       notes: input.notes || null,
+      routing_id: input.routing_id || null,
+      units_per_box: input.units_per_box || null,
+      boxes_per_pallet: input.boxes_per_pallet || null,
       created_by: userInfo.userId,
       updated_by: userInfo.userId
     })

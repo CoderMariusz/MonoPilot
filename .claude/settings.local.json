@@ -55,7 +55,9 @@
       "Bash(timeout 60 pnpm type-check:*)",
       "Bash(curl -s http://localhost:3000/api/technical/routings)",
       "Bash(powershell:*)",
-      "Bash(timeout /t 10 /nobreak)"
+      "Bash(timeout /t 10 /nobreak)",
+      "Bash(curl -s http://localhost:3000/api/technical/routings?limit=10)",
+      "Bash(curl -s http://localhost:3000/api/settings/lines?limit=10)"
     ],
     "deny": [],
     "ask": []
