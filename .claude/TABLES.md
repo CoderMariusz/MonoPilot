@@ -15,9 +15,9 @@ created_at, updated_at
 
 ### users
 ```
-id, email, full_name, role, org_id,
-avatar_url, is_active, last_sign_in_at,
-created_at, updated_at
+id, email, first_name, last_name, role, org_id,
+status (invited/active/inactive), last_login_at,
+created_by, updated_by, created_at, updated_at
 ```
 
 ### user_sessions
@@ -199,7 +199,9 @@ received_qty, status, created_at, updated_at
 
 ### po_approvals
 ```
-id, po_id, user_id, action, comments, created_at
+id, org_id, po_id, status (pending/approved/rejected),
+approved_by (FK users), approved_at, rejection_reason,
+comments, created_at
 ```
 
 ### po_status_history
@@ -236,8 +238,10 @@ started_at, completed_at, created_at, updated_at
 ### transfer_orders
 ```
 id, org_id, to_number, status,
-source_warehouse_id, dest_warehouse_id,
-scheduled_date, shipped_date, received_date,
+from_warehouse_id, to_warehouse_id,
+planned_ship_date, planned_receive_date,
+actual_ship_date, actual_receive_date,
+notes, created_by, updated_by,
 created_at, updated_at
 ```
 

@@ -154,8 +154,10 @@ export function PurchaseOrdersTable() {
         method: 'DELETE',
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error('Failed to delete purchase order')
+        throw new Error(data.error || 'Failed to delete purchase order')
       }
 
       toast({

@@ -57,7 +57,7 @@ export async function GET(
       .from('po_approvals')
       .select(`
         *,
-        users:approved_by(id, email, full_name)
+        users:approved_by(id, email, first_name, last_name)
       `)
       .eq('po_id', id)
       .eq('org_id', currentUser.org_id)

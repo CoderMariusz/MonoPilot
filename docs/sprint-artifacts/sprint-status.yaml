@@ -146,10 +146,10 @@ development_status:
   # Batch 03A-1: Purchase Orders
   batch-03A-1-purchase-orders: contexted
   3-1-po-crud: done
-  3-2-po-lines: review
+  3-2-po-lines: done
   3-3-bulk-po: deferred
-  3-4-po-approval: review
-  3-5-po-statuses: review
+  3-4-po-approval: done
+  3-5-po-statuses: done
   batch-03A-1-retrospective: optional
 
   # Batch 03C-1: Work Orders Core
@@ -173,18 +173,18 @@ development_status:
 
   # Batch 04A-1: Work Order Lifecycle
   batch-04A-1-wo-lifecycle: contexted
-  4-1-production-dashboard: review
-  4-2-wo-start: review
-  4-3-wo-pause-resume: review
-  4-4-operation-start: review
-  4-5-operation-complete: review
-  4-6-wo-complete: review
+  4-1-production-dashboard: done
+  4-2-wo-start: done
+  4-3-wo-pause-resume: done
+  4-4-operation-start: done
+  4-5-operation-complete: done
+  4-6-wo-complete: done
   batch-04A-1-retrospective: optional
 
   # Batch 04A-2: Material Reservation
   batch-04A-2-material-reservation: contexted
-  4-7-material-reservation-desktop: ready-for-dev
-  4-8-material-reservation-scanner: ready-for-dev
+  4-7-material-reservation-desktop: done
+  4-8-material-reservation-scanner: done
   batch-04A-2-retrospective: optional
 
   # Batch 04B-1: Consumption

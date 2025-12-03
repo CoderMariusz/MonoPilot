@@ -64,8 +64,8 @@ interface TransferOrder {
   actual_ship_date: string | null
   actual_receive_date: string | null
   notes: string | null
-  from_warehouses?: Warehouse
-  to_warehouses?: Warehouse
+  from_warehouse?: Warehouse
+  to_warehouse?: Warehouse
 }
 
 export function TransferOrdersTable() {
@@ -252,11 +252,11 @@ export function TransferOrdersTable() {
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <span className="truncate">
-                        {to.from_warehouses?.code || 'N/A'}
+                        {to.from_warehouse?.code || 'N/A'}
                       </span>
                       <ArrowRight className="h-3 w-3 text-gray-400 flex-shrink-0" />
                       <span className="truncate">
-                        {to.to_warehouses?.code || 'N/A'}
+                        {to.to_warehouse?.code || 'N/A'}
                       </span>
                       {isExpanded ? (
                         <ChevronUp className="h-5 w-5 text-gray-400 ml-2" />
@@ -276,11 +276,11 @@ export function TransferOrdersTable() {
                       <div className="grid grid-cols-2 gap-3 pt-3 text-sm">
                         <div>
                           <span className="text-gray-500">From:</span>
-                          <p className="font-medium">{to.from_warehouses?.name || 'N/A'}</p>
+                          <p className="font-medium">{to.from_warehouse?.name || 'N/A'}</p>
                         </div>
                         <div>
                           <span className="text-gray-500">To:</span>
-                          <p className="font-medium">{to.to_warehouses?.name || 'N/A'}</p>
+                          <p className="font-medium">{to.to_warehouse?.name || 'N/A'}</p>
                         </div>
                         <div>
                           <span className="text-gray-500">Ship Date:</span>
@@ -375,15 +375,15 @@ export function TransferOrdersTable() {
                   >
                     <TableCell className="font-medium">{to.to_number}</TableCell>
                     <TableCell>
-                      {to.from_warehouses?.name || 'N/A'}
+                      {to.from_warehouse?.name || 'N/A'}
                       <div className="text-sm text-gray-500">
-                        {to.from_warehouses?.code}
+                        {to.from_warehouse?.code}
                       </div>
                     </TableCell>
                     <TableCell>
-                      {to.to_warehouses?.name || 'N/A'}
+                      {to.to_warehouse?.name || 'N/A'}
                       <div className="text-sm text-gray-500">
-                        {to.to_warehouses?.code}
+                        {to.to_warehouse?.code}
                       </div>
                     </TableCell>
                     <TableCell>

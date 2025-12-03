@@ -105,7 +105,7 @@ export function SupplierFormModal({
         }
 
         const data = await response.json()
-        setTaxCodes(data.tax_codes || [])
+        setTaxCodes(data.taxCodes || data.tax_codes || [])
       } catch (error) {
         console.error('Error fetching tax codes:', error)
         toast({

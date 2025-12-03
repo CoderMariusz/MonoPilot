@@ -302,7 +302,7 @@ export default function PurchaseOrderDetailsPage({
 
     setStatusChanging(true)
     try {
-      const response = await fetch(`/api/planning/purchase-orders/${po.id}`, {
+      const response = await fetch(`/api/planning/purchase-orders/${po.id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),

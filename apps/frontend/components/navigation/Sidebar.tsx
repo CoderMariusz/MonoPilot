@@ -54,7 +54,7 @@ const allModules: SidebarModule[] = [
     key: 'production',
     name: 'Production',
     icon: Factory,
-    href: '/production',
+    href: '/production/dashboard',
     color: 'text-green-600',
   },
   {

@@ -50,7 +50,7 @@ interface TOLine {
   shipped_qty: number
   received_qty: number
   notes: string | null
-  products?: Product
+  product?: Product
 }
 
 interface TOLinesTableProps {
@@ -254,8 +254,8 @@ export function TOLinesTable({ transferOrderId, toStatus, onLinesUpdate }: TOLin
               lines.map((line) => (
                 <TableRow key={line.id}>
                   <TableCell>
-                    {line.products?.name || 'N/A'}
-                    <div className="text-sm text-gray-500">{line.products?.code}</div>
+                    {line.product?.name || 'N/A'}
+                    <div className="text-sm text-gray-500">{line.product?.code}</div>
                   </TableCell>
                   <TableCell className="text-right">{formatNumber(line.quantity)}</TableCell>
                   <TableCell>{line.uom}</TableCell>
@@ -312,7 +312,7 @@ export function TOLinesTable({ transferOrderId, toStatus, onLinesUpdate }: TOLin
           <AlertDialogHeader>
             <AlertDialogTitle>Delete TO Line</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this line ({selectedLine?.products?.name})? This
+              Are you sure you want to delete this line ({selectedLine?.product?.name})? This
               action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

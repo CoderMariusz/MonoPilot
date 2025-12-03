@@ -94,7 +94,7 @@ export function ProductLineForm({
       }
 
       const data = await response.json()
-      const products = data.products || []
+      const products = data.data || data.products || []
 
       if (products.length === 0) {
         setError(`Product "${productCode}" not found`)
@@ -112,8 +112,9 @@ export function ProductLineForm({
       let defaultSupplier = null
       if (supplierResponse.ok) {
         const supplierData = await supplierResponse.json()
-        if (supplierData.supplier_products?.length > 0) {
-          const sp = supplierData.supplier_products[0]
+        const assignments = supplierData.assignments || supplierData.supplier_products || []
+        if (assignments.length > 0) {
+          const sp = assignments[0]
           defaultSupplier = {
             id: sp.supplier_id,
             name: sp.suppliers?.name,

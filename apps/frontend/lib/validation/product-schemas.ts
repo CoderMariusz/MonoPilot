@@ -116,6 +116,7 @@ export type TechnicalSettingsInput = z.input<typeof technicalSettingsSchema>
 
 export const productListQuerySchema = z.object({
   search: z.string().optional(),
+  code: z.string().optional(), // Exact match by product code
   type: z.array(z.string()).or(z.string()).optional(),
   status: z.array(z.string()).or(z.string()).optional(),
   category: z.string().optional(),

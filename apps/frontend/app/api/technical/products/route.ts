@@ -51,7 +51,10 @@ export async function GET(req: NextRequest) {
       .is('deleted_at', null)
 
     // Apply filters
-    if (params.search) {
+    if (params.code) {
+      // Exact match by product code (case-insensitive)
+      query = query.ilike('code', params.code)
+    } else if (params.search) {
       query = query.or(`code.ilike.%${params.search}%,name.ilike.%${params.search}%`)
     }
 

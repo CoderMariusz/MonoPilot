@@ -231,21 +231,7 @@ export async function DELETE(
 
     const supabaseAdmin = createServerSupabaseAdmin()
 
-    // AC-1.8: Check if PO has lines
-    const { count: lineCount } = await supabaseAdmin
-      .from('po_lines')
-      .select('*', { count: 'exact', head: true })
-      .eq('po_id', id)
-      .eq('org_id', currentUser.org_id)
-
-    if (lineCount && lineCount > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete PO with lines. Delete lines first.' },
-        { status: 403 }
-      )
-    }
-
-    // AC-1.8: Check PO status
+    // AC-1.8: Check PO status first
     const { data: po } = await supabaseAdmin
       .from('purchase_orders')
       .select('status, org_id')
@@ -267,6 +253,18 @@ export async function DELETE(
         { error: 'Can only delete POs in Draft status' },
         { status: 403 }
       )
+    }
+
+    // Auto-delete PO lines if PO is in Draft status
+    const { error: deleteLinesError } = await supabaseAdmin
+      .from('po_lines')
+      .delete()
+      .eq('po_id', id)
+      .eq('org_id', currentUser.org_id)
+
+    if (deleteLinesError) {
+      console.error('Error deleting PO lines:', deleteLinesError)
+      return NextResponse.json({ error: 'Failed to delete PO lines' }, { status: 500 })
     }
 
     // Delete PO

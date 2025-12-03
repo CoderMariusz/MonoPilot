@@ -30,8 +30,8 @@ interface TransferOrder {
   actual_ship_date: string | null
   actual_receive_date: string | null
   notes: string | null
-  from_warehouses?: Warehouse
-  to_warehouses?: Warehouse
+  from_warehouse?: Warehouse
+  to_warehouse?: Warehouse
   created_at: string
   updated_at: string
 }
@@ -223,15 +223,19 @@ export default function TransferOrderDetailsPage({ params }: { params: Promise<{
             <div className="flex justify-between">
               <dt className="text-gray-600">From Warehouse:</dt>
               <dd className="font-medium">
-                {to.from_warehouses?.name}
-                <div className="text-sm text-gray-500">{to.from_warehouses?.code}</div>
+                {to.from_warehouse?.name || 'N/A'}
+                {to.from_warehouse?.code && (
+                  <div className="text-sm text-gray-500">{to.from_warehouse.code}</div>
+                )}
               </dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-gray-600">To Warehouse:</dt>
               <dd className="font-medium">
-                {to.to_warehouses?.name}
-                <div className="text-sm text-gray-500">{to.to_warehouses?.code}</div>
+                {to.to_warehouse?.name || 'N/A'}
+                {to.to_warehouse?.code && (
+                  <div className="text-sm text-gray-500">{to.to_warehouse.code}</div>
+                )}
               </dd>
             </div>
             <div className="flex justify-between">

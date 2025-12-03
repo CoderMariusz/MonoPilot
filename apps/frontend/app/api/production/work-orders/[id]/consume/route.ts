@@ -310,7 +310,7 @@ export async function GET(
         reversed_at, reverse_reason,
         wo_materials(material_name, product_id),
         license_plates(lp_number),
-        users(full_name, email)
+        users(first_name, last_name, email)
       `)
       .eq('wo_id', woId)
       .eq('org_id', currentUser.org_id)

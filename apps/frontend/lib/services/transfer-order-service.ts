@@ -183,7 +183,6 @@ export async function listTransferOrders(
   filters: TransferOrderFilters
 ): Promise<ListResult<TransferOrder>> {
   try {
-    const supabase = await createServerSupabase()
     const orgId = await getCurrentOrgId()
 
     if (!orgId) {
@@ -193,22 +192,17 @@ export async function listTransferOrders(
       }
     }
 
-    let query = supabase
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Fetch transfer orders without warehouse join (FK hint not working)
+    let query = supabaseAdmin
       .from('transfer_orders')
-      .select(
-        `
-        *,
-        from_warehouse:warehouses!from_warehouse_id(code, name),
-        to_warehouse:warehouses!to_warehouse_id(code, name)
-      `,
-        { count: 'exact' }
-      )
+      .select('*', { count: 'exact' })
+      .eq('org_id', orgId)
 
     // Apply filters
     if (filters.search) {
-      query = query.or(
-        `to_number.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`
-      )
+      query = query.or(`to_number.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`)
     }
 
     if (filters.status) {
@@ -246,6 +240,38 @@ export async function listTransferOrders(
       }
     }
 
+    // Fetch warehouses separately and merge
+    if (data && data.length > 0) {
+      const warehouseIds = [
+        ...new Set([
+          ...data.map((to: any) => to.from_warehouse_id),
+          ...data.map((to: any) => to.to_warehouse_id),
+        ]),
+      ].filter(Boolean)
+
+      const { data: warehouses } = await supabaseAdmin
+        .from('warehouses')
+        .select('id, code, name')
+        .in('id', warehouseIds)
+
+      const warehouseMap = new Map(
+        warehouses?.map((w: any) => [w.id, { code: w.code, name: w.name }]) || []
+      )
+
+      // Add warehouse info to transfer orders
+      const enrichedData = data.map((to: any) => ({
+        ...to,
+        from_warehouse: warehouseMap.get(to.from_warehouse_id) || null,
+        to_warehouse: warehouseMap.get(to.to_warehouse_id) || null,
+      }))
+
+      return {
+        success: true,
+        data: enrichedData,
+        total: count || 0,
+      }
+    }
+
     return {
       success: true,
       data: data || [],
@@ -265,15 +291,24 @@ export async function listTransferOrders(
  */
 export async function getTransferOrder(id: string): Promise<ServiceResult<TransferOrder>> {
   try {
-    const supabase = await createServerSupabase()
+    const orgId = await getCurrentOrgId()
 
-    const { data, error } = await supabase
+    if (!orgId) {
+      return {
+        success: false,
+        error: 'Organization ID not found',
+        code: 'INVALID_INPUT',
+      }
+    }
+
+    const supabaseAdmin = createServerSupabaseAdmin()
+
+    // Fetch transfer order
+    const { data, error } = await supabaseAdmin
       .from('transfer_orders')
       .select(
         `
         *,
-        from_warehouse:warehouses!from_warehouse_id(code, name),
-        to_warehouse:warehouses!to_warehouse_id(code, name),
         lines:to_lines(
           *,
           product:products(code, name)
@@ -281,6 +316,7 @@ export async function getTransferOrder(id: string): Promise<ServiceResult<Transf
       `
       )
       .eq('id', id)
+      .eq('org_id', orgId)
       .single()
 
     if (error || !data) {
@@ -291,9 +327,26 @@ export async function getTransferOrder(id: string): Promise<ServiceResult<Transf
       }
     }
 
+    // Fetch warehouses separately
+    const warehouseIds = [data.from_warehouse_id, data.to_warehouse_id].filter(Boolean)
+    const { data: warehouses } = await supabaseAdmin
+      .from('warehouses')
+      .select('id, code, name')
+      .in('id', warehouseIds)
+
+    const warehouseMap = new Map(
+      warehouses?.map((w: any) => [w.id, { code: w.code, name: w.name }]) || []
+    )
+
+    const enrichedData = {
+      ...data,
+      from_warehouse: warehouseMap.get(data.from_warehouse_id) || null,
+      to_warehouse: warehouseMap.get(data.to_warehouse_id) || null,
+    }
+
     return {
       success: true,
-      data,
+      data: enrichedData,
     }
   } catch (error) {
     console.error('Error in getTransferOrder:', error)
@@ -343,13 +396,7 @@ export async function createTransferOrder(
         created_by: userId,
         updated_by: userId,
       })
-      .select(
-        `
-        *,
-        from_warehouse:warehouses!from_warehouse_id(code, name),
-        to_warehouse:warehouses!to_warehouse_id(code, name)
-      `
-      )
+      .select('*')
       .single()
 
     if (error) {
@@ -371,9 +418,26 @@ export async function createTransferOrder(
       }
     }
 
+    // Fetch warehouses separately
+    const warehouseIds = [data.from_warehouse_id, data.to_warehouse_id].filter(Boolean)
+    const { data: warehouses } = await supabaseAdmin
+      .from('warehouses')
+      .select('id, code, name')
+      .in('id', warehouseIds)
+
+    const warehouseMap = new Map(
+      warehouses?.map((w: any) => [w.id, { code: w.code, name: w.name }]) || []
+    )
+
+    const enrichedData = {
+      ...data,
+      from_warehouse: warehouseMap.get(data.from_warehouse_id) || null,
+      to_warehouse: warehouseMap.get(data.to_warehouse_id) || null,
+    }
+
     return {
       success: true,
-      data,
+      data: enrichedData,
     }
   } catch (error) {
     console.error('Error in createTransferOrder:', error)
@@ -437,13 +501,7 @@ export async function updateTransferOrder(
         updated_by: userId,
       })
       .eq('id', id)
-      .select(
-        `
-        *,
-        from_warehouse:warehouses!from_warehouse_id(code, name),
-        to_warehouse:warehouses!to_warehouse_id(code, name)
-      `
-      )
+      .select('*')
       .single()
 
     if (error) {
@@ -455,9 +513,26 @@ export async function updateTransferOrder(
       }
     }
 
+    // Fetch warehouses separately
+    const warehouseIds = [data.from_warehouse_id, data.to_warehouse_id].filter(Boolean)
+    const { data: warehouses } = await supabaseAdmin
+      .from('warehouses')
+      .select('id, code, name')
+      .in('id', warehouseIds)
+
+    const warehouseMap = new Map(
+      warehouses?.map((w: any) => [w.id, { code: w.code, name: w.name }]) || []
+    )
+
+    const enrichedData = {
+      ...data,
+      from_warehouse: warehouseMap.get(data.from_warehouse_id) || null,
+      to_warehouse: warehouseMap.get(data.to_warehouse_id) || null,
+    }
+
     return {
       success: true,
-      data,
+      data: enrichedData,
     }
   } catch (error) {
     console.error('Error in updateTransferOrder:', error)
@@ -600,15 +675,10 @@ export async function changeToStatus(
       .update({
         status,
         updated_by: userData.userId,
-        updated_at: new Date().toISOString(),
       })
       .eq('id', id)
       .eq('org_id', userData.orgId)
-      .select(`
-        *,
-        from_warehouse:warehouses!from_warehouse_id(code, name),
-        to_warehouse:warehouses!to_warehouse_id(code, name)
-      `)
+      .select('*')
       .single()
 
     if (updateError) {
@@ -620,9 +690,26 @@ export async function changeToStatus(
       }
     }
 
+    // Fetch warehouses separately
+    const warehouseIds = [updatedTo.from_warehouse_id, updatedTo.to_warehouse_id].filter(Boolean)
+    const { data: warehouses } = await supabaseAdmin
+      .from('warehouses')
+      .select('id, code, name')
+      .in('id', warehouseIds)
+
+    const warehouseMap = new Map(
+      warehouses?.map((w: any) => [w.id, { code: w.code, name: w.name }]) || []
+    )
+
+    const enrichedData = {
+      ...updatedTo,
+      from_warehouse: warehouseMap.get(updatedTo.from_warehouse_id) || null,
+      to_warehouse: warehouseMap.get(updatedTo.to_warehouse_id) || null,
+    }
+
     return {
       success: true,
-      data: updatedTo as TransferOrder,
+      data: enrichedData as TransferOrder,
     }
   } catch (error) {
     console.error('Error in changeToStatus:', error)
@@ -643,9 +730,9 @@ export async function changeToStatus(
  */
 export async function getToLines(transferOrderId: string): Promise<ListResult<ToLine>> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('to_lines')
       .select(
         `
@@ -1020,8 +1107,6 @@ export async function shipTransferOrder(
         .from('to_lines')
         .update({
           shipped_qty: newShippedQty,
-          updated_by: userId,
-          updated_at: new Date().toISOString(),
         })
         .eq('id', lineItem.to_line_id)
 
@@ -1053,8 +1138,6 @@ export async function shipTransferOrder(
       .select(
         `
         *,
-        from_warehouse:warehouses!from_warehouse_id(code, name),
-        to_warehouse:warehouses!to_warehouse_id(code, name),
         lines:to_lines(
           *,
           product:products(code, name)
@@ -1072,9 +1155,26 @@ export async function shipTransferOrder(
       }
     }
 
+    // Fetch warehouses separately
+    const warehouseIds = [data.from_warehouse_id, data.to_warehouse_id].filter(Boolean)
+    const { data: warehouses } = await supabaseAdmin
+      .from('warehouses')
+      .select('id, code, name')
+      .in('id', warehouseIds)
+
+    const warehouseMap = new Map(
+      warehouses?.map((w: any) => [w.id, { code: w.code, name: w.name }]) || []
+    )
+
+    const enrichedData = {
+      ...data,
+      from_warehouse: warehouseMap.get(data.from_warehouse_id) || null,
+      to_warehouse: warehouseMap.get(data.to_warehouse_id) || null,
+    }
+
     return {
       success: true,
-      data,
+      data: enrichedData,
     }
   } catch (error) {
     console.error('Error in shipTransferOrder:', error)
@@ -1095,9 +1195,9 @@ export async function shipTransferOrder(
  */
 export async function getToLineLps(toLineId: string): Promise<ListResult<ToLineLp>> {
   try {
-    const supabase = await createServerSupabase()
+    const supabaseAdmin = createServerSupabaseAdmin()
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('to_line_lps')
       .select(
         `

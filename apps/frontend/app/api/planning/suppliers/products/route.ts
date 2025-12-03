@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { supplier_id, product_id, is_default, unit_price, lead_time_days, min_order_qty } = body
+    const { supplier_id, product_id, is_default, unit_price, lead_time_days, min_order_qty, moq } = body
 
     if (!supplier_id || !product_id) {
       return NextResponse.json(
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
           is_default: is_default ?? false,
           unit_price: unit_price ?? null,
           lead_time_days: lead_time_days ?? null,
-          min_order_qty: min_order_qty ?? null,
+          moq: moq ?? min_order_qty ?? null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id)
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
         is_default: is_default ?? false,
         unit_price: unit_price ?? null,
         lead_time_days: lead_time_days ?? null,
-        min_order_qty: min_order_qty ?? null,
+        moq: moq ?? min_order_qty ?? null,
       })
       .select(`
         *,
