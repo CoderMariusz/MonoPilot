@@ -86,7 +86,7 @@ export function ProductLineForm({
     try {
       // Fetch product by code
       const response = await fetch(
-        `/api/products?code=${encodeURIComponent(productCode.trim().toUpperCase())}&limit=1`
+        `/api/technical/products?code=${encodeURIComponent(productCode.trim().toUpperCase())}&limit=1`
       )
 
       if (!response.ok) {

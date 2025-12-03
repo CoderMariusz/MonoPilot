@@ -22,7 +22,7 @@ export default function PurchaseOrdersPage() {
           <p className="text-muted-foreground text-sm">Manage and track purchase orders</p>
         </div>
 
-        <PlanningActionButtons showTO={false} showWO={false} />
+        <PlanningActionButtons showPO={false} showTO={false} showWO={false} />
 
         <PurchaseOrdersTable />
       </div>
