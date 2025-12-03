@@ -50,7 +50,11 @@
       "Bash(pnpm dev)",
       "Bash(lsof:*)",
       "Bash(\"c:\\Users\\Mariusz K\\Documents\\Programowanie\\MonoPilot\\apps\\frontend\\app\\api\\technical\\boms\\[id]\\items\\[itemId]\\route.ts\")",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(git push:*)",
+      "Bash(timeout 60 pnpm type-check:*)",
+      "Bash(curl -s http://localhost:3000/api/technical/routings)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

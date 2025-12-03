@@ -3,21 +3,23 @@
  * Handles BOM item operations with operation assignment and line-specific configs
  */
 
-import { createServerSupabase, createServerSupabaseAdmin } from '@/lib/supabase/server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { BOMItem, BOMItemsByOperation, CreateBOMItemInput, UpdateBOMItemInput } from '@/lib/validation/bom-schemas'
 
 // Helper to get current user's org_id
 async function getCurrentUserOrgId(): Promise<{ userId: string; orgId: string } | null> {
   const supabase = await createServerSupabase()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+  console.log('getCurrentUserOrgId - session:', session?.user?.id, 'error:', sessionError)
   if (!session?.user?.id) return null
 
-  const { data: user } = await supabase
+  const { data: user, error: userError } = await supabase
     .from('users')
     .select('org_id')
     .eq('id', session.user.id)
     .single()
 
+  console.log('getCurrentUserOrgId - user:', user, 'error:', userError)
   if (!user?.org_id) return null
   return { userId: session.user.id, orgId: user.org_id }
 }
@@ -122,30 +124,46 @@ export async function createBomItem(
   bomId: string,
   input: CreateBOMItemInput
 ): Promise<BOMItem> {
-  const userInfo = await getCurrentUserOrgId()
-  if (!userInfo) {
+  console.log('createBomItem called with bomId:', bomId, 'input:', input)
+
+  const supabase = await createServerSupabase()
+
+  // Check authentication
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) {
     throw new Error('Unauthorized')
   }
 
-  const supabaseAdmin = createServerSupabaseAdmin()
+  // Get user's org_id
+  const { data: user } = await supabase
+    .from('users')
+    .select('org_id')
+    .eq('id', session.user.id)
+    .single()
 
-  // Get BOM with routing
-  const { data: bom, error: bomError } = await supabaseAdmin
+  if (!user?.org_id) {
+    throw new Error('Unauthorized')
+  }
+
+  const orgId = user.org_id
+
+  // Get BOM with routing (using user's session - RLS will filter by org)
+  console.log('Fetching BOM with id:', bomId)
+  const { data: bom, error: bomError } = await supabase
     .from('boms')
     .select('id, org_id, product_id, routing_id')
     .eq('id', bomId)
     .single()
 
-  if (bomError || !bom) {
-    throw new Error('BOM_NOT_FOUND')
-  }
+  console.log('BOM query result:', { bom, bomError })
 
-  if (bom.org_id !== userInfo.orgId) {
+  if (bomError || !bom) {
+    console.log('BOM not found or error:', bomError)
     throw new Error('BOM_NOT_FOUND')
   }
 
   // Validate component exists
-  const { data: component, error: compError } = await supabaseAdmin
+  const { data: component, error: compError } = await supabase
     .from('products')
     .select('id, org_id')
     .eq('id', input.component_id)
@@ -155,7 +173,7 @@ export async function createBomItem(
     throw new Error('INVALID_COMPONENT')
   }
 
-  if (component.org_id !== userInfo.orgId) {
+  if (component.org_id !== orgId) {
     throw new Error('INVALID_COMPONENT')
   }
 
@@ -181,7 +199,7 @@ export async function createBomItem(
   }
 
   // Insert item
-  const { data: newItem, error: insertError } = await supabaseAdmin
+  const { data: newItem, error: insertError } = await supabase
     .from('bom_items')
     .insert({
       bom_id: bomId,
@@ -227,15 +245,29 @@ export async function updateBomItem(
   itemId: string,
   input: UpdateBOMItemInput
 ): Promise<BOMItem> {
-  const userInfo = await getCurrentUserOrgId()
-  if (!userInfo) {
+  const supabase = await createServerSupabase()
+
+  // Check authentication
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) {
     throw new Error('Unauthorized')
   }
 
-  const supabaseAdmin = createServerSupabaseAdmin()
+  // Get user's org_id
+  const { data: user } = await supabase
+    .from('users')
+    .select('org_id')
+    .eq('id', session.user.id)
+    .single()
 
-  // Get BOM
-  const { data: bom, error: bomError } = await supabaseAdmin
+  if (!user?.org_id) {
+    throw new Error('Unauthorized')
+  }
+
+  const orgId = user.org_id
+
+  // Get BOM (RLS filters by org)
+  const { data: bom, error: bomError } = await supabase
     .from('boms')
     .select('id, org_id, product_id, routing_id')
     .eq('id', bomId)
@@ -245,12 +277,8 @@ export async function updateBomItem(
     throw new Error('BOM_NOT_FOUND')
   }
 
-  if (bom.org_id !== userInfo.orgId) {
-    throw new Error('BOM_NOT_FOUND')
-  }
-
   // Verify item exists
-  const { data: existingItem, error: itemError } = await supabaseAdmin
+  const { data: existingItem, error: itemError } = await supabase
     .from('bom_items')
     .select('id, component_id, is_output')
     .eq('id', itemId)
@@ -263,13 +291,13 @@ export async function updateBomItem(
 
   // Validate component if changing
   if (input.component_id) {
-    const { data: component } = await supabaseAdmin
+    const { data: component } = await supabase
       .from('products')
       .select('id, org_id')
       .eq('id', input.component_id)
       .single()
 
-    if (!component || component.org_id !== userInfo.orgId) {
+    if (!component || component.org_id !== orgId) {
       throw new Error('INVALID_COMPONENT')
     }
 
@@ -310,7 +338,7 @@ export async function updateBomItem(
   if (input.notes !== undefined) updateData.notes = input.notes
 
   // Update
-  const { data: updatedItem, error: updateError } = await supabaseAdmin
+  const { data: updatedItem, error: updateError } = await supabase
     .from('bom_items')
     .update(updateData)
     .eq('id', itemId)
@@ -338,26 +366,27 @@ export async function updateBomItem(
  * AC-2.26.6
  */
 export async function deleteBomItem(bomId: string, itemId: string): Promise<void> {
-  const userInfo = await getCurrentUserOrgId()
-  if (!userInfo) {
+  const supabase = await createServerSupabase()
+
+  // Check authentication
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) {
     throw new Error('Unauthorized')
   }
 
-  const supabaseAdmin = createServerSupabaseAdmin()
-
-  // Verify BOM exists and belongs to user's org
-  const { data: bom } = await supabaseAdmin
+  // Verify BOM exists (RLS filters by org)
+  const { data: bom } = await supabase
     .from('boms')
-    .select('id, org_id')
+    .select('id')
     .eq('id', bomId)
     .single()
 
-  if (!bom || bom.org_id !== userInfo.orgId) {
+  if (!bom) {
     throw new Error('BOM_NOT_FOUND')
   }
 
   // Delete item
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('bom_items')
     .delete()
     .eq('id', itemId)

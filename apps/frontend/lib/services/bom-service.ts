@@ -177,7 +177,7 @@ export async function getBOMById(id: string, include_items = false): Promise<BOM
       ),
       items:bom_items (
         *,
-        product:products!product_id (
+        component:products!component_id (
           id,
           code,
           name,

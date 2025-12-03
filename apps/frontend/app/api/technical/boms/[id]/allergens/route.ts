@@ -39,12 +39,12 @@ export async function GET(
       return NextResponse.json({ error: 'BOM not found' }, { status: 404 });
     }
 
-    // Fetch all BOM items (excluding by-products)
+    // Fetch all BOM items (excluding outputs/by-products)
     const { data: items, error: itemsError } = await supabase
       .from('bom_items')
-      .select('product_id')
+      .select('component_id')
       .eq('bom_id', id)
-      .eq('is_by_product', false); // Only input items
+      .eq('is_output', false); // Only input items
 
     if (itemsError) {
       console.error('Error fetching BOM items:', itemsError);
@@ -64,8 +64,8 @@ export async function GET(
       );
     }
 
-    // Extract product IDs
-    const productIds = items.map(item => item.product_id);
+    // Extract component IDs
+    const productIds = items.map(item => item.component_id);
 
     // Fetch allergens for all component products
     const { data: productAllergens, error: allergensError } = await supabase

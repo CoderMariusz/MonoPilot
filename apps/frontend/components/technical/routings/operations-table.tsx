@@ -46,7 +46,7 @@ export function OperationsTable({ routingId }: OperationsTableProps) {
       }
 
       const data = await response.json()
-      setOperations(data.operations || [])
+      setOperations(data.data || [])
     } catch (error) {
       console.error('Error fetching operations:', error)
       toast({

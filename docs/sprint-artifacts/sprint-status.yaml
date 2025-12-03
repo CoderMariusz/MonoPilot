@@ -133,10 +133,10 @@ development_status:
   batch-02A-2-bom-restructure: ready-for-dev
   2-24-routing-restructure: done
   2-25-bom-production-lines: done
-  2-26-bom-items-operation-assignment: review
-  2-27-bom-item-alternatives: review
-  2-28-bom-packaging-fields: review
-  2-29-bom-routing-ui-update: review
+  2-26-bom-items-operation-assignment: done
+  2-27-bom-item-alternatives: done
+  2-28-bom-packaging-fields: done
+  2-29-bom-routing-ui-update: done
   batch-02A-2-retrospective: optional
 
   # ============================================
@@ -205,7 +205,7 @@ development_status:
 
   # Batch 04C-1: Config & Traceability
   batch-04C-1-config-traceability: contexted
-  4-17-production-settings: review
+  4-17-production-settings: done
   4-18-lp-updates-consumption: ready-for-dev
   4-19-genealogy-creation: ready-for-dev
   4-20-operation-timeline: ready-for-dev

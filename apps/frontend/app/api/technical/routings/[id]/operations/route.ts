@@ -3,9 +3,10 @@ import { createServerSupabase } from '@/lib/supabase/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
     const { data: { session }, error: authError } = await supabase.auth.getSession()
     if (authError || !session) {
@@ -15,7 +16,7 @@ export async function GET(
     const { data: operations, error } = await supabase
       .from('routing_operations')
       .select('*')
-      .eq('routing_id', params.id)
+      .eq('routing_id', id)
       .order('sequence', { ascending: true })
 
     if (error) {
@@ -31,9 +32,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = await createServerSupabase()
     const { data: { session }, error: authError } = await supabase.auth.getSession()
     if (authError || !session) {
@@ -49,7 +51,7 @@ export async function POST(
     const { data: operation, error } = await supabase
       .from('routing_operations')
       .insert({
-        routing_id: params.id,
+        routing_id: id,
         sequence: body.sequence,
         name: body.name || null,
         description: body.description || null,

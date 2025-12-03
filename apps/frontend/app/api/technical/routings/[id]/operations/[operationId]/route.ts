@@ -3,9 +3,10 @@ import { createServerSupabase } from '@/lib/supabase/server'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; operationId: string } }
+  { params }: { params: Promise<{ id: string; operationId: string }> }
 ) {
   try {
+    const { operationId } = await params
     const supabase = await createServerSupabase()
     const { data: { session }, error: authError } = await supabase.auth.getSession()
     if (authError || !session) {
@@ -23,7 +24,7 @@ export async function PUT(
         ...(body.labor_cost_per_hour !== undefined && { labor_cost_per_hour: body.labor_cost_per_hour }),
         ...(body.sequence !== undefined && { sequence: body.sequence }),
       })
-      .eq('id', params.operationId)
+      .eq('id', operationId)
       .select()
       .single()
 
@@ -40,9 +41,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; operationId: string } }
+  { params }: { params: Promise<{ id: string; operationId: string }> }
 ) {
   try {
+    const { operationId } = await params
     const supabase = await createServerSupabase()
     const { data: { session }, error: authError } = await supabase.auth.getSession()
     if (authError || !session) {
@@ -52,7 +54,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('routing_operations')
       .delete()
-      .eq('id', params.operationId)
+      .eq('id', operationId)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

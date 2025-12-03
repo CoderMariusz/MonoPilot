@@ -124,15 +124,29 @@ id, org_id, settings (jsonb), created_at, updated_at
 
 ### boms (Bill of Materials)
 ```
-id, org_id, product_id, name, version, status,
-is_active, effective_from, effective_to,
-created_at, updated_at
+id, org_id, product_id, routing_id, version, status,
+output_qty, output_uom, effective_from, effective_to,
+units_per_box, boxes_per_pallet, notes,
+created_by, updated_by, created_at, updated_at
 ```
 
 ### bom_items
 ```
-id, bom_id, product_id, quantity, unit,
-sequence, notes, created_at, updated_at
+id, bom_id, component_id, operation_seq, is_output,
+quantity, uom, scrap_percent, sequence,
+line_ids (uuid[]), consume_whole_lp, notes,
+created_at, updated_at
+```
+
+### bom_item_alternatives
+```
+id, bom_item_id, alternative_component_id,
+priority, quantity_ratio, notes, created_at
+```
+
+### bom_production_lines
+```
+id, bom_id, line_id, labor_cost_per_hour, created_at
 ```
 
 ### routings

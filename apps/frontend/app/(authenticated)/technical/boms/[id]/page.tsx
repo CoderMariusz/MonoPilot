@@ -60,18 +60,17 @@ interface Product {
 interface BOMItem {
   id: string
   bom_id: string
-  product_id: string
-  product: Product
+  component_id: string
+  component?: Product
+  operation_seq: number
+  is_output: boolean
   quantity: number
   uom: string
   scrap_percent: number
   sequence: number
+  line_ids?: string[] | null
   consume_whole_lp: boolean
-  is_by_product: boolean
-  yield_percent?: number
-  condition_flags?: string[]
-  condition_logic?: 'AND' | 'OR'
-  notes?: string
+  notes?: string | null
 }
 
 interface BOM {
@@ -166,8 +165,9 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
     try {
       const response = await fetch(`/api/technical/boms/${id}/items`)
       if (response.ok) {
-        const data = await response.json()
-        setItems(data.items || data || [])
+        const result = await response.json()
+        // API returns { data: items[] }
+        setItems(result.data || [])
       }
     } catch (error) {
       console.error('Error fetching items:', error)
@@ -277,8 +277,8 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
   }
 
   // Separate inputs from by-products
-  const inputItems = items.filter((i) => !i.is_by_product)
-  const byProductItems = items.filter((i) => i.is_by_product)
+  const inputItems = items.filter((i) => !i.is_output)
+  const byProductItems = items.filter((i) => i.is_output)
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -382,7 +382,7 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
                         <TableHead>Component</TableHead>
                         <TableHead>Quantity</TableHead>
                         <TableHead>Scrap %</TableHead>
-                        <TableHead>Flags</TableHead>
+                        <TableHead>Op. Seq</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -392,8 +392,8 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
                           <TableCell className="text-gray-500">{item.sequence}</TableCell>
                           <TableCell>
                             <div>
-                              <p className="font-medium">{item.product.code}</p>
-                              <p className="text-sm text-gray-500">{item.product.name}</p>
+                              <p className="font-medium">{item.component?.code || '-'}</p>
+                              <p className="text-sm text-gray-500">{item.component?.name || '-'}</p>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -401,18 +401,7 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
                           </TableCell>
                           <TableCell>{item.scrap_percent}%</TableCell>
                           <TableCell>
-                            {item.condition_flags && item.condition_flags.length > 0 ? (
-                              <div className="flex gap-1 flex-wrap">
-                                {item.condition_flags.map((flag) => (
-                                  <Badge key={flag} variant="outline" className="text-xs">
-                                    {flag}
-                                  </Badge>
-                                ))}
-                                <span className="text-xs text-gray-400">({item.condition_logic})</span>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
+                            <Badge variant="outline">{item.operation_seq}</Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
@@ -451,7 +440,8 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
                       <TableRow>
                         <TableHead className="w-12">#</TableHead>
                         <TableHead>By-Product</TableHead>
-                        <TableHead>Yield %</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Op. Seq</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -461,11 +451,14 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
                           <TableCell className="text-gray-500">{item.sequence}</TableCell>
                           <TableCell>
                             <div>
-                              <p className="font-medium">{item.product.code}</p>
-                              <p className="text-sm text-gray-500">{item.product.name}</p>
+                              <p className="font-medium">{item.component?.code || '-'}</p>
+                              <p className="text-sm text-gray-500">{item.component?.name || '-'}</p>
                             </div>
                           </TableCell>
-                          <TableCell>{item.yield_percent}%</TableCell>
+                          <TableCell>{item.quantity} {item.uom}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{item.operation_seq}</Badge>
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               <Button
@@ -613,7 +606,7 @@ export default function BOMDetailPage({ params }: { params: Promise<{ id: string
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Item?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove {deletingItem?.product.code} from this BOM?
+              Are you sure you want to remove {deletingItem?.component?.code || 'this item'} from this BOM?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
