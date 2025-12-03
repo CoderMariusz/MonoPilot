@@ -336,7 +336,7 @@ export async function getAllAlternativesForBom(
   }
 
   // Reshape data to include primary_component at top level
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  
   return (data || []).map((alt: any) => ({
     ...alt,
     primary_component: alt.bom_item?.component || null

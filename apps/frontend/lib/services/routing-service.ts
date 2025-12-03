@@ -375,7 +375,7 @@ export async function checkRoutingInUse(routingId: string): Promise<{ inUse: boo
 
     // Will check boms.routing_id after Story 2.25
     // For now, routing_id column doesn't exist in boms table yet
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    
     const { count } = await (supabase as any)
       .from('boms')
       .select('id', { count: 'exact', head: true })
