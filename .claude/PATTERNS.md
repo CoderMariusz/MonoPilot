@@ -1,124 +1,64 @@
-# MonoPilot - Code Patterns Reference
+# Patterns
 
-> **UWAGA**: Ten plik jest REFERENCJĄ. AI powinno go czytać TYLKO gdy:
-> - Tworzy nowy API endpoint
-> - Tworzy nową migrację/RLS
-> - Tworzy nowy komponent z Supabase
-> - Pisze nowe testy E2E
+## Overview
+Common patterns used across the agent methodology.
 
----
+## Code Patterns
 
-## RLS Policy Pattern
-```sql
-ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
+### Naming Conventions
+- Files: `kebab-case.md`
+- Agents: `UPPER-CASE.md`
+- Variables: `camelCase`
+- Constants: `UPPER_SNAKE_CASE`
 
-CREATE POLICY "Enable read for authenticated users"
-  ON table_name FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Enable insert for authenticated users"
-  ON table_name FOR INSERT TO authenticated WITH CHECK (true);
-
-CREATE POLICY "Enable update for authenticated users"
-  ON table_name FOR UPDATE TO authenticated
-  USING (true) WITH CHECK (true);
-
-CREATE POLICY "Enable delete for authenticated users"
-  ON table_name FOR DELETE TO authenticated USING (true);
+### File Organization
+```
+component/
+  ├── index.ts          # Main export
+  ├── component.ts      # Implementation
+  ├── component.test.ts # Tests
+  ├── types.ts          # Types
+  └── utils.ts          # Utilities
 ```
 
----
+## Documentation Patterns
 
-## API Route Pattern
-```typescript
-// apps/frontend/src/app/api/[resource]/route.ts
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-
-export async function GET() {
-  const supabase = await createClient()
-  const { data, error } = await supabase.from('table_name').select('*')
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
-}
-
-export async function POST(request: Request) {
-  const supabase = await createClient()
-  const body = await request.json()
-  const { data, error } = await supabase.from('table_name').insert(body).select()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data, { status: 201 })
-}
+### Markdown Headers
+```markdown
+# Title (H1) - One per document
+## Section (H2)
+### Subsection (H3)
 ```
 
----
-
-## Component Pattern
-```typescript
-'use client'
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-
-export default function Component() {
-  const [data, setData] = useState([])
-  const supabase = createClient()
-
-  useEffect(() => { fetchData() }, [])
-
-  async function fetchData() {
-    const { data } = await supabase.from('table').select('*')
-    setData(data || [])
-  }
-
-  return <div>{/* UI */}</div>
-}
+### Tables
+```markdown
+| Column 1 | Column 2 |
+|----------|----------|
+| Data | Data |
 ```
 
----
-
-## E2E Test Pattern
-```typescript
-import { test, expect } from '@playwright/test'
-import { createTestOrganization, createTestUser } from './fixtures/test-setup'
-
-test.describe('Feature X', () => {
-  test('should do something', async ({ page, context, baseURL }) => {
-    const { orgId } = await createTestOrganization()
-    const { userId, token } = await createTestUser(orgId)
-
-    await context.addCookies([{
-      name: 'sb-auth',
-      value: token,
-      domain: new URL(baseURL!).hostname,
-      path: '/',
-    }])
-
-    await page.goto('/page-url')
-    await expect(page.locator('selector')).toBeVisible()
-  })
-})
+### Checklists
+```markdown
+- [ ] Todo item
+- [x] Completed item
 ```
 
-### Test Fixtures (test-setup.ts)
-- `createTestOrganization()` - zwraca orgId
-- `createTestUser(orgId)` - tworzy user + JWT
-- `createTestWarehouses(orgId)` - 2 magazyny
-- `createTestProducts(orgId, count)` - produkty
-- `cleanupTestData(orgId)` - cleanup
+## Communication Patterns
 
----
-
-## Server Actions Pattern (alternatywa dla API)
-```typescript
-'use server'
-import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
-
-export async function createItem(formData: FormData) {
-  const supabase = await createClient()
-  const { error } = await supabase.from('items').insert({
-    name: formData.get('name')
-  })
-  if (error) throw new Error(error.message)
-  revalidatePath('/items')
-}
+### Status Updates
+```markdown
+**Status:** {In Progress | Blocked | Complete}
+**Progress:** {X}%
+**Next:** {next action}
 ```
+
+### Handoff Format
+```markdown
+From: {agent}
+To: {agent}
+Artifact: {what}
+Context: {summary}
+```
+
+## Reference
+See `.claude/patterns/` for detailed pattern documentation.

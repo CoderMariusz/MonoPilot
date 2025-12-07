@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.9" epic="6" batch="06A-2">
+  <summary>Track investigation and resolution for quality holds with root cause and corrective actions.</summary>
+
+  <tables>
+    <table name="quality_holds" operation="update"/>
+    <table name="hold_investigation_notes" operation="create"/>
+  </tables>
+
+  <components>
+    <component name="HoldInvestigationPanel.tsx" type="modal"/>
+    <component name="HoldDetailPage.tsx" type="page"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/holds/:id/investigation" method="PUT"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.6"/>
+  </dependencies>
+</story-context>

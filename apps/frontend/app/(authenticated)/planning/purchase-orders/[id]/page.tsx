@@ -49,6 +49,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { POLinesTable } from '@/components/planning/POLinesTable'
 import { PlanningHeader } from '@/components/planning/PlanningHeader'
+import { CreateASNModal } from '@/components/warehouse/CreateASNModal'
 
 interface Supplier {
   id: string
@@ -132,6 +133,7 @@ export default function PurchaseOrderDetailsPage({
   const [approvalComments, setApprovalComments] = useState('')
   const [submittingApproval, setSubmittingApproval] = useState(false)
   const [statusChanging, setStatusChanging] = useState(false)
+  const [createASNModalOpen, setCreateASNModalOpen] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -439,18 +441,27 @@ export default function PurchaseOrderDetailsPage({
 
       <div className="px-6 py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/planning/purchase-orders')}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          <h1 className="text-2xl font-bold">{po.po_number}</h1>
-          {getStatusBadge(po.status)}
-          {getApprovalBadge(po.approval_status)}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/planning/purchase-orders')}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <h1 className="text-2xl font-bold">{po.po_number}</h1>
+            {getStatusBadge(po.status)}
+            {getApprovalBadge(po.approval_status)}
+          </div>
+
+          {/* Create ASN Button - only for confirmed+ POs */}
+          {['confirmed', 'approved', 'partially_received', 'received'].includes(po.status) && (
+            <Button onClick={() => setCreateASNModalOpen(true)}>
+              Create ASN
+            </Button>
+          )}
         </div>
 
       {/* Tabs */}
@@ -792,6 +803,20 @@ export default function PurchaseOrderDetailsPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create ASN Modal */}
+      <CreateASNModal
+        open={createASNModalOpen}
+        onClose={() => setCreateASNModalOpen(false)}
+        onSuccess={() => {
+          setCreateASNModalOpen(false)
+          toast({
+            title: 'Success',
+            description: 'ASN created successfully',
+          })
+        }}
+        preSelectedPOId={po.id}
+      />
       </div>
     </div>
   )

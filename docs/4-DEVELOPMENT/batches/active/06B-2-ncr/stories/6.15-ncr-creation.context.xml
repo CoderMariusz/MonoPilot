@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.15" epic="6" batch="06B-2">
+  <summary>Create Non-Conformance Reports to document quality issues with severity tracking.</summary>
+
+  <tables>
+    <table name="non_conformance_reports" operation="create"/>
+  </tables>
+
+  <components>
+    <component name="CreateNCRModal.tsx" type="modal"/>
+    <component name="NCRPage.tsx" type="page"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/ncrs" method="POST"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="Epic 1"/>
+  </dependencies>
+</story-context>

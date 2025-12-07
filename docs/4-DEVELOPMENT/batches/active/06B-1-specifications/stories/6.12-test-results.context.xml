@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.12" epic="6" batch="06B-1">
+  <summary>Record test results against LPs with auto pass/fail determination and override option.</summary>
+
+  <tables>
+    <table name="test_results" operation="create"/>
+    <table name="license_plates" operation="read"/>
+    <table name="product_specifications" operation="read"/>
+  </tables>
+
+  <components>
+    <component name="TestResultsPage.tsx" type="page"/>
+    <component name="TestResultFormModal.tsx" type="modal"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/test-results" method="POST"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.10"/>
+  </dependencies>
+</story-context>

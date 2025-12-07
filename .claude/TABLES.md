@@ -1,332 +1,280 @@
-# Database Tables - Quick Schema Reference
-
-> AI: Użyj tego zamiast czytać migracje SQL
-
----
+# Database Tables Reference
 
 ## Core Tables
 
 ### organizations
-```
-id, name, slug, settings (jsonb),
-wizard_completed, wizard_step, logo_url,
-created_at, updated_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Organization ID |
+| company_name | VARCHAR(100) | - | Nazwa firmy |
+| nip_vat | VARCHAR(50) | - | NIP/VAT |
+| timezone | VARCHAR(50) | - | IANA timezone |
+| default_currency | VARCHAR(3) | - | ISO 4217 (PLN/EUR/USD/GBP) |
+| default_language | VARCHAR(2) | - | ISO 639-1 (PL/EN) |
 
 ### users
-```
-id, email, first_name, last_name, role, org_id,
-status (invited/active/inactive), last_login_at,
-created_by, updated_by, created_at, updated_at
-```
-
-### user_sessions
-```
-id, user_id, token, ip_address, user_agent,
-expires_at, created_at
-```
-
-### user_invitations
-```
-id, email, role, org_id, invited_by,
-token, status, expires_at, created_at
-```
-
-### user_preferences
-```
-id, user_id, preferences (jsonb), created_at, updated_at
-```
-
-### activity_logs
-```
-id, org_id, user_id, action, entity_type, entity_id,
-details (jsonb), created_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | auth.users(id) | User ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| email | VARCHAR(255) | - | Email |
+| role | VARCHAR(20) | - | admin/manager/operator/planner/etc. |
+| status | VARCHAR(20) | - | invited/active/inactive |
 
 ---
 
-## Settings Tables
+## Warehouse Management
 
 ### warehouses
-```
-id, org_id, name, code, address, is_active,
-is_default, created_at, updated_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Warehouse ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| code | VARCHAR(50) | - | Unique code per org |
+| name | VARCHAR(100) | - | Display name |
+| default_receiving_location_id | UUID FK | locations(id) | Default receiving |
+| default_shipping_location_id | UUID FK | locations(id) | Default shipping |
+| is_active | BOOLEAN | - | Soft delete |
 
 ### locations
-```
-id, org_id, warehouse_id, name, code, type,
-is_active, created_at, updated_at
-```
-
-### machines
-```
-id, org_id, name, code, type, status,
-is_active, created_at, updated_at
-```
-
-### machine_line_assignments
-```
-id, machine_id, line_id, is_primary, created_at
-```
-
-### production_lines
-```
-id, org_id, warehouse_id, name, code,
-is_active, created_at, updated_at
-```
-
-### allergens
-```
-id, org_id, name, code, description, eu_code,
-is_eu_standard, is_active, created_at, updated_at
-```
-
-### tax_codes
-```
-id, org_id, name, code, rate, description,
-is_default, is_active, created_at, updated_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Location ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| warehouse_id | UUID FK | warehouses(id) | Parent warehouse |
+| code | VARCHAR(50) | - | Unique per warehouse |
+| type | VARCHAR(20) | - | receiving/production/storage/shipping/transit/quarantine |
+| barcode | VARCHAR(100) | - | Auto-generated LOC-{code}-{seq} |
+| zone | VARCHAR(100) | - | Optional zone |
+| capacity | DECIMAL(10,2) | - | Optional capacity |
+| is_active | BOOLEAN | - | Soft delete |
 
 ---
 
-## Technical Tables
+## Products & BOMs
 
 ### products
-```
-id, org_id, name, sku, description, type,
-unit_of_measure, cost, price, status,
-is_active, created_at, updated_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Product ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| code | TEXT | - | Immutable, unique per org |
+| name | TEXT | - | Display name |
+| type | product_type | - | RM/WIP/FG/PKG/BP/CUSTOM |
+| uom | TEXT | - | Unit of measure |
+| version | NUMERIC(4,1) | - | Auto-incremented (1.0 → 1.1 → 2.0) |
+| status | TEXT | - | active/inactive/obsolete |
 
-### product_version_history
-```
-id, product_id, version, changes (jsonb),
-changed_by, created_at
-```
-
-### product_allergens
-```
-id, product_id, allergen_id, level (contains/may_contain/free),
-created_at
-```
-
-### product_type_config
-```
-id, org_id, type_code, name, settings (jsonb),
-is_active, created_at, updated_at
-```
-
-### technical_settings
-```
-id, org_id, settings (jsonb), created_at, updated_at
-```
-
-### boms (Bill of Materials)
-```
-id, org_id, product_id, routing_id, version, status,
-output_qty, output_uom, effective_from, effective_to,
-units_per_box, boxes_per_pallet, notes,
-created_by, updated_by, created_at, updated_at
-```
+### boms
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | BOM ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| product_id | UUID FK | products(id) | Output product |
+| version | VARCHAR(10) | - | Version (e.g., 1.0) |
+| effective_from | DATE | - | Start date |
+| effective_to | DATE | - | End date (nullable) |
+| status | bom_status | - | draft/active/phased_out/inactive |
+| output_qty | DECIMAL(10,3) | - | Output quantity |
 
 ### bom_items
-```
-id, bom_id, component_id, operation_seq, is_output,
-quantity, uom, scrap_percent, sequence,
-line_ids (uuid[]), consume_whole_lp, notes,
-created_at, updated_at
-```
-
-### bom_item_alternatives
-```
-id, bom_item_id, alternative_component_id,
-priority, quantity_ratio, notes, created_at
-```
-
-### bom_production_lines
-```
-id, bom_id, line_id, labor_cost_per_hour, created_at
-```
-
-### routings
-```
-id, org_id, name, code, description,
-is_active, created_at, updated_at
-```
-
-### routing_operations
-```
-id, routing_id, name, sequence, duration,
-machine_id, line_id, instructions,
-created_at, updated_at
-```
-
-### product_routings
-```
-id, product_id, routing_id, is_default, created_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Item ID |
+| bom_id | UUID FK | boms(id) | Parent BOM |
+| product_id | UUID FK | products(id) | Input material |
+| quantity | DECIMAL(10,3) | - | Required quantity |
+| uom | TEXT | - | Unit of measure |
+| scrap_percent | DECIMAL(5,2) | - | 0-100% |
+| is_by_product | BOOLEAN | - | Output by-product flag |
+| yield_percent | DECIMAL(5,2) | - | By-product yield % |
+| consume_whole_lp | BOOLEAN | - | Consume entire LP flag |
 
 ---
 
-## Planning Tables
-
-### suppliers
-```
-id, org_id, name, code, contact_name, email, phone,
-address, is_active, created_at, updated_at
-```
-
-### supplier_products
-```
-id, supplier_id, product_id, supplier_sku,
-lead_time_days, min_order_qty, price,
-created_at, updated_at
-```
-
-### purchase_orders
-```
-id, org_id, supplier_id, po_number, status,
-order_date, expected_date, total_amount,
-notes, created_at, updated_at
-```
-
-### po_lines
-```
-id, po_id, product_id, quantity, unit_price,
-received_qty, status, created_at, updated_at
-```
-
-### po_approvals
-```
-id, org_id, po_id, status (pending/approved/rejected),
-approved_by (FK users), approved_at, rejection_reason,
-comments, created_at
-```
-
-### po_status_history
-```
-id, po_id, status, changed_by, created_at
-```
-
-### planning_settings
-```
-id, org_id, settings (jsonb), created_at, updated_at
-```
+## Work Orders & Production
 
 ### work_orders
-```
-id, org_id, wo_number, product_id, bom_id, routing_id,
-quantity, status, scheduled_start, scheduled_end,
-actual_start, actual_end, line_id,
-created_at, updated_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | WO ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| wo_number | VARCHAR(50) | - | Unique WO number |
+| product_id | UUID FK | products(id) | Product to produce |
+| planned_quantity | DECIMAL(12,3) | - | Planned qty |
+| produced_quantity | DECIMAL(12,3) | - | Actual produced |
+| status | VARCHAR(20) | - | draft/released/in_progress/completed/closed/cancelled |
+| bom_id | UUID FK | boms(id) | BOM snapshot |
+| is_over_produced | BOOLEAN | - | Over-production flag |
+| over_production_qty | DECIMAL(15,6) | - | Over-production quantity |
 
 ### wo_materials
-```
-id, org_id, work_order_id, product_id, product_code, product_name,
-quantity_per, quantity_required, quantity_issued, consumed_qty, uom,
-bom_id, bom_item_id, line_number, consume_whole_lp,
-created_at, updated_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Material line ID |
+| organization_id | UUID FK | organizations(id) | Multi-tenancy |
+| work_order_id | UUID FK | work_orders(id) | Parent WO |
+| product_id | UUID FK | products(id) | Material product |
+| quantity_required | DECIMAL(15,6) | - | Total required |
+| quantity_issued | DECIMAL(15,6) | - | Issued/consumed |
+| quantity_reserved | DECIMAL(15,6) | - | Reserved quantity |
+| bom_item_id | UUID FK | bom_items(id) | Original BOM item |
 
 ### wo_operations
-```
-id, wo_id, operation_id, sequence, status,
-planned_duration, actual_duration,
-started_at, completed_at, created_at, updated_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Operation ID |
+| organization_id | UUID FK | organizations(id) | Multi-tenancy |
+| work_order_id | UUID FK | work_orders(id) | Parent WO |
+| operation_number | INTEGER | - | Sequence number |
+| operation_name | VARCHAR(255) | - | Operation name |
+| work_center_id | UUID FK | machines(id) | Work center |
+| status | VARCHAR(20) | - | pending/in_progress/completed/skipped |
+| quantity_completed | DECIMAL(15,3) | - | Completed qty |
+
+### wo_material_reservations
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Reservation ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy (uses org_id) |
+| wo_material_id | UUID FK | wo_materials(id) | Material line |
+| work_order_id | UUID FK | work_orders(id) | Parent WO |
+| lp_id | UUID FK | license_plates(id) | Reserved LP |
+| reserved_qty | DECIMAL(15,6) | - | Reserved quantity |
+| status | VARCHAR(20) | - | pending/confirmed/consumed/cancelled |
+| reserved_at | TIMESTAMPTZ | - | Reservation timestamp |
+| reserved_by | UUID FK | users(id) | Reserved by user |
 
 ### wo_consumption
-```
-id, org_id, wo_id, material_id, reservation_id, lp_id,
-consumed_qty, uom, consumed_by_user_id, consumed_at,
-operation_id, status (consumed/reversed),
-reversed_at, reversed_by_user_id, reverse_reason,
-notes, created_at, updated_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Consumption ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| wo_id | UUID FK | work_orders(id) | Work order |
+| material_id | UUID FK | wo_materials(id) | Material line |
+| lp_id | UUID FK | license_plates(id) | License plate |
+| consumed_qty | DECIMAL(15,6) | - | Consumed quantity |
+| status | VARCHAR(20) | - | consumed/reversed |
+| reversed_at | TIMESTAMPTZ | - | Reversal timestamp |
+| output_id | UUID FK | production_outputs(id) | Linked output |
 
-### lp_movements
-```
-id, org_id, lp_id, movement_type,
-qty_change, qty_before, qty_after, uom,
-wo_id, po_id, consumption_id,
-created_by_user_id, created_at, notes
-```
-
-### transfer_orders
-```
-id, org_id, to_number, status,
-from_warehouse_id, to_warehouse_id,
-planned_ship_date, planned_receive_date,
-actual_ship_date, actual_receive_date,
-notes, created_by, updated_by,
-created_at, updated_at
-```
-
-### to_lines
-```
-id, to_id, product_id, quantity, received_qty,
-status, created_at, updated_at
-```
-
-### to_line_lps
-```
-id, to_line_id, lp_id, quantity, created_at
-```
-
-### to_status_history
-```
-id, to_id, status, changed_by, created_at
-```
+### production_outputs
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Output ID |
+| organization_id | UUID FK | organizations(id) | Multi-tenancy |
+| wo_id | UUID FK | work_orders(id) | Work order |
+| lp_id | UUID FK | license_plates(id) | Output LP |
+| output_number | INTEGER | - | Sequential per WO (1,2,3...) |
+| quantity | DECIMAL(15,6) | - | Output quantity |
+| is_over_production | BOOLEAN | - | Over-production flag |
+| qa_status | VARCHAR(20) | - | pass/fail/pending |
 
 ---
 
-## Warehouse Tables
+## License Plates & Traceability
 
 ### license_plates
-```
-id, org_id, lp_number, product_id, quantity,
-status, location_id, expiry_date,
-lot_number, batch_number,
-created_at, updated_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | LP ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| lp_number | VARCHAR(50) | - | Unique LP number |
+| product_id | UUID FK | products(id) | Product |
+| current_qty | DECIMAL(15,6) | - | Current quantity |
+| location_id | UUID FK | locations(id) | Current location |
+| consumed_by_wo_id | UUID FK | work_orders(id) | Consuming WO |
+| consumed_at | TIMESTAMPTZ | - | Consumption timestamp |
 
 ### lp_genealogy
-```
-id, parent_lp_id, child_lp_id, relationship_type,
-quantity, created_at
-```
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Genealogy ID |
+| parent_lp_id | UUID FK | license_plates(id) | Output LP |
+| child_lp_id | UUID FK | license_plates(id) | Input LP |
+| quantity_used | DECIMAL(15,6) | - | Used quantity |
+| work_order_id | UUID FK | work_orders(id) | WO context |
+| status | VARCHAR(20) | - | active/reversed |
+| is_over_production | BOOLEAN | - | Over-production flag |
 
-### traceability_links
-```
-id, org_id, source_type, source_id,
-target_type, target_id, link_type,
-quantity, created_at
-```
-
-### recall_simulations
-```
-id, org_id, name, criteria (jsonb),
-results (jsonb), created_at
-```
+### lp_movements
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Movement ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| lp_id | UUID FK | license_plates(id) | License plate |
+| movement_type | VARCHAR(30) | - | creation/receipt/consumption/reversal/adjustment/transfer |
+| qty_change | DECIMAL(15,6) | - | Quantity delta |
+| qty_before | DECIMAL(15,6) | - | Before qty |
+| qty_after | DECIMAL(15,6) | - | After qty |
 
 ---
 
-## Common Patterns
+## Planning & Receiving
 
-### Wszystkie tabele mają:
-- `id` - UUID primary key
-- `org_id` - FK do organizations (multi-tenant)
-- `created_at`, `updated_at` - timestamps
+### asn
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | ASN ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| asn_number | VARCHAR(50) | - | Unique per org |
+| po_id | UUID FK | purchase_orders(id) | Purchase order |
+| supplier_id | UUID FK | suppliers(id) | Supplier |
+| warehouse_id | UUID FK | warehouses(id) | Target warehouse |
+| expected_arrival_date | DATE | - | Expected arrival |
+| carrier | VARCHAR(100) | - | Carrier name |
+| tracking_number | VARCHAR(100) | - | Tracking number |
+| status | VARCHAR(20) | - | draft/submitted/receiving/received/cancelled |
+| notes | TEXT | - | Additional notes |
+| created_by | UUID FK | users(id) | Creator |
 
-### RLS Pattern:
-```sql
--- Wszystkie tabele: authenticated users only
-USING (true) / WITH CHECK (true)
-```
+### asn_items
+| Kolumna | Typ | Relacje | Opis |
+|---------|-----|---------|------|
+| id | UUID PK | - | Item ID |
+| org_id | UUID FK | organizations(id) | Multi-tenancy |
+| asn_id | UUID FK | asn(id) | Parent ASN |
+| sequence | INTEGER | - | Line sequence (auto-increment) |
+| po_line_id | UUID FK | po_lines(id) | PO line reference |
+| product_id | UUID FK | products(id) | Product |
+| expected_qty | DECIMAL(15,6) | - | Expected quantity |
+| received_qty | DECIMAL(15,6) | - | Actual received |
+| uom | VARCHAR(20) | - | Unit of measure |
+| supplier_batch_number | VARCHAR(100) | - | External batch/lot |
+| manufacture_date | DATE | - | Manufacture date |
+| expiry_date | DATE | - | Expiry date |
+| created_at | TIMESTAMPTZ | - | Creation timestamp |
+| updated_at | TIMESTAMPTZ | - | Update timestamp |
 
-### Status Enums:
-- **PO/TO/WO**: draft, pending, approved, in_progress, completed, cancelled
-- **Products**: active, inactive, discontinued
-- **LP**: available, reserved, consumed, expired
+---
+
+## Quick Lookup Patterns
+
+### Multi-tenancy
+Wszystkie tabele mają `org_id UUID FK → organizations(id)` + RLS policy
+
+### Soft Delete
+`is_active BOOLEAN` lub `deleted_at TIMESTAMPTZ`
+
+### Audit Trail
+`created_by`, `updated_by`, `created_at`, `updated_at`
+
+### Org Column Naming (UWAGA!)
+Niektóre tabele używają różnych nazw:
+| Tabela | Kolumna |
+|--------|---------|
+| wo_materials | organization_id |
+| wo_operations | organization_id |
+| production_outputs | organization_id |
+| wo_consumption | org_id |
+| wo_material_reservations | org_id |
+| lp_movements | org_id |
+
+### Status Enums
+- `users.role`: admin/manager/operator/viewer/planner/technical/purchasing/warehouse/qc/finance
+- `users.status`: invited/active/inactive
+- `locations.type`: receiving/production/storage/shipping/transit/quarantine
+- `products.type`: RM/WIP/FG/PKG/BP/CUSTOM
+- `boms.status`: draft/active/phased_out/inactive
+- `work_orders.status`: draft/released/in_progress/completed/closed/cancelled
+- `asn.status`: draft/submitted/receiving/received/cancelled

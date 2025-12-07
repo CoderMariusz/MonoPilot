@@ -41,6 +41,7 @@ interface POLine {
   quantity: number
   unit_price: number
   discount_percent: number
+  tax_rate?: number
   expected_delivery_date: string | null
 }
 
@@ -64,6 +65,7 @@ export function POLineFormModal({
     quantity: line?.quantity?.toString() || '1',
     unit_price: line?.unit_price?.toString() || '0',
     discount_percent: line?.discount_percent?.toString() || '0',
+    tax_rate: line?.tax_rate?.toString() || '0',
     expected_delivery_date: line?.expected_delivery_date
       ? new Date(line.expected_delivery_date).toISOString().split('T')[0]
       : '',
@@ -158,6 +160,11 @@ export function POLineFormModal({
       newErrors.discount_percent = 'Discount must be between 0 and 100'
     }
 
+    const tax_rate = parseFloat(formData.tax_rate)
+    if (isNaN(tax_rate) || tax_rate < 0 || tax_rate > 100) {
+      newErrors.tax_rate = 'Tax rate must be between 0 and 100'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -184,6 +191,7 @@ export function POLineFormModal({
         quantity: parseFloat(formData.quantity),
         unit_price: parseFloat(formData.unit_price),
         discount_percent: parseFloat(formData.discount_percent),
+        tax_rate: parseFloat(formData.tax_rate),
         expected_delivery_date: formData.expected_delivery_date || null,
       }
 
@@ -225,10 +233,13 @@ export function POLineFormModal({
   const quantity = parseFloat(formData.quantity) || 0
   const unit_price = parseFloat(formData.unit_price) || 0
   const discount_percent = parseFloat(formData.discount_percent) || 0
+  const tax_rate = parseFloat(formData.tax_rate) || 0
 
   const line_subtotal = quantity * unit_price
   const discount_amount = line_subtotal * (discount_percent / 100)
-  const line_total = line_subtotal - discount_amount
+  const after_discount = line_subtotal - discount_amount
+  const tax_amount = after_discount * (tax_rate / 100)
+  const line_total = after_discount + tax_amount
 
   const selectedProduct = products.find((p) => p.id === formData.product_id)
 
@@ -333,6 +344,23 @@ export function POLineFormModal({
             )}
           </div>
 
+          {/* Tax Rate */}
+          <div className="space-y-2">
+            <Label htmlFor="tax_rate">Tax Rate %</Label>
+            <Input
+              id="tax_rate"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={formData.tax_rate}
+              onChange={(e) => handleChange('tax_rate', e.target.value)}
+            />
+            {errors.tax_rate && (
+              <p className="text-sm text-red-500">{errors.tax_rate}</p>
+            )}
+          </div>
+
           {/* Expected Delivery Date */}
           <div className="space-y-2">
             <Label htmlFor="expected_delivery_date">Expected Delivery Date</Label>
@@ -353,6 +381,12 @@ export function POLineFormModal({
 
               <div className="text-gray-600">Discount Amount:</div>
               <div className="text-right">-{discount_amount.toFixed(2)}</div>
+
+              <div className="text-gray-600">After Discount:</div>
+              <div className="text-right">{after_discount.toFixed(2)}</div>
+
+              <div className="text-gray-600">Tax Amount ({tax_rate}%):</div>
+              <div className="text-right">+{tax_amount.toFixed(2)}</div>
 
               <div className="text-gray-600 font-medium">Line Total:</div>
               <div className="text-right font-medium">{line_total.toFixed(2)}</div>

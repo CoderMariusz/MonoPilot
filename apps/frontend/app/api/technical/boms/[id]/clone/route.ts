@@ -162,7 +162,7 @@ export async function POST(
       .from('boms')
       .select(`
         *,
-        product:products!product_id (
+        product:products (
           id,
           code,
           name,
@@ -171,7 +171,7 @@ export async function POST(
         ),
         items:bom_items (
           *,
-          product:products!product_id (
+          product:products (
             id,
             code,
             name,

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.1" epic="6" batch="06A-1">
+  <summary>Enable QC users to assign and track QA status on every LP with audit trail.</summary>
+
+  <tables>
+    <table name="license_plates" operation="update"/>
+    <table name="qa_status_changes" operation="create"/>
+  </tables>
+
+  <components>
+    <component name="LPQAStatusModal.tsx" type="modal"/>
+    <component name="LPDetailPage.tsx" type="page"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/warehouse/license-plates/:id/qa-status" method="PUT"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="Epic 5 (LP)"/>
+  </dependencies>
+</story-context>

@@ -56,7 +56,7 @@ export async function GET(
         routing_id,
         units_per_box,
         boxes_per_pallet,
-        product:products!product_id (
+        product:products (
           id,
           code,
           name,

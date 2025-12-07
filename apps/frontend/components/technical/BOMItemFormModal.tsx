@@ -45,6 +45,12 @@ interface BOMItem {
   line_ids?: string[] | null
   consume_whole_lp: boolean
   notes?: string | null
+  // Story 2.13: By-products
+  is_by_product: boolean
+  yield_percent?: number | null
+  // Story 2.12: Conditional items
+  condition_flags?: string[] | null
+  condition_logic?: 'AND' | 'OR' | null
 }
 
 interface BOMItemFormModalProps {
@@ -65,6 +71,12 @@ export function BOMItemFormModal({ bomId, item, onClose, onSuccess }: BOMItemFor
     sequence: item?.sequence?.toString() || '',
     consume_whole_lp: item?.consume_whole_lp || false,
     notes: item?.notes || '',
+    // Story 2.13: By-products
+    is_by_product: item?.is_by_product || false,
+    yield_percent: item?.yield_percent?.toString() || '',
+    // Story 2.12: Conditional items
+    condition_flags: item?.condition_flags?.join(', ') || '',
+    condition_logic: item?.condition_logic || 'AND',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -150,6 +162,14 @@ export function BOMItemFormModal({ bomId, item, onClose, onSuccess }: BOMItemFor
       newErrors.scrap_percent = 'Scrap percent must be between 0 and 100'
     }
 
+    // Story 2.13: Validate yield_percent when is_by_product is true
+    if (formData.is_by_product) {
+      const yieldPercent = parseFloat(formData.yield_percent)
+      if (isNaN(yieldPercent) || yieldPercent < 0 || yieldPercent > 100) {
+        newErrors.yield_percent = 'Yield percent must be between 0 and 100'
+      }
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -178,6 +198,14 @@ export function BOMItemFormModal({ bomId, item, onClose, onSuccess }: BOMItemFor
         is_output: formData.is_output,
         consume_whole_lp: formData.consume_whole_lp,
         notes: formData.notes || null,
+        // Story 2.13: By-products
+        is_by_product: formData.is_by_product,
+        yield_percent: formData.is_by_product ? parseFloat(formData.yield_percent) : null,
+        // Story 2.12: Conditional items
+        condition_flags: formData.condition_flags
+          ? formData.condition_flags.split(',').map(f => f.trim()).filter(f => f)
+          : null,
+        condition_logic: formData.condition_flags?.trim() ? formData.condition_logic : null,
       }
 
       if (!isEditMode) {
@@ -387,6 +415,91 @@ export function BOMItemFormModal({ bomId, item, onClose, onSuccess }: BOMItemFor
                 Consume Whole License Plate (LP)
               </Label>
             </div>
+          </div>
+
+          {/* Story 2.13: By-Product Settings */}
+          <div className="space-y-3 pt-2 border-t">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="is_by_product"
+                checked={formData.is_by_product}
+                onCheckedChange={(checked) => handleChange('is_by_product', checked === true)}
+              />
+              <Label htmlFor="is_by_product" className="text-sm font-normal cursor-pointer">
+                By-Product (output produced alongside main product)
+              </Label>
+            </div>
+
+            {formData.is_by_product && (
+              <div className="ml-6 space-y-2">
+                <Label htmlFor="yield_percent">
+                  Yield Percent <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="yield_percent"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={formData.yield_percent}
+                  onChange={(e) => handleChange('yield_percent', e.target.value)}
+                  placeholder="e.g., 5.0"
+                  className={errors.yield_percent ? 'border-red-500' : ''}
+                />
+                {errors.yield_percent && <p className="text-sm text-red-500">{errors.yield_percent}</p>}
+                <p className="text-xs text-gray-500">
+                  Expected yield as % of main output (e.g., 5% = 5kg by-product per 100kg main output)
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Story 2.12: Conditional Item Settings */}
+          <div className="space-y-3 pt-2 border-t">
+            <Label>Conditional Flags (Story 2.12)</Label>
+            <Input
+              id="condition_flags"
+              value={formData.condition_flags}
+              onChange={(e) => handleChange('condition_flags', e.target.value)}
+              placeholder="e.g., organic, vegan, kosher"
+            />
+            <p className="text-xs text-gray-500">
+              Comma-separated flags. Item only consumed when WO matches these conditions.
+            </p>
+
+            {formData.condition_flags && (
+              <div className="flex items-center gap-4 ml-2">
+                <Label className="text-sm">Match Logic:</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    id="logic_and"
+                    name="condition_logic"
+                    value="AND"
+                    checked={formData.condition_logic === 'AND'}
+                    onChange={() => handleChange('condition_logic', 'AND')}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="logic_and" className="text-sm font-normal cursor-pointer">
+                    AND (all flags must match)
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    id="logic_or"
+                    name="condition_logic"
+                    value="OR"
+                    checked={formData.condition_logic === 'OR'}
+                    onChange={() => handleChange('condition_logic', 'OR')}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="logic_or" className="text-sm font-normal cursor-pointer">
+                    OR (any flag matches)
+                  </Label>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notes */}

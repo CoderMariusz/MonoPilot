@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.2" epic="6" batch="06A-1">
+  <summary>Enforce valid QA status transitions with state machine rules and manager override.</summary>
+
+  <tables>
+    <table name="license_plates" operation="update"/>
+  </tables>
+
+  <components>
+    <component name="LPQAStatusModal.tsx" type="modal"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/warehouse/license-plates/:id/qa-status" method="PUT"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.1"/>
+  </dependencies>
+</story-context>

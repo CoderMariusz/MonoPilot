@@ -13,6 +13,8 @@
 | **Settings** | `app/(authenticated)/settings/` | `components/settings/` | `app/api/settings/` |
 | **Planning** | `app/(authenticated)/planning/` | `components/planning/` | `app/api/planning/` |
 | **Technical** | `app/(authenticated)/technical/` | `components/technical/` | `app/api/technical/` |
+| **Production** | `app/(authenticated)/production/` | `components/production/` | `app/api/production/` |
+| **Scanner** | `app/(authenticated)/scanner/` | `components/scanner/` | - |
 
 ---
 
@@ -78,6 +80,32 @@
 /dashboard/*           GET
 ```
 
+### Production (`/api/production/`)
+```
+/work-orders/[id]/materials    GET       → WOMaterialsTable
+/work-orders/[id]/operations   GET, PUT  → WOOperationsTable
+/work-orders/[id]/consumption  POST      → Material consumption
+/work-orders/[id]/output       POST      → Production output
+/work-orders/[id]/reservations GET, POST → Material reservations
+/scanner/*                     POST      → Scanner operations
+```
+
+### Warehouse (`/api/warehouse/`)
+```
+/license-plates                GET, POST → LPsTable, CreateLPModal
+/license-plates/[id]           GET, PUT  → LP detail page
+/license-plates/[id]/split     POST      → LPSplitModal (Story 5.5)
+/license-plates/merge          POST      → LPMergeModal (Story 5.6)
+/license-plates/[id]/genealogy GET       → LPGenealogyTree (Story 5.7)
+/license-plates/[id]/status    PUT       → LPStatusChangeModal
+/license-plates/[id]/print     POST      → Print label
+/license-plates/expiring       GET       → ExpiringLPsWidget
+/asns                          GET, POST → ASNsTable
+/asns/[id]                     GET, PUT  → ASN detail
+/grns                          GET, POST → GRNsTable
+/grns/[id]                     GET       → GRN detail
+```
+
 ---
 
 ## Components by Feature
@@ -136,6 +164,69 @@ routings/                    → Routing management
 GenealogyTree.tsx            → Traceability view
 LPNode.tsx                   → License plate node
 TechnicalHeader.tsx          → Module header
+```
+
+### Production
+```
+# WO Lifecycle (Stories 4.1-4.6)
+WOStartModal.tsx             → Start work order (4.2)
+WOPauseModal.tsx             → Pause work order (4.3)
+WOResumeModal.tsx            → Resume work order (4.3)
+PauseHistoryPanel.tsx        → Pause history view (4.3)
+WOCompleteModal.tsx          → Complete work order (4.6)
+WOOperationsPanel.tsx        → Operations panel view
+
+# Operations (Stories 4.4-4.5)
+OperationStartModal.tsx      → Start operation (4.4)
+OperationCompleteModal.tsx   → Complete operation (4.5)
+OperationTimeline.tsx        → Operation timeline (4.20)
+OperationTimelinePanel.tsx   → Timeline panel (4.20)
+
+# Materials & Reservation (Stories 4.7-4.8)
+MaterialReservationModal.tsx → Reserve materials (4.7)
+MaterialReservationsTable.tsx→ Reservations list (4.7)
+UnreserveConfirmDialog.tsx   → Confirm unreserve (4.7)
+
+# Consumption (Stories 4.9-4.11)
+ConsumeConfirmDialog.tsx     → Confirm consumption (4.9)
+ReverseConsumptionDialog.tsx → Reverse consumption (4.10)
+ConsumptionHistoryTable.tsx  → Consumption history (4.15)
+
+# Output (Stories 4.12-4.16)
+OutputRegistrationModal.tsx  → Register output (4.12)
+ByProductRegistrationDialog.tsx → By-product registration (4.14)
+```
+
+### Scanner (Pages - inline components)
+```
+# Note: Scanner uses inline components in page files, not separate component folder
+scanner/page.tsx             → Scanner home/menu
+scanner/reserve/page.tsx     → Material reservation scanner (Story 4.8)
+scanner/output/page.tsx      → Output registration scanner (Story 4.13)
+```
+
+### Warehouse
+```
+# LP Operations (Stories 5.5-5.7)
+LPSplitModal.tsx             → Split LP into multiple (Story 5.5)
+LPMergeModal.tsx             → Merge multiple LPs (Story 5.6)
+LPGenealogyTree.tsx          → Display LP genealogy tree (Story 5.7)
+LPStatusBadge.tsx            → LP status badge
+LPStatusChangeModal.tsx      → Change LP status
+CreateLPModal.tsx            → Create new LP
+LPFormModal.tsx              → Edit LP
+LPsTable.tsx                 → LP list table
+LPDetailPanel.tsx            → LP detail sidebar
+
+# ASN & Receiving (Stories 5.8-5.13)
+ASNsTable.tsx                → ASN list
+CreateASNModal.tsx           → Create ASN
+ASNItemsTable.tsx            → ASN items
+GRNsTable.tsx                → GRN list
+CreateGRNModal.tsx           → Create GRN
+ReceiveItemModal.tsx         → Receive item
+GRNItemsTable.tsx            → GRN items
+ExpiringLPsWidget.tsx        → Expiring LPs dashboard widget
 ```
 
 ### Common/UI

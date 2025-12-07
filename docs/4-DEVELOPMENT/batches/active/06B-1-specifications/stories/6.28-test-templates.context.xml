@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.28" epic="6" batch="06B-1">
+  <summary>Create reusable test templates for common tests with pre-filled specs.</summary>
+
+  <tables>
+    <table name="test_templates" operation="create"/>
+    <table name="product_specifications" operation="read"/>
+  </tables>
+
+  <components>
+    <component name="TestTemplatesPage.tsx" type="page"/>
+    <component name="TemplateFormModal.tsx" type="modal"/>
+    <component name="ApplyTemplateModal.tsx" type="modal"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/test-templates" method="POST"/>
+    <route path="/api/quality/test-templates" method="GET"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.10"/>
+  </dependencies>
+</story-context>

@@ -1,85 +1,83 @@
-# AI Prompts - Szablony
+# Prompts Reference
 
-> Kopiuj i wypełnij `[placeholdery]`
+## Agent Invocation Prompts
 
----
-
-## Quick Fix
+### Start New Project
 ```
-Fix: [opis błędu]
-Plik: [ścieżka:linia]
-NIE czytaj innych plików.
+Invoke ORCHESTRATOR to start a new project.
+Project: {name}
+Description: {description}
 ```
 
-## Nowy API Endpoint
+### Create PRD
 ```
-Dodaj [GET/POST/PUT/DELETE] /api/[module]/[resource]
-Tabela: [nazwa]
-Pola: [lista pól]
-Przeczytaj PATTERNS.md dla wzorca.
-```
-
-## Nowy Component
-```
-Dodaj komponent [nazwa] do [moduł]
-Funkcja: [opis]
-Bazuj na: [istniejący komponent jako wzorzec]
+Invoke PM-AGENT to create PRD.
+Requirements: {requirements}
+Stakeholders: {stakeholders}
 ```
 
-## Modyfikacja istniejącego
+### Design Architecture
 ```
-W pliku [ścieżka]
-Dodaj/Zmień: [co]
-NIE zmieniaj innych części.
-```
-
-## Bug z błędem
-```
-Błąd: [treść błędu]
-Grep "[keyword]" żeby znaleźć plik.
-NIE czytaj niepowiązanych plików.
+Invoke ARCHITECT-AGENT to design system.
+PRD: @docs/1-BASELINE/product/prd.md
+Constraints: {constraints}
 ```
 
-## Story Implementation
+### Plan Sprint
 ```
-/bmad:bmm:workflows:dev-story
-Story: [numer np. 4-1]
-```
-
-## Code Review (małe zmiany)
-```
-git diff --stat
-git diff [plik]
-Sprawdź tylko zmienione linie.
+Invoke SCRUM-MASTER to plan sprint.
+Backlog: @docs/2-MANAGEMENT/epics/current/
+Capacity: {capacity}
 ```
 
-## Code Review (duże zmiany >5 plików)
+### Implement Story
 ```
-/bmad:bmm:workflows:code-review
-```
-
-## Status Check
-```
-cat docs/sprint-artifacts/sprint-status.yaml | head -60
+Invoke {BACKEND-DEV|FRONTEND-DEV} to implement story.
+Story: {story reference}
+Design: {design reference}
 ```
 
-## Nowa migracja
+### Review Code
 ```
-Dodaj migrację dla [tabela/zmiana]
-Przeczytaj PATTERNS.md dla RLS.
-Lokalizacja: apps/frontend/lib/supabase/migrations/
+Invoke CODE-REVIEWER to review implementation.
+Code: {file references}
+Story: {story reference}
 ```
 
----
+## Query Prompts
 
-## Tips dla AI
+### Get Status
+```
+What is the current project status?
+Read @PROJECT-STATE.md
+```
 
-### Zanim zaczniesz:
-1. **Pytaj** o lokalizację jeśli nie wiesz
-2. **Grep** zamiast czytać wiele plików
-3. **Sprawdź** FILE-MAP.md dla struktury
-4. **Sprawdź** TABLES.md dla schematu DB
+### List Blockers
+```
+What are the current blockers?
+Check @.claude/state/TASK-QUEUE.md
+```
 
-### Po zakończeniu:
-1. **Update** sprint-status.yaml jeśli story done
-2. **Pokaż** tylko diff, nie cały plik
+### Review Decisions
+```
+What decisions have been made?
+Check @.claude/state/DECISION-LOG.md
+```
+
+## Update Prompts
+
+### Update State
+```
+Update PROJECT-STATE.md with:
+- Current phase: {phase}
+- Active sprint: {sprint}
+- Progress: {progress}
+```
+
+### Log Decision
+```
+Log decision in DECISION-LOG.md:
+- Decision: {decision}
+- Rationale: {rationale}
+- Impact: {impact}
+```

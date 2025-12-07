@@ -71,6 +71,12 @@ interface BOMItem {
   line_ids?: string[] | null
   consume_whole_lp: boolean
   notes?: string | null
+  // Story 2.13: By-products
+  is_by_product: boolean
+  yield_percent?: number | null
+  // Story 2.12: Conditional items
+  condition_flags?: string[] | null
+  condition_logic?: 'AND' | 'OR' | null
 }
 
 interface BOM {

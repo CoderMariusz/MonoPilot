@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.16" epic="6" batch="06B-2">
+  <summary>Track NCR through its lifecycle (open, investigating, corrective_action, closed) with timestamps and notes.</summary>
+
+  <tables>
+    <table name="non_conformance_reports" operation="update"/>
+  </tables>
+
+  <components>
+    <component name="NCRDetailPage.tsx" type="page"/>
+    <component name="NCRStatusModal.tsx" type="modal"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/ncrs/:id/status" method="PUT"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.15"/>
+  </dependencies>
+</story-context>
