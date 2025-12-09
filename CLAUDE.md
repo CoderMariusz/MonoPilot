@@ -1,14 +1,14 @@
-# CLAUDE.md
+# CLAUDE.md Template
 
-## Project: MonoPilot
+## Project: test-project
 
 ## Quick Context
-{Brief project description - fill this in}
+{Brief project description}
 
 ## Tech Stack
 - Backend: {technology}
 - Frontend: {technology}
-- Database: PostgreSQL
+- Database: {technology}
 
 ## Agent System
 This project uses the Agent Methodology Pack.
@@ -19,9 +19,9 @@ See `.claude/agents/ORCHESTRATOR.md` for entry point.
 - View state: `@PROJECT-STATE.md`
 
 ## Conventions
-- Language: other
-- {Add your coding conventions}
-- {Add your naming conventions}
+- {coding conventions}
+- {naming conventions}
+- {file organization}
 
 ## Current Sprint
 See `@PROJECT-STATE.md` for current sprint status.

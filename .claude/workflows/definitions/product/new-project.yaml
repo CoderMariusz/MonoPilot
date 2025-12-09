@@ -1,0 +1,125 @@
+# New Project Workflow
+# Full project setup from idea to sprint-ready state
+#
+# Documentation: @.claude/workflows/documentation/DISCOVERY-FLOW.md
+#                @.claude/workflows/documentation/EPIC-WORKFLOW.md
+
+name: new-project
+description: Complete workflow for new project initialization
+trigger: "new_project | major_feature | greenfield"
+
+# Expected duration: Multiple sessions
+# Parallelization: Limited (sequential dependencies)
+
+steps:
+  - id: discovery
+    agent: discovery-agent
+    type: new_project
+    depth: deep                  # Full discovery for new projects
+    description: "Gather requirements through structured interview"
+    input:
+      context_refs:
+        - "@CLAUDE.md"
+        - "@docs/1-BASELINE/product/project-brief.md"
+    output:
+      deliverable: "docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+      min_clarity: 60            # Min to proceed, but agent targets 85%
+    checkpoint:
+      - "Business context documented"
+      - "User personas identified"
+      - "Scope boundaries defined"
+    next: prd_creation
+    on_blocked: ask_user
+
+  - id: prd_creation
+    agent: pm-agent
+    type: create_prd
+    description: "Create Product Requirements Document"
+    input:
+      context_refs:
+        - "@docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+    output:
+      deliverable: "docs/1-BASELINE/product/prd.md"
+    checkpoint:
+      - "All requirements have MoSCoW priority"
+      - "Success metrics are SMART"
+      - "Scope is explicit (in/out/future)"
+    next: architecture
+    on_blocked: return_to_discovery
+
+  - id: architecture
+    agent: architect-agent
+    type: full_design
+    description: "Design architecture and break into epics/stories"
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+    output:
+      deliverables:
+        - "docs/1-BASELINE/architecture/system-overview.md"
+        - "docs/2-MANAGEMENT/epics/epic-01-*.md"
+    checkpoint:
+      - "All PRD requirements mapped to stories"
+      - "ADRs created for major decisions"
+      - "Dependencies mapped"
+    next: scope_validation
+    on_blocked: return_to_pm
+
+  - id: scope_validation
+    agent: product-owner
+    type: scope_review
+    description: "Validate scope and INVEST compliance"
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+        - "@docs/2-MANAGEMENT/epics/epic-01-*.md"
+    output:
+      deliverable: "docs/2-MANAGEMENT/reviews/scope-review-epic-01.md"
+    checkpoint:
+      - "All stories pass INVEST"
+      - "No scope creep detected"
+      - "AC are testable"
+    decision:
+      approved: sprint_planning
+      needs_revision: return_to_architect
+    on_blocked: ask_user
+
+  - id: sprint_planning
+    agent: scrum-master
+    type: sprint_planning
+    description: "Plan first sprint"
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/epic-01-*.md"
+        - "@docs/2-MANAGEMENT/reviews/scope-review-epic-01.md"
+    output:
+      deliverable: "docs/2-MANAGEMENT/sprints/sprint-01-plan.md"
+    checkpoint:
+      - "Capacity not exceeded"
+      - "Dependencies respected"
+      - "Stories have estimates"
+    next: complete
+
+  - id: complete
+    type: workflow_complete
+    summary: "Project ready for development"
+    next_workflow: "engineering/story-delivery.yaml"
+
+# Error handling
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalate_to: user
+
+# Quality gates between phases
+quality_gates:
+  discovery_to_prd:
+    - clarity_score >= 60
+  prd_to_architecture:
+    - prd_complete
+    - requirements_prioritized
+  architecture_to_validation:
+    - stories_created
+    - dependencies_mapped
+  validation_to_sprint:
+    - scope_approved

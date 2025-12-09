@@ -1,0 +1,158 @@
+# Story Delivery Workflow
+# TDD-based story implementation: RED → GREEN → REFACTOR → REVIEW → QA
+#
+# Documentation: @.claude/workflows/documentation/STORY-WORKFLOW.md
+
+name: story-delivery
+description: Complete TDD workflow for implementing a single story
+trigger: "story_implementation | feature_development"
+
+# Expected duration: 1-3 sessions per story
+# Parallelization: Frontend + Backend can run in parallel after RED phase
+
+prerequisites:
+  - story_approved_by_po
+  - acceptance_criteria_defined
+  - dependencies_resolved
+
+steps:
+  - id: ux_design
+    agent: ux-designer
+    type: wireframe
+    description: "Design UI components (if story has UI)"
+    condition: "story.has_ui_component == true"
+    optional: true
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+        - "@docs/1-BASELINE/product/prd.md"
+    output:
+      deliverables:
+        - "docs/3-ARCHITECTURE/ux/wireframes/wireframe-{feature}.md"
+    checkpoint:
+      - "All 4 states defined (loading, empty, error, success)"
+      - "Accessibility notes included"
+      - "Touch targets >= 48x48dp"
+    next: red_phase
+
+  - id: red_phase
+    agent: test-engineer
+    type: write_failing_tests
+    description: "Write failing tests for all acceptance criteria"
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+        - "@docs/3-ARCHITECTURE/ux/wireframes/*.md"
+    output:
+      deliverables:
+        - "tests/**/*-{feature}.test.{ext}"
+    checkpoint:
+      - "Tests cover all acceptance criteria"
+      - "Tests fail with expected errors"
+      - "No tests pass yet"
+    next: green_phase
+
+  - id: green_phase
+    description: "Implement minimal code to make tests pass"
+    parallel:
+      - agent: backend-dev
+        type: implement
+        condition: "story.type in ['backend', 'full-stack']"
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+            - "@tests/**/*-{feature}.test.{ext}"
+        checkpoint:
+          - "All backend tests pass"
+          - "No security vulnerabilities"
+          - "API contracts match spec"
+
+      - agent: frontend-dev
+        type: implement
+        condition: "story.type in ['frontend', 'full-stack']"
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+            - "@docs/3-ARCHITECTURE/ux/wireframes/*.md"
+            - "@tests/**/*-{feature}.test.{ext}"
+        checkpoint:
+          - "All frontend tests pass"
+          - "Accessibility checks pass"
+          - "Responsive design verified"
+
+    gate:
+      - "All tests pass"
+      - "Build succeeds"
+    next: refactor_phase
+
+  - id: refactor_phase
+    agent: senior-dev
+    type: refactor
+    description: "Improve code quality without changing behavior"
+    input:
+      context_refs:
+        - "src/**/{feature}*"
+        - "@tests/**/*-{feature}.test.{ext}"
+    output:
+      improvements:
+        - "Code quality improvements"
+        - "Performance optimizations"
+        - "Pattern alignment"
+    checkpoint:
+      - "All tests still pass"
+      - "No new functionality added"
+      - "Code follows patterns"
+    next: code_review
+
+  - id: code_review
+    agent: code-reviewer
+    type: full_review
+    description: "Review code for quality, security, and best practices"
+    input:
+      context_refs:
+        - "src/**/{feature}*"
+        - "@tests/**/*-{feature}.test.{ext}"
+        - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+    decision:
+      approved: qa_testing
+      request_changes: return_to_green
+    checkpoint:
+      - "Security checklist passed"
+      - "Code quality acceptable"
+      - "Tests adequate"
+
+  - id: qa_testing
+    agent: qa-agent
+    type: acceptance_testing
+    description: "Verify story meets acceptance criteria"
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/current/story-{N}.{M}.md"
+    decision:
+      pass: complete
+      fail: return_to_green
+    checkpoint:
+      - "All AC verified"
+      - "Edge cases tested"
+      - "No regressions"
+
+  - id: complete
+    type: story_complete
+    summary: "Story implemented and verified"
+    actions:
+      - "Update PROJECT-STATE.md"
+      - "Mark story as Done"
+      - "Notify scrum-master"
+
+# TDD Phase enforcement
+tdd_rules:
+  - "RED must complete before GREEN"
+  - "GREEN must complete before REFACTOR"
+  - "Tests must pass before REVIEW"
+  - "REVIEW must APPROVE before QA"
+
+# Error handling
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalate_to: scrum-master

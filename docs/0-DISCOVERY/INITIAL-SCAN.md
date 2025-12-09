@@ -1,181 +1,148 @@
-# INITIAL-SCAN: MonoPilot
+# INITIAL-SCAN: agent-methodology-pack
 
 ## Document Info
-- **Version:** 2.0
+- **Version:** 1.0
 - **Created:** 2025-12-06
 - **Scan Agent:** DOC-AUDITOR (quick mode)
-- **Scan Type:** Existing Project Migration
+- **Scan Type:** New Project Initialization
 
 ## Executive Summary
-**MonoPilot** to aplikacja ERP/MES dla przemysłu produkcyjnego (food manufacturing). Projekt jest aktywnie rozwijany z ukończonymi Epic 1-3 (Settings, Technical, Planning) i trwającym Epic 4 (Production). Wykorzystuje Next.js 15 + Supabase + TypeScript.
+The **Agent Methodology Pack** is a comprehensive multi-agent development framework for building software with Claude AI. It provides specialized AI agents, workflows, state management, and documentation structures for software development projects.
 
 ## Project Structure Overview
 
 ```
-MonoPilot/
-├── apps/frontend/             # Next.js 15 Application
-│   ├── app/                   # App Router (pages + API)
-│   │   ├── (authenticated)/   # Protected routes
-│   │   │   ├── dashboard/
-│   │   │   ├── settings/
-│   │   │   ├── technical/
-│   │   │   ├── planning/
-│   │   │   └── production/
-│   │   ├── api/              # Route handlers
-│   │   └── auth/             # Auth pages
-│   ├── components/           # React components
-│   │   ├── ui/               # shadcn/ui primitives
-│   │   ├── settings/
-│   │   ├── technical/
-│   │   ├── planning/
-│   │   └── production/
-│   ├── lib/                  # Business logic
-│   │   ├── services/         # Service layer (20+ services)
-│   │   ├── validation/       # Zod schemas
-│   │   ├── supabase/         # DB clients + migrations
-│   │   └── cache/            # Redis caching
-│   └── __tests__/            # Vitest tests
+agent-methodology-pack/
+├── CLAUDE.md                 # Main project configuration (template)
+├── PROJECT-STATE.md          # Sprint state tracking (template)
+├── README.md                 # Comprehensive project documentation
+├── INSTALL.md                # Installation instructions
+├── QUICK-START.md            # 5-minute setup guide
+├── CHANGELOG.md              # Version history
 │
-├── docs/                     # Documentation
-│   ├── epics/                # Epic definitions (01-09)
-│   ├── batches/              # Sprint batches with stories
-│   ├── ux-design/            # UX specifications
-│   ├── reference/            # Technical reference
-│   ├── meta/                 # Retrospectives, reviews
-│   └── helpers/              # Development guides
+├── .claude/                  # Agent methodology core
+│   ├── agents/               # 13 specialized agents
+│   │   ├── ORCHESTRATOR.md   # Task routing agent
+│   │   ├── planning/         # 8 planning agents
+│   │   ├── development/      # 4 development agents
+│   │   └── quality/          # 3 quality agents
+│   ├── workflows/            # Process workflows
+│   │   ├── DISCOVERY-FLOW.md
+│   │   ├── EPIC-WORKFLOW.md
+│   │   ├── STORY-WORKFLOW.md
+│   │   └── more...
+│   ├── patterns/             # Development patterns
+│   ├── state/                # Runtime state files
+│   └── audit/                # Audit reports
 │
-├── .claude/                  # Agent Methodology Pack
-│   ├── agents/               # AI agents (ORCHESTRATOR, etc.)
-│   ├── workflows/            # DISCOVERY-FLOW, EPIC-WORKFLOW
-│   ├── patterns/
-│   └── state/
+├── docs/                     # BMAD documentation structure
+│   ├── 00-START-HERE.md     # Documentation index
+│   ├── 1-BASELINE/          # Foundation documents
+│   ├── 2-MANAGEMENT/        # Project management
+│   ├── 3-ARCHITECTURE/      # Design artifacts
+│   ├── 4-DEVELOPMENT/       # Implementation docs
+│   └── 5-ARCHIVE/           # Historical documents
 │
-└── scripts/                  # Automation scripts
+├── scripts/                  # Automation scripts
+│   └── init-interactive.sh  # Interactive project setup
+│
+└── templates/                # Document templates
 ```
 
-## Technology Stack
+## Technology Stack Indicators
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Next.js | 15.1.4 | App Router, SSR |
-| React | 19.0.0 | UI framework |
-| TypeScript | 5.9.3 | Type safety |
-| Tailwind CSS | 3.4.1 | Styling |
-| shadcn/ui | - | Component library |
-| Supabase | 2.84.0 | PostgreSQL + Auth + RLS |
-| Zod | 3.25.76 | Validation |
-| Vitest | 4.0.12 | Testing |
-| Playwright | 1.56.1 | E2E testing |
-| pnpm | - | Package manager |
+| Indicator | Found | Notes |
+|-----------|-------|-------|
+| package.json | No | Not a Node.js project |
+| requirements.txt | No | Not a Python project |
+| Cargo.toml | No | Not a Rust project |
+| go.mod | No | Not a Go project |
+| .gitignore | Yes | Standard git ignores |
+| Shell scripts | Yes | Bash automation scripts |
 
-## Database Schema Summary
-
-**Tables:** 47+ in public schema
-**Multi-tenancy:** All tables with `org_id`
-**RLS:** Enabled on all tables
-**Migrations:** 51 SQL files applied
-
-### Core Tables
-- `organizations` - Tenant root
-- `users` - User accounts (synced with auth.users)
-- `warehouses` - Warehouse definitions
-- `locations` - Storage locations
-- `machines` - Production machines
-- `production_lines` - Manufacturing lines
-- `products` - Product catalog (RM, WIP, FG, PKG, BP)
-- `boms` / `bom_items` - Bills of Materials
-- `routings` / `routing_operations` - Production processes
-- `purchase_orders` / `po_lines` - Purchasing
-- `work_orders` - Production orders
-- `license_plates` - Inventory tracking (LP/batch)
-
-## Epic Status
-
-| Epic | Name | Status | Batches |
-|------|------|--------|---------|
-| 1 | Settings | ✅ Complete | 01A-01E |
-| 2 | Technical | ✅ Complete | 02A-02D |
-| 3 | Planning | ✅ Complete | 03A-03C |
-| 4 | Production | 🔄 In Progress | 04A-04C |
-| 5 | Warehouse | 📋 Planned | - |
-| 6 | Quality | 📋 Planned | - |
-| 7 | Shipping | 📋 Planned | - |
-| 8 | NPD | 📋 Planned | - |
-| 9 | Performance | 📋 Planned | - |
+**Primary Technology:** Markdown-based documentation framework with Bash scripts
 
 ## Existing Documentation
 
-### Epic Definitions
-- `docs/epics/01-settings.md` - Settings module
-- `docs/epics/02-technical.md` - Technical/products
-- `docs/epics/03-planning.md` - Planning/PO/TO
-- `docs/epics/04-production.md` - Production/WO
-- `docs/epics/06-quality.md` - Quality/QC
-- `docs/epics/07-shipping.md` - Shipping
-- `docs/epics/08-npd.md` - New Product Development
-- `docs/epics/09-performance-optimization.md` - Performance
+### Core Documentation (Root Level)
+| File | Size | Purpose |
+|------|------|---------|
+| README.md | ~620 lines | Comprehensive project overview |
+| INSTALL.md | ~13K chars | Installation instructions |
+| QUICK-START.md | ~12K chars | Quick setup guide |
+| CHANGELOG.md | ~3K chars | Version history |
+| BUGFIX-init-interactive.md | ~3.7K chars | Bug fix documentation |
 
-### Story Documentation
-- `docs/batches/01A-auth-users/stories/` - 4 stories
-- `docs/batches/01B-infrastructure-config/stories/` - 4 stories
-- `docs/batches/01C-master-data/stories/` - 3 stories
-- `docs/batches/01D-dashboards-ux/stories/` - 4 stories
-- `docs/batches/01E-ui-redesign/stories/` - 4 stories
-- `docs/batches/04B-2-output-registration/stories/`
-- `docs/batches/04C-1-config-traceability/stories/`
-- `docs/batches/05A-1-lp-core/stories/`
-- `docs/batches/05A-2-lp-operations/stories/`
-- `docs/batches/05A-3-receiving/stories/`
+### Agent Documentation (.claude/agents/)
+| Agent Category | Count | Key Files |
+|----------------|-------|-----------|
+| Orchestrator | 1 | ORCHESTRATOR.md (24K chars) |
+| Planning | 8 | DISCOVERY-AGENT.md, PM-AGENT.md, ARCHITECT-AGENT.md, DOC-AUDITOR.md, etc. |
+| Development | 4 | BACKEND-DEV.md, FRONTEND-DEV.md, SENIOR-DEV.md, TEST-ENGINEER.md |
+| Quality | 3 | CODE-REVIEWER.md, QA-AGENT.md, TECH-WRITER.md |
 
-### Technical Reference
-- `docs/reference/database-schema.md` - Full DB documentation
-- `docs/reference/code-architecture.md` - Architecture guide
-- `docs/reference/rls-and-supabase-clients.md` - RLS patterns
-- `docs/reference/template-system-guide.md` - Component templates
+### Workflow Documentation (.claude/workflows/)
+| Workflow | Purpose |
+|----------|---------|
+| DISCOVERY-FLOW.md | Project understanding before planning |
+| EPIC-WORKFLOW.md | End-to-end feature development |
+| STORY-WORKFLOW.md | User story implementation |
+| AD-HOC-FLOW.md | Direct user requests |
 
-### UX Design
-- `docs/ux-design/ux-design-settings-module.md`
-- `docs/ux-design/ux-design-technical-module.md`
-- `docs/ux-design/ux-design-planning-po-module.md`
-- `docs/ux-design/ux-design-production-module.md`
-- `docs/ux-design/ux-design-warehouse-module.md`
-- `docs/ux-design/ux-design-quality-module.md`
-- `docs/ux-design/ux-design-shipping-module.md`
-- `docs/ux-design/ux-design-npd-module.md`
+### State Management (.claude/state/)
+- AGENT-STATE.md
+- TASK-QUEUE.md
+- HANDOFFS.md
+- DEPENDENCIES.md
+- METRICS.md
 
-### Development Helpers
-- `docs/helpers/HE-development-guide.md`
-- `docs/helpers/HE-code-review-common-errors.md`
+## Key Configuration Files
 
-### AI Helper Files (.claude/)
-- `.claude/CLAUDE.md` - AI efficiency guide
-- `.claude/FILE-MAP.md` - Project structure index
-- `.claude/TABLES.md` - Database quick reference
-- `.claude/PATTERNS.md` - Code patterns
-- `.claude/PROMPTS.md` - Prompt templates
+| File | Location | Purpose |
+|------|----------|---------|
+| CLAUDE.md | Root | Project configuration (template) |
+| PROJECT-STATE.md | Root | Sprint state tracking (template) |
+| CONTEXT-BUDGET.md | .claude/ | Token management |
+| MODEL-ROUTING.md | .claude/ | Model selection guide |
+| PATTERNS.md | .claude/ | Pattern index |
 
-## Key Findings
+## Scripts Identified
 
-### Strengths
-1. **Well-documented** - Extensive epic/story/reference docs
-2. **Clear architecture** - Layered service pattern
-3. **Type-safe** - Full TypeScript with Zod validation
-4. **Multi-tenant** - RLS-based org isolation
-5. **Test coverage** - Vitest + Playwright setup
-6. **AI-optimized** - Token efficiency guides
+| Script | Purpose |
+|--------|---------|
+| init-interactive.sh | Interactive project initialization |
+| init-project.sh | Standard project initialization |
+| validate-docs.sh | Structure validation |
+| token-counter.sh | Context usage tracking |
+| sprint-transition.sh | Sprint archival |
 
-### Observations
-1. **Migration in progress** - Agent Methodology Pack being integrated
-2. **Epic 4 active** - Production module implementation ongoing
-3. **BMAD structure** - Migrating to new doc organization (0-5 folders)
-4. **Multiple doc systems** - Legacy (`docs/`) + new (`.claude/`, `docs/0-DISCOVERY/`)
+## Project Type Classification
+
+**Classification:** Developer Framework / Methodology Pack
+**Domain:** AI-Assisted Software Development
+**Target Users:** Developers using Claude AI for software development
+**Nature:** This is the methodology pack itself, not a project using it
+
+## Observations
+
+### What This Project IS
+1. A comprehensive multi-agent framework for Claude AI
+2. A documentation methodology (BMAD structure)
+3. A collection of specialized agent prompts
+4. A set of workflows for software development
+5. Automation scripts for project management
+
+### What This Project NEEDS
+1. Clarity on the purpose of this discovery session
+2. Understanding if we're:
+   - a) Developing/improving the methodology pack itself
+   - b) Using it to build a new project
+   - c) Testing/validating the framework
 
 ### Questions for Discovery Interview
-1. Jaki jest aktualny status Epic 4 (Production)?
-2. Które stories są w trakcie implementacji?
-3. Czy są blokery lub problemy techniczne?
-4. Jakie są priorytety na najbliższy sprint?
-5. Czy migracja do Agent Methodology Pack jest głównym celem?
+1. What is the goal of this project initialization?
+2. Are we building new features for the methodology pack?
+3. Or are we setting up to use this pack for a different project?
 
 ## Gate: SCAN_COMPLETE
 
@@ -193,5 +160,4 @@ Next: Proceed to Phase 2 (Discovery Interview)
 
 ---
 **Scan completed:** 2025-12-06
-**Project:** MonoPilot (ERP/MES for food manufacturing)
 **Next Phase:** Discovery Interview with DISCOVERY-AGENT

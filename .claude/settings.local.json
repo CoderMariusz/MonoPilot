@@ -1,4 +1,17 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nrefactor: Unify agent frontmatter and remove duplicates\n\nChanges:\n- ORCHESTRATOR: Add strict delegation rules (NEVER write code/tests),\n  parallel execution protocol, quality gates, fast-track routing\n- All 14 agents: Unified frontmatter with type, trigger, behavior fields\n- Remove duplicate Identity sections from all agents\n- Delete duplicate workflows: EPIC-FLOW, DEVELOPMENT-FLOW, PLANNING-FLOW\n- Add templates: TEST-TEMPLATES, BACKEND-TEMPLATES, FRONTEND-TEMPLATES\n- Add migration docs (sharded from single MIGRATION-GUIDE.md)\n\nAgent model assignments:\n- opus: ORCHESTRATOR, SENIOR-DEV, PM-AGENT, ARCHITECT-AGENT, PRODUCT-OWNER\n- sonnet: All other agents (development, quality, planning)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Expand SCRUM-MASTER agent to full specification\n\n- Add complete workflow with 5 steps and checkpoints\n- Add sprint planning, monitoring, blocker removal, review, retro\n- Add output templates (sprint plan, review, retrospective)\n- Add common mistakes, error recovery, quality checklist\n- Add handoff protocols to ORCHESTRATOR\n- Expand from 66 lines to 594 lines\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(rmdir:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
   "enabledMcpjsonServers": [
     "supabase"
   ],

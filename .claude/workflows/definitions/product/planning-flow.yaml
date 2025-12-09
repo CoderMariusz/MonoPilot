@@ -1,0 +1,505 @@
+# Planning Flow Workflow
+# Connects discovery outputs to epic breakdown
+# Handles portfolio planning, epic scoping, and roadmap adjustments
+#
+# Documentation: @.claude/workflows/documentation/PLANNING-FLOW.md
+# Inputs from: @.claude/workflows/documentation/DISCOVERY-FLOW.md
+# Outputs to: @.claude/workflows/documentation/EPIC-WORKFLOW.md
+
+name: planning-flow
+description: Strategic planning workflow - from discovery to sprint-ready epics
+trigger: "planning | roadmap | prioritization | epic_planning"
+
+# Expected duration: 1-3 sessions depending on scope
+# Parallelization: Research agents can run in parallel
+
+modes:
+  - id: portfolio
+    description: "Full portfolio planning - new project or major pivot"
+    triggers:
+      - "new_project"
+      - "major_pivot"
+      - "annual_planning"
+    phases: [context, outcomes, epic_discovery, prioritization, sprint_intake, confirmation]
+
+  - id: epic_scoped
+    description: "Single epic deep-dive - feature expansion"
+    triggers:
+      - "new_feature"
+      - "epic_expansion"
+    phases: [context, epic_discovery, prioritization, confirmation]
+    skip_phases: [outcomes]
+
+  - id: adjustment
+    description: "Quick priority adjustment - mid-sprint changes"
+    triggers:
+      - "priority_change"
+      - "scope_adjustment"
+      - "resource_change"
+    phases: [context, prioritization, confirmation]
+    skip_phases: [outcomes, epic_discovery]
+
+# Input sources - flexible, user can add more
+inputs:
+  required:
+    - type: discovery_output
+      source: "docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+      description: "Output from DISCOVERY-FLOW"
+
+  optional:
+    - type: existing_prd
+      source: "docs/1-BASELINE/product/prd.md"
+      description: "Existing PRD if available"
+
+    - type: market_research
+      source: "docs/0-DISCOVERY/research/*.md"
+      description: "Research agent outputs"
+
+    - type: user_provided
+      source: "{user_input}"
+      description: "Additional context from user"
+
+    - type: external_docs
+      source: "{external_refs}"
+      description: "External documentation or specs"
+
+# Main workflow phases
+phases:
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 1: CONTEXT
+  # ═══════════════════════════════════════════════════════════════════
+  - id: context
+    name: "Context Gathering"
+    description: "Collect and validate all inputs for planning"
+    agent: orchestrator
+    type: coordination
+
+    activities:
+      - "Validate discovery outputs are complete"
+      - "Identify gaps in information"
+      - "Trigger research agents if needed"
+      - "Consolidate all inputs"
+
+    parallel_research:
+      enabled: true
+      agents:
+        - research-agent
+      triggers:
+        - "technology_unknown"
+        - "market_gap"
+        - "competitor_analysis_needed"
+
+    input:
+      context_refs:
+        - "@docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+        - "@docs/0-DISCOVERY/research/*.md"
+
+    output:
+      deliverable: "docs/0-DISCOVERY/planning-context.md"
+
+    checkpoint:
+      - "All required inputs available"
+      - "Clarity score >= 60%"
+      - "No critical unknowns blocking"
+
+    gate:
+      pass: outcomes
+      fail: return_to_discovery
+
+    on_blocked:
+      action: trigger_discovery_agent
+      params:
+        type: gap_filling
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 2: OUTCOMES / PRD
+  # ═══════════════════════════════════════════════════════════════════
+  - id: outcomes
+    name: "Outcomes & PRD"
+    description: "Define measurable outcomes and create/update PRD"
+    agent: pm-agent
+    type: prd_creation
+
+    activities:
+      - "Define SMART success metrics"
+      - "Create/update PRD"
+      - "Apply MoSCoW prioritization to requirements"
+      - "Define explicit scope boundaries"
+
+    input:
+      context_refs:
+        - "@docs/0-DISCOVERY/planning-context.md"
+        - "@docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+      templates:
+        - "@.claude/templates/prd-template.md"
+
+    output:
+      deliverables:
+        - "docs/1-BASELINE/product/prd.md"
+        - "docs/1-BASELINE/product/success-metrics.md"
+
+    checkpoint:
+      - "All requirements have MoSCoW priority"
+      - "Success metrics are SMART"
+      - "Scope explicitly defined (IN/OUT/FUTURE)"
+      - "At least 3 MUST requirements defined"
+
+    gate:
+      pass: epic_discovery
+      needs_revision:
+        action: iterate
+        max_iterations: 2
+
+    quality_criteria:
+      - name: requirement_completeness
+        check: "Each FR has: description, priority, AC, traces"
+      - name: nfr_coverage
+        check: "Performance, Security, Scalability addressed"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 3: EPIC DISCOVERY
+  # ═══════════════════════════════════════════════════════════════════
+  - id: epic_discovery
+    name: "Epic Discovery & Breakdown"
+    description: "Identify epics, map dependencies, assess risks"
+
+    sub_phases:
+
+      - id: epic_identification
+        agent: architect-agent
+        type: epic_breakdown
+        description: "Identify and structure epics from PRD"
+
+        activities:
+          - "Map PRD requirements to epics"
+          - "Ensure each epic has clear boundaries"
+          - "Validate INVEST compliance at epic level"
+
+        input:
+          context_refs:
+            - "@docs/1-BASELINE/product/prd.md"
+          templates:
+            - "@.claude/templates/epic-template.md"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/epics/epic-catalog.md"
+
+        checkpoint:
+          - "Each PRD requirement mapped to epic"
+          - "Epic boundaries are clear"
+          - "No orphan requirements"
+
+      - id: dependency_mapping
+        agent: architect-agent
+        type: dependency_analysis
+        description: "Map dependencies between epics"
+
+        activities:
+          - "Identify technical dependencies"
+          - "Identify business dependencies"
+          - "Create dependency graph"
+          - "Identify critical path"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+          templates:
+            - "@.claude/templates/epic-dependency-graph.md"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/epics/dependency-graph.md"
+
+        checkpoint:
+          - "All dependencies explicit"
+          - "No circular dependencies"
+          - "Critical path identified"
+
+      - id: risk_assessment
+        agent: architect-agent
+        type: risk_analysis
+        description: "Assess risks per epic"
+
+        activities:
+          - "Identify technical risks"
+          - "Identify business risks"
+          - "Propose mitigations"
+          - "Flag unknowns requiring research"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+            - "@docs/2-MANAGEMENT/epics/dependency-graph.md"
+          templates:
+            - "@.claude/templates/risk-registry.md"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/risks/risk-registry.md"
+
+        checkpoint:
+          - "Each epic has risk assessment"
+          - "High risks have mitigation plans"
+          - "Research spikes identified for unknowns"
+
+    gate:
+      pass: prioritization
+      needs_research:
+        action: trigger_research
+        agent: research-agent
+        return_to: epic_discovery.risk_assessment
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 4: PRIORITIZATION
+  # ═══════════════════════════════════════════════════════════════════
+  - id: prioritization
+    name: "Prioritization & Roadmap"
+    description: "Prioritize epics and create roadmap"
+
+    sub_phases:
+
+      - id: value_scoring
+        agent: product-owner
+        type: prioritization
+        description: "Score epics by business value"
+
+        activities:
+          - "Apply value scoring framework"
+          - "Consider dependencies in scoring"
+          - "Balance quick wins vs strategic"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+            - "@docs/2-MANAGEMENT/epics/dependency-graph.md"
+            - "@docs/2-MANAGEMENT/risks/risk-registry.md"
+
+        scoring_criteria:
+          - business_value: "1-5 scale"
+          - user_impact: "1-5 scale"
+          - technical_risk: "1-5 scale (inverse)"
+          - dependency_weight: "0-3 scale"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/epics/prioritized-backlog.md"
+
+      - id: roadmap_creation
+        agent: product-owner
+        type: roadmap
+        description: "Create NOW/NEXT/LATER roadmap"
+
+        activities:
+          - "Bucket epics into NOW/NEXT/LATER"
+          - "Respect dependency constraints"
+          - "Balance capacity with ambition"
+          - "Define milestone markers"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/prioritized-backlog.md"
+            - "@docs/2-MANAGEMENT/epics/dependency-graph.md"
+          templates:
+            - "@.claude/templates/roadmap.md"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/roadmap.md"
+
+        checkpoint:
+          - "NOW bucket has max 2-3 epics"
+          - "Dependencies respected in sequencing"
+          - "Clear milestone definitions"
+
+    gate:
+      pass: sprint_intake
+      needs_revision:
+        action: rebalance
+        triggers:
+          - "NOW bucket > 3 epics"
+          - "dependency_violation"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 5: SPRINT INTAKE
+  # ═══════════════════════════════════════════════════════════════════
+  - id: sprint_intake
+    name: "Sprint Intake Preparation"
+    description: "Prepare first epic(s) for sprint planning"
+
+    sub_phases:
+
+      - id: story_breakdown
+        agent: architect-agent
+        type: story_creation
+        description: "Break NOW epics into INVEST stories"
+
+        activities:
+          - "Break epic into stories"
+          - "Apply INVEST criteria"
+          - "Define acceptance criteria"
+          - "Estimate complexity (S/M/L)"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/roadmap.md"
+            - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+          templates:
+            - "@.claude/templates/story-template.md"
+
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/epics/epic-{N}-stories.md"
+
+        checkpoint:
+          - "All stories pass INVEST"
+          - "AC in Given/When/Then format"
+          - "Complexity estimated"
+
+      - id: invest_validation
+        agent: product-owner
+        type: story_review
+        description: "Validate stories against INVEST and PRD"
+
+        activities:
+          - "Review INVEST compliance"
+          - "Verify PRD traceability"
+          - "Check scope alignment"
+          - "Validate testability of AC"
+
+        input:
+          context_refs:
+            - "@docs/2-MANAGEMENT/epics/epic-{N}-stories.md"
+            - "@docs/1-BASELINE/product/prd.md"
+          templates:
+            - "@.claude/templates/story-checklist-template.md"
+
+        output:
+          deliverable: "docs/2-MANAGEMENT/reviews/invest-review-epic-{N}.md"
+
+        decision:
+          approved: confirmation
+          needs_revision:
+            return_to: sprint_intake.story_breakdown
+            max_iterations: 2
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 6: CONFIRMATION
+  # ═══════════════════════════════════════════════════════════════════
+  - id: confirmation
+    name: "Planning Confirmation"
+    description: "Final review and handoff"
+    agent: orchestrator
+    type: confirmation
+
+    activities:
+      - "Verify all artifacts created"
+      - "Confirm stakeholder alignment"
+      - "Prepare handoff to EPIC-WORKFLOW"
+
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/roadmap.md"
+        - "@docs/2-MANAGEMENT/epics/epic-{N}-stories.md"
+        - "@docs/2-MANAGEMENT/reviews/invest-review-epic-{N}.md"
+
+    output:
+      deliverable: "docs/2-MANAGEMENT/planning-summary.md"
+
+    summary_includes:
+      - "Roadmap overview"
+      - "First sprint candidates"
+      - "Key risks and mitigations"
+      - "Open questions for user"
+
+    checkpoint:
+      - "All planning artifacts complete"
+      - "Stories ready for sprint planning"
+      - "No blocking issues"
+
+    next_workflow:
+      workflow: "definitions/product/new-project.yaml"
+      start_at: "scope_validation"
+      # OR direct to EPIC-WORKFLOW
+      alternative:
+        workflow: "documentation/EPIC-WORKFLOW.md"
+        start_at: "Phase 2: Story Breakdown"
+
+# ═══════════════════════════════════════════════════════════════════
+# QUALITY GATES
+# ═══════════════════════════════════════════════════════════════════
+quality_gates:
+  context_to_outcomes:
+    - clarity_score >= 60
+    - no_critical_unknowns
+
+  outcomes_to_epic_discovery:
+    - prd_complete
+    - requirements_prioritized
+    - scope_defined
+
+  epic_discovery_to_prioritization:
+    - epics_identified
+    - dependencies_mapped
+    - risks_assessed
+
+  prioritization_to_sprint_intake:
+    - roadmap_created
+    - now_bucket_defined
+
+  sprint_intake_to_confirmation:
+    - stories_invest_compliant
+    - ac_testable
+
+# ═══════════════════════════════════════════════════════════════════
+# ERROR HANDLING
+# ═══════════════════════════════════════════════════════════════════
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalate_to: user
+
+error_recovery:
+  clarity_too_low:
+    action: return_to_discovery
+    message: "Need more information - returning to DISCOVERY-FLOW"
+
+  circular_dependency:
+    action: escalate
+    message: "Circular dependency detected - user decision required"
+
+  scope_creep_detected:
+    action: pause
+    message: "Scope expansion detected - confirm with user before proceeding"
+
+# ═══════════════════════════════════════════════════════════════════
+# ARTIFACTS
+# ═══════════════════════════════════════════════════════════════════
+artifacts:
+  planning_context:
+    path: "docs/0-DISCOVERY/planning-context.md"
+    created_by: context
+
+  prd:
+    path: "docs/1-BASELINE/product/prd.md"
+    created_by: outcomes
+
+  epic_catalog:
+    path: "docs/2-MANAGEMENT/epics/epic-catalog.md"
+    created_by: epic_discovery.epic_identification
+
+  dependency_graph:
+    path: "docs/2-MANAGEMENT/epics/dependency-graph.md"
+    created_by: epic_discovery.dependency_mapping
+
+  risk_registry:
+    path: "docs/2-MANAGEMENT/risks/risk-registry.md"
+    created_by: epic_discovery.risk_assessment
+
+  roadmap:
+    path: "docs/2-MANAGEMENT/roadmap.md"
+    created_by: prioritization.roadmap_creation
+
+  stories:
+    path: "docs/2-MANAGEMENT/epics/epic-{N}-stories.md"
+    created_by: sprint_intake.story_breakdown
+
+  planning_summary:
+    path: "docs/2-MANAGEMENT/planning-summary.md"
+    created_by: confirmation
