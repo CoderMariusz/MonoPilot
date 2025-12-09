@@ -200,6 +200,74 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // 6. Try Purchase Order
+    const { data: poData } = await supabase
+      .from('purchase_orders')
+      .select(`
+        id,
+        po_number,
+        status,
+        expected_delivery_date,
+        supplier:suppliers(name),
+        warehouse:warehouses(name)
+      `)
+      .eq('org_id', orgId)
+      .ilike('po_number', `%${barcode}%`)
+      .limit(1)
+      .single()
+
+    if (poData) {
+      const supplier = poData.supplier as { name?: string } | null
+      const warehouse = poData.warehouse as WarehouseFK
+      return NextResponse.json({
+        data: {
+          type: 'purchase_order',
+          id: poData.id,
+          details: {
+            po_number: poData.po_number,
+            status: poData.status,
+            supplier_name: supplier?.name || 'Unknown',
+            warehouse_name: warehouse?.name || 'Unknown',
+            expected_delivery_date: poData.expected_delivery_date,
+          },
+        },
+      })
+    }
+
+    // 7. Try Transfer Order
+    const { data: toData } = await supabase
+      .from('transfer_orders')
+      .select(`
+        id,
+        to_number,
+        status,
+        expected_ship_date,
+        from_warehouse:warehouses!transfer_orders_from_warehouse_id_fkey(name),
+        to_warehouse:warehouses!transfer_orders_to_warehouse_id_fkey(name)
+      `)
+      .eq('org_id', orgId)
+      .ilike('to_number', `%${barcode}%`)
+      .limit(1)
+      .single()
+
+    if (toData) {
+      const fromWarehouse = toData.from_warehouse as WarehouseFK
+      const toWarehouse = toData.to_warehouse as WarehouseFK
+      return NextResponse.json({
+        data: {
+          type: 'transfer_order',
+          id: toData.id,
+          details: {
+            to_number: toData.to_number,
+            status: toData.status,
+            from_warehouse_name: fromWarehouse?.name || 'Unknown',
+            to_warehouse_name: toWarehouse?.name || 'Unknown',
+            expected_ship_date: toData.expected_ship_date,
+          },
+        },
+      })
+    }
+
     // Not found
     return NextResponse.json({ error: 'Barcode not found' }, { status: 404 })
   } catch (error) {

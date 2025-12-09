@@ -1,7 +1,8 @@
 /**
  * Scanner Warehouse Receive Page
  * Operator receives materials from PO (Purchase Order) or TO (Transfer Order)
- * Documents are SELECTED from list, NOT scanned
+ * Flow: Scan PO/TO barcode → Select line → Enter qty → Batch → Location → Confirm
+ * BUG-004 FIX: Changed from dropdown selection to barcode-first approach
  */
 
 'use client'
@@ -35,8 +36,7 @@ import { ScannerFeedback } from '@/components/scanner/ScannerFeedback'
 // ============================================================================
 
 type ReceiveStep =
-  | 'document_type'
-  | 'document_select'
+  | 'scan_document'
   | 'line_select'
   | 'qty'
   | 'batch'
@@ -46,15 +46,6 @@ type ReceiveStep =
   | 'error'
 
 type DocumentType = 'PO' | 'TO'
-
-interface DocumentItem {
-  id: string
-  number: string
-  supplier?: string
-  from_warehouse?: string
-  line_count: number
-  status: string
-}
 
 interface DocumentLine {
   id: string
@@ -100,12 +91,11 @@ export default function ScannerWarehouseReceivePage() {
   const { toast } = useToast()
 
   const [state, setState] = useState<ReceiveState>({
-    step: 'document_type',
+    step: 'scan_document',
     qty: 0,
     batch_number: '',
   })
 
-  const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [loading, setLoading] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackState>({
     show: false,
@@ -113,6 +103,7 @@ export default function ScannerWarehouseReceivePage() {
     message: '',
   })
 
+  const scannerInputRef = useRef<HTMLInputElement>(null)
   const locationInputRef = useRef<HTMLInputElement>(null)
 
   // Auto-focus location input
@@ -127,8 +118,7 @@ export default function ScannerWarehouseReceivePage() {
   }
 
   const resetToStart = () => {
-    setState({ step: 'document_type', qty: 0, batch_number: '' })
-    setDocuments([])
+    setState({ step: 'scan_document', qty: 0, batch_number: '' })
   }
 
   const progress = state.lines
@@ -139,70 +129,50 @@ export default function ScannerWarehouseReceivePage() {
   // Handlers
   // ============================================================================
 
-  // Step 1: Select Document Type (PO or TO)
-  const handleDocumentTypeSelect = async (type: DocumentType) => {
-    setState((prev) => ({ ...prev, document_type: type, step: 'document_select' }))
-    await loadDocuments(type)
-  }
-
-  // Step 2: Load Documents
-  const loadDocuments = async (type: DocumentType) => {
+  // Step 1: Scan Document (PO or TO)
+  const handleDocumentScan = async (barcode: string) => {
     setLoading(true)
     try {
-      let url = ''
-      if (type === 'PO') {
-        url = '/api/planning/purchase-orders?status=confirmed&status=partially_received'
-      } else {
-        url = '/api/planning/transfer-orders?status=in_transit'
+      // Use scanner lookup API
+      const res = await fetch(`/api/scanner/lookup?barcode=${encodeURIComponent(barcode)}`)
+
+      if (!res.ok) {
+        showFeedback('error', 'Document Not Found')
+        setLoading(false)
+        return
       }
 
-      const res = await fetch(url)
-      if (!res.ok) throw new Error('Failed to load documents')
+      const { data } = await res.json()
 
-      const result = await res.json()
-
-      let docs: DocumentItem[] = []
-      if (type === 'PO') {
-        docs = (result.data || []).map((po: any) => ({
-          id: po.id,
-          number: po.po_number,
-          supplier: po.supplier?.name || 'Unknown',
-          line_count: po.line_count || 0,
-          status: po.status,
-        }))
-      } else {
-        docs = (result.data || []).map((to: any) => ({
-          id: to.id,
-          number: to.to_number,
-          from_warehouse: to.from_warehouse?.name || 'Unknown',
-          line_count: to.line_count || 0,
-          status: to.status,
-        }))
+      // Validate it's a PO or TO
+      if (data.type !== 'purchase_order' && data.type !== 'transfer_order') {
+        showFeedback('error', 'Invalid barcode - not a PO/TO')
+        setLoading(false)
+        return
       }
 
-      setDocuments(docs)
+      // Determine document type
+      const docType: DocumentType = data.type === 'purchase_order' ? 'PO' : 'TO'
+      const docNumber = data.details.po_number || data.details.to_number
 
-      if (docs.length === 0) {
-        showFeedback('warning', 'No Documents Found')
-      }
+      // Load document lines
+      await loadDocumentLines(data.id, docType, docNumber)
     } catch (err) {
-      console.error('Load documents error:', err)
-      setState((prev) => ({ ...prev, step: 'error', error: 'Failed to load documents' }))
-      showFeedback('error', 'Load Failed')
-    } finally {
+      console.error('Document scan error:', err)
+      setState((prev) => ({ ...prev, step: 'error', error: 'Failed to scan document' }))
+      showFeedback('error', 'Scan Failed')
       setLoading(false)
     }
   }
 
-  // Step 3: Select Document
-  const handleDocumentSelect = async (doc: DocumentItem) => {
-    setLoading(true)
+  // Step 2: Load Document Lines
+  const loadDocumentLines = async (docId: string, docType: DocumentType, docNumber: string) => {
     try {
       let linesUrl = ''
-      if (state.document_type === 'PO') {
-        linesUrl = `/api/planning/purchase-orders/${doc.id}/lines`
+      if (docType === 'PO') {
+        linesUrl = `/api/planning/purchase-orders/${docId}/lines`
       } else {
-        linesUrl = `/api/planning/transfer-orders/${doc.id}/lines`
+        linesUrl = `/api/planning/transfer-orders/${docId}/lines`
       }
 
       const res = await fetch(linesUrl)
@@ -227,7 +197,7 @@ export default function ScannerWarehouseReceivePage() {
         setState((prev) => ({
           ...prev,
           step: 'error',
-          error: `Document ${doc.number} has no lines`
+          error: `Document ${docNumber} has no lines`
         }))
         showFeedback('error', 'No Lines')
         setLoading(false)
@@ -238,13 +208,14 @@ export default function ScannerWarehouseReceivePage() {
       setState((prev) => ({
         ...prev,
         step: 'line_select',
-        document_id: doc.id,
-        document_number: doc.number,
+        document_type: docType,
+        document_id: docId,
+        document_number: docNumber,
         lines,
         warehouse_id: undefined, // Will be determined by document type
       }))
     } catch (err) {
-      console.error('Document select error:', err)
+      console.error('Load lines error:', err)
       setState((prev) => ({ ...prev, step: 'error', error: 'Failed to load document lines' }))
       showFeedback('error', 'Error')
     } finally {
@@ -252,7 +223,7 @@ export default function ScannerWarehouseReceivePage() {
     }
   }
 
-  // Step 4: Select Line to Receive
+  // Step 3: Select Line to Receive
   const handleLineSelect = (line: DocumentLine) => {
     if (line.remaining_qty <= 0) {
       showFeedback('warning', 'Already Received')
@@ -423,115 +394,59 @@ export default function ScannerWarehouseReceivePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          {state.step !== 'document_type' && (
+          {state.step !== 'scan_document' && (
             <Button variant="ghost" size="icon" onClick={resetToStart} className="h-12 w-12">
               <ChevronLeft className="h-6 w-6" />
             </Button>
           )}
           <h1 className="text-xl font-bold">Warehouse Receive</h1>
         </div>
-        {state.document_number && <Badge className="h-8 text-sm">{state.document_number}</Badge>}
+        {state.document_number && (
+          <Badge className="h-8 text-sm font-mono">{state.document_number}</Badge>
+        )}
       </div>
 
       {/* Progress */}
-      {state.lines && state.step !== 'document_type' && state.step !== 'document_select' && (
+      {state.lines && state.step !== 'scan_document' && (
         <div className="mb-4">
           <Progress value={progress} className="h-2" />
           <div className="text-xs text-gray-500 mt-1 text-center">
-            {state.lines.filter((l) => l.remaining_qty === 0).length} / {state.lines.length} lines
+            {state.lines.filter((l) => l.remaining_qty === 0).length} / {state.lines.length} lines received
           </div>
         </div>
       )}
 
-      {/* STEP: Document Type Selection */}
-      {state.step === 'document_type' && (
-        <div className="space-y-3">
-          <Card
-            className="cursor-pointer active:scale-95 transition-transform"
-            onClick={() => handleDocumentTypeSelect('PO')}
-          >
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <FileText className="h-8 w-8 text-blue-600" />
+      {/* STEP: Scan Document (PO or TO) */}
+      {state.step === 'scan_document' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scan className="h-6 w-6" />
+                Scan PO or TO Barcode
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-blue-50 rounded-lg text-center">
+                <Scan className="h-12 w-12 mx-auto text-blue-600 mb-2" />
+                <p className="text-sm text-gray-600">
+                  Scan Purchase Order (PO) or Transfer Order (TO) barcode to start receiving
+                </p>
               </div>
-              <div className="flex-1">
-                <div className="font-bold text-lg">Purchase Order (PO)</div>
-                <div className="text-sm text-gray-500">Receive from supplier</div>
-              </div>
-              <ArrowRight className="h-6 w-6 text-gray-400" />
-            </CardContent>
-          </Card>
 
-          <Card
-            className="cursor-pointer active:scale-95 transition-transform"
-            onClick={() => handleDocumentTypeSelect('TO')}
-          >
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <ArrowRight className="h-8 w-8 text-purple-600" />
-              </div>
-              <div className="flex-1">
-                <div className="font-bold text-lg">Transfer Order (TO)</div>
-                <div className="text-sm text-gray-500">Receive from warehouse</div>
-              </div>
-              <ArrowRight className="h-6 w-6 text-gray-400" />
+              <ScannerInput
+                ref={scannerInputRef}
+                onSubmit={handleDocumentScan}
+                loading={loading}
+                placeholder="Scan PO/TO barcode..."
+                autoFocus
+              />
             </CardContent>
           </Card>
 
           <Button variant="outline" className="w-full h-14" onClick={() => router.push('/scanner')}>
             <ChevronLeft className="h-5 w-5 mr-2" />
             Back to Scanner
-          </Button>
-        </div>
-      )}
-
-      {/* STEP: Document Selection */}
-      {state.step === 'document_select' && (
-        <div className="space-y-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-6 w-6" />
-                Select {state.document_type}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {loading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                </div>
-              ) : documents.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No {state.document_type}s available
-                </div>
-              ) : (
-                documents.map((doc) => (
-                  <Card
-                    key={doc.id}
-                    className="cursor-pointer hover:bg-gray-50 active:scale-95 transition-transform"
-                    onClick={() => handleDocumentSelect(doc)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="font-mono font-bold text-lg">{doc.number}</div>
-                        <Badge variant="outline">{doc.status}</Badge>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {state.document_type === 'PO' ? doc.supplier : doc.from_warehouse}
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1">
-                        {doc.line_count} line{doc.line_count !== 1 ? 's' : ''}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Button variant="outline" className="w-full h-14" onClick={resetToStart}>
-            <ChevronLeft className="h-5 w-5 mr-2" />
-            Back
           </Button>
         </div>
       )}
@@ -587,9 +502,9 @@ export default function ScannerWarehouseReceivePage() {
             </CardContent>
           </Card>
 
-          <Button variant="outline" className="w-full h-14" onClick={() => setState((prev) => ({ ...prev, step: 'document_select' }))}>
+          <Button variant="outline" className="w-full h-14" onClick={resetToStart}>
             <ChevronLeft className="h-5 w-5 mr-2" />
-            Back
+            Back to Scan
           </Button>
         </div>
       )}

@@ -7,6 +7,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -55,6 +56,7 @@ export function GRNItemsTable({ grnId, onItemReceived }: GRNItemsTableProps) {
   const [loading, setLoading] = useState(true)
   const [receiveModalOpen, setReceiveModalOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<GRNItem | null>(null)
+  const router = useRouter()
   const { toast } = useToast()
 
   const fetchItems = async () => {
@@ -189,14 +191,11 @@ export function GRNItemsTable({ grnId, onItemReceived }: GRNItemsTableProps) {
                   <TableCell>
                     {item.license_plates ? (
                       <button
-                        onClick={() => {
-                          // TODO: Navigate to LP detail page when available
-                          toast({
-                            title: 'License Plate',
-                            description: `LP: ${item.license_plates?.lp_number}`,
-                          })
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(`/warehouse/inventory/${item.license_plates?.id}`)
                         }}
-                        className="text-blue-600 hover:underline text-sm"
+                        className="text-blue-600 hover:underline text-sm font-mono"
                       >
                         {item.license_plates.lp_number}
                       </button>
