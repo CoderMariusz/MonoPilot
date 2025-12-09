@@ -1,10 +1,10 @@
 # Production Module PRD
 
-**Status:** DONE (Epic 4 Complete)
+**Status:** DONE (Epic 4 Complete) + Planned Enhancements
 **Priority:** P0 - Core Module
 **Epic:** 4
-**Stories:** 21
-**Phase:** MVP Phase 1
+**Stories:** 21 (MVP) + 25 (Enhancements)
+**Phase:** MVP Phase 1 (DONE), Phase 2-3 (PLANNED)
 
 ---
 
@@ -46,7 +46,7 @@ Modul Production odpowiada za wykonywanie zlecen produkcyjnych (Work Orders) - o
 
 **Route:** `/settings/production-execution`
 
-### 3.1 Feature Toggles
+### 3.1 Feature Toggles (MVP - DONE)
 
 | Setting | Type | Default | Opis |
 |---------|------|---------|------|
@@ -58,7 +58,7 @@ Modul Production odpowiada za wykonywanie zlecen produkcyjnych (Work Orders) - o
 | `require_qa_on_output` | toggle | On | Output wymaga przypisania QA status |
 | `auto_create_by_product_lp` | toggle | On | Auto-tworz LP dla by-products |
 
-### 3.2 Dashboard Settings
+### 3.2 Dashboard Settings (MVP - DONE)
 
 | Setting | Type | Default | Opis |
 |---------|------|---------|------|
@@ -66,6 +66,21 @@ Modul Production odpowiada za wykonywanie zlecen produkcyjnych (Work Orders) - o
 | `show_material_alerts` | toggle | On | Pokaz alerty o brakach materialowych |
 | `show_delay_alerts` | toggle | On | Pokaz alerty o opoznieniach |
 | `show_quality_alerts` | toggle | On | Pokaz alerty o quality holds |
+
+### 3.3 Planned Settings (Phase 2)
+
+| Setting | Type | Default | Opis | Phase |
+|---------|------|---------|------|-------|
+| `allow_wo_splitting` | toggle | Off | Czy mozna dzielic WO na mniejsze | 2 |
+| `allow_wo_merging` | toggle | Off | Czy mozna laczyc WO | 2 |
+| `allow_material_substitution` | toggle | Off | Czy mozna zamieniac materialy | 2 |
+| `require_photo_on_output` | toggle | Off | Wymaga zdjecia przy outputcie | 2 |
+| `enable_voice_commands` | toggle | Off | Wlacz komendy glosowe na skanerze | 3 |
+| `backflush_consumption` | toggle | Off | Auto-konsumpcja po outputcie | 2 |
+| `enable_rework_tracking` | toggle | Off | Sledzenie przerobek | 2 |
+| `scrap_reason_required` | toggle | On | Wymaga reason code dla scrapa | 2 |
+| `enable_break_tracking` | toggle | Off | Sledzenie przerw operatorow | 2 |
+| `offline_mode_enabled` | toggle | Off | Tryb offline dla skanerow | 3 |
 
 ---
 
@@ -75,6 +90,8 @@ Modul Production odpowiada za wykonywanie zlecen produkcyjnych (Work Orders) - o
 
 ```
 Draft --> Released --> In Progress --> [Paused] --> Completed --> Closed
+                             |
+                             +--[On Hold]--+  (Phase 2)
 ```
 
 | Status | Opis | Dozwolone akcje |
@@ -83,6 +100,7 @@ Draft --> Released --> In Progress --> [Paused] --> Completed --> Closed
 | `released` | Gotowe do produkcji | Start |
 | `in_progress` | Produkcja w toku | Pause, Consume, Output, Complete |
 | `paused` | Wstrzymane (toggle required) | Resume |
+| `on_hold` | Wstrzymane (quality/issue) | Release (Phase 2) |
 | `completed` | Produkcja zakonczona | Close |
 | `closed` | WO zamkniete (archiwalne) | View only |
 
@@ -318,7 +336,7 @@ CREATE TABLE production_settings (
 
 ---
 
-## 8. Functional Requirements
+## 8. Functional Requirements (MVP - DONE)
 
 ### 8.1 Dashboard (FR-PROD-001)
 - KPI cards: Orders today, units produced, avg yield, active WOs, material shortages
@@ -407,29 +425,148 @@ CREATE TABLE production_settings (
 
 ---
 
-## 9. Integration Points
+## 9. Planned Enhancements
 
-### 9.1 Z Technical Module
+### 9.1 Work Order Management (Phase 2)
+
+| Feature | Opis | Priority |
+|---------|------|----------|
+| **WO Splitting** | Podziel WO na mniejsze partie (np. WO-001 na WO-001-A, WO-001-B) | Should |
+| **WO Merging** | Polacz podobne WO w jedno wieksze zlecenie | Could |
+| **WO Rescheduling** | Zmien planned dates na WO w trakcie produkcji | Should |
+| **WO Cloning** | Skopiuj WO do nowego zlecenia | Should |
+| **Priority Management** | Ustaw priorytety WO (1-5), sortuj po priorytecie | Should |
+| **WO Hold/Release** | Wstrzymaj WO z powodu quality/issue, zwolnij po rozwiazaniu | Must |
+
+### 9.2 Execution Enhancements (Phase 2)
+
+| Feature | Opis | Priority |
+|---------|------|----------|
+| **Step-by-step SOP** | Digital SOP z guided workflow - krok po kroku instrukcje | Should |
+| **Photo Capture** | Zdjecia podczas produkcji (quality evidence) | Should |
+| **Operator Notes** | Notatki/komentarze operatora do WO | Must |
+| **Time Tracking** | Sledzenie czasu per operacja (setup, run, cleanup) | Should |
+| **Break Tracking** | Sledzenie przerw operatorow (lunch, bathroom, etc.) | Could |
+
+### 9.3 Consumption Enhancements (Phase 2)
+
+| Feature | Opis | Priority |
+|---------|------|----------|
+| **Material Substitution** | Zamiana materialow na alternatywne (jesli zdefiniowane w BOM) | Must |
+| **Under-Consumption Alerts** | Alert gdy konsumpcja < expected (potential waste) | Should |
+| **Backflush Consumption** | Auto-konsumpcja materialow po outputcie (proporcjonalnie) | Should |
+| **Consumption Reversal** | Pelny reversal z reason code i approval | Done (enhance) |
+
+### 9.4 Output Enhancements (Phase 2)
+
+| Feature | Opis | Priority |
+|---------|------|----------|
+| **Multi-Output Support** | Jedno WO -> wiele roznych produktow (co-products) | Should |
+| **Output Quality Grade** | Przypisz grade (A, B, C) do outputu | Should |
+| **Rework Tracking** | Sledzenie przerobek z osobnym WO lub inline | Must |
+| **Scrap Recording** | Rejestracja scrapa z reason codes i cost tracking | Must |
+
+### 9.5 By-Product Enhancements (Phase 2)
+
+| Feature | Opis | Priority |
+|---------|------|----------|
+| **By-Product LP Creation** | Done | Done |
+| **By-Product Yield Tracking** | Sledzenie actual vs expected by-product yield | Should |
+| **By-Product Cost Allocation** | Alokacja kosztow do by-products | Could |
+
+### 9.6 Yield & Performance (Phase 2-3)
+
+| Feature | Opis | Priority |
+|---------|------|----------|
+| **Yield Variance Analysis** | Analiza wariancji z drill-down do przyczyn | Must |
+| **Theoretical vs Actual** | Porownanie planned/actual z trendami | Should |
+| **Yield Trend Reporting** | Wykresy trendu yield w czasie | Should |
+| **Loss Categorization** | Kategoryzacja strat: process, quality, material, other | Should |
+| **OEE Calculation** | Real-time OEE (Availability x Performance x Quality) | Must |
+
+### 9.7 Scanner Enhancements (Phase 3)
+
+| Feature | Opis | Priority |
+|---------|------|----------|
+| **Voice Commands** | Hands-free voice control dla operatorow | Could |
+| **Barcode-Driven Workflow** | Pelny workflow sterowany barkodami | Should |
+| **Offline Queue** | Kolejka offline dla slabego connectivity | Must |
+| **Multi-WO Mode** | Przelaczanie miedzy WO bez powrotu do menu | Should |
+
+---
+
+## 10. Competitive Comparison
+
+### 10.1 Industry Leaders Analysis
+
+| Feature | MonoPilot (MVP) | AVEVA MES | Plex | CSB-System | Aptean |
+|---------|-----------------|-----------|------|------------|--------|
+| **WO Lifecycle** | DONE | Full | Full | Full | Full |
+| **Material Consumption** | DONE | Full + batch | Full | Full | Full |
+| **Output Registration** | DONE | Full | Full | Full | Full |
+| **Genealogy/Traceability** | DONE | Advanced | Advanced | Full | Full |
+| **Yield Tracking** | DONE | + OEE | + OEE | Full | Full |
+| **Real-time Dashboard** | DONE | Advanced | Advanced | Full | Full |
+| **Scanner/Mobile** | DONE | Limited | Full | Limited | Full |
+| **Digital SOP** | Planned | Full | Full | Limited | Full |
+| **Connected Worker** | Planned | Full | Limited | No | Limited |
+| **Voice Commands** | Planned | Limited | No | No | No |
+| **Offline Mode** | Planned | Yes | Yes | Yes | Limited |
+
+### 10.2 Competitive Advantages
+
+**MonoPilot Strengths:**
+- LP-based consumption (granular traceability)
+- Multi-tenant SaaS architecture
+- Modern PWA scanner (works on any device)
+- Simple, intuitive UX (food industry focused)
+- Cost-effective for SMB
+
+**Gaps to Address (Phase 2-3):**
+- OEE calculation (AVEVA, Plex)
+- Digital SOP/work instructions (AVEVA, Plex)
+- Connected worker features (AVEVA)
+- Recipe/batch control (CSB)
+- Production cost analysis (Aptean)
+
+### 10.3 Feature Parity Roadmap
+
+| Feature | Current Status | Target Phase | Reference |
+|---------|----------------|--------------|-----------|
+| Real-time OEE | Not started | Phase 2 | AVEVA, Plex |
+| Digital SOP | Not started | Phase 2 | AVEVA, Plex |
+| Yield variance analysis | Not started | Phase 2 | All competitors |
+| Voice commands | Not started | Phase 3 | AVEVA (limited) |
+| Offline mode | Not started | Phase 3 | AVEVA, Plex, CSB |
+| Recipe execution | Not started | Phase 3+ | CSB |
+
+---
+
+## 11. Integration Points
+
+### 11.1 Z Technical Module
 - BOM snapshot kopiowany do WO
 - Routing operations kopiowane do wo_operations
 - Product info dla output LP
 
-### 9.2 Z Planning Module
+### 11.2 Z Planning Module
 - WO tworzony w Planning
 - Status updates z Planning
 
-### 9.3 Z Warehouse Module
+### 11.3 Z Warehouse Module
 - LP consumption decreases LP qty
 - Output creates new LP
 - LP status updates (consumed, available)
 
-### 9.4 Z Quality Module (Phase 2)
+### 11.4 Z Quality Module (Phase 2)
 - QA status na output LP
 - Quality holds blokuja LP
 
 ---
 
-## 10. Story Map
+## 12. Story Map
+
+### 12.1 MVP Stories (DONE)
 
 | Story | Tytul | Priority | Status |
 |-------|-------|----------|--------|
@@ -454,12 +591,61 @@ CREATE TABLE production_settings (
 | 4.19 | Genealogy Record Creation | Must | DONE |
 | 4.20 | Operation Timeline View | Should | DONE |
 
-**Summary:** 21 stories, 100% complete
+**MVP Summary:** 21 stories, 100% complete
+
+### 12.2 Enhancement Stories (PLANNED)
+
+See `docs/2-MANAGEMENT/epics/04-production-enhanced.md` for detailed stories.
 
 ---
 
-## 11. Version History
+## 13. Code Implementation Summary
+
+### 13.1 Core Services (Implemented)
+
+| Service | File | Stories |
+|---------|------|---------|
+| `work-order-service.ts` | WO CRUD, BOM/Routing copy | 3.10-3.14 |
+| `wo-start-service.ts` | WO start, material availability | 4.2 |
+| `wo-pause-service.ts` | Pause/resume, duration tracking | 4.3 |
+| `wo-complete-service.ts` | WO completion, validation | 4.6 |
+| `production-dashboard-service.ts` | KPIs, alerts, active WOs | 4.1 |
+| `output-registration-service.ts` | Output, consumption, genealogy | 4.12, 4.18, 4.19 |
+| `genealogy-service.ts` | Forward/backward trace | 4.19 |
+
+### 13.2 API Routes (Implemented)
+
+```
+/api/production/
+  dashboard/
+    kpis/
+    active-wos/
+    alerts/
+  work-orders/[id]/
+    start/
+    pause/
+    resume/
+    complete/
+    materials/
+      reserve/
+      available-lps/
+    consume/
+      reverse/
+    outputs/
+      preview/
+    operations/
+      [opId]/
+        start/
+        complete/
+    by-products/
+  settings/
+```
+
+---
+
+## 14. Version History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2025-12-09 | PM-Agent | Initial PRD from Epic 4 consolidation |
+| 1.1 | 2025-12-09 | PM-Agent | Added Planned Enhancements, Competitive Comparison, Code Summary |

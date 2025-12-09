@@ -1,7 +1,7 @@
 # Settings Module PRD
 
 **Epic:** 1 - Settings
-**Status:** DONE (19 stories)
+**Status:** DONE (19 stories) + Phase 2/3 Enhancements Planned
 **Ostatnia aktualizacja:** 2025-12-09
 
 ---
@@ -163,8 +163,8 @@ Settings Module stanowi fundament calego systemu MonoPilot. Odpowiada za:
 **Status Flow:**
 
 ```
-invited → active
-           ↓
+invited -> active
+           |
        inactive
 ```
 
@@ -245,7 +245,7 @@ invited → active
 **Status Flow:**
 
 ```
-active ↔ down ↔ maintenance
+active <-> down <-> maintenance
 ```
 
 ### 4.6 Production Line
@@ -307,33 +307,33 @@ MILK, EGGS, FISH, CRUSTACEANS, TREE_NUTS, PEANUTS, WHEAT, SOY, CELERY, MUSTARD, 
 
 ```
 Step 1: Company Info
-    → company_name, address, country, timezone
-    ↓
+    -> company_name, address, country, timezone
+    |
 Step 2: Default Settings
-    → currency, date_format, number_format
-    ↓
+    -> currency, date_format, number_format
+    |
 Step 3: First Warehouse
-    → warehouse code, name, address
-    ↓
+    -> warehouse code, name, address
+    |
 Step 4: Invite Users
-    → email, role selection
-    ↓
-Complete → wizard_completed = true
+    -> email, role selection
+    |
+Complete -> wizard_completed = true
 ```
 
 #### User Invitation Flow
 
 ```
 Admin creates invitation
-    ↓
+    |
 Email sent to user
-    ↓
+    |
 User clicks link
-    ↓
+    |
 User sets password
-    ↓
-User status: invited → active
-    ↓
+    |
+User status: invited -> active
+    |
 User can login
 ```
 
@@ -360,6 +360,7 @@ User can login
 | allergens | 1 | YES | EU14 + custom |
 | tax_codes | 4 | YES | VAT/tax rates |
 | activity_logs | 2 | YES | Dashboard feed |
+| warehouse_settings | 1 | YES | LP/scanner/barcode config |
 
 ### Indexes
 
@@ -505,11 +506,11 @@ CREATE POLICY "{table}_tenant_isolation" ON {table_name}
 
 | Modul | Integracja | Opis |
 |-------|------------|------|
-| Technical | products → org_id | Produkty per organizacja |
-| Planning | suppliers → org_id | Dostawcy per organizacja |
-| Planning | purchase_orders → warehouse_id | PO target warehouse |
-| Production | work_orders → production_line_id | WO execution line |
-| Warehouse | license_plates → location_id | LP location tracking |
+| Technical | products -> org_id | Produkty per organizacja |
+| Planning | suppliers -> org_id | Dostawcy per organizacja |
+| Planning | purchase_orders -> warehouse_id | PO target warehouse |
+| Production | work_orders -> production_line_id | WO execution line |
+| Warehouse | license_plates -> location_id | LP location tracking |
 | All | activity_logs | Dashboard feed |
 
 ### External Integrations
@@ -550,15 +551,143 @@ CREATE POLICY "{table}_tenant_isolation" ON {table_name}
 
 ---
 
-## 11. Version History
+## 11. Settings Options Matrix
+
+### Obecnie konfigurowalne opcje
+
+| Kategoria | Opcja | Lokalizacja | Typ | Status |
+|-----------|-------|-------------|-----|--------|
+| **Organization** | Company name | organizations.company_name | text | DONE |
+| | Logo | organizations.logo_url | file | DONE |
+| | Address | organizations.address | text | DONE |
+| | Country | organizations.country | select | DONE |
+| | NIP/VAT | organizations.nip_vat | text | DONE |
+| | Fiscal year start | organizations.fiscal_year_start | date | DONE |
+| **Regional** | Date format | organizations.date_format | select | DONE |
+| | Number format | organizations.number_format | select | DONE |
+| | Unit system | organizations.unit_system | select | DONE |
+| | Timezone | organizations.timezone | select | DONE |
+| | Currency | organizations.default_currency | select | DONE |
+| | Language | organizations.default_language | select | DONE |
+| **Warehouse** | LP number format | warehouse_settings.lp_number_format | text | DONE |
+| | Auto print labels | warehouse_settings.auto_print_labels | boolean | DONE |
+| | Allow over receipt | warehouse_settings.allow_over_receipt | boolean | DONE |
+| | Over receipt tolerance | warehouse_settings.over_receipt_tolerance_pct | number | DONE |
+| **Scanner** | Session timeout | warehouse_settings.scanner_session_timeout_mins | number | DONE |
+| | Warning timeout | warehouse_settings.scanner_warning_timeout_secs | number | DONE |
+| | Max offline operations | warehouse_settings.max_offline_operations | number | DONE |
+| **Barcode** | LP format | warehouse_settings.barcode_format_lp | select | DONE |
+| | Product format | warehouse_settings.barcode_format_product | select | DONE |
+| | Location format | warehouse_settings.barcode_format_location | select | DONE |
+| **Modules** | Technical | organizations.modules_enabled | array | DONE |
+| | Planning | organizations.modules_enabled | array | DONE |
+| | Production | organizations.modules_enabled | array | DONE |
+| | Warehouse | organizations.modules_enabled | array | DONE |
+| | Quality | organizations.modules_enabled | array | DONE |
+| | Shipping | organizations.modules_enabled | array | DONE |
+
+### Brakujace opcje (do Phase 2/3)
+
+| Kategoria | Opcja | Opis | Priority |
+|-----------|-------|------|----------|
+| **User Preferences** | Theme | dark/light/system | Should Have |
+| | Dashboard layout | customizable widgets | Could Have |
+| | Notification preferences | email/push/in-app | Should Have |
+| **Advanced Permissions** | Custom roles | tworzenie wlasnych rol | Could Have |
+| | Fine-grained permissions | per-feature permissions | Could Have |
+| **Multi-site** | Site hierarchy | parent/child organizations | Should Have |
+| | Cross-site transfers | transfer between sites | Should Have |
+| **Audit** | Audit log viewer | who changed what | Should Have |
+| | Data retention policy | auto-delete old data | Could Have |
+| **Integrations** | API keys management | dla zewnetrznych systemow | Should Have |
+| | Webhooks | event notifications | Could Have |
+
+---
+
+## 12. Competitive Analysis - Settings Module
+
+### Porownianie z konkurencja
+
+| Funkcja | AVEVA MES | Plex | Aptean | CSB | MonoPilot |
+|---------|-----------|------|--------|-----|-----------|
+| **Multi-tenancy** | Per-instance | Single-instance | Per-instance | Per-instance | Multi-tenant SaaS |
+| **Role system** | Configurable | Predefined | MS Dynamics | Custom | 10 predefined |
+| **User invitation** | Manual | Email | Manual | Manual | Email + JWT |
+| **Warehouse hierarchy** | Deep | Deep | Deep | Deep | Flat (1 level) |
+| **Location types** | 10+ | 10+ | 10+ | 10+ | 6 types |
+| **Module toggles** | License-based | Module-based | Module-based | Module-based | Toggle-based |
+| **Onboarding wizard** | None (consultant) | Limited | None | None | 4-step wizard |
+| **Self-service setup** | No | Limited | No | No | Yes |
+| **Implementation time** | 6-18 months | 3-9 months | 3-12 months | 6-18 months | Weeks |
+
+### MonoPilot Advantages
+
+1. **Self-service onboarding** - konkurenci wymagaja consultantow
+2. **Email-based invitations** - prosty flow (JWT + 7-day expiry)
+3. **Modern UX** - Next.js vs legacy interfaces
+4. **Multi-tenant architecture** - niski koszt per-org
+5. **Fast deployment** - tygodnie vs miesiace
+
+### Gaps vs Competition
+
+| Gap | AVEVA/Plex | MonoPilot Status | Priority |
+|-----|------------|------------------|----------|
+| Multi-site support | Full hierarchy | Single-org only | Phase 3 |
+| Custom roles | Configurable | 10 predefined | Phase 2 |
+| Audit log viewer | Full trail | Basic activity log | Phase 2 |
+| API key management | Full | None | Phase 2 |
+| SSO/SAML | Yes | No | Phase 3 |
+| Data export/import | Full | None | Phase 2 |
+| Webhook notifications | Yes | No | Phase 3 |
+| User groups | Yes | No | Phase 2 |
+
+---
+
+## 13. Planned Enhancements
+
+### Phase 2 (Post-MVP)
+
+| ID | Feature | Opis | Priority | Effort |
+|----|---------|------|----------|--------|
+| ENH-SET-01 | User preferences | Theme, language per user | Should Have | M |
+| ENH-SET-02 | Notification preferences | Email/push settings | Should Have | M |
+| ENH-SET-03 | Audit log viewer | Przegladarka zmian | Should Have | L |
+| ENH-SET-04 | API keys management | Generate/revoke keys | Should Have | M |
+| ENH-SET-05 | Import/Export settings | Backup/restore config | Should Have | M |
+| ENH-SET-06 | User groups | Group-based permissions | Should Have | L |
+| ENH-SET-07 | Advanced role editor | Custom permissions | Could Have | L |
+| ENH-SET-08 | Organization branding | Custom colors, logo placement | Could Have | S |
+
+### Phase 3 (Future)
+
+| ID | Feature | Opis | Priority | Effort |
+|----|---------|------|----------|--------|
+| ENH-SET-09 | Multi-site support | Parent/child organizations | Should Have | XL |
+| ENH-SET-10 | SSO/SAML integration | Enterprise auth | Should Have | L |
+| ENH-SET-11 | Webhooks | Event notifications | Could Have | M |
+| ENH-SET-12 | Feature flags per org | Beta features | Could Have | M |
+| ENH-SET-13 | Custom fields | Configurable fields | Could Have | L |
+| ENH-SET-14 | Data retention policies | Auto-archive | Could Have | M |
+| ENH-SET-15 | Advanced ABAC | Attribute-based access | Won't Have (v1) | XL |
+
+### Effort Legend
+- S = Small (1-2 days)
+- M = Medium (3-5 days)
+- L = Large (1-2 weeks)
+- XL = Extra Large (2-4 weeks)
+
+---
+
+## 14. Version History
 
 | Wersja | Data | Opis |
 |--------|------|------|
 | 1.0 | 2025-12-09 | Initial PRD based on discovery |
+| 1.1 | 2025-12-09 | Added competitive analysis, enhancements, settings matrix |
 
 ---
 
-## 12. Services Reference
+## 15. Services Reference
 
 **Key service files:**
 - `apps/frontend/lib/services/warehouse-service.ts`
@@ -571,3 +700,5 @@ CREATE POLICY "{table}_tenant_isolation" ON {table_name}
 - `apps/frontend/lib/services/wizard-service.ts`
 - `apps/frontend/lib/services/module-service.ts`
 - `apps/frontend/lib/services/dashboard-service.ts`
+- `apps/frontend/lib/services/session-service.ts`
+- `apps/frontend/lib/services/user-validation.ts`

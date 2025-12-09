@@ -1,7 +1,7 @@
 # Technical Module PRD
 
 **Epic:** 2 - Technical
-**Status:** DONE (28 stories)
+**Status:** DONE (28 stories) + PLANNED ENHANCEMENTS
 **Ostatnia aktualizacja:** 2025-12-09
 
 ---
@@ -184,22 +184,22 @@ Technical Module odpowiada za zarzadzanie danymi technicznymi produktow:
 
 | Status | Opis | Transitions |
 |--------|------|-------------|
-| Draft | W przygotowaniu | → Active |
-| Active | Aktywny do produkcji | → Phased Out, Inactive |
-| Phased Out | Wygasajacy | → Inactive |
+| Draft | W przygotowaniu | -> Active |
+| Active | Aktywny do produkcji | -> Phased Out, Inactive |
+| Phased Out | Wygasajacy | -> Inactive |
 | Inactive | Nieaktywny | - |
 
 **Status Flow:**
 
 ```
-Draft → Active → Phased Out → Inactive
-           ↓
-       Inactive
+Draft -> Active -> Phased Out -> Inactive
+            |
+        Inactive
 ```
 
 **Version Auto-Increment:**
 ```
-1.0 → 1.1 → 1.2 → ... → 1.9 → 2.0 → 2.1 ...
+1.0 -> 1.1 -> 1.2 -> ... -> 1.9 -> 2.0 -> 2.1 ...
 ```
 
 ### 4.5 BOM Items
@@ -322,33 +322,33 @@ Draft → Active → Phased Out → Inactive
 
 ```
 Select product type
-    ↓
+    |
 Enter code (IMMUTABLE) + name
-    ↓
+    |
 Set UoM + optional fields
-    ↓
+    |
 Assign allergens (contains/may_contain)
-    ↓
-Save → version = 1.0
+    |
+Save -> version = 1.0
 ```
 
 #### BOM Creation
 
 ```
 Select parent product (FG/WIP)
-    ↓
+    |
 System auto-assigns version (1.0 or next)
-    ↓
+    |
 Set effective_from date
-    ↓
+    |
 Add BOM items (components)
-    ↓
+    |
 Optional: assign routing
-    ↓
+    |
 Optional: set conditional flags
-    ↓
+    |
 Save as Draft
-    ↓
+    |
 Activate when ready
 ```
 
@@ -356,15 +356,15 @@ Activate when ready
 
 ```
 Select source BOM
-    ↓
+    |
 Click "Clone"
-    ↓
+    |
 System creates new version
-    ↓
+    |
 Copies all items
-    ↓
+    |
 Sets effective_from = today
-    ↓
+    |
 Status = Draft
 ```
 
@@ -372,20 +372,20 @@ Status = Draft
 
 ```
 Select LP or Batch Number
-    ↓
+    |
 Choose options:
   - Include shipped LPs
   - Include notifications
-    ↓
+    |
 Run simulation
-    ↓
+    |
 View results:
   - Affected LPs count
   - Total quantity
   - Locations
   - Forward trace (where did it go)
   - Backward trace (where did it come from)
-    ↓
+    |
 Save simulation record (immutable)
 ```
 
@@ -546,7 +546,7 @@ FOR EACH ROW EXECUTE FUNCTION increment_product_version();
 | FR-TECH-15 | User moze wykonac recall simulation | Must Have | DONE |
 | FR-TECH-16 | Recall simulation jest immutable audit record | Must Have | DONE |
 | FR-TECH-17 | Technical settings kontroluja field visibility | Should Have | DONE |
-| FR-TECH-18 | BOM status flow: Draft → Active → Phased Out → Inactive | Must Have | DONE |
+| FR-TECH-18 | BOM status flow: Draft -> Active -> Phased Out -> Inactive | Must Have | DONE |
 | FR-TECH-19 | Product allergens dziedzicza z BOM items | Should Have | DONE |
 
 ---
@@ -621,6 +621,7 @@ FOR EACH ROW EXECUTE FUNCTION increment_product_version();
 | Wersja | Data | Opis |
 |--------|------|------|
 | 1.0 | 2025-12-09 | Initial PRD based on discovery |
+| 1.1 | 2025-12-09 | Added competitive analysis and planned enhancements |
 
 ---
 
@@ -646,9 +647,9 @@ FOR EACH ROW EXECUTE FUNCTION increment_product_version();
 ```
 Rule: For same product_id, effective dates cannot overlap
 Example:
-  BOM v1.0: effective_from=2024-01-01, effective_to=2024-06-30 ✓
-  BOM v1.1: effective_from=2024-07-01, effective_to=NULL ✓
-  BOM v1.2: effective_from=2024-05-01 ✗ OVERLAP ERROR
+  BOM v1.0: effective_from=2024-01-01, effective_to=2024-06-30 OK
+  BOM v1.1: effective_from=2024-07-01, effective_to=NULL OK
+  BOM v1.2: effective_from=2024-05-01 OVERLAP ERROR
 ```
 
 ### Active BOM Selection
@@ -670,8 +671,235 @@ LIMIT 1;
 function incrementVersion(version: string): string {
   const [major, minor] = version.split('.').map(Number)
   if (minor >= 9) {
-    return `${major + 1}.0` // 1.9 → 2.0
+    return `${major + 1}.0` // 1.9 -> 2.0
   }
-  return `${major}.${minor + 1}` // 1.0 → 1.1
+  return `${major}.${minor + 1}` // 1.0 -> 1.1
 }
 ```
+
+---
+
+## 14. Competitive Analysis
+
+### Porownanie z konkurencja w obszarze Technical/Recipe Management
+
+| Funkcja | MonoPilot (Current) | CSB-System | Aptean | AVEVA | Plex |
+|---------|---------------------|------------|--------|-------|------|
+| **Products** |
+| Product types | 6 typow (RM, WIP, FG, PKG, BP, CUSTOM) | Pelna hierarchia | Formuly + produkty | Recipe-based | Hierarchia |
+| Product variants | - | Rozmiar, smak | Pelne warianty | - | PLM integration |
+| Nutritional info | - | Pelne EU 1169/2011 | TAK | Częsciowe | - |
+| Product lifecycle | active/inactive | Pelne PLM | TAK | TAK | TAK |
+| Product images | - | TAK | TAK | - | TAK |
+| **BOMs** |
+| Versioning | Date-based X.Y | TAK | Formula versions | Recipe versions | ECO-based |
+| BOM comparison | - | TAK | TAK | TAK | TAK |
+| Alternatives | TAK (priority-based) | TAK | TAK | TAK | TAK |
+| Phantom BOMs | - | TAK | TAK | - | TAK |
+| Costing | Basic | Zaawansowane | TAK | - | TAK |
+| Scrap factors | Per-line % | Per-line % | TAK | TAK | TAK |
+| **Routings** |
+| Setup vs Run time | - | TAK | TAK | TAK | TAK |
+| Labor requirements | Per-operation | Crew planning | TAK | - | TAK |
+| Tool requirements | - | TAK | - | - | TAK |
+| Machine capabilities | Basic assignment | Pelne matching | TAK | TAK | TAK |
+| **Allergens** |
+| EU 14 major | TAK (preloaded) | TAK | TAK | - | - |
+| Cross-contamination | - | Risk levels | TAK | - | - |
+| Cleaning validation | - | TAK | - | - | - |
+| Allergen matrix | - | TAK | TAK | - | - |
+| **Traceability** |
+| Forward/Backward | TAK | TAK | TAK | TAK | TAK |
+| Batch genealogy viz | Basic tree | Visual tree | TAK | TAK | TAK |
+| Recall simulation | TAK | TAK | TAK | - | TAK |
+| Export (XML/JSON) | - | TAK | TAK | - | - |
+
+### Kluczowe wnioski z analizy konkurencji
+
+1. **CSB-System** (Food-specific ERP):
+   - Lider w recipe management dla food
+   - Deep integration z nutritional calculation
+   - Cutting optimization dla miesa
+
+2. **Aptean** (Formula/Recipe Management):
+   - Silne w NPD (New Product Development)
+   - Formula scaling
+   - Regulatory compliance (EU 1169/2011)
+
+3. **AVEVA** (Recipe-based Process):
+   - Batch execution focus
+   - Process recipe management
+   - ISA-88 compliance
+
+4. **Plex** (Manufacturing Cloud):
+   - PLM integration
+   - Yield tracking
+   - Cost reporting
+
+### Recommended Enhancements Priority
+
+| Priority | Area | Enhancement | Competitor Match |
+|----------|------|-------------|------------------|
+| HIGH | Products | Nutritional info (EU 1169/2011) | CSB, Aptean |
+| HIGH | BOMs | BOM comparison (diff) | All competitors |
+| HIGH | Traceability | Batch genealogy visualization | All competitors |
+| MEDIUM | Products | Product lifecycle (obsolete, discontinued) | All competitors |
+| MEDIUM | BOMs | Phantom BOMs | CSB, Aptean, Plex |
+| MEDIUM | Routings | Setup vs Run time | All competitors |
+| MEDIUM | Allergens | Cross-contamination risk levels | CSB, Aptean |
+| LOW | Products | Product images/documents | CSB, Aptean, Plex |
+| LOW | Products | Product variants (size, flavor) | CSB, Aptean |
+| LOW | Traceability | Export (XML/JSON for audits) | CSB, Aptean |
+
+---
+
+## 15. Planned Enhancements
+
+### Phase 2A: Products Enhancements (10-15 stories)
+
+| ID | Enhancement | Description | Priority | Traces To |
+|----|-------------|-------------|----------|-----------|
+| ENH-P-01 | Nutritional Information | EU 1169/2011 compliant nutritional facts | HIGH | CSB, Aptean parity |
+| ENH-P-02 | Product Lifecycle | Status: active, obsolete, discontinued, pending_approval | HIGH | Industry standard |
+| ENH-P-03 | Product Images | Image upload (primary, gallery), thumbnails | LOW | UX improvement |
+| ENH-P-04 | Product Documents | Spec sheets, CoA uploads, document versioning | MEDIUM | Regulatory |
+| ENH-P-05 | Product Variants | Size, flavor, packaging variants with parent-child | LOW | Aptean parity |
+| ENH-P-06 | Product Categories Tree | Hierarchical categories (not flat) | MEDIUM | Better organization |
+
+### Phase 2B: BOM Enhancements (8-12 stories)
+
+| ID | Enhancement | Description | Priority | Traces To |
+|----|-------------|-------------|----------|-----------|
+| ENH-B-01 | BOM Comparison | Visual diff between two BOM versions | HIGH | All competitors |
+| ENH-B-02 | BOM Costing Summary | Total cost breakdown (material, labor, overhead) | HIGH | Cost control |
+| ENH-B-03 | Phantom BOMs | Sub-assemblies that don't create inventory | MEDIUM | CSB, Plex parity |
+| ENH-B-04 | BOM Import/Export | CSV/Excel import, export to ERP formats | MEDIUM | Integration |
+| ENH-B-05 | Scrap/Waste Factors | Enhanced per-line with waste type tracking | LOW | Aptean parity |
+| ENH-B-06 | BOM Where-Used | "Where is this component used?" report | MEDIUM | Usability |
+
+### Phase 2C: Routing Enhancements (6-8 stories)
+
+| ID | Enhancement | Description | Priority | Traces To |
+|----|-------------|-------------|----------|-----------|
+| ENH-R-01 | Setup vs Run Time | Separate setup_minutes and run_minutes_per_unit | MEDIUM | All competitors |
+| ENH-R-02 | Labor Requirements | Crew size, skill level per operation | MEDIUM | Planning accuracy |
+| ENH-R-03 | Tool Requirements | Tool assignment per operation | LOW | Plex parity |
+| ENH-R-04 | Machine Capability Matching | Only show compatible machines | MEDIUM | Scheduling |
+| ENH-R-05 | Operation Dependencies | Parallel vs sequential operations | LOW | Complex recipes |
+
+### Phase 2D: Allergen Enhancements (4-6 stories)
+
+| ID | Enhancement | Description | Priority | Traces To |
+|----|-------------|-------------|----------|-----------|
+| ENH-A-01 | Cross-Contamination Levels | Risk: High/Medium/Low per allergen pair | MEDIUM | CSB, Aptean |
+| ENH-A-02 | Cleaning Validation | Required cleaning between allergen changeovers | MEDIUM | Food safety |
+| ENH-A-03 | Allergen Matrix Report | Product x Allergen matrix view | MEDIUM | Audit support |
+| ENH-A-04 | Allergen Declaration | Print-ready allergen statement generator | LOW | Label compliance |
+
+### Phase 2E: Traceability Enhancements (6-8 stories)
+
+| ID | Enhancement | Description | Priority | Traces To |
+|----|-------------|-------------|----------|-----------|
+| ENH-T-01 | Batch Genealogy Visualization | Interactive tree/graph view | HIGH | UX, All competitors |
+| ENH-T-02 | Recall Drill Simulation | Timed drill with metrics | MEDIUM | FDA compliance |
+| ENH-T-03 | Traceability Export | XML/JSON export for auditors | MEDIUM | Regulatory |
+| ENH-T-04 | Mock Recall Scheduling | Scheduled recall drills | LOW | GFSI requirements |
+| ENH-T-05 | Customer Notification Templates | Email templates for recall notices | LOW | Operations |
+
+---
+
+## 16. Settings Options Matrix
+
+### Current Settings
+
+| Setting | Type | Default | Configurable | Description |
+|---------|------|---------|--------------|-------------|
+| product_field_config | JSON | All visible | YES | Field visibility/mandatory per field |
+| max_bom_versions | INTEGER | NULL (unlimited) | YES | Limit BOM versions per product |
+| use_conditional_flags | BOOLEAN | false | YES | Enable conditional BOM items |
+| conditional_flags | ARRAY | 8 flags | YES | List of available flags |
+
+### Proposed New Settings (Phase 2)
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| enable_nutritional | BOOLEAN | false | Enable nutritional info on products |
+| nutritional_standard | ENUM | EU_1169 | EU_1169 / FDA / BOTH |
+| enable_product_images | BOOLEAN | false | Enable product image uploads |
+| enable_phantom_boms | BOOLEAN | false | Enable phantom BOM type |
+| allergen_risk_levels | BOOLEAN | false | Enable cross-contamination tracking |
+| enable_setup_time | BOOLEAN | false | Enable setup vs run time in routings |
+| traceability_export_format | ENUM | JSON | JSON / XML / BOTH |
+| recall_drill_frequency_days | INTEGER | 90 | Suggested recall drill frequency |
+
+---
+
+## 17. Implementation Code Analysis
+
+### Current Implementation Strengths
+
+**BOM Service (`bom-service.ts`):**
+- Dobrze zaimplementowane wersjonowanie (1.0 -> 1.1 -> 2.0)
+- Date-based active BOM selection
+- Production lines assignment
+- Labor cost calculation
+
+**BOM Item Service (`bom-item-service.ts`):**
+- Operation assignment per item
+- Line-specific configurations
+- Input/output grouping by operation
+- Scrap calculation helper
+
+**Routing Service (`routing-service.ts`):**
+- Reusable routing templates
+- Machine assignment
+- Labor cost per operation
+- In-use check before delete
+
+**Traceability Service (`traceability-service.ts`):**
+- Forward/backward trace via recursive CTE
+- CSV export
+- Summary calculation
+
+**Recall Service (`recall-service.ts`):**
+- Comprehensive recall simulation
+- Location analysis
+- Customer impact calculation
+- Regulatory info (FDA reportable)
+- Financial impact estimation
+
+### Implementation Gaps for Enhancements
+
+| Enhancement | Gap | Estimated Effort |
+|-------------|-----|------------------|
+| Nutritional info | New table `product_nutritional`, new service | 5-8 days |
+| BOM comparison | New comparison logic, UI component | 3-5 days |
+| Phantom BOMs | New BOM type, production logic change | 5-8 days |
+| Setup/Run time | Schema change, UI update | 2-3 days |
+| Batch genealogy viz | Frontend D3.js/React Flow component | 5-8 days |
+| Cross-contamination | New table, allergen service extension | 3-5 days |
+
+---
+
+## 18. Appendix: Validation Schemas Summary
+
+### Product Schemas (`product-schemas.ts`)
+
+| Schema | Fields | Validation |
+|--------|--------|------------|
+| productCreateSchema | code, name, type, uom, ... | code: 2-50 chars, alphanumeric |
+| productUpdateSchema | all except code | code immutable |
+| allergenAssignmentSchema | contains[], may_contain[] | UUID arrays |
+| productTypeCreateSchema | code, name | code: uppercase only |
+| technicalSettingsSchema | product_field_config, flags | nested validation |
+
+### BOM Schemas (`bom-schemas.ts`)
+
+| Schema | Fields | Validation |
+|--------|--------|------------|
+| CreateBOMSchema | product_id, effective_from, output_qty, ... | dates, positive numbers |
+| UpdateBOMSchema | all except product_id | partial update |
+| CloneBOMSchema | effective_from, effective_to | to > from |
+| CreateBOMItemSchema | component_id, operation_seq, quantity, ... | positive qty, 0-100 scrap |
+| SetBomLinesSchema | lines[] | no duplicate line_ids |
+| CreateBOMItemAlternativeSchema | alternative_component_id, priority, ratio | positive values |

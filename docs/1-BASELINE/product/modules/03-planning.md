@@ -1,7 +1,7 @@
 # Planning Module PRD
 
 **Epic:** 3 - Planning
-**Status:** DONE (30 stories)
+**Status:** DONE (30 stories) + Planned Enhancements
 **Ostatnia aktualizacja:** 2025-12-09
 
 ---
@@ -77,6 +77,17 @@ Planning Module odpowiada za planowanie i zarzadzanie zamowieniami:
 | `po_require_approval` | ON | PO requires manager approval |
 | `po_approval_threshold` | 10000 | Threshold for mandatory approval |
 | `auto_create_grn` | OFF | Auto-create GRN from PO |
+
+### Settings Options Matrix (Current vs Planned)
+
+| Setting | Current | Phase 2 | Phase 3 |
+|---------|---------|---------|---------|
+| PO approval workflow | Single threshold | Multi-level matrix | Role-based matrix |
+| Currency handling | Single currency PO | Multi-currency view | Landed cost |
+| Supplier rating | - | Basic scorecard | Full SQM |
+| Lead time tracking | Static field | Promised vs actual | Forecast-based |
+| Reorder points | - | Manual | Auto-calculated |
+| Safety stock | - | Manual per product | Dynamic calculation |
 
 ---
 
@@ -161,8 +172,8 @@ Planning Module odpowiada za planowanie i zarzadzanie zamowieniami:
 **PO Status Flow:**
 
 ```
-draft → submitted → approved → receiving → closed
-   ↓         ↓           ↓
+draft -> submitted -> approved -> receiving -> closed
+   |         |           |
 cancelled  rejected   cancelled
 ```
 
@@ -232,8 +243,8 @@ cancelled  rejected   cancelled
 **TO Status Flow:**
 
 ```
-draft → planned → partially_shipped → shipped → partially_received → received
-   ↓        ↓                             ↓
+draft -> planned -> partially_shipped -> shipped -> partially_received -> received
+   |        |                             |
 cancelled cancelled                  cancelled
 ```
 
@@ -298,8 +309,8 @@ cancelled cancelled                  cancelled
 **WO Status Flow (full impl in Epic 4):**
 
 ```
-draft → released → in_progress → completed → closed
-   ↓        ↓            ↓
+draft -> released -> in_progress -> completed -> closed
+   |        |            |
 cancelled cancelled   cancelled
 ```
 
@@ -313,13 +324,13 @@ cancelled cancelled   cancelled
 
 ```
 Enter code + name
-    ↓
+    |
 Set currency + tax_code
-    ↓
+    |
 Set payment_terms + lead_time_days
-    ↓
+    |
 Optional: Set MOQ
-    ↓
+    |
 Save supplier
 ```
 
@@ -327,22 +338,22 @@ Save supplier
 
 ```
 Select supplier
-    ↓
+    |
 System inherits: currency, payment_terms
-    ↓
+    |
 Select warehouse
-    ↓
+    |
 Set expected_delivery_date
-    ↓
+    |
 Add lines:
   - Select product
   - System inherits: uom, default price
   - Enter quantity
-    ↓
+    |
 System calculates: subtotal, tax, total
-    ↓
+    |
 Save as Draft
-    ↓
+    |
 Submit for approval (if required)
 ```
 
@@ -350,35 +361,35 @@ Submit for approval (if required)
 
 ```
 PO status = submitted
-    ↓
+    |
 Manager reviews
-    ↓
+    |
 Approve:
-  → status = approved
-  → approved_by, approved_at filled
+  -> status = approved
+  -> approved_by, approved_at filled
     OR
 Reject:
-  → status = draft (returned)
-  → rejection_reason filled
+  -> status = draft (returned)
+  -> rejection_reason filled
 ```
 
 #### TO Creation
 
 ```
 Select from_warehouse
-    ↓
+    |
 Select to_warehouse (must be different)
-    ↓
+    |
 Set planned dates
-    ↓
+    |
 Add lines:
   - Select product
   - Enter quantity
-    ↓
+    |
 Optional: Select specific LPs
-    ↓
+    |
 Save as Draft
-    ↓
+    |
 Set status = planned
 ```
 
@@ -386,34 +397,34 @@ Set status = planned
 
 ```
 TO status = planned
-    ↓
+    |
 Enter ship quantities per line
-    ↓
+    |
 System validates: shipped_qty <= quantity
-    ↓
+    |
 First shipment:
-  → actual_ship_date = today (immutable)
-    ↓
+  -> actual_ship_date = today (immutable)
+    |
 System updates status:
-  - All shipped → shipped
-  - Partial → partially_shipped
+  - All shipped -> shipped
+  - Partial -> partially_shipped
 ```
 
 #### WO Creation (stub)
 
 ```
 Select product (FG/WIP only)
-    ↓
+    |
 System finds active BOM for date
-    ↓
+    |
 Enter planned_quantity
-    ↓
+    |
 Select production_line
-    ↓
+    |
 Set planned_start/end dates
-    ↓
+    |
 Save as Draft
-    ↓
+    |
 Release when ready
 ```
 
@@ -425,10 +436,10 @@ Release when ready
 
 ```
 Scan PO barcode (or select from dropdown)
-    ↓
+    |
 Display: PO lines with open qty
-    ↓
-→ Continue in Warehouse module (GRN creation)
+    |
+-> Continue in Warehouse module (GRN creation)
 ```
 
 ---
@@ -560,7 +571,7 @@ CREATE UNIQUE INDEX work_orders_org_wo_number_unique ON work_orders(org_id, wo_n
 | FR-PLAN-08 | System auto-calculates PO totals | Must Have | DONE |
 | FR-PLAN-09 | PO wymaga approval (configurable) | Should Have | DONE |
 | FR-PLAN-10 | Manager moze approve/reject PO | Must Have | DONE |
-| FR-PLAN-11 | PO status flow: draft → submitted → approved → receiving → closed | Must Have | DONE |
+| FR-PLAN-11 | PO status flow: draft -> submitted -> approved -> receiving -> closed | Must Have | DONE |
 | FR-PLAN-12 | TO number jest auto-generated (TO-YYYY-NNN) | Must Have | DONE |
 | FR-PLAN-13 | TO from_warehouse != to_warehouse validation | Must Have | DONE |
 | FR-PLAN-14 | TO wspiera partial shipment | Must Have | DONE |
@@ -589,12 +600,12 @@ CREATE UNIQUE INDEX work_orders_org_wo_number_unique ON work_orders(org_id, wo_n
 ### Data Flow
 
 ```
-Supplier → PO Header (currency, payment_terms)
-Product → PO Line (uom, description)
-Product → TO Line (uom)
-BOM → WO (snapshot)
-PO → GRN (receiving in Warehouse)
-TO → Stock Movement (shipping/receiving)
+Supplier -> PO Header (currency, payment_terms)
+Product -> PO Line (uom, description)
+Product -> TO Line (uom)
+BOM -> WO (snapshot)
+PO -> GRN (receiving in Warehouse)
+TO -> Stock Movement (shipping/receiving)
 ```
 
 ---
@@ -638,15 +649,98 @@ TO → Stock Movement (shipping/receiving)
 
 ---
 
-## 11. Version History
+## 11. Planned Enhancements
+
+### Porownanie z konkurencja
+
+| Funkcja | Aptean | Plex | CSB | AVEVA | MonoPilot Current | Phase |
+|---------|--------|------|-----|-------|-------------------|-------|
+| Supplier CRUD | YES | YES | YES | YES | YES | MVP |
+| PO Workflow | YES | YES | YES | YES | YES | MVP |
+| TO Workflow | YES | YES | YES | YES | YES | MVP |
+| WO Creation | YES | YES | YES | YES | YES (stub) | MVP |
+| Supplier Scorecard | YES | YES | YES | - | - | Phase 2 |
+| Lead Time Tracking | YES | YES | YES | YES | Partial | Phase 2 |
+| Supplier Price Lists | YES | YES | YES | - | - | Phase 2 |
+| Multi-Level Approval | YES | YES | - | YES | - | Phase 2 |
+| Blanket PO | YES | YES | YES | - | - | Phase 2 |
+| MRP/MPS | YES | YES | YES | YES | - | Phase 3 |
+| Demand Forecasting | YES | YES | YES | YES | - | Phase 3 |
+| Safety Stock Mgmt | YES | YES | YES | YES | - | Phase 3 |
+| WO Scheduling (Gantt) | - | YES | - | YES | - | Phase 3 |
+| Capacity Planning | - | YES | - | YES | - | Phase 3 |
+| AI-Optimized Scheduling | - | - | - | YES | - | Phase 4+ |
+
+### Enhancement Categories
+
+#### Phase 2 - Supplier & PO Enhancements (Epic 3.5)
+
+**Suppliers:**
+- Supplier rating/scorecard (basic)
+- Lead time tracking (promised vs actual)
+- Supplier price lists (with date validity)
+- Multiple contacts per supplier
+- Supplier documents (certificates, contracts)
+- Preferred suppliers per product (ranking)
+
+**Purchase Orders:**
+- PO templates (recurring orders)
+- Blanket POs (frame agreements)
+- PO split/merge
+- Multi-level approval matrix
+- PO change request workflow
+- Supplier confirmation workflow
+
+**Transfer Orders:**
+- TO priority field
+- TO templates
+- Inter-warehouse transfer optimization
+
+**Work Orders:**
+- WO templates
+- WO copy function
+- Material availability check before release
+
+#### Phase 3 - Advanced Planning (Epic 13)
+
+**MRP Basics:**
+- Safety stock configuration
+- Reorder point calculation
+- Lead time consideration
+- Below safety stock alerts
+- Simple demand view
+- Auto-replenishment rules
+
+**Demand Management:**
+- Historical demand analysis
+- Basic demand forecasting
+- Forecast vs actual comparison
+
+**WO Scheduling:**
+- WO Gantt view
+- WO grouping (campaigns)
+- Capacity check before release
+
+#### Phase 3 - Supplier Quality (Epic 14)
+
+- Supplier audits
+- Full supplier scorecards
+- Supplier portal (basic)
+- CoA verification workflow
+- Approved Supplier List (ASL)
+
+---
+
+## 12. Version History
 
 | Wersja | Data | Opis |
 |--------|------|------|
 | 1.0 | 2025-12-09 | Initial PRD based on discovery |
+| 1.1 | 2025-12-09 | Added Planned Enhancements, Competitive Analysis |
 
 ---
 
-## 12. Services Reference
+## 13. Services Reference
 
 **Key service files:**
 - `apps/frontend/lib/services/purchase-order-service.ts`
@@ -654,14 +748,20 @@ TO → Stock Movement (shipping/receiving)
 - `apps/frontend/lib/services/transfer-order-service.ts`
 - `apps/frontend/lib/services/work-order-service.ts`
 
+**Validation schemas:**
+- `apps/frontend/lib/validation/planning-schemas.ts`
+- `apps/frontend/lib/validation/transfer-order-schemas.ts`
+- `apps/frontend/lib/validation/work-order-schemas.ts`
+
 **API routes:**
 - `apps/frontend/app/api/planning/suppliers/route.ts`
 - `apps/frontend/app/api/planning/purchase-orders/route.ts`
 - `apps/frontend/app/api/planning/transfer-orders/route.ts`
+- `apps/frontend/app/api/planning/work-orders/route.ts`
 
 ---
 
-## 13. Key Business Rules
+## 14. Key Business Rules
 
 ### PO Number Generation
 
@@ -714,24 +814,34 @@ function calculateToStatus(lines: ToLine[]): string {
 
 ```
 IF po_require_approval = false:
-  → PO can be submitted directly to approved
+  -> PO can be submitted directly to approved
 
 IF po_require_approval = true:
   IF po.total >= po_approval_threshold:
-    → Manager approval required
+    -> Manager approval required
   ELSE:
-    → Auto-approve or submit
+    -> Auto-approve or submit
 ```
 
 ### Data Inheritance Chain
 
 ```
 Supplier
-  → PO Header: currency, payment_terms
-    → PO Line: tax_code (for calculation)
+  -> PO Header: currency, payment_terms
+    -> PO Line: tax_code (for calculation)
 
 Product
-  → PO Line: uom, description, default_price
-  → TO Line: uom
-  → WO: uom
+  -> PO Line: uom, description, default_price
+  -> TO Line: uom
+  -> WO: uom
 ```
+
+---
+
+## 15. Related Epics
+
+| Epic | Nazwa | Relationship |
+|------|-------|--------------|
+| Epic 13 | Advanced Planning (MRP & Demand) | Extends Planning with MRP |
+| Epic 14 | Supplier Quality Management | Extends Supplier functionality |
+| Epic 3.5 | Planning Enhancements | Phase 2 improvements |
