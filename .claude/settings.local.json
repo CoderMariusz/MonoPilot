@@ -9,7 +9,8 @@
       "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Expand SCRUM-MASTER agent to full specification\n\n- Add complete workflow with 5 steps and checkpoints\n- Add sprint planning, monitoring, blocker removal, review, retro\n- Add output templates (sprint plan, review, retrospective)\n- Add common mistakes, error recovery, quality checklist\n- Add handoff protocols to ORCHESTRATOR\n- Expand from 66 lines to 594 lines\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(rmdir:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nrefactor: Remove BMAD framework and restructure documentation\n\n- Remove entire .bmad/ directory (old methodology framework)\n- Remove legacy docs/ structure (batches, architecture, management)\n- Update .claude/STARTUP-PROMPT.md for MonoPilot project\n- Update ORCHESTRATOR.md with instant delegation protocol\n- Keep core docs/0-DISCOVERY/ for project understanding\n\nThis cleanup prepares for fresh DISCOVERY-FLOW with new agent system.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

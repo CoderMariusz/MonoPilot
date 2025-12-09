@@ -1,5 +1,6 @@
 {
-  "/(authenticated)/scanner/production/entry/page": "app/(authenticated)/scanner/production/entry/page.js",
+  "/api/health/route": "app/api/health/route.js",
   "/(authenticated)/scanner/page": "app/(authenticated)/scanner/page.js",
+  "/(authenticated)/scanner/production/entry/page": "app/(authenticated)/scanner/production/entry/page.js",
   "/(authenticated)/scanner/production/output/page": "app/(authenticated)/scanner/production/output/page.js"
 }
