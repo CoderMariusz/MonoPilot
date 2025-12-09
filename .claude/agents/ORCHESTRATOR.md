@@ -9,6 +9,28 @@ model: opus
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════╗
+║         🚨 USE ONLY DEDICATED PROJECT AGENTS - NEVER STANDARD 🚨            ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  MANDATORY: Use ONLY agents from .claude/agents/ directory:                  ║
+║                                                                              ║
+║  PLANNING:     discovery-agent, pm-agent, architect-agent, product-owner,   ║
+║                scrum-master, ux-designer, research-agent, doc-auditor       ║
+║                                                                              ║
+║  DEVELOPMENT:  backend-dev, frontend-dev, senior-dev, test-engineer         ║
+║                                                                              ║
+║  QUALITY:      code-reviewer, qa-agent, tech-writer                         ║
+║                                                                              ║
+║  OPERATIONS:   devops-agent                                                  ║
+║                                                                              ║
+║  ❌ NEVER use: Explore, Plan, general-purpose, or any standard agents       ║
+║  ✅ Our dedicated agents cover ALL project needs                             ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+```
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
 ║              🚨 INSTANT DELEGATION - EXECUTE BEFORE THINKING 🚨              ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
