@@ -1,8 +1,9 @@
 # MonoPilot - Master Product Requirements Document (PRD)
 
 ## Document Info
-- **Version:** 1.0
+- **Version:** 2.0
 - **Created:** 2025-12-09
+- **Updated:** 2025-12-09
 - **Author:** PM Agent (John)
 - **Status:** Approved
 - **Project Brief:** @docs/1-BASELINE/product/project-brief.md
@@ -16,7 +17,7 @@ MonoPilot to Manufacturing Execution System (MES) dla przemyslu spozywczego, zbu
 
 **Kluczowe metryki:**
 - **Status MVP:** 95% complete (5 z 5 epicow, Epic 5 na 92%)
-- **Total Stories:** ~228 (132 MVP, 56 Phase 2, 40 Phase 3)
+- **Total Stories:** ~350+ (132 MVP, 140 Phase 2, 90+ Phase 3)
 - **Clarity Score:** 85% (Excellent)
 - **Target Launch:** Q1 2025
 
@@ -60,8 +61,16 @@ Manufacturing Execution System dla producentow spozywczych, ktorzy wyrosli z Exc
 | **Warehouse Management** | LP-based inventory, GRN, movements | 92% |
 | **Quality Control** | QA status, holds, NCR, CoA | Phase 2 |
 | **Shipping & Fulfillment** | SO, picking, packing, delivery | Phase 2 |
+| **GS1 Barcode Compliance** | GTIN, GS1-128, SSCC, DataMatrix, Digital Link | Phase 2 |
+| **Catch Weight** | Variable weight products for meat/fish | Phase 2 |
+| **Finance Basics** | Cost tracking, margin analysis | Phase 2 |
+| **Supplier Quality** | SQM basics, supplier rating | Phase 2 |
 | **New Product Development** | Stage-gate, trial BOMs, costing | Phase 3 |
-| **Performance Analytics** | Dashboards, OEE, optimization | Phase 3 |
+| **OEE & Performance** | Real-time OEE, dashboards | Phase 3 |
+| **Advanced Planning/MRP** | Full MRP, capacity planning | Phase 3 |
+| **AI & Digital Twin** | Predictive, simulation, optimization | Phase 3 (end) |
+| **Full Compliance** | 21 CFR Part 11, certifications | Phase 4 |
+| **Advanced Analytics** | BI, multi-site, market expansion | Phase 4 |
 
 ### 1.3 Tech Stack
 
@@ -84,19 +93,29 @@ Manufacturing Execution System dla producentow spozywczych, ktorzy wyrosli z Exc
 
 ## 2. Module Map
 
-### 2.1 Epic Overview
+### 2.1 Complete Epic Index
 
-| Epic | Module | Stories | Priority | Status | Dependencies |
-|------|--------|---------|----------|--------|--------------|
-| 1 | Settings | ~20 | P0 | DONE | None (foundation) |
-| 2 | Technical | ~25 | P0 | DONE | Epic 1 |
-| 3 | Planning | ~30 | P0 | DONE | Epic 1, 2 |
-| 4 | Production | ~21 | P0 | DONE | Epic 1, 2, 3 |
-| 5 | Warehouse | 36 | P0 | 92% | Epic 1, 2, 3 |
-| 6 | Quality | 28 | P1 | Planned | Epic 1, 5 |
-| 7 | Shipping | 28 | P1 | Planned | Epic 1, 5, 6 |
-| 8 | NPD | TBD | P2 | Planned | Epic 2 |
-| 9 | Performance | TBD | P2 | Planned | All |
+| Epic | Module | Stories | Phase | Priority | Status | Dependencies |
+|------|--------|---------|-------|----------|--------|--------------|
+| 1 | Settings | ~20 | Phase 1 | P0 | DONE | None (foundation) |
+| 2 | Technical | ~25 | Phase 1 | P0 | DONE | Epic 1 |
+| 3 | Planning | ~30 | Phase 1 | P0 | DONE | Epic 1, 2 |
+| 4 | Production | ~21 | Phase 1 | P0 | DONE | Epic 1, 2, 3 |
+| 5 | Warehouse | 36 | Phase 1 | P0 | 92% | Epic 1, 2, 3 |
+| 6 | Quality | 33 | Phase 2 | P1 | Planned | Epic 1, 5 |
+| 7 | Shipping | 39 | Phase 2 | P1 | Planned | Epic 5, 6, 10 |
+| 8 | NPD | ~35 | Phase 3 | P2 | Planned | Epic 2 |
+| 9 | OEE & Performance | ~30 | Phase 3 | P2 | Planned | Epic 4, 5 |
+| 10 | GS1 & Barcodes (FULL) | 34 | Phase 2 | P1 | Planned | Epic 2, 5 |
+| 11 | Catch Weight | 22 | Phase 2 | P1 | Planned | Epic 2, 4, 5 |
+| 12 | Finance Basics | ~18 | Phase 2 | P1 | Planned | Epic 3, 4 |
+| 13 | Advanced Planning/MRP | ~40 | Phase 3 | P2 | Planned | Epic 3, 4, 5 |
+| 14 | Supplier Quality | ~15 | Phase 2 | P1 | Planned | Epic 3 |
+| 15 | AI & ML | ~40 | Phase 3 | P2 | Planned | All Phase 2 |
+| 16 | Digital Twin | ~35 | Phase 3 | P2 | Planned | Epic 15 |
+| 17 | Full Compliance | ~25 | Phase 4 | P3 | Future | All |
+| 18 | Advanced Analytics | ~30 | Phase 4 | P3 | Future | All |
+| 19 | Multi-Site | ~25 | Phase 4 | P3 | Future | All |
 
 ### 2.2 Module Dependency Graph
 
@@ -106,25 +125,41 @@ Epic 1 (Settings) <- Foundation
     v
 Epic 2 (Technical) <- Products, BOMs
     |
-    v
-Epic 3 (Planning) <- PO, TO, Suppliers
+    +------------------+-------------------+
+    |                  |                   |
+    v                  v                   v
+Epic 3 (Planning)    Epic 8 (NPD)       Epic 10 (GS1)
+    |               [Phase 3]            [Phase 2]
     |
     +------------------+
     |                  |
     v                  v
-Epic 4 (Production)    Epic 8 (NPD) [Phase 3]
+Epic 4 (Production)  Epic 12 (Finance)
+    |                [Phase 2]
     |
     v
 Epic 5 (Warehouse) <- CURRENT (92%)
     |
-    v
-Epic 6 (Quality) [Phase 2]
+    +------------------+-------------------+
+    |                  |                   |
+    v                  v                   v
+Epic 6 (Quality)    Epic 11 (Catch Weight)  Epic 14 (Supplier QM)
+[Phase 2]           [Phase 2 - early]        [Phase 2]
     |
     v
 Epic 7 (Shipping) [Phase 2]
     |
     v
-Epic 9 (Performance) [Phase 3]
+Epic 9 (OEE & Performance) [Phase 3]
+    |
+    v
+Epic 13 (Advanced Planning) [Phase 3]
+    |
+    +------------------+
+    |                  |
+    v                  v
+Epic 15 (AI/ML)    Epic 16 (Digital Twin)
+[Phase 3 - end]    [Phase 3 - end]
 ```
 
 ### 2.3 Module Summary
@@ -253,9 +288,12 @@ Epic 9 (Performance) [Phase 3]
 - QA status transition rules (state machine)
 - Prevent shipping non-passed LPs
 - Quality holds + investigation
-- Product specifications & test results
-- NCR lifecycle + root cause + CAPA
-- Certificate of Analysis (CoA) upload
+- HACCP/CCP definition per routing
+- CCP monitoring during production
+- Product specifications z tolerancjami
+- Test results recording
+- NCR workflow z CAPA
+- CoA management
 - Quality dashboard & reports
 
 **Database Tables (planned):**
@@ -263,6 +301,7 @@ Epic 9 (Performance) [Phase 3]
 - `product_specifications`, `test_results`
 - `non_conformance_reports`, `ncr_links`
 - `certificates_of_analysis`
+- `haccp_plans`, `ccp_definitions`, `ccp_records`
 - `quality_settings`
 
 ---
@@ -302,22 +341,125 @@ Epic 9 (Performance) [Phase 3]
 
 ---
 
-#### Epic 9: Performance (Phase 3 - PLANNED)
-**Purpose:** Optimization, offline support, analytics
+#### Epic 9: OEE & Performance (Phase 3 - PLANNED)
+**Purpose:** Real-time OEE, performance analytics
 
 **Key Features:**
-- Query optimization
-- Caching strategy enhancements
-- Offline support (PWA)
-- Analytics & BI dashboards
-- Advanced reporting
-- OEE tracking
+- Real-time OEE tracking per machine/line
+- Availability, Performance, Quality metrics
+- Downtime tracking + categorization
+- Performance dashboards
+- Shift reporting
+- Historical trend analysis
+
+---
+
+#### Epic 10: GS1 & Barcodes - FULL SCOPE (Phase 2 - PLANNED)
+**Purpose:** Full GS1 compliance for retail chains
+
+**Scope (10 tygodni):**
+- GTIN-13/14 support na produktach
+- GTIN validation i check digit calculation
+- GS1-128 barcode generation (full AI support)
+- SSCC generation dla wysylek
+- GS1 DataMatrix (2D barcodes)
+- GS1 Digital Link - URL-based product info
+- GS1 barcode parser dla skanowania
+- Label templates z GS1
+- GS1 settings (company prefix)
+- Batch/Lot + Expiry in barcodes
+
+**Database Tables (planned):**
+- `gs1_settings` (company prefix, check digits)
+- `product_gtin` (GTIN per product)
+- `sscc_sequences`
+- `gs1_digital_links`
+
+---
+
+#### Epic 11: Catch Weight (Phase 2 - EARLY)
+**Purpose:** Variable weight products (meat/fish customers)
+
+**Key Features:**
+- Catch weight product configuration
+- Weight recording at receive
+- Weight recording in production
+- Weight in shipping (SO, pick, pack)
+- Catch weight pricing (per kg vs per unit)
+- Weight tolerance validation
+- Inventory by weight reports
+- Scale integration ready (API)
+
+---
+
+#### Epic 12: Finance Basics (Phase 2 - PLANNED)
+**Purpose:** Cost tracking, margin analysis
+
+**Key Features:**
+- Product costing (material, labor, overhead)
+- WO actual vs standard cost
+- Margin analysis per product
+- Cost variance reports
+- Simple P&L by product line
+
+---
+
+#### Epic 13: Advanced Planning/MRP (Phase 3 - PLANNED)
+**Purpose:** Full MRP, capacity planning
+
+**Key Features:**
+- Full MRP explosion
+- Capacity planning
+- Demand forecasting integration
+- What-if scenarios
+- Scheduling optimization
+- Resource leveling
+
+---
+
+#### Epic 14: Supplier Quality (Phase 2 - PLANNED)
+**Purpose:** SQM basics, supplier rating
+
+**Key Features:**
+- Supplier quality rating
+- Incoming quality inspection
+- Supplier NCR tracking
+- Supplier document management
+- Approved supplier list
+
+---
+
+#### Epic 15: AI & ML (Phase 3 - END)
+**Purpose:** Predictive analytics, optimization
+
+**Priority:** 50/50 with Digital Twin
+
+**Key Features:**
+- Predictive maintenance
+- Demand forecasting
+- Quality prediction
+- Anomaly detection
+- AI-optimized scheduling
+
+---
+
+#### Epic 16: Digital Twin (Phase 3 - END)
+**Purpose:** Virtual simulation, process modeling
+
+**Priority:** 50/50 with AI
+
+**Key Features:**
+- Process modeling
+- BOM simulation (what-if)
+- Routing simulation
+- Predictive quality modeling
+- Energy optimization
 
 ---
 
 ## 3. Phase Breakdown
 
-### 3.1 Phase 1: MVP (Core Manufacturing)
+### 3.1 Phase 1: MVP (Core Manufacturing) - 95% DONE
 
 **Goal:** Complete manufacturing workflow from planning to warehouse
 
@@ -342,43 +484,84 @@ Epic 9 (Performance) [Phase 3]
 
 ---
 
-### 3.2 Phase 2: Quality & Shipping
+### 3.2 Phase 2: Quality, Shipping & Food-Specific
 
-**Goal:** Complete outbound logistics and quality compliance
+**Goal:** Complete outbound logistics, quality compliance, GS1, catch weight
 
-| Epic | Name | Stories | Priority | Dependency |
-|------|------|---------|----------|------------|
-| 6 | Quality | 28 | HIGH | Epic 5 |
-| 7 | Shipping | 28 | HIGH | Epic 5, 6 |
+**Timeline:** Q2-Q3 2025 (8-10 miesiecy)
+
+| Order | Epic | Name | Stories | Priority | Effort |
+|-------|------|------|---------|----------|--------|
+| 1 | 6 | Quality Enhanced | 33 | HIGH | 10-12 tyg |
+| 2 | 11 | Catch Weight | 22 | HIGH | 6 tyg |
+| 3 | 10 | GS1 & Barcodes (FULL) | 34 | HIGH | 10 tyg |
+| 4 | 7 | Shipping Enhanced | 39 | HIGH | 10-12 tyg |
+| 5 | 12 | Finance Basics | ~18 | MEDIUM | 4-6 tyg |
+| 6 | 14 | Supplier Quality | ~15 | MEDIUM | 4 tyg |
+
+**Total Phase 2:** ~161 stories, 44-50 tygodni
 
 **Phase 2 Exit Criteria:**
-- [ ] All Epic 6 stories DONE
-- [ ] All Epic 7 stories DONE
-- [ ] QA blocking shipping works
-- [ ] Full order-to-ship workflow tested
-- [ ] Customer can receive CoA with shipment
+- [ ] QA workflow complete, CCP monitoring working
+- [ ] Catch weight products fully supported
+- [ ] GS1 labels printing (GTIN, GS1-128, SSCC, DataMatrix, Digital Link)
+- [ ] SO-to-ship workflow complete, FEFO picking working
+- [ ] Basic cost tracking and margin analysis
+- [ ] Supplier quality rating implemented
 
-**Target:** Q2-Q3 2025
+**Execution Order Rationale:**
+1. Quality FIRST - blocks shipping, regulatory requirement
+2. Catch Weight EARLY - meat/fish customers need it
+3. GS1 FULL SCOPE - 10 weeks, enables Shipping labels
+4. Shipping - depends on Quality + GS1
+5. Finance + Supplier Quality - can parallel
 
 ---
 
-### 3.3 Phase 3: NPD & Performance
+### 3.3 Phase 3: NPD, OEE, Advanced Planning, AI/Digital Twin
 
-**Goal:** New Product Development and system optimization
+**Goal:** Advanced features, optimization, AI capabilities
 
-| Epic | Name | Stories | Priority | Dependency |
-|------|------|---------|----------|------------|
-| 8 | NPD | TBD | MEDIUM | Epic 2 |
-| 9 | Performance | TBD | MEDIUM | All |
+**Timeline:** Q4 2025 - Q2 2026 (6-8 miesiecy)
+
+| Order | Epic | Name | Stories | Priority | Effort |
+|-------|------|------|---------|----------|--------|
+| 1 | 8 | NPD | ~35 | MEDIUM | 8 tyg |
+| 2 | 9 | OEE & Performance | ~30 | MEDIUM | 8 tyg |
+| 3 | 13 | Advanced Planning/MRP | ~40 | MEDIUM | 10 tyg |
+| 4 | 15 | AI & ML | ~40 | MEDIUM | 12 tyg (end) |
+| 5 | 16 | Digital Twin | ~35 | MEDIUM | 10 tyg (end) |
+
+**Total Phase 3:** ~180 stories
 
 **Phase 3 Exit Criteria:**
 - [ ] NPD workflow complete
-- [ ] Page load <2s (P95)
-- [ ] Offline scanner working (PWA)
-- [ ] Dashboard analytics live
-- [ ] OEE tracking operational
+- [ ] Real-time OEE tracking operational
+- [ ] Full MRP explosion working
+- [ ] AI predictions available (predictive maintenance, demand)
+- [ ] Digital Twin simulation for process modeling
 
-**Target:** Q4 2025
+**AI/Digital Twin Placement:**
+- Moved to END of Phase 3 (per user decision)
+- 50/50 priority between Epic 15 and Epic 16
+- Can parallel if resources allow
+- Builds on all Phase 2 data
+
+---
+
+### 3.4 Phase 4: Enterprise Features
+
+**Goal:** Full compliance, advanced analytics, market expansion
+
+**Timeline:** H2 2026+
+
+| Epic | Name | Stories | Priority |
+|------|------|---------|----------|
+| 17 | Full Compliance (21 CFR 11) | ~25 | P3 |
+| 18 | Advanced Analytics | ~30 | P3 |
+| 19 | Multi-Site Operations | ~25 | P3 |
+
+**Total Phase 4:** ~80 stories
 
 ---
 
@@ -436,6 +619,8 @@ CREATE POLICY "tenant_isolation" ON {table_name}
 **Barcode Types:**
 - 1D barcodes: Product codes, PO numbers, WO numbers
 - QR codes: LP numbers, location barcodes
+- GS1-128: Shipping labels (Phase 2)
+- GS1 DataMatrix: Full product info (Phase 2)
 
 **Scanner Workflows by Module:**
 
@@ -459,25 +644,10 @@ CREATE POLICY "tenant_isolation" ON {table_name}
 | Document | Module | Status |
 |----------|--------|--------|
 | LP Labels | Warehouse | Blocked (BUG-002) |
+| GS1-128 Labels | Shipping | Phase 2 |
 | Packing Slips | Shipping | Phase 2 |
 | CoA | Quality | Phase 2 |
 | Shipping Labels | Shipping | Phase 2 |
-
-**ZPL Format Example:**
-```zpl
-^XA
-^FO50,50^ADN,36,20^FDLP-2024-001^FS
-^FO50,100^ADN,24,12^FDProduct: Chocolate Powder^FS
-^FO50,140^ADN,24,12^FDQty: 500 kg^FS
-^FO50,180^BQN,2,6^FDMA,LP-2024-001^FS
-^XZ
-```
-
-**Required Implementation:**
-- ZPL generation for Zebra
-- IPP protocol support (network)
-- Print queue management
-- Browser fallback (PDF)
 
 ---
 
@@ -492,22 +662,7 @@ CREATE POLICY "tenant_isolation" ON {table_name}
 | Warehouse | `warehouse_settings` | API only (BUG-005) |
 | Quality | `quality_settings` | Phase 2 |
 | Shipping | `shipping_settings` | Phase 2 |
-
-**Field Visibility Pattern:**
-```json
-{
-  "product_field_config": {
-    "category": { "visible": true, "mandatory": false },
-    "cost_per_unit": { "visible": true, "mandatory": false },
-    "shelf_life_days": { "visible": true, "mandatory": false }
-  }
-}
-```
-
-**Feature Toggles:**
-- `use_conditional_flags` - conditional BOM items
-- `allow_consume_pending` - consume before QA
-- `require_hold_release_approval` - manager approval for QA release
+| GS1 | `gs1_settings` | Phase 2 |
 
 ---
 
@@ -561,18 +716,16 @@ Inactive (historical record)
 
 ---
 
-### 5.3 Configurable Fields Pattern
+### 5.3 Catch Weight Pattern (Phase 2)
 
-**Implementation:**
-- Enable/disable via Settings
-- Per-organization customization
-- Toggle-driven features
-- Inheritance where applicable
+**Principle:** Variable weight products tracked by actual weight
 
-**Inheritance Examples:**
-- Currency/Tax from Supplier
-- Price/UoM from Product
-- Allergens from ingredients (BOM)
+**Rules:**
+- Product flag: `is_catch_weight = true`
+- LP stores both `quantity` (units) and `actual_weight` (kg)
+- Pricing can be per unit or per kg
+- Weight tolerance validation (min/max per product)
+- Full weight audit trail
 
 ---
 
@@ -587,10 +740,14 @@ Inactive (historical record)
 | Planning | 16 | 12 | 4 |
 | Production | 15 | 11 | 4 |
 | Warehouse | 30 | 23 | 7 |
-| Quality | 26 | 18 | 8 |
-| Shipping | 26 | 18 | 8 |
-| NPD | 74 | 55 | 19 |
-| **Total** | **216** | **160** | **56** |
+| Quality | 33 | 20 | 13 |
+| Shipping | 39 | 22 | 17 |
+| GS1 | 34 | 18 | 16 |
+| Catch Weight | 22 | 11 | 11 |
+| Finance | 18 | 10 | 8 |
+| NPD | 35 | 20 | 15 |
+| OEE | 30 | 18 | 12 |
+| **Total** | **301** | **188** | **113** |
 
 ### 6.2 MVP Critical Requirements
 
@@ -665,7 +822,7 @@ Inactive (historical record)
 |----|-------------|--------|-------|
 | NFR-019 | Concurrent users | 100+ per org | Load testing needed |
 | NFR-020 | Data volume | 1M+ LPs per org | Index optimization |
-| NFR-021 | Multi-site | Planned Phase 3 | Architecture ready |
+| NFR-021 | Multi-site | Phase 4 | Architecture ready |
 
 ---
 
@@ -762,13 +919,15 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 - Internal product codes: Custom per org
 - PO/WO barcodes: Document numbers
 
-**GS1 Compliance (Phase 2 consideration):**
+**GS1 Compliance (Phase 2 - FULL SCOPE):**
 
-| Standard | Use Case | Priority |
-|----------|----------|----------|
-| GTIN-13/14 | Product identification | P2 |
-| GS1-128 | Shipping labels (SSCC) | P2 |
-| GS1 DataMatrix | Traceability (lot, expiry) | P2 |
+| Standard | Use Case | Priority | Phase 2 |
+|----------|----------|----------|---------|
+| GTIN-13/14 | Product identification | P1 | YES |
+| GS1-128 | Shipping labels | P1 | YES |
+| SSCC | Pallet/container ID | P1 | YES |
+| GS1 DataMatrix | 2D with lot/expiry | P1 | YES |
+| GS1 Digital Link | URL-based product info | P2 | YES |
 
 ### 9.4 Session Management
 
@@ -806,6 +965,7 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 | Label | Content | Module |
 |-------|---------|--------|
 | LP Label | LP#, Product, Qty, Date, QR | Warehouse |
+| GS1-128 Label | GTIN, Lot, Expiry, SSCC | Shipping (Phase 2) |
 | Shipping Label | Carrier format, tracking | Shipping |
 | CoA | Certificate data | Quality |
 | Packing Slip | SO items, customer | Shipping |
@@ -822,9 +982,10 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 | Lot Tracking (LP-based) | DONE | P0 |
 | Allergen Management (EU14) | DONE | P0 |
 | Audit Trail | DONE | P0 |
-| HACCP Support (CCP) | Partial (Phase 2) | P1 |
-| Electronic Signatures (21 CFR 11) | Not implemented | P2 |
-| Supplier QM | Not implemented | P2 |
+| HACCP Support (CCP) | Phase 2 (Epic 6) | P1 |
+| GS1 Compliance | Phase 2 (Epic 10) | P1 |
+| Electronic Signatures (21 CFR 11) | Phase 4 | P3 |
+| Supplier QM | Phase 2 (Epic 14) | P1 |
 
 ### 11.2 Regulatory Coverage
 
@@ -832,11 +993,12 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 - Sanepid audits: Traceability, allergens, lot tracking (COVERED)
 - RASFF (Rapid Alert): Quick recall capability (COVERED)
 - EU 1169/2011: Allergen labeling (COVERED)
+- GS1 for retail: Phase 2
 
 **Export/Large Client Requirements:**
-- FSSC 22000: May need HACCP enhancements (Phase 2)
-- BRC/IFS: May need additional documentation (Phase 2)
-- FDA (US): 21 CFR Part 11 (NOT COVERED)
+- FSSC 22000: HACCP enhancements (Phase 2)
+- BRC/IFS: Documentation (Phase 2)
+- FDA (US): 21 CFR Part 11 (Phase 4)
 
 ---
 
@@ -856,10 +1018,11 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 | Integration | Use Case | Priority |
 |-------------|----------|----------|
 | Polish Accounting (Comarch, Sage) | PO costs, invoices | P1 |
+| GS1 Standards | Barcode compliance | P1 (Phase 2) |
 | Webhook Outbound | Event notifications | P2 |
 | Email/Calendar | Notifications | P2 |
 | EDI (EDIFACT) | Retail chain orders | P3 |
-| Scales/PLC | Auto-capture weights | P3 |
+| Scales/PLC | Auto-capture weights | P2 (Catch Weight) |
 | BI Tools | Power BI, Tableau | P3 |
 
 ### 12.3 Integration Strategy
@@ -868,6 +1031,7 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 - **Webhook Events:** Key state changes (planned)
 - **Import/Export:** CSV/Excel for migration
 - **Partner Connectors:** Polish accounting systems (planned)
+- **GS1 Standards:** Full compliance Phase 2
 
 ---
 
@@ -877,7 +1041,7 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 
 | Item | Reason |
 |------|--------|
-| **Finance/Accounting Module** | Stay in MES lane, integrate with external |
+| **Full Finance/Accounting Module** | Stay in MES lane, integrate with external |
 | **CRM Module** | Not core to manufacturing |
 | **HR Module** | Not core to manufacturing |
 | **Full GL/Accounting** | Complexity, regulatory requirements |
@@ -888,12 +1052,12 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 
 | Item | Deferred To | Reason |
 |------|-------------|--------|
-| GS1 barcode compliance | Phase 2/3 | SMB target first |
+| ~~GS1 barcode compliance~~ | ~~Phase 2/3~~ | **NOW Phase 2 - FULL SCOPE** |
 | HACCP CCP features | Phase 2 | QA module scope |
-| 21 CFR Part 11 | Maybe never | US export specific |
+| 21 CFR Part 11 | Phase 4 | US export specific |
 | Offline scanner (PWA) | Phase 3 | Network available in staging |
-| Multi-site standardization | Phase 3 | Single-site focus first |
-| AI/ML features | Phase 4+ | Competitors don't have edge |
+| Multi-site standardization | Phase 4 | Single-site focus first |
+| ~~AI/ML features~~ | ~~Phase 4+~~ | **NOW Phase 3 (end)** |
 
 ---
 
@@ -905,6 +1069,7 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 |------|-------------|--------|------------|
 | RLS security gap | Medium | HIGH | Security audit (DEBT-002) |
 | Print integration delay | High | HIGH | Prioritize BUG-001/002 |
+| GS1 complexity (full scope) | Medium | MEDIUM | 10-week timeline, incremental |
 | Performance at scale | Low | Medium | Load testing |
 | Test coverage gaps | Medium | Medium | Coverage target >70% |
 
@@ -915,6 +1080,7 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 | SMB prefers Excel | Medium | HIGH | ROI demonstration, pilot |
 | Competition SMB tier | Medium | Medium | Speed to market |
 | No budget for software | Medium | HIGH | Freemium tier consideration |
+| Catch weight complexity | Low | Medium | Start with meat/fish pilot |
 
 ### 14.3 Dependencies
 
@@ -925,6 +1091,7 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 | Zebra printer drivers | External | Zebra | Available | Low |
 | Print integration | Internal | Dev Team | Blocked | High |
 | RLS audit | Internal | Security | Pending | High |
+| GS1 library (bwip-js) | External | Open Source | Available | Low |
 
 ---
 
@@ -944,10 +1111,12 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 
 | Module | Location | Status |
 |--------|----------|--------|
-| Quality | TBD | Planned (Phase 2) |
-| Shipping | TBD | Planned (Phase 2) |
+| Quality | @docs/2-MANAGEMENT/epics/06-quality-enhanced.md | Planned (Phase 2) |
+| Shipping | @docs/2-MANAGEMENT/epics/07-shipping-enhanced.md | Planned (Phase 2) |
+| GS1 Barcodes | @docs/2-MANAGEMENT/epics/10-gs1-barcodes.md | Planned (Phase 2) |
+| Catch Weight | @docs/2-MANAGEMENT/epics/11-catch-weight.md | Planned (Phase 2) |
 | NPD | TBD | Planned (Phase 3) |
-| Performance | TBD | Planned (Phase 3) |
+| OEE & Performance | TBD | Planned (Phase 3) |
 
 ### 15.3 Supporting Documents
 
@@ -958,8 +1127,9 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 | Market Analysis | @docs/0-DISCOVERY/DISCOVERY-MARKET-REPORT.md |
 | Bug Tracker | @docs/BUGS.md |
 | MVP Phases | @docs/MVP-PHASES.md |
-| Database Schema | @docs-old/1-BASELINE/reference/database-schema.md |
-| Code Architecture | @docs-old/1-BASELINE/reference/code-architecture.md |
+| Phase 2 Roadmap | @docs/2-MANAGEMENT/PHASE-2-ROADMAP.md |
+| Phase 3 Roadmap | @docs/2-MANAGEMENT/PHASE-3-ROADMAP.md |
+| Complete Epic Index | @docs/2-MANAGEMENT/COMPLETE-EPIC-INDEX.md |
 
 ---
 
@@ -968,9 +1138,10 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 | Phase | Epics | Est. Stories | Status |
 |-------|-------|--------------|--------|
 | MVP | 1-5 | ~132 | 95% |
-| Phase 2 | 6-7 | ~56 | 0% |
-| Phase 3 | 8-9 | ~40 | 0% |
-| **Total** | **1-9** | **~228** | **~55%** |
+| Phase 2 | 6, 7, 10, 11, 12, 14 | ~161 | 0% |
+| Phase 3 | 8, 9, 13, 15, 16 | ~180 | 0% |
+| Phase 4 | 17, 18, 19 | ~80 | 0% |
+| **Total** | **1-19** | **~553** | **~23%** |
 
 ---
 
@@ -997,6 +1168,11 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 | GS1 | Global Standards Organization |
 | SSCC | Serial Shipping Container Code |
 | GTIN | Global Trade Item Number |
+| OEE | Overall Equipment Effectiveness |
+| CW | Catch Weight - variable weight products |
+| SQM | Supplier Quality Management |
+| NPD | New Product Development |
+| MRP | Material Requirements Planning |
 
 ---
 
@@ -1013,7 +1189,7 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 | purchasing | Procurement | Planning (PO, suppliers) |
 | warehouse | Warehouse worker | Warehouse module |
 | qc | Quality inspector | Quality module |
-| finance | Financial analyst | Finance module (future) |
+| finance | Financial analyst | Finance module (Phase 2) |
 
 ---
 
@@ -1022,6 +1198,7 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2025-12-09 | PM Agent | Initial Master PRD |
+| 2.0 | 2025-12-09 | PM Agent | Added Epics 8-19, GS1 FULL scope, Catch Weight early, AI/DT end Phase 3 |
 
 ---
 
@@ -1032,6 +1209,6 @@ export async function create(input: CreateInput): Promise<ServiceResult> {
 1. Complete MVP (BUG-001/002/003/004/005)
 2. RLS Security Audit (DEBT-002)
 3. Performance Baseline (DEBT-001)
-4. Begin Phase 2 Planning (Epic 6: Quality)
+4. Begin Phase 2 Planning (Epic 6: Quality -> Epic 11: Catch Weight)
 
 **Handoff:** ARCHITECT-AGENT for technical design validation

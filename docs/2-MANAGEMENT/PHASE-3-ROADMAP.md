@@ -1,8 +1,28 @@
-# MonoPilot - Phase 3+ Roadmap
+# MonoPilot - Phase 3 Roadmap
 
+**Version:** 3.0
 **Last Updated:** 2025-12-09
-**Status:** Draft
-**Source:** DISCOVERY-REPORT-V4.md (Gap Analysis & Industry Trends 2025)
+**Status:** PLANNED
+**Author:** PM-Agent (John)
+
+---
+
+## Executive Summary
+
+Phase 3 wprowadza zaawansowane funkcjonalnosci wykraczajace poza podstawowy MES:
+- **NPD (New Product Development)** - strukturyzowany proces rozwoju produktow
+- **OEE & Performance** - sledzenie wydajnosci produkcji w czasie rzeczywistym
+- **Advanced Planning (MRP)** - demand forecasting, auto-replenishment
+- **Reports & Analytics** - self-service dashboards, KPI builder
+- **Compliance & Certifications** - BRC/IFS, 21 CFR Part 11
+
+**Kluczowe metryki Phase 3:**
+- **Nowych epicow:** 5 (NPD, OEE, Advanced Planning, Reports, Compliance)
+- **Total stories:** ~109
+- **Estimated effort:** 36-40 tygodni (9-10 miesiecy)
+- **Target:** H2 2025 - H1 2026
+
+**Uwaga:** AI & Digital Twin przesuniete do Phase 4 - buduja na danych z OEE i innych modulow.
 
 ---
 
@@ -10,307 +30,355 @@
 
 | Faza | Epiki | Cel | Horyzont |
 |------|-------|-----|----------|
-| **Phase 3** | 8-11 | AI, Digital Twin, IIoT, Sustainability | H2 2025 |
-| **Phase 4** | 12-14 | Supply Chain, Advanced Security, UX | H1 2026 |
-| **Phase 5** | 15-17 | Multi-site, Market Expansion, Partner Ecosystem | H2 2026+ |
+| **Phase 1** | 1-5 | MVP Core Manufacturing | Q1 2025 (95% done) |
+| **Phase 2** | 6, 7, 10-12, 14 | Quality, Shipping, GS1, Catch Weight, Finance, SQM | Q2-Q4 2025 |
+| **Phase 3** | 8, 9, 13, 15, 16 | NPD, OEE, MRP, Reports, Compliance | Q4 2025 - Q2 2026 |
+| **Phase 4** | 17-22 | AI, Digital Twin, IIoT, Supply Chain, Multi-site | H2 2026+ |
 
 ---
 
-## Phase 3: Inteligentna Produkcja
+## Phase 3 Epics Overview
 
-**Cel:** Wprowadzenie AI, Digital Twins i IIoT do MonoPilot - przejscie z MES reaktywnego do predykcyjnego.
+| Order | Epic | Nazwa | Stories | Priority | Effort | Document |
+|-------|------|-------|---------|----------|--------|----------|
+| 1 | 9 | OEE & Performance | 25 | P1 | 8-10 tyg | `epics/09-oee-performance.md` |
+| 2 | 15 | Reports & Analytics | 18 | P2 | 6-8 tyg | `epics/15-reports-analytics.md` |
+| 3 | 8 | NPD (New Product Development) | 28 | P2 | 8-10 tyg | `epics/08-npd.md` |
+| 4 | 13 | Advanced Planning (MRP) | 20 | P2 | 8-10 tyg | `epics/13-advanced-planning.md` |
+| 5 | 16 | Compliance & Certifications | 18 | P2 | 6-8 tyg | `epics/16-compliance.md` |
 
-**Timeline:** H2 2025 (Q3-Q4)
-
-### Epic 8: AI & Machine Learning (Epic 8 - rozszerzony)
-
-**Priorytet:** HIGH
-**Zaleznosci:** Epic 5 (Warehouse), Epic 9 (Performance/Analytics)
-**Szacunek:** 35-45 stories
-
-**Zakres MVP dla Epic 8:**
-- Predictive Maintenance - podstawowe modele anomalii
-- AI-Optimized Scheduling - heurystyczne algorytmy
-- Quality Prediction - analiza trendow jakosciowych
-
-**Kluczowe Komponenty:**
-
-| Komponent | Opis | Priorytet | Szacunek |
-|-----------|------|-----------|----------|
-| Anomaly Detection | Wykrywanie odchylen w produkcji | P1 | L |
-| Predictive Maintenance | Prognozowanie awarii maszyn | P1 | XL |
-| AI Scheduling | Optymalizacja kolejnosci WO | P2 | XL |
-| Quality Prediction | Prognoza jakosci na podstawie parametrow | P2 | L |
-| Automated Inspection | Integracja z computer vision | P3 | XL |
-
-**Notatki techniczne:**
-- Wymagana integracja z platformami ML (TensorFlow.js / Python microservice)
-- Time-series storage dla danych sensorowych (TimescaleDB extension dla Supabase)
-- Event-driven architektura dla real-time predictions
+**Total Phase 3 Stories:** ~109
+**Total Phase 3 Effort:** 36-40 tygodni
 
 ---
 
-### Epic 9: Digital Twin & Simulation (Nowy Epic)
+## Epic Details
 
-**Priorytet:** MEDIUM-HIGH
-**Zaleznosci:** Epic 2 (Technical - BOMs), Epic 4 (Production), Epic 8 (AI)
-**Szacunek:** 30-40 stories
+### Epic 9: OEE & Performance (8-10 tyg) - ORDER 1
 
-**Zakres MVP dla Epic 9:**
-- Process Modelling - wirtualne modele linii produkcyjnych
-- What-If Analysis dla BOM - symulacja zmian receptur
-- Basic simulation dla nowych routing'ow
+**Goal:** Real-time OEE tracking i performance dashboards
 
-**Kluczowe Komponenty:**
+**Rationale:** Krytyczna luka (4/4 konkurentow ma), fundament dla AI w Phase 4
 
-| Komponent | Opis | Priorytet | Szacunek |
-|-----------|------|-----------|----------|
-| Process Modeling | Wirtualne reprezentacje linii | P1 | L |
-| BOM Simulation | What-if dla receptur i kosztow | P1 | M |
-| Routing Simulation | Symulacja alternatywnych sciezek | P2 | L |
-| Predictive Quality | Model jakosci z parametrow procesu | P2 | L |
-| Energy Optimization | Symulacja zuzycia energii | P3 | M |
+**Key Features:**
+- Machine performance configuration
+- Shift management
+- Downtime tracking & categorization
+- Production counting (good/reject)
+- OEE calculation engine (Availability x Performance x Quality)
+- Real-time OEE display
+- OEE dashboards & reports
+- Downtime analysis (Pareto, MTBF, MTTR)
+- Six Big Losses analysis
 
-**Notatki techniczne:**
-- Wizualizacja 3D opcjonalna (Three.js)
-- Integracja z danymi real-time z IIoT (Epic 10)
-- API do symulacji Monte Carlo dla analiz NPD
+**Stories:** 25
+- Must Have: 14
+- Should Have: 9
+- Could Have: 2
 
----
-
-### Epic 10: IIoT & Edge Integration (Nowy Epic)
-
-**Priorytet:** HIGH
-**Zaleznosci:** Infrastructure setup, Epic 5 (Warehouse)
-**Szacunek:** 40-50 stories
-
-**Zakres MVP dla Epic 10:**
-- Machine Connectivity - MQTT/OPC UA gateway
-- Real-time sensor data collection
-- Basic event-driven architecture
-
-**Kluczowe Komponenty:**
-
-| Komponent | Opis | Priorytet | Szacunek |
-|-----------|------|-----------|----------|
-| MQTT Gateway | Polaczenie z maszynami via MQTT | P1 | L |
-| OPC UA Connector | Standard przemyslowy dla PLC | P1 | XL |
-| Sensor Data Model | Elastyczny model danych sensorowych | P1 | M |
-| Edge Processing | Lokalne przetwarzanie danych | P2 | XL |
-| Event Bus (NATS) | Architektura event-driven | P2 | L |
-| Time-Series Storage | TimescaleDB dla danych | P1 | M |
-
-**Notatki techniczne:**
-- Self-hosted edge gateway (Raspberry Pi / industrial PC)
-- Protokoly: MQTT, OPC UA, Modbus
-- Integracja z popularnymi PLC (Siemens, Allen-Bradley, Omron)
+**Dependencies:** Epic 4 (Production)
 
 ---
 
-### Epic 11: Sustainability & ESG (Nowy Epic)
+### Epic 15: Reports & Analytics (6-8 tyg) - ORDER 2
 
-**Priorytet:** MEDIUM
-**Zaleznosci:** Epic 10 (IIoT - dla danych energetycznych)
-**Szacunek:** 25-30 stories
+**Goal:** Self-service dashboards i KPI builder
 
-**Zakres MVP dla Epic 11:**
-- Energy tracking per maszyna/WO
-- CO2 footprint kalkulacja
-- Waste & Scrap reporting
+**Rationale:** Potrzebne dla OEE dashboards, uniwersalne dla wszystkich modulow
 
-**Kluczowe Komponenty:**
+**Key Features:**
+- Dashboard builder (CRUD, layout)
+- Widget library (pre-built per module)
+- Widget configuration
+- Dashboard sharing
+- Custom KPI definition
+- Standard report library
+- Report parameters & export
+- Scheduled reports
+- Power BI connector (API)
+- Data export API
 
-| Komponent | Opis | Priorytet | Szacunek |
-|-----------|------|-----------|----------|
-| Energy Tracking | Zuzycie energii per maszyna/WO | P1 | M |
-| CO2 Calculator | Slad weglowy produktu | P1 | M |
-| Waste Reporting | Analiza zrodla odpadow | P1 | M |
-| Scrap Analytics | Redukcja strat materialowych | P2 | M |
-| ESG Dashboard | Raportowanie ESG | P2 | L |
-| Certification Support | BRC, IFS, FSSC 22000 | P3 | L |
+**Stories:** 18
+- Must Have: 9
+- Should Have: 9
 
-**Notatki techniczne:**
-- Integracja z CO2 emission factors (scope 1, 2, 3)
-- Export do raportow ESG zgodnych z CSRD (EU)
-- Kalkulator na podstawie BOM i consumption
+**Dependencies:** All core modules (data sources)
 
 ---
 
-## Phase 3 - Podsumowanie
+### Epic 8: NPD - New Product Development (8-10 tyg) - ORDER 3
 
-### Macierz Zaleznosci
+**Goal:** Strukturyzowany proces wprowadzania nowych produktow
+
+**Rationale:** Roznicowanie konkurencyjne, zwiazane z Quality
+
+**Key Features:**
+- Stage-Gate process (Idea -> Development -> Testing -> Launch)
+- Trial BOMs & Routings
+- Trial Work Orders
+- Costing Analysis (estimated vs actual)
+- Launch to Production workflow
+- NPD Dashboard & Reports
+
+**Stories:** 28
+- Must Have: 17
+- Should Have: 9
+- Could Have: 2
+
+**Dependencies:** Epic 2, Epic 4, Epic 6
+
+---
+
+### Epic 13: Advanced Planning/MRP (8-10 tyg) - ORDER 4
+
+**Goal:** Demand forecasting i auto-replenishment
+
+**Rationale:** Zaawansowane planowanie, buduje na Phase 2
+
+**Key Features:**
+- Historical demand analysis
+- Demand forecast generation
+- Forecast vs actual comparison
+- Safety stock management
+- Auto-replenishment rules & execution
+- MRP run dashboard
+- Planned orders management
+- Multi-level BOM explosion
+- ABC classification
+
+**Stories:** 20
+- Must Have: 13
+- Should Have: 6
+- Could Have: 1
+
+**Dependencies:** Epic 3, Epic 5, Epic 12
+
+---
+
+### Epic 16: Compliance & Certifications (6-8 tyg) - ORDER 5
+
+**Goal:** Wsparcie BRC/IFS, FSSC 22000, 21 CFR Part 11
+
+**Rationale:** Regulatory, potrzebuje danych z Quality i innych modulow
+
+**Key Features:**
+- Certification standard definitions (BRC, IFS, FSSC)
+- Compliance self-assessment
+- Gap analysis reports
+- Certification tracking & renewal alerts
+- Electronic signature (21 CFR Part 11)
+- Enhanced audit trail
+- Tamper-evident storage
+- Traceability report
+- HACCP compliance report
+- Batch record report
+- Document version control
+
+**Stories:** 18
+- Must Have: 15
+- Should Have: 3
+
+**Dependencies:** Epic 6, Epic 14
+
+---
+
+## Execution Order & Timeline
+
+### Recommended Order
+
+| Order | Epic | Rationale | Dependencies |
+|-------|------|-----------|--------------|
+| 1 | Epic 9: OEE | Krytyczna luka (4/4 konkurentow), fundament dla Phase 4 AI | Epic 4 |
+| 2 | Epic 15: Reports | Potrzebne dla OEE dashboards, uniwersalne | All |
+| 3 | Epic 8: NPD | Roznicowanie, zwiazane z Quality | Epic 2, 6 |
+| 4 | Epic 13: MRP | Zaawansowane, buduje na Phase 2 | Epic 3, 5, 12 |
+| 5 | Epic 16: Compliance | Regulatory, potrzebuje danych z innych modulow | Epic 6, 14 |
+
+### Timeline (9-10 months)
 
 ```
-Epic 8 (AI/ML) <----> Epic 9 (Digital Twin)
-      ^                      ^
-      |                      |
-      v                      v
-Epic 10 (IIoT) <----> Epic 11 (Sustainability)
+Week    1-4    5-8    9-12   13-16   17-20   21-24   25-28   29-32   33-36   37-40
+        |------|------|------|-------|-------|-------|-------|-------|-------|------|
+        [============== Epic 9: OEE (8-10 weeks) ==============]
+               [======== Epic 15: Reports (6-8 weeks) ========]
+                              [============== Epic 8: NPD (8-10 weeks) ==============]
+                                             [============= Epic 13: MRP (8-10 weeks) =============]
+                                                                    [======= Epic 16: Compliance (6-8 weeks) =======]
 ```
 
-### Kolejnosc Implementacji
+### Parallel Execution
 
-1. **Epic 10 (IIoT)** - Fundamentalne zrodlo danych
-2. **Epic 8 (AI/ML)** - Wymaga danych z IIoT
-3. **Epic 11 (Sustainability)** - Buduje na danych energetycznych
-4. **Epic 9 (Digital Twin)** - Integruje wszystkie komponenty
-
-### Szacowane Story Count
-
-| Epic | Min Stories | Max Stories | Srednia |
-|------|-------------|-------------|---------|
-| Epic 8 (AI/ML) | 35 | 45 | 40 |
-| Epic 9 (Digital Twin) | 30 | 40 | 35 |
-| Epic 10 (IIoT) | 40 | 50 | 45 |
-| Epic 11 (Sustainability) | 25 | 30 | 28 |
-| **Phase 3 Total** | **130** | **165** | **148** |
+| Team | Epics | Focus | Weeks |
+|------|-------|-------|-------|
+| **Team A** (Core) | Epic 9, Epic 13 | OEE + MRP backend | 1-32 |
+| **Team B** (Product) | Epic 8, Epic 16 | NPD + Compliance | 9-40 |
+| **Team C** (Analytics) | Epic 15 | Reports + Dashboards | 5-16 |
+| **Team D** (Frontend) | All | UI/UX dla wszystkich | 1-40 |
 
 ---
 
-## Phase 4: Zaawansowane Operacje
+## Dependencies from Phase 2
 
-**Cel:** Supply Chain Connectivity, Advanced Security, Enterprise UX
+### Required Before Phase 3
 
-**Timeline:** H1 2026 (Q1-Q2)
+| Item | Source | Required For |
+|------|--------|--------------|
+| Quality Module complete | Epic 6 | NPD, Compliance |
+| Shipping complete | Epic 7 | Reports data |
+| Finance Basics | Epic 12 | MRP, NPD costing |
+| Supplier Quality | Epic 14 | Compliance |
+| Production complete | Epic 4 | OEE |
 
-### Epic 12: Supply Chain Collaboration
+### Phase 2 Outputs Used
 
-**Priorytet:** HIGH
-**Zaleznosci:** Epic 3 (Planning), Epic 7 (Shipping)
-**Szacunek:** 35-45 stories
-
-**Zakres:**
-- Supplier Portal - widocznosc PO, potwierdzenia dostaw
-- Demand Forecasting - AI-based prognozowanie zapotrzebowania
-- Auto-Replenishment - automatyczne PO przy niskim stanie
-- EDI Integration - komunikacja z duzymi klientami/dostawcami
-
----
-
-### Epic 13: Advanced Security
-
-**Priorytet:** HIGH (dla klientow enterprise)
-**Zaleznosci:** Core infrastructure
-**Szacunek:** 25-30 stories
-
-**Zakres:**
-- Zero-Trust Architecture - weryfikacja kazdego requestu
-- ABAC (Attribute-Based Access Control) - granularne uprawnienia
-- 21 CFR Part 11 Compliance - elektroniczne podpisy
-- On-Premise/Hybrid Deployment - opcja self-hosted
+| Epic | Uses From Phase 2 |
+|------|-------------------|
+| Epic 8 (NPD) | BOMs, Routings, Quality specs |
+| Epic 9 (OEE) | WO data, machine tables |
+| Epic 13 (MRP) | Stock levels, PO, SO |
+| Epic 15 (Reports) | All module data |
+| Epic 16 (Compliance) | Audit logs, NCR, CoA |
 
 ---
 
-### Epic 14: UX Enhancements
+## Phase 3 to Phase 4 Handoff
 
-**Priorytet:** MEDIUM
-**Zaleznosci:** Epic 8 (AI), Epic 10 (IIoT)
-**Szacunek:** 30-35 stories
+### What Moves to Phase 4
 
-**Zakres:**
-- Guided Work Instructions - cyfrowe SOP
-- AR Integration - wsparcie RealWear/smart glasses
-- Self-Service Analytics - drag-and-drop dashboardy
-- Mobile-first redesign - optymalizacja dla operatorow
+| Feature | Reason | Phase 4 Epic |
+|---------|--------|--------------|
+| AI & Machine Learning | Wymaga OEE + danych historycznych | Epic 17 |
+| Digital Twin & Simulation | Zaawansowana funkcjonalnosc | Epic 18 |
+| IIoT & Edge Integration | Infrastruktura hardware | Epic 19 |
+| Supply Chain Collaboration | Portal dostawcy/klienta | Epic 20 |
+| Advanced Security | Zero-trust, on-premise | Epic 21 |
+| Multi-Site Operations | Enterprise feature | Epic 22 |
 
----
+### Phase 4 Preview
 
-## Phase 5: Skalowanie i Ekspansja
-
-**Cel:** Multi-site, Internacjonalizacja, Partner Ecosystem
-
-**Timeline:** H2 2026+
-
-### Epic 15: Multi-Site Operations
-
-**Priorytet:** MEDIUM
-**Szacunek:** 25-30 stories
-
-**Zakres:**
-- Multi-site within tenant - wiele fabryk w jednej organizacji
-- Centralized management - globalne ustawienia
-- Site-level configuration - lokalne customizacje
-- Cross-site transfers - przesuniescia miedzy zakladami
+| Epic | Name | Estimated Effort |
+|------|------|------------------|
+| 17 | AI & Machine Learning | 12 tyg |
+| 18 | Digital Twin & Simulation | 10 tyg |
+| 19 | IIoT & Edge Integration | 14 tyg |
+| 20 | Supply Chain Collaboration | 12 tyg |
+| 21 | Advanced Security | 10 tyg |
+| 22 | Multi-Site Operations | 12 tyg |
 
 ---
 
-### Epic 16: Market Expansion
+## Success Criteria for Phase 3
 
-**Priorytet:** MEDIUM
-**Szacunek:** 20-25 stories
+### Functional Criteria
 
-**Zakres:**
-- Multi-language support - EN, DE, FR
-- Multi-currency - EUR, USD, PLN
-- Regional compliance - US FDA, UK FSA
-- Tax & legal modules - konfiguracje regionalne
+| Epic | Success Criteria |
+|------|-----------------|
+| Epic 9 (OEE) | Real-time OEE display, downtime tracking, reports |
+| Epic 15 (Reports) | Custom dashboards, scheduled reports, API export |
+| Epic 8 (NPD) | Stage-Gate working, trial WO, launch to production |
+| Epic 13 (MRP) | Forecast working, auto-replenishment, planned orders |
+| Epic 16 (Compliance) | 21 CFR Part 11 signatures, BRC self-assessment |
 
----
+### Quality Criteria
 
-### Epic 17: Partner Ecosystem
+| Metric | Target |
+|--------|--------|
+| Test Coverage | >75% |
+| Bug Severity | No P0/P1 bugs at release |
+| Performance | Dashboard load <3s (P95) |
+| OEE Accuracy | Match manual calculation within 1% |
 
-**Priorytet:** LOW
-**Szacunek:** 15-20 stories
+### Business Criteria
 
-**Zakres:**
-- Public API documentation - developer portal
-- Marketplace - third-party apps
-- Certified integrators - program partnerski
-- Sandbox environment - srodowisko testowe dla partnerow
-
----
-
-## Roadmap Timeline
-
-```
-2025 Q1-Q2: Phase 1-2 (MVP + Quality/Shipping)
-           |
-2025 Q3:   Epic 10 (IIoT) - Foundation
-           |
-2025 Q4:   Epic 8 (AI/ML) + Epic 11 (Sustainability)
-           |
-2026 Q1:   Epic 9 (Digital Twin)
-           |
-2026 Q2:   Epic 12 (Supply Chain) + Epic 13 (Security)
-           |
-2026 Q3:   Epic 14 (UX) + Epic 15 (Multi-Site)
-           |
-2026 Q4:   Epic 16 (Expansion) + Epic 17 (Partners)
-```
+| Metric | Target |
+|--------|--------|
+| OEE Visibility | All customers tracking OEE |
+| NPD Adoption | 30% customers using Stage-Gate |
+| Compliance Ready | BRC/IFS self-assessment available |
+| Analytics Usage | 50% managers with custom dashboards |
 
 ---
 
-## Metryki Sukcesu dla Phase 3
+## Milestones
 
-| Metryka | Cel | Timeframe |
-|---------|-----|-----------|
-| Machine connectivity | 5+ typow PLC obslugiwanych | Q4 2025 |
-| Anomaly detection accuracy | >85% precision | Q4 2025 |
-| Energy tracking adoption | 50% klientow | Q1 2026 |
-| Digital twin usage | 20% klientow z symulacja | Q1 2026 |
-| Scheduling optimization | 15% poprawa efektywnosci | Q2 2026 |
-
----
-
-## Ryzyka i Mitigacje
-
-| Ryzyko | Prawdopodobienstwo | Wplyw | Mitigacja |
-|--------|-------------------|-------|-----------|
-| Zlozonosc ML w produkcji | Wysoki | Wysoki | Start z prostymi modelami, iteracja |
-| Roznorodnosc sprzetu IIoT | Wysoki | Sredni | Focus na popularne PLC, modular gateway |
-| Brak danych do AI | Sredni | Wysoki | Syntetyczne dane do treningu, pilot programs |
-| Koszty edge infrastructure | Sredni | Sredni | Cloud-first opcja, edge jako premium |
-| Konkurencja enterprise | Niski | Sredni | Focus na SMB, szybkosc wdrozenia |
+| Milestone | Week | Deliverables |
+|-----------|------|--------------|
+| **M1: OEE MVP** | 6 | Downtime tracking, basic OEE calculation |
+| **M2: OEE Complete** | 10 | Full OEE, dashboards, reports |
+| **M3: Reports MVP** | 12 | Dashboard builder, widget library |
+| **M4: NPD MVP** | 18 | Stage-Gate, trial BOM |
+| **M5: NPD Complete** | 22 | Full NPD with launch workflow |
+| **M6: MRP MVP** | 28 | Forecast, safety stock |
+| **M7: MRP Complete** | 32 | Full MRP, auto-replenishment |
+| **M8: Compliance MVP** | 36 | E-signatures, self-assessment |
+| **M9: Phase 3 Complete** | 40 | All epics done, tested, documented |
 
 ---
 
-## Dokumenty Powiazane
+## Resource Requirements
 
-- Epic Stories: @docs/2-MANAGEMENT/epics/ADVANCED-FEATURES-BACKLOG.md
-- Phase 1-2: @docs/MVP-PHASES.md
-- Discovery Report: @docs/0-DISCOVERY/DISCOVERY-REPORT-V4.md
-- Project Brief: @docs/1-BASELINE/product/project-brief.md
+### Team Composition
+
+| Role | FTE | Responsibility |
+|------|-----|----------------|
+| **Backend Dev (Core)** | 2 | OEE, MRP engines |
+| **Backend Dev (Domain)** | 1 | NPD, Compliance logic |
+| **Frontend Dev** | 1.5 | Dashboards, charts, forms |
+| **QA Engineer** | 0.5 | Testing, automation |
+| **PM** | 0.5 | Coordination, stories |
+
+### Infrastructure
+
+| Item | Notes |
+|------|-------|
+| TimescaleDB | Time-series storage for OEE data |
+| Chart Library | Recharts or Chart.js for dashboards |
+| PDF Generation | react-pdf or server-side |
+| E-signature | Custom implementation (no external service) |
+
+---
+
+## Risk Register
+
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| OEE data accuracy | High | High | Clear definitions, validation, training |
+| MRP complexity | Medium | High | Phased implementation, start simple |
+| 21 CFR Part 11 | Medium | High | Expert review, phased rollout |
+| Stage-Gate adoption | Medium | Medium | Training, templates, champions |
+| Performance at scale | Medium | Medium | Caching, materialized views |
+
+---
+
+## Related Documents
+
+| Document | Path |
+|----------|------|
+| Epic 8: NPD | `docs/2-MANAGEMENT/epics/08-npd.md` |
+| Epic 9: OEE | `docs/2-MANAGEMENT/epics/09-oee-performance.md` |
+| Epic 13: MRP | `docs/2-MANAGEMENT/epics/13-advanced-planning.md` |
+| Epic 15: Reports | `docs/2-MANAGEMENT/epics/15-reports-analytics.md` |
+| Epic 16: Compliance | `docs/2-MANAGEMENT/epics/16-compliance.md` |
+| Phase 2 Roadmap | `docs/2-MANAGEMENT/PHASE-2-ROADMAP.md` |
+| Feature Gap Analysis | `docs/0-DISCOVERY/FEATURE-GAP-ANALYSIS.md` |
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 1.0 | 2025-12-09 | PM-Agent | Initial Phase 3 Roadmap |
+| 2.0 | 2025-12-09 | PM-Agent | Added NPD (Epic 8), OEE (Epic 9), MRP (Epic 13), AI/DT at END |
+| 3.0 | 2025-12-09 | PM-Agent | Full rewrite with new epics (8, 9, 13, 15, 16), AI/DT moved to Phase 4 |
 
 ---
 
 **Document End**
+
+**Next Steps:**
+1. Complete Phase 2 execution
+2. Validate Epic dependencies
+3. Prepare OEE pilot (first Phase 3 epic)
+4. Setup TimescaleDB for time-series data
+5. Review compliance requirements with legal
