@@ -152,7 +152,7 @@ export async function listPurchaseOrders(
 
     // Apply filters
     if (filters.search) {
-      query = query.or(`po_number.ilike.%${filters.search}%,suppliers.name.ilike.%${filters.search}%`)
+      query = query.ilike('po_number', `%${filters.search}%`)
     }
 
     if (filters.status && filters.status !== 'all') {

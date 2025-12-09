@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.11</id>
+    <title>Auto-Calculate Pass/Fail for Numeric Tests</title>
+    <batch>06B-1</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Auto-determine pass/fail for numeric tests based on spec limits</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.10">Product Specification Management</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <calculation_logic>
+      <rule>If result within min/max → passed</rule>
+      <rule>If result outside range → failed</rule>
+      <rule>Variance = (result - expected) / expected × 100</rule>
+    </calculation_logic>
+
+    <service>
+      <name>calculateTestResult</name>
+      <input>specId, resultValue</input>
+      <output>{ passed: boolean, variance: number }</output>
+    </service>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">If result within min/max → passed</ac>
+    <ac id="2">If result outside range → failed</ac>
+    <ac id="3">Variance calculated: (result - expected) / expected × 100</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-13">System shall auto-calculate pass/fail for numeric tests</fr>
+  </functional_requirements>
+</story>

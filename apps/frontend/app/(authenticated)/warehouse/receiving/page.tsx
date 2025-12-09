@@ -1,24 +1,25 @@
 /**
- * GRN List Page
- * Epic 5 Batch 5A-3 - Story 5.11: GRN with LP Creation
- * AC-5.11.1: Display GRN list with filters
+ * Warehouse Receiving Page
+ * Story 5.32: Receive from PO (Desktop)
+ *
+ * Lists Purchase Orders ready for receiving and allows receiving goods
  */
 
 'use client'
 
-import { GRNsTable } from '@/components/warehouse/GRNsTable'
+import { POListForReceiving } from '@/components/warehouse/POListForReceiving'
 
-export default function GRNsPage() {
+export default function ReceivingPage() {
   return (
-    <div>
-      <div className="px-6 py-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Goods Receipt Notes</h1>
-          <p className="text-muted-foreground text-sm">Receive goods from ASN and create license plates</p>
-        </div>
-
-        <GRNsTable />
+    <div className="px-6 py-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Goods Receiving</h1>
+        <p className="text-muted-foreground text-sm">
+          Receive goods from purchase orders and transfer orders
+        </p>
       </div>
+
+      <POListForReceiving />
     </div>
   )
 }

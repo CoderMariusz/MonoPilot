@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.3</id>
+    <title>Product History</title>
+    <batch>02A-1</batch>
+    <points>3</points>
+    <effort_hours>4-5</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Complete audit trail with field-level change tracking and version comparison.</description>
+
+  <dependencies>
+    <requires>
+      <story id="2.1">Product CRUD</story>
+      <story id="2.2">Product Versioning</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>product_version_history</name>
+        <columns>
+          <column name="id" type="UUID" pk="true"/>
+          <column name="product_id" type="UUID" fk="products.id"/>
+          <column name="version" type="NUMERIC(4,1)"/>
+          <column name="changed_fields" type="JSONB">{ field: { old: X, new: Y } }</column>
+          <column name="change_summary" type="TEXT"/>
+          <column name="changed_by" type="UUID" fk="users.id"/>
+          <column name="changed_at" type="TIMESTAMPTZ"/>
+          <column name="org_id" type="UUID"/>
+        </columns>
+        <indexes>
+          <index>idx_product_version_history_product ON (product_id, changed_at DESC)</index>
+        </indexes>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/products/:id/history">
+        <description>Get version history for a product</description>
+        <query_params>page, limit</query_params>
+        <response>{ data: HistoryEntry[], pagination }</response>
+      </endpoint>
+      <endpoint method="GET" path="/api/technical/products/:id/history/compare">
+        <description>Compare two versions</description>
+        <query_params>v1, v2</query_params>
+        <response>{ v1, v2, differences: DiffEntry[] }</response>
+      </endpoint>
+    </api_endpoints>
+
+    <components_to_create>
+      <component name="ProductHistoryModal" path="app/technical/products/components/ProductHistoryModal.tsx">
+        Timeline view of version changes
+      </component>
+      <component name="VersionCompareDialog" path="app/technical/products/components/VersionCompareDialog.tsx">
+        Side-by-side diff view with color coding
+      </component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.3.1">History Timeline - vertical timeline with version, fields changed, user, timestamp</ac>
+    <ac id="2.3.2">Version Compare - select 2 versions, show diff with color coding</ac>
+    <ac id="2.3.3">History Pagination - 20 entries per page</ac>
+    <ac id="2.3.4">Field-Level Tracking - show old → new for each changed field</ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <integration_tests>
+      <test>Update product → history entry created</test>
+      <test>GET /api/technical/products/:id/history returns entries</test>
+      <test>Compare v1.0 vs v1.5 shows correct diff</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Open history modal → see timeline</test>
+      <test>Click compare → select versions → see diff</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="high">History records are immutable - no UPDATE/DELETE</note>
+    <note priority="medium">Diff view: green=added, red=removed, yellow=changed</note>
+  </implementation_notes>
+</story>

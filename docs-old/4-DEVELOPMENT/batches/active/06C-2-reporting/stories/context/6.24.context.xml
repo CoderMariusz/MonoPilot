@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.24</id>
+    <title>Export Reports to PDF/Excel</title>
+    <batch>06C-2</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Export generated reports to PDF and Excel formats</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.23">Quality Reports Generation</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="GET" path="/api/quality/reports/:id/download">
+        <description>Download report in specified format</description>
+        <query_params>format: 'pdf' | 'excel'</query_params>
+      </endpoint>
+    </api_endpoints>
+
+    <export_libraries>
+      <library name="jspdf">PDF generation</library>
+      <library name="jspdf-autotable">PDF tables</library>
+      <library name="xlsx">Excel generation (SheetJS)</library>
+    </export_libraries>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Export to PDF format</ac>
+    <ac id="2">Export to Excel format</ac>
+    <ac id="3">Download generated file</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-26">System shall export reports to PDF/Excel</fr>
+  </functional_requirements>
+</story>

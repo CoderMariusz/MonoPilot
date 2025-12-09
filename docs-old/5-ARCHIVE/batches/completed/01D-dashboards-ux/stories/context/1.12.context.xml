@@ -1,0 +1,886 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>1.12</story-id>
+    <story-title>Settings Wizard (UX Design)</story-title>
+    <epic-id>1</epic-id>
+    <epic-title>Foundation &amp; Settings</epic-title>
+    <batch-id>01D</batch-id>
+    <batch-title>Dashboards &amp; UX</batch-title>
+    <status>ready-for-dev</status>
+    <priority>P0</priority>
+    <story-points>13</story-points>
+    <estimated-hours>52</estimated-hours>
+    <created>2025-11-20</created>
+    <updated>2025-11-27</updated>
+  </metadata>
+
+  <story-overview>
+    <user-story>
+      As a new Admin,
+      I want a guided wizard to set up my organization,
+      so that I don't miss any important configuration.
+    </user-story>
+
+    <business-value>
+      <time-savings>
+        <initial-setup>
+          <before>4 hours (240 minutes)</before>
+          <after>10 minutes</after>
+          <reduction>96%</reduction>
+        </initial-setup>
+        <error-reduction>95% reduction in setup errors via validation + templates</error-reduction>
+        <annual-savings>~43 hours/year saved per admin = $4,300 @ $100/hr</annual-savings>
+      </time-savings>
+
+      <risk-mitigation>
+        <data-integrity>100% elimination of orphan data (safe delete warnings)</data-integrity>
+        <compliance>100% audit trail coverage (FDA 21 CFR Part 11)</compliance>
+        <validation>Validation + templates reduce setup errors by 95%</validation>
+      </risk-mitigation>
+    </business-value>
+
+    <key-features>
+      <feature>6-step guided wizard with progress indicator</feature>
+      <feature>Progress persistence (auto-save after each step)</feature>
+      <feature>Skip &amp; resume functionality</feature>
+      <feature>Circular dependency resolution (warehouse → locations → update defaults)</feature>
+      <feature>Module selection with pre-selected defaults</feature>
+      <feature>User invitation with role assignment</feature>
+    </key-features>
+  </story-overview>
+
+  <acceptance-criteria>
+    <criterion id="AC-012.1" priority="P0">
+      <title>6-step wizard triggered on first login</title>
+      <description>
+        - Triggered when organizations.wizard_completed = false
+        - Modal or full-page wizard with progress indicator (1/6, 2/6, ...)
+        - 6 steps: Organization Basics, Regional Settings, First Warehouse, Key Locations, Module Selection, Invite Users
+        - Cannot skip to step N without completing step N-1
+        - "Skip wizard" button: dismiss, redirect to dashboard
+      </description>
+    </criterion>
+
+    <criterion id="AC-012.2" priority="P0">
+      <title>Each step validates before proceeding</title>
+      <validation-rules>
+        <step number="1">
+          <field>company_name</field>
+          <rule>required, min 2 chars</rule>
+        </step>
+        <step number="2">
+          <field>timezone</field>
+          <rule>required</rule>
+        </step>
+        <step number="2">
+          <field>currency</field>
+          <rule>required</rule>
+        </step>
+        <step number="2">
+          <field>language</field>
+          <rule>required</rule>
+        </step>
+        <step number="3">
+          <field>warehouse.code</field>
+          <rule>required</rule>
+        </step>
+        <step number="3">
+          <field>warehouse.name</field>
+          <rule>required</rule>
+        </step>
+        <step number="4">
+          <field>locations</field>
+          <rule>at least Receiving and Shipping required</rule>
+        </step>
+        <step number="5">
+          <field>modules</field>
+          <rule>at least one module must be enabled</rule>
+        </step>
+        <step number="6">
+          <field>users</field>
+          <rule>optional, can skip user invitations</rule>
+        </step>
+      </validation-rules>
+      <error-handling>On validation error: show inline error, prevent next step</error-handling>
+    </criterion>
+
+    <criterion id="AC-012.3" priority="P0">
+      <title>Wizard completion status tracked</title>
+      <tracking>
+        <field>organizations.wizard_completed</field>
+        <type>BOOLEAN</type>
+        <default>false</default>
+        <description>Set to true when wizard completes</description>
+      </tracking>
+      <progress-persistence>
+        <field>organizations.wizard_progress</field>
+        <type>JSON</type>
+        <structure>{ step: number, data: Partial&lt;WizardData&gt; }</structure>
+        <description>Saves current step and form data for resume functionality</description>
+      </progress-persistence>
+      <resume>
+        <button>Resume Setup Wizard</button>
+        <visibility>Visible if wizard_completed = false</visibility>
+        <behavior>Opens wizard at last completed step</behavior>
+      </resume>
+    </criterion>
+
+    <criterion id="AC-012.4" priority="P0">
+      <title>Wizard skip and resume functionality</title>
+      <skip>
+        <button>Skip wizard</button>
+        <action>Dismiss modal, redirect to dashboard</action>
+        <banner>
+          <message>Complete your organization setup</message>
+          <button>Resume</button>
+          <visibility>Shown if wizard_completed = false</visibility>
+        </banner>
+      </skip>
+      <resume>
+        <trigger>Resume button on dashboard banner OR /settings → Setup Wizard</trigger>
+        <behavior>Opens wizard, restores progress from wizard_progress JSON</behavior>
+      </resume>
+    </criterion>
+
+    <criterion id="AC-012.5" priority="P0">
+      <title>Wizard flow handles circular dependencies</title>
+      <flow>
+        <step number="3" action="Create warehouse">
+          <field>default_receiving_location_id</field>
+          <value>NULL</value>
+        </step>
+        <step number="3" action="Create warehouse">
+          <field>default_shipping_location_id</field>
+          <value>NULL</value>
+        </step>
+        <step number="3" action="Create warehouse">
+          <field>transit_location_id</field>
+          <value>NULL</value>
+        </step>
+        <step number="4" action="Create 4 locations">
+          <location type="Receiving">
+            <field>warehouse_id</field>
+            <value>wizardData.warehouse.id</value>
+          </location>
+          <location type="Shipping">
+            <field>warehouse_id</field>
+            <value>wizardData.warehouse.id</value>
+          </location>
+          <location type="Transit">
+            <field>warehouse_id</field>
+            <value>wizardData.warehouse.id</value>
+          </location>
+          <location type="Production">
+            <field>warehouse_id</field>
+            <value>wizardData.warehouse.id</value>
+          </location>
+        </step>
+        <step number="4" action="After location creation">
+          <update>
+            <target>warehouse</target>
+            <field>default_receiving_location_id</field>
+            <value>receivingLocation.id</value>
+          </update>
+          <update>
+            <target>warehouse</target>
+            <field>default_shipping_location_id</field>
+            <value>shippingLocation.id</value>
+          </update>
+          <update>
+            <target>warehouse</target>
+            <field>transit_location_id</field>
+            <value>transitLocation.id</value>
+          </update>
+        </step>
+      </flow>
+      <resolution>Circular dependency resolved: warehouse ← locations ← warehouse defaults</resolution>
+    </criterion>
+
+    <criterion id="AC-012.6" priority="P0">
+      <title>Module selection with descriptions</title>
+      <ui-design>
+        <layout>Grid of module cards (2x4 or 3x3)</layout>
+        <card-elements>
+          <element>checkbox (not toggle)</element>
+          <element>icon</element>
+          <element>name</element>
+          <element>description</element>
+        </card-elements>
+      </ui-design>
+      <modules>
+        <module code="technical" default="checked">Technical</module>
+        <module code="planning" default="checked">Planning</module>
+        <module code="production" default="checked">Production</module>
+        <module code="warehouse" default="checked">Warehouse</module>
+        <module code="quality" default="unchecked">Quality</module>
+        <module code="shipping" default="unchecked">Shipping</module>
+        <module code="npd" default="unchecked">NPD</module>
+        <module code="finance" default="unchecked">Finance</module>
+      </modules>
+      <validation>At least one module required</validation>
+    </criterion>
+
+    <criterion id="AC-012.7" priority="P0">
+      <title>User invitation with role assignment</title>
+      <form>
+        <fields>
+          <field>email</field>
+          <field>first_name</field>
+          <field>last_name</field>
+          <field>role (dropdown with 10 roles)</field>
+        </fields>
+        <actions>
+          <action>+ Add Another User (adds row)</action>
+          <action>Remove user (X icon per row)</action>
+        </actions>
+      </form>
+      <behavior>
+        <optional>Step 6 is optional, can skip</optional>
+        <on-completion>Send invitations to all users via POST /api/settings/users</on-completion>
+        <email>Users receive email with signup link</email>
+      </behavior>
+    </criterion>
+
+    <criterion id="AC-012.8" priority="P0">
+      <title>Progress indicator and navigation</title>
+      <progress-indicator>
+        <type>Progress bar or stepper</type>
+        <display>Shows current step (1/6, 2/6, etc.)</display>
+        <states>
+          <completed>Checkmark icon</completed>
+          <current>Highlighted</current>
+          <future>Grayed out</future>
+        </states>
+      </progress-indicator>
+      <navigation>
+        <button name="Back" disabled-on="step 1"/>
+        <button name="Next" enabled-when="current step valid"/>
+        <button name="Complete Setup" visible-on="step 6"/>
+      </navigation>
+      <completion>
+        <success-modal>Setup complete! Welcome to MonoPilot</success-modal>
+        <redirect>/dashboard</redirect>
+      </completion>
+    </criterion>
+
+    <criterion id="AC-012.9" priority="P0">
+      <title>Wizard data validation and error handling</title>
+      <validation>
+        <schemas>All form fields use Zod validation schemas from Stories 1.1, 1.2, 1.5, 1.6</schemas>
+      </validation>
+      <error-types>
+        <api-error>
+          <display>Toast or inline message</display>
+          <behavior>Show error, allow retry, don't auto-advance step</behavior>
+        </api-error>
+        <network-error>
+          <display>Connection lost modal</display>
+          <action>Retry button</action>
+        </network-error>
+        <validation-error>
+          <display>Inline per field</display>
+          <behavior>Highlight step with error in stepper</behavior>
+        </validation-error>
+      </error-types>
+      <data-persistence>
+        <auto-save>Data auto-saved per step to wizard_progress JSON</auto-save>
+        <transaction>All operations in transaction (rollback on error)</transaction>
+      </data-persistence>
+    </criterion>
+
+    <criterion id="AC-012.10" priority="P1">
+      <title>Wizard can be accessed later from Settings</title>
+      <menu-item>
+        <location>/settings → Setup Wizard</location>
+        <label-when-incomplete>Complete Setup Wizard</label-when-incomplete>
+        <label-when-complete>Re-run Setup Wizard</label-when-complete>
+      </menu-item>
+      <review-mode>
+        <trigger>wizard_completed = true</trigger>
+        <behavior>All data pre-filled, can edit and re-save</behavior>
+        <use-cases>
+          <use-case>Create 2nd warehouse</use-case>
+          <use-case>Invite more users</use-case>
+          <use-case>Multi-warehouse setup</use-case>
+        </use-cases>
+      </review-mode>
+    </criterion>
+  </acceptance-criteria>
+
+  <ui-components>
+    <wizard-steps>
+      <step number="1" component="Step1OrganizationBasics.tsx">
+        <title>Organization Basics</title>
+        <fields>
+          <field name="company_name" type="text" required="true" min-length="2"/>
+          <field name="logo" type="file" max-size="2MB"/>
+          <field name="address" type="text"/>
+          <field name="city" type="text"/>
+          <field name="postal_code" type="text"/>
+          <field name="country" type="select"/>
+        </fields>
+        <validation-schema>UpdateOrganizationSchema (Story 1.1)</validation-schema>
+      </step>
+
+      <step number="2" component="Step2RegionalSettings.tsx">
+        <title>Regional Settings</title>
+        <fields>
+          <field name="timezone" type="select" required="true" default="UTC"/>
+          <field name="currency" type="select" required="true" default="USD"/>
+          <field name="language" type="select" required="true" default="EN"/>
+          <field name="date_format" type="select" default="MM/DD/YYYY"/>
+          <field name="number_format" type="select" default="1,000.00"/>
+        </fields>
+      </step>
+
+      <step number="3" component="Step3FirstWarehouse.tsx">
+        <title>First Warehouse</title>
+        <fields>
+          <field name="code" type="text" required="true"/>
+          <field name="name" type="text" required="true"/>
+          <field name="address" type="text"/>
+        </fields>
+        <validation-schema>CreateWarehouseSchema (Story 1.5)</validation-schema>
+        <api-call>POST /api/settings/warehouses</api-call>
+        <note>Creates warehouse with defaults = NULL (circular dependency)</note>
+      </step>
+
+      <step number="4" component="Step4KeyLocations.tsx">
+        <title>Key Locations</title>
+        <locations>
+          <location type="Receiving">
+            <field name="code" auto-filled="REC-01"/>
+            <field name="name" default="Receiving"/>
+            <field name="type" pre-selected="Receiving"/>
+          </location>
+          <location type="Shipping">
+            <field name="code" auto-filled="SHIP-01"/>
+            <field name="name" default="Shipping"/>
+            <field name="type" pre-selected="Shipping"/>
+          </location>
+          <location type="Transit">
+            <field name="code" auto-filled="TRANS-01"/>
+            <field name="name" default="Transit"/>
+            <field name="type" pre-selected="Transit"/>
+          </location>
+          <location type="Production">
+            <field name="code" auto-filled="PROD-01"/>
+            <field name="name" default="Production"/>
+            <field name="type" pre-selected="Production"/>
+          </location>
+        </locations>
+        <validation-schema>CreateLocationSchema x4 (Story 1.6)</validation-schema>
+        <api-call>POST /api/settings/locations (x4)</api-call>
+        <post-creation>Update warehouse defaults with location IDs</post-creation>
+      </step>
+
+      <step number="5" component="Step5ModuleSelection.tsx">
+        <title>Module Selection</title>
+        <layout>Grid of 8 module cards (2x4 or 3x3)</layout>
+        <modules>
+          <module code="technical" icon="Wrench" color="blue" default="checked">
+            <name>Technical</name>
+            <description>BOM, Products, Routings, Specifications</description>
+          </module>
+          <module code="planning" icon="Calendar" color="indigo" default="checked">
+            <name>Planning</name>
+            <description>Purchase Orders, Work Orders, Suppliers</description>
+          </module>
+          <module code="production" icon="Factory" color="green" default="checked">
+            <name>Production</name>
+            <description>Work Order execution, Production Tracking</description>
+          </module>
+          <module code="warehouse" icon="Package" color="orange" default="checked">
+            <name>Warehouse</name>
+            <description>Inventory, Stock Moves, Transfers</description>
+          </module>
+          <module code="quality" icon="CheckCircle" color="red" default="unchecked">
+            <name>Quality</name>
+            <description>NCRs, Quality Checks, Inspections</description>
+          </module>
+          <module code="shipping" icon="Truck" color="purple" default="unchecked">
+            <name>Shipping</name>
+            <description>Outbound Logistics, Deliveries</description>
+          </module>
+          <module code="npd" icon="Lightbulb" color="pink" default="unchecked">
+            <name>NPD</name>
+            <description>New Product Development, R&amp;D</description>
+          </module>
+          <module code="finance" icon="DollarSign" color="yellow" default="unchecked">
+            <name>Finance</name>
+            <description>Costing, Invoicing, Financial Reports</description>
+          </module>
+        </modules>
+        <validation>At least one module must be enabled</validation>
+      </step>
+
+      <step number="6" component="Step6InviteUsers.tsx">
+        <title>Invite Users</title>
+        <form>
+          <multi-row-form>
+            <row>
+              <field name="email" type="email" required="true"/>
+              <field name="first_name" type="text" required="true"/>
+              <field name="last_name" type="text" required="true"/>
+              <field name="role" type="select" required="true">
+                <options>Admin, Manager, Supervisor, Operator, Quality Inspector, Planner, Warehouse Worker, Technician, Viewer, Guest</options>
+              </field>
+            </row>
+          </multi-row-form>
+          <actions>
+            <button>+ Add Another User</button>
+            <button>Remove user (X icon per row)</button>
+          </actions>
+        </form>
+        <validation-schema>CreateUserSchema (Story 1.2)</validation-schema>
+        <api-call>POST /api/settings/users (for each user)</api-call>
+        <optional>Step is optional, can skip</optional>
+      </step>
+    </wizard-steps>
+
+    <shared-components>
+      <component name="WizardProgressIndicator.tsx">
+        <purpose>Shows steps 1-6 with checkmarks for completed steps</purpose>
+        <states>
+          <completed>Checkmark icon, enabled</completed>
+          <current>Highlighted</current>
+          <future>Grayed out, disabled</future>
+        </states>
+      </component>
+
+      <component name="WizardNavigation.tsx">
+        <buttons>
+          <button name="Back" disabled-on="step 1"/>
+          <button name="Next" enabled-when="current step valid"/>
+          <button name="Skip wizard" action="dismiss modal"/>
+          <button name="Complete Setup" visible-on="step 6"/>
+        </buttons>
+      </component>
+
+      <component name="WizardBanner.tsx">
+        <display-condition>wizard_completed = false</display-condition>
+        <message>Complete your organization setup to get started</message>
+        <actions>
+          <button>Resume Setup</button>
+          <button>Dismiss (X icon)</button>
+        </actions>
+        <location>Dashboard banner</location>
+      </component>
+
+      <component name="SetupWizard.tsx">
+        <file>apps/frontend/app/onboarding/wizard/page.tsx</file>
+        <state>
+          <field>currentStep (1-6)</field>
+          <field>wizardData (WizardData interface)</field>
+        </state>
+        <methods>
+          <method>saveProgress() - POST /api/settings/wizard/progress</method>
+          <method>getProgress() - GET /api/settings/wizard/progress</method>
+          <method>completeWizard() - POST /api/settings/wizard/complete</method>
+        </methods>
+      </component>
+    </shared-components>
+  </ui-components>
+
+  <data-model>
+    <interface name="WizardData">
+      <field name="step" type="number">Current step (1-6)</field>
+      <field name="organization" type="object">
+        <subfield name="company_name" type="string"/>
+        <subfield name="logo" type="File" optional="true"/>
+        <subfield name="address" type="string"/>
+        <subfield name="city" type="string"/>
+        <subfield name="postal_code" type="string"/>
+        <subfield name="country" type="string"/>
+      </field>
+      <field name="regional" type="object">
+        <subfield name="timezone" type="string"/>
+        <subfield name="currency" type="string"/>
+        <subfield name="language" type="string"/>
+        <subfield name="date_format" type="string"/>
+        <subfield name="number_format" type="string"/>
+      </field>
+      <field name="warehouse" type="object">
+        <subfield name="code" type="string"/>
+        <subfield name="name" type="string"/>
+        <subfield name="address" type="string" optional="true"/>
+      </field>
+      <field name="locations" type="object">
+        <subfield name="receiving" type="{ code: string, name: string }"/>
+        <subfield name="shipping" type="{ code: string, name: string }"/>
+        <subfield name="transit" type="{ code: string, name: string }"/>
+        <subfield name="production" type="{ code: string, name: string }"/>
+      </field>
+      <field name="modules" type="string[]">Array of enabled module codes</field>
+      <field name="users" type="Array">
+        <subfield name="email" type="string"/>
+        <subfield name="first_name" type="string"/>
+        <subfield name="last_name" type="string"/>
+        <subfield name="role" type="UserRole"/>
+      </field>
+    </interface>
+
+    <database-schema>
+      <table name="organizations">
+        <column name="wizard_completed" type="BOOLEAN" default="false" description="Tracks if setup wizard has been completed"/>
+        <column name="wizard_progress" type="JSONB" nullable="true" description="Stores current wizard step and form data for resume functionality"/>
+      </table>
+      <migration>
+        <file>006_add_wizard_tracking_to_organizations.sql</file>
+        <sql>
+          ALTER TABLE organizations
+            ADD COLUMN wizard_completed BOOLEAN DEFAULT false NOT NULL,
+            ADD COLUMN wizard_progress JSONB;
+        </sql>
+      </migration>
+    </database-schema>
+  </data-model>
+
+  <api-endpoints>
+    <endpoint method="POST" path="/api/settings/wizard/progress">
+      <auth>Admin only</auth>
+      <body>
+        <field name="step" type="number"/>
+        <field name="data" type="Partial&lt;WizardData&gt;"/>
+      </body>
+      <behavior>
+        <action>Update organizations.wizard_progress</action>
+        <action>Merge new data with existing data</action>
+      </behavior>
+    </endpoint>
+
+    <endpoint method="GET" path="/api/settings/wizard/progress">
+      <auth>Admin only</auth>
+      <response>
+        <field name="step" type="number"/>
+        <field name="data" type="Partial&lt;WizardData&gt;"/>
+      </response>
+      <behavior>Query organizations.wizard_progress and return current state</behavior>
+    </endpoint>
+
+    <endpoint method="POST" path="/api/settings/wizard/complete">
+      <auth>Admin only</auth>
+      <body>WizardData (all steps)</body>
+      <behavior>
+        <transaction>
+          <action order="1">Update organization (company_name, logo, address, etc.)</action>
+          <action order="2">Update regional settings</action>
+          <action order="3">Create warehouse (POST /api/settings/warehouses)</action>
+          <action order="4">Create 4 locations (POST /api/settings/locations x4)</action>
+          <action order="5">Update warehouse defaults with location IDs</action>
+          <action order="6">Update modules_enabled</action>
+          <action order="7">Create users and send invitations (POST /api/settings/users x N)</action>
+          <action order="8">Set wizard_completed = true</action>
+        </transaction>
+        <rollback>On any error, rollback all changes</rollback>
+      </behavior>
+      <response>
+        <success>{ success: true }</success>
+        <error>{ error: string, details: object }</error>
+      </response>
+    </endpoint>
+
+    <endpoint-integrations>
+      <integration story="1.1">PUT /api/settings/organization (Step 1)</integration>
+      <integration story="1.5">POST /api/settings/warehouses (Step 3)</integration>
+      <integration story="1.6">POST /api/settings/locations x4 (Step 4)</integration>
+      <integration story="1.2">POST /api/settings/users (Step 6)</integration>
+    </endpoint-integrations>
+  </api-endpoints>
+
+  <testing-strategy>
+    <unit-tests>
+      <test>Wizard service logic: saveWizardProgress(), getWizardProgress(), completeWizard()</test>
+      <test>Validation schemas: Each step's Zod schema (organization, warehouse, location, user)</test>
+      <test>Circular dependency resolution: Warehouse → Locations → Update warehouse defaults</test>
+    </unit-tests>
+
+    <integration-tests>
+      <test>Complete wizard → all entities created (organization, warehouse, 4 locations, users, modules)</test>
+      <test>Skip wizard → progress saved, can resume</test>
+      <test>Resume wizard → data pre-filled</test>
+      <test>Validation errors → step blocked</test>
+      <test>API error → rollback, retry</test>
+    </integration-tests>
+
+    <e2e-tests-playwright>
+      <test>First login → wizard opens</test>
+      <test>Complete all 6 steps → redirect to dashboard</test>
+      <test>Skip wizard → banner shown, resume works</test>
+      <test>Re-run wizard → creates 2nd warehouse</test>
+    </e2e-tests-playwright>
+  </testing-strategy>
+
+  <technical-decisions>
+    <decision id="1">
+      <title>Wizard Trigger</title>
+      <implementation>On first Admin login: check organizations.wizard_completed. If false, show wizard (modal or full-page). If true, normal dashboard.</implementation>
+    </decision>
+
+    <decision id="2">
+      <title>Progress Persistence</title>
+      <implementation>organizations.wizard_progress: JSON field stores current step + form data. Allows resume after dismissal.</implementation>
+    </decision>
+
+    <decision id="3">
+      <title>Circular Dependency Resolution</title>
+      <flow>
+        Step 3: Create warehouse (defaults = NULL)
+        ↓
+        Step 4: Create 4 locations (with warehouse_id)
+        ↓
+        After Step 4: Update warehouse.default_*_location_id
+        ↓
+        Circular dependency resolved
+      </flow>
+    </decision>
+
+    <decision id="4">
+      <title>All-or-Nothing Approach</title>
+      <implementation>Use database transaction for wizard completion. If any step fails: rollback all changes. User can retry without partial data.</implementation>
+    </decision>
+
+    <decision id="5">
+      <title>Optional User Invitations</title>
+      <rationale>Step 6 optional (can skip). Some admins prefer to invite users later.</rationale>
+    </decision>
+  </technical-decisions>
+
+  <ux-design-references>
+    <reference source="ux-design-settings-module.md">
+      <variant>Variant B (P0 MVP): Setup Wizard + Grouped Dashboard</variant>
+      <time-savings>96% faster setup (4 hours → 10 minutes)</time-savings>
+      <features>
+        <feature>6-step guided wizard with progress indicator</feature>
+        <feature>Step validation (cannot proceed to N+1 without completing N)</feature>
+        <feature>Progress persistence (auto-save after each step)</feature>
+        <feature>Skip &amp; resume functionality</feature>
+        <feature>Circular dependency resolution</feature>
+        <feature>Template support (future: Small/Medium/Large plant templates)</feature>
+      </features>
+    </reference>
+
+    <reference source="ux-design-shared-system.md">
+      <integration>ModuleHeader component</integration>
+      <integration>app-colors.ts (green Create, gray View/Edit, red Delete)</integration>
+      <integration>Mobile responsive (forms stack on &lt; 768px)</integration>
+      <integration>Keyboard navigation (Tab, Enter, Escape)</integration>
+    </reference>
+  </ux-design-references>
+
+  <prerequisites>
+    <prerequisite story="1.1">Organization Settings API (PUT /api/settings/organization)</prerequisite>
+    <prerequisite story="1.2">User Management API (POST /api/settings/users)</prerequisite>
+    <prerequisite story="1.5">Warehouse Configuration API (POST /api/settings/warehouses)</prerequisite>
+    <prerequisite story="1.6">Location Configuration API (POST /api/settings/locations)</prerequisite>
+    <prerequisite>All Stories 1.1-1.11 (wizard integrates all previous stories)</prerequisite>
+  </prerequisites>
+
+  <implementation-tasks>
+    <task id="1" estimated-hours="4">
+      <title>Database Schema - Wizard Tracking</title>
+      <subtasks>
+        <subtask>Add wizard_completed BOOLEAN DEFAULT false to organizations</subtask>
+        <subtask>Add wizard_progress JSONB to organizations</subtask>
+        <subtask>Update organizations seed to include wizard fields</subtask>
+        <subtask>Run migration and verify</subtask>
+      </subtasks>
+    </task>
+
+    <task id="2" estimated-hours="3">
+      <title>Wizard Data Model</title>
+      <subtasks>
+        <subtask>Define WizardData interface (TypeScript)</subtask>
+        <subtask>Define WizardProgress interface</subtask>
+        <subtask>Export types from lib/types/wizard.ts</subtask>
+      </subtasks>
+    </task>
+
+    <task id="3" estimated-hours="8">
+      <title>Wizard Service - Core Logic</title>
+      <subtasks>
+        <subtask>Create WizardService class/module</subtask>
+        <subtask>Implement saveWizardProgress(orgId, step, data)</subtask>
+        <subtask>Implement getWizardProgress(orgId)</subtask>
+        <subtask>Implement completeWizard(orgId, data) with transaction</subtask>
+        <subtask>Handle circular dependency: warehouse → locations → update defaults</subtask>
+      </subtasks>
+    </task>
+
+    <task id="4" estimated-hours="4">
+      <title>API Endpoints</title>
+      <subtasks>
+        <subtask>POST /api/settings/wizard/progress</subtask>
+        <subtask>GET /api/settings/wizard/progress</subtask>
+        <subtask>POST /api/settings/wizard/complete</subtask>
+        <subtask>Add Admin auth checks</subtask>
+      </subtasks>
+    </task>
+
+    <task id="5" estimated-hours="12">
+      <title>Frontend Wizard Component</title>
+      <subtasks>
+        <subtask>Create /app/onboarding/wizard/page.tsx</subtask>
+        <subtask>Implement SetupWizard component (state, navigation, progress)</subtask>
+        <subtask>Create Step1OrganizationBasics.tsx</subtask>
+        <subtask>Create Step2RegionalSettings.tsx</subtask>
+        <subtask>Create Step3FirstWarehouse.tsx</subtask>
+        <subtask>Create Step4KeyLocations.tsx</subtask>
+        <subtask>Create Step5ModuleSelection.tsx</subtask>
+        <subtask>Create Step6InviteUsers.tsx</subtask>
+      </subtasks>
+    </task>
+
+    <task id="6" estimated-hours="4">
+      <title>Step Validation</title>
+      <subtasks>
+        <subtask>Each step component: Zod schema validation</subtask>
+        <subtask>On Next click: validate, save progress, increment step</subtask>
+        <subtask>Use react-hook-form for each step</subtask>
+        <subtask>Inline error display</subtask>
+      </subtasks>
+    </task>
+
+    <task id="7" estimated-hours="3">
+      <title>Wizard Progress Auto-Save</title>
+      <subtasks>
+        <subtask>On Next click: POST /api/settings/wizard/progress</subtask>
+        <subtask>On page load: GET /api/settings/wizard/progress</subtask>
+        <subtask>Prefill form fields with saved data</subtask>
+      </subtasks>
+    </task>
+
+    <task id="8" estimated-hours="3">
+      <title>Wizard Skip and Resume</title>
+      <subtasks>
+        <subtask>Skip wizard button: close modal, redirect to dashboard</subtask>
+        <subtask>Dashboard banner: show if wizard_completed = false</subtask>
+        <subtask>Resume Setup button: open wizard, restore progress</subtask>
+        <subtask>Settings menu item: Setup Wizard link</subtask>
+      </subtasks>
+    </task>
+
+    <task id="9" estimated-hours="4">
+      <title>Circular Dependency Resolution</title>
+      <subtasks>
+        <subtask>Step 3: Create warehouse with defaults = NULL</subtask>
+        <subtask>Step 4: Create 4 locations with warehouse_id</subtask>
+        <subtask>After step 4: Update warehouse defaults with location IDs</subtask>
+        <subtask>Test rollback if location creation fails</subtask>
+      </subtasks>
+    </task>
+
+    <task id="10" estimated-hours="3">
+      <title>Wizard Completion</title>
+      <subtasks>
+        <subtask>On step 6 Complete Setup: validate all steps</subtask>
+        <subtask>POST /api/settings/wizard/complete (all data)</subtask>
+        <subtask>Success modal: Setup complete! Welcome to MonoPilot</subtask>
+        <subtask>Redirect to dashboard</subtask>
+      </subtasks>
+    </task>
+
+    <task id="11" estimated-hours="2">
+      <title>Module Selection UI</title>
+      <subtasks>
+        <subtask>Grid of 8 module cards (2x4 or 3x3)</subtask>
+        <subtask>Each card: checkbox, icon, name, description</subtask>
+        <subtask>Pre-check: Technical, Planning, Production, Warehouse</subtask>
+        <subtask>Validation: at least one module required</subtask>
+      </subtasks>
+    </task>
+
+    <task id="12" estimated-hours="2">
+      <title>User Invitation UI</title>
+      <subtasks>
+        <subtask>Multi-row form: email, first_name, last_name, role</subtask>
+        <subtask>+ Add Another User button</subtask>
+        <subtask>Remove user button (X icon)</subtask>
+        <subtask>Optional step: can skip</subtask>
+      </subtasks>
+    </task>
+
+    <task id="13" estimated-hours="2">
+      <title>Wizard Re-run from Settings</title>
+      <subtasks>
+        <subtask>Add Setup Wizard menu item to /settings</subtask>
+        <subtask>Load wizard in review mode (data pre-filled)</subtask>
+        <subtask>Allow edit and re-save</subtask>
+      </subtasks>
+    </task>
+
+    <task id="14" estimated-hours="2">
+      <title>Progress Indicator</title>
+      <subtasks>
+        <subtask>Implement stepper component (steps 1-6)</subtask>
+        <subtask>Show current step highlighted</subtask>
+        <subtask>Completed steps: checkmark icon</subtask>
+        <subtask>Future steps: grayed out</subtask>
+      </subtasks>
+    </task>
+
+    <task id="15" estimated-hours="3">
+      <title>Error Handling</title>
+      <subtasks>
+        <subtask>API errors: show toast, allow retry</subtask>
+        <subtask>Network errors: show Connection lost modal, Retry button</subtask>
+        <subtask>Validation errors: show inline per field</subtask>
+        <subtask>Transaction rollback: all-or-nothing approach</subtask>
+      </subtasks>
+    </task>
+
+    <task id="16" estimated-hours="6">
+      <title>Integration &amp; Testing</title>
+      <subtasks>
+        <subtask>Unit tests: wizard service logic, validation</subtask>
+        <subtask>Integration tests: complete wizard, skip, resume, validation errors, rollback</subtask>
+        <subtask>E2E tests (Playwright): first login → wizard → completion, skip → resume</subtask>
+      </subtasks>
+    </task>
+  </implementation-tasks>
+
+  <file-structure>
+    <frontend>
+      <file>apps/frontend/app/onboarding/wizard/page.tsx</file>
+      <file>apps/frontend/components/wizard/SetupWizard.tsx</file>
+      <file>apps/frontend/components/wizard/Step1OrganizationBasics.tsx</file>
+      <file>apps/frontend/components/wizard/Step2RegionalSettings.tsx</file>
+      <file>apps/frontend/components/wizard/Step3FirstWarehouse.tsx</file>
+      <file>apps/frontend/components/wizard/Step4KeyLocations.tsx</file>
+      <file>apps/frontend/components/wizard/Step5ModuleSelection.tsx</file>
+      <file>apps/frontend/components/wizard/Step6InviteUsers.tsx</file>
+      <file>apps/frontend/components/wizard/WizardProgressIndicator.tsx</file>
+      <file>apps/frontend/components/wizard/WizardNavigation.tsx</file>
+      <file>apps/frontend/components/wizard/WizardBanner.tsx</file>
+      <file>apps/frontend/lib/types/wizard.ts</file>
+      <file>apps/frontend/lib/services/wizard-service.ts</file>
+    </frontend>
+
+    <backend>
+      <file>apps/frontend/app/api/settings/wizard/progress/route.ts</file>
+      <file>apps/frontend/app/api/settings/wizard/complete/route.ts</file>
+    </backend>
+
+    <database>
+      <file>supabase/migrations/006_add_wizard_tracking_to_organizations.sql</file>
+    </database>
+
+    <tests>
+      <file>apps/frontend/__tests__/unit/wizard-service.test.ts</file>
+      <file>apps/frontend/__tests__/integration/wizard-complete.test.ts</file>
+      <file>tests/e2e/wizard.spec.ts</file>
+    </tests>
+  </file-structure>
+
+  <completion-checklist>
+    <item>All 16 tasks completed</item>
+    <item>6-step wizard implemented with validation and progress persistence</item>
+    <item>Circular dependency resolution tested</item>
+    <item>Skip and resume functionality working</item>
+    <item>Integration tests: complete wizard, skip, resume, validation errors, rollback</item>
+    <item>E2E tests: first login → wizard → completion, skip → resume</item>
+    <item>Code review approved</item>
+    <item>Documentation updated</item>
+  </completion-checklist>
+</story-context>

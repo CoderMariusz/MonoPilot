@@ -5,10 +5,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerSupabase } from '@/lib/supabase/server'
+
+// Type helpers for Supabase FK joins
+type ProductFK = { name?: string; code?: string; uom?: string } | null
+type LocationFK = { code?: string; name?: string } | null
+type WarehouseFK = { name?: string } | null
 
 export async function GET(req: NextRequest) {
-  const supabase = await createServerClient()
+  const supabase = await createServerSupabase()
   const searchParams = req.nextUrl.searchParams
   const barcode = searchParams.get('barcode')
 
@@ -56,17 +61,19 @@ export async function GET(req: NextRequest) {
       .single()
 
     if (lpData) {
+      const product = lpData.product as ProductFK
+      const location = lpData.location as LocationFK
       return NextResponse.json({
         data: {
           type: 'license_plate',
           id: lpData.id,
           details: {
             lp_number: lpData.lp_number,
-            product_name: lpData.product?.name || 'Unknown',
-            product_code: lpData.product?.code || '',
+            product_name: product?.name || 'Unknown',
+            product_code: product?.code || '',
             quantity: lpData.current_qty,
-            uom: lpData.product?.uom || 'EA',
-            location_code: lpData.location?.code || 'Unknown',
+            uom: product?.uom || 'EA',
+            location_code: location?.code || 'Unknown',
           },
         },
       })
@@ -90,6 +97,7 @@ export async function GET(req: NextRequest) {
       .single()
 
     if (locationData) {
+      const warehouse = locationData.warehouse as WarehouseFK
       return NextResponse.json({
         data: {
           type: 'location',
@@ -99,7 +107,7 @@ export async function GET(req: NextRequest) {
             name: locationData.name || locationData.code,
             type: locationData.type,
             zone: locationData.zone,
-            warehouse_name: locationData.warehouse?.name || 'Unknown',
+            warehouse_name: warehouse?.name || 'Unknown',
           },
         },
       })
@@ -147,13 +155,14 @@ export async function GET(req: NextRequest) {
       .single()
 
     if (woData) {
+      const product = woData.product as ProductFK
       return NextResponse.json({
         data: {
           type: 'work_order',
           id: woData.id,
           details: {
             wo_number: woData.wo_number,
-            product_name: woData.product?.name || 'Unknown',
+            product_name: product?.name || 'Unknown',
             planned_qty: woData.planned_quantity,
             output_qty: woData.produced_quantity || 0,
             status: woData.status,
@@ -177,6 +186,7 @@ export async function GET(req: NextRequest) {
       .single()
 
     if (palletData) {
+      const location = palletData.location as LocationFK
       return NextResponse.json({
         data: {
           type: 'pallet',
@@ -184,7 +194,7 @@ export async function GET(req: NextRequest) {
           details: {
             pallet_number: palletData.pallet_number,
             status: palletData.status,
-            location_code: palletData.location?.code || 'Unknown',
+            location_code: location?.code || 'Unknown',
           },
         },
       })

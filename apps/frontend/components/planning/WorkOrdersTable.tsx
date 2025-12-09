@@ -74,6 +74,8 @@ interface WorkOrder {
 }
 
 export function WorkOrdersTable() {
+  console.log('[WorkOrdersTable MOUNT/UPDATE] Component function called');
+
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -103,6 +105,9 @@ export function WorkOrdersTable() {
       }
 
       const data = await response.json()
+      console.log('[WorkOrdersTable] API response:', JSON.stringify(data, null, 2))
+      console.log('[WorkOrdersTable] work_orders array:', data.work_orders)
+      console.log('[WorkOrdersTable] work_orders length:', data.work_orders?.length)
       setWorkOrders(data.work_orders || [])
     } catch (error) {
       console.error('Error fetching work orders:', error)
@@ -116,9 +121,10 @@ export function WorkOrdersTable() {
     }
   }
 
-  // Fetch on status filter change
+  // Fetch on mount and filter changes
   useEffect(() => {
     fetchWorkOrders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter])
 
   // Debounced search (300ms delay to avoid fetching on every keystroke)
@@ -128,6 +134,7 @@ export function WorkOrdersTable() {
     }, 300)
 
     return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
   // Handle delete
@@ -206,20 +213,16 @@ export function WorkOrdersTable() {
     return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
   }
 
+  console.log('[WorkOrdersTable RENDER]', {
+    workOrders: workOrders,
+    workOrdersLength: workOrders?.length,
+    isLoading: loading,
+    isMobile: isMobile,
+    willShowEmpty: !loading && workOrders.length === 0
+  });
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Work Orders</h1>
-        <Button onClick={() => {
-          setEditingWorkOrder(null)
-          setFormModalOpen(true)
-        }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Work Order
-        </Button>
-      </div>
-
       {/* Filters */}
       <div className="flex gap-4">
         <div className="relative flex-1 max-w-md">

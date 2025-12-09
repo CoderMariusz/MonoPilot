@@ -1,0 +1,481 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.7</id>
+    <title>LP Genealogy Tracking</title>
+    <batch>5A-2</batch>
+    <points>8</points>
+    <effort_hours>8-10</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>Track LP relationships (parent-child) for complete FDA-compliant traceability with atomic transaction handling and circular dependency prevention</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.5">LP Split</story>
+      <story id="5.6">LP Merge</story>
+    </requires>
+    <enables>
+      <story id="5.28">Forward/Backward Traceability</story>
+      <story id="5.29">Genealogy Recording</story>
+      <story id="4.7">WO Consumption</story>
+    </enables>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>lp_genealogy</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK, DEFAULT gen_random_uuid()"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, FK organizations(id)"/>
+          <column name="parent_lp_id" type="UUID" constraint="NOT NULL, FK license_plates(id)"/>
+          <column name="child_lp_id" type="UUID" constraint="NOT NULL, FK license_plates(id)"/>
+          <column name="wo_id" type="UUID" constraint="FK work_orders(id)"/>
+          <column name="operation_type" type="VARCHAR(20)" constraint="NOT NULL, CHECK IN ('split','merge','consume','produce')"/>
+          <column name="created_at" type="TIMESTAMP" constraint="DEFAULT now()"/>
+          <column name="created_by_user_id" type="UUID" constraint="NOT NULL, FK users(id)"/>
+        </columns>
+        <unique_constraint>UNIQUE(parent_lp_id, child_lp_id)</unique_constraint>
+        <unique_constraint>UNIQUE(org_id, parent_lp_id, child_lp_id)</unique_constraint>
+        <indexes>
+          <index name="idx_lp_genealogy_org_id" columns="org_id"/>
+          <index name="idx_lp_genealogy_parent" columns="parent_lp_id"/>
+          <index name="idx_lp_genealogy_child" columns="child_lp_id"/>
+          <index name="idx_lp_genealogy_created_at" columns="created_at"/>
+          <index name="idx_lp_genealogy_operation_type" columns="operation_type"/>
+          <index name="idx_lp_genealogy_wo_id" columns="wo_id"/>
+        </indexes>
+      </table>
+      <table>
+        <name>license_plates</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK"/>
+          <column name="org_id" type="UUID" constraint="FK organizations(id)"/>
+          <column name="status" type="VARCHAR(20)" constraint="DEFAULT 'available'"/>
+        </columns>
+      </table>
+      <table>
+        <name>work_orders</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK"/>
+          <column name="org_id" type="UUID" constraint="FK organizations(id)"/>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="POST" path="/api/warehouse/license-plates/genealogy">
+        <description>Create genealogy link between parent and child LP with atomic validation and circular dependency check</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="parent_lp_id" type="UUID" required="true"/>
+          <field name="child_lp_id" type="UUID" required="true"/>
+          <field name="wo_id" type="UUID" required="false" constraint="required for consume/produce operations"/>
+          <field name="operation_type" type="enum" required="true" constraint="split|merge|consume|produce"/>
+        </request>
+        <response status="201">
+          <field name="genealogy_id" type="UUID"/>
+          <field name="parent_lp_id" type="UUID"/>
+          <field name="child_lp_id" type="UUID"/>
+          <field name="operation_type" type="string"/>
+          <field name="created_at" type="timestamp"/>
+          <field name="success_message" type="string" example="Genealogy link created successfully"/>
+        </response>
+        <response status="400">
+          <field name="error" type="string" example="Cannot create genealogy: Parent License Plate LP-001234 does not exist"/>
+          <field name="error_code" type="string" value="PARENT_NOT_FOUND|CHILD_NOT_FOUND|DIFFERENT_ORGS|CIRCULAR_DEPENDENCY|DUPLICATE_LINK|INVALID_WO|INVALID_OPERATION_TYPE"/>
+        </response>
+        <response status="404">
+          <field name="error" type="string" example="License Plate not found"/>
+        </response>
+      </endpoint>
+
+      <endpoint method="POST" path="/api/warehouse/license-plates/genealogy/trace">
+        <description>Trace LP genealogy forward (descendants) or backward (ancestors)</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="lp_id" type="UUID" required="true"/>
+          <field name="direction" type="enum" required="true" constraint="forward|backward"/>
+          <field name="max_depth" type="integer" required="false" default="10"/>
+        </request>
+        <response status="200">
+          <field name="lp_id" type="UUID"/>
+          <field name="lp_number" type="string"/>
+          <field name="direction" type="string" value="forward|backward"/>
+          <field name="nodes" type="array">
+            <item>
+              <field name="lp_id" type="UUID"/>
+              <field name="lp_number" type="string"/>
+              <field name="operation_type" type="string" value="split|merge|consume|produce"/>
+              <field name="wo_id" type="UUID"/>
+              <field name="depth" type="integer"/>
+              <field name="created_at" type="timestamp"/>
+            </item>
+          </field>
+          <field name="total_nodes" type="integer"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+
+    <frontend_routes>
+      <route path="/warehouse/license-plates/:id" component="LicensePlatePage">
+        <feature name="GenealogyTab">
+          <description>New tab showing genealogy information</description>
+          <subsection name="ParentChild">
+            <description>Direct parent and children of this LP</description>
+          </subsection>
+          <subsection name="TraceControls">
+            <button name="TraceForward">Trace descendants (forward)</button>
+            <button name="TraceBackward">Trace ancestors (backward)</button>
+          </subsection>
+          <subsection name="OrphanWarning">
+            <description>Show if parent LP deleted: "⚠️ LP-005678: Parent LP-001234 no longer exists (orphaned)"</description>
+          </subsection>
+        </feature>
+      </route>
+    </frontend_routes>
+
+    <components_to_create>
+      <component name="GenealogyTree">
+        <description>Visual tree component for forward/backward trace</description>
+        <props>
+          <prop name="rootLp" type="LicensePlate" required="true"/>
+          <prop name="direction" type="enum" required="true" constraint="forward|backward"/>
+          <prop name="nodes" type="GenealogyNode[]" required="true"/>
+        </props>
+        <features>
+          <feature name="TreeVisualization">
+            <description>Graphical tree with nodes and edges</description>
+            <node_label>{lp_number} ({operation_type})</node_label>
+            <edge_label>{operation_type}</edge_label>
+          </feature>
+          <feature name="ColorCoding">
+            <color operation="split">Blue</color>
+            <color operation="merge">Green</color>
+            <color operation="consume">Orange</color>
+            <color operation="produce">Red</color>
+          </feature>
+          <feature name="DepthIndicator">
+            <description>Show depth level (1, 2, 3...)</description>
+          </feature>
+          <feature name="Expandable">
+            <description>Click node to expand deep genealogies</description>
+          </feature>
+          <feature name="Timestamp">
+            <description>Show creation date on hover</description>
+          </feature>
+        </features>
+      </component>
+      <component name="OrphanedLPWarning">
+        <description>Warning banner for orphaned LPs</description>
+        <props>
+          <prop name="parentLpNumber" type="string" required="true"/>
+        </props>
+        <ui>⚠️ LP-005678: Parent LP-001234 no longer exists (orphaned)</ui>
+      </component>
+    </components_to_create>
+
+    <recursive_queries>
+      <query name="forward_trace_descendants">
+        <description>Find all descendants of an LP (children, grandchildren, etc.)</description>
+        <sql><![CDATA[
+WITH RECURSIVE descendants AS (
+  SELECT
+    child_lp_id,
+    operation_type,
+    wo_id,
+    1 AS depth,
+    ARRAY[parent_lp_id, child_lp_id] AS path,
+    created_at,
+    created_by_user_id
+  FROM lp_genealogy
+  WHERE parent_lp_id = $1 AND org_id = $2
+
+  UNION ALL
+
+  SELECT
+    g.child_lp_id,
+    g.operation_type,
+    g.wo_id,
+    d.depth + 1,
+    d.path || g.child_lp_id,
+    g.created_at,
+    g.created_by_user_id
+  FROM lp_genealogy g
+  JOIN descendants d ON g.parent_lp_id = d.child_lp_id
+  WHERE d.depth < $3 AND g.org_id = $2
+)
+SELECT
+  d.child_lp_id,
+  lp.lp_number,
+  d.operation_type,
+  d.wo_id,
+  d.depth,
+  d.path,
+  d.created_at
+FROM descendants d
+JOIN license_plates lp ON d.child_lp_id = lp.id
+ORDER BY d.depth, d.child_lp_id;
+        ]]></sql>
+        <parameters>
+          <parameter name="parent_lp_id" type="UUID">LP to trace from</parameter>
+          <parameter name="org_id" type="UUID">Organization ID for RLS</parameter>
+          <parameter name="max_depth" type="INTEGER">Maximum recursion depth (default 10)</parameter>
+        </parameters>
+      </query>
+
+      <query name="backward_trace_ancestors">
+        <description>Find all ancestors of an LP (parents, grandparents, etc.)</description>
+        <sql><![CDATA[
+WITH RECURSIVE ancestors AS (
+  SELECT
+    parent_lp_id,
+    operation_type,
+    wo_id,
+    1 AS depth,
+    ARRAY[parent_lp_id, child_lp_id] AS path,
+    created_at,
+    created_by_user_id
+  FROM lp_genealogy
+  WHERE child_lp_id = $1 AND org_id = $2
+
+  UNION ALL
+
+  SELECT
+    g.parent_lp_id,
+    g.operation_type,
+    g.wo_id,
+    a.depth + 1,
+    g.parent_lp_id || a.path,
+    g.created_at,
+    g.created_by_user_id
+  FROM lp_genealogy g
+  JOIN ancestors a ON g.child_lp_id = a.parent_lp_id
+  WHERE a.depth < $3 AND g.org_id = $2
+)
+SELECT
+  a.parent_lp_id,
+  lp.lp_number,
+  a.operation_type,
+  a.wo_id,
+  a.depth,
+  a.path,
+  a.created_at
+FROM ancestors a
+JOIN license_plates lp ON a.parent_lp_id = lp.id
+ORDER BY a.depth, a.parent_lp_id;
+        ]]></sql>
+        <parameters>
+          <parameter name="child_lp_id" type="UUID">LP to trace from</parameter>
+          <parameter name="org_id" type="UUID">Organization ID for RLS</parameter>
+          <parameter name="max_depth" type="INTEGER">Maximum recursion depth (default 10)</parameter>
+        </parameters>
+      </query>
+
+      <query name="circular_dependency_detection">
+        <description>Check if adding parent_lp_id → child_lp_id would create circular dependency</description>
+        <sql><![CDATA[
+WITH RECURSIVE ancestors_of_parent AS (
+  SELECT parent_lp_id, 1 AS depth
+  FROM lp_genealogy WHERE child_lp_id = $1 AND org_id = $2
+
+  UNION ALL
+
+  SELECT g.parent_lp_id, a.depth + 1
+  FROM lp_genealogy g
+  JOIN ancestors_of_parent a ON g.child_lp_id = a.parent_lp_id
+  WHERE a.depth < 10 AND g.org_id = $2
+)
+SELECT COUNT(*) as ancestor_count FROM ancestors_of_parent
+WHERE parent_lp_id = $3;
+        ]]></sql>
+        <parameters>
+          <parameter name="parent_lp_id_to_add" type="UUID">The parent LP we're trying to add</parameter>
+          <parameter name="org_id" type="UUID">Organization ID for RLS</parameter>
+          <parameter name="potential_child" type="UUID">The child LP (if count > 0, circular dependency)</parameter>
+        </parameters>
+        <logic>If ancestor_count > 0, then potential_child is already an ancestor of parent_lp_id_to_add → circular dependency</logic>
+      </query>
+    </recursive_queries>
+
+    <validation_rules>
+      <rule id="fk_parent_exists">parent_lp_id must exist in license_plates table</rule>
+      <rule id="fk_child_exists">child_lp_id must exist in license_plates table</rule>
+      <rule id="fk_wo_exists">wo_id must exist in work_orders table (if provided)</rule>
+      <rule id="same_org">parent_lp and child_lp must belong to same org_id</rule>
+      <rule id="operation_type_valid">operation_type must be 'split', 'merge', 'consume', or 'produce'</rule>
+      <rule id="wo_required_for_consume">operation_type='consume' or 'produce' requires wo_id</rule>
+      <rule id="no_duplicate_link">No duplicate genealogy link for same parent-child pair</rule>
+      <rule id="no_self_link">parent_lp_id != child_lp_id</rule>
+      <rule id="no_circular_dependency">child_lp_id cannot be ancestor of parent_lp_id</rule>
+      <rule id="immutable_genealogy">Genealogy records are INSERT-only (no UPDATE, no DELETE)</rule>
+    </validation_rules>
+
+    <rls_policies>
+      <policy table="lp_genealogy">
+        <select>
+          <statement>SELECT * WHERE org_id = current_user.org_id</statement>
+          <applies_to>authenticated</applies_to>
+        </select>
+        <insert>
+          <statement>INSERT WHERE org_id = current_user.org_id</statement>
+          <applies_to>authenticated</applies_to>
+        </insert>
+      </policy>
+    </rls_policies>
+
+    <database_operations>
+      <operation type="transaction">
+        <name>Genealogy Creation Transaction (Atomic, Gap 2)</name>
+        <steps>
+          <step>1. BEGIN TRANSACTION</step>
+          <step>2. VALIDATE parent_lp_id exists in license_plates WHERE org_id</step>
+          <step>3. VALIDATE child_lp_id exists in license_plates WHERE org_id</step>
+          <step>4. VALIDATE both LPs belong to same org_id</step>
+          <step>5. VALIDATE wo_id exists (if provided)</step>
+          <step>6. VALIDATE operation_type is valid enum</step>
+          <step>7. CHECK for duplicate link: SELECT COUNT(*) FROM lp_genealogy WHERE parent_lp_id AND child_lp_id</step>
+          <step>8. If duplicate found: ROLLBACK and return error (silent success on idempotent retry)</step>
+          <step>9. DETECT circular dependency using recursive CTE</step>
+          <step>10. If circular: ROLLBACK and return "Circular dependency detected"</step>
+          <step>11. INSERT lp_genealogy record</step>
+          <step>12. VERIFY trace integrity: Forward + backward trace queries execute successfully</step>
+          <step>13. COMMIT TRANSACTION</step>
+          <step>14. Return genealogy record with success</step>
+        </steps>
+        <rollback_condition>ANY validation failure, duplicate link (on first insert), circular dependency, or INSERT failure</rollback_condition>
+        <concurrency_handling>Unique constraint (parent_lp_id, child_lp_id) prevents duplicate inserts across concurrent requests - second attempt gets constraint violation (silent success)</concurrency_handling>
+      </operation>
+
+      <operation type="query">
+        <name>Orphan Detection</name>
+        <description>Find LPs whose parent no longer exists</description>
+        <query><![CDATA[
+SELECT DISTINCT
+  lg.child_lp_id,
+  lp.lp_number,
+  lg.parent_lp_id,
+  'orphaned' as status
+FROM lp_genealogy lg
+LEFT JOIN license_plates lp_parent ON lg.parent_lp_id = lp_parent.id
+JOIN license_plates lp ON lg.child_lp_id = lp.id
+WHERE lp_parent.id IS NULL
+  AND lg.org_id = $1;
+        ]]></query>
+      </operation>
+    </database_operations>
+
+    <error_handling>
+      <error code="PARENT_NOT_FOUND">
+        <message>Cannot create genealogy: Parent License Plate {parent_lp_number} does not exist. Verify LP number.</message>
+        <http_status>400</http_status>
+        <action>Prompt user to verify parent LP exists and is in same organization</action>
+      </error>
+      <error code="CHILD_NOT_FOUND">
+        <message>Cannot create genealogy: Child License Plate {child_lp_number} does not exist. Verify LP number.</message>
+        <http_status>400</http_status>
+      </error>
+      <error code="DIFFERENT_ORGS">
+        <message>Cannot create genealogy: Parent and child LPs belong to different organizations. Cross-org genealogy not allowed.</message>
+        <http_status>400</http_status>
+      </error>
+      <error code="CIRCULAR_DEPENDENCY">
+        <message>Cannot create genealogy: Circular dependency detected. LP-{parent_lp_number} is already a descendant of LP-{child_lp_number}.</message>
+        <http_status>400</http_status>
+      </error>
+      <error code="DUPLICATE_LINK">
+        <message>Cannot create genealogy: Link already exists between Parent LP-{parent_lp_number} and Child LP-{child_lp_number}.</message>
+        <http_status>400</http_status>
+        <note>On retry: Return silent success (idempotent operation)</note>
+      </error>
+      <error code="INVALID_WO">
+        <message>Cannot create genealogy: Work Order #{wo_id} does not exist or is not related to these LPs.</message>
+        <http_status>400</http_status>
+      </error>
+      <error code="INVALID_OPERATION_TYPE">
+        <message>Cannot create genealogy: Operation type '{operation_type}' is invalid. Use: split, merge, consume, or produce.</message>
+        <http_status>400</http_status>
+      </error>
+      <error code="WO_REQUIRED">
+        <message>Cannot create genealogy: Operation type '{operation_type}' requires wo_id. Please provide Work Order ID.</message>
+        <http_status>400</http_status>
+      </error>
+    </error_handling>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1" title="Genealogy Recording">
+      <test>After LP split, genealogy record exists with parent_lp_id, child_lp_id, operation_type='split'</test>
+      <test>After LP merge, genealogy records exist for each source→target pair with operation_type='merge'</test>
+    </ac>
+    <ac id="2" title="Forward Trace">
+      <test>LP-001 split → LP-002, LP-003. Trace forward from LP-001 shows LP-002 and LP-003</test>
+      <test>LP-002, LP-003 merged → LP-004. Trace forward from LP-001 shows LP-002, LP-003, LP-004</test>
+    </ac>
+    <ac id="3" title="Backward Trace">
+      <test>Trace backward from LP-004 shows LP-002, LP-003, LP-001 (ancestors)</test>
+    </ac>
+    <ac id="4" title="Genealogy Integrity & Atomicity">
+      <test>Create genealogy with invalid parent_lp_id → error, no record created</test>
+      <test>Create genealogy with circular dependency → error, no record created</test>
+      <test>Create genealogy twice with same parent-child → second attempt idempotent (silent success or error)</test>
+      <test>All validations happen in transaction - if ANY fails, entire transaction rolls back</test>
+    </ac>
+    <ac id="5" title="Trace Verification Integrity">
+      <test>After genealogy insert, forward/backward traces work correctly</test>
+      <test>Delete parent LP, verify child shows orphan warning</test>
+    </ac>
+    <ac id="6" title="Operation Type Semantics">
+      <test>Split operation records operation_type='split'</test>
+      <test>Merge operation records operation_type='merge'</test>
+      <test>Consume/produce operations record wo_id</test>
+    </ac>
+    <ac id="7" title="Data Integrity Guarantees">
+      <test>Split LP-001 → LP-002, LP-003; consume both in WO; verify genealogy chain complete</test>
+      <test>Genealogy records are immutable (cannot update or delete)</test>
+    </ac>
+    <ac id="8" title="Recall Simulation">
+      <test>Contaminated Flour LP-001 → Forward trace finds all affected products (Bread, Pastry, etc.)</test>
+      <test>Contaminated Bread LP-004 → Backward trace finds Flour LP-001</test>
+    </ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test>Circular dependency detection: A→B, B→C, C→A → detected</test>
+      <test>Valid genealogy: A→B→C → no error</test>
+      <test>FK validation: Parent not exists → error</test>
+      <test>FK validation: Different orgs → error</test>
+      <test>Duplicate link: Insert twice → idempotent</test>
+      <test>Operation type validation: invalid type → error</test>
+    </unit_tests>
+    <integration_tests>
+      <test>POST /api/warehouse/license-plates/genealogy with valid parent/child/wo_id</test>
+      <test>POST /api/warehouse/license-plates/genealogy/trace with direction=forward</test>
+      <test>POST /api/warehouse/license-plates/genealogy/trace with direction=backward</test>
+      <test>Circular dependency detection with 3-level genealogy</test>
+      <test>Orphan detection: delete parent LP, verify child marked orphaned</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Create split genealogy: LP-001 split → LP-002, LP-003</test>
+      <test>Open LP-001 genealogy tab → shows direct children LP-002, LP-003</test>
+      <test>Click "Trace Forward" on LP-001 → opens tree view showing descendants</test>
+      <test>Open LP-002 genealogy tab → shows parent LP-001</test>
+      <test>Click "Trace Backward" on LP-002 → opens tree view showing ancestors</test>
+      <test>Create complex genealogy: split, merge, consume operations across 4 LPs</test>
+      <test>Verify genealogy tree shows complete chain with color-coded operations</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="critical">Sprint 0 Gap 2: Genealogy must be fully atomic with circular dependency detection. Any validation failure → complete rollback.</note>
+    <note priority="critical">Genealogy records are IMMUTABLE - no DELETE, no UPDATE, only INSERT. This maintains FDA audit trail integrity.</note>
+    <note priority="critical">Circular dependency detection MUST use recursive CTE for correctness. Performance concern: limit depth to 10.</note>
+    <note priority="high">Recursive CTEs can be slow with deep genealogy (>10 levels). Consider denormalization or caching for frequently-queried paths.</note>
+    <note priority="high">Duplicate genealogy inserts should be idempotent - silent success on retry (already exists check).</note>
+    <note priority="medium">Orphan detection: If parent LP deleted, genealogy records remain (immutable). UI should flag orphaned LPs with warning.</note>
+    <note priority="medium">Consider adding genealogy visualization library for tree rendering (e.g., react-tree-view or similar).</note>
+  </implementation_notes>
+</story>

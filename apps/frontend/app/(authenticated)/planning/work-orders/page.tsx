@@ -23,8 +23,10 @@ import { TableIcon, LayoutGrid, CalendarDays } from 'lucide-react'
 type ViewMode = 'table' | 'spreadsheet' | 'timeline'
 
 export default function WorkOrdersPage() {
+  console.log('[WorkOrdersPage] Component function called');
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const { isMobile } = useResponsiveView()
+  console.log('[WorkOrdersPage] viewMode:', viewMode, 'isMobile:', isMobile);
 
   return (
     <div>
@@ -77,6 +79,7 @@ export default function WorkOrdersPage() {
         )}
 
         {/* Render based on view mode */}
+        {(() => { console.log('[WorkOrdersPage] About to render WorkOrdersTable:', viewMode === 'table' || isMobile); return null; })()}
         {viewMode === 'table' || isMobile ? (
           <WorkOrdersTable />
         ) : viewMode === 'spreadsheet' ? (

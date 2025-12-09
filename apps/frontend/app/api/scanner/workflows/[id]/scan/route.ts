@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getWorkflowDefinition, getNextStep } from '@/lib/scanner/workflow-definitions'
-import { sessions } from '../../start/route'
+import { getSession, setSession, deleteSession, isSessionExpired } from '@/lib/scanner/session-store'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const workflow_id = params.id
 
     // Get session
-    const scannerSession = sessions.get(workflow_id)
+    const scannerSession = getSession(workflow_id)
     if (!scannerSession) {
       return NextResponse.json(
         {
@@ -64,8 +64,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // Check session expiration
-    if (new Date() > new Date(scannerSession.expires_at)) {
-      sessions.delete(workflow_id)
+    if (isSessionExpired(scannerSession)) {
+      deleteSession(workflow_id)
       return NextResponse.json(
         {
           success: false,
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const now = new Date()
       scannerSession.expires_at = new Date(now.getTime() + 30 * 60 * 1000).toISOString()
 
-      sessions.set(workflow_id, scannerSession)
+      setSession(scannerSession)
 
       return NextResponse.json({
         success: true,
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     } else {
       // Workflow complete
       const completedData = scannerSession.step_data
-      sessions.delete(workflow_id)
+      deleteSession(workflow_id)
 
       return NextResponse.json({
         success: true,

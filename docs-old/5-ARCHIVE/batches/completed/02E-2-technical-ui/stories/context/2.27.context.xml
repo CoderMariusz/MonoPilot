@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.27</id>
+    <title>Technical Tables Consistency</title>
+    <batch>02E-2</batch>
+    <points>3</points>
+    <effort_hours>4-5</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Standardized table styling, pagination, sorting, and filtering across Technical module.</description>
+
+  <technical_context>
+    <components_to_create>
+      <component name="TechnicalDataTable" path="components/technical/TechnicalDataTable.tsx">
+        Data table with pagination, sorting, filtering, selection
+      </component>
+    </components_to_create>
+
+    <features>
+      <feature>Consistent column widths and alignment</feature>
+      <feature>Sortable columns with indicators</feature>
+      <feature>Filter dropdowns</feature>
+      <feature>Pagination controls (page size, page number, total)</feature>
+      <feature>Row selection checkboxes</feature>
+      <feature>Search input</feature>
+      <feature>Empty state</feature>
+      <feature>Loading skeleton</feature>
+    </features>
+
+    <library>tanstack-table with shadcn DataTable</library>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.27.1">Consistent table styling</ac>
+    <ac id="2.27.2">Pagination controls</ac>
+    <ac id="2.27.3">Sort indicators</ac>
+    <ac id="2.27.4">Filter dropdowns</ac>
+    <ac id="2.27.5">Row selection</ac>
+  </acceptance_criteria>
+</story>

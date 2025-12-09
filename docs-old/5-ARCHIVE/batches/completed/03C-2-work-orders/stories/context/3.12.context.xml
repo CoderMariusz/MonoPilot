@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>3.12</id>
+    <title>WO Materials Snapshot</title>
+    <batch>03C-2</batch>
+    <points>8</points>
+    <effort_hours>6-8</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>
+    Capture BOM items as immutable snapshot in wo_materials table at WO creation time.
+    Materials are scaled to WO quantity and cannot be changed after WO is released.
+    Critical for FDA traceability and recipe integrity.
+  </description>
+
+  <dependencies>
+    <blocks>
+      <story id="3.13">Material Availability Check</story>
+      <epic id="4">Production - Material Consumption</epic>
+    </blocks>
+    <requires>
+      <story id="3.10">Work Order CRUD</story>
+      <story id="3.11">BOM Auto-Selection</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>wo_materials</name>
+        <columns>
+          <column name="id" type="UUID" pk="true"/>
+          <column name="org_id" type="UUID" fk="organizations.id"/>
+          <column name="wo_id" type="UUID" fk="work_orders.id" on_delete="CASCADE"/>
+          <column name="product_id" type="UUID" fk="products.id"/>
+          <column name="bom_item_id" type="UUID" fk="bom_items.id" nullable="true"/>
+          <column name="quantity" type="NUMERIC(15,3)"/>
+          <column name="uom" type="VARCHAR(20)"/>
+          <column name="scrap_percent" type="NUMERIC(5,2)" default="0"/>
+          <column name="consume_whole_lp" type="BOOLEAN" default="false"/>
+          <column name="is_by_product" type="BOOLEAN" default="false"/>
+          <column name="yield_percent" type="NUMERIC(5,2)" default="100"/>
+          <column name="condition_flags" type="JSONB" nullable="true"/>
+          <column name="consumed_qty" type="NUMERIC(15,3)" default="0"/>
+          <column name="created_at" type="TIMESTAMPTZ"/>
+          <column name="updated_at" type="TIMESTAMPTZ"/>
+        </columns>
+        <indexes>
+          <index name="idx_wo_materials_wo_id" columns="wo_id"/>
+          <index name="idx_wo_materials_product" columns="product_id"/>
+        </indexes>
+        <rls_policies>
+          <policy name="Enable read for authenticated" operation="SELECT"/>
+          <policy name="Enable insert for authenticated" operation="INSERT"/>
+          <policy name="Enable update for authenticated" operation="UPDATE"/>
+        </rls_policies>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/planning/work-orders/:id/materials">
+        <response type="array">
+          <field name="id" type="string"/>
+          <field name="product_id" type="string"/>
+          <field name="product_name" type="string"/>
+          <field name="quantity" type="number"/>
+          <field name="uom" type="string"/>
+          <field name="consumed_qty" type="number"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+
+    <services>
+      <service name="WOMaterialsService">
+        <method name="copyBOMToWOMaterials">
+          <param name="woId" type="string"/>
+          <param name="bomId" type="string"/>
+          <param name="woQty" type="number"/>
+          <returns>WOMaterial[]</returns>
+          <notes>Creates snapshot in single transaction with WO</notes>
+        </method>
+        <method name="validateMaterialsLock">
+          <param name="woId" type="string"/>
+          <returns>boolean</returns>
+          <notes>Returns false if WO status is Released or later</notes>
+        </method>
+      </service>
+    </services>
+
+    <components_to_create>
+      <component name="WOMaterialsList" path="components/planning/WOMaterialsList.tsx">
+        <props>
+          <prop name="woId" type="string"/>
+          <prop name="materials" type="WOMaterial[]"/>
+          <prop name="readonly" type="boolean"/>
+        </props>
+      </component>
+      <component name="BOMSnapshotWarning" path="components/planning/BOMSnapshotWarning.tsx">
+        <props>
+          <prop name="bomVersion" type="string"/>
+          <prop name="isArchived" type="boolean"/>
+        </props>
+      </component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <criterion id="AC-1">
+      <description>BOM Items Copied to WO Materials</description>
+      <given>WO is created with BOM selected</given>
+      <then>all BOM items copied to wo_materials with scaled quantities</then>
+    </criterion>
+    <criterion id="AC-2">
+      <description>Quantity Scaling</description>
+      <formula>wo_material.qty = bom_item.qty × (wo.qty / bom.output_qty)</formula>
+    </criterion>
+    <criterion id="AC-3">
+      <description>Immutability After Release</description>
+      <given>WO status = 'Released'</given>
+      <then>wo_materials cannot be modified</then>
+      <error_message>Cannot modify materials: WO is Released</error_message>
+    </criterion>
+    <criterion id="AC-4">
+      <description>BOM Update Warning</description>
+      <given>BOM updated after WO creation</given>
+      <then>WO shows warning indicating snapshot version differs</then>
+    </criterion>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test>Quantity scaling calculation correct</test>
+      <test>All BOM item fields copied</test>
+      <test>Scrap percent applied correctly</test>
+    </unit_tests>
+    <integration_tests>
+      <test>wo_materials created with WO in transaction</test>
+      <test>Cannot update materials after release</test>
+      <test>BOM change detection works</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Create WO → verify materials copied</test>
+      <test>Release WO → verify materials locked</test>
+      <test>Update BOM → verify warning shown on WO</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="critical">NO FK CASCADE UPDATE from bom_items to wo_materials</note>
+    <note priority="critical">Transaction atomicity: WO + materials in single transaction</note>
+    <note priority="high">Critical for FDA traceability (Gap 3 resolution)</note>
+    <note priority="medium">Track bom_version in metadata for audit</note>
+  </implementation_notes>
+</story>

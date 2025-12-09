@@ -5,22 +5,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { getWorkflowDefinition, type WorkflowType } from '@/lib/scanner/workflow-definitions'
+import { setSession, type ScannerSession } from '@/lib/scanner/session-store'
 
 const SESSION_TIMEOUT_MINUTES = 30
-
-interface ScannerSession {
-  workflow_id: string
-  workflow_type: WorkflowType
-  user_id: string
-  org_id: string
-  current_step: string
-  step_data: Record<string, any>
-  created_at: string
-  expires_at: string
-}
-
-// Store sessions in memory (in production, use Redis)
-const sessions = new Map<string, ScannerSession>()
 
 export async function POST(request: NextRequest) {
   try {
@@ -129,7 +116,7 @@ export async function POST(request: NextRequest) {
       expires_at: expiresAt.toISOString(),
     }
 
-    sessions.set(workflow_id, scannerSession)
+    setSession(scannerSession)
 
     const currentStep = workflow.steps[0]
 
@@ -167,6 +154,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
-// Export sessions for other routes (in production, use shared store)
-export { sessions }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.26" epic="6" batch="06A-2">
+  <summary>Provide streamlined UX for managing quality holds with list, filters, and actions.</summary>
+
+  <tables>
+    <table name="quality_holds" operation="read"/>
+  </tables>
+
+  <components>
+    <component name="QualityHoldsPage.tsx" type="page"/>
+    <component name="HoldsTable.tsx" type="table"/>
+    <component name="HoldDetailPage.tsx" type="page"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/holds" method="GET"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.6"/>
+  </dependencies>
+</story-context>

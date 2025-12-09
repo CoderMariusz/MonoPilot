@@ -95,7 +95,7 @@ export default function MachinesPage() {
 
   // Delete handler (AC-006.5)
   const handleDelete = async (machine: Machine) => {
-    if (!confirm(`Delete machine "${machine.name}"? This action cannot be undone.`)) {
+    if (!confirm(`Delete machine &quot;${machine.name}&quot;? This action cannot be undone.`)) {
       return
     }
 

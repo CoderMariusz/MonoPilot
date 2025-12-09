@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.27</id>
+    <title>BOM Item Alternatives</title>
+    <batch>02A-2-bom-restructure</batch>
+    <points>2</points>
+    <effort_hours>8</effort_hours>
+    <priority>P1</priority>
+    <status>todo</status>
+  </metadata>
+
+  <description>
+    Enable BOM items to have alternative components that can be used as substitutes
+    during production with priority ordering and quantity conversion ratios.
+  </description>
+
+  <dependencies>
+    <blocks>
+      <story id="2.29">Update existing BOM/Routing UI</story>
+    </blocks>
+    <requires>
+      <story id="2.26">BOM Items with Operation Assignment (bom_items table)</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>bom_item_alternatives</name>
+        <action>CREATE</action>
+        <columns>
+          <column name="id" type="UUID" nullable="false" default="gen_random_uuid()" pk="true"/>
+          <column name="bom_item_id" type="UUID" nullable="false" fk="bom_items(id) ON DELETE CASCADE"/>
+          <column name="alternative_component_id" type="UUID" nullable="false" fk="products(id)"/>
+          <column name="priority" type="INTEGER" nullable="false" default="1"/>
+          <column name="quantity_ratio" type="DECIMAL(10,4)" nullable="false" default="1.0000"/>
+          <column name="notes" type="TEXT" nullable="true"/>
+          <column name="created_at" type="TIMESTAMPTZ" nullable="false" default="now()"/>
+        </columns>
+        <constraints>
+          <unique columns="bom_item_id, alternative_component_id"/>
+        </constraints>
+        <indexes>
+          <index name="idx_bom_item_alternatives_item" columns="bom_item_id"/>
+          <index name="idx_bom_item_alternatives_component" columns="alternative_component_id"/>
+        </indexes>
+        <rls enabled="true">
+          <policy name="Enable all for authenticated" operation="ALL" role="authenticated"/>
+        </rls>
+        <notes>
+          priority: lower number = higher priority (1 = first choice)
+          quantity_ratio: conversion factor (1.0 = same qty, 1.1 = 10% more needed)
+        </notes>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/boms/:bomId/items/:itemId/alternatives">
+        <description>List alternatives for BOM item ordered by priority</description>
+        <response status="200">
+          <field name="data" type="array">
+            <item>
+              <field name="id" type="uuid"/>
+              <field name="bom_item_id" type="uuid"/>
+              <field name="alternative_component_id" type="uuid"/>
+              <field name="alternative_component" type="Product"/>
+              <field name="priority" type="number"/>
+              <field name="quantity_ratio" type="number"/>
+              <field name="notes" type="string | null"/>
+            </item>
+          </field>
+        </response>
+        <errors>
+          <error code="BOM_NOT_FOUND" status="404"/>
+          <error code="ITEM_NOT_FOUND" status="404"/>
+        </errors>
+      </endpoint>
+
+      <endpoint method="POST" path="/api/technical/boms/:bomId/items/:itemId/alternatives">
+        <description>Add alternative to BOM item</description>
+        <body>
+          <field name="alternative_component_id" type="uuid" required="true"/>
+          <field name="priority" type="integer" required="false" default="next available"/>
+          <field name="quantity_ratio" type="decimal" required="false" default="1.0"/>
+          <field name="notes" type="string" required="false"/>
+        </body>
+        <response status="201">Created BomItemAlternative</response>
+        <errors>
+          <error code="INVALID_COMPONENT" status="400"/>
+          <error code="DUPLICATE_ALTERNATIVE" status="400"/>
+          <error code="SAME_AS_PRIMARY" status="400"/>
+          <error code="ITEM_NOT_FOUND" status="404"/>
+        </errors>
+      </endpoint>
+
+      <endpoint method="PUT" path="/api/technical/boms/:bomId/items/:itemId/alternatives/:altId">
+        <description>Update alternative (cannot change component_id)</description>
+        <body>
+          <field name="priority" type="integer" required="false"/>
+          <field name="quantity_ratio" type="decimal" required="false"/>
+          <field name="notes" type="string | null" required="false"/>
+        </body>
+        <response status="200">Updated BomItemAlternative</response>
+        <errors>
+          <error code="ALTERNATIVE_NOT_FOUND" status="404"/>
+        </errors>
+      </endpoint>
+
+      <endpoint method="DELETE" path="/api/technical/boms/:bomId/items/:itemId/alternatives/:altId">
+        <description>Remove alternative from item</description>
+        <response status="200">Success message</response>
+        <errors>
+          <error code="ALTERNATIVE_NOT_FOUND" status="404"/>
+        </errors>
+      </endpoint>
+
+      <endpoint method="PUT" path="/api/technical/boms/:bomId/items/:itemId/alternatives">
+        <description>Bulk replace all alternatives for item</description>
+        <body>
+          <field name="alternatives" type="array" required="true">
+            <item>
+              <field name="alternative_component_id" type="uuid" required="true"/>
+              <field name="priority" type="integer" required="true"/>
+              <field name="quantity_ratio" type="decimal" required="false" default="1.0"/>
+              <field name="notes" type="string" required="false"/>
+            </item>
+          </field>
+        </body>
+        <response status="200">Array of BomItemAlternative</response>
+        <errors>
+          <error code="DUPLICATE_IN_REQUEST" status="400"/>
+          <error code="INVALID_COMPONENT" status="400"/>
+        </errors>
+      </endpoint>
+    </api_endpoints>
+
+    <services>
+      <service name="BomItemAlternativeService" path="lib/services/bom-item-alternative-service.ts">
+        <method name="list" params="bomItemId: string" returns="Promise&lt;BomItemAlternative[]&gt;"/>
+        <method name="create" params="bomItemId: string, data: CreateAlternativeInput" returns="Promise&lt;BomItemAlternative&gt;"/>
+        <method name="update" params="altId: string, data: UpdateAlternativeInput" returns="Promise&lt;BomItemAlternative&gt;"/>
+        <method name="delete" params="altId: string" returns="Promise&lt;void&gt;"/>
+        <method name="bulkReplace" params="bomItemId: string, alternatives: CreateAlternativeInput[]" returns="Promise&lt;BomItemAlternative[]&gt;"/>
+        <method name="getNextPriority" params="bomItemId: string" returns="Promise&lt;number&gt;"/>
+        <method name="calculateAlternativeQuantity" params="originalQty: number, quantityRatio: number" returns="Promise&lt;number&gt;"/>
+        <method name="getAvailableAlternatives" params="bomItemId: string, warehouseId: string" returns="Promise&lt;AvailableAlternative[]&gt;"/>
+      </service>
+    </services>
+
+    <types>
+      <type name="BomItemAlternative">
+        <field name="id" type="string"/>
+        <field name="bom_item_id" type="string"/>
+        <field name="alternative_component_id" type="string"/>
+        <field name="alternative_component" type="Product" optional="true"/>
+        <field name="priority" type="number"/>
+        <field name="quantity_ratio" type="number"/>
+        <field name="notes" type="string | null"/>
+        <field name="created_at" type="string"/>
+      </type>
+
+      <type name="CreateAlternativeInput">
+        <field name="alternative_component_id" type="string"/>
+        <field name="priority" type="number" optional="true"/>
+        <field name="quantity_ratio" type="number" optional="true"/>
+        <field name="notes" type="string" optional="true"/>
+      </type>
+
+      <type name="UpdateAlternativeInput">
+        <field name="priority" type="number" optional="true"/>
+        <field name="quantity_ratio" type="number" optional="true"/>
+        <field name="notes" type="string | null" optional="true"/>
+      </type>
+
+      <type name="BomItemWithAlternatives">
+        <extends>BomItem</extends>
+        <field name="alternatives" type="BomItemAlternative[]"/>
+      </type>
+
+      <type name="AvailableAlternative">
+        <field name="alternative" type="BomItemAlternative"/>
+        <field name="availableQty" type="number"/>
+        <field name="requiredQty" type="number"/>
+      </type>
+    </types>
+
+    <validation_schemas>
+      <schema name="createAlternativeSchema">
+        <field name="alternative_component_id" rule="z.string().uuid()"/>
+        <field name="priority" rule="z.number().int().positive().optional()"/>
+        <field name="quantity_ratio" rule="z.number().positive().max(100).optional().default(1.0)"/>
+        <field name="notes" rule="z.string().max(500).optional()"/>
+      </schema>
+
+      <schema name="bulkAlternativesSchema">
+        <field name="alternatives" rule="z.array(...).refine(noDuplicateComponentIds)"/>
+      </schema>
+    </validation_schemas>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.27.1">Create bom_item_alternatives table with all columns</ac>
+    <ac id="2.27.2">Enable RLS with authenticated policy</ac>
+    <ac id="2.27.3">GET alternatives returns list ordered by priority</ac>
+    <ac id="2.27.4">POST adds alternative with auto-priority if not provided</ac>
+    <ac id="2.27.5">PUT updates priority/ratio (cannot change component)</ac>
+    <ac id="2.27.6">DELETE removes alternative</ac>
+    <ac id="2.27.7">PUT bulk replaces all alternatives atomically</ac>
+    <ac id="2.27.8">Include alternatives in BOM items response (optional)</ac>
+    <ac id="2.27.9">Validation: component exists, not duplicate, not same as primary</ac>
+    <ac id="2.27.10">Implement service with all methods including helpers</ac>
+    <ac id="2.27.11">Define TypeScript types</ac>
+    <ac id="2.27.12">Create Zod validation schemas with duplicate check</ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests target="95%">
+      <test>list() returns ordered by priority</test>
+      <test>create() with all fields</test>
+      <test>create() auto-priority assignment</test>
+      <test>create() rejects duplicate alternative</test>
+      <test>create() rejects same as primary component</test>
+      <test>update() updates priority/ratio</test>
+      <test>delete() removes record</test>
+      <test>bulkReplace() replaces all atomically</test>
+      <test>calculateAlternativeQuantity() correct calculation</test>
+    </unit_tests>
+
+    <integration_tests target="70%">
+      <test>GET alternatives (200)</test>
+      <test>POST create (201)</test>
+      <test>POST duplicate (400)</test>
+      <test>POST same as primary (400)</test>
+      <test>PUT update (200)</test>
+      <test>DELETE remove (200)</test>
+      <test>PUT bulk replace (200)</test>
+      <test>Item not found (404)</test>
+      <test>Auth required (401)</test>
+    </integration_tests>
+
+    <e2e_tests>
+      <test>Create BOM with items</test>
+      <test>Add 2 alternatives to item</test>
+      <test>Verify priority ordering</test>
+      <test>Update alternative quantity_ratio</test>
+      <test>Delete one alternative</test>
+      <test>Bulk replace alternatives</test>
+      <test>Verify alternatives in item response</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note type="pattern">Cannot change alternative_component_id - delete and recreate</note>
+    <note type="pattern">Auto-priority: if not provided, assign max(priority) + 1</note>
+    <note type="calculation">alternativeQty = primaryQty * quantityRatio</note>
+    <note type="cascade">Alternatives deleted when item deleted (ON DELETE CASCADE)</note>
+    <note type="validation">Primary component cannot be added as alternative</note>
+  </implementation_notes>
+
+  <production_use_case>
+    <example>
+      <description>Flour alternatives for baking</description>
+      <primary>Flour (10 kg)</primary>
+      <alternatives>
+        <alt priority="1" component="Bread Flour" ratio="1.0"/>
+        <alt priority="2" component="All-Purpose Flour" ratio="1.05"/>
+        <alt priority="3" component="Wheat Flour" ratio="0.95"/>
+      </alternatives>
+      <selection_logic>
+        1. Check stock for Flour - Not enough
+        2. Check Alternative 1 (Bread Flour) - Available - Use this
+        3. Calculate qty: 10 * 1.0 = 10 kg
+      </selection_logic>
+    </example>
+  </production_use_case>
+</story>

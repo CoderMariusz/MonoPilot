@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.25</id>
+    <title>Scanner Feedback</title>
+    <batch>5C-1</batch>
+    <points>3</points>
+    <effort_hours>3-4</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Haptic vibration and audio feedback for scan results with configuration options and accessibility support</description>
+  <dependencies>
+    <requires><story id="5.23">Scanner Guided Workflows</story><story id="5.24">Scanner Barcode Validation</story></requires>
+    <enables><story id="5.26">Scanner Operations Menu</story><story id="5.27">Scanner Session Timeout</story></enables>
+  </dependencies>
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="POST" path="/api/scanner/feedback">
+        <description>Log feedback event for analytics</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="session_id" type="UUID" required="true">Scanner session ID</field>
+          <field name="feedback_type" type="string" required="true">success, error, or warning</field>
+          <field name="haptic_pattern" type="string" required="false">Pattern name triggered</field>
+          <field name="auto_proceeded" type="boolean" required="false">Whether auto-advance occurred</field>
+        </request>
+        <response status="201">
+          <field name="feedback_id" type="UUID"/>
+          <field name="created_at" type="timestamp"/>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/scanner/workflow-config/:type">
+        <description>Get workflow configuration including feedback settings</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="workflow_type" type="string"/>
+          <field name="steps" type="array"/>
+          <field name="enable_haptic" type="boolean"/>
+          <field name="enable_audio" type="boolean"/>
+          <field name="vibration_pattern" type="string" comment="success, error, warning, custom"/>
+          <field name="audio_file_path" type="string" nullable="true"/>
+          <field name="auto_proceed_delay_ms" type="integer" default="1500"/>
+        </response>
+      </endpoint>
+      <endpoint method="PUT" path="/api/scanner/workflow-config/:type">
+        <description>Update workflow feedback configuration (admin only)</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="enable_haptic" type="boolean" required="false"/>
+          <field name="enable_audio" type="boolean" required="false"/>
+          <field name="vibration_pattern" type="string" required="false">success, error, warning, custom</field>
+          <field name="audio_file_path" type="string" required="false"/>
+          <field name="auto_proceed_delay_ms" type="integer" required="false"/>
+        </request>
+        <response status="200">
+          <field name="workflow_type" type="string"/>
+          <field name="updated_at" type="timestamp"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+    <database_tables>
+      <table>
+        <name>scanner_feedback_logs</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK, DEFAULT gen_random_uuid()"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, FK organizations(id)"/>
+          <column name="session_id" type="UUID" constraint="NOT NULL, FK scanner_sessions(id)"/>
+          <column name="feedback_type" type="VARCHAR(50)" constraint="NOT NULL, CHECK IN (success, error, warning)"/>
+          <column name="haptic_pattern" type="VARCHAR(50)" constraint="nullable"/>
+          <column name="audio_played" type="BOOLEAN" constraint="DEFAULT false"/>
+          <column name="auto_proceeded" type="BOOLEAN" constraint="DEFAULT false"/>
+          <column name="created_at" type="TIMESTAMP" constraint="DEFAULT NOW()"/>
+        </columns>
+      </table>
+    </database_tables>
+    <feedback_patterns>
+      <pattern name="success_haptic">
+        <description>Double-tap vibration for successful validation</description>
+        <timing>[100, 50, 100]</timing>
+        <units>milliseconds</units>
+        <comment>100ms vibrate, 50ms pause, 100ms vibrate</comment>
+      </pattern>
+      <pattern name="error_haptic">
+        <description>Long continuous vibration for error</description>
+        <timing>[200, 100, 200]</timing>
+        <units>milliseconds</units>
+        <comment>200ms vibrate, 100ms pause, 200ms vibrate (longer, more pronounced)</comment>
+      </pattern>
+      <pattern name="warning_haptic">
+        <description>Single medium vibration for warning/partial match</description>
+        <timing>[150]</timing>
+        <units>milliseconds</units>
+        <comment>150ms vibrate (medium attention)</comment>
+      </pattern>
+    </feedback_patterns>
+    <audio_tones>
+      <tone name="success_beep">
+        <frequency>800</frequency>
+        <units>Hz</units>
+        <duration>150</duration>
+        <duration_units>ms</duration_units>
+        <envelope>attack 10ms, sustain 130ms, release 10ms</envelope>
+        <volume_db>55</volume_db>
+        <description>Upward beep for successful validation (positive reinforcement)</description>
+      </tone>
+      <tone name="error_beep">
+        <frequency>400</frequency>
+        <units>Hz</units>
+        <duration>200</duration>
+        <duration_units>ms</duration_units>
+        <envelope>attack 10ms, sustain 180ms, release 10ms</envelope>
+        <volume_db>50</volume_db>
+        <description>Downward beep for error (attention, needs action)</description>
+      </tone>
+      <tone name="warning_beep">
+        <frequency>600</frequency>
+        <units>Hz</units>
+        <duration>100</duration>
+        <duration_units>ms</duration_units>
+        <envelope>attack 10ms, sustain 80ms, release 10ms</envelope>
+        <volume_db>52</volume_db>
+        <description>Mid-range beep for warning/partial match (decision needed)</description>
+      </tone>
+      <tone name="chime">
+        <frequencies>1000, 1500</frequencies>
+        <units>Hz (harmonics)</units>
+        <duration>200</duration>
+        <duration_units>ms</duration_units>
+        <description>Chime tone (alternate to beep, less annoying for repeated use)</description>
+      </tone>
+      <tone name="bell">
+        <frequencies>complex waveform with harmonics</frequencies>
+        <duration>300</duration>
+        <duration_units>ms</duration_units>
+        <description>Bell tone (more pleasant than beep)</description>
+      </tone>
+    </audio_tones>
+    <components>
+      <component name="ScannerFeedbackService">
+        <location>src/services/scanner/ScannerFeedbackService.ts</location>
+        <description>Service for managing haptic and audio feedback</description>
+        <methods>
+          - triggerHapticFeedback(pattern: 'success' | 'error' | 'warning' | 'custom', timings?: number[])
+          - playAudioFeedback(tone: 'beep' | 'chime' | 'bell', frequency?: number, volume?: 0-100)
+          - showVisualFeedback(type: 'success' | 'error' | 'warning', message: string)
+          - testHaptic(pattern: string)
+          - testAudio(tone: string, volume: number)
+        </methods>
+        <browser_support>navigator.vibrate or navigator.webkitVibrate for haptic, Web Audio API for audio</browser_support>
+      </component>
+      <component name="FeedbackDisplay">
+        <location>src/components/scanner/FeedbackDisplay.tsx</location>
+        <description>Visual feedback display with color and icon</description>
+        <displays>
+          - Colored background flash (100ms): green (success), red (error), yellow (warning)
+          - Icon: checkmark (success), X (error), exclamation (warning)
+          - Message text
+          - Auto-advance trigger (after success, configurable delay)
+        </displays>
+      </component>
+      <component name="ScannerSettingsModal">
+        <location>src/components/scanner/ScannerSettingsModal.tsx</location>
+        <description>Modal for configuring feedback, haptic, and audio settings</description>
+        <sections>
+          - Haptic Feedback: toggle + pattern selector (light/standard/strong) + test button
+          - Audio Feedback: toggle + volume slider (0-100%) + tone selector (beep/chime/bell) + test button
+          - Auto-advance: toggle + delay selector (1000/1500/2000/3000ms)
+          - Device Info: device_id, offline status
+          - About: version, support link
+        </sections>
+      </component>
+      <component name="HapticTestButton">
+        <location>src/components/scanner/HapticTestButton.tsx</location>
+        <description>Button to test haptic feedback pattern</description>
+        <features>
+          - Click triggers selected haptic pattern
+          - Shows feedback: "Pattern triggered"
+          - Disabled if haptic not supported
+        </features>
+      </component>
+      <component name="AudioTestButton">
+        <location>src/components/scanner/AudioTestButton.tsx</location>
+        <description>Button to test audio tone</description>
+        <features>
+          - Click triggers selected tone at volume setting
+          - Shows feedback: "Tone playing"
+          - Volume slider to test different levels
+          - Uses Web Audio API (no files needed)
+        </features>
+      </component>
+    </components>
+    <hooks>
+      <hook name="useScannerFeedback">
+        <accepts>workflow_type</accepts>
+        <returns>{ feedbackConfig, triggerFeedback, testFeedback, loading, error }</returns>
+        <api_call>GET /api/scanner/workflow-config/:type</api_call>
+        <description>Fetch and manage feedback configuration</description>
+      </hook>
+      <hook name="useHapticFeedback">
+        <accepts>pattern: 'success' | 'error' | 'warning'</accepts>
+        <returns>{ trigger, supported }</returns>
+        <description>Trigger haptic feedback with pattern</description>
+      </hook>
+      <hook name="useAudioFeedback">
+        <accepts>tone: 'beep' | 'chime' | 'bell', frequency?: number, volume?: number</accepts>
+        <returns>{ play, supported }</returns>
+        <description>Play audio tone using Web Audio API</description>
+      </hook>
+    </hooks>
+    <haptic_implementation>
+      <method name="triggerVibration">
+        <code>
+          const pattern = [100, 50, 100]; // success pattern
+          if (navigator.vibrate) {
+            navigator.vibrate(pattern);
+          } else if (navigator.webkitVibrate) {
+            navigator.webkitVibrate(pattern);
+          }
+        </code>
+        <browser_support>Most Android devices, some iOS devices (iOS 13+)</browser_support>
+        <fallback>Silently ignore if not supported (graceful degradation)</fallback>
+      </method>
+    </haptic_implementation>
+    <audio_implementation>
+      <method name="playSyntheticTone">
+        <code>
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          oscillator.frequency.value = 800; // Hz
+          oscillator.type = 'sine';
+
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.15);
+        </code>
+        <browser_support>Web Audio API (all modern browsers)</browser_support>
+        <advantages>No file downloads, instant playback, offline capable, synthesized on-the-fly</advantages>
+      </method>
+    </audio_implementation>
+    <validation_rules>
+      <rule id="haptic_supported">Check navigator.vibrate before attempting</rule>
+      <rule id="audio_supported">Check AudioContext support before attempting</rule>
+      <rule id="volume_range">Volume 0-100%, validate before setting</rule>
+      <rule id="pattern_valid">Pattern name must be known (success, error, warning, custom)</rule>
+      <rule id="delay_range">Auto-proceed delay 1000-5000ms only</rule>
+    </validation_rules>
+    <rls_policies>
+      <policy table="scanner_feedback_logs">
+        <insert>WHERE org_id = current_user.org_id</insert>
+        <select>WHERE org_id = current_user.org_id (admin only)</select>
+      </policy>
+    </rls_policies>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1" title="Success Feedback">
+      <test>Barcode validation succeeds → haptic double-tap triggered [100, 50, 100]</test>
+      <test>Audio upward beep (800Hz, 150ms) plays</test>
+      <test>Visual: green background flash</test>
+      <test>Auto-advance after 1.5 seconds</test>
+    </ac>
+    <ac id="2" title="Error Feedback">
+      <test>Barcode validation fails → haptic long vibration [200, 100, 200]</test>
+      <test>Audio downward beep (400Hz, 200ms) plays</test>
+      <test>Visual: red background flash</test>
+      <test>Stay on step (no auto-advance)</test>
+      <test>Message shown: "Barcode not found. Try again."</test>
+    </ac>
+    <ac id="3" title="Warning Feedback">
+      <test>Partial match (90%) detected → haptic medium tap [150]</test>
+      <test>Audio mid-range beep (600Hz, 100ms) plays</test>
+      <test>Visual: yellow/orange background flash</test>
+      <test>Confirmation modal shown: "90% match. Confirm?"</test>
+    </ac>
+    <ac id="4" title="Haptic Pattern Configuration">
+      <test>Open scanner settings → toggle "Enable Haptic Feedback"</test>
+      <test>Pattern selector: Light, Standard (default), Strong</test>
+      <test>Test button: triggers selected pattern</test>
+      <test>Saves to scanner_workflow_configs</test>
+    </ac>
+    <ac id="5" title="Audio Configuration">
+      <test>Open scanner settings → toggle "Enable Audio Feedback"</test>
+      <test>Volume slider (0-100%, default 70%)</test>
+      <test>Tone selector: Beep (default), Chime, Bell</test>
+      <test>Test button: plays selected tone at volume</test>
+      <test>Audio level < 60dB (warehouse-safe)</test>
+    </ac>
+    <ac id="6" title="Auto-Advance Configuration">
+      <test>Auto-advance toggle (default on)</test>
+      <test>Delay selector: 1000ms, 1500ms (default), 2000ms, 3000ms</test>
+      <test>Longer delays allow operator to perceive feedback</test>
+    </ac>
+    <ac id="7" title="Accessibility">
+      <test>Disable audio feedback → haptic still works (sufficient for operation)</test>
+      <test>Visual feedback always enabled</test>
+      <test>Screen reader announces validation result</test>
+    </ac>
+    <ac id="8" title="Offline Capability">
+      <test>Offline mode → haptic works (device hardware)</test>
+      <test>Audio plays (cached locally)</test>
+      <test>Visual feedback renders (DOM)</test>
+      <test>No API dependency for feedback</test>
+    </ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>
+      <test>Haptic pattern generation: correct durations [100, 50, 100]</test>
+      <test>Audio tone synthesis: correct frequency (800Hz success, 400Hz error, 600Hz warning)</test>
+      <test>Feedback config loading: returns correct defaults (haptic on, audio on, 1500ms delay)</test>
+      <test>Volume envelope: attack 10ms, decay proper (no clipping)</test>
+      <test>Pattern normalization: success/error/warning mapped correctly</test>
+    </unit_tests>
+    <integration_tests>
+      <test>POST /api/scanner/feedback logs correctly with feedback_type, haptic_pattern, audio_played</test>
+      <test>GET /api/scanner/workflow-config/:type returns all feedback settings</test>
+      <test>PUT /api/scanner/workflow-config/:type updates settings (admin only)</test>
+      <test>Haptic triggers on device (mock with navigator.vibrate)</test>
+      <test>Audio plays with Web Audio API (test with mock AudioContext)</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Valid barcode scan → haptic double-tap felt</test>
+      <test>Valid barcode scan → audio upward beep heard</test>
+      <test>Valid barcode scan → visual feedback flashes green</test>
+      <test>Valid barcode scan → auto-advance after 1.5 seconds</test>
+      <test>Invalid barcode scan → haptic longer vibration felt</test>
+      <test>Invalid barcode scan → audio downward beep heard</test>
+      <test>Invalid barcode scan → visual feedback flashes red</test>
+      <test>Invalid barcode scan → stays on step (no auto-advance)</test>
+      <test>Open settings → toggle haptic off → scan → no haptic</test>
+      <test>Open settings → change tone to "chime" → test → chime plays</test>
+      <test>Open settings → change delay to 3000ms → scan → slower advancement</test>
+      <test>Offline mode → disable internet → scan → haptic/audio still work</test>
+      <test>Disable audio → scan → haptic still works (sufficient feedback)</test>
+      <test>Screen reader on → scan → result announced correctly</test>
+    </e2e_tests>
+  </test_plan>
+</story>

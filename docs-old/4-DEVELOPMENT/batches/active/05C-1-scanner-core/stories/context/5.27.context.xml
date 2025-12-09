@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.27</id>
+    <title>Scanner Session Timeout</title>
+    <batch>5C-1</batch>
+    <points>3</points>
+    <effort_hours>3-4</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Automatic session timeout for unattended scanner devices with 30-second warning, extensible duration, and data preservation</description>
+  <dependencies>
+    <requires><story id="5.23">Scanner Guided Workflows</story><story id="5.26">Scanner Operations Menu</story></requires>
+    <enables>Complete scanner core functionality</enables>
+  </dependencies>
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="PATCH" path="/api/scanner/sessions/:id/activity">
+        <description>Update last_activity_at to track idle time</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="last_activity_at" type="timestamp"/>
+          <field name="idle_seconds_remaining" type="integer"/>
+          <field name="warning_active" type="boolean" comment="True if within 30s of timeout"/>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/scanner/sessions/:id/status">
+        <description>Get current session status and idle time</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="session_id" type="UUID"/>
+          <field name="status" type="string" comment="active, paused, timeout, completed"/>
+          <field name="idle_time" type="integer" comment="Seconds idle since last activity"/>
+          <field name="idle_seconds_remaining" type="integer"/>
+          <field name="warning_active" type="boolean"/>
+          <field name="last_activity_at" type="timestamp"/>
+          <field name="expires_at" type="timestamp"/>
+        </response>
+      </endpoint>
+      <endpoint method="POST" path="/api/scanner/sessions/:id/extend">
+        <description>Extend session by another idle_duration_seconds</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="last_activity_at" type="timestamp"/>
+          <field name="idle_seconds_remaining" type="integer"/>
+          <field name="expires_at" type="timestamp"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+    <database_operations>
+      <operation name="calculate_idle_time">
+        SELECT EXTRACT(EPOCH FROM (NOW() - last_activity_at)) AS idle_seconds
+        FROM scanner_sessions WHERE id = $1
+      </operation>
+      <operation name="update_last_activity">
+        UPDATE scanner_sessions
+        SET last_activity_at = NOW(), updated_at = NOW()
+        WHERE id = $1 AND org_id = $2
+        RETURNING last_activity_at
+      </operation>
+      <operation name="mark_session_expired">
+        UPDATE scanner_sessions
+        SET status = 'timeout', updated_at = NOW()
+        WHERE id = $1 AND NOW() - last_activity_at >= (idle_duration_seconds || ' seconds')::INTERVAL
+      </operation>
+      <operation name="background_cleanup_job">
+        UPDATE scanner_sessions
+        SET status = 'timeout'
+        WHERE status = 'active' AND NOW() - last_activity_at >= (idle_duration_seconds || ' seconds')::INTERVAL
+      </operation>
+    </database_operations>
+    <background_jobs>
+      <job name="session_timeout_cleanup">
+        <schedule>Every 30 seconds</schedule>
+        <query>Find sessions where NOW() - last_activity_at >= idle_duration_seconds</query>
+        <action>Update status = 'timeout'</action>
+        <retention>Keep timeout sessions for 24 hours (recovery window), archive after 7 days</retention>
+      </job>
+    </background_jobs>
+    <components>
+      <component name="SessionTimeoutWarning">
+        <location>src/components/scanner/SessionTimeoutWarning.tsx</location>
+        <description>Fixed banner warning about session expiration</description>
+        <displays>
+          - Fixed position: top of screen
+          - Background: orange/yellow warning color
+          - Text: "Session expiring in 30 seconds"
+          - Countdown timer: MM:SS format (00:30 → 00:01)
+          - Large button: "Extend Session" (green, 60px)
+          - Z-index: above all content
+        </displays>
+        <trigger>Shown when idle_time >= (idle_duration - 30)</trigger>
+      </component>
+      <component name="SessionExpiredScreen">
+        <location>src/components/scanner/SessionExpiredScreen.tsx</location>
+        <description>Full-screen logout screen on session timeout</description>
+        <displays>
+          - Center: large "Session Expired" heading
+          - Message: "For security, idle sessions are closed automatically"
+          - Sub-text: "5 items were processed before timeout"
+          - Summary of pending validations count
+          - Primary button: "Log In Again" (blue)
+          - Secondary button: "View Queue" (gray)
+        </displays>
+      </component>
+      <component name="SessionRecoveryModal">
+        <location>src/components/scanner/SessionRecoveryModal.tsx</location>
+        <description>Offer to resume expired session on re-login</description>
+        <displays>
+          - Heading: "Resume Previous Session?"
+          - Message: "You have an active receive workflow with 5 items"
+          - Created: timestamp
+          - Buttons: "Resume" (green), "Start New" (gray)
+          - Auto-dismiss if not interacted within 30 seconds
+        </displays>
+      </component>
+      <component name="TimeoutSettingsPanel">
+        <location>src/components/scanner/TimeoutSettingsPanel.tsx</location>
+        <description>Settings panel for timeout duration configuration</description>
+        <displays>
+          - Label: "Session Timeout Duration"
+          - Radio buttons: 2min, 3min, 5min (default), 10min, 15min, Custom
+          - Custom input: text field for seconds
+          - Save button
+          - Help text: "Sessions automatically close after idle period"
+        </displays>
+      </component>
+    </components>
+    <hooks>
+      <hook name="useSessionTimeout">
+        <accepts>session_id, idle_duration_seconds</accepts>
+        <returns>{ idle_time, idle_seconds_remaining, warning_active, extend_session, is_expired }</returns>
+        <description>Track session timeout, poll every 10 seconds</description>
+        <api_call>GET /api/scanner/sessions/:id/status</api_call>
+      </hook>
+      <hook name="useActivityTracking">
+        <accepts>session_id</accepts>
+        <returns>{ track_activity }</returns>
+        <description>Listen to user activity (scan, tap, touch) and update session</description>
+        <events>scanEvent, clickEvent, touchEvent, keyEvent</events>
+        <debounce>Don't send more than 1x per 10 seconds</debounce>
+      </hook>
+      <hook name="useOfflineTimeout">
+        <accepts>idle_duration_seconds</accepts>
+        <returns>{ idle_time, is_expired }</returns>
+        <description>Calculate timeout locally using Date.now() (works offline)</description>
+      </hook>
+    </hooks>
+    <activity_tracking>
+      <monitored_events>
+        - Hardware barcode scan (hardware event)
+        - Button click (mouse click, touch tap)
+        - Input field focus/change (keyboard input)
+      </monitored_events>
+      <ignored_events>
+        - Mouse movement (not relevant for mobile/scanner)
+        - Page scroll (passive, not user intent)
+        - Window focus (background tab activity)
+      </ignored_events>
+      <throttling>
+        - Debounce: max 1 activity update per 10 seconds
+        - Prevents excessive API calls during active workflow
+        - Client-side tracking with local timestamp
+      </throttling>
+    </activity_tracking>
+    <offline_timeout_calculation>
+      <method name="local_idle_calculation">
+        <step number="1">Store last_activity_timestamp = Date.now() on activity</step>
+        <step number="2">Poll every 1 second: idle_time = Date.now() - last_activity_timestamp</step>
+        <step number="3">If idle_time >= idle_duration: trigger timeout client-side</step>
+        <step number="4">On reconnect: sync with server to verify timeout (prevent clock manipulation)</step>
+      </method>
+      <advantage>Works offline: timeout enforced without internet</advantage>
+      <security>Server verifies on sync: no client-side clock tampering possible</security>
+    </offline_timeout_calculation>
+    <session_recovery>
+      <window>24 hours after timeout</window>
+      <conditions>
+        - Session status = 'timeout'
+        - User same as session creator
+        - Within 24 hours of timeout
+      </conditions>
+      <recovery_options>
+        - Resume session: continue at current step
+        - Start new: create fresh session (old saved for archive)
+      </recovery_options>
+      <data_preservation>
+        - Pending barcode_validations saved to IndexedDB
+        - Session context (steps, items) preserved
+        - No sensitive data persisted (no auth tokens)
+      </data_preservation>
+    </session_recovery>
+    <security_considerations>
+      <requirement name="session_key_device_tying">
+        - session_key generated on session creation
+        - Tied to device_id (device identifier)
+        - If device stolen: old session can't be resumed on new device
+      </requirement>
+      <requirement name="sensitive_data_clearing">
+        - On logout: clear auth token from memory (not localStorage)
+        - Clear session_id from active context
+        - Keep only offline cache data (barcode validations, no auth)
+      </requirement>
+      <requirement name="no_sensitive_data_offline">
+        - IndexedDB queue contains only: scanned_barcode, validation_status, lp_id
+        - No passwords, no auth tokens, no user PII
+        - Validations tied to session_id (session expires, validation discarded)
+      </requirement>
+    </security_considerations>
+    <validation_rules>
+      <rule id="idle_duration_positive">idle_duration_seconds must be > 0</rule>
+      <rule id="warning_threshold_less_than_duration">warning_threshold (30s) must be < idle_duration</rule>
+      <rule id="timeout_enforced_offline">Client enforces timeout locally even if offline</rule>
+      <rule id="server_verifies_on_sync">Server validates timeout on sync (prevent clock tampering)</rule>
+      <rule id="recovery_window_24h">Only allow recovery within 24 hours of timeout</rule>
+    </validation_rules>
+    <rls_policies>
+      <policy table="scanner_sessions">
+        <update>WHERE org_id = current_user.org_id AND user_id = current_user.id (user can only update own sessions)</update>
+      </policy>
+    </rls_policies>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1" title="Default Idle Timeout">
+      <test>Create new scanner session → idle_duration_seconds = 300 (5 minutes)</test>
+      <test>expires_at = NOW() + 300 seconds</test>
+      <test>Start activity tracking: last_activity_at = NOW()</test>
+    </ac>
+    <ac id="2" title="Activity Tracking">
+      <test>User scans barcode → PATCH /api/scanner/sessions/:id/activity called</test>
+      <test>User taps button → activity tracked</test>
+      <test>Update: last_activity_at = NOW()</test>
+      <test>Return: idle_seconds_remaining</test>
+    </ac>
+    <ac id="3" title="Idle Timeout Calculation">
+      <test>Idle time = NOW() - last_activity_at</test>
+      <test>If idle < 270s: normal operation (green)</test>
+      <test>If 270s <= idle < 300s: warning (yellow)</test>
+      <test>If idle >= 300s: expired (red)</test>
+      <test>Show countdown: "X seconds remaining"</test>
+    </ac>
+    <ac id="4" title="Warning Banner">
+      <test>Idle >= 270 seconds (30s before timeout) → warning banner shown</test>
+      <test>Banner text: "Session expiring in 30 seconds"</test>
+      <test>Countdown timer visible: 00:30 → 00:01</test>
+      <test>Large button: "Extend Session"</test>
+      <test>Banner as overlay above content</test>
+    </ac>
+    <ac id="5" title="Extend Session">
+      <test>Click "Extend Session" → PATCH /api/scanner/sessions/:id/activity</test>
+      <test>Reset last_activity_at = NOW()</test>
+      <test>Reset idle timer: countdown gone</test>
+      <test>Auto-extend for another 300 seconds (5 minutes)</test>
+      <test>Show: "Session extended for 5 minutes"</test>
+    </ac>
+    <ac id="6" title="Session Expiration">
+      <test>Idle >= 300 seconds → session expires</test>
+      <test>Update status = 'timeout'</test>
+      <test>Show logout screen: "Session Expired"</test>
+      <test>Message: "For security, idle sessions are closed automatically"</test>
+      <test>Button: "Log In Again" → redirect to /scanner</test>
+      <test>Save pending validations (don't lose data)</test>
+    </ac>
+    <ac id="7" title="Configurable Timeout Duration">
+      <test>Open scanner settings → show timeout options: 2/3/5/10/15 minutes</test>
+      <test>Default: 5 minutes (300s) pre-selected</test>
+      <test>Custom option: input field for seconds</test>
+      <test>Save button: update scanner_workflow_configs</test>
+      <test>New sessions use selected duration</test>
+    </ac>
+    <ac id="8" title="Prevent Data Loss">
+      <test>Session expires during workflow → pending validations saved</test>
+      <test>Mark session as status='timeout' (not discarded)</test>
+      <test>Re-login: offer "Resume" if within 24 hours</test>
+      <test>Show summary: "5 items processed before timeout"</test>
+      <test>Option to complete workflow or start fresh</test>
+    </ac>
+    <ac id="9" title="Security Considerations">
+      <test>30 seconds before timeout → warn (don't auto-logout)</test>
+      <test>Session key tied to device_id (anti-theft)</test>
+      <test>Clear sensitive data on logout (auth tokens)</test>
+      <test>No sensitive data in offline queue</test>
+    </ac>
+    <ac id="10" title="Offline Timeout Handling">
+      <test>Disable internet → idle > 5min → timeout enforced locally</test>
+      <test>Session status updated when online</test>
+      <test>Pending validations preserved (not lost)</test>
+      <test>Re-login when online → recovery offered</test>
+    </ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>
+      <test>Idle time calculation: (NOW() - last_activity_at) = correct seconds</test>
+      <test>Warning threshold: idle >= (duration - 30) triggers warning</test>
+      <test>Timeout threshold: idle >= duration triggers expiration</test>
+      <test>Countdown timer: counts 30 → 0 correctly</test>
+      <test>Offline timeout: Date.now() calculation works offline</test>
+      <test>Recovery window: 24h check works correctly</test>
+    </unit_tests>
+    <integration_tests>
+      <test>PATCH /api/scanner/sessions/:id/activity resets last_activity_at</test>
+      <test>GET /api/scanner/sessions/:id/status returns correct idle_time</test>
+      <test>POST /api/scanner/sessions/:id/extend extends expires_at</test>
+      <test>Background job marks expired sessions as status='timeout'</test>
+      <test>Offline timeouts validated on sync</test>
+      <test>Recovery session created within 24h window</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Create session with 300s timeout → idle_time = 0</test>
+      <test>Wait 270 seconds → warning banner appears "30 seconds"</test>
+      <test>Click "Extend Session" → idle_time resets → warning gone</test>
+      <test>Let idle 300s (no extend) → "Session Expired" screen</test>
+      <test>Expired screen: offer "Log In Again"</test>
+      <test>Settings: change timeout to 2 minutes → next session uses 120s</test>
+      <test>Offline mode: disable internet → idle 5min → timeout enforced locally</test>
+      <test>Re-login: show recovery option "Resume previous (5 items)"</test>
+      <test>Recovery window: session > 24h → don't show recovery option</test>
+      <test>Choose "Resume" → continue at same step</test>
+      <test>Choose "Start New" → fresh session</test>
+    </e2e_tests>
+  </test_plan>
+</story>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.7" epic="6" batch="06A-2">
+  <summary>Notify QC Manager and specified users when quality holds are created.</summary>
+
+  <tables>
+    <table name="quality_holds" operation="read"/>
+    <table name="notifications" operation="create"/>
+    <table name="quality_settings" operation="read"/>
+  </tables>
+
+  <components>
+    <component name="NotificationService.ts" type="service"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/notifications" method="POST"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.6"/>
+  </dependencies>
+</story-context>

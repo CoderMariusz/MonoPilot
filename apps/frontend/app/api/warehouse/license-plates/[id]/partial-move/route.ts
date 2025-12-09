@@ -163,6 +163,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // AC-5.16.6: Create genealogy record
     const { error: genealogyError } = await adminClient.from('lp_genealogy').insert({
+      org_id: currentUser.org_id,
       parent_lp_id: id,
       child_lp_id: newLP.id,
       relationship_type: 'split',

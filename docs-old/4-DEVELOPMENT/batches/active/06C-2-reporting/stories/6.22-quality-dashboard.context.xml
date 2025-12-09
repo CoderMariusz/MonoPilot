@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.22" epic="6" batch="06C-2">
+  <summary>Show quality KPIs (open holds, NCRs, test fail rate, CoAs) with trend charts for performance monitoring.</summary>
+
+  <tables>
+    <table name="quality_holds" operation="read"/>
+    <table name="non_conformance_reports" operation="read"/>
+    <table name="test_results" operation="read"/>
+    <table name="certificates_of_analysis" operation="read"/>
+  </tables>
+
+  <components>
+    <component name="QualityDashboardPage.tsx" type="page"/>
+    <component name="QualityKPICards.tsx" type="modal"/>
+    <component name="NCRTrendChart.tsx" type="modal"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/dashboard" method="GET"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.6"/>
+    <story id="6.15"/>
+    <story id="6.19"/>
+  </dependencies>
+</story-context>

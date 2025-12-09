@@ -1,0 +1,665 @@
+<story-context id="4-13-output-registration-scanner" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>13</storyId>
+    <title>Output Registration (Scanner)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <template>Scanner/Mobile Pattern with ZPL Label Printing</template>
+    <estimatedEffort>0.5 day</estimatedEffort>
+    <priority>P0</priority>
+  </metadata>
+
+  <story>
+    <asA>Operator</asA>
+    <iWant>to register output via scanner</iWant>
+    <soThat>I can work efficiently with touch-optimized mobile interface</soThat>
+    <tasks>
+      <task id="1" ac="AC-4.13.1">Create scanner output page with barcode scanning (touch-optimized)</task>
+      <task id="2" ac="AC-4.13.2">Implement quantity and QA status input with large buttons</task>
+      <task id="3" ac="AC-4.13.4">Integrate ZPL label printer for LP labels</task>
+      <task id="4" ac="AC-4.13.3">By-product prompting (Story 4.14 integration)</task>
+      <task id="5" ac="AC-4.13.7">Offline queue integration (Story 5.36)</task>
+      <task id="6" ac="AC-4.13.8">Verification UI with success feedback</task>
+      <task id="7">E2E tests for scanner output workflow</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-4.13.1">
+      Scanner Output Workflow:
+      - User navigates to /scanner/output
+      - Scan WO barcode → show WO summary (product name, planned qty, progress)
+      - Touch-optimized layout (large text, minimal clutter)
+    </criterion>
+    <criterion id="AC-4.13.2">
+      Quantity &amp; QA Status Input:
+      - Large numeric keypad for qty entry (buttons >44px)
+      - Large QA status buttons (Pass/Fail/Quarantine) if required in settings
+      - Submit → register output, print LP label
+    </criterion>
+    <criterion id="AC-4.13.3">
+      By-Product Prompts:
+      - After main output registration, if WO has by-products in wo_materials
+      - Show prompt: "Register by-products?" with large Yes/No buttons
+      - If Yes → redirect to by-product registration (Story 4.14)
+      - If No → complete registration
+    </criterion>
+    <criterion id="AC-4.13.4">
+      Label Printing with ZPL Format:
+      - Printer configuration from production_settings.printer_network_address (Story 4.17)
+      - Label content includes:
+        * LP number/barcode (CODE128 format)
+        * Product name
+        * Quantity and UoM (e.g., "500 kg")
+        * Batch/WO number
+        * Expiry date (if applicable)
+        * Printed timestamp
+      - Example ZPL format:
+        ^XA
+        ^BY2,3,100
+        ^FO50,50^BC^FD[LP_NUMBER]^FS
+        ^FO50,150^A0N,25,25^FD[PRODUCT_NAME]^FS
+        ^FO50,180^A0N,20,20^FD[QTY] [UOM]^FS
+        ^FO50,210^A0N,20,20^FDExp: [EXPIRY_DATE]^FS
+        ^FO50,240^A0N,15,15^FD[TIMESTAMP]^FS
+        ^XZ
+      - Send ZPL to network printer via HTTP POST or raw TCP socket
+    </criterion>
+    <criterion id="AC-4.13.5">
+      Touch Optimization:
+      - All buttons >44px minimum tap target
+      - Large font sizes (18px+ for primary text)
+      - Voice feedback optional (future enhancement)
+      - No hover interactions (touch devices don't have hover)
+    </criterion>
+    <criterion id="AC-4.13.6">
+      Same API as Desktop:
+      - Uses POST /api/production/work-orders/:id/outputs endpoint
+      - Same validation, consumption logic, genealogy updates
+      - Same response format
+    </criterion>
+    <criterion id="AC-4.13.7">
+      Offline Support:
+      - If offline, queue output operation in localStorage
+      - Show toast: "Offline - operation queued"
+      - Auto-sync when connection restored (Story 5.36)
+    </criterion>
+    <criterion id="AC-4.13.8">
+      Verification:
+      - After registration, show green checkmark with success message
+      - Display: "Output registered: LP-2024-001 (500 kg)"
+      - Options: "Continue" (scan next WO) or "Complete WO" (mark WO as completed)
+    </criterion>
+  </acceptanceCriteria>
+
+  <uxDesign>
+    <designSystem>
+      <reference>
+        <doc>docs/ux-design/ux-design-shared-system.md</doc>
+        <section>4.4 Touch &amp; Motor - Minimum tap target: 48px × 48px</section>
+        <note>Scanner mode requires touch optimization with large buttons and spacing</note>
+      </reference>
+      <reference>
+        <doc>docs/ux-design/ux-design-production-module.md</doc>
+        <section>Scanner Mode - Touch Optimization</section>
+        <note>Use larger touch targets (56px buttons vs 44px desktop)</note>
+      </reference>
+    </designSystem>
+    <components>
+      <component>
+        <name>ScannerOutputPage</name>
+        <path>apps/frontend/app/scanner/output/page.tsx</path>
+        <kind>Mobile-First Scanner Page</kind>
+        <layout>
+          <section name="Header" height="60px">
+            - Back button (large, left)
+            - Title: "Register Output"
+            - Help icon (optional, right)
+          </section>
+          <section name="Barcode Scanner" height="auto">
+            - Camera viewfinder (full-width)
+            - Manual entry button (large, below camera)
+            - Scanned WO summary card (product, planned qty, progress)
+          </section>
+          <section name="Input Form" height="auto">
+            - Quantity input with large numeric keypad
+            - QA status buttons (large, 3 options: Pass/Fail/Quarantine)
+            - Notes field (optional, textarea)
+          </section>
+          <section name="Actions" height="80px">
+            - Register Output button (green-600, full-width, 56px height)
+            - Cancel button (gray-600, full-width, 44px height)
+          </section>
+        </layout>
+      </component>
+      <component>
+        <name>NumericKeypad</name>
+        <path>apps/frontend/components/scanner/NumericKeypad.tsx</path>
+        <kind>Touch-Optimized Keypad</kind>
+        <specs>
+          - 3×4 grid (1-9, 0, backspace, decimal)
+          - Button size: 56px × 56px minimum
+          - Large font: 24px
+          - Spacing: 8px between buttons
+        </specs>
+      </component>
+      <component>
+        <name>QAStatusButtons</name>
+        <path>apps/frontend/components/scanner/QAStatusButtons.tsx</path>
+        <kind>Large Button Group</kind>
+        <specs>
+          - 3 buttons: Pass (green), Fail (red), Quarantine (yellow)
+          - Button height: 56px
+          - Icon + text (large, 18px font)
+          - Full-width on mobile
+        </specs>
+      </component>
+      <component>
+        <name>LabelPrinter</name>
+        <path>apps/frontend/lib/services/label-printer.ts</path>
+        <kind>ZPL Label Generation &amp; Printing Service</kind>
+        <methods>
+          <method name="generateZPL">Generate ZPL string from LP data</method>
+          <method name="printLabel">Send ZPL to network printer via HTTP or TCP</method>
+          <method name="validatePrinterConnection">Check printer availability</method>
+        </methods>
+      </component>
+      <component>
+        <name>ByProductPrompt</name>
+        <path>apps/frontend/components/scanner/ByProductPrompt.tsx</path>
+        <kind>Full-Screen Modal</kind>
+        <specs>
+          - Large text: "Register by-products?"
+          - 2 large buttons: Yes (green, 56px), No (gray, 56px)
+          - Full-width buttons, stacked vertically
+        </specs>
+      </component>
+      <component>
+        <name>SuccessVerification</name>
+        <path>apps/frontend/components/scanner/SuccessVerification.tsx</path>
+        <kind>Success Screen</kind>
+        <specs>
+          - Large green checkmark icon
+          - Success message: "Output registered: LP-2024-001 (500 kg)"
+          - 2 options: "Continue" (scan next WO), "Complete WO" (mark as completed)
+        </specs>
+      </component>
+    </components>
+    <colorPalette>
+      <color name="Primary (Submit)" value="green-600" hex="#16a34a" />
+      <color name="Secondary (Cancel)" value="gray-600" hex="#4b5563" />
+      <color name="Success (Pass/Checkmark)" value="green-500" hex="#10b981" />
+      <color name="Danger (Fail)" value="red-600" hex="#dc2626" />
+      <color name="Warning (Quarantine)" value="yellow-500" hex="#eab308" />
+    </colorPalette>
+    <touchOptimization>
+      <minTapTarget>48px × 48px (WCAG AAA)</minTapTarget>
+      <recommendedTapTarget>56px × 56px (scanner mode)</recommendedTapTarget>
+      <spacing>8px minimum between interactive elements</spacing>
+      <fontSize>18px+ for primary text, 24px for keypad buttons</fontSize>
+      <noHover>Do not use hover states (touch devices)</noHover>
+    </touchOptimization>
+    <mobileResponsive>
+      <viewport>Width 360px-768px (mobile/tablet)</viewport>
+      <orientation>Portrait primary, landscape secondary</orientation>
+      <keyboardHandling>Auto-scroll to keep input visible when keyboard opens</keyboardHandling>
+    </mobileResponsive>
+    <reference>
+      <doc>docs/ux-design/ux-design-shared-system.md</doc>
+      <section>5.4 Touch &amp; Motor - Minimum tap target: 48px × 48px</section>
+      <note>Scanner mode exceeds minimum (56px recommended)</note>
+    </reference>
+  </uxDesign>
+
+  <databaseSchema>
+    <tables>
+      <table name="production_settings">
+        <description>Production configuration settings (Story 4.17)</description>
+        <relevantColumns>
+          <column name="id" type="uuid" pk="true" />
+          <column name="org_id" type="uuid" fk="organizations.id" />
+          <column name="printer_network_address" type="varchar" note="Network printer IP/hostname for ZPL labels (e.g., 192.168.1.100:9100)" />
+          <column name="require_qa_on_output" type="boolean" default="false" note="If true, QA status required on output registration" />
+          <column name="auto_create_by_product_lp" type="boolean" default="false" note="If true, auto-create by-product LPs without prompting" />
+        </relevantColumns>
+        <note>Read printer_network_address for label printing (AC-4.13.4)</note>
+      </table>
+      <table name="license_plates">
+        <description>Output LPs created via scanner (same as desktop Story 4.12)</description>
+        <relevantColumns>
+          <column name="id" type="uuid" pk="true" />
+          <column name="lp_number" type="varchar" unique="true" note="Auto-generated LP number (e.g., LP-2024-001)" />
+          <column name="batch_number" type="varchar" note="Batch number = WO.wo_number" />
+          <column name="product_id" type="uuid" fk="products.id" />
+          <column name="quantity" type="numeric" check="> 0" />
+          <column name="uom" type="varchar" />
+          <column name="expiry_date" type="date" nullable="true" note="Calculated from product.shelf_life_days" />
+          <column name="qa_status" type="varchar" nullable="true" values="pass|fail|quarantine" />
+        </relevantColumns>
+        <note>Same table used by desktop (Story 4.12), scanner creates LPs identically</note>
+      </table>
+      <table name="production_outputs">
+        <description>Audit trail for output registrations (created in Story 4.12)</description>
+        <relevantColumns>
+          <column name="id" type="uuid" pk="true" />
+          <column name="wo_id" type="uuid" fk="work_orders.id" />
+          <column name="output_lp_id" type="uuid" fk="license_plates.id" />
+          <column name="quantity" type="numeric" check="> 0" />
+          <column name="registered_by" type="uuid" fk="users.id" />
+          <column name="registered_at" type="timestamptz" default="now()" />
+        </relevantColumns>
+        <note>Scanner uses same table as desktop</note>
+      </table>
+      <table name="offline_queue">
+        <description>NEW TABLE - Queues operations when offline (Story 5.36)</description>
+        <schema>
+          <column name="id" type="uuid" pk="true" default="gen_random_uuid()" />
+          <column name="org_id" type="uuid" fk="organizations.id" />
+          <column name="user_id" type="uuid" fk="users.id" />
+          <column name="operation_type" type="varchar" values="output_registration|consumption|etc" />
+          <column name="payload" type="jsonb" note="Serialized operation data" />
+          <column name="queued_at" type="timestamptz" default="now()" />
+          <column name="synced_at" type="timestamptz" nullable="true" />
+          <column name="status" type="varchar" values="pending|synced|failed" default="pending" />
+        </schema>
+        <note>To be created in Story 5.36 (Offline Support)</note>
+      </table>
+    </tables>
+    <migrations>
+      <migration name="create_production_settings_printer_config" file="supabase/migrations/XXX_add_printer_config.sql">
+        <action>ADD COLUMN printer_network_address to production_settings (if not exists)</action>
+        <action>ADD COLUMN require_qa_on_output to production_settings (if not exists)</action>
+      </migration>
+      <migration name="create_offline_queue_table" file="supabase/migrations/XXX_create_offline_queue.sql">
+        <action>CREATE TABLE offline_queue (Story 5.36 dependency)</action>
+        <note>Only needed if Story 5.36 not yet implemented</note>
+      </migration>
+    </migrations>
+  </databaseSchema>
+
+  <apiPatterns>
+    <endpoint>
+      <method>POST</method>
+      <path>/api/production/work-orders/:id/outputs</path>
+      <requestBody>
+        {
+          "qty": "number (required, > 0)",
+          "qa_status": "string (optional, required if Settings.require_qa_on_output)",
+          "location_id": "uuid (optional, defaults to line.default_output_location_id)",
+          "notes": "string (optional, max 500 chars)"
+        }
+      </requestBody>
+      <responseBody>
+        {
+          "success": true,
+          "data": {
+            "output_lp_id": "uuid",
+            "lp_number": "string (e.g., LP-2024-001)",
+            "product_name": "string",
+            "quantity": "number",
+            "uom": "string",
+            "batch_number": "string (WO number)",
+            "expiry_date": "date | null",
+            "has_by_products": "boolean (true if WO has by-products)",
+            "cumulative_output_qty": "number",
+            "progress_percent": "number"
+          }
+        }
+      </responseBody>
+      <implementation>
+        <file>apps/frontend/app/api/production/work-orders/[id]/outputs/route.ts</file>
+        <note>Endpoint already exists from Story 4.12, scanner reuses same API</note>
+        <additionalLogic>
+          - Add "has_by_products" to response (check wo_materials for by-product entries)
+          - Add "product_name" to response (for label printing)
+        </additionalLogic>
+      </implementation>
+      <errorHandling>
+        <error code="400" condition="qty <= 0">Output quantity must be > 0</error>
+        <error code="400" condition="WO status != 'in_progress'">WO not in progress</error>
+        <error code="400" condition="qa_status required but missing">QA status is required</error>
+        <error code="503" condition="Printer unavailable">Label printer not reachable</error>
+      </errorHandling>
+    </endpoint>
+    <endpoint>
+      <method>POST</method>
+      <path>/api/production/print-label</path>
+      <requestBody>
+        {
+          "lp_id": "uuid (required)",
+          "printer_address": "string (optional, defaults to Settings.printer_network_address)"
+        }
+      </requestBody>
+      <responseBody>
+        {
+          "success": true,
+          "message": "Label sent to printer"
+        }
+      </responseBody>
+      <implementation>
+        <file>apps/frontend/app/api/production/print-label/route.ts</file>
+        <pattern>
+          - Fetch LP data (license_plates table)
+          - Generate ZPL string using template (AC-4.13.4)
+          - Send ZPL to printer via HTTP POST or raw TCP socket
+          - Return success/error
+        </pattern>
+      </implementation>
+      <note>NEW endpoint for label printing (AC-4.13.4)</note>
+    </endpoint>
+    <reference>
+      <existingPattern>apps/frontend/app/api/production/work-orders/[id]/outputs/route.ts</existingPattern>
+      <note>Scanner uses same endpoint as desktop (AC-4.13.6), no duplication</note>
+    </reference>
+  </apiPatterns>
+
+  <services>
+    <service>
+      <name>LabelPrinterService</name>
+      <file>apps/frontend/lib/services/label-printer.ts</file>
+      <methods>
+        <method name="generateZPL">
+          <description>Generate ZPL string from LP data</description>
+          <parameters>lpData: { lp_number, product_name, quantity, uom, batch_number, expiry_date }</parameters>
+          <returns>string (ZPL formatted label)</returns>
+          <logic>
+            - Use ZPL template from AC-4.13.4
+            - Replace placeholders with LP data
+            - Format dates (YYYY-MM-DD)
+            - Return ZPL string
+          </logic>
+        </method>
+        <method name="printLabel">
+          <description>Send ZPL to network printer</description>
+          <parameters>zpl: string, printerAddress: string</parameters>
+          <returns>Promise&lt;{ success: boolean, error?: string }&gt;</returns>
+          <logic>
+            - Parse printer address (IP:port or hostname)
+            - Try HTTP POST to printer (if supports HTTP)
+            - Fallback to raw TCP socket (port 9100 for Zebra)
+            - Handle timeout (5 seconds)
+            - Return success/error
+          </logic>
+        </method>
+        <method name="validatePrinterConnection">
+          <description>Check if printer is reachable</description>
+          <parameters>printerAddress: string</parameters>
+          <returns>Promise&lt;boolean&gt;</returns>
+          <logic>
+            - Ping printer (HTTP HEAD or TCP connect)
+            - Return true if reachable, false otherwise
+          </logic>
+        </method>
+      </methods>
+      <note>NEW service for ZPL label printing (AC-4.13.4)</note>
+    </service>
+    <service>
+      <name>OfflineQueueService</name>
+      <file>apps/frontend/lib/services/offline-queue.ts</file>
+      <methods>
+        <method name="queueOperation">
+          <description>Queue operation when offline</description>
+          <parameters>operationType: string, payload: object</parameters>
+          <returns>void</returns>
+          <logic>
+            - Store operation in localStorage (key: "offline_queue")
+            - Append to array of pending operations
+            - Show toast: "Offline - operation queued"
+          </logic>
+        </method>
+        <method name="syncQueue">
+          <description>Sync queued operations when online</description>
+          <returns>Promise&lt;void&gt;</returns>
+          <logic>
+            - Read operations from localStorage
+            - Send each to API in order
+            - Remove from queue if successful
+            - Show toast: "Synced 3 operations"
+          </logic>
+        </method>
+      </methods>
+      <note>Partial implementation for AC-4.13.7, full implementation in Story 5.36</note>
+    </service>
+    <reference>
+      <existingService>apps/frontend/lib/services/output-service.ts</existingService>
+      <note>Scanner calls same OutputService.registerOutput as desktop (Story 4.12)</note>
+    </reference>
+  </services>
+
+  <testingStrategy>
+    <e2eTests>
+      <testFile>tests/e2e/scanner-output.spec.ts</testFile>
+      <scenarios>
+        <scenario name="Scanner output workflow - scan WO and register output">
+          <steps>
+            1. Create test organization + user + WO in 'in_progress'
+            2. Create test reserved LPs for WO
+            3. Navigate to /scanner/output (mobile viewport 375×667)
+            4. Mock barcode scan (trigger input event with WO number)
+            5. Verify WO summary card shown (product name, planned qty, progress)
+            6. Enter quantity using numeric keypad (70 kg)
+            7. Select QA status (Pass button)
+            8. Click "Register Output" button
+            9. Verify toast: "Output registered successfully"
+            10. Verify success screen: "Output registered: LP-2024-001 (70 kg)"
+            11. Verify label printing API called with correct ZPL
+            12. Click "Continue" button
+            13. Verify scanner resets to scan next WO
+          </steps>
+        </scenario>
+        <scenario name="By-product prompt shown when WO has by-products">
+          <steps>
+            1. Create test WO with by-products in wo_materials
+            2. Navigate to /scanner/output
+            3. Scan WO, register output
+            4. Verify by-product prompt: "Register by-products?"
+            5. Click "Yes" button
+            6. Verify redirect to /scanner/by-products/:woId (Story 4.14)
+          </steps>
+        </scenario>
+        <scenario name="Touch optimization - all buttons meet 48px minimum">
+          <steps>
+            1. Navigate to /scanner/output (mobile viewport)
+            2. Verify all buttons have min-height: 48px
+            3. Verify keypad buttons have min-height: 56px
+            4. Verify spacing between buttons >= 8px
+            5. Verify font sizes >= 18px for primary text
+          </steps>
+        </scenario>
+        <scenario name="Offline queue - operation queued when offline">
+          <steps>
+            1. Navigate to /scanner/output
+            2. Scan WO, enter qty
+            3. Enable offline mode (mock navigator.onLine = false)
+            4. Click "Register Output"
+            5. Verify toast: "Offline - operation queued"
+            6. Verify operation stored in localStorage
+            7. Enable online mode (navigator.onLine = true)
+            8. Wait for auto-sync
+            9. Verify toast: "Synced 1 operation"
+            10. Verify output LP created in database
+          </steps>
+        </scenario>
+        <scenario name="Label printing error handling">
+          <steps>
+            1. Mock printer unavailable (API returns 503)
+            2. Register output
+            3. Verify error toast: "Label printer not reachable"
+            4. Verify output LP still created (printing is non-blocking)
+            5. Verify "Retry Print" button shown
+          </steps>
+        </scenario>
+      </scenarios>
+    </e2eTests>
+    <unitTests>
+      <testFile>tests/unit/services/label-printer.test.ts</testFile>
+      <scenarios>
+        <test name="generateZPL returns correct ZPL string">
+          lpData: { lp_number: "LP-001", product_name: "Flour", quantity: 500, uom: "kg", batch_number: "WO-001", expiry_date: "2025-12-31" }
+          → ZPL includes: ^BC^FDLP-001^FS, ^FDFlour^FS, ^FD500 kg^FS, ^FDExp: 2025-12-31^FS
+        </test>
+        <test name="printLabel sends ZPL to printer via HTTP">
+          Mock HTTP POST to 192.168.1.100:9100
+          → Verify request body = ZPL string
+        </test>
+        <test name="validatePrinterConnection returns true if printer reachable">
+          Mock successful HTTP HEAD to 192.168.1.100:9100
+          → Returns true
+        </test>
+        <test name="validatePrinterConnection returns false if printer unreachable">
+          Mock timeout on HTTP HEAD
+          → Returns false
+        </test>
+      </scenarios>
+    </unitTests>
+    <fixtures>
+      <fixture name="createTestWOWithByProducts">
+        <file>tests/e2e/fixtures/test-setup.ts</file>
+        <returns>{ woId, wo_number, product_id, by_products: [{ product_id, yield_percent }] }</returns>
+      </fixture>
+      <fixture name="mockBarcodeScanner">
+        <file>tests/e2e/fixtures/test-setup.ts</file>
+        <logic>Trigger input event with barcode data (simulate hardware scanner)</logic>
+      </fixture>
+    </fixtures>
+  </testingStrategy>
+
+  <integrationPoints>
+    <dependency>
+      <storyId>4.12</storyId>
+      <title>Output Registration (Desktop)</title>
+      <reason>Scanner reuses same API endpoint and business logic</reason>
+      <sharedCode>POST /api/production/work-orders/:id/outputs, OutputService</sharedCode>
+    </dependency>
+    <dependency>
+      <storyId>4.14</storyId>
+      <title>By-Product Registration</title>
+      <reason>Scanner prompts for by-products after main output (AC-4.13.3)</reason>
+      <flow>Main output → By-product prompt → Story 4.14 scanner page</flow>
+    </dependency>
+    <dependency>
+      <storyId>4.17</storyId>
+      <title>Production Settings</title>
+      <reason>Reads printer_network_address and require_qa_on_output settings</reason>
+      <tables>production_settings</tables>
+    </dependency>
+    <dependency>
+      <storyId>5.36</storyId>
+      <title>Offline Support</title>
+      <reason>Scanner queues operations when offline (AC-4.13.7)</reason>
+      <tables>offline_queue</tables>
+      <note>Partial implementation in this story, full implementation in Epic 5</note>
+    </dependency>
+  </integrationPoints>
+
+  <businessLogic>
+    <rule name="Same API as Desktop">
+      <description>
+        Scanner mode uses identical backend logic as desktop (Story 4.12):
+        - Same validation (qty > 0, WO status, QA status)
+        - Same LP creation, consumption, genealogy updates
+        - Same response format
+        Only difference is UI (touch-optimized vs desktop)
+      </description>
+    </rule>
+    <rule name="ZPL Label Printing">
+      <description>
+        Label printing happens AFTER output LP created:
+        1. Create output LP in database
+        2. Generate ZPL string from LP data
+        3. Send ZPL to network printer (non-blocking)
+        4. If printer fails, show error but output LP still exists
+        5. Operator can retry print from LP detail page
+      </description>
+    </rule>
+    <rule name="By-Product Prompting">
+      <description>
+        By-products registered AFTER main output:
+        1. Register main output → create output LP
+        2. Check if WO has by-products (query wo_materials WHERE is_by_product = true)
+        3. If yes, show prompt: "Register by-products?"
+        4. If operator clicks "Yes", redirect to /scanner/by-products/:woId (Story 4.14)
+        5. If operator clicks "No", complete registration (return to scanner home)
+      </description>
+    </rule>
+    <rule name="Offline Queue">
+      <description>
+        When offline (navigator.onLine = false):
+        1. Store operation in localStorage (key: "offline_queue")
+        2. Show toast: "Offline - operation queued"
+        3. When online, auto-sync queued operations in background
+        4. Show toast: "Synced X operations"
+        5. If sync fails, retry with exponential backoff
+      </description>
+    </rule>
+    <rule name="Touch Optimization">
+      <description>
+        All interactive elements meet WCAG AAA touch targets:
+        - Minimum: 48px × 48px (WCAG AA)
+        - Recommended: 56px × 56px (scanner mode)
+        - Spacing: 8px minimum between elements
+        - Font sizes: 18px+ for primary text, 24px for keypad
+        - No hover states (touch devices)
+      </description>
+    </rule>
+  </businessLogic>
+
+  <zplLabelFormat>
+    <template>
+      ^XA
+      ^BY2,3,100
+      ^FO50,50^BC^FD{LP_NUMBER}^FS
+      ^FO50,150^A0N,25,25^FD{PRODUCT_NAME}^FS
+      ^FO50,180^A0N,20,20^FD{QUANTITY} {UOM}^FS
+      ^FO50,210^A0N,20,20^FDExp: {EXPIRY_DATE}^FS
+      ^FO50,240^A0N,15,15^FD{TIMESTAMP}^FS
+      ^XZ
+    </template>
+    <fields>
+      <field name="LP_NUMBER" example="LP-2024-001" note="Barcode + human-readable" />
+      <field name="PRODUCT_NAME" example="All-Purpose Flour" note="Product name from products table" />
+      <field name="QUANTITY" example="500" note="LP quantity" />
+      <field name="UOM" example="kg" note="Unit of measure" />
+      <field name="EXPIRY_DATE" example="2025-12-31" note="Calculated from shelf_life_days, or empty if N/A" />
+      <field name="TIMESTAMP" example="2025-11-27 14:30:00" note="Print timestamp" />
+    </fields>
+    <printerConfig>
+      <address>From production_settings.printer_network_address (e.g., 192.168.1.100:9100)</address>
+      <protocol>HTTP POST or raw TCP socket (port 9100 for Zebra printers)</protocol>
+      <barcodeFormat>CODE128 (^BC command)</barcodeFormat>
+      <labelSize>Typically 4×6 inch thermal labels</labelSize>
+    </printerConfig>
+    <errorHandling>
+      <error condition="Printer unreachable">Show error toast, output LP still created, offer "Retry Print" button</error>
+      <error condition="Invalid ZPL">Log error, show toast: "Label format error - contact admin"</error>
+    </errorHandling>
+  </zplLabelFormat>
+
+  <relatedStories>
+    <story id="4.12" title="Output Registration (Desktop)" relationship="parallel" note="Same API, different UI" />
+    <story id="4.13" title="Output Registration (Scanner)" relationship="current" />
+    <story id="4.14" title="By-Product Registration" relationship="follows" note="Prompted after main output" />
+    <story id="4.17" title="Production Settings" relationship="prerequisite" note="Provides printer_network_address" />
+    <story id="5.36" title="Offline Support" relationship="integrates" note="Queues operations when offline" />
+  </relatedStories>
+
+  <technicalNotes>
+    <note>Scanner UI built with mobile-first approach (viewport 360px-768px)</note>
+    <note>Barcode scanner uses browser's built-in keyboard input (hardware scanners act as keyboards)</note>
+    <note>ZPL printing requires network access to printer (check firewall rules)</note>
+    <note>Offline queue uses localStorage (max 5-10MB, enough for ~100 operations)</note>
+    <note>Touch optimization follows iOS Human Interface Guidelines + Material Design for tap targets</note>
+    <note>Voice feedback optional (future enhancement, not in this story)</note>
+    <note>Label printing is non-blocking (output LP created even if printer fails)</note>
+  </technicalNotes>
+
+  <references>
+    <doc>docs/stories/04-13-output-registration-scanner.md</doc>
+    <doc>docs/stories/04-12-output-registration-desktop.context.xml</doc>
+    <doc>docs/ux-design/ux-design-shared-system.md</doc>
+    <doc>docs/ux-design/ux-design-production-module.md</doc>
+    <doc>docs/epics/04-production.md</doc>
+  </references>
+</story-context>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.4</id>
+    <title>Product Allergens</title>
+    <batch>02A-1</batch>
+    <points>3</points>
+    <effort_hours>4-5</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Track "Contains" and "May Contain" allergens per product with allergen master data from Epic 1.</description>
+
+  <dependencies>
+    <requires>
+      <story id="2.1">Product CRUD</story>
+      <epic id="1">Allergens master data (Story 1.9)</epic>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>product_allergens</name>
+        <columns>
+          <column name="product_id" type="UUID" fk="products.id"/>
+          <column name="allergen_id" type="UUID" fk="allergens.id"/>
+          <column name="relation_type" type="TEXT">contains | may_contain</column>
+          <column name="created_at" type="TIMESTAMPTZ"/>
+          <column name="created_by" type="UUID"/>
+          <column name="org_id" type="UUID"/>
+        </columns>
+        <constraints>
+          <pk>product_id, allergen_id, relation_type</pk>
+          <check>relation_type IN ('contains', 'may_contain')</check>
+        </constraints>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/products/:id/allergens">
+        <description>Get allergens for a product</description>
+        <response>{ contains: Allergen[], may_contain: Allergen[] }</response>
+      </endpoint>
+      <endpoint method="PUT" path="/api/technical/products/:id/allergens">
+        <description>Update product allergens (replace, not merge)</description>
+        <body>{ contains: string[], may_contain: string[] }</body>
+        <note>Allergen changes do NOT increment product version</note>
+      </endpoint>
+    </api_endpoints>
+
+    <components_to_create>
+      <component name="ProductAllergenSection" path="app/technical/products/components/ProductAllergenSection.tsx">
+        Two multi-select dropdowns with allergen badges
+      </component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.4.1">Allergen Assignment - two sections: Contains and May Contain</ac>
+    <ac id="2.4.2">Multi-Select - dropdown with all org allergens from Epic 1</ac>
+    <ac id="2.4.3">Visual Display - badges/tags showing assigned allergens</ac>
+    <ac id="2.4.4">No Version Impact - allergen changes don't increment version</ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <integration_tests>
+      <test>PUT /api/technical/products/:id/allergens updates records</test>
+      <test>GET /api/technical/products/:id includes allergens</test>
+      <test>Allergen update does NOT change product version</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Assign wheat to Contains → save → verify badge appears</test>
+      <test>Remove allergen → save → verify badge removed</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="high">14 EU allergens + custom allergens from Epic 1</note>
+    <note priority="medium">PUT replaces all allergens (not merge)</note>
+  </implementation_notes>
+</story>

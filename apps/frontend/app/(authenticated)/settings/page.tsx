@@ -22,6 +22,8 @@ import {
   Receipt,
   Grid3x3,
   Wand2,
+  Package,
+  ShoppingCart,
 } from 'lucide-react'
 
 interface SettingModule {
@@ -63,6 +65,20 @@ const settingsModules: SettingModule[] = [
     icon: MapPin,
     href: '/settings/locations',
     color: 'text-orange-600',
+  },
+  {
+    name: 'Warehouse Settings',
+    description: 'LP format, scanner & barcode configuration',
+    icon: Package,
+    href: '/settings/warehouse',
+    color: 'text-orange-600',
+  },
+  {
+    name: 'Planning Settings',
+    description: 'Configure PO, TO, and WO settings',
+    icon: ShoppingCart,
+    href: '/settings/planning',
+    color: 'text-green-600',
   },
   {
     name: 'Machines',

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.2</id>
+    <title>QA Status Transition Rules</title>
+    <batch>06A-1</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Enforce valid QA status transitions via state machine</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.1">LP QA Status Management</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <state_machine>
+      <transition from="pending" to="passed,failed,quarantine"/>
+      <transition from="quarantine" to="passed,failed"/>
+      <transition from="failed" to="quarantine"/>
+      <transition from="passed" to="none" note="Manager override only"/>
+    </state_machine>
+
+    <validation_logic>
+      <rule>validateQAStatusTransition(currentStatus, newStatus, userRole)</rule>
+      <rule>Manager role can override passed status</rule>
+    </validation_logic>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Invalid transition blocked with error message</ac>
+    <ac id="2">Valid transitions allowed</ac>
+    <ac id="3">Manager can override passed status</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-02">System shall enforce status transitions</fr>
+  </functional_requirements>
+</story>

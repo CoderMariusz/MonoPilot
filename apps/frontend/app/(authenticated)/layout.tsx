@@ -8,6 +8,7 @@ export default async function AuthenticatedLayout({
 }: {
   children: React.ReactNode
 }) {
+  console.log('[AuthenticatedLayout] Starting render');
   const supabase = await createServerSupabase()
 
   const {
@@ -15,6 +16,7 @@ export default async function AuthenticatedLayout({
   } = await supabase.auth.getSession()
 
   if (!session) {
+    console.log('[AuthenticatedLayout] No session, redirecting to login');
     redirect('/login')
   }
 
@@ -26,6 +28,7 @@ export default async function AuthenticatedLayout({
     .single()
 
   if (!currentUser) {
+    console.log('[AuthenticatedLayout] No currentUser, redirecting to login');
     redirect('/login')
   }
 
@@ -38,6 +41,7 @@ export default async function AuthenticatedLayout({
 
   const enabledModules = organization?.modules_enabled || []
   const user = session.user
+  console.log('[AuthenticatedLayout] Rendering children for user:', user.email);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

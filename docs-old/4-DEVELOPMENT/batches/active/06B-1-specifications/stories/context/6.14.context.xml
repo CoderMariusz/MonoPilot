@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.14</id>
+    <title>Compare Results to Specifications</title>
+    <batch>06B-1</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Show side-by-side comparison of results vs specs with deviations</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.12">Record Test Results Against LPs</story>
+      <story id="6.10">Product Specification Management</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <components_to_create>
+      <component>SpecComparisonView - side-by-side table</component>
+    </components_to_create>
+
+    <display_logic>
+      <column>Specification (min/max)</column>
+      <column>Actual result</column>
+      <column>Variance %</column>
+      <column>Pass/Fail</column>
+      <color_coding>
+        <green>Within spec</green>
+        <yellow>Near limits (&lt;10% from boundary)</yellow>
+        <red>Out of spec</red>
+      </color_coding>
+    </display_logic>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Shows: Specification (min/max), Actual result, Variance, Pass/Fail</ac>
+    <ac id="2">Color-coded: green within spec, yellow near limits (&lt;10%), red out of spec</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-16">System shall compare results to specifications</fr>
+  </functional_requirements>
+</story>

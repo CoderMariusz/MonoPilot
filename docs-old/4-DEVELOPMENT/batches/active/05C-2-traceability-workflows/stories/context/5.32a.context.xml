@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.32a</id>
+    <title>Shared Receiving Service - Technical Foundation</title>
+    <batch>05C-2</batch>
+    <status>drafted</status>
+    <type>Technical Foundation</type>
+  </metadata>
+
+  <description>Shared ReceivingService consolidating receiving logic for PO, TO, and Manual receives</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.11">GRN &amp; LP Creation</story>
+      <story id="5.1">License Plate</story>
+      <story id="5.31">Warehouse Settings</story>
+      <story id="5.14">LP Location Move</story>
+    </requires>
+    <used_by>
+      <story id="5.32">Receive from PO (Desktop)</story>
+      <story id="5.33">Receive from TO (Desktop)</story>
+      <story id="5.34">Scanner Receive Workflow</story>
+    </used_by>
+  </dependencies>
+
+  <technical_context>
+    <service_methods>
+      <method name="receiveFromPO">Create GRN + LPs, update PO status</method>
+      <method name="receiveFromTO">Update LP locations, create stock_moves</method>
+      <method name="manualReceive">Create GRN + LP without source document</method>
+      <method name="validateReceive">Pre-submission validation</method>
+      <method name="getSourceDocument">Get PO/TO for form pre-population</method>
+    </service_methods>
+
+    <api_endpoints>
+      <endpoint method="POST" path="/api/warehouse/receiving/from-po">Receive from PO</endpoint>
+      <endpoint method="POST" path="/api/warehouse/receiving/from-to">Receive from TO</endpoint>
+      <endpoint method="POST" path="/api/warehouse/receiving/manual">Manual receive</endpoint>
+      <endpoint method="POST" path="/api/warehouse/receiving/validate">Validate before submit</endpoint>
+      <endpoint method="GET" path="/api/warehouse/source-documents/:type">List documents for receiving</endpoint>
+    </api_endpoints>
+
+    <validation_rules>
+      <rule type="location">Must be active and storage-capable</rule>
+      <rule type="po_status">Must be Confirmed or PartiallyReceived</rule>
+      <rule type="to_status">Must be Shipped</rule>
+      <rule type="batch_number">Required for FDA compliance</rule>
+      <rule type="qty">Must be > 0, respect over-receipt tolerance</rule>
+    </validation_rules>
+
+    <atomicity>
+      <note>All operations wrapped in database transactions</note>
+      <note>GRN + LPs + status updates succeed or fail together</note>
+    </atomicity>
+
+    <settings_integration>
+      <setting>allow_over_receipt</setting>
+      <setting>over_receipt_tolerance</setting>
+      <setting>require_batch_number</setting>
+      <setting>auto_print_labels</setting>
+    </settings_integration>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">ReceivingService interface with 3 operations (PO, TO, Manual)</ac>
+    <ac id="2">Validation rules per receive type</ac>
+    <ac id="3">API endpoints: validate, from-po, from-to, manual</ac>
+    <ac id="4">Database operations: GRN, LP, stock_move creation</ac>
+    <ac id="5">Error handling: non-recoverable vs. warnings</ac>
+    <ac id="6">Atomicity: all-or-nothing transactions</ac>
+    <ac id="7">Respects warehouse settings configuration</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="WH-FR-32">System shall provide shared receiving service</fr>
+  </functional_requirements>
+</story>

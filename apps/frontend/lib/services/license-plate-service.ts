@@ -29,6 +29,12 @@ export interface LicensePlate {
   updated_by?: string
   created_at: string
   updated_at: string
+  // Story 5.30: Source document tracking
+  source_type?: 'receiving' | 'production' | 'transfer' | 'manual'
+  source_grn_id?: string
+  source_wo_id?: string
+  source_to_id?: string
+  source_po_id?: string
   // Joins
   product?: {
     id: string
@@ -46,6 +52,22 @@ export interface LicensePlate {
     id: string
     code: string
     name: string
+  }
+  source_grn?: {
+    id: string
+    grn_number: string
+  }
+  source_wo?: {
+    id: string
+    wo_number: string
+  }
+  source_to?: {
+    id: string
+    to_number: string
+  }
+  source_po?: {
+    id: string
+    po_number: string
   }
 }
 
@@ -65,6 +87,12 @@ export interface CreateLPInput {
   received_date?: string
   qa_status?: QAStatus
   status?: LPStatus
+  // Story 5.30: Source document tracking
+  source_type?: 'receiving' | 'production' | 'transfer' | 'manual'
+  source_grn_id?: string
+  source_wo_id?: string
+  source_to_id?: string
+  source_po_id?: string
 }
 
 export interface UpdateLPInput {
@@ -136,6 +164,12 @@ export async function createLP(
       expiry_date: input.expiry_date,
       received_date: input.received_date || new Date().toISOString().split('T')[0],
       created_by: userId,
+      // Story 5.30: Source document tracking
+      source_type: input.source_type,
+      source_grn_id: input.source_grn_id,
+      source_wo_id: input.source_wo_id,
+      source_to_id: input.source_to_id,
+      source_po_id: input.source_po_id,
     })
     .select(`
       *,
@@ -164,7 +198,11 @@ export async function getLP(lpId: string): Promise<LicensePlate | null> {
       *,
       product:products (id, code, name, type, uom),
       location:locations (id, code, name),
-      warehouse:warehouses (id, code, name)
+      warehouse:warehouses (id, code, name),
+      source_grn:goods_receipt_notes (id, grn_number),
+      source_wo:work_orders (id, wo_number),
+      source_to:transfer_orders (id, to_number),
+      source_po:purchase_orders (id, po_number)
     `)
     .eq('id', lpId)
     .single()

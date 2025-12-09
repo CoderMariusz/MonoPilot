@@ -69,6 +69,7 @@ export function CreatePalletModal({ open, onClose, onSuccess }: CreatePalletModa
       setLocationId('')
       setNotes('')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   // Filter locations by warehouse

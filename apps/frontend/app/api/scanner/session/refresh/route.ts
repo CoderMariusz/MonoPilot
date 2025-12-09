@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { sessions } from '../../workflows/start/route'
+import { getSession, refreshSession } from '@/lib/scanner/session-store'
 
 const SESSION_TIMEOUT_MINUTES = 30
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // If workflow_id provided, refresh that session
     if (workflow_id) {
-      const scannerSession = sessions.get(workflow_id)
+      const scannerSession = getSession(workflow_id)
       if (!scannerSession) {
         return NextResponse.json(
           {
@@ -63,10 +63,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Extend session
-      const now = new Date()
-      const newExpiresAt = new Date(now.getTime() + SESSION_TIMEOUT_MINUTES * 60 * 1000)
-      scannerSession.expires_at = newExpiresAt.toISOString()
-      sessions.set(workflow_id, scannerSession)
+      const refreshedSession = refreshSession(workflow_id, SESSION_TIMEOUT_MINUTES)
 
       return NextResponse.json({
         success: true,
@@ -75,7 +72,7 @@ export async function POST(request: NextRequest) {
         vibrate: false,
         data: {
           workflow_id,
-          session_expires_at: newExpiresAt.toISOString(),
+          session_expires_at: refreshedSession?.expires_at,
         },
       })
     }

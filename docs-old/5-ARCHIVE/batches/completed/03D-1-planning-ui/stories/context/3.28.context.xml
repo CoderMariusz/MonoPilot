@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story_context version="1.0">
+  <metadata>
+    <story_id>3.28</story_id>
+    <title>Transfer Orders Table View</title>
+    <batch>03D-1-planning-ui</batch>
+    <priority>P1</priority>
+    <story_points>2</story_points>
+  </metadata>
+
+  <dependencies>
+    <database_tables>
+      <table name="transfer_orders" status="exists"/>
+      <table name="to_lines" status="exists"/>
+      <table name="warehouses" status="exists"/>
+    </database_tables>
+    <existing_components>
+      <component path="apps/frontend/components/planning/PlanningHeader.tsx"/>
+      <component path="apps/frontend/components/ui/table.tsx"/>
+    </existing_components>
+    <ux_reference>docs/ux-design/ux-design-planning-to-module.md</ux_reference>
+  </dependencies>
+
+  <technical_context>
+    <components>
+      <component name="TopTOCards">
+        Top 3 recent TOs (100px max height)
+        Shows: TO#, From→To, Status, Items count
+      </component>
+      <component name="TransferOrdersTable">
+        Columns: TO#, From Warehouse, To Warehouse, Items, Status, Date, Actions
+        Features: Search, Filters, Pagination
+        Mobile: Card view
+      </component>
+      <component name="CreateTOModal">
+        Fields: From Warehouse, To Warehouse, Transfer Date, Items Count, Notes
+        Validation: From ≠ To, Date ≥ today
+      </component>
+    </components>
+
+    <status_colors>
+      pending: yellow-200/yellow-800
+      in_transit: blue-200/blue-800
+      completed: green-200/green-800
+      cancelled: red-200/red-800
+    </status_colors>
+  </technical_context>
+
+  <test_plan>
+    <e2e_tests>
+      <test>TO table loads with data</test>
+      <test>Create TO modal validation</test>
+      <test>Filter by status/warehouse</test>
+      <test>Mobile card view</test>
+    </e2e_tests>
+  </test_plan>
+</story_context>

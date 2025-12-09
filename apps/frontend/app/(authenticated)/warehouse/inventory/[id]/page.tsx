@@ -16,11 +16,16 @@ import { LPStatusChangeModal } from '@/components/warehouse/LPStatusChangeModal'
 import { LPSplitModal } from '@/components/warehouse/LPSplitModal'
 import { LPMergeModal } from '@/components/warehouse/LPMergeModal'
 import { LPGenealogyTree } from '@/components/warehouse/LPGenealogyTree'
+import { TraceabilityViewer } from '@/components/warehouse/TraceabilityViewer'
+import { MoveLPModal } from '@/components/warehouse/MoveLPModal'
+import { PartialMoveLPModal } from '@/components/warehouse/PartialMoveLPModal'
+import { LPMovementHistory } from '@/components/warehouse/LPMovementHistory'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import {
   ArrowLeft,
+  ArrowRight,
   Package,
   MapPin,
   Calendar,
@@ -30,6 +35,8 @@ import {
   GitBranch,
   Split,
   Merge,
+  MoveRight,
+  Search,
 } from 'lucide-react'
 
 interface LicensePlate {
@@ -52,6 +59,12 @@ interface LicensePlate {
   consumed_at?: string
   created_at: string
   updated_at: string
+  // Story 5.30: Source document tracking
+  source_type?: 'receiving' | 'production' | 'transfer' | 'manual'
+  source_grn_id?: string
+  source_wo_id?: string
+  source_to_id?: string
+  source_po_id?: string
   product?: {
     id: string
     code: string
@@ -68,6 +81,22 @@ interface LicensePlate {
     id: string
     code: string
     name: string
+  }
+  source_grn?: {
+    id: string
+    grn_number: string
+  }
+  source_wo?: {
+    id: string
+    wo_number: string
+  }
+  source_to?: {
+    id: string
+    to_number: string
+  }
+  source_po?: {
+    id: string
+    po_number: string
   }
 }
 
@@ -106,6 +135,8 @@ export default function LPDetailPage() {
   const [lp, setLp] = useState<LicensePlate | null>(null)
   const [statusHistory, setStatusHistory] = useState<StatusHistory[]>([])
   const [genealogy, setGenealogy] = useState<GenealogyRecord[]>([])
+  const [showMoveModal, setShowMoveModal] = useState(false)
+  const [showPartialMoveModal, setShowPartialMoveModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showStatusChangeModal, setShowStatusChangeModal] = useState(false)
   const [showSplitModal, setShowSplitModal] = useState(false)
@@ -360,6 +391,10 @@ export default function LPDetailPage() {
             <GitBranch className="h-4 w-4 mr-1" />
             Genealogy
           </TabsTrigger>
+          <TabsTrigger value="traceability">
+            <Search className="h-4 w-4 mr-1" />
+            Traceability
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="details" className="space-y-4">
@@ -386,6 +421,70 @@ export default function LPDetailPage() {
                   <div>
                     <p className="text-xs text-muted-foreground">Manufacturing Date</p>
                     <p className="font-medium">{format(new Date(lp.manufacturing_date), 'MMM d, yyyy')}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Story 5.30: Source Document Information */}
+          {lp.source_type && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Source Document</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Source Type</p>
+                  <Badge variant="outline" className="mt-1">
+                    {lp.source_type === 'receiving' && 'Receiving'}
+                    {lp.source_type === 'production' && 'Production'}
+                    {lp.source_type === 'transfer' && 'Transfer'}
+                    {lp.source_type === 'manual' && 'Manual'}
+                  </Badge>
+                </div>
+                {lp.source_grn && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">GRN</p>
+                    <a
+                      href={`/warehouse/receiving/${lp.source_grn.id}`}
+                      className="font-medium text-blue-600 hover:underline"
+                    >
+                      {lp.source_grn.grn_number}
+                    </a>
+                  </div>
+                )}
+                {lp.source_po && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Purchase Order</p>
+                    <a
+                      href={`/planning/purchase-orders/${lp.source_po.id}`}
+                      className="font-medium text-blue-600 hover:underline"
+                    >
+                      {lp.source_po.po_number}
+                    </a>
+                  </div>
+                )}
+                {lp.source_wo && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Work Order</p>
+                    <a
+                      href={`/production/work-orders/${lp.source_wo.id}`}
+                      className="font-medium text-blue-600 hover:underline"
+                    >
+                      {lp.source_wo.wo_number}
+                    </a>
+                  </div>
+                )}
+                {lp.source_to && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Transfer Order</p>
+                    <a
+                      href={`/planning/transfer-orders/${lp.source_to.id}`}
+                      className="font-medium text-blue-600 hover:underline"
+                    >
+                      {lp.source_to.to_number}
+                    </a>
                   </div>
                 )}
               </CardContent>
@@ -435,6 +534,10 @@ export default function LPDetailPage() {
 
         <TabsContent value="genealogy" className="space-y-4">
           <LPGenealogyTree lpId={lpId} />
+        </TabsContent>
+
+        <TabsContent value="traceability" className="space-y-4">
+          <TraceabilityViewer lpId={lpId} lpNumber={lp.lp_number} />
         </TabsContent>
       </Tabs>
 

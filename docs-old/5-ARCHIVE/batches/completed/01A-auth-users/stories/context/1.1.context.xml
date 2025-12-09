@@ -1,0 +1,608 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>1.1</story-id>
+    <title>Organization Configuration</title>
+    <batch>01A-auth-users</batch>
+    <epic>1 - Foundation &amp; Settings</epic>
+    <status>ready-for-dev</status>
+    <generated-date>2025-11-28</generated-date>
+  </metadata>
+
+  <story-definition>
+    <user-story>
+      As an Admin,
+      I want to configure my organization's basic settings,
+      so that the system reflects my company's identity and preferences.
+    </user-story>
+
+    <acceptance-criteria>
+      <criterion id="AC-001.1">
+        <title>Organization Form Fields</title>
+        <description>User może wypełnić i zapisać organization form z wymaganymi polami</description>
+        <fields>
+          <field name="company_name" required="true" max-length="100"/>
+          <field name="address" required="false"/>
+          <field name="city" required="false"/>
+          <field name="postal_code" required="false"/>
+          <field name="country" required="false"/>
+          <field name="nip_vat_number" required="false"/>
+        </fields>
+      </criterion>
+
+      <criterion id="AC-001.2">
+        <title>Logo Upload Functionality</title>
+        <validation>
+          <allowed-formats>jpg, png, webp</allowed-formats>
+          <max-file-size>2MB</max-file-size>
+          <storage>Supabase Storage bucket 'organization-logos'</storage>
+          <url-type>Signed URL (1h TTL)</url-type>
+        </validation>
+      </criterion>
+
+      <criterion id="AC-001.3">
+        <title>Regional Settings</title>
+        <description>Regional settings zapisywane i applied globally</description>
+        <settings>
+          <setting name="timezone" type="dropdown" values="IANA timezones"/>
+          <setting name="default_currency" type="dropdown" values="PLN, EUR, USD, GBP"/>
+          <setting name="default_language" type="dropdown" values="PL, EN"/>
+          <setting name="date_format" type="dropdown" values="DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD"/>
+          <setting name="number_format" type="dropdown" values="'1 000,00', '1,000.00'"/>
+          <setting name="unit_system" type="dropdown" values="metric, imperial"/>
+        </settings>
+      </criterion>
+
+      <criterion id="AC-001.4">
+        <title>User Experience Requirements</title>
+        <requirements>
+          <requirement>Validation errors shown inline on blur</requirement>
+          <requirement>Success toast displayed after successful save</requirement>
+          <requirement>Form sections: Basic Data, Business Settings, Regional</requirement>
+          <requirement>Fiscal year start dropdown (January, April, July, October)</requirement>
+          <requirement>All dropdowns properly populated (countries, timezones, currencies)</requirement>
+          <requirement>Changes saved immediately with success feedback</requirement>
+        </requirements>
+      </criterion>
+    </acceptance-criteria>
+  </story-definition>
+
+  <database-schema>
+    <table name="organizations">
+      <purpose>Multi-tenant root table - stores organization configuration</purpose>
+      <rls-enabled>true</rls-enabled>
+      <existing-rows>4</existing-rows>
+
+      <columns>
+        <column name="id" type="UUID" constraint="PK" description="Primary key"/>
+        <column name="company_name" type="VARCHAR" constraint="NOT NULL, ≥2 chars" description="Company name"/>
+        <column name="logo_url" type="TEXT" constraint="NULL" description="Supabase Storage URL"/>
+        <column name="address" type="TEXT" constraint="NULL" description="Street address"/>
+        <column name="city" type="VARCHAR" constraint="NULL" description="City"/>
+        <column name="postal_code" type="VARCHAR" constraint="NULL" description="Postal code"/>
+        <column name="country" type="VARCHAR" constraint="NULL" description="Country"/>
+        <column name="nip_vat" type="VARCHAR" constraint="NULL" description="NIP/VAT number"/>
+        <column name="fiscal_year_start" type="DATE" constraint="NULL" description="Fiscal year start (Jan/Apr/Jul/Oct)"/>
+        <column name="date_format" type="VARCHAR" constraint="DEFAULT 'DD/MM/YYYY'" description="DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD"/>
+        <column name="number_format" type="VARCHAR" constraint="DEFAULT '1,234.56'" description="'1 000,00', '1,000.00'"/>
+        <column name="unit_system" type="VARCHAR" constraint="DEFAULT 'metric'" description="metric, imperial"/>
+        <column name="timezone" type="VARCHAR" constraint="DEFAULT 'UTC'" description="IANA timezone"/>
+        <column name="default_currency" type="VARCHAR" constraint="DEFAULT 'EUR'" description="PLN, EUR, USD, GBP"/>
+        <column name="default_language" type="VARCHAR" constraint="DEFAULT 'EN'" description="PL, EN"/>
+        <column name="modules_enabled" type="TEXT[]" constraint="NOT NULL, ≥1 module" description="Enabled modules array"/>
+        <column name="wizard_completed" type="BOOLEAN" constraint="DEFAULT false" description="Setup wizard status"/>
+        <column name="wizard_progress" type="JSONB" constraint="NULL" description="Wizard progress state"/>
+        <column name="created_at" type="TIMESTAMPTZ" constraint="DEFAULT now()" description="Creation timestamp"/>
+        <column name="updated_at" type="TIMESTAMPTZ" constraint="DEFAULT now()" description="Last update timestamp"/>
+      </columns>
+
+      <indexes>
+        <index type="primary">id</index>
+      </indexes>
+
+      <constraints>
+        <constraint type="CHECK">char_length(company_name) >= 2</constraint>
+        <constraint type="CHECK">array_length(modules_enabled, 1) > 0</constraint>
+      </constraints>
+
+      <rls-policy>
+        <name>organizations_tenant_isolation</name>
+        <type>FOR ALL</type>
+        <using>
+          current_setting('request.jwt.claims', true)::json->>'role' = 'service_role'
+          OR org_id = (auth.jwt() ->> 'org_id')::uuid
+        </using>
+      </rls-policy>
+    </table>
+
+    <supabase-storage>
+      <bucket name="organization-logos">
+        <access>authenticated</access>
+        <max-file-size>2MB</max-file-size>
+        <allowed-mime-types>
+          <mime>image/jpeg</mime>
+          <mime>image/png</mime>
+          <mime>image/webp</mime>
+        </allowed-mime-types>
+        <signed-url-ttl>1h</signed-url-ttl>
+      </bucket>
+    </supabase-storage>
+  </database-schema>
+
+  <api-endpoints>
+    <endpoint>
+      <method>GET</method>
+      <path>/api/settings/organization</path>
+      <auth>Admin</auth>
+      <purpose>Fetch organization settings</purpose>
+      <query-params>None</query-params>
+      <response-type>Organization</response-type>
+      <response-example>
+        {
+          "id": "uuid",
+          "company_name": "MonoPilot Sp. z o.o.",
+          "logo_url": "https://...",
+          "address": "ul. Główna 1",
+          "city": "Warszawa",
+          "postal_code": "00-001",
+          "country": "PL",
+          "nip_vat": "1234567890",
+          "fiscal_year_start": "2025-01-01",
+          "date_format": "DD/MM/YYYY",
+          "number_format": "1 000,00",
+          "unit_system": "metric",
+          "timezone": "Europe/Warsaw",
+          "default_currency": "PLN",
+          "default_language": "PL",
+          "modules_enabled": ["production", "planning", "warehouse"],
+          "wizard_completed": true,
+          "created_at": "2025-11-01T10:00:00Z",
+          "updated_at": "2025-11-28T10:00:00Z"
+        }
+      </response-example>
+    </endpoint>
+
+    <endpoint>
+      <method>PUT</method>
+      <path>/api/settings/organization</path>
+      <auth>Admin only</auth>
+      <purpose>Update organization settings</purpose>
+      <body-schema>UpdateOrganizationInput (Zod validated)</body-schema>
+      <request-example>
+        {
+          "company_name": "MonoPilot Sp. z o.o.",
+          "address": "ul. Główna 1",
+          "city": "Warszawa",
+          "postal_code": "00-001",
+          "country": "PL",
+          "nip_vat": "1234567890",
+          "fiscal_year_start": "2025-01-01",
+          "date_format": "DD/MM/YYYY",
+          "number_format": "1 000,00",
+          "unit_system": "metric",
+          "timezone": "Europe/Warsaw",
+          "default_currency": "PLN",
+          "default_language": "PL"
+        }
+      </request-example>
+      <response-type>Updated Organization object</response-type>
+      <side-effects>
+        <effect>Update organization record</effect>
+        <effect>Update updated_at timestamp</effect>
+      </side-effects>
+    </endpoint>
+
+    <endpoint>
+      <method>POST</method>
+      <path>/api/settings/organization/logo</path>
+      <auth>Admin only</auth>
+      <purpose>Upload organization logo</purpose>
+      <body-type>FormData with file</body-type>
+      <validation>
+        <rule>Max file size: 2MB</rule>
+        <rule>Allowed types: image/jpeg, image/png, image/webp</rule>
+      </validation>
+      <response-example>
+        {
+          "logo_url": "https://xxx.supabase.co/storage/v1/object/sign/organization-logos/..."
+        }
+      </response-example>
+      <side-effects>
+        <effect>Upload to Supabase Storage bucket 'organization-logos'</effect>
+        <effect>Update organizations.logo_url</effect>
+        <effect>Generate signed URL (1h TTL)</effect>
+      </side-effects>
+    </endpoint>
+  </api-endpoints>
+
+  <validation-schemas>
+    <schema name="UpdateOrganizationSchema">
+      <library>Zod</library>
+      <location>lib/validation/organization-schemas.ts</location>
+      <definition>
+        z.object({
+          company_name: z.string().min(2, "Min 2 chars").max(100, "Max 100 chars").optional(),
+          address: z.string().max(255).optional(),
+          city: z.string().max(100).optional(),
+          postal_code: z.string().max(20).optional(),
+          country: z.enum(['PL', 'UK', 'US', 'DE', 'FR', ...]).optional(),
+          nip_vat: z.string().max(50).optional(),
+          fiscal_year_start: z.date().optional(),
+          date_format: z.enum(['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']).optional(),
+          number_format: z.enum(['1 000,00', '1,000.00']).optional(),
+          unit_system: z.enum(['metric', 'imperial']).optional(),
+          timezone: z.string().optional(), // IANA timezone
+          default_currency: z.enum(['PLN', 'EUR', 'USD', 'GBP']).optional(),
+          default_language: z.enum(['PL', 'EN']).optional()
+        })
+      </definition>
+      <usage>
+        <client>React Hook Form validation</client>
+        <server>API route validation (PUT /api/settings/organization)</server>
+      </usage>
+    </schema>
+
+    <schema name="LogoUploadSchema">
+      <library>Zod</library>
+      <location>lib/validation/organization-schemas.ts</location>
+      <definition>
+        z.object({
+          file: z.instanceof(File)
+            .refine(file => file.size &lt;= 2 * 1024 * 1024, "Max 2MB")
+            .refine(file => ['image/jpeg', 'image/png', 'image/webp'].includes(file.type), "Only jpg/png/webp")
+        })
+      </definition>
+      <usage>
+        <client>File input validation before upload</client>
+      </usage>
+    </schema>
+  </validation-schemas>
+
+  <ui-components>
+    <page>
+      <route>/settings/organization</route>
+      <file>app/settings/organization/page.tsx</file>
+      <description>Organization settings page with OrganizationForm</description>
+    </page>
+
+    <component>
+      <name>OrganizationForm</name>
+      <file>components/settings/OrganizationForm.tsx</file>
+      <purpose>Main organization settings form with 3 sections</purpose>
+      <sections>
+        <section name="Basic Data">
+          <fields>company_name, address, city, postal_code, country, nip_vat</fields>
+        </section>
+        <section name="Business Settings">
+          <fields>fiscal_year_start, date_format, number_format, unit_system</fields>
+        </section>
+        <section name="Regional">
+          <fields>timezone, default_currency, default_language</fields>
+        </section>
+      </sections>
+      <form-library>react-hook-form</form-library>
+      <validation>Inline validation on blur (Zod + react-hook-form)</validation>
+      <feedback>
+        <success>Toast notification on successful save</success>
+        <error>Toast notification on failure</error>
+      </feedback>
+      <dropdowns>
+        <dropdown name="countries" source="world-countries library"/>
+        <dropdown name="timezones" source="date-fns-tz or Intl API"/>
+        <dropdown name="currencies" source="Static list (PLN, EUR, USD, GBP)"/>
+        <dropdown name="languages" source="Static list (PL, EN)"/>
+      </dropdowns>
+    </component>
+
+    <component>
+      <name>LogoUpload</name>
+      <file>components/settings/LogoUpload.tsx</file>
+      <purpose>Logo upload with preview and validation</purpose>
+      <features>
+        <feature>File input (hidden, triggered by button/dropzone)</feature>
+        <feature>Preview current logo (or placeholder initials)</feature>
+        <feature>Drag-and-drop support (optional, nice-to-have)</feature>
+        <feature>Client-side validation: format, size</feature>
+        <feature>Upload progress indicator</feature>
+        <feature>Error handling: show toast if upload fails</feature>
+        <feature>Display uploaded logo with signed URL</feature>
+        <feature>Fallback: show company initials if no logo</feature>
+      </features>
+    </component>
+
+    <ui-library>
+      <name>shadcn/ui</name>
+      <components>
+        <component>Form - Form wrapper</component>
+        <component>Input - Text inputs</component>
+        <component>Select - Dropdowns</component>
+        <component>Toast - Success/error notifications</component>
+        <component>Button - Submit/upload buttons</component>
+        <component>Card - Section containers</component>
+      </components>
+    </ui-library>
+  </ui-components>
+
+  <testing-strategy>
+    <unit-tests>
+      <framework>Vitest</framework>
+      <tests>
+        <test>UpdateOrganizationSchema validation (valid inputs)</test>
+        <test>UpdateOrganizationSchema validation (invalid inputs)</test>
+        <test>LogoUploadSchema validation (file size &lt; 2MB)</test>
+        <test>LogoUploadSchema validation (file size &gt; 2MB - error)</test>
+        <test>LogoUploadSchema validation (allowed types)</test>
+        <test>LogoUploadSchema validation (disallowed types - error)</test>
+      </tests>
+    </unit-tests>
+
+    <integration-tests>
+      <framework>Vitest + Supabase Test Client</framework>
+      <tests>
+        <test>GET /api/settings/organization returns organization data</test>
+        <test>PUT /api/settings/organization updates fields</test>
+        <test>PUT /api/settings/organization returns updated data</test>
+        <test>POST /api/settings/organization/logo uploads file to Supabase Storage</test>
+        <test>POST /api/settings/organization/logo returns signed URL</test>
+        <test>POST /api/settings/organization/logo updates organizations.logo_url</test>
+        <test>POST /api/settings/organization/logo rejects file &gt; 2MB</test>
+        <test>POST /api/settings/organization/logo rejects invalid file types</test>
+      </tests>
+    </integration-tests>
+
+    <e2e-tests>
+      <framework>Playwright</framework>
+      <tests>
+        <test>Navigate to /settings/organization as Admin</test>
+        <test>Form loads with current organization data</test>
+        <test>Fill form with valid data in all sections</test>
+        <test>Upload logo (2MB jpg file)</test>
+        <test>Submit form - success toast displayed</test>
+        <test>Refresh page - data persisted</test>
+        <test>Try upload invalid logo (3MB) - error shown</test>
+        <test>Try upload invalid logo (txt file) - error shown</test>
+        <test>Inline validation on blur (empty company_name - error)</test>
+        <test>All dropdowns populated correctly</test>
+      </tests>
+    </e2e-tests>
+  </testing-strategy>
+
+  <architecture-notes>
+    <multi-tenancy>
+      <description>All organization data isolated by org_id (from JWT)</description>
+      <rls-enforcement>RLS policy filters by org_id from auth.jwt()</rls-enforcement>
+    </multi-tenancy>
+
+    <validation-pattern>
+      <description>Zod schemas shared between client and server</description>
+      <client>React Hook Form uses Zod schema for inline validation</client>
+      <server>API routes validate request body with same Zod schema</server>
+    </validation-pattern>
+
+    <error-handling>
+      <description>RFC 7807 error responses from API</description>
+      <example>
+        {
+          "error": "Validation failed",
+          "code": "VALIDATION_ERROR",
+          "details": { "company_name": "Min 2 chars" }
+        }
+      </example>
+    </error-handling>
+
+    <file-upload>
+      <description>Direct to Supabase Storage, return signed URL</description>
+      <flow>
+        1. Client validates file (size, type)
+        2. POST /api/settings/organization/logo with FormData
+        3. Server validates again
+        4. Upload to Supabase Storage bucket 'organization-logos'
+        5. Generate signed URL (1h TTL)
+        6. Update organizations.logo_url
+        7. Return { logo_url: string }
+      </flow>
+    </file-upload>
+
+    <regional-settings>
+      <description>Applied globally across all modules</description>
+      <scope>Settings stored in organizations table, used by all features</scope>
+      <examples>
+        <example>date_format used in all date displays</example>
+        <example>number_format used in quantity/price displays</example>
+        <example>default_currency used in financial modules</example>
+        <example>timezone used for timestamps</example>
+      </examples>
+    </regional-settings>
+  </architecture-notes>
+
+  <security-considerations>
+    <logo-upload>
+      <measure>Client + server validation (size, type)</measure>
+      <measure>Authenticated access only to Storage bucket (not public)</measure>
+      <measure>Signed URLs (1h TTL) prevent unauthorized access</measure>
+      <measure>Optional: Resize to max 1024x1024 on upload (sharp library)</measure>
+    </logo-upload>
+
+    <api-access>
+      <measure>Admin-only for PUT /api/settings/organization</measure>
+      <measure>Middleware check for Admin role</measure>
+    </api-access>
+
+    <input-validation>
+      <measure>Zod schemas prevent SQL injection, XSS</measure>
+      <measure>Server-side validation (never trust client)</measure>
+    </input-validation>
+
+    <rls-enforcement>
+      <measure>RLS policies ensure user sees only their org data</measure>
+      <measure>org_id from JWT (cannot be spoofed)</measure>
+    </rls-enforcement>
+  </security-considerations>
+
+  <dependencies>
+    <prerequisite>
+      <story>None</story>
+      <reason>This is the first story in Epic 1 (Foundation module)</reason>
+    </prerequisite>
+
+    <external-services>
+      <service name="Supabase">
+        <features>Database, Storage, Auth</features>
+      </service>
+    </external-services>
+
+    <libraries>
+      <library name="react-hook-form" purpose="Form state management"/>
+      <library name="zod" purpose="Validation schemas"/>
+      <library name="@supabase/supabase-js" purpose="Supabase client"/>
+      <library name="shadcn/ui" purpose="UI components (Form, Input, Select, Toast)"/>
+      <library name="sharp" purpose="Image resizing (optional optimization)"/>
+      <library name="world-countries" purpose="Countries dropdown (optional)"/>
+      <library name="date-fns-tz" purpose="Timezones dropdown (optional)"/>
+    </libraries>
+  </dependencies>
+
+  <implementation-tasks>
+    <task id="1" priority="high" estimated-hours="2">
+      <title>Database Schema &amp; Migrations</title>
+      <subtasks>
+        <subtask>Create 'organizations' table migration (if not exists)</subtask>
+        <subtask>Add columns: company_name, logo_url, address, city, postal_code, country, nip_vat, fiscal_year_start, date_format, number_format, unit_system, timezone, default_currency, default_language</subtask>
+        <subtask>Add unique constraint on organization (1 org per tenant initially)</subtask>
+        <subtask>Run migration and verify schema</subtask>
+      </subtasks>
+    </task>
+
+    <task id="2" priority="high" estimated-hours="1">
+      <title>Supabase Storage Configuration</title>
+      <subtasks>
+        <subtask>Create 'organization-logos' bucket in Supabase Storage</subtask>
+        <subtask>Configure bucket policy: authenticated access only</subtask>
+        <subtask>Set max file size: 2MB</subtask>
+        <subtask>Configure allowed MIME types: image/jpeg, image/png, image/webp</subtask>
+        <subtask>Test signed URL generation (1h TTL)</subtask>
+      </subtasks>
+    </task>
+
+    <task id="3" priority="high" estimated-hours="4">
+      <title>API Endpoints</title>
+      <subtasks>
+        <subtask>Implement GET /api/settings/organization</subtask>
+        <subtask>Implement PUT /api/settings/organization (Admin only)</subtask>
+        <subtask>Implement POST /api/settings/organization/logo (Admin only)</subtask>
+        <subtask>Validate file upload (size, type)</subtask>
+        <subtask>Upload to Supabase Storage and return signed URL</subtask>
+      </subtasks>
+    </task>
+
+    <task id="4" priority="high" estimated-hours="2">
+      <title>Zod Validation Schemas</title>
+      <subtasks>
+        <subtask>Create UpdateOrganizationSchema (all fields)</subtask>
+        <subtask>Create LogoUploadSchema (file validation)</subtask>
+        <subtask>Use schemas in client (react-hook-form) and server (API routes)</subtask>
+      </subtasks>
+    </task>
+
+    <task id="5" priority="high" estimated-hours="6">
+      <title>Frontend Organization Settings Page</title>
+      <subtasks>
+        <subtask>Create /app/settings/organization/page.tsx</subtask>
+        <subtask>Implement OrganizationForm component with 3 sections</subtask>
+        <subtask>Populate dropdowns (countries, timezones, currencies, languages)</subtask>
+        <subtask>Inline validation on blur (Zod + react-hook-form)</subtask>
+        <subtask>Success toast on save</subtask>
+        <subtask>Error toast on failure</subtask>
+      </subtasks>
+    </task>
+
+    <task id="6" priority="high" estimated-hours="4">
+      <title>Logo Upload Component</title>
+      <subtasks>
+        <subtask>Create LogoUpload component</subtask>
+        <subtask>File input with preview</subtask>
+        <subtask>Client-side validation (format, size)</subtask>
+        <subtask>Upload progress indicator</subtask>
+        <subtask>Display uploaded logo with signed URL</subtask>
+        <subtask>Fallback: show company initials if no logo</subtask>
+      </subtasks>
+    </task>
+
+    <task id="7" priority="medium" estimated-hours="6">
+      <title>Integration &amp; Testing</title>
+      <subtasks>
+        <subtask>Unit tests: Zod schemas validation (valid/invalid cases)</subtask>
+        <subtask>Integration tests: API endpoints (GET, PUT, POST logo)</subtask>
+        <subtask>E2E tests: Complete organization setup flow</subtask>
+        <subtask>E2E tests: Logo upload (valid + invalid files)</subtask>
+        <subtask>E2E tests: Form validation and error handling</subtask>
+      </subtasks>
+    </task>
+
+    <task id="8" priority="low" estimated-hours="1">
+      <title>Documentation &amp; Cleanup</title>
+      <subtasks>
+        <subtask>Update type definitions (TypeScript interfaces)</subtask>
+        <subtask>Add API route documentation (JSDoc comments)</subtask>
+        <subtask>Update README if needed (API endpoints section)</subtask>
+      </subtasks>
+    </task>
+  </implementation-tasks>
+
+  <performance-targets>
+    <api-response-times unit="p95">
+      <endpoint path="GET /api/settings/organization" target="200ms" notes="Single row query"/>
+      <endpoint path="PUT /api/settings/organization" target="300ms" notes="Single row update"/>
+      <endpoint path="POST /api/settings/organization/logo" target="2s" notes="2MB upload to Storage"/>
+    </api-response-times>
+
+    <database-indexes>
+      <index table="organizations" column="id" type="primary"/>
+    </database-indexes>
+  </performance-targets>
+
+  <technical-stack>
+    <frontend>
+      <framework>Next.js 15 App Router</framework>
+      <library>React 19</library>
+      <language>TypeScript 5.7 (strict mode)</language>
+      <styling>Tailwind CSS 3.4</styling>
+      <ui-components>Shadcn/UI</ui-components>
+      <forms>React Hook Form + Zod validation</forms>
+    </frontend>
+
+    <backend>
+      <database>PostgreSQL 15 (via Supabase)</database>
+      <storage>Supabase Storage</storage>
+      <auth>Supabase Auth</auth>
+    </backend>
+
+    <testing>
+      <unit>Vitest</unit>
+      <integration>Vitest + Supabase Test Client</integration>
+      <e2e>Playwright</e2e>
+    </testing>
+  </technical-stack>
+
+  <file-structure>
+    <expected-files>
+      <file path="app/settings/organization/page.tsx" description="Main settings page"/>
+      <file path="app/api/settings/organization/route.ts" description="GET, PUT /api/settings/organization"/>
+      <file path="app/api/settings/organization/logo/route.ts" description="POST /api/settings/organization/logo"/>
+      <file path="lib/validation/organization-schemas.ts" description="Zod schemas (UpdateOrganizationSchema, LogoUploadSchema)"/>
+      <file path="components/settings/OrganizationForm.tsx" description="Main form component"/>
+      <file path="components/settings/LogoUpload.tsx" description="Logo upload component"/>
+      <file path="supabase/migrations/20XX_create_organizations.sql" description="Database migration (if needed)"/>
+      <file path="__tests__/unit/organization-schemas.test.ts" description="Unit tests (Zod validation)"/>
+      <file path="__tests__/integration/organization-api.test.ts" description="Integration tests (API endpoints)"/>
+      <file path="tests/e2e/organization.spec.ts" description="E2E tests (complete flow)"/>
+    </expected-files>
+  </file-structure>
+
+  <references>
+    <reference type="story-doc" path="docs/batches/01A-auth-users/stories/1.1-organization-configuration.md"/>
+    <reference type="tech-spec" path="docs/batches/01A-auth-users/tech-spec.md"/>
+    <reference type="epic" path="docs/epics/epic-1-settings.md#Story-1.1"/>
+    <reference type="architecture" path="docs/architecture/modules/settings.md" status="optional"/>
+  </references>
+</story-context>

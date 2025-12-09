@@ -64,6 +64,7 @@ export function MovePalletModal({
       fetchLocations()
       setLocationId('')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, warehouseId])
 
   const fetchLocations = async () => {

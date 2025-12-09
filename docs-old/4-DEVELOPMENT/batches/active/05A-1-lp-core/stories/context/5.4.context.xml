@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.4</id>
+    <title>LP Number Generation</title>
+    <batch>5A-1</batch>
+    <points>5</points>
+    <effort_hours>5-8</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>Auto-generate unique LP numbers with configurable format and daily sequence reset</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.1">License Plate Creation</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>lp_number_sequence</name>
+        <columns>
+          <column name="org_id" type="UUID" constraint="PK, FK organizations(id)"/>
+          <column name="sequence_date" type="DATE" constraint="PK"/>
+          <column name="next_sequence" type="INT" constraint="DEFAULT 1"/>
+        </columns>
+        <unique_constraint>UNIQUE(org_id, sequence_date)</unique_constraint>
+      </table>
+      <table>
+        <name>license_plates</name>
+        <columns>
+          <column name="lp_number" type="VARCHAR(50)" constraint="UNIQUE(org_id, lp_number)"/>
+        </columns>
+      </table>
+      <table>
+        <name>warehouse_settings</name>
+        <columns>
+          <column name="lp_number_format" type="VARCHAR(100)" constraint="DEFAULT 'LP-YYYYMMDD-NNNN'"/>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="POST" path="/api/warehouse/license-plates/generate-number">
+        <description>Generate next LP number based on format</description>
+        <query_params>
+          <param name="override_format" type="string" example="ACME-{date}-{seq}"/>
+        </query_params>
+        <response status="200">
+          <field name="next_lp_number" type="string" example="LP-20250127-0001"/>
+          <field name="all_recent_numbers" type="array"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+
+    <number_generation_logic>
+      <default_format>LP-YYYYMMDD-NNNN</default_format>
+      <format_components>
+        <component name="YYYY">Year (2025)</component>
+        <component name="MMDD">Month-Day (0127)</component>
+        <component name="NNNN">4-digit sequence (0001-9999)</component>
+      </format_components>
+      <sequence_reset>
+        <behavior>Reset to 0001 on each new day</behavior>
+        <implementation>lp_number_sequence table with (org_id, sequence_date) PK</implementation>
+      </sequence_reset>
+      <custom_formats>
+        <format example="ACME-{date}-{seq}">Org-code + date + sequence</format>
+        <format example="WHA{seq}">Warehouse-code + sequence only</format>
+      </custom_formats>
+      <atomicity>Must prevent duplicate numbers under concurrent load (use unique index)</atomicity>
+    </number_generation_logic>
+
+    <frontend_routes>
+      <route path="/settings/warehouse" component="WarehouseSettingsPage">
+        <field name="lp_number_format" type="text input"/>
+        <validation>Validate format matches pattern (YYYY, MMDD, NNNN placeholders)</validation>
+      </route>
+    </frontend_routes>
+
+    <validation_rules>
+      <rule>LP number format must be consistent within org</rule>
+      <rule>LP number must be globally unique per org_id</rule>
+      <rule>Format validation: no invalid placeholders</rule>
+      <rule>Sequence must not exceed 9999 (daily reset)</rule>
+    </validation_rules>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1" title="Default Format">
+      <test>Create LP without explicit lp_number, verify auto-generated as LP-YYYYMMDD-NNNN</test>
+    </ac>
+    <ac id="2" title="Daily Sequence Reset">
+      <test>Create LP on day 1, next day create another LP, verify sequence resets and date changes</test>
+    </ac>
+    <ac id="3" title="Configurable Format">
+      <test>Admin changes format in settings, new LPs use new format</test>
+    </ac>
+    <ac id="4" title="Admin Override">
+      <test>Admin provides custom lp_number, verify validated and accepted if unique</test>
+    </ac>
+    <ac id="5" title="Global Uniqueness">
+      <test>Attempt to create duplicate lp_number, verify rejected with error and suggestion</test>
+    </ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test>Sequence increment (1 → 2 → 3 → ...)</test>
+      <test>Daily reset (9999 on day 1 → 0001 on day 2)</test>
+      <test>Format generation with different templates (LP-YYYYMMDD-NNNN, ACME-{date}-{seq}, etc)</test>
+    </unit_tests>
+    <integration_tests>
+      <test>Concurrent LP creation (3+ simultaneous) - verify no duplicate sequences</test>
+      <test>POST /api/warehouse/license-plates with no lp_number → verify auto-generated</test>
+      <test>Unique index prevents duplicate lp_number</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Create 5 LPs in sequence, verify numbering LP-YYYYMMDD-0001 through 0005</test>
+      <test>Change format in settings, create LP, verify new format used</test>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="critical">LP number uniqueness is security/traceability requirement - enforce at DB level</note>
+    <note priority="critical">Sequence must be atomic under concurrent load (use DB transaction or mutex)</note>
+    <note priority="high">Daily sequence reset requires scheduled task or logic on first LP of day</note>
+    <note priority="high">Format configurability important for different warehouse strategies</note>
+    <note priority="medium">Suggest next available number helps admin if collision occurs</note>
+  </implementation_notes>
+</story>

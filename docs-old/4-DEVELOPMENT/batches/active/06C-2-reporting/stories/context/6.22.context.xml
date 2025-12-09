@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.22</id>
+    <title>Quality Dashboard</title>
+    <batch>06C-2</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Show quality KPIs for performance monitoring</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.6">Quality Holds List</story>
+      <story id="6.15">NCR Creation</story>
+      <story id="6.19">Certificate of Analysis Upload</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <frontend_routes>
+      <route path="/quality/dashboard">Quality Dashboard page</route>
+    </frontend_routes>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/quality/dashboard">
+        <description>Get all dashboard KPIs and charts data</description>
+        <response>
+          {
+            openHolds: number,
+            openNcrsBySeverity: { low, medium, high, critical },
+            avgHoldResolutionDays: number,
+            failedTestRate: number,
+            pendingCoas: number,
+            ncrTrend: { month, count }[],
+            topDefectTypes: { type, count }[],
+            supplierDefectRate: { supplier, rate }[]
+          }
+        </response>
+      </endpoint>
+    </api_endpoints>
+
+    <kpis>
+      <kpi>Open Quality Holds</kpi>
+      <kpi>Open NCRs by Severity</kpi>
+      <kpi>Avg Hold Resolution Time</kpi>
+      <kpi>Failed Test Rate (%)</kpi>
+      <kpi>Pending CoAs</kpi>
+    </kpis>
+
+    <charts>
+      <chart>NCR trend by month</chart>
+      <chart>Top defect types</chart>
+      <chart>Supplier defect rate</chart>
+    </charts>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Dashboard shows 5 KPIs: Open Holds, NCRs by Severity, Avg Resolution, Failed Rate, Pending CoAs</ac>
+    <ac id="2">NCR trend chart by month</ac>
+    <ac id="3">Top defect types chart</ac>
+    <ac id="4">Supplier defect rate chart</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-24">System shall provide quality dashboard with KPIs</fr>
+  </functional_requirements>
+</story>

@@ -68,7 +68,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // Fetch GRN
     const { data: grn, error: grnError } = await supabaseAdmin
       .from('goods_receipt_notes')
-      .select('id, grn_number, status, warehouse_id, receiving_location_id, org_id')
+      .select('id, grn_number, status, warehouse_id, receiving_location_id, org_id, po_id')
       .eq('id', grn_id)
       .eq('org_id', currentUser.org_id)
       .single()
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // Determine location: provided > GRN receiving location > null
     const finalLocationId = location_id || grn.receiving_location_id || null
 
-    // Create License Plate using service
+    // Create License Plate using service (Story 5.30: Set source document)
     const createdLP = await createLP(
       {
         product_id: grnItem.product_id,
@@ -165,6 +165,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
         expiry_date: finalExpiryDate,
         status: 'available',
         qa_status: 'pending',
+        // Story 5.30: Source document tracking
+        source_type: 'receiving',
+        source_grn_id: grn_id,
+        source_po_id: grn.po_id || undefined,
       },
       currentUser.org_id,
       session.user.id

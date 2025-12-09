@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.20</id>
+    <title>Require CoA on Receipt</title>
+    <batch>06C-1</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Require CoA for certain products to enforce compliance</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.19">Certificate of Analysis Upload</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>products</name>
+        <changes>
+          <add_column>require_coa boolean DEFAULT false</add_column>
+        </changes>
+      </table>
+    </tables>
+
+    <validation_logic>
+      <rule>If product.require_coa = true AND no CoA uploaded → block GRN completion</rule>
+      <rule>Show warning: "CoA required for this product"</rule>
+    </validation_logic>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">Product setting: require_coa toggle</ac>
+    <ac id="2">If true, GRN cannot complete without CoA upload</ac>
+    <ac id="3">Warning shown if missing</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-22">System shall require CoA on receipt when enabled</fr>
+  </functional_requirements>
+</story>

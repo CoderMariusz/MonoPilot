@@ -1,0 +1,900 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>04-9-1-1</story-id>
+    <story-title>1:1 Consumption Enforcement</story-title>
+    <epic>4 - Production Execution</epic>
+    <status>drafted</status>
+    <priority>P0</priority>
+    <story-points>1</story-points>
+    <effort>0.5 day</effort>
+    <created>2025-11-27</created>
+  </metadata>
+
+  <!-- ========================================== -->
+  <!-- STORY CONTENT -->
+  <!-- ========================================== -->
+  <story-content>
+    <user-story>
+      <as>System</as>
+      <i-want>to enforce full LP consumption when flagged</i-want>
+      <so-that>allergen control is maintained</so-that>
+    </user-story>
+
+    <problem-statement>
+      Allergen control requires complete License Plate consumption to prevent cross-contamination.
+      When consume_whole_lp flag is true (from BOM), system must block partial consumption and
+      enforce 1:1 LP-to-output genealogy. This validation must exist at 3 layers: Desktop UI,
+      Scanner UI, and API level.
+    </problem-statement>
+
+    <acceptance-criteria>
+      <ac id="AC-4.9.1" title="Whole LP Flag">
+        Given material has consume_whole_lp = true (from BOM)
+        When operator tries to consume partial
+        Then system blocks: "Must consume entire LP"
+      </ac>
+
+      <ac id="AC-4.9.2" title="Scanner UI">
+        When consuming via scanner
+        Then qty input disabled, shows "Full LP: 50 kg" (read-only)
+      </ac>
+
+      <ac id="AC-4.9.3" title="Desktop UI">
+        When consuming via desktop (Story 4.7)
+        Then qty field shows full LP qty, cannot change, only "Consume All" button
+      </ac>
+
+      <ac id="AC-4.9.4" title="Validation Check Locations">
+        Then consume_whole_lp flag from wo_materials (copied from BOM in Story 3.10)
+        - Desktop UI (Story 4.7): qty field disabled, "Consume All" button only
+        - Scanner UI (Story 4.8): qty input disabled, shows full LP qty (read-only)
+        - API Layer: POST /api/production/work-orders/:id/consume validates consume_whole_lp
+      </ac>
+
+      <ac id="AC-4.9.5" title="API Validation">
+        Then POST /api/production/work-orders/:id/consume:
+        - Checks consume_whole_lp flag
+        - If true: validates qty == LP.qty (entire LP)
+        - If qty != LP.qty when flag=true: rejects with 400 error
+      </ac>
+
+      <ac id="AC-4.9.6" title="Error Message">
+        When attempting partial consumption
+        Then 400 error: "Material 'Flour' must be consumed entirely (50 kg). Cannot consume partial amounts."
+      </ac>
+
+      <ac id="AC-4.9.7" title="Prerequisites">
+        Then Requires Story 3.10 (BOM snapshot with consume_whole_lp flag)
+      </ac>
+
+      <ac id="AC-4.9.8" title="Testing">
+        Then Test with both whole and partial consumption BOM items
+      </ac>
+    </acceptance-criteria>
+
+    <tasks>
+      <task id="1" status="pending">Verify wo_materials has consume_whole_lp column</task>
+      <task id="2" status="pending">API validation logic</task>
+      <task id="3" status="pending">Scanner UI (disable qty input)</task>
+      <task id="4" status="pending">Desktop UI (read-only qty)</task>
+      <task id="5" status="pending">Error messages</task>
+      <task id="6" status="pending">Tests</task>
+    </tasks>
+  </story-content>
+
+  <!-- ========================================== -->
+  <!-- DESIGN CONTEXT -->
+  <!-- ========================================== -->
+  <design-context>
+    <ux-design source="ux-design-production-module.md">
+      <section name="Desktop Material Reservation UI">
+        <wireframe>
+          Materials Table:
+          - Product | Required Qty | Reserved Qty | Remaining | Reserved LPs (sequence) | Actions
+          - Reserve button opens modal with LP search/scan
+          - Conditional qty input:
+            * If consume_whole_lp = false: qty input enabled
+            * If consume_whole_lp = true: qty field DISABLED/read-only, shows "Entire LP: [LP_qty] [UOM]"
+            * Only "Reserve Full LP" button visible when consume_whole_lp=true
+        </wireframe>
+
+        <interaction-pattern>
+          When consume_whole_lp = true:
+          1. Modal shows LP details with qty (read-only)
+          2. Qty input field is disabled (gray background)
+          3. "Reserve Full LP" button (green-600)
+          4. Tooltip: "This material requires complete LP consumption for allergen control"
+        </interaction-pattern>
+      </section>
+
+      <section name="Scanner Material Reservation UI">
+        <wireframe>
+          Scanner Flow (Touch-optimized):
+          1. Scan WO barcode
+          2. Show materials needing reservation
+          3. Scan LP barcode
+          4. Quantity Entry:
+             - If consume_whole_lp=false: qty input enabled, operator enters qty
+             - If consume_whole_lp=true: qty field disabled, shows full LP qty (large font: 48px)
+             - Only "Reserve Full LP" button (>44px touch target)
+          5. Confirmation → move to next material
+        </wireframe>
+
+        <mobile-optimization>
+          - Large buttons (>44px touch targets)
+          - Error messages: Large red text (24px)
+          - Visual indicator: Padlock icon 🔒 when consume_whole_lp=true
+        </mobile-optimization>
+      </section>
+
+      <section name="Shared System Colors">
+        <colors source="ux-design-shared-system.md">
+          PRIMARY (Create/CTA):     green-600   (#16a34a)
+          DANGER (Delete/Error):    red-600     (#dc2626)
+          SECONDARY (Actions):      gray-600    (#4b5563)
+          ERROR BADGE:              red-200 bg + red-800 text
+        </colors>
+
+        <typography>
+          Error messages: Text-base (16px) - Body text
+          Scanner qty:    Text-3xl (30px) - Large display
+          Button text:    Text-sm (14px) - Secondary text
+        </typography>
+      </section>
+    </ux-design>
+  </design-context>
+
+  <!-- ========================================== -->
+  <!-- DATABASE SCHEMA -->
+  <!-- ========================================== -->
+  <database-schema>
+    <table name="wo_materials">
+      <description>
+        BOM snapshot for Work Order materials (created in Story 3.10).
+        Includes consume_whole_lp flag copied from bom_items.
+      </description>
+      <columns>
+        <column name="id" type="UUID" primary-key="true">PK</column>
+        <column name="org_id" type="UUID" not-null="true">FK → organizations</column>
+        <column name="wo_id" type="UUID" not-null="true">FK → work_orders</column>
+        <column name="product_id" type="UUID" not-null="true">FK → products (material)</column>
+        <column name="qty" type="NUMERIC" not-null="true">Planned quantity (scaled from BOM)</column>
+        <column name="uom" type="VARCHAR" not-null="true">Unit of measure</column>
+        <column name="scrap_percent" type="NUMERIC" default="0">Scrap allowance %</column>
+        <column name="consume_whole_lp" type="BOOLEAN" default="false">
+          **KEY FIELD**: Enforce full LP consumption (1:1 rule)
+          Copied from bom_items during WO creation (Story 3.10)
+        </column>
+        <column name="is_by_product" type="BOOLEAN" default="false">Output vs input material</column>
+        <column name="yield_percent" type="NUMERIC" default="100">Expected yield %</column>
+        <column name="status" type="VARCHAR" default="planned">
+          planned | allocated | partially_consumed | consumed
+        </column>
+        <column name="created_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+        <column name="updated_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+      </columns>
+      <constraints>
+        <unique>(org_id, wo_id, product_id)</unique>
+        <check>qty > 0</check>
+        <check>scrap_percent >= 0 AND scrap_percent &lt;= 100</check>
+        <check>yield_percent > 0 AND yield_percent &lt;= 100</check>
+      </constraints>
+      <indexes>
+        <index>(org_id, wo_id)</index>
+        <index>(product_id)</index>
+        <index>(consume_whole_lp) WHERE consume_whole_lp = true</index>
+      </indexes>
+    </table>
+
+    <table name="license_plates">
+      <description>
+        Inventory units (LPs) with quantity tracking.
+        Used for material reservation and consumption.
+      </description>
+      <columns>
+        <column name="id" type="UUID" primary-key="true">PK</column>
+        <column name="org_id" type="UUID" not-null="true">FK → organizations</column>
+        <column name="lp_number" type="VARCHAR" not-null="true">Unique barcode (LP-YYYYMMDD-NNNN)</column>
+        <column name="product_id" type="UUID" not-null="true">FK → products</column>
+        <column name="quantity" type="NUMERIC" not-null="true">Current quantity</column>
+        <column name="uom" type="VARCHAR" not-null="true">Unit of measure</column>
+        <column name="status" type="VARCHAR" default="available">
+          available | reserved | consumed | quarantine
+        </column>
+        <column name="batch_number" type="VARCHAR">Batch/Lot number</column>
+        <column name="expiry_date" type="DATE">Expiry date (if applicable)</column>
+        <column name="created_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+        <column name="updated_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+      </columns>
+      <constraints>
+        <unique>(org_id, lp_number)</unique>
+        <check>quantity >= 0</check>
+      </constraints>
+    </table>
+
+    <table name="wo_material_reservations">
+      <description>
+        Tracks LP reservations for WO materials (Story 4.7).
+        Used to validate consume_whole_lp enforcement.
+      </description>
+      <columns>
+        <column name="id" type="UUID" primary-key="true">PK</column>
+        <column name="org_id" type="UUID" not-null="true">FK → organizations</column>
+        <column name="wo_id" type="UUID" not-null="true">FK → work_orders</column>
+        <column name="material_id" type="UUID" not-null="true">FK → wo_materials</column>
+        <column name="lp_id" type="UUID" not-null="true">FK → license_plates</column>
+        <column name="reserved_qty" type="NUMERIC" not-null="true">Quantity reserved from LP</column>
+        <column name="sequence_number" type="INTEGER" not-null="true">Consumption order (1, 2, 3...)</column>
+        <column name="status" type="VARCHAR" default="reserved">reserved | consumed</column>
+        <column name="notes" type="TEXT">Optional notes</column>
+        <column name="created_at" type="TIMESTAMPTZ" not-null="true">Timestamp</column>
+      </columns>
+      <constraints>
+        <check>reserved_qty > 0</check>
+        <check>sequence_number > 0</check>
+      </constraints>
+    </table>
+
+    <validation-logic>
+      <query name="Check consume_whole_lp for material">
+        <sql>
+          SELECT consume_whole_lp, qty, uom, product_id
+          FROM wo_materials
+          WHERE id = :material_id AND org_id = :org_id
+        </sql>
+      </query>
+
+      <query name="Get LP details for validation">
+        <sql>
+          SELECT lp_number, quantity, uom, product_id, status
+          FROM license_plates
+          WHERE id = :lp_id AND org_id = :org_id
+        </sql>
+      </query>
+
+      <validation-rule>
+        IF wo_material.consume_whole_lp = true THEN
+          ASSERT reserved_qty == lp.quantity
+          ELSE
+            RAISE ERROR "Material '{product_name}' must be consumed entirely ({lp.quantity} {lp.uom}). Cannot consume partial amounts."
+          END IF
+        END IF
+      </validation-rule>
+    </validation-logic>
+  </database-schema>
+
+  <!-- ========================================== -->
+  <!-- API PATTERNS -->
+  <!-- ========================================== -->
+  <api-patterns>
+    <endpoint method="POST" path="/api/production/work-orders/:id/materials/reserve">
+      <description>
+        Reserve LP for WO material with consume_whole_lp validation (Story 4.7).
+        This story adds validation logic to enforce full LP consumption.
+      </description>
+
+      <request-body>
+        {
+          "material_id": "uuid",      // FK to wo_materials
+          "lp_id": "uuid",             // FK to license_plates
+          "reserved_qty": 50.5,        // Quantity to reserve (must == LP.qty if consume_whole_lp=true)
+          "notes": "string (optional)"
+        }
+      </request-body>
+
+      <validation-steps>
+        1. Auth check: Verify user is authenticated + has Production role
+        2. Org isolation: Verify wo_id belongs to user's org_id
+        3. WO status: Verify WO is 'in-progress' (not draft/completed)
+        4. Fetch wo_material: Get consume_whole_lp flag + required qty
+        5. Fetch LP: Get LP quantity + product_id + status
+        6. Product match: Verify LP.product_id == wo_material.product_id
+        7. UoM match: Verify LP.uom == wo_material.uom
+        8. LP status: Verify LP.status = 'available' (not reserved/consumed)
+        9. **Consume_whole_lp validation**:
+           IF wo_material.consume_whole_lp = true:
+             IF reserved_qty != LP.quantity:
+               RETURN 400 Error: "Material '{product_name}' must be consumed entirely ({LP.quantity} {LP.uom}). Cannot consume partial amounts."
+             END IF
+           ELSE:
+             IF reserved_qty > LP.quantity:
+               RETURN 400 Error: "LP has {LP.quantity} {LP.uom}, requested {reserved_qty} {LP.uom} for reservation"
+             END IF
+           END IF
+        10. Create reservation: Insert into wo_material_reservations
+        11. Update LP status: Set LP.status = 'reserved'
+        12. Create genealogy record: Insert into lp_genealogy (parent_lp_id, wo_id, child_lp_id=NULL)
+      </validation-steps>
+
+      <response-success status="201">
+        {
+          "id": "uuid",
+          "wo_id": "uuid",
+          "material_id": "uuid",
+          "lp_id": "uuid",
+          "reserved_qty": 50,
+          "sequence_number": 1,
+          "status": "reserved",
+          "lp_details": {
+            "lp_number": "LP-20251127-0001",
+            "product_name": "Flour",
+            "quantity": 50,
+            "uom": "kg"
+          },
+          "created_at": "2025-11-27T10:30:00Z"
+        }
+      </response-success>
+
+      <response-error status="400">
+        {
+          "error": "CONSUME_WHOLE_LP_VIOLATION",
+          "message": "Material 'Flour' must be consumed entirely (50 kg). Cannot consume partial amounts.",
+          "details": {
+            "material_id": "uuid",
+            "lp_id": "uuid",
+            "lp_quantity": 50,
+            "requested_qty": 25,
+            "consume_whole_lp": true
+          }
+        }
+      </response-error>
+
+      <response-error status="400">
+        {
+          "error": "INSUFFICIENT_LP_QUANTITY",
+          "message": "LP has 10kg, requested 15kg for reservation",
+          "details": {
+            "lp_id": "uuid",
+            "lp_quantity": 10,
+            "requested_qty": 15
+          }
+        }
+      </response-error>
+
+      <response-error status="400">
+        {
+          "error": "WO_NOT_IN_PROGRESS",
+          "message": "WO not in progress",
+          "details": {
+            "wo_id": "uuid",
+            "wo_status": "draft"
+          }
+        }
+      </response-error>
+    </endpoint>
+
+    <service-layer source="lib/services/material-reservation-service.ts">
+      <class name="MaterialReservationService">
+        <method name="reserveMaterial" async="true">
+          <parameters>
+            woId: string
+            materialId: string
+            lpId: string
+            reservedQty: number
+            orgId: string
+            notes?: string
+          </parameters>
+          <returns>Promise&lt;Reservation&gt;</returns>
+          <steps>
+            1. Fetch wo_material with consume_whole_lp flag
+            2. Fetch LP details (quantity, product_id, uom, status)
+            3. Validate product_id + uom match
+            4. Validate LP status = 'available'
+            5. **Enforce consume_whole_lp**:
+               IF wo_material.consume_whole_lp = true:
+                 IF reservedQty != LP.quantity:
+                   throw new ConsumeWholeLPViolationError(...)
+                 END IF
+               ELSE:
+                 IF reservedQty > LP.quantity:
+                   throw new InsufficientLPQuantityError(...)
+                 END IF
+               END IF
+            6. Begin transaction:
+               a. Insert wo_material_reservations
+               b. Update LP.status = 'reserved'
+               c. Insert lp_genealogy (parent_lp_id, child_lp_id=NULL)
+            7. Commit transaction
+            8. Return reservation details
+          </steps>
+        </method>
+      </class>
+
+      <error-classes>
+        class ConsumeWholeLPViolationError extends Error {
+          code: 'CONSUME_WHOLE_LP_VIOLATION'
+          httpStatus: 400
+          details: {
+            material_id: string
+            lp_id: string
+            lp_quantity: number
+            requested_qty: number
+            consume_whole_lp: true
+          }
+        }
+
+        class InsufficientLPQuantityError extends Error {
+          code: 'INSUFFICIENT_LP_QUANTITY'
+          httpStatus: 400
+          details: {
+            lp_id: string
+            lp_quantity: number
+            requested_qty: number
+          }
+        }
+      </error-classes>
+    </service-layer>
+
+    <existing-api-pattern source="apps/frontend/app/api/planning/work-orders/[id]/route.ts">
+      <template>
+        // apps/frontend/app/api/production/work-orders/[id]/materials/reserve/route.ts
+
+        import { createClient } from '@/lib/supabase/server'
+        import { NextResponse } from 'next/server'
+        import { MaterialReservationService } from '@/lib/services/material-reservation-service'
+
+        export async function POST(
+          request: Request,
+          { params }: { params: { id: string } }
+        ) {
+          try {
+            const supabase = await createClient()
+
+            // 1. Auth check
+            const { data: { user }, error: authError } = await supabase.auth.getUser()
+            if (authError || !user) {
+              return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            }
+
+            // 2. Get org_id
+            const { data: userData } = await supabase
+              .from('users')
+              .select('org_id')
+              .eq('id', user.id)
+              .single()
+
+            const orgId = userData?.org_id
+            if (!orgId) {
+              return NextResponse.json({ error: 'Organization not found' }, { status: 403 })
+            }
+
+            // 3. Parse request body
+            const body = await request.json()
+            const { material_id, lp_id, reserved_qty, notes } = body
+
+            // 4. Validate input
+            if (!material_id || !lp_id || !reserved_qty) {
+              return NextResponse.json(
+                { error: 'Missing required fields: material_id, lp_id, reserved_qty' },
+                { status: 400 }
+              )
+            }
+
+            // 5. Call service layer
+            const service = new MaterialReservationService(supabase)
+            const reservation = await service.reserveMaterial(
+              params.id, // wo_id
+              material_id,
+              lp_id,
+              reserved_qty,
+              orgId,
+              notes
+            )
+
+            return NextResponse.json(reservation, { status: 201 })
+
+          } catch (error: any) {
+            if (error.code === 'CONSUME_WHOLE_LP_VIOLATION') {
+              return NextResponse.json(
+                { error: error.code, message: error.message, details: error.details },
+                { status: 400 }
+              )
+            }
+            if (error.code === 'INSUFFICIENT_LP_QUANTITY') {
+              return NextResponse.json(
+                { error: error.code, message: error.message, details: error.details },
+                { status: 400 }
+              )
+            }
+            return NextResponse.json(
+              { error: 'Internal server error', message: error.message },
+              { status: 500 }
+            )
+          }
+        }
+      </template>
+    </existing-api-pattern>
+  </api-patterns>
+
+  <!-- ========================================== -->
+  <!-- UI COMPONENTS -->
+  <!-- ========================================== -->
+  <ui-components>
+    <component name="MaterialReservationModal" location="apps/frontend/components/production/MaterialReservationModal.tsx">
+      <description>
+        Modal for reserving LP to WO material (Desktop UI).
+        Enforces consume_whole_lp validation by disabling qty input.
+      </description>
+
+      <props>
+        {
+          woId: string
+          material: {
+            id: string
+            product_id: string
+            product_name: string
+            qty: number
+            uom: string
+            consume_whole_lp: boolean  // **KEY PROP**
+            reserved_qty: number
+          }
+          onReserve: (reservation: Reservation) => void
+          onClose: () => void
+        }
+      </props>
+
+      <state>
+        {
+          lpId: string | null
+          lpDetails: { lp_number, quantity, uom, product_name } | null
+          reservedQty: number  // Auto-filled to LP.quantity if consume_whole_lp=true
+          notes: string
+          loading: boolean
+          error: string | null
+        }
+      </state>
+
+      <rendering-logic>
+        // Conditional qty input based on consume_whole_lp flag
+
+        {material.consume_whole_lp ? (
+          // Case 1: consume_whole_lp = true → qty field DISABLED
+          &lt;div&gt;
+            &lt;label className="text-sm font-medium text-gray-700"&gt;
+              Quantity (Full LP Required 🔒)
+            &lt;/label&gt;
+            &lt;input
+              type="number"
+              value={lpDetails?.quantity || ''}
+              disabled
+              className="bg-gray-100 text-gray-600 cursor-not-allowed"
+              readOnly
+            /&gt;
+            &lt;p className="text-xs text-gray-500 mt-1"&gt;
+              This material requires complete LP consumption for allergen control.
+            &lt;/p&gt;
+          &lt;/div&gt;
+        ) : (
+          // Case 2: consume_whole_lp = false → qty input ENABLED
+          &lt;div&gt;
+            &lt;label className="text-sm font-medium text-gray-700"&gt;
+              Quantity to Reserve
+            &lt;/label&gt;
+            &lt;input
+              type="number"
+              value={reservedQty}
+              onChange={(e) => setReservedQty(Number(e.target.value))}
+              max={lpDetails?.quantity}
+              className="border border-gray-300"
+            /&gt;
+            &lt;p className="text-xs text-gray-500 mt-1"&gt;
+              Available: {lpDetails?.quantity} {lpDetails?.uom}
+            &lt;/p&gt;
+          &lt;/div&gt;
+        )}
+
+        // Button text changes
+        &lt;button
+          onClick={handleReserve}
+          className="bg-green-600 text-white px-4 py-2"
+        &gt;
+          {material.consume_whole_lp ? 'Reserve Full LP' : 'Reserve'}
+        &lt;/button&gt;
+      </rendering-logic>
+
+      <api-call>
+        async function handleReserve() {
+          setLoading(true)
+          setError(null)
+
+          try {
+            const response = await fetch(`/api/production/work-orders/${woId}/materials/reserve`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                material_id: material.id,
+                lp_id: lpId,
+                reserved_qty: material.consume_whole_lp ? lpDetails.quantity : reservedQty,
+                notes
+              })
+            })
+
+            if (!response.ok) {
+              const error = await response.json()
+              throw new Error(error.message)
+            }
+
+            const reservation = await response.json()
+            onReserve(reservation)
+            onClose()
+          } catch (err) {
+            setError(err.message)
+          } finally {
+            setLoading(false)
+          }
+        }
+      </api-call>
+    </component>
+
+    <component name="ScannerReservationFlow" location="apps/frontend/app/(authenticated)/scanner/reserve/page.tsx">
+      <description>
+        Scanner UI for material reservation (Story 4.8).
+        Touch-optimized with large buttons and disabled qty input for consume_whole_lp=true.
+      </description>
+
+      <rendering-logic>
+        // Large font for qty display when consume_whole_lp=true
+
+        {material.consume_whole_lp ? (
+          // Case 1: Full LP required
+          &lt;div className="text-center"&gt;
+            &lt;p className="text-lg text-gray-600"&gt;Full LP Required 🔒&lt;/p&gt;
+            &lt;p className="text-3xl font-bold text-gray-900 mt-2"&gt;
+              {lpDetails.quantity} {lpDetails.uom}
+            &lt;/p&gt;
+            &lt;button
+              onClick={handleReserveFull}
+              className="bg-green-600 text-white text-lg px-8 py-4 mt-4 rounded-lg"
+              style={{ minHeight: '48px', minWidth: '200px' }}
+            &gt;
+              Reserve Full LP
+            &lt;/button&gt;
+          &lt;/div&gt;
+        ) : (
+          // Case 2: Partial allowed
+          &lt;div&gt;
+            &lt;input
+              type="number"
+              value={reservedQty}
+              onChange={(e) => setReservedQty(Number(e.target.value))}
+              className="text-2xl text-center border border-gray-300 p-4"
+              style={{ fontSize: '24px' }}
+            /&gt;
+            &lt;button
+              onClick={handleReserve}
+              className="bg-green-600 text-white text-lg px-8 py-4 mt-4 rounded-lg"
+              style={{ minHeight: '48px', minWidth: '200px' }}
+            &gt;
+              Reserve
+            &lt;/button&gt;
+          &lt;/div&gt;
+        )}
+      </rendering-logic>
+
+      <error-display>
+        {error &amp;&amp; (
+          &lt;div className="bg-red-100 border border-red-400 text-red-800 px-4 py-3 rounded-lg mt-4"&gt;
+            &lt;p className="text-xl font-semibold"&gt;⚠️ Error&lt;/p&gt;
+            &lt;p className="text-lg mt-2"&gt;{error}&lt;/p&gt;
+          &lt;/div&gt;
+        )}
+      </error-display>
+    </component>
+  </ui-components>
+
+  <!-- ========================================== -->
+  <!-- TESTING STRATEGY -->
+  <!-- ========================================== -->
+  <testing-strategy>
+    <unit-tests>
+      <test file="lib/services/material-reservation-service.test.ts">
+        <test-case name="Should enforce consume_whole_lp when flag is true">
+          const material = { consume_whole_lp: true, qty: 100, uom: 'kg' }
+          const lp = { quantity: 50, uom: 'kg' }
+          const reservedQty = 25 // Partial
+
+          expect(service.reserveMaterial(..., reservedQty)).rejects.toThrow(
+            "Material 'Flour' must be consumed entirely (50 kg). Cannot consume partial amounts."
+          )
+        </test-case>
+
+        <test-case name="Should allow full LP consumption when consume_whole_lp is true">
+          const material = { consume_whole_lp: true, qty: 100, uom: 'kg' }
+          const lp = { quantity: 50, uom: 'kg' }
+          const reservedQty = 50 // Full LP
+
+          expect(service.reserveMaterial(..., reservedQty)).resolves.toMatchObject({
+            reserved_qty: 50,
+            status: 'reserved'
+          })
+        </test-case>
+
+        <test-case name="Should allow partial consumption when consume_whole_lp is false">
+          const material = { consume_whole_lp: false, qty: 100, uom: 'kg' }
+          const lp = { quantity: 50, uom: 'kg' }
+          const reservedQty = 25 // Partial
+
+          expect(service.reserveMaterial(..., reservedQty)).resolves.toMatchObject({
+            reserved_qty: 25,
+            status: 'reserved'
+          })
+        </test-case>
+
+        <test-case name="Should reject if reserved_qty > LP.quantity">
+          const lp = { quantity: 10, uom: 'kg' }
+          const reservedQty = 15
+
+          expect(service.reserveMaterial(..., reservedQty)).rejects.toThrow(
+            "LP has 10kg, requested 15kg for reservation"
+          )
+        </test-case>
+      </test>
+    </unit-tests>
+
+    <integration-tests>
+      <test file="app/api/production/work-orders/[id]/materials/reserve/route.test.ts">
+        <test-case name="POST /api/production/work-orders/:id/materials/reserve - 400 when consume_whole_lp violated">
+          const response = await POST('/api/production/work-orders/WO-001/materials/reserve', {
+            material_id: 'mat-with-consume-whole-lp-true',
+            lp_id: 'lp-50kg',
+            reserved_qty: 25  // Partial
+          })
+
+          expect(response.status).toBe(400)
+          expect(response.body.error).toBe('CONSUME_WHOLE_LP_VIOLATION')
+          expect(response.body.message).toContain('must be consumed entirely')
+        </test-case>
+
+        <test-case name="POST - 201 when full LP consumed with consume_whole_lp=true">
+          const response = await POST('/api/production/work-orders/WO-001/materials/reserve', {
+            material_id: 'mat-with-consume-whole-lp-true',
+            lp_id: 'lp-50kg',
+            reserved_qty: 50  // Full LP
+          })
+
+          expect(response.status).toBe(201)
+          expect(response.body.reserved_qty).toBe(50)
+        </test-case>
+
+        <test-case name="POST - 201 when partial consumed with consume_whole_lp=false">
+          const response = await POST('/api/production/work-orders/WO-001/materials/reserve', {
+            material_id: 'mat-with-consume-whole-lp-false',
+            lp_id: 'lp-50kg',
+            reserved_qty: 25  // Partial allowed
+          })
+
+          expect(response.status).toBe(201)
+          expect(response.body.reserved_qty).toBe(25)
+        </test-case>
+      </test>
+    </integration-tests>
+
+    <e2e-tests>
+      <test file="tests/e2e/production-consumption-enforcement.spec.ts">
+        <test-case name="Desktop UI - Should disable qty input when consume_whole_lp=true">
+          await page.goto('/production/work-orders/WO-001')
+          await page.click('button:has-text("Reserve Material")')
+
+          // Select LP with consume_whole_lp=true material
+          await page.fill('input[placeholder="Scan or search LP"]', 'LP-001')
+
+          // Qty input should be disabled
+          const qtyInput = page.locator('input[type="number"]')
+          await expect(qtyInput).toBeDisabled()
+          await expect(qtyInput).toHaveValue('50')  // LP quantity
+
+          // Button should say "Reserve Full LP"
+          await expect(page.locator('button:has-text("Reserve Full LP")')).toBeVisible()
+        </test-case>
+
+        <test-case name="Desktop UI - Should enable qty input when consume_whole_lp=false">
+          await page.goto('/production/work-orders/WO-002')
+          await page.click('button:has-text("Reserve Material")')
+
+          // Select LP with consume_whole_lp=false material
+          await page.fill('input[placeholder="Scan or search LP"]', 'LP-002')
+
+          // Qty input should be enabled
+          const qtyInput = page.locator('input[type="number"]')
+          await expect(qtyInput).toBeEnabled()
+
+          // Can enter partial qty
+          await qtyInput.fill('25')
+          await expect(page.locator('button:has-text("Reserve")')).toBeVisible()
+        </test-case>
+
+        <test-case name="API - Should reject partial consumption when consume_whole_lp=true">
+          const response = await page.request.post('/api/production/work-orders/WO-001/materials/reserve', {
+            data: {
+              material_id: 'mat-whole-lp-true',
+              lp_id: 'lp-50kg',
+              reserved_qty: 25
+            }
+          })
+
+          expect(response.status()).toBe(400)
+          const error = await response.json()
+          expect(error.error).toBe('CONSUME_WHOLE_LP_VIOLATION')
+          expect(error.message).toContain('must be consumed entirely')
+        </test-case>
+
+        <test-case name="Scanner UI - Should show large qty and disable input when consume_whole_lp=true">
+          await page.goto('/scanner/reserve')
+          await page.fill('input[placeholder="Scan WO"]', 'WO-001')
+          await page.fill('input[placeholder="Scan LP"]', 'LP-001')
+
+          // Should show large qty (48px font)
+          await expect(page.locator('text=50 kg')).toHaveCSS('font-size', '30px')
+
+          // Button should be large and green
+          const button = page.locator('button:has-text("Reserve Full LP")')
+          await expect(button).toHaveCSS('background-color', 'rgb(22, 163, 74)')  // green-600
+          await expect(button).toHaveCSS('min-height', '48px')
+        </test-case>
+      </test>
+    </e2e-tests>
+  </testing-strategy>
+
+  <!-- ========================================== -->
+  <!-- DEPENDENCIES & INTEGRATION -->
+  <!-- ========================================== -->
+  <dependencies>
+    <prerequisite story="03-10" title="Work Order CRUD">
+      BOM snapshot creation with consume_whole_lp flag.
+      wo_materials table must have consume_whole_lp column copied from bom_items.
+    </prerequisite>
+
+    <prerequisite story="04-7" title="Material Reservation (Desktop)">
+      Desktop UI for material reservation.
+      This story enhances 4.7 with consume_whole_lp validation.
+    </prerequisite>
+
+    <prerequisite story="04-8" title="Material Reservation (Scanner)">
+      Scanner UI for material reservation.
+      This story enhances 4.8 with consume_whole_lp validation.
+    </prerequisite>
+
+    <integration story="04-12" title="Output Registration (Desktop)">
+      When output is registered, system should verify all consume_whole_lp materials
+      were fully consumed (genealogy check).
+    </integration>
+
+    <integration story="04-19" title="Genealogy Tree Creation">
+      Genealogy records created during reservation (parent_lp_id set).
+      Enforce 1:1 LP-to-output relationship for consume_whole_lp materials.
+    </integration>
+  </dependencies>
+
+  <!-- ========================================== -->
+  <!-- IMPLEMENTATION NOTES -->
+  <!-- ========================================== -->
+  <implementation-notes>
+    <note priority="high">
+      **Validation at 3 Layers:**
+      1. Desktop UI (MaterialReservationModal): Disable qty input, show "Reserve Full LP" button
+      2. Scanner UI (ScannerReservationFlow): Disable qty input, large font display
+      3. API (POST /api/production/work-orders/:id/materials/reserve): Enforce reserved_qty == LP.qty
+    </note>
+
+    <note priority="medium">
+      **Error Message Consistency:**
+      Use exact message: "Material '{product_name}' must be consumed entirely ({LP.quantity} {LP.uom}). Cannot consume partial amounts."
+      This message should appear in:
+      - API response (400 error)
+      - Desktop UI error toast
+      - Scanner UI large red error text
+    </note>
+
+    <note priority="medium">
+      **Database Query Performance:**
+      Add index on wo_materials.consume_whole_lp for faster lookups:
+      CREATE INDEX idx_wo_materials_consume_whole_lp ON wo_materials(consume_whole_lp) WHERE consume_whole_lp = true;
+    </note>
+
+    <note priority="low">
+      **Future Enhancement:**
+      Consider adding tooltip/help text explaining why consume_whole_lp is enforced (allergen control).
+    </note>
+  </implementation-notes>
+</story-context>

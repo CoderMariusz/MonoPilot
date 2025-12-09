@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.6</id>
+    <title>BOM CRUD</title>
+    <batch>02B-1</batch>
+    <points>5</points>
+    <effort_hours>6-8</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Create, read, update, delete Bill of Materials with product assignment, version control, and effective dates.</description>
+
+  <dependencies>
+    <blocks>
+      <story id="2.7">BOM Items Management</story>
+      <story id="2.8">Date Overlap Validation</story>
+    </blocks>
+    <requires>
+      <batch id="02A-1">Products Core</batch>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>boms</name>
+        <columns>
+          <column name="id" type="UUID" pk="true"/>
+          <column name="org_id" type="UUID" fk="organizations.id"/>
+          <column name="product_id" type="UUID" fk="products.id">Output product</column>
+          <column name="version" type="TEXT">Format: 1.0, 1.1, 2.0</column>
+          <column name="effective_from" type="DATE" required="true"/>
+          <column name="effective_to" type="DATE"/>
+          <column name="status" type="TEXT">draft, active, phased_out, inactive</column>
+          <column name="output_qty" type="NUMERIC" default="1.0"/>
+          <column name="output_uom" type="TEXT"/>
+          <column name="notes" type="TEXT"/>
+          <column name="created_by" type="UUID"/>
+          <column name="updated_by" type="UUID"/>
+          <column name="created_at" type="TIMESTAMPTZ"/>
+          <column name="updated_at" type="TIMESTAMPTZ"/>
+        </columns>
+        <constraints>
+          <unique>org_id, product_id, version</unique>
+        </constraints>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/boms">List BOMs with filters</endpoint>
+      <endpoint method="POST" path="/api/technical/boms">Create BOM (version auto-assigned)</endpoint>
+      <endpoint method="GET" path="/api/technical/boms/:id">Get BOM details</endpoint>
+      <endpoint method="PUT" path="/api/technical/boms/:id">Update BOM</endpoint>
+      <endpoint method="DELETE" path="/api/technical/boms/:id">Delete BOM (cascade items)</endpoint>
+    </api_endpoints>
+
+    <frontend_routes>
+      <route path="/technical/boms" component="BOMListPage"/>
+      <route path="/technical/boms/:id" component="BOMDetailPage"/>
+    </frontend_routes>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.6.1">BOM List grouped by product</ac>
+    <ac id="2.6.2">Add BOM form with product, dates, status, output_qty</ac>
+    <ac id="2.6.3">Version auto-assigned (1.0 if first)</ac>
+    <ac id="2.6.4">BOM list shows product, version, dates, status, items count</ac>
+  </acceptance_criteria>
+
+  <test_plan>
+    <integration_tests>
+      <test>POST /api/technical/boms creates with version 1.0</test>
+      <test>GET /api/technical/boms returns grouped by product</test>
+    </integration_tests>
+  </test_plan>
+</story>

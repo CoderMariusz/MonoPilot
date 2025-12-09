@@ -1,0 +1,552 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+  <metadata>
+    <story>04-17-production-settings-configuration</story>
+    <epic>4-production-execution</epic>
+    <priority>P0</priority>
+    <effort>0.5 day</effort>
+    <story_points>1</story_points>
+  </metadata>
+
+  <!-- ============================= -->
+  <!-- STORY DEFINITION              -->
+  <!-- ============================= -->
+  <story_definition>
+    <user_story>
+      <as>Admin</as>
+      <i_want>to configure Production module settings</i_want>
+      <so_that>execution matches our process</so_that>
+    </user_story>
+
+    <acceptance_criteria>
+      <criterion id="AC-4.17.1">
+        <title>Settings Page</title>
+        <given>Admin navigates to /settings/production-execution</given>
+        <when>page loads</when>
+        <then>can configure toggles and values</then>
+        <settings>
+          <setting name="allow_pause_wo" type="toggle" options="true/false" />
+          <setting name="auto_complete_wo" type="toggle" options="true/false" />
+          <setting name="require_operation_sequence" type="toggle" options="true/false" />
+          <setting name="require_qa_on_output" type="toggle" options="true/false" />
+          <setting name="auto_create_by_product_lp" type="toggle" options="true/false" default="false" note="If false, prompt operator to decide" />
+          <setting name="dashboard_refresh_seconds" type="number" range="30-300" default="30" validation="minimum 30 to prevent server overload" />
+        </settings>
+        <notes>
+          <note>allow_partial_lp_consumption not needed - default behavior is partial consumption</note>
+          <note>consume_whole_lp flag from BOM controls whole LP enforcement (Story 4.9)</note>
+          <note>allow_over_consumption check happens at output registration with warning/confirm (Story 4.11)</note>
+        </notes>
+      </criterion>
+
+      <criterion id="AC-4.17.2">
+        <title>Settings Persistence</title>
+        <then>production_settings table stores settings (org-level isolation)</then>
+      </criterion>
+
+      <criterion id="AC-4.17.3">
+        <title>Default Values</title>
+        <then>All toggles default to true (permissive), refresh_seconds defaults to 30</then>
+      </criterion>
+
+      <criterion id="AC-4.17.4">
+        <title>API Routes</title>
+        <then>GET/PUT /api/production/settings endpoints available</then>
+      </criterion>
+
+      <criterion id="AC-4.17.5">
+        <title>Real-Time Application</title>
+        <when>settings changed</when>
+        <then>New settings applied immediately (no restart needed)</then>
+      </criterion>
+
+      <criterion id="AC-4.17.6">
+        <title>Validation</title>
+        <then>dashboard_refresh_seconds validated: 30 &lt;= value &lt;= 300 (minimum 30 seconds to prevent server overload)</then>
+      </criterion>
+
+      <criterion id="AC-4.17.7">
+        <title>Audit Logging</title>
+        <when>settings changed</when>
+        <then>Audit record created: what changed, by whom, when</then>
+      </criterion>
+
+      <criterion id="AC-4.17.8">
+        <title>Role-Based Access</title>
+        <then>Only Admins can view/modify production settings</then>
+      </criterion>
+    </acceptance_criteria>
+
+    <tasks>
+      <task id="1">Create/verify production_settings table</task>
+      <task id="2">Settings UI page</task>
+      <task id="3">GET/PUT API endpoints</task>
+      <task id="4">Settings persistence and defaults</task>
+      <task id="5">Real-time setting application</task>
+      <task id="6">Tests</task>
+    </tasks>
+  </story_definition>
+
+  <!-- ============================= -->
+  <!-- DATABASE SCHEMA               -->
+  <!-- ============================= -->
+  <database_schema>
+    <table_to_create name="production_settings">
+      <description>Production module settings (Story 4.17)</description>
+      <rls_enabled>true</rls_enabled>
+      <org_isolation>true</org_isolation>
+
+      <columns>
+        <column name="id" type="uuid" default="uuid_generate_v4()" primary_key="true" />
+        <column name="org_id" type="uuid" nullable="false" unique="true" fk="organizations.id" comment="Organization FK - one settings row per org" />
+
+        <!-- Toggle Settings (all default true = permissive) -->
+        <column name="allow_pause_wo" type="boolean" default="true" comment="Allow operators to pause work orders" />
+        <column name="auto_complete_wo" type="boolean" default="true" comment="Auto-complete WO when output qty reaches planned qty" />
+        <column name="require_operation_sequence" type="boolean" default="true" comment="Enforce strict operation sequence from routing" />
+        <column name="require_qa_on_output" type="boolean" default="true" comment="Require QA check before output registration" />
+        <column name="auto_create_by_product_lp" type="boolean" default="false" comment="Auto-create license plates for by-products (false = prompt operator)" />
+
+        <!-- Dashboard Settings -->
+        <column name="dashboard_refresh_seconds" type="integer" default="30" check="dashboard_refresh_seconds >= 30 AND dashboard_refresh_seconds <= 300" comment="Dashboard auto-refresh interval (30-300 seconds)" />
+
+        <!-- Audit Fields -->
+        <column name="created_at" type="timestamptz" default="now()" />
+        <column name="updated_at" type="timestamptz" default="now()" />
+        <column name="updated_by" type="uuid" nullable="true" fk="users.id" comment="User who last updated settings (for audit)" />
+      </columns>
+
+      <constraints>
+        <unique_constraint columns="org_id" comment="One settings record per organization" />
+        <check_constraint name="valid_refresh_interval" expression="dashboard_refresh_seconds >= 30 AND dashboard_refresh_seconds <= 300" />
+      </constraints>
+
+      <rls_policies>
+        <policy name="Enable read for authenticated users" operation="SELECT" role="authenticated" using="true" />
+        <policy name="Enable insert for authenticated users" operation="INSERT" role="authenticated" with_check="true" />
+        <policy name="Enable update for authenticated users" operation="UPDATE" role="authenticated" using="true" with_check="true" />
+        <policy name="Enable delete for authenticated users" operation="DELETE" role="authenticated" using="true" />
+      </rls_policies>
+
+      <indexes>
+        <index name="idx_production_settings_org_id" columns="org_id" unique="true" />
+      </indexes>
+    </table_to_create>
+
+    <reference_schema>
+      <table name="planning_settings">
+        <description>Similar pattern - org-level settings table</description>
+        <columns>
+          <column name="id" type="uuid" primary_key="true" />
+          <column name="org_id" type="uuid" unique="true" fk="organizations.id" />
+          <column name="po_statuses" type="jsonb" />
+          <column name="po_default_status" type="varchar" />
+          <column name="po_require_approval" type="boolean" default="false" />
+          <column name="po_approval_threshold" type="numeric" nullable="true" />
+          <column name="created_at" type="timestamptz" default="now()" />
+          <column name="updated_at" type="timestamptz" default="now()" />
+        </columns>
+        <note>Use this as reference for org-level settings pattern</note>
+      </table>
+
+      <table name="technical_settings">
+        <description>Another example of module settings table</description>
+        <columns>
+          <column name="org_id" type="uuid" primary_key="true" fk="organizations.id" />
+          <column name="product_field_config" type="jsonb" />
+          <column name="max_bom_versions" type="integer" nullable="true" />
+          <column name="use_conditional_flags" type="boolean" default="false" />
+          <column name="conditional_flags" type="jsonb" />
+          <column name="updated_at" type="timestamptz" default="now()" />
+          <column name="updated_by" type="uuid" nullable="true" fk="users.id" />
+        </columns>
+        <note>Shows updated_by pattern for audit trail</note>
+      </table>
+    </reference_schema>
+  </database_schema>
+
+  <!-- ============================= -->
+  <!-- API PATTERN (from Planning)   -->
+  <!-- ============================= -->
+  <api_reference>
+    <source_file>apps/frontend/app/api/planning/settings/route.ts</source_file>
+    <pattern>GET/PUT settings endpoint pattern</pattern>
+
+    <get_endpoint>
+      <route>GET /api/production/settings</route>
+      <authentication>Required (session check)</authentication>
+      <authorization>Any authenticated user can view</authorization>
+      <logic>
+        1. Check authentication (session)
+        2. Get current user and org_id
+        3. Fetch production_settings WHERE org_id = user.org_id
+        4. If not exists (error code PGRST116), create default settings row
+        5. Return settings
+      </logic>
+      <response>
+        <success status="200">{ settings: ProductionSettings }</success>
+        <error status="401">{ error: "Unauthorized" }</error>
+        <error status="404">{ error: "User not found" }</error>
+        <error status="500">{ error: "Internal server error" }</error>
+      </response>
+    </get_endpoint>
+
+    <put_endpoint>
+      <route>PUT /api/production/settings</route>
+      <authentication>Required (session check)</authentication>
+      <authorization>Admin only (check role = 'admin')</authorization>
+      <validation>
+        - Use Zod schema for input validation
+        - Validate dashboard_refresh_seconds: 30 &lt;= value &lt;= 300
+        - All toggle fields are boolean
+      </validation>
+      <logic>
+        1. Check authentication
+        2. Get current user, verify role = 'admin'
+        3. Parse and validate request body with Zod
+        4. Update production_settings WHERE org_id = user.org_id
+        5. Set updated_by = user.id, updated_at = now()
+        6. Return updated settings
+      </logic>
+      <response>
+        <success status="200">{ settings: ProductionSettings, message: "Settings updated successfully" }</success>
+        <error status="401">{ error: "Unauthorized" }</error>
+        <error status="403">{ error: "Forbidden: Admin role required" }</error>
+        <error status="400">{ error: "Invalid request data", details: ZodErrors }</error>
+        <error status="500">{ error: "Internal server error" }</error>
+      </response>
+    </put_endpoint>
+
+    <implementation_reference>
+      <file>apps/frontend/app/api/planning/settings/route.ts</file>
+      <key_patterns>
+        <pattern>createServerSupabase() for auth check</pattern>
+        <pattern>createServerSupabaseAdmin() for DB operations (bypasses RLS)</pattern>
+        <pattern>Auto-create default settings if not exists (PGRST116 error)</pattern>
+        <pattern>Role-based authorization check</pattern>
+        <pattern>Zod validation for PUT body</pattern>
+      </key_patterns>
+    </implementation_reference>
+  </api_reference>
+
+  <!-- ============================= -->
+  <!-- VALIDATION SCHEMA             -->
+  <!-- ============================= -->
+  <validation>
+    <file_to_create>apps/frontend/lib/validation/production-schemas.ts</file_to_create>
+    <zod_schema>
+      <name>productionSettingsSchema</name>
+      <fields>
+        <field name="allow_pause_wo" type="z.boolean()" />
+        <field name="auto_complete_wo" type="z.boolean()" />
+        <field name="require_operation_sequence" type="z.boolean()" />
+        <field name="require_qa_on_output" type="z.boolean()" />
+        <field name="auto_create_by_product_lp" type="z.boolean()" />
+        <field name="dashboard_refresh_seconds" type="z.number().int().min(30).max(300)" />
+      </fields>
+    </zod_schema>
+    <reference>
+      <file>apps/frontend/lib/validation/planning-schemas.ts</file>
+      <export>planningSettingsSchema</export>
+    </reference>
+  </validation>
+
+  <!-- ============================= -->
+  <!-- UI COMPONENT PATTERN          -->
+  <!-- ============================= -->
+  <ui_reference>
+    <source_file>apps/frontend/app/(authenticated)/settings/planning/page.tsx</source_file>
+    <description>Planning Settings page - use as template for Production Settings</description>
+
+    <component_structure>
+      <state_management>
+        - useState for settings, loading, saving
+        - useEffect to fetch on mount
+        - useToast for notifications
+      </state_management>
+
+      <fetch_pattern>
+        const fetchSettings = useCallback(async () => {
+          const response = await fetch('/api/production/settings')
+          const data = await response.json()
+          setSettings(data.settings)
+        }, [toast])
+      </fetch_pattern>
+
+      <save_pattern>
+        const saveSettings = async (updatedSettings) => {
+          const response = await fetch('/api/production/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...settings, ...updatedSettings }),
+          })
+          // Show toast, update local state
+        }
+      </save_pattern>
+
+      <ui_elements>
+        <element>Toggle switches for boolean settings (shadcn/ui Switch)</element>
+        <element>Number input with validation for dashboard_refresh_seconds</element>
+        <element>Loading spinner while fetching</element>
+        <element>Success/Error toasts</element>
+        <element>Auto-save on toggle change</element>
+        <element>Min/max validation display for number input</element>
+      </ui_elements>
+    </component_structure>
+
+    <layout>
+      <page_route>/settings/production-execution</page_route>
+      <title>Production Settings</title>
+      <sections>
+        <section>
+          <title>Work Order Settings</title>
+          <fields>
+            - Allow Pause WO (toggle)
+            - Auto-Complete WO (toggle)
+            - Require Operation Sequence (toggle)
+            - Require QA on Output (toggle)
+            - Auto-Create By-Product LPs (toggle with description)
+          </fields>
+        </section>
+        <section>
+          <title>Dashboard Settings</title>
+          <fields>
+            - Dashboard Refresh Interval (number input, 30-300, unit: seconds)
+            - Helper text: "Auto-refresh interval for production dashboard (minimum 30 seconds)"
+          </fields>
+        </section>
+      </sections>
+    </layout>
+  </ui_reference>
+
+  <!-- ============================= -->
+  <!-- TESTING STRATEGY              -->
+  <!-- ============================= -->
+  <testing>
+    <e2e_tests>
+      <file>tests/e2e/production-settings.spec.ts</file>
+      <test_cases>
+        <test name="Admin can view production settings">
+          <steps>
+            1. Login as Admin
+            2. Navigate to /settings/production-execution
+            3. Verify page loads with default settings
+            4. Verify all toggles are visible
+            5. Verify dashboard refresh input visible
+          </steps>
+          <assertions>
+            - Settings form displayed
+            - Toggle switches show default values (true)
+            - Dashboard refresh shows 30 seconds
+          </assertions>
+        </test>
+
+        <test name="Admin can update toggle settings">
+          <steps>
+            1. Login as Admin
+            2. Navigate to settings page
+            3. Toggle 'Allow Pause WO' to false
+            4. Wait for save toast
+            5. Refresh page
+            6. Verify toggle persisted
+          </steps>
+          <assertions>
+            - Success toast shown
+            - Settings saved to DB
+            - Page refresh shows updated value
+          </assertions>
+        </test>
+
+        <test name="Admin can update dashboard refresh interval">
+          <steps>
+            1. Login as Admin
+            2. Navigate to settings page
+            3. Change dashboard_refresh_seconds to 60
+            4. Wait for save
+            5. Refresh page
+            6. Verify value persisted
+          </steps>
+          <assertions>
+            - Input accepts valid range (30-300)
+            - Value saved correctly
+            - Validation prevents &lt;30 or &gt;300
+          </assertions>
+        </test>
+
+        <test name="Non-admin cannot access settings">
+          <steps>
+            1. Login as Operator (non-admin)
+            2. Navigate to /settings/production-execution
+            3. Verify 403 Forbidden or redirect
+          </steps>
+          <assertions>
+            - Operator cannot view/edit settings
+            - Appropriate error message shown
+          </assertions>
+        </test>
+
+        <test name="Validation prevents invalid refresh interval">
+          <steps>
+            1. Login as Admin
+            2. Navigate to settings page
+            3. Attempt to set dashboard_refresh_seconds to 10 (below minimum)
+            4. Verify error shown
+            5. Attempt to set to 400 (above maximum)
+            6. Verify error shown
+          </steps>
+          <assertions>
+            - Min validation (30) enforced
+            - Max validation (300) enforced
+            - Error messages clear
+          </assertions>
+        </test>
+
+        <test name="Default settings created on first access">
+          <steps>
+            1. Ensure no production_settings row exists for test org
+            2. Login as Admin
+            3. Navigate to /settings/production-execution
+            4. Verify default settings auto-created
+          </steps>
+          <assertions>
+            - Settings row created with defaults
+            - All toggles = true
+            - dashboard_refresh_seconds = 30
+          </assertions>
+        </test>
+      </test_cases>
+
+      <fixtures>
+        <fixture>createTestOrganization() - returns orgId</fixture>
+        <fixture>createTestUser(orgId, role='admin') - returns userId, token</fixture>
+        <fixture>cleanupTestData(orgId) - cleanup after tests</fixture>
+      </fixtures>
+
+      <test_data>
+        <organization>Test Org for Production Settings</organization>
+        <users>
+          <user role="admin">Admin User</user>
+          <user role="operator">Operator User</user>
+        </users>
+      </test_data>
+    </e2e_tests>
+
+    <unit_tests>
+      <api_route_tests>
+        <test>GET /api/production/settings - returns settings for authenticated user</test>
+        <test>GET /api/production/settings - creates defaults if not exists</test>
+        <test>GET /api/production/settings - returns 401 for unauthenticated</test>
+        <test>PUT /api/production/settings - updates settings for admin</test>
+        <test>PUT /api/production/settings - returns 403 for non-admin</test>
+        <test>PUT /api/production/settings - validates dashboard_refresh_seconds range</test>
+        <test>PUT /api/production/settings - validates boolean fields</test>
+      </api_route_tests>
+
+      <validation_tests>
+        <test>productionSettingsSchema accepts valid input</test>
+        <test>productionSettingsSchema rejects dashboard_refresh_seconds &lt; 30</test>
+        <test>productionSettingsSchema rejects dashboard_refresh_seconds &gt; 300</test>
+        <test>productionSettingsSchema requires boolean toggles</test>
+      </validation_tests>
+    </unit_tests>
+  </testing>
+
+  <!-- ============================= -->
+  <!-- RELATED STORIES & CONTEXT     -->
+  <!-- ============================= -->
+  <related_stories>
+    <story id="04-01">
+      <title>Production Dashboard</title>
+      <relationship>Dashboard refresh interval controlled by settings.dashboard_refresh_seconds</relationship>
+      <note>Dashboard should read settings and apply auto-refresh based on configured interval</note>
+    </story>
+
+    <story id="04-03">
+      <title>WO Pause/Resume</title>
+      <relationship>Pause functionality enabled/disabled by settings.allow_pause_wo</relationship>
+      <note>If allow_pause_wo = false, hide pause button in UI</note>
+    </story>
+
+    <story id="04-09">
+      <title>Material Consumption</title>
+      <relationship>BOM item consume_whole_lp flag controls whole LP enforcement</relationship>
+      <note>Settings do NOT include allow_partial_lp_consumption - default behavior is partial</note>
+    </story>
+
+    <story id="04-11">
+      <title>Over-Consumption Control</title>
+      <relationship>Over-consumption check happens at output registration with warning/confirm dialog</relationship>
+      <note>No settings toggle needed - always prompt user for confirmation</note>
+    </story>
+
+    <story id="04-12">
+      <title>Output Registration (Desktop)</title>
+      <relationship>
+        - auto_complete_wo controls WO completion when output reaches planned qty
+        - require_qa_on_output requires QA check before registration
+        - auto_create_by_product_lp controls automatic by-product LP creation
+      </relationship>
+    </story>
+
+    <story id="03-22">
+      <title>Planning Settings Extended</title>
+      <relationship>Reference implementation for settings pattern (Planning module)</relationship>
+      <file>apps/frontend/app/(authenticated)/settings/planning/page.tsx</file>
+      <file>apps/frontend/app/api/planning/settings/route.ts</file>
+    </story>
+  </related_stories>
+
+  <!-- ============================= -->
+  <!-- TECHNICAL NOTES               -->
+  <!-- ============================= -->
+  <technical_notes>
+    <migration>
+      <file>supabase/migrations/XXX_create_production_settings.sql</file>
+      <steps>
+        1. CREATE TABLE production_settings with org_id FK
+        2. Add columns for all toggle settings (boolean, default true)
+        3. Add dashboard_refresh_seconds (integer, default 30, CHECK constraint 30-300)
+        4. Add audit fields (created_at, updated_at, updated_by)
+        5. UNIQUE constraint on org_id
+        6. Enable RLS
+        7. Create RLS policies (SELECT/INSERT/UPDATE/DELETE for authenticated)
+        8. GRANT permissions to authenticated, service_role
+      </steps>
+    </migration>
+
+    <real_time_application>
+      <note>Settings applied immediately - no server restart needed</note>
+      <implementation>
+        - Frontend components fetch settings on mount
+        - Dashboard reads dashboard_refresh_seconds and sets interval
+        - WO pause button visibility controlled by allow_pause_wo
+        - Auto-complete logic checks auto_complete_wo setting
+      </implementation>
+    </real_time_application>
+
+    <audit_trail>
+      <field>updated_by (uuid FK to users.id)</field>
+      <field>updated_at (timestamptz)</field>
+      <note>Track who changed settings and when for compliance</note>
+    </audit_trail>
+
+    <default_behavior>
+      <all_toggles>true (permissive by default)</all_toggles>
+      <dashboard_refresh_seconds>30 seconds (minimum to prevent server overload)</dashboard_refresh_seconds>
+      <rationale>Start permissive, allow orgs to lock down based on their processes</rationale>
+    </default_behavior>
+  </technical_notes>
+
+  <!-- ============================= -->
+  <!-- DEPENDENCIES                  -->
+  <!-- ============================= -->
+  <dependencies>
+    <table>organizations (org_id FK)</table>
+    <table>users (updated_by FK)</table>
+    <library>shadcn/ui (Switch, Input, Label components)</library>
+    <library>Zod (validation)</library>
+    <library>React (useState, useEffect, useCallback)</library>
+    <pattern>Supabase server client (auth, RLS bypass)</pattern>
+    <pattern>Planning settings implementation (reference)</pattern>
+  </dependencies>
+</context>

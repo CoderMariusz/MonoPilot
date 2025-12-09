@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.24" epic="6" batch="06C-2">
+  <summary>Export reports to PDF (formatted) and Excel (raw data) for easy sharing.</summary>
+
+  <tables>
+    <table name="non_conformance_reports" operation="read"/>
+    <table name="test_results" operation="read"/>
+    <table name="quality_holds" operation="read"/>
+  </tables>
+
+  <components>
+    <component name="ReportExporter.tsx" type="modal"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/reports/export" method="POST"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.23"/>
+  </dependencies>
+</story-context>

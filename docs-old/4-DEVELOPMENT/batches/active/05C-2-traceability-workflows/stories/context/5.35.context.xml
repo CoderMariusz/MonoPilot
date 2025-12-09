@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.35</id>
+    <title>Inventory Count</title>
+    <batch>5C-2</batch>
+    <points>8</points>
+    <effort_hours>8-10</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>Physical inventory verification workflow with scanner/desktop modes and variance reporting</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.1">License Plate Creation</story>
+      <story id="5.11">GRN and LP Creation</story>
+      <story id="5.23">Scanner Guided Workflows</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>inventory_counts</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, FK organizations(id)"/>
+          <column name="count_number" type="VARCHAR(50)" constraint="NOT NULL, UNIQUE(org_id)"/>
+          <column name="location_id" type="UUID" constraint="NOT NULL, FK locations(id)"/>
+          <column name="status" type="VARCHAR(20)" constraint="CHECK IN ('pending','in_progress','completed','verified')"/>
+          <column name="expected_lps" type="INTEGER"/>
+          <column name="scanned_lps" type="INTEGER"/>
+          <column name="found_lps" type="INTEGER"/>
+          <column name="missing_lps" type="INTEGER"/>
+          <column name="variance_pct" type="DECIMAL(5,2)"/>
+          <column name="initiated_at" type="TIMESTAMP"/>
+          <column name="completed_at" type="TIMESTAMP"/>
+        </columns>
+      </table>
+      <table>
+        <name>inventory_count_items</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK"/>
+          <column name="count_id" type="UUID" constraint="NOT NULL, FK inventory_counts(id)"/>
+          <column name="lp_id" type="UUID" constraint="NOT NULL, FK license_plates(id)"/>
+          <column name="expected" type="BOOLEAN" constraint="DEFAULT true"/>
+          <column name="scanned_at" type="TIMESTAMP"/>
+        </columns>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="POST" path="/api/warehouse/inventory-counts">
+        <description>Initiate inventory count for location</description>
+        <request>
+          <field name="location_id" type="UUID"/>
+          <field name="reason" type="string" constraint="cycle_count|audit|recount"/>
+        </request>
+        <response status="201">
+          <field name="count_id" type="UUID"/>
+          <field name="expected_lps" type="integer"/>
+        </response>
+      </endpoint>
+      <endpoint method="POST" path="/api/warehouse/inventory-counts/:id/scan">
+        <description>Scan LP during count</description>
+        <request>
+          <field name="lp_id" type="UUID"/>
+        </request>
+      </endpoint>
+      <endpoint method="POST" path="/api/warehouse/inventory-counts/:id/complete">
+        <description>Complete count and calculate variance</description>
+        <response status="200">
+          <field name="variance_pct" type="decimal"/>
+          <field name="missing_lps" type="integer"/>
+          <field name="found_lps" type="integer"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+
+    <services>
+      <service name="InventoryCountService">
+        <method name="initiateCount" params="location_id, reason" return="InventoryCount"/>
+        <method name="scanLP" params="count_id, lp_id" return="ScanResult"/>
+        <method name="completeCount" params="count_id" return="VarianceReport"/>
+        <method name="recountMissing" params="count_id" return="void"/>
+      </service>
+    </services>
+
+    <components_to_create>
+      <component name="InventoryCountPage.tsx">
+        <description>Initiate count, show progress, display results</description>
+      </component>
+      <component name="ScannerCountMode.tsx">
+        <description>Barcode input with progress counter</description>
+      </component>
+      <component name="VarianceReportComponent.tsx">
+        <description>Summary, missing/extra LP lists, download report</description>
+      </component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <criterion id="AC1">Initiate count for location with reason</criterion>
+    <criterion id="AC2">Scanner mode: scan location → scan LPs with progress counter</criterion>
+    <criterion id="AC3">Desktop mode: LP list with checkboxes</criterion>
+    <criterion id="AC4">Missing LP detection</criterion>
+    <criterion id="AC5">Complete count: calculate variance %</criterion>
+    <criterion id="AC6">Variance report with missing/extra LPs</criterion>
+    <criterion id="AC7">Recount missing LPs option</criterion>
+  </acceptance_criteria>
+
+  <test_plan>
+    <integration_tests>
+      <test name="Initiate count → load expected LPs"/>
+      <test name="Scan LP → mark found"/>
+      <test name="Complete count → variance calculated"/>
+      <test name="Variance = ((missing + found) / expected) * 100"/>
+    </integration_tests>
+    <e2e_tests>
+      <test name="Full count: initiate → scan 14/15 LPs → complete → variance -6.67%"/>
+      <test name="Recount missing → scan missing LP → variance 0%"/>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="high">Variance critical for accuracy/compliance</note>
+    <note priority="medium">Future: Cycle counting (count subset regularly)</note>
+    <note priority="medium">Report useful for management review</note>
+  </implementation_notes>
+</story>

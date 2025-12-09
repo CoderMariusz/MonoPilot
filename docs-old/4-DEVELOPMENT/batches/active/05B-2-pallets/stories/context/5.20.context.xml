@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.20</id>
+    <title>Pallet LP Management</title>
+    <batch>5B-2</batch>
+    <points>5</points>
+    <effort_hours>5-6</effort_hours>
+    <status>todo</status>
+  </metadata>
+  <description>Add and remove license plates from pallets with location tracking and pallet summary updates</description>
+  <dependencies>
+    <requires><story id="5.19">Pallet Creation</story><story id="5.1">License Plate Creation</story></requires>
+    <enables><story id="5.21">Pallet Move</story><story id="5.22">Pallet Status</story></enables>
+  </dependencies>
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="POST" path="/api/warehouse/pallets/:id/items">
+        <description>Add license plate to pallet</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="lp_id" type="UUID" required="true">License plate to add</field>
+          <field name="position_order" type="integer" required="false">Position in pallet (loading order), default next sequence</field>
+        </request>
+        <response status="201">
+          <field name="id" type="UUID" comment="pallet_items.id"/>
+          <field name="pallet_id" type="UUID"/>
+          <field name="lp_id" type="UUID"/>
+          <field name="position_order" type="integer"/>
+          <field name="added_at" type="timestamp"/>
+          <field name="lp_updated" type="object">
+            <field name="location_id" type="UUID" comment="Updated to pallet location"/>
+            <field name="location_code" type="string"/>
+          </field>
+          <field name="pallet_summary" type="object">
+            <field name="lp_count" type="integer"/>
+            <field name="total_quantity" type="decimal"/>
+            <field name="total_uom" type="string"/>
+          </field>
+        </response>
+        <response status="400">
+          <field name="error" type="string" example="LP already on another pallet"/>
+        </response>
+      </endpoint>
+      <endpoint method="DELETE" path="/api/warehouse/pallets/:id/items/:item_id">
+        <description>Remove license plate from pallet</description>
+        <auth>authenticated</auth>
+        <response status="200">
+          <field name="removed" type="boolean"/>
+          <field name="lp_id" type="UUID"/>
+          <field name="pallet_summary" type="object">
+            <field name="lp_count" type="integer"/>
+            <field name="total_quantity" type="decimal"/>
+            <field name="total_uom" type="string"/>
+          </field>
+        </response>
+        <response status="400">
+          <field name="error" type="string" example="Cannot remove item from closed pallet"/>
+        </response>
+      </endpoint>
+      <endpoint method="PUT" path="/api/warehouse/pallets/:id/items/:item_id/reorder">
+        <description>Update position order of item in pallet</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="position_order" type="integer" required="true">New position order</field>
+        </request>
+        <response status="200">
+          <field name="id" type="UUID"/>
+          <field name="position_order" type="integer"/>
+          <field name="updated_at" type="timestamp"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+    <database_tables>
+      <table>
+        <name>pallet_items</name>
+        <columns>
+          <column name="id" type="UUID" constraint="PK, DEFAULT gen_random_uuid()"/>
+          <column name="org_id" type="UUID" constraint="NOT NULL, FK organizations(id)"/>
+          <column name="pallet_id" type="UUID" constraint="NOT NULL, FK pallets(id) ON DELETE CASCADE"/>
+          <column name="lp_id" type="UUID" constraint="NOT NULL, FK license_plates(id)"/>
+          <column name="position_order" type="INTEGER" constraint="DEFAULT 0"/>
+          <column name="added_at" type="TIMESTAMP" constraint="DEFAULT NOW()"/>
+          <column name="added_by_user_id" type="UUID" constraint="NOT NULL, FK users(id)"/>
+          <column name="unique_lp_per_pallet" constraint="UNIQUE(pallet_id, lp_id)"/>
+        </columns>
+        <note>UNIQUE constraint prevents same LP on same pallet twice</note>
+      </table>
+    </database_tables>
+    <queries>
+      <query name="get_pallet_with_items">
+        SELECT
+          p.id, p.pallet_number, p.location_id, l.code as location_code,
+          p.status, p.notes,
+          COUNT(pi.id) as lp_count,
+          SUM(lp.quantity) as total_quantity, lp.uom
+        FROM pallets p
+        LEFT JOIN pallet_items pi ON p.id = pi.pallet_id
+        LEFT JOIN license_plates lp ON pi.lp_id = lp.id
+        LEFT JOIN locations l ON p.location_id = l.id
+        WHERE p.id = $1 AND p.org_id = $2
+        GROUP BY p.id, l.code, lp.uom
+      </query>
+      <query name="get_pallet_items_ordered">
+        SELECT
+          pi.id, pi.position_order,
+          lp.id as lp_id, lp.lp_number, lp.quantity, lp.uom,
+          lp.product_id, pr.name as product_name,
+          pi.added_at, pi.added_by_user_id, u.full_name as added_by
+        FROM pallet_items pi
+        JOIN license_plates lp ON pi.lp_id = lp.id
+        LEFT JOIN products pr ON lp.product_id = pr.id
+        LEFT JOIN users u ON pi.added_by_user_id = u.id
+        WHERE pi.pallet_id = $1
+        ORDER BY pi.position_order ASC
+      </query>
+      <query name="check_lp_on_pallet">
+        SELECT pi.pallet_id, p.pallet_number
+        FROM pallet_items pi
+        JOIN pallets p ON pi.pallet_id = p.id
+        WHERE pi.lp_id = $1 AND pi.org_id = $2
+        LIMIT 1
+      </query>
+      <query name="validate_lp_location_update">
+        UPDATE license_plates
+        SET location_id = $2, updated_at = NOW()
+        WHERE id = $1 AND org_id = $3
+        RETURNING location_id
+      </query>
+    </queries>
+    <indexes>
+      <index name="idx_pallet_items_pallet_id">On column: pallet_id (critical for finding items per pallet)</index>
+      <index name="idx_pallet_items_lp_id">On column: lp_id (for finding which pallet LP is on)</index>
+      <index name="idx_pallet_items_org_id">On column: org_id (org filtering)</index>
+    </indexes>
+    <components>
+      <component name="AddLPToPalletModal">
+        <location>src/components/warehouse/pallets/AddLPToPalletModal.tsx</location>
+        <description>Modal for adding LP to pallet with autocomplete search</description>
+        <fields>
+          - LP search/autocomplete (shows LP#, product, qty, current location)
+          - Position order input (optional, default to next sequence)
+          - Add button with loading state
+          - Cancel button
+        </fields>
+        <validation>
+          - LP must exist and org match
+          - LP cannot already be on another pallet
+          - Pallet must be status='open'
+        </validation>
+      </component>
+      <component name="PalletSummaryCard">
+        <location>src/components/warehouse/pallets/PalletSummaryCard.tsx</location>
+        <description>Summary card showing pallet info</description>
+        <displays>
+          - Pallet number (clickable to detail)
+          - Location (code and name)
+          - Status badge (open/closed/shipped)
+          - LP count: "3 items"
+          - Total quantity: "450.50 kg"
+          - Created by and date
+          - Edit notes button (if status='open')
+        </displays>
+      </component>
+      <component name="PalletItemsTable">
+        <location>src/components/warehouse/pallets/PalletItemsTable.tsx</location>
+        <description>Table of LPs in pallet with ordering</description>
+        <columns>
+          - Position (1, 2, 3... for loading sequence)
+          - LP Number (clickable link to LP detail)
+          - Product (product name)
+          - Qty and UoM
+          - Added By (user name)
+          - Added At (timestamp)
+          - Remove button (trash icon, only if pallet status='open')
+        </columns>
+        <features>
+          - Ordered by position_order
+          - Remove button triggers confirmation dialog
+          - Future: drag-to-reorder support
+        </features>
+      </component>
+      <component name="LPSearchAutocomplete">
+        <location>src/components/warehouse/LPSearchAutocomplete.tsx</location>
+        <description>Reusable LP search dropdown with status filtering</description>
+        <features>
+          - Search by LP# or product name
+          - Show results: LP#, Product, Qty, Current Location, Status
+          - Filter out LPs already on pallets (or show as disabled)
+          - Filter out LPs with invalid status
+          - Debounced search
+        </features>
+      </component>
+    </components>
+    <hooks>
+      <hook name="useAddLPToPallet">
+        <accepts>pallet_id, lp_id, position_order (optional)</accepts>
+        <returns>{ item, pallet_summary, loading, error }</returns>
+        <api_call>POST /api/warehouse/pallets/:id/items</api_call>
+      </hook>
+      <hook name="useRemoveLPFromPallet">
+        <accepts>pallet_id, item_id</accepts>
+        <returns>{ removed, pallet_summary, loading, error }</returns>
+        <api_call>DELETE /api/warehouse/pallets/:id/items/:item_id</api_call>
+      </hook>
+      <hook name="useLPSearch">
+        <accepts>search_term, exclude_on_pallets (boolean)</accepts>
+        <returns>{ results, loading, error }</returns>
+        <note>Search LPs not on pallets or all LPs based on exclude flag</note>
+      </hook>
+    </hooks>
+    <validation_rules>
+      <rule id="lp_exists">LP must exist in database</rule>
+      <rule id="lp_org">LP.org_id must match user org_id</rule>
+      <rule id="lp_not_on_pallet">LP cannot already be on another pallet (query pallet_items)</rule>
+      <rule id="lp_not_on_this_pallet">LP cannot be added to same pallet twice (UNIQUE constraint)</rule>
+      <rule id="pallet_open">Pallet status must = 'open' for add/remove operations</rule>
+      <rule id="position_order_valid">position_order must be >= 0</rule>
+    </validation_rules>
+    <rls_policies>
+      <policy table="pallet_items">
+        <select>WHERE org_id = current_user.org_id</select>
+        <insert>WHERE org_id = current_user.org_id</insert>
+        <delete>WHERE org_id = current_user.org_id</delete>
+      </policy>
+    </rls_policies>
+  </technical_context>
+  <acceptance_criteria>
+    <ac id="1" title="Add LP to Pallet">
+      <test>Open pallet detail → click "Add LP" → modal opens with search and position input</test>
+      <test>Search LP by number/product → results shown with current location</test>
+      <test>Select LP → autocomplete closes, LP selected</test>
+      <test>Submit → POST /api/warehouse/pallets/:id/items → pallet_items created</test>
+    </ac>
+    <ac id="2" title="LP Location Updated">
+      <test>After adding LP → LP.location_id updated to pallet.location_id</test>
+      <test>LP appears at pallet location in location UI</test>
+    </ac>
+    <ac id="3" title="Remove LP from Pallet">
+      <test>Click Remove button on pallet item → confirmation dialog</test>
+      <test>Confirm → DELETE /api/warehouse/pallets/:id/items/:item_id → item deleted</test>
+      <test>LP.location_id NOT changed (remains at pallet location)</test>
+    </ac>
+    <ac id="4" title="Pallet Summary Updated">
+      <test>After add/remove → pallet summary updated: LP count, total quantity, UoM</test>
+      <test>Display shows: "3 items, 450.50 kg"</test>
+    </ac>
+    <ac id="5" title="Item Ordering">
+      <test>Items displayed in position_order sequence (1, 2, 3...)</test>
+      <test>Position column shows in table</test>
+    </ac>
+    <ac id="6" title="Validation">
+      <test>Add LP already on another pallet → error "LP already on another pallet"</test>
+      <test>Add to closed pallet → "Cannot modify closed pallet"</test>
+      <test>Add non-existent LP → error "LP does not exist"</test>
+    </ac>
+    <ac id="7" title="Item List Display">
+      <test>Pallet detail page shows items table: Position, LP#, Product, Qty, Added By, Added At, Remove</test>
+    </ac>
+  </acceptance_criteria>
+  <test_plan>
+    <unit_tests>
+      <test>LP validation: exists check, org check, on-pallet check</test>
+      <test>Pallet status validation: only add/remove if status='open'</test>
+      <test>Position order calculation: next sequence</test>
+      <test>UNIQUE constraint: duplicate LP on pallet rejected</test>
+    </unit_tests>
+    <integration_tests>
+      <test>POST /api/warehouse/pallets/:id/items with valid LP → 201 created</test>
+      <test>LP.location_id updated to pallet location</test>
+      <test>POST with LP already on pallet → 400 error</test>
+      <test>POST with closed pallet → 400 error</test>
+      <test>DELETE /api/warehouse/pallets/:id/items/:item_id → 200 deleted</test>
+      <test>LP.location_id NOT changed on removal</test>
+      <test>GET /api/warehouse/pallets/:id returns items in position order</test>
+    </integration_tests>
+    <e2e_tests>
+      <test>Open pallet detail page with status='open'</test>
+      <test>Click "Add LP" → modal opens</test>
+      <test>Search "LP-001" → results shown</test>
+      <test>Select LP → item added to pallet</test>
+      <test>Verify: LP appears in items table at correct position</test>
+      <test>Verify: pallet summary updated (count, quantity)</test>
+      <test>Click Remove on item → confirmation dialog</test>
+      <test>Confirm → item removed, summary updated</test>
+    </e2e_tests>
+  </test_plan>
+</story>

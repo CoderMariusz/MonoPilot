@@ -1,0 +1,645 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>04-7</story-id>
+    <title>Material Reservation (Desktop)</title>
+    <epic>4 - Production Execution</epic>
+    <status>drafted</status>
+    <priority>P0</priority>
+    <story-points>2</story-points>
+    <effort>1 day</effort>
+    <created>2025-11-27</created>
+  </metadata>
+
+  <!-- ============================================================================ -->
+  <!-- STORY REQUIREMENTS -->
+  <!-- ============================================================================ -->
+
+  <requirements>
+    <user-story>
+      <as-a>Operator</as-a>
+      <i-want>to reserve/allocate materials from desktop</i-want>
+      <so-that>I can track which LPs will be used for production (actual consumption happens when output is registered - Story 4.12/4.13)</so-that>
+    </user-story>
+
+    <problem-statement>
+      Materials need to be pre-allocated to WO in the order they will be consumed. This reservation:
+      1. Locks LP sequence (A → B → C order cannot change)
+      2. Enables consume_whole_lp enforcement (entire LP consumed when output triggers it)
+      3. Creates audit trail for material traceability
+      4. Actual consumption happens automatically when output is registered (4.12/4.13) based on output qty
+      5. Genealogy records created with parent_lp_id, waiting for child_lp_id (output LP)
+    </problem-statement>
+
+    <acceptance-criteria>
+      <criterion id="AC-4.7.1" title="Materials Table">
+        <given>viewing WO material reservation page</given>
+        <when>page loads</when>
+        <then>table shows: Product, Required Qty, Reserved Qty, Remaining, Reserved LPs (sequence), Actions</then>
+      </criterion>
+
+      <criterion id="AC-4.7.2" title="Material Reservation Modal (Story 4.9 Integration)">
+        <when>clicking "Reserve" on material</when>
+        <then>
+          modal opens to allocate LP for this material:
+          - LP search/scan input (find LP by barcode or product)
+          - **Conditional qty input**:
+            - **If consume_whole_lp = false**: qty input field enabled, validates product/UoM/qty available
+            - **If consume_whole_lp = true** (Story 4.9): qty field **disabled/read-only**, shows "Entire LP: [LP_qty] [UOM]", only "Reserve Full LP" button
+          - Shows sequence number (e.g., "LP #1 for Flour", "LP #2 for Flour", etc.)
+        </then>
+      </criterion>
+
+      <criterion id="AC-4.7.3" title="Material Reservation Recording &amp; Genealogy Initialization">
+        <when>confirming reservation</when>
+        <then>
+          - **Reservation recorded**: wo_material_reservations entry created:
+            - wo_id, material_id, lp_id, reserved_qty, sequence_number (1, 2, 3...)
+            - status = 'reserved'
+          - **LP status changed**: license_plates.status = 'reserved' (locked for this WO)
+          - **Genealogy record created** (Story 4.19 integration):
+            - lp_genealogy entry created with: parent_lp_id (reserved LP), child_lp_id = NULL, wo_id, reserved_at
+            - child_lp_id will be filled later during output registration (Story 4.12)
+            - actual_consumed_qty calculated later based on output (Story 4.12/4.13)
+        </then>
+      </criterion>
+
+      <criterion id="AC-4.7.4" title="Progress Tracking">
+        <then>
+          Reserved Qty updated, Remaining = Required - Reserved, visual progress bar showing:
+          - Reserved LPs in sequence order with their qty
+          - Example: "Reserved: 80kg (LP-A) + 40kg (LP-B) = 120kg / Required 200kg"
+        </then>
+      </criterion>
+
+      <criterion id="AC-4.7.5" title="API Endpoint">
+        <then>POST /api/production/work-orders/:id/materials/reserve with {lp_id, material_id, reserved_qty, notes}</then>
+      </criterion>
+
+      <criterion id="AC-4.7.6" title="Error Handling">
+        <scenario>LP insufficient qty for reservation</scenario>
+        <then>400 error: "LP has 10kg, requested 15kg for reservation"</then>
+
+        <scenario>LP already reserved for this WO</scenario>
+        <then>400 error: "LP already reserved for this WO"</then>
+
+        <scenario>WO not in progress</scenario>
+        <then>400 error: "WO not in progress"</then>
+
+        <scenario>consume_whole_lp=true AND requested qty != LP.qty</scenario>
+        <then>400 error: "Material must use entire LP (50kg). Cannot reserve partial."</then>
+      </criterion>
+
+      <criterion id="AC-4.7.7" title="Role-Based Access">
+        <then>Operators and Production Managers can reserve materials</then>
+      </criterion>
+
+      <criterion id="AC-4.7.8" title="Prerequisites">
+        <then>Requires Story 3.10 (Work Order CRUD with BOM Snapshot) and Epic 5 (License Plates)</then>
+      </criterion>
+    </acceptance-criteria>
+
+    <tasks>
+      <task id="1">Create wo_consumption table/API</task>
+      <task id="2">ConsumptionService implementation</task>
+      <task id="3">Consumption modal component</task>
+      <task id="4">Materials table component</task>
+      <task id="5">LP validation and quantity checks</task>
+      <task id="6">Tests</task>
+    </tasks>
+  </requirements>
+
+  <!-- ============================================================================ -->
+  <!-- UX DESIGN REFERENCE -->
+  <!-- ============================================================================ -->
+
+  <ux-design>
+    <shared-system source="docs/ux-design/ux-design-shared-system.md">
+      <header>
+        <component>ModuleHeader</component>
+        <tabs>Production | Dashboard | Active WOs | Completed | Yields | ⚙️</tabs>
+        <height>60px</height>
+      </header>
+
+      <action-buttons>
+        <height>40px</height>
+        <pattern>Create buttons row below header</pattern>
+      </action-buttons>
+
+      <stats-cards>
+        <component>ModuleStatsCard</component>
+        <height>max 120px</height>
+        <layout>2×2 grid (4 metrics per card)</layout>
+        <responsive>
+          Desktop: 4 cards in 1 row (lg)
+          Tablet: 2 cards per row (md)
+          Mobile: 1 card per row (sm)
+        </responsive>
+      </stats-cards>
+
+      <tables>
+        <component>DataTable</component>
+        <features>
+          - Sortable headers (click to sort)
+          - Inline filters (Status, Type, Date Range)
+          - Fuzzy search on primary columns
+          - Pagination (20 items per page)
+          - Row actions (View, Edit, Delete inline buttons)
+        </features>
+        <mobile-responsive>
+          Converts to card view on &lt;768px with expand/collapse animations
+        </mobile-responsive>
+      </tables>
+
+      <color-palette>
+        <primary-actions>green-600 (#16a34a)</primary-actions>
+        <secondary-actions>gray-600 (#4b5563)</secondary-actions>
+        <danger>red-600 (#dc2626)</danger>
+        <status-badges>
+          Active/Confirmed: green-200 bg + green-800 text
+          Pending/Draft: yellow-200 bg + yellow-800 text
+          Inactive/Archived: gray-200 bg + gray-800 text
+          Error/Expired: red-200 bg + red-800 text
+        </status-badges>
+      </color-palette>
+
+      <typography>
+        h1: text-3xl (30px) - Page titles
+        h2: text-2xl (24px) - Section headers
+        h3: text-xl (20px) - Card titles, column headers
+        p: text-base (16px) - Body text, table data
+        sm: text-sm (14px) - Labels, secondary text
+        xs: text-xs (12px) - Hints, metadata
+      </typography>
+    </shared-system>
+
+    <production-module source="docs/ux-design/ux-design-production-module.md">
+      <real-time-dashboard>
+        <variant>Variant B - Real-Time Production Board</variant>
+        <features>
+          - Single-screen dashboard with KPI cards + Kanban-style line board
+          - Real-time updates via WebSocket (30-second refresh)
+          - WO Details Modal with 6 tabs (Overview, Operations, Materials, Yield, Trace, History)
+          - Mobile/tablet view for Line Supervisors (1280×800)
+        </features>
+      </real-time-dashboard>
+
+      <existing-tables>
+        work_orders: wo_number, product_id, bom_id, quantity, priority, status, line_id, scheduled_start/end, actual_start/end
+        wo_operations: wo_id, sequence_number, operation_name, status, started_at, finished_at, expected_yield_pct
+        wo_materials: wo_id, material_id, qty_planned, qty_required, consume_whole_lp flag
+        production_outputs: wo_id, product_id, quantity, operation_seq, qa_status, type: 'PR'|'FG'|'BP'
+        license_plates: lp_number, product_id, quantity, uom, status, expiry_date, batch_number
+        lp_reservations: lp_id, wo_id, qty_reserved, qty_consumed
+      </existing-tables>
+    </production-module>
+
+    <material-handling>
+      <lp-scanning>
+        <description>
+          LP search/scan input allows operators to find License Plates by:
+          - Barcode scan (primary method on shop floor)
+          - LP number manual entry
+          - Product name/SKU search (shows available LPs for that product)
+        </description>
+        <validation>
+          - Must validate LP exists and has available qty
+          - Must check LP not already fully reserved
+          - Must validate product matches material requirement
+          - Must validate UoM compatibility
+        </validation>
+      </lp-scanning>
+
+      <consume-whole-lp-flag>
+        <description>
+          When wo_materials.consume_whole_lp = true (Story 4.9):
+          - Quantity input field is disabled/read-only
+          - UI shows "Entire LP: [LP_qty] [UOM]" message
+          - Only "Reserve Full LP" button available
+          - Validates that reserved_qty = LP.quantity exactly
+        </description>
+        <error-handling>
+          If consume_whole_lp=true AND requested qty != LP.qty:
+          Return 400 error: "Material must use entire LP (50kg). Cannot reserve partial."
+        </error-handling>
+      </consume-whole-lp-flag>
+
+      <sequence-tracking>
+        <description>
+          Reserved LPs must be tracked in sequence order:
+          - First LP reserved gets sequence_number = 1
+          - Second LP gets sequence_number = 2, etc.
+          - Sequence determines consumption order during output registration (Story 4.12/4.13)
+        </description>
+        <ui-display>
+          Show sequence in reservation modal: "LP #1 for Flour", "LP #2 for Flour"
+          Show sequence in materials table: "Reserved: 80kg (LP-A #1) + 40kg (LP-B #2)"
+        </ui-display>
+      </sequence-tracking>
+    </material-handling>
+  </ux-design>
+
+  <!-- ============================================================================ -->
+  <!-- DATABASE SCHEMA -->
+  <!-- ============================================================================ -->
+
+  <database-schema source="docs/reference/database-schema.md">
+    <table name="wo_materials">
+      <description>Work Order materials (BOM snapshot)</description>
+      <columns>
+        id: UUID PRIMARY KEY
+        org_id: UUID FK → organizations
+        wo_id: UUID FK → work_orders
+        material_id: UUID FK → products (RM/WIP/PKG)
+        qty_planned: NUMERIC (from BOM, original qty)
+        qty_required: NUMERIC (adjusted for WO quantity)
+        consume_whole_lp: BOOLEAN (Story 4.9 - must consume entire LP, no partial)
+        created_at: TIMESTAMPTZ
+        updated_at: TIMESTAMPTZ
+      </columns>
+      <constraints>
+        CHECK: qty_planned > 0
+        CHECK: qty_required > 0
+        UNIQUE: (wo_id, material_id) - no duplicate materials per WO
+      </constraints>
+    </table>
+
+    <table name="wo_material_reservations" status="NEW - to be created">
+      <description>Material reservation records (Story 4.7)</description>
+      <columns>
+        id: UUID PRIMARY KEY
+        org_id: UUID FK → organizations
+        wo_id: UUID FK → work_orders
+        material_id: UUID FK → products
+        lp_id: UUID FK → license_plates
+        reserved_qty: NUMERIC (qty reserved from this LP, > 0)
+        sequence_number: INTEGER (1, 2, 3... - consumption order)
+        status: VARCHAR ('reserved', 'consumed', 'released')
+        notes: TEXT (optional reservation notes)
+        reserved_by: UUID FK → users
+        reserved_at: TIMESTAMPTZ
+        consumed_at: TIMESTAMPTZ (NULL until consumption in Story 4.12/4.13)
+        created_at: TIMESTAMPTZ
+        updated_at: TIMESTAMPTZ
+      </columns>
+      <constraints>
+        CHECK: reserved_qty > 0
+        CHECK: sequence_number > 0
+        CHECK: status IN ('reserved', 'consumed', 'released')
+        UNIQUE: (wo_id, lp_id) - prevent double reservation of same LP for same WO
+      </constraints>
+      <indexes>
+        idx_reservations_wo: (wo_id) - fast lookup by WO
+        idx_reservations_lp: (lp_id) - fast lookup by LP
+        idx_reservations_status: (status) - filter by status
+      </indexes>
+    </table>
+
+    <table name="license_plates">
+      <description>License Plates (LPs) for inventory tracking</description>
+      <columns>
+        id: UUID PRIMARY KEY
+        org_id: UUID FK → organizations
+        lp_number: VARCHAR UNIQUE (barcode, e.g., LP-2024-001234)
+        product_id: UUID FK → products
+        quantity: NUMERIC (current available qty, > 0)
+        uom: VARCHAR (kg, L, pcs, etc.)
+        status: VARCHAR ('available', 'reserved', 'consumed', 'quarantine', 'expired')
+        batch_number: VARCHAR (lot/batch tracking)
+        expiry_date: DATE (for perishables)
+        location_id: UUID FK → locations (current storage location)
+        created_at: TIMESTAMPTZ
+        updated_at: TIMESTAMPTZ
+      </columns>
+      <constraints>
+        CHECK: quantity > 0
+        CHECK: status IN ('available', 'reserved', 'consumed', 'quarantine', 'expired')
+        UNIQUE: lp_number (global barcode uniqueness)
+      </constraints>
+    </table>
+
+    <table name="lp_genealogy" status="Story 4.19 integration">
+      <description>Parent-child LP relationships for traceability</description>
+      <columns>
+        id: UUID PRIMARY KEY
+        org_id: UUID FK → organizations
+        parent_lp_id: UUID FK → license_plates (consumed input LP)
+        child_lp_id: UUID FK → license_plates (NULL initially, filled during output registration Story 4.12)
+        wo_id: UUID FK → work_orders
+        reserved_at: TIMESTAMPTZ (when reservation created)
+        consumed_at: TIMESTAMPTZ (NULL until consumption in Story 4.12/4.13)
+        actual_consumed_qty: NUMERIC (NULL until consumption, calculated based on output qty)
+        created_at: TIMESTAMPTZ
+        updated_at: TIMESTAMPTZ
+      </columns>
+      <note>
+        Story 4.7 creates genealogy record with parent_lp_id populated, child_lp_id NULL.
+        Story 4.12 (output registration) fills child_lp_id and actual_consumed_qty.
+      </note>
+    </table>
+
+    <rls-policies>
+      <pattern>Standard tenant isolation (all tables)</pattern>
+      <sql>
+        CREATE POLICY "{table}_tenant_isolation" ON {table_name}
+          FOR ALL
+          USING (
+            current_setting('request.jwt.claims', true)::json->>'role' = 'service_role'
+            OR org_id = (auth.jwt() ->> 'org_id')::uuid
+          );
+      </sql>
+      <note>Always use createServerSupabaseAdmin() in services (service role)</note>
+    </rls-policies>
+  </database-schema>
+
+  <!-- ============================================================================ -->
+  <!-- API PATTERNS -->
+  <!-- ============================================================================ -->
+
+  <api-patterns>
+    <endpoint>
+      <method>POST</method>
+      <path>/api/production/work-orders/:id/materials/reserve</path>
+      <description>Reserve LP for WO material</description>
+      <request-body>
+        {
+          "lp_id": "uuid",
+          "material_id": "uuid",
+          "reserved_qty": "number",
+          "notes": "string (optional)"
+        }
+      </request-body>
+      <response-success status="200">
+        {
+          "success": true,
+          "reservation": {
+            "id": "uuid",
+            "wo_id": "uuid",
+            "material_id": "uuid",
+            "lp_id": "uuid",
+            "lp_number": "string",
+            "reserved_qty": "number",
+            "sequence_number": "number",
+            "status": "reserved",
+            "reserved_at": "timestamp"
+          },
+          "genealogy_id": "uuid"
+        }
+      </response-success>
+      <response-errors>
+        400: "LP has 10kg, requested 15kg for reservation"
+        400: "LP already reserved for this WO"
+        400: "WO not in progress"
+        400: "Material must use entire LP (50kg). Cannot reserve partial." (consume_whole_lp violation)
+        404: "Work order not found"
+        404: "License plate not found"
+        404: "Material not found in WO materials"
+      </response-errors>
+      <business-logic>
+        1. Validate WO exists and status = 'in_progress'
+        2. Validate material exists in wo_materials for this WO
+        3. Validate LP exists and has sufficient available qty
+        4. Validate LP.product_id matches material requirement
+        5. Check consume_whole_lp flag:
+           - If true: validate reserved_qty = LP.quantity exactly
+           - If false: validate reserved_qty ≤ LP.quantity
+        6. Check LP not already reserved for this WO (UNIQUE constraint)
+        7. Calculate sequence_number = MAX(sequence_number) + 1 for this wo_id + material_id
+        8. BEGIN TRANSACTION:
+           a. INSERT wo_material_reservations (wo_id, material_id, lp_id, reserved_qty, sequence_number, status='reserved', reserved_by, reserved_at=NOW())
+           b. UPDATE license_plates SET status='reserved' WHERE id=lp_id
+           c. INSERT lp_genealogy (parent_lp_id=lp_id, child_lp_id=NULL, wo_id, reserved_at=NOW())
+        9. COMMIT
+        10. Return reservation + genealogy_id
+      </business-logic>
+    </endpoint>
+
+    <existing-endpoints>
+      <endpoint path="/api/production/work-orders/:id" method="GET">
+        Get WO details (includes materials, operations, outputs)
+      </endpoint>
+      <endpoint path="/api/production/yield/pr" method="POST">
+        Record PR output (Story 4.12)
+      </endpoint>
+      <endpoint path="/api/production/yield/fg" method="POST">
+        Record FG output (Story 4.13)
+      </endpoint>
+      <endpoint path="/api/production/consume" method="POST">
+        Material consumption (triggered by output registration Story 4.12/4.13)
+      </endpoint>
+    </existing-endpoints>
+
+    <route-template>
+      <location>apps/frontend/app/api/production/work-orders/[id]/materials/reserve/route.ts</location>
+      <pattern>
+        import { createClient } from '@/lib/supabase/server'
+        import { NextResponse } from 'next/server'
+
+        export async function POST(req: Request, { params }: { params: { id: string } }) {
+          const supabase = await createClient()
+          const body = await req.json()
+
+          // Business logic here (validation, transaction)
+
+          const { data, error } = await supabase
+            .from('wo_material_reservations')
+            .insert({ ... })
+            .select()
+            .single()
+
+          if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+          return NextResponse.json(data)
+        }
+      </pattern>
+    </route-template>
+  </api-patterns>
+
+  <!-- ============================================================================ -->
+  <!-- TESTING STRATEGY -->
+  <!-- ============================================================================ -->
+
+  <testing-strategy>
+    <unit-tests>
+      <framework>Vitest</framework>
+      <location>apps/frontend/__tests__/unit/production/</location>
+      <coverage>
+        - Reservation validation logic (qty checks, consume_whole_lp enforcement)
+        - Sequence number calculation
+        - Error handling (insufficient qty, duplicate reservation, WO not in progress)
+        - LP status transitions
+      </coverage>
+    </unit-tests>
+
+    <integration-tests>
+      <framework>Playwright E2E</framework>
+      <location>tests/e2e/production/material-reservation.spec.ts</location>
+      <fixtures>
+        - createTestOrganization() → orgId
+        - createTestUser(orgId) → userId, token
+        - createTestWarehouses(orgId) → 2 warehouses
+        - createTestProducts(orgId, count) → RM products
+        - Create test WO with materials (wo_materials)
+        - Create test LPs with available qty
+      </fixtures>
+      <test-scenarios>
+        <scenario name="Reserve LP for material (normal flow)">
+          1. Create WO with status='in_progress', 1 material (Flour, qty_required=200kg, consume_whole_lp=false)
+          2. Create LP (Flour, qty=100kg, status='available')
+          3. Navigate to /production/work-orders/{wo_id}/materials
+          4. Click "Reserve" on Flour material
+          5. Modal opens: search LP by barcode
+          6. Enter LP barcode, qty=80kg
+          7. Click "Reserve"
+          8. Verify:
+             - wo_material_reservations created (reserved_qty=80kg, sequence_number=1, status='reserved')
+             - license_plates.status updated to 'reserved'
+             - lp_genealogy created (parent_lp_id populated, child_lp_id NULL)
+             - Materials table shows "Reserved: 80kg (LP-XXX #1) / Required 200kg"
+        </scenario>
+
+        <scenario name="Reserve multiple LPs in sequence">
+          1. Same WO setup (Flour, qty_required=200kg)
+          2. Create LP-A (100kg), LP-B (80kg), LP-C (50kg)
+          3. Reserve LP-A, 100kg → sequence_number=1
+          4. Reserve LP-B, 80kg → sequence_number=2
+          5. Reserve LP-C, 20kg → sequence_number=3
+          6. Verify: Materials table shows all 3 LPs in sequence order
+        </scenario>
+
+        <scenario name="Consume whole LP enforcement">
+          1. Create WO with material (Sugar, qty_required=100kg, consume_whole_lp=TRUE)
+          2. Create LP (Sugar, qty=50kg)
+          3. Click "Reserve"
+          4. Modal shows: "Entire LP: 50kg" (qty input disabled)
+          5. Click "Reserve Full LP"
+          6. Verify: reserved_qty=50kg (entire LP)
+          7. Try to reserve partial qty (40kg) via API → 400 error: "Material must use entire LP (50kg). Cannot reserve partial."
+        </scenario>
+
+        <scenario name="Error: Insufficient LP qty">
+          1. Create LP (Flour, qty=10kg)
+          2. Try to reserve 15kg
+          3. Verify: 400 error: "LP has 10kg, requested 15kg for reservation"
+        </scenario>
+
+        <scenario name="Error: LP already reserved">
+          1. Reserve LP-A for WO-001
+          2. Try to reserve LP-A again for same WO
+          3. Verify: 400 error: "LP already reserved for this WO"
+        </scenario>
+
+        <scenario name="Error: WO not in progress">
+          1. Create WO with status='draft'
+          2. Try to reserve LP
+          3. Verify: 400 error: "WO not in progress"
+        </scenario>
+
+        <scenario name="Mobile responsive view">
+          1. Set viewport to 640×800 (mobile)
+          2. Navigate to materials page
+          3. Verify: Table converts to card view with expand/collapse
+        </scenario>
+      </test-scenarios>
+    </integration-tests>
+
+    <e2e-configuration source="playwright.config.ts">
+      <browsers>chromium, firefox, webkit</browsers>
+      <timeout>60s</timeout>
+      <base-url>env NEXT_PUBLIC_APP_URL or http://localhost:5000</base-url>
+      <dev-server>cd apps/frontend &amp;&amp; pnpm dev</dev-server>
+      <auth-setup>
+        await context.addCookies([{
+          name: 'sb-auth',
+          value: token,
+          domain: new URL(baseURL!).hostname,
+          path: '/',
+        }])
+      </auth-setup>
+    </e2e-configuration>
+
+    <test-commands>
+      pnpm test              # Playwright E2E (all browsers)
+      pnpm test:e2e          # Alias for Playwright
+      pnpm test -- --headed  # With UI
+      pnpm test -- --debug   # Debug mode
+      pnpm test -- --project=chromium  # Specific browser
+    </test-commands>
+  </testing-strategy>
+
+  <!-- ============================================================================ -->
+  <!-- IMPLEMENTATION NOTES -->
+  <!-- ============================================================================ -->
+
+  <implementation-notes>
+    <dependencies>
+      <story id="3.10" title="Work Order CRUD with BOM Snapshot">
+        Provides wo_materials table with consume_whole_lp flag
+      </story>
+      <story id="4.9" title="Consume Whole LP Flag">
+        Adds consume_whole_lp business logic to wo_materials
+      </story>
+      <epic id="5" title="License Plates">
+        Provides license_plates table and LP scanning functionality
+      </epic>
+      <story id="4.12" title="Output Registration (PR)">
+        Consumes reserved materials based on output qty
+      </story>
+      <story id="4.13" title="Output Registration (FG)">
+        Consumes reserved materials for FG output
+      </story>
+      <story id="4.19" title="Genealogy Tracking">
+        Uses lp_genealogy table created in Story 4.7
+      </story>
+    </dependencies>
+
+    <file-structure>
+      apps/frontend/
+        app/api/production/work-orders/[id]/materials/reserve/route.ts  (NEW)
+        app/(authenticated)/production/work-orders/[id]/materials/page.tsx  (NEW)
+        components/production/MaterialsTable.tsx  (NEW)
+        components/production/ReserveMaterialModal.tsx  (NEW)
+        lib/validation/production-schemas.ts  (UPDATE - add reservation schema)
+      tests/e2e/production/material-reservation.spec.ts  (NEW)
+    </file-structure>
+
+    <role-based-access>
+      Allowed roles: operator, manager (production manager)
+      Check in API route:
+      - Verify user.role IN ('operator', 'manager')
+      - Return 403 if unauthorized
+    </role-based-access>
+
+    <optimizations>
+      <pagination>Materials table: 20 items per page</pagination>
+      <debounce>LP search input: 300ms debounce</debounce>
+      <caching>Use SWR for WO materials data fetching</caching>
+      <real-time>Subscribe to wo_material_reservations changes via Supabase Realtime (30s refresh)</real-time>
+    </optimizations>
+
+    <error-handling>
+      <client-side>
+        - Toast notifications for success/error
+        - Inline validation for qty input
+        - Loading states in modal
+      </client-side>
+      <server-side>
+        - Transaction rollback on any step failure
+        - Detailed error messages (400, 404, 500)
+        - Log errors to server console
+      </server-side>
+    </error-handling>
+  </implementation-notes>
+
+  <!-- ============================================================================ -->
+  <!-- RELATED STORIES -->
+  <!-- ============================================================================ -->
+
+  <related-stories>
+    <story id="3.10" relationship="prerequisite">Work Order CRUD with BOM Snapshot</story>
+    <story id="4.9" relationship="prerequisite">Consume Whole LP Flag</story>
+    <story id="4.12" relationship="next">Output Registration (PR) - consumes reserved materials</story>
+    <story id="4.13" relationship="next">Output Registration (FG) - consumes reserved materials</story>
+    <story id="4.18" relationship="related">LP Updates After Consumption</story>
+    <story id="4.19" relationship="integration">Genealogy Tracking - uses lp_genealogy table</story>
+  </related-stories>
+</story-context>

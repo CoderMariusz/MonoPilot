@@ -474,6 +474,7 @@ export class MaterialReservationService {
     // Create genealogy record (AC-4.7.10)
     // Note: reserved_qty is calculated from wo_material_reservations, not stored on wo_materials
     const { error: genealogyError } = await this.supabase.from('lp_genealogy').insert({
+      org_id: orgId,
       parent_lp_id: lpId,
       child_lp_id: null, // Will be filled in Story 4.12 output registration
       relationship_type: 'production',

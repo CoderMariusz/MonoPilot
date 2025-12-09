@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.32</id>
+    <title>Receive from PO (Desktop)</title>
+    <batch>5C-2</batch>
+    <points>8</points>
+    <effort_hours>8-10</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>Desktop UI for receiving goods against PO with GRN and LP creation (atomic transaction)</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.11">GRN and LP Creation</story>
+      <story id="3.1">Purchase Order</story>
+      <story id="5.31">Warehouse Settings</story>
+    </requires>
+    <enables>
+      <story id="5.35">Inventory Count</story>
+    </enables>
+  </dependencies>
+
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="GET" path="/api/warehouse/po-for-receiving">
+        <description>Get POs ready for receiving with line items</description>
+        <auth>authenticated</auth>
+        <response status="200" type="PO[]"/>
+      </endpoint>
+      <endpoint method="POST" path="/api/warehouse/receiving/from-po">
+        <description>Create GRN and LPs from PO (atomic transaction)</description>
+        <auth>authenticated</auth>
+        <request>
+          <field name="po_id" type="UUID"/>
+          <field name="items" type="array">
+            <item>
+              <field name="po_line_id" type="UUID"/>
+              <field name="qty_received" type="decimal"/>
+              <field name="batch_number" type="string" required="true"/>
+              <field name="location_id" type="UUID" required="true"/>
+            </item>
+          </field>
+        </request>
+        <response status="201">
+          <field name="grn_id" type="UUID"/>
+          <field name="grn_number" type="string"/>
+          <field name="lps_created" type="integer"/>
+        </response>
+      </endpoint>
+    </api_endpoints>
+
+    <services>
+      <service name="ReceivingService">
+        <method name="getPOsForReceiving" params="org_id" return="PO[]"/>
+        <method name="receiveFromPO" params="po_id, items" return="GRN"/>
+        <method name="validateReceive" params="po_id, items" return="ValidationError[]"/>
+      </service>
+    </services>
+
+    <frontend_routes>
+      <route path="/warehouse/receiving" method="GET" description="PO receiving page"/>
+    </frontend_routes>
+
+    <components_to_create>
+      <component name="ReceivingPage.tsx" path="src/components/warehouse/">
+        <description>List POs, expand to show lines, receive modal</description>
+      </component>
+      <component name="ReceiveModalComponent.tsx">
+        <description>Form for single/multiple line receiving</description>
+      </component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <criterion id="AC1">Navigate to /warehouse/receiving shows PO list</criterion>
+    <criterion id="AC2">Click PO expands line items with ordered/received/remaining</criterion>
+    <criterion id="AC3">Receive modal with qty, batch, expiry, location inputs</criterion>
+    <criterion id="AC4">Over-receipt validation based on warehouse_settings</criterion>
+    <criterion id="AC5">Create GRN and LPs atomically</criterion>
+    <criterion id="AC6">Update PO status on full receive</criterion>
+  </acceptance_criteria>
+
+  <test_plan>
+    <integration_tests>
+      <test name="Create GRN + LPs from PO (atomic transaction)"/>
+      <test name="Update PO received_qty correctly"/>
+      <test name="Status transition on full receive"/>
+    </integration_tests>
+    <e2e_tests>
+      <test name="Navigate to receiving → Find PO → Receive line item → Verify GRN created"/>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="critical">Atomic transaction: GRN + all LPs must succeed together or rollback</note>
+    <note priority="critical">Over-receipt depends on warehouse_settings.allow_over_receipt</note>
+    <note priority="high">Batch number required (traceability compliance)</note>
+  </implementation_notes>
+</story>

@@ -1,7 +1,8 @@
 /**
  * Scanner Layout
  * Story 5.23-5.27: Scanner Guided Workflows
- * Mobile-first layout with bottom nav and session timeout
+ * Story 5.36: Scanner Offline Queue - Core
+ * Mobile-first layout with bottom nav, session timeout, and offline support
  */
 
 'use client'
@@ -11,6 +12,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Home, Clock } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { OfflineQueueIndicator } from '@/components/scanner/OfflineQueueIndicator'
 
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000 // 15 minutes (Story 5.27)
 const WARNING_BEFORE_MS = 60 * 1000 // 1 minute warning
@@ -91,6 +93,9 @@ export default function ScannerLayout({ children }: { children: React.ReactNode 
               {isHome ? 'Scanner Terminal' : 'Scanner Operation'}
             </h1>
           </div>
+          {/* Offline Queue Indicator - Story 5.36 */}
+          <OfflineQueueIndicator />
+
           {showTimeoutWarning && (
             <div className="flex items-center gap-1 text-orange-600 text-sm">
               <Clock className="h-4 w-4" />

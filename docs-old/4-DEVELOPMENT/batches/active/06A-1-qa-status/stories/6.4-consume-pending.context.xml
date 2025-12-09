@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.4" epic="6" batch="06A-1">
+  <summary>Allow Admin to configure if pending LPs can be consumed in production with warning messages.</summary>
+
+  <tables>
+    <table name="quality_settings" operation="read"/>
+    <table name="license_plates" operation="read"/>
+  </tables>
+
+  <components>
+    <component name="QualitySettingsPage.tsx" type="page"/>
+    <component name="ConsumptionValidation.tsx" type="modal"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/settings" method="GET"/>
+    <route path="/api/warehouse/license-plates/validate-consumption" method="GET"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.1"/>
+  </dependencies>
+</story-context>

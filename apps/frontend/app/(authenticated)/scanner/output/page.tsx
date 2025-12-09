@@ -99,8 +99,8 @@ export default function ScannerOutputPage() {
       const response = await fetch(`/api/planning/work-orders?search=${encodeURIComponent(barcode)}`)
       if (!response.ok) throw new Error('Failed to search WO')
 
-      const { data } = await response.json()
-      const wo = data?.find((w: WOData) => w.wo_number === barcode || w.id === barcode)
+      const { work_orders } = await response.json()
+      const wo = work_orders?.find((w: WOData) => w.wo_number === barcode || w.id === barcode)
 
       if (!wo) {
         toast({ title: 'Error', description: 'Work Order not found', variant: 'destructive' })

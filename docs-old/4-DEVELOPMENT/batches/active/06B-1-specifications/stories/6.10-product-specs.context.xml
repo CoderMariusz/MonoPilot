@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.10" epic="6" batch="06B-1">
+  <summary>Allow QC users to define specifications per product with test parameters and limits.</summary>
+
+  <tables>
+    <table name="product_specifications" operation="create"/>
+    <table name="products" operation="read"/>
+  </tables>
+
+  <components>
+    <component name="ProductDetailPage.tsx" type="page"/>
+    <component name="SpecificationsTab.tsx" type="modal"/>
+    <component name="SpecificationFormModal.tsx" type="modal"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/specifications" method="POST"/>
+    <route path="/api/quality/specifications" method="PUT"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="Epic 2 (Products)"/>
+  </dependencies>
+</story-context>

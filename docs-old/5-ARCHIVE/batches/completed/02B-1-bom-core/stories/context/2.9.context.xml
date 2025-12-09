@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.9</id>
+    <title>BOM Timeline Visualization</title>
+    <batch>02B-1</batch>
+    <points>3</points>
+    <effort_hours>4-5</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Gantt-style timeline showing all BOM versions for a product with color-coded status.</description>
+
+  <dependencies>
+    <requires>
+      <story id="2.6">BOM CRUD</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/boms/timeline">
+        <query>product_id</query>
+        <response>Array of BOM with dates, version, status, color</response>
+      </endpoint>
+    </api_endpoints>
+
+    <visualization>
+      <library>Recharts or similar</library>
+      <x_axis>Date timeline</x_axis>
+      <bars>One bar per BOM version</bars>
+      <colors>
+        <color status="active">green</color>
+        <color status="draft">gray</color>
+        <color status="phased_out">orange</color>
+        <color status="inactive">red</color>
+      </colors>
+    </visualization>
+
+    <components_to_create>
+      <component name="BOMTimeline" path="app/technical/boms/components/BOMTimeline.tsx"/>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.9.1">Timeline shows all BOM versions for product</ac>
+    <ac id="2.9.2">Bars colored by status</ac>
+    <ac id="2.9.3">Click bar navigates to BOM detail</ac>
+    <ac id="2.9.4">Scrollable/zoomable for 10+ versions</ac>
+  </acceptance_criteria>
+</story>

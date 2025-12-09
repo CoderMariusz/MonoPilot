@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.29</id>
+    <title>Genealogy Recording</title>
+    <batch>5C-2</batch>
+    <points>5</points>
+    <effort_hours>5-6</effort_hours>
+    <status>todo</status>
+  </metadata>
+
+  <description>Record all LP relationships (split, merge, consume, produce) in lp_genealogy table with atomic transaction guarantee</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.1">License Plate Creation</story>
+      <story id="5.5">LP Split</story>
+      <story id="5.6">LP Merge</story>
+      <story id="4.7">WO Material Consumption</story>
+      <story id="4.12">WO Output Recording</story>
+    </requires>
+    <enables>
+      <story id="5.28">Forward/Backward Traceability</story>
+    </enables>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table>
+        <name>lp_genealogy</name>
+        <note>See Story 5.28 context for schema</note>
+      </table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="POST" path="/api/warehouse/lp-genealogy">
+        <description>Record genealogy relationship (internal service)</description>
+        <auth>service</auth>
+        <request>
+          <field name="parent_lp_id" type="UUID" required="false"/>
+          <field name="child_lp_id" type="UUID" required="false"/>
+          <field name="operation_type" type="enum" required="true" constraint="split|merge|consume|produce"/>
+          <field name="wo_id" type="UUID" required="false"/>
+        </request>
+      </endpoint>
+    </api_endpoints>
+
+    <services>
+      <service name="GenealoggyService">
+        <method name="recordSplit" params="parent_id, child_ids[]" return="void"/>
+        <method name="recordMerge" params="parent_ids[], child_id" return="void"/>
+        <method name="recordConsume" params="input_id, output_id, wo_id" return="void"/>
+        <method name="recordProduce" params="input_id, output_id, wo_id" return="void"/>
+      </service>
+    </services>
+  </technical_context>
+
+  <acceptance_criteria>
+    <criterion id="AC1">Record split genealogy with parent-child links</criterion>
+    <criterion id="AC2">Record merge genealogy with multiple sources</criterion>
+    <criterion id="AC3">Record consume genealogy with WO reference</criterion>
+    <criterion id="AC4">Genealogy records are immutable (no UPDATE/DELETE)</criterion>
+    <criterion id="AC5">Genealogy creation is atomic with LP operation</criterion>
+  </acceptance_criteria>
+
+  <test_plan>
+    <unit_tests>
+      <test name="Record split: parent-child links created"/>
+      <test name="Record merge: all source-target links created"/>
+      <test name="Immutability: UPDATE blocked"/>
+      <test name="Immutability: DELETE blocked"/>
+    </unit_tests>
+    <integration_tests>
+      <test name="Split operation + genealogy both succeed or both fail"/>
+      <test name="Genealogy records readable after split"/>
+    </integration_tests>
+    <e2e_tests>
+      <test name="Perform split → verify genealogy recorded → trace forward"/>
+    </e2e_tests>
+  </test_plan>
+
+  <implementation_notes>
+    <note priority="critical">Genealogy must be atomic with LP operation - if operation fails, genealogy not created</note>
+    <note priority="critical">FDA compliance: Genealogy is immutable audit trail for food safety recalls</note>
+    <note priority="high">Use database trigger to prevent UPDATE/DELETE on genealogy records</note>
+  </implementation_notes>
+</story>

@@ -276,6 +276,9 @@ export async function registerOutput(
       expiry_date: expiryDate,
       manufacturing_date: new Date().toISOString().split('T')[0],
       created_by: userId,
+      // Story 5.30: Source document tracking
+      source_type: 'production',
+      source_wo_id: input.woId,
     })
     .select()
     .single()
@@ -406,7 +409,8 @@ export async function registerOutput(
         input.woId,
         outputLp.id,
         genealogyInputs,
-        userId
+        userId,
+        orgId
       )
       genealogyCount = genealogyRecords.length
     } catch (gErr) {
@@ -418,6 +422,7 @@ export async function registerOutput(
   // Handle over-production genealogy (AC-4.12b.10)
   if (input.isOverProduction && input.overProductionParentLpId) {
     await supabase.from('lp_genealogy').insert({
+      org_id: orgId,
       parent_lp_id: input.overProductionParentLpId,
       child_lp_id: outputLp.id,
       relationship_type: 'production',

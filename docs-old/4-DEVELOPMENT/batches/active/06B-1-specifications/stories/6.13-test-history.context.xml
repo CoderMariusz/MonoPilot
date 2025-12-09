@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.13" epic="6" batch="06B-1">
+  <summary>View complete test history for any LP with filters.</summary>
+
+  <tables>
+    <table name="test_results" operation="read"/>
+    <table name="license_plates" operation="read"/>
+  </tables>
+
+  <components>
+    <component name="LPDetailPage.tsx" type="page"/>
+    <component name="TestHistoryTab.tsx" type="table"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/test-results" method="GET"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.12"/>
+  </dependencies>
+</story-context>

@@ -467,10 +467,10 @@ export async function listWorkOrders(
       .eq('org_id', orgId)
 
     // Apply filters
+    // Note: PostgREST .or() doesn't support relation columns (products.name)
+    // Search only by wo_number from main table
     if (filters.search) {
-      query = query.or(
-        `wo_number.ilike.%${filters.search}%,products.name.ilike.%${filters.search}%`
-      )
+      query = query.ilike('wo_number', `%${filters.search}%`)
     }
 
     if (filters.status) {

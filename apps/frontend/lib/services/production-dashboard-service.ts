@@ -47,7 +47,7 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
     const { data: completedOrders, error: ordersError } = await supabase
       .from('work_orders')
       .select('id')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .eq('status', 'completed')
       .gte('completed_at', `${today}T00:00:00Z`)
       .lt('completed_at', `${today}T23:59:59Z`)
@@ -58,19 +58,19 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
     // 2. Units produced today
     const { data: outputs, error: outputError } = await supabase
       .from('production_outputs')
-      .select('qty')
+      .select('quantity')
       .eq('organization_id', orgId)
       .gte('created_at', `${today}T00:00:00Z`)
       .lt('created_at', `${today}T23:59:59Z`)
 
     if (outputError) throw outputError
-    const units_produced_today = outputs?.reduce((sum, o) => sum + (o.qty || 0), 0) || 0
+    const units_produced_today = outputs?.reduce((sum, o) => sum + (Number(o.quantity) || 0), 0) || 0
 
     // 3. Average yield today (weighted: SUM(actual_output) / SUM(planned_qty))
     const { data: yieldData, error: yieldError } = await supabase
       .from('work_orders')
-      .select('planned_qty, output_qty')
-      .eq('organization_id', orgId)
+      .select('planned_quantity, output_qty')
+      .eq('org_id', orgId)
       .eq('status', 'completed')
       .gte('completed_at', `${today}T00:00:00Z`)
       .lt('completed_at', `${today}T23:59:59Z`)
@@ -79,7 +79,7 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
 
     let avg_yield_today = 0
     if (yieldData && yieldData.length > 0) {
-      const totalPlanned = yieldData.reduce((sum, wo) => sum + (wo.planned_qty || 0), 0)
+      const totalPlanned = yieldData.reduce((sum, wo) => sum + (wo.planned_quantity || 0), 0)
       const totalActual = yieldData.reduce((sum, wo) => sum + (wo.output_qty || 0), 0)
       avg_yield_today = totalPlanned > 0 ? (totalActual / totalPlanned) * 100 : 0
     }
@@ -88,7 +88,7 @@ export async function getKPIs(orgId: string): Promise<KPIData> {
     const { data: activeWOs, error: activeError } = await supabase
       .from('work_orders')
       .select('id')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .in('status', ['in_progress', 'paused'])
 
     if (activeError) throw activeError
@@ -126,6 +126,7 @@ export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<Ac
   const supabase = createServerSupabaseAdmin()
 
   try {
+    // Note: work_orders.production_line_id references machines table, not production_lines
     const { data, error } = await supabase
       .from('work_orders')
       .select(
@@ -133,7 +134,7 @@ export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<Ac
         id,
         wo_number,
         product_id,
-        planned_qty,
+        planned_quantity,
         output_qty,
         status,
         started_at,
@@ -141,12 +142,12 @@ export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<Ac
         products (
           name
         ),
-        production_lines (
+        machines:production_line_id (
           name
         )
       `
       )
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .in('status', ['in_progress', 'paused'])
       .order('started_at', { ascending: true })
       .limit(limit)
@@ -158,12 +159,12 @@ export async function getActiveWorkOrders(orgId: string, limit = 10): Promise<Ac
         id: wo.id,
         wo_number: wo.wo_number,
         product_name: wo.products?.name || 'Unknown',
-        planned_qty: wo.planned_qty || 0,
+        planned_qty: wo.planned_quantity || 0,
         output_qty: wo.output_qty || 0,
         status: wo.status,
-        progress_percent: wo.planned_qty ? (wo.output_qty / wo.planned_qty) * 100 : 0,
+        progress_percent: wo.planned_quantity ? (wo.output_qty / wo.planned_quantity) * 100 : 0,
         started_at: wo.started_at,
-        line_name: wo.production_lines?.name || 'Unassigned',
+        line_name: wo.machines?.name || 'Unassigned',
       })) || []
     )
   } catch (error) {
@@ -210,7 +211,7 @@ export async function getAlerts(orgId: string, limit = 5): Promise<Alert[]> {
     const { data: delayedWOs, error: delayError } = await supabase
       .from('work_orders')
       .select('id, wo_number, scheduled_completion_date')
-      .eq('organization_id', orgId)
+      .eq('org_id', orgId)
       .in('status', ['in_progress', 'paused'])
       .lt('scheduled_completion_date', delayThreshold)
       .limit(10)
@@ -231,8 +232,8 @@ export async function getAlerts(orgId: string, limit = 5): Promise<Alert[]> {
     // 3. Quality holds (QA status = 'hold' on input LPs)
     const { data: qualityHolds, error: qaError } = await supabase
       .from('license_plates')
-      .select('id, wo_id, qa_status')
-      .eq('organization_id', orgId)
+      .select('id, consumed_by_wo_id, qa_status')
+      .eq('org_id', orgId)
       .eq('qa_status', 'hold')
       .limit(10)
 
@@ -243,7 +244,7 @@ export async function getAlerts(orgId: string, limit = 5): Promise<Alert[]> {
           type: 'quality_hold',
           severity: 'critical',
           description: `Quality hold placed on material`,
-          wo_id: lp.wo_id,
+          wo_id: lp.consumed_by_wo_id,
           created_at: new Date().toISOString(),
         })
       })

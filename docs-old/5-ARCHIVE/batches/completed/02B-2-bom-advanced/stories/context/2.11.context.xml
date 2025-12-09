@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.11</id>
+    <title>BOM Compare</title>
+    <batch>02B-2</batch>
+    <points>3</points>
+    <effort_hours>4-5</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Side-by-side diff view showing added, removed, and changed items between two BOM versions.</description>
+
+  <dependencies>
+    <requires>
+      <story id="2.6">BOM CRUD</story>
+      <story id="2.7">BOM Items</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/boms/compare">
+        <query>v1 (BOM id), v2 (BOM id)</query>
+        <response>
+          {
+            added: BOMItem[],     // In v2 not in v1
+            removed: BOMItem[],   // In v1 not in v2
+            changed: [{item_v1, item_v2, changes}],
+            unchanged: BOMItem[]
+          }
+        </response>
+        <comparison_logic>Match items by product_id</comparison_logic>
+      </endpoint>
+    </api_endpoints>
+
+    <components_to_create>
+      <component name="BOMCompareDialog" path="app/technical/boms/components/BOMCompareDialog.tsx">
+        Version selectors + diff table with color coding
+      </component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.11.1">Compare button requires 2+ versions</ac>
+    <ac id="2.11.2">Select 2 versions in dropdowns</ac>
+    <ac id="2.11.3">Diff view: green=added, red=removed, yellow=changed, gray=unchanged</ac>
+    <ac id="2.11.4">Match items by product_id</ac>
+  </acceptance_criteria>
+</story>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>5.23a</id>
+    <title>Scanner Workflow Definitions - Technical Foundation</title>
+    <batch>05C-1</batch>
+    <status>drafted</status>
+    <type>Technical Foundation</type>
+  </metadata>
+
+  <description>Define workflow state machines and step configurations for all scanner operations</description>
+
+  <dependencies>
+    <requires>
+      <story id="5.1">License Plates</story>
+      <story id="5.11">GRN &amp; LP Creation</story>
+    </requires>
+    <used_by>
+      <story id="5.23">Scanner Guided Workflows</story>
+      <story id="5.26">Scanner Operations Menu</story>
+      <story id="5.27">Scanner Session Timeout</story>
+      <story id="5.34">Scanner Receive Workflow</story>
+      <story id="5.35">Inventory Count</story>
+    </used_by>
+  </dependencies>
+
+  <technical_context>
+    <workflow_types>
+      <type name="receive">Receive from PO/TO/Manual</type>
+      <type name="put_away">Move received LP to storage</type>
+      <type name="pick">Allocate for WO/TO</type>
+      <type name="consume">Record WO material consumption</type>
+      <type name="output">Record WO finished product</type>
+      <type name="move">Relocate between locations</type>
+      <type name="count">Physical inventory count</type>
+    </workflow_types>
+
+    <step_actions>
+      <action>scan_barcode</action>
+      <action>select_option</action>
+      <action>enter_number</action>
+      <action>enter_text</action>
+      <action>confirm</action>
+    </step_actions>
+
+    <barcode_patterns>
+      <pattern type="LP">LP-\d{8}-\d{4}</pattern>
+      <pattern type="PO">PO-\d+</pattern>
+      <pattern type="TO">TO-\d+</pattern>
+      <pattern type="WO">WO-\d+</pattern>
+      <pattern type="Location">LOC-\d+</pattern>
+    </barcode_patterns>
+
+    <tables>
+      <table>
+        <name>scanner_workflow_configs</name>
+        <description>Workflow definitions with steps JSON</description>
+      </table>
+      <table>
+        <name>workflow_customizations</name>
+        <description>Org-level workflow overrides</description>
+      </table>
+    </tables>
+
+    <offline_support>
+      <note>Steps 1-6 cached in IndexedDB</note>
+      <note>Final step synced on reconnect</note>
+    </offline_support>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">7 workflows fully specified (receive, put_away, pick, consume, output, move, count)</ac>
+    <ac id="2">Each workflow defines: steps, validations, error handling, UI components</ac>
+    <ac id="3">State machine transitions documented (forward, backward, exit)</ac>
+    <ac id="4">Barcode format recognition patterns defined</ac>
+    <ac id="5">Offline support: workflows cached in IndexedDB</ac>
+    <ac id="6">Error handling: non-fatal, user can retry/skip/abandon</ac>
+    <ac id="7">Localization: instructions translatable per org/locale</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="SC-FR-01">System shall define scanner workflow configurations</fr>
+  </functional_requirements>
+</story>

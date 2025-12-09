@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>2.24</id>
+    <title>Allergen Matrix Visualization</title>
+    <batch>02E-1</batch>
+    <points>3</points>
+    <effort_hours>4-5</effort_hours>
+    <status>pending</status>
+  </metadata>
+
+  <description>Matrix view of Products × Allergens with color coding and Excel export.</description>
+
+  <dependencies>
+    <requires>
+      <story id="2.4">Product Allergens</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <api_endpoints>
+      <endpoint method="GET" path="/api/technical/dashboard/allergen-matrix">
+        <query>product_type[], sort_by=allergen_count, limit, offset</query>
+        <response>matrix: AllergenMatrixRow[], allergens: Allergen[], total</response>
+      </endpoint>
+      <endpoint method="POST" path="/api/technical/dashboard/allergen-matrix/export">
+        <body>filters</body>
+        <response>excel_url</response>
+      </endpoint>
+    </api_endpoints>
+
+    <matrix_structure>
+      <rows>Products (product_id, code, name, type)</rows>
+      <columns>Allergens (14 EU + custom)</columns>
+      <cells>contains | may_contain | none</cells>
+    </matrix_structure>
+
+    <color_coding>
+      <color value="contains">Red</color>
+      <color value="may_contain">Yellow</color>
+      <color value="none">Green</color>
+    </color_coding>
+
+    <components_to_create>
+      <component name="AllergenMatrix" path="app/technical/dashboard/components/AllergenMatrix.tsx"/>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="2.24.1">Matrix with Products (rows) × Allergens (columns)</ac>
+    <ac id="2.24.2">Color coding: Red, Yellow, Green</ac>
+    <ac id="2.24.3">Filter by product type, category</ac>
+    <ac id="2.24.4">Sort by allergen count</ac>
+    <ac id="2.24.5">Export to Excel</ac>
+  </acceptance_criteria>
+</story>

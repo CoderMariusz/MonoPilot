@@ -1,0 +1,1045 @@
+# Shipping Module - UX Design Specification
+
+**Date:** 2025-11-19
+**Updated:** 2025-11-27 - Integrated with Shared System
+**Version:** 2.0
+**Status:** Ready for Implementation
+**Priority:** P1 (Outbound Logistics)
+
+---
+
+## 🔗 SHARED UI SYSTEM INTEGRATION (v2.0)
+
+Shipping Module now integrates with [Shared UI Design System](./ux-design-shared-system.md).
+
+**Applied Components:**
+- ✅ **ModuleHeader**: Shipping | Sales Orders | Picking | Packing | Shipments | ⚙️
+- ✅ **Stats Cards**: 4 cards (Orders, Picking, Packed, Shipped) - 120px, 2×2 grid
+- ✅ **DataTable Base**: Sales Orders table, Picking list, Shipment list (sortable, filterable)
+- ✅ **Colors**: app-colors.ts (green Create, gray View/Edit, red Delete)
+- ✅ **Mobile Responsive**: Tables → Card view on < 768px
+- ✅ **Dark Mode**: Settings → Appearance
+
+**Shipping-Specific Features (Enhanced):**
+- 🎯 **Sales Order Management** - Customer orders, lines, status tracking
+- 🎯 **Picking Workflow** - License plate selection, quantity management
+- 🎯 **Packing Workflow** - Box/container assignment, weight tracking
+- 🎯 **Shipment Tracking** - Carrier integration, tracking numbers, delivery confirmation
+- 🎯 **Document Generation** - Packing slips, shipping labels, COCs (Certificates of Conformance)
+
+**Layout:**
+```
+ModuleHeader: Shipping│SO│Picking│Packing│Shipments│⚙️  ← Shared
+[Create SO] [Print Labels] [Generate Docs]              ← Shared buttons
+[Stats Cards: Orders, Picking, Packed, Shipped]         ← Shared (4 cards)
+[SO Table] [Picking List] [Shipment Status]             ← Shipping-specific (Shared table base)
+Customer tracking, Carrier integration, Documents       ← Shipping-specific
+```
+
+---
+
+## Table of Contents
+
+1. [Executive Summary](#1-executive-summary)
+2. [Project & Users Context](#2-project--users-context)
+3. [Design System](#3-design-system)
+4. [Desktop UX - Sales Orders](#4-desktop-ux---sales-orders)
+5. [Desktop UX - Picking](#5-desktop-ux---picking)
+6. [Desktop UX - Packing](#6-desktop-ux---packing)
+7. [Desktop UX - Shipments](#7-desktop-ux---shipments)
+8. [Scanner UX - Mobile Workflows](#8-scanner-ux---mobile-workflows)
+9. [Documents & Labels](#9-documents--labels)
+10. [Component Library](#10-component-library)
+11. [Implementation Roadmap](#11-implementation-roadmap)
+12. [Success Metrics](#12-success-metrics)
+13. [Appendix](#13-appendix)
+
+---
+
+## 1. Executive Summary
+
+### Problem Statement
+
+Outbound logistics in manufacturing requires efficient order fulfillment, picking, packing, and shipping. Current challenges include:
+
+- **Manual picking**: Paper-based with no optimization
+- **No picking strategies**: No FIFO/FEFO enforcement
+- **Slow packing**: Manual item verification
+- **Limited visibility**: No real-time order status
+- **Document overhead**: Manual generation of BOL, packing slips
+
+### Solution Overview
+
+A **hybrid picking-packing system** with:
+
+1. **Paper + Scanner Picking** - Toggle between printed pick lists and scanner-guided workflows
+2. **Scan-to-Pack** - Barcode-driven packing verification
+3. **Generic Carrier Support** - User-configurable carriers with PDF BOL generation
+4. **Real-time Status** - Live order tracking through fulfillment lifecycle
+
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Picking method | Both (paper + scanner toggle) | Supports different warehouse setups |
+| Packing interface | Scan-to-pack | Eliminates manual errors |
+| Carrier integration | Generic (user configures) | Flexible for all carriers |
+| BOL format | PDF generation | Universal, printable |
+
+### Expected Impact
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Picking time | 5 min/order | 2 min/order | **60% faster** |
+| Packing errors | 5% | <1% | **80% reduction** |
+| Pick accuracy | 92% | 99%+ | **7% improvement** |
+| Shipping documentation | 10 min | 30s | **95% faster** |
+
+---
+
+## 2. Project & Users Context
+
+### User Personas
+
+#### Primary Persona: Warehouse Picker (Mobile Scanner)
+
+- **Role:** Executes pick lists, collects items from locations
+- **Device:** Mobile PWA or paper pick list (toggle)
+- **Daily volume:** 20-50 pick lists per shift
+- **Needs:**
+  - Efficient pick path routing
+  - Clear location guidance
+  - Easy short handling
+  - Offline capability (scanner)
+- **Pain points:**
+  - Walking back and forth (no optimized route)
+  - Wrong item picked (no validation)
+  - Paper lists get lost/damaged
+
+#### Secondary Persona: Pack Station Operator (Desktop + Scanner)
+
+- **Role:** Verifies picked items, packs into boxes, applies labels
+- **Device:** Desktop + handheld scanner
+- **Daily volume:** 30-80 packages per shift
+- **Needs:**
+  - Quick scan verification
+  - Auto-weight capture
+  - Label printing
+  - Packing slip generation
+- **Pain points:**
+  - Manual item counting
+  - Wrong items shipped
+  - Label printing delays
+
+#### Tertiary Persona: Shipping Supervisor (Desktop)
+
+- **Role:** Manages orders, assigns pickers, tracks shipments
+- **Device:** Desktop (1920×1080)
+- **Needs:**
+  - Order overview dashboard
+  - Priority management
+  - Performance tracking
+  - Carrier coordination
+- **Pain points:**
+  - No visibility into floor status
+  - Manual report generation
+  - Delayed carrier updates
+
+### Platform Requirements
+
+| Platform | Users | Primary Use | Priority |
+|----------|-------|-------------|----------|
+| Desktop | 30% | Order management, packing | P0 |
+| Mobile Scanner | 50% | Picking, verification | P0 |
+| Paper | 20% | Backup picking | P1 |
+
+---
+
+## 3. Design System
+
+### Color Palette
+
+Following MonoPilot design system with shipping-specific states:
+
+#### Order Status Colors
+```css
+--so-draft: #94a3b8;        /* Gray-400 */
+--so-confirmed: #3b82f6;    /* Blue-500 */
+--so-picking: #8b5cf6;      /* Violet-500 */
+--so-packed: #f59e0b;       /* Amber-500 */
+--so-shipped: #22c55e;      /* Green-500 */
+--so-delivered: #10b981;    /* Emerald-500 */
+--so-cancelled: #ef4444;    /* Red-500 */
+```
+
+#### Pick Status Colors
+```css
+--pick-pending: #eab308;    /* Yellow-500 */
+--pick-in-progress: #3b82f6; /* Blue-500 */
+--pick-completed: #22c55e;  /* Green-500 */
+--pick-short: #f97316;      /* Orange-500 */
+```
+
+#### Priority Colors
+```css
+--priority-urgent: #ef4444; /* Red-500 */
+--priority-high: #f97316;   /* Orange-500 */
+--priority-normal: #3b82f6; /* Blue-500 */
+--priority-low: #94a3b8;    /* Gray-400 */
+```
+
+---
+
+## 4. Desktop UX - Sales Orders
+
+### 4.1 SO List View
+
+**Route:** `/shipping/sales-orders`
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Sales Orders                                    [+ New Order]  │
+├─────────────────────────────────────────────────────────────────┤
+│  Status: [All ▼]  Customer: [All ▼]  Priority: [All ▼]         │
+│  Date: [This week ▼]  Warehouse: [Main ▼]  [Search...]         │
+├─────────────────────────────────────────────────────────────────┤
+│  SO Number    Customer       Date    Items  Ship Date  Status   │
+│  ─────────────────────────────────────────────────────────────  │
+│  SO-2025-001  ABC Corp      Jan 19   5      Jan 20    ● Confirm │
+│  SO-2025-002  XYZ Ltd       Jan 19   3      Jan 21    ● Pick    │
+│  SO-2025-003  123 Foods     Jan 18   8      Jan 19    ● Packed  │
+│  SO-2024-998  Best Buy      Jan 17   12     Jan 18    ✓ Ship    │
+│  ...                                                             │
+├─────────────────────────────────────────────────────────────────┤
+│  Showing 1-50 of 234  [< 1 2 3 ... 5 >]                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Table Columns
+
+| Column | Width | Sortable | Description |
+|--------|-------|----------|-------------|
+| SO Number | 120px | Yes | Clickable → details |
+| Customer | 180px | Yes | Customer name |
+| Order Date | 100px | Yes | When ordered |
+| Items | 60px | Yes | Line count |
+| Ship Date | 100px | Yes | Requested date |
+| Priority | 80px | Yes | Color-coded badge |
+| Status | 100px | Yes | Color-coded badge |
+| Actions | 80px | No | [...] menu |
+
+#### Quick Actions
+
+- **Confirm**: Move from draft to confirmed
+- **Generate Pick**: Create pick list
+- **Ship**: Mark as shipped
+
+### 4.2 Create SO Modal
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  New Sales Order                                       [X Close]│
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Customer        [Search customer...        ] [+ New]           │
+│                                                                 │
+│  Ship-to Address                                                │
+│  [123 Main Street                          ]                    │
+│  [City, State, ZIP                         ]                    │
+│  [Country                                  ]                    │
+│                                                                 │
+│  Requested Date  [2025-01-20    ] 📅                           │
+│  Warehouse       [Main Warehouse ▼]                             │
+│  Priority        [Normal ▼]                                     │
+│                                                                 │
+│  ─────────────────────────────────                              │
+│                                                                 │
+│  Order Lines                                      [+ Add Line]  │
+│  Product           Qty    UoM   Price    Total                  │
+│  ───────────────────────────────────────────────────            │
+│  [Chicken Breast▼] [100 ] [kg]  [12.50]  1,250.00  [X]         │
+│  [Flour         ▼] [500 ] [kg]  [2.00 ]  1,000.00  [X]         │
+│  [________________]                                             │
+│                                                                 │
+│                              Order Total: 2,250.00              │
+│                                                                 │
+│  Notes           [________________________]                     │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  [Cancel]                           [Save Draft] [Save & Confirm]│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 4.3 SO Detail View
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SO-2025-001                                           [X Close]│
+├─────────────────────────────────────────────────────────────────┤
+│  [Overview] [Lines] [Shipments] [History]                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Customer        ABC Corporation                                │
+│  Status          ● Confirmed                                    │
+│  Priority        Normal                                         │
+│                                                                 │
+│  Order Date      2025-01-19                                     │
+│  Requested Date  2025-01-20                                     │
+│  Ship From       Main Warehouse                                 │
+│                                                                 │
+│  Ship To:                                                       │
+│  123 Main Street                                                │
+│  Chicago, IL 60601                                              │
+│                                                                 │
+│  ─────────────────────────────────                              │
+│                                                                 │
+│  Lines (5)                                                      │
+│  Product           Ordered  Picked   Shipped  Status            │
+│  Chicken Breast    100 kg   100 kg   0 kg     ● Picked          │
+│  Flour             500 kg   500 kg   0 kg     ● Picked          │
+│  Sugar             250 kg   200 kg   0 kg     ● Short           │
+│  ...                                                             │
+│                                                                 │
+│  Order Total: $2,250.00                                         │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  [Edit] [Generate Pick] [Create Shipment] [Cancel Order]        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 5. Desktop UX - Picking
+
+### 5.1 Pick List View
+
+**Route:** `/shipping/pick-lists`
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Pick Lists                                    [+ Generate Pick]│
+├─────────────────────────────────────────────────────────────────┤
+│  Status: [Pending ▼]  Assigned: [All ▼]  Date: [Today ▼]       │
+├─────────────────────────────────────────────────────────────────┤
+│  Pick #      SO/Shipment   Items  Status      Assigned  Priority│
+│  ─────────────────────────────────────────────────────────────  │
+│  PICK-001    SO-2025-001   5      ● Pending   —         High    │
+│  PICK-002    SO-2025-002   3      ● Progress  Jan K.    Normal  │
+│  PICK-003    SH-2025-001   8      ✓ Complete  Maria N.  Normal  │
+│  ...                                                             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Pick Detail View
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PICK-001 (SO-2025-001)                                [X Close]│
+├─────────────────────────────────────────────────────────────────┤
+│  Status: ● In Progress    Assigned: Jan Kowalski               │
+│  Progress: 3/5 items (60%)  ━━━━━━━━━━░░░░░                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Pick Items (sorted by location path)                           │
+│                                                                 │
+│  □  Location  Product         Required  Picked  LP        Status│
+│  ─────────────────────────────────────────────────────────────  │
+│  ✓  A-01-01   Chicken Breast  100 kg    100     LP250119  ✓ Done│
+│  ✓  A-01-02   Flour           500 kg    500     LP250118  ✓ Done│
+│  ✓  B-02-01   Sugar           250 kg    200     LP250120  ⚠ Short│
+│  □  B-03-01   Milk            200 L     —       LP250121  ○ Pend │
+│  □  C-01-01   Eggs            50 doz    —       LP250122  ○ Pend │
+│                                                                 │
+│  ─────────────────────────────────                              │
+│                                                                 │
+│  Suggested LP: LP250121-001                                     │
+│  Location: B-03-01 (Storage Zone B)                             │
+│  Available: 200 L (Full LP)                                     │
+│  Expiry: 2025-02-28  QA: ● Passed                              │
+│                                                                 │
+│  [Select Different LP]                                          │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  [Print Pick List]  [Assign]           [Start] [Complete Pick]  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 5.3 Picking Mode Toggle
+
+**Both paper and scanner supported with toggle:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Generate Pick List                                    [X Close]│
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Source            ○ Sales Order   ○ Shipment                   │
+│  Select            [SO-2025-001 ▼]                              │
+│                                                                 │
+│  Picking Strategy  [FIFO ▼]                                     │
+│                    ○ FIFO (First In First Out)                  │
+│                    ○ FEFO (First Expiry First Out)              │
+│                    ○ Manual (User selects LP)                   │
+│                                                                 │
+│  ─────────────────────────────────                              │
+│                                                                 │
+│  Picking Method                                                 │
+│  ┌──────────────────┐  ┌──────────────────┐                    │
+│  │  📄 Paper        │  │  📱 Scanner      │                    │
+│  │  Print pick list │  │  Mobile guided   │                    │
+│  │  Manual confirm  │  │  Scan to confirm │                    │
+│  └──────────────────┘  └──────────────────┘                    │
+│                                                                 │
+│  □ Optimize pick path (sort by location)                       │
+│  □ Assign to picker: [Select user... ▼]                        │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  [Cancel]                              [Generate & Print/Send]  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 5.4 Paper Pick List (Printable)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PICK LIST: PICK-001                                            │
+│  Date: 2025-01-19                   Warehouse: Main Warehouse   │
+│  SO: SO-2025-001                    Customer: ABC Corporation   │
+│  Assigned: ________________         Priority: HIGH              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  #   Location   Product         Required  Picked  LP Number     │
+│  ─────────────────────────────────────────────────────────────  │
+│  1   A-01-01    Chicken Breast  100 kg    ____    ____________  │
+│  2   A-01-02    Flour           500 kg    ____    ____________  │
+│  3   B-02-01    Sugar           250 kg    ____    ____________  │
+│  4   B-03-01    Milk            200 L     ____    ____________  │
+│  5   C-01-01    Eggs            50 doz    ____    ____________  │
+│                                                                 │
+│  Notes: _____________________________________________________   │
+│  ____________________________________________________________   │
+│                                                                 │
+│  Picker Signature: ___________________  Date/Time: ___________  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 6. Desktop UX - Packing
+
+### 6.1 Pack Station Interface
+
+**Route:** `/shipping/pack-station`
+
+**Scan-to-pack workflow:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Pack Station                                                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Shipment/SO  [SH-2025-001          ] [Scan] or [Select ▼]     │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                         │                                       │
+│  Items to Pack (5)      │  Current Package                      │
+│  ─────────────────────  │  ─────────────────────────────────    │
+│                         │                                       │
+│  ○ Chicken Breast 100kg │  Package: PKG-001                     │
+│  ○ Flour 500kg          │  Type: [Standard Box ▼]               │
+│  ○ Sugar 250kg          │                                       │
+│  ○ Milk 200L            │  Scan item to add:                    │
+│  ○ Eggs 50doz           │  [                      ] [📷]        │
+│                         │                                       │
+│                         │  Added to package:                    │
+│                         │  ✓ Chicken Breast 100kg               │
+│                         │  ✓ Flour 500kg                        │
+│                         │                                       │
+│                         │  Weight: [28.5    ] kg                │
+│                         │                                       │
+│                         │  [Complete Package] [New Package]     │
+│                         │                                       │
+├─────────────────────────┴───────────────────────────────────────┤
+│                                                                 │
+│  Completed Packages (2)                                         │
+│  PKG-001: 2 items, 28.5 kg  [Print Label]                      │
+│  PKG-002: 1 item, 12.0 kg   [Print Label]                      │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  [Print All Labels]  [Print Packing Slip]  [Complete Shipment]  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 6.2 Scan-to-Pack Flow
+
+1. **Select Shipment** - Scan shipment barcode or select from list
+2. **Create Package** - System creates new package
+3. **Scan Items** - Scan LP barcode to add to package
+4. **Validate** - System verifies LP against shipment
+5. **Enter Weight** - Manual or scale integration
+6. **Complete Package** - Print label, close package
+7. **Repeat** - Until all items packed
+8. **Complete Shipment** - Print packing slip, mark ready to ship
+
+---
+
+## 7. Desktop UX - Shipments
+
+### 7.1 Shipment List View
+
+**Route:** `/shipping/shipments`
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Shipments                                     [+ New Shipment] │
+├─────────────────────────────────────────────────────────────────┤
+│  Status: [All ▼]  Carrier: [All ▼]  Date: [This week ▼]        │
+├─────────────────────────────────────────────────────────────────┤
+│  Shipment #    Customer      Date    Packages  Carrier  Status  │
+│  ─────────────────────────────────────────────────────────────  │
+│  SH-2025-001   ABC Corp     Jan 19   3         FedEx    ● Pack  │
+│  SH-2025-002   XYZ Ltd      Jan 19   2         DHL      ● Ship  │
+│  SH-2024-998   123 Foods    Jan 18   5         UPS      ✓ Deliv │
+│  ...                                                             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 7.2 Shipment Detail View
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SH-2025-001                                           [X Close]│
+├─────────────────────────────────────────────────────────────────┤
+│  [Overview] [Packages] [Documents] [Tracking]                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Status          ● Packed (Ready to Ship)                       │
+│  Customer        ABC Corporation                                │
+│  Ship Date       2025-01-20                                     │
+│                                                                 │
+│  Carrier         [FedEx              ▼]  ← User configures      │
+│  Service         [Ground             ▼]                         │
+│  Tracking #      [___________________]                          │
+│                                                                 │
+│  ─────────────────────────────────                              │
+│                                                                 │
+│  Ship To:                                                       │
+│  ABC Corporation                                                │
+│  123 Main Street                                                │
+│  Chicago, IL 60601                                              │
+│                                                                 │
+│  ─────────────────────────────────                              │
+│                                                                 │
+│  Packages (3)                          Total Weight: 85.5 kg    │
+│  PKG-001: 28.5 kg  |  PKG-002: 35.0 kg  |  PKG-003: 22.0 kg    │
+│                                                                 │
+│  Contents:                                                      │
+│  Chicken Breast (100 kg), Flour (500 kg), Sugar (250 kg)...    │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  [Print Packing Slip] [Print BOL] [Print Labels]  [Mark Shipped]│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 7.3 Carrier Configuration
+
+**Generic carrier setup (user configurable):**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Carrier Configuration                                 [X Close]│
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Configured Carriers                               [+ Add New]  │
+│                                                                 │
+│  Name          Services              Contact        Default     │
+│  ─────────────────────────────────────────────────────────────  │
+│  FedEx         Ground, Express       1-800-463-3339    ●       │
+│  UPS           Ground, 2-Day, Next   1-800-742-5877    ○       │
+│  DHL           Express, Economy      1-800-225-5345    ○       │
+│  InPost        Paczkomat             +48 22 123 4567   ○       │
+│  ...                                                             │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 8. Scanner UX - Mobile Workflows
+
+### 8.1 Scanner Shipping Home
+
+```
+┌─────────────────────────────┐
+│  ≡  Shipping          🌙    │
+├─────────────────────────────┤
+│                             │
+│  Warehouse: Main WH    [▼]  │
+│                             │
+│  ┌───────────────────────┐  │
+│  │     📋 PICK           │  │
+│  │     Pick items        │  │
+│  └───────────────────────┘  │
+│                             │
+│  ┌───────────────────────┐  │
+│  │     📦 PACK           │  │
+│  │     Pack shipment     │  │
+│  └───────────────────────┘  │
+│                             │
+│  ┌───────────────────────┐  │
+│  │     🚚 SHIP           │  │
+│  │     Verify & dispatch │  │
+│  └───────────────────────┘  │
+│                             │
+├─────────────────────────────┤
+│  ● Online          Queue: 0 │
+└─────────────────────────────┘
+```
+
+### 8.2 Scanner Pick Workflow
+
+#### Step 1: Select Pick List
+
+```
+┌─────────────────────────────┐
+│  ←  Pick                    │
+├─────────────────────────────┤
+│                             │
+│  [Scan pick number...]      │
+│                             │
+│  ─────── OR ───────         │
+│                             │
+│  My Assigned Picks:         │
+│                             │
+│  ┌───────────────────────┐  │
+│  │  PICK-001             │  │
+│  │  SO-2025-001 - 5 items│  │
+│  │  Priority: High       │  │
+│  └───────────────────────┘  │
+│                             │
+│  ┌───────────────────────┐  │
+│  │  PICK-002             │  │
+│  │  SO-2025-002 - 3 items│  │
+│  │  Priority: Normal     │  │
+│  └───────────────────────┘  │
+│                             │
+└─────────────────────────────┘
+```
+
+#### Step 2: Pick Items (Repeat)
+
+```
+┌─────────────────────────────┐
+│  ←  PICK-001          1/5   │
+├─────────────────────────────┤
+│                             │
+│  Go to Location:            │
+│  ┌───────────────────────┐  │
+│  │       A-01-01         │  │  Large, clear
+│  │   Receiving Zone A    │  │
+│  └───────────────────────┘  │
+│                             │
+│  Product:                   │
+│  Chicken Breast             │
+│  Required: 100 kg           │
+│                             │
+│  Suggested LP:              │
+│  LP250119-001               │
+│  Qty: 100 kg | Exp: Dec 31  │
+│                             │
+│  ─────────────────────      │
+│                             │
+│  Scan LP to confirm:        │
+│  [                  ] [📷]  │
+│                             │
+│  [Short Item] [Skip]        │
+│                             │
+├─────────────────────────────┤
+│  [✓ CONFIRM PICK]           │
+└─────────────────────────────┘
+```
+
+#### Step 3: Handle Short
+
+```
+┌─────────────────────────────┐
+│  ←  Short Item              │
+├─────────────────────────────┤
+│                             │
+│  Sugar                      │
+│  Required: 250 kg           │
+│  Available: 200 kg          │
+│                             │
+│  ─────────────────────      │
+│                             │
+│  What to do?                │
+│                             │
+│  ┌───────────────────────┐  │
+│  │  Pick available (200) │  │
+│  │  Mark rest as short   │  │
+│  └───────────────────────┘  │
+│                             │
+│  ┌───────────────────────┐  │
+│  │  Select different LP  │  │
+│  │  Try another location │  │
+│  └───────────────────────┘  │
+│                             │
+│  ┌───────────────────────┐  │
+│  │  Skip this item       │  │
+│  │  Come back later      │  │
+│  └───────────────────────┘  │
+│                             │
+└─────────────────────────────┘
+```
+
+#### Step 4: Complete Pick
+
+```
+┌─────────────────────────────┐
+│  ←  Pick Complete      ✓    │
+├─────────────────────────────┤
+│                             │
+│           ✓                 │
+│                             │
+│  PICK-001 Completed         │
+│                             │
+│  Items: 5/5 picked          │
+│  Shorts: 1 (50 kg Sugar)    │
+│                             │
+│  ─────────────────────      │
+│                             │
+│  Ready for packing          │
+│                             │
+├─────────────────────────────┤
+│                             │
+│  [PICK ANOTHER]             │
+│                             │
+│  [Back to Home]             │
+│                             │
+└─────────────────────────────┘
+```
+
+### 8.3 Scanner Pack Workflow
+
+```
+┌─────────────────────────────┐
+│  ←  Pack Shipment           │
+├─────────────────────────────┤
+│                             │
+│  Scan Shipment:             │
+│  [SH-2025-001       ] [📷]  │
+│                             │
+│  ─────────────────────      │
+│  Customer: ABC Corp         │
+│  Items: 5 to pack           │
+│  ─────────────────────      │
+│                             │
+│  Current Package: PKG-001   │
+│                             │
+│  Scan item to add:          │
+│  [                  ] [📷]  │
+│                             │
+│  In package:                │
+│  ✓ Chicken Breast 100 kg    │
+│  ✓ Flour 500 kg             │
+│                             │
+│  [Complete Package]         │
+│                             │
+├─────────────────────────────┤
+│  Remaining: 3 items         │
+└─────────────────────────────┘
+```
+
+### 8.4 Scanner Ship Verification
+
+```
+┌─────────────────────────────┐
+│  ←  Ship Verification       │
+├─────────────────────────────┤
+│                             │
+│  Scan Shipment:             │
+│  [SH-2025-001       ] [📷]  │
+│                             │
+│  ─────────────────────      │
+│  Customer: ABC Corp         │
+│  Carrier: FedEx             │
+│  Packages: 3                │
+│  ─────────────────────      │
+│                             │
+│  Verify packages:           │
+│                             │
+│  ✓ PKG-001 (scanned)        │
+│  ✓ PKG-002 (scanned)        │
+│  ○ PKG-003 (pending)        │
+│                             │
+│  Scan package: [       ]    │
+│                             │
+├─────────────────────────────┤
+│                             │
+│  [MARK SHIPPED]             │
+│                             │
+└─────────────────────────────┘
+```
+
+---
+
+## 9. Documents & Labels
+
+### 9.1 Packing Slip (PDF)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  [Company Logo]                           PACKING SLIP          │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  Shipment: SH-2025-001              Date: 2025-01-20            │
+│  Order: SO-2025-001                                             │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  Ship To:                          Ship From:                   │
+│  ABC Corporation                   MonoPilot Foods              │
+│  123 Main Street                   456 Industrial Ave           │
+│  Chicago, IL 60601                 Warsaw, Poland               │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  Item         Description      Qty     Lot/Batch                │
+│  ─────────────────────────────────────────────────────────────  │
+│  1            Chicken Breast   100 kg  BATCH-320                │
+│  2            Flour            500 kg  BATCH-321                │
+│  3            Sugar            250 kg  BATCH-322                │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  Total Packages: 3              Total Weight: 85.5 kg           │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  Received by: ________________  Date: ____________              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 9.2 Bill of Lading (PDF)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  [Company Logo]                    BILL OF LADING               │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  BOL Number: BOL-2025-001          Date: 2025-01-20             │
+│  Shipment: SH-2025-001                                          │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  SHIPPER:                          CONSIGNEE:                   │
+│  MonoPilot Foods                   ABC Corporation              │
+│  456 Industrial Ave                123 Main Street              │
+│  Warsaw, Poland                    Chicago, IL 60601            │
+│  Contact: +48 22 123 4567          Contact: +1 312 555 0123     │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  CARRIER:                          SERVICE:                     │
+│  FedEx                             Ground                       │
+│  Tracking: 1234567890              Est. Delivery: 2025-01-25    │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  FREIGHT DETAILS:                                               │
+│                                                                 │
+│  Qty  Package Type    Weight    Dimensions    Description       │
+│  ─────────────────────────────────────────────────────────────  │
+│  3    Standard Box    85.5 kg   Various       Food products     │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  SPECIAL INSTRUCTIONS:                                          │
+│  Keep refrigerated. Handle with care.                           │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  Shipper Signature: ________________  Date: ____________        │
+│  Carrier Signature: ________________  Date: ____________        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 9.3 Shipping Label
+
+Generated as PDF with:
+- Carrier logo
+- Tracking barcode (Code128)
+- Ship-to address
+- Ship-from address
+- Weight
+- Service type
+- Handling instructions
+
+---
+
+## 10. Component Library
+
+### 10.1 Order Status Badge
+
+```tsx
+<OrderStatusBadge status="picking" />
+// Variants: draft, confirmed, picking, packed, shipped, delivered, cancelled
+```
+
+### 10.2 Pick Progress Bar
+
+```tsx
+<PickProgressBar picked={3} total={5} shorts={1} />
+// Shows: 3/5 items (60%) with short indicator
+```
+
+### 10.3 Package Card
+
+```tsx
+<PackageCard
+  number="PKG-001"
+  items={2}
+  weight={28.5}
+  onPrintLabel={handlePrint}
+/>
+```
+
+### 10.4 Priority Badge
+
+```tsx
+<PriorityBadge priority="high" />
+// Variants: urgent, high, normal, low
+```
+
+### 10.5 Carrier Selector
+
+```tsx
+<CarrierSelector
+  carriers={configuredCarriers}
+  value={selectedCarrier}
+  onChange={setCarrier}
+/>
+```
+
+---
+
+## 11. Implementation Roadmap
+
+### Phase 1: Desktop Core (Weeks 1-3)
+
+| Task | Effort | Priority |
+|------|--------|----------|
+| SO List and CRUD | 3d | P0 |
+| Pick list generation | 2d | P0 |
+| Pick detail view | 2d | P0 |
+| Pack station UI | 3d | P0 |
+| Shipment management | 2d | P0 |
+
+**Success Metrics:**
+- SO creation: <60s
+- Pick generation: <10s
+- Pack station setup: <30s
+
+### Phase 2: Scanner & Documents (Weeks 4-6)
+
+| Task | Effort | Priority |
+|------|--------|----------|
+| Scanner pick workflow | 3d | P0 |
+| Scanner pack workflow | 2d | P0 |
+| Scanner ship verification | 2d | P0 |
+| Packing slip PDF | 1d | P0 |
+| BOL PDF | 1d | P1 |
+| Shipping labels | 2d | P0 |
+
+**Success Metrics:**
+- Scanner pick: <2 min/order
+- Pack verification: 100% accurate
+- Document generation: <5s
+
+### Phase 3: Advanced Features (Weeks 7-9)
+
+| Task | Effort | Priority |
+|------|--------|----------|
+| Paper pick list printing | 2d | P1 |
+| FIFO/FEFO strategy | 2d | P1 |
+| Carrier configuration | 2d | P1 |
+| Short handling | 2d | P1 |
+| Reports | 3d | P2 |
+
+---
+
+## 12. Success Metrics
+
+### Efficiency Metrics
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Pick time | <2 min/order | Average pick completion |
+| Pack time | <3 min/shipment | Average pack completion |
+| Ship time | <30s/shipment | Verification + mark shipped |
+| Document generation | <5s | PDF generation time |
+
+### Quality Metrics
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Pick accuracy | >99% | Correct items picked |
+| Ship accuracy | 100% | Right items to right customer |
+| Short rate | <5% | Items not available |
+
+### Adoption Metrics
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Scanner adoption | >70% | Pickers using scanner vs paper |
+| Pack station usage | >90% | Shipments via pack station |
+
+---
+
+## 13. Appendix
+
+### 13.1 Keyboard Shortcuts (Desktop)
+
+| Shortcut | Action |
+|----------|--------|
+| `N` | New SO/Shipment |
+| `G` | Generate pick list |
+| `P` | Print |
+| `Enter` | Confirm action |
+| `Esc` | Cancel/Close |
+
+### 13.2 Picking Strategy Reference
+
+| Strategy | Use When | Logic |
+|----------|----------|-------|
+| FIFO | Standard products | Oldest received first |
+| FEFO | Perishables | Earliest expiry first |
+| Manual | Special requirements | User selects LP |
+
+### 13.3 References
+
+**Internal Docs:**
+- PRD: `docs/prd/modules/shipping.md`
+- Architecture: `docs/architecture/modules/shipping.md`
+- Warehouse patterns: `docs/architecture/patterns/scanner.md`
+
+**External References:**
+- WCAG 2.1 AAA: https://www.w3.org/WAI/WCAG21/quickref/
+- PWA Best Practices: https://web.dev/progressive-web-apps/
+
+### 13.4 Changelog
+
+| Date | Version | Changes | Author |
+|------|---------|---------|--------|
+| 2025-11-19 | 1.0 | Initial Shipping UX specification | AI UX Designer |
+
+---
+
+**End of Shipping Module UX Specification**

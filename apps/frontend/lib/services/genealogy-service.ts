@@ -102,15 +102,28 @@ export async function createOutputGenealogy(
     consumed_qty: number
     uom: string
   }>,
-  userId: string
+  userId: string,
+  orgId?: string
 ): Promise<GenealogyEntry[]> {
   const supabase = createAdminClient()
   const entries: GenealogyEntry[] = []
+
+  // Get org_id from output LP if not provided
+  let resolvedOrgId = orgId
+  if (!resolvedOrgId) {
+    const { data: lpData } = await supabase
+      .from('license_plates')
+      .select('org_id')
+      .eq('id', outputLpId)
+      .single()
+    resolvedOrgId = lpData?.org_id
+  }
 
   for (const consumed of consumedReservations) {
     const { data, error } = await supabase
       .from('lp_genealogy')
       .insert({
+        org_id: resolvedOrgId,
         parent_lp_id: consumed.lp_id,
         child_lp_id: outputLpId,
         relationship_type: 'production',
@@ -144,6 +157,7 @@ export async function createPartialConsumptionGenealogy(
   consumedQty: number,
   uom: string,
   userId: string,
+  orgId: string,
   reservationId?: string
 ): Promise<GenealogyEntry> {
   const supabase = createAdminClient()
@@ -151,6 +165,7 @@ export async function createPartialConsumptionGenealogy(
   const { data, error } = await supabase
     .from('lp_genealogy')
     .insert({
+      org_id: orgId,
       parent_lp_id: parentLpId,
       child_lp_id: childLpId,
       relationship_type: 'production',

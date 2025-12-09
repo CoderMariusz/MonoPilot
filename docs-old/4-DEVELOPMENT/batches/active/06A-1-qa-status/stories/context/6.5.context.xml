@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story>
+  <metadata>
+    <id>6.5</id>
+    <title>QA Change Audit Trail</title>
+    <batch>06A-1</batch>
+    <status>drafted</status>
+  </metadata>
+
+  <description>Track all QA status changes for compliance and review</description>
+
+  <dependencies>
+    <requires>
+      <story id="6.1">LP QA Status Management</story>
+    </requires>
+  </dependencies>
+
+  <technical_context>
+    <tables>
+      <table name="qa_status_changes">Already created in Story 6.1</table>
+    </tables>
+
+    <api_endpoints>
+      <endpoint method="GET" path="/api/quality/audit">
+        <description>List QA status changes with filters</description>
+        <query_params>lp_id, user_id, date_from, date_to, status</query_params>
+        <response>{ data: QAStatusChange[], total: number }</response>
+      </endpoint>
+    </api_endpoints>
+
+    <frontend_routes>
+      <route path="/quality/audit">QA Audit Trail page</route>
+    </frontend_routes>
+
+    <components_to_create>
+      <component>QAAuditTable - filterable table with columns: LP#, Old→New status, User, Timestamp, Reason/Notes</component>
+      <component>QAAuditFilters - filter by LP, user, date range, status</component>
+    </components_to_create>
+  </technical_context>
+
+  <acceptance_criteria>
+    <ac id="1">/quality/audit shows table with: LP number, Old → New status, User, Timestamp, Reason/Notes</ac>
+    <ac id="2">Filter by LP, user, date range, status</ac>
+  </acceptance_criteria>
+
+  <functional_requirements>
+    <fr id="QC-FR-05">System shall record audit trail for QA changes</fr>
+  </functional_requirements>
+</story>

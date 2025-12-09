@@ -137,6 +137,7 @@ export async function POST(
 
       // AC-5.5.3: Create lp_genealogy record linking parent to child
       await adminClient.from('lp_genealogy').insert({
+        org_id: currentUser.org_id,
         parent_lp_id: id,
         child_lp_id: newLP.id,
         relationship_type: 'split',

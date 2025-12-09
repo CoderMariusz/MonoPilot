@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="6.18" epic="6" batch="06B-2">
+  <summary>Document root cause analysis and CAPA (corrective/preventive actions) for NCRs with timeline tracking.</summary>
+
+  <tables>
+    <table name="non_conformance_reports" operation="update"/>
+  </tables>
+
+  <components>
+    <component name="NCRDetailPage.tsx" type="page"/>
+    <component name="RCAPanel.tsx" type="modal"/>
+    <component name="CAPAPanel.tsx" type="modal"/>
+  </components>
+
+  <api-routes>
+    <route path="/api/quality/ncrs/:id/rca" method="PUT"/>
+  </api-routes>
+
+  <dependencies>
+    <story id="6.15"/>
+  </dependencies>
+</story-context>
