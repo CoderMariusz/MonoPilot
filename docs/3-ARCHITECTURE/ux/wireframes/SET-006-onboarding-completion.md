@@ -20,7 +20,7 @@ Final step of the 15-minute onboarding wizard. Shows success confirmation, summa
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  MonoPilot Setup Wizard                         [6/6] 100%  │
+│  MonoPilot Onboarding Wizard                    [6/6] 100%  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
 │                         ✓                                     │
@@ -62,7 +62,7 @@ Final step of the 15-minute onboarding wizard. Shows success confirmation, summa
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  MonoPilot Setup Wizard                         [6/6] 100%  │
+│  MonoPilot Onboarding Wizard                    [6/6] 100%  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
 │                      [Spinner]                                │
@@ -87,7 +87,7 @@ Final step of the 15-minute onboarding wizard. Shows success confirmation, summa
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  MonoPilot Setup Wizard                         [6/6] 100%  │
+│  MonoPilot Onboarding Wizard                    [6/6] 100%  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
 │                         ⚠                                     │
@@ -204,7 +204,7 @@ WHERE id = :org_id;
   - Receive Inventory (Warehouse module)
 
 ### 4. Wizard Accessibility
-- Wizard can be re-run from Settings → "Setup Wizard"
+- Wizard can be re-run from Settings → "Onboarding Wizard"
 - Use case: Create additional warehouses, invite more users
 - Opens in review mode with existing data pre-filled
 

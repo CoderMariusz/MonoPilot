@@ -38,6 +38,9 @@
 │    - Line A - Main Production             │
 │    - Line B - Packaging                   │
 │                                           │
+│  Capacity *                               │
+│  [______] units/hour                      │
+│                                           │
 │  Specifications                           │
 │  [_____________________________]          │
 │  [_____________________________]          │
@@ -58,6 +61,7 @@
 - **Name**: Text input, 2-100 chars, required
 - **Type**: Dropdown (6 options), required, default "Other"
 - **Production Line**: Dropdown (from lines table), optional, default "(None)"
+- **Capacity**: Number input, units/hour, required, min 0.01, max 999999
 - **Specifications**: Multi-line text (3 lines), optional, 0-500 chars
 - **Active**: Checkbox, default ON
 
@@ -75,7 +79,7 @@
 
 - **Loading**: Spinner + "Creating machine..." while POST /api/settings/machines runs
 - **Empty**: N/A (modal triggered by button click)
-- **Error**: Red banner + inline errors (code exists, invalid format, missing required fields)
+- **Error**: Red banner + inline errors (code exists, invalid format, missing required fields, capacity <= 0)
 - **Success**: Form fields populated (edit) or blank (create), ready for input
 
 ---
@@ -101,6 +105,7 @@
 | Name | Required, 2-100 chars |
 | Type | Required, one of 6 types |
 | Production Line | Optional, foreign key to production_lines table |
+| Capacity | Required, number > 0, max 999999, decimals allowed (0.01-999999) |
 | Specifications | Optional, 0-500 chars, free-form text |
 | Active | Boolean, default true |
 
@@ -133,6 +138,7 @@
   name: string;
   type: 'MIXER' | 'OVEN' | 'PACKAGING' | 'FILLING' | 'LABELING' | 'OTHER';
   production_line_id: string | null;  // optional FK
+  capacity_per_hour: number;           // required, > 0, max 999999
   specifications: string;              // optional
   active: boolean;
   org_id: string;                     // auto-populated
@@ -156,8 +162,9 @@
 4. Code uniqueness: debounce 500ms on blur
 5. Code immutable if machine has WO operation records (show warning in edit mode)
 6. Production Line dropdown: load on modal open, show "(None)" option
-7. Specifications field: placeholder "e.g., Capacity: 500kg/hour, Power: 15kW"
-8. Type tooltips: optional, show common use cases on hover
+7. **Capacity field**: NumberInput component, suffix "units/hour", step 0.01, required
+8. Specifications field: placeholder "e.g., Power: 15kW, Dimensions: 2m x 1.5m x 2m"
+9. Type tooltips: optional, show common use cases on hover
 
 ---
 

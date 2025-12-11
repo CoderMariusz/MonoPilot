@@ -28,6 +28,9 @@
 │  │                                                             │ │
 │  │  Contact Email *          Phone                            │ │
 │  │  [admin@acme.com       ]  [+48 123 456 789              ]  │ │
+│  │                                                             │ │
+│  │  Website                                                    │ │
+│  │  [https://bakeryfresh.pl                                 ] │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                   │
 │  Address                                                          │
@@ -46,6 +49,15 @@
 │  │                                                             │ │
 │  │  Date Format             Number Format                      │ │
 │  │  [DD/MM/YYYY          ▼] [1.234,56      ▼]                 │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                   │
+│  Business Hours                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  Working Days                                               │ │
+│  │  ☑ Mon  ☑ Tue  ☑ Wed  ☑ Thu  ☑ Fri  ☐ Sat  ☐ Sun         │ │
+│  │                                                             │ │
+│  │  Start Time              End Time                          │ │
+│  │  [08:00               ▼] [17:00                         ▼] │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                   │
 │  Tax Information                                                  │
@@ -82,6 +94,9 @@
 │  Phone                    │
 │  [+48 123 456 789      ]  │
 │                           │
+│  Website                  │
+│  [https://bakery.pl    ]  │
+│                           │
 │  Street Address           │
 │  [123 Main Street      ]  │
 │                           │
@@ -109,6 +124,16 @@
 │  Number Format            │
 │  [1.234,56             ▼] │
 │                           │
+│  Working Days             │
+│  ☑ Mon ☑ Tue ☑ Wed       │
+│  ☑ Thu ☑ Fri ☐ Sat ☐ Sun │
+│                           │
+│  Start Time               │
+│  [08:00                ▼] │
+│                           │
+│  End Time                 │
+│  [17:00                ▼] │
+│                           │
 │  Tax ID (VAT/NIP)         │
 │  [PL1234567890         ]  │
 │                           │
@@ -132,9 +157,10 @@
 - **Actions**: Upload (file picker), Remove (delete current)
 
 ### 2. Form Sections
-- **Basic Information**: Name, logo, contact (email/phone)
+- **Basic Information**: Name, logo, contact (email/phone), website
 - **Address**: Street, city, postal, country dropdown
 - **Regional Settings**: Timezone, language, currency, formats
+- **Business Hours**: Working days (checkboxes), start/end time (dropdowns)
 - **Tax Information**: Tax ID, default tax rate
 
 ### 3. Dropdowns
@@ -145,13 +171,24 @@
 - **Date Format**: DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD
 - **Number Format**: 1.234,56 (EU) vs 1,234.56 (US)
 - **Tax Rate**: Predefined rates from tax_codes table
+- **Start/End Time**: 30-minute intervals (00:00 - 23:30)
 
-### 4. Validation
+### 4. Business Hours
+- **Working Days**: 7 checkboxes (Mon-Sun), multi-select
+- **Default**: Mon-Fri selected, Sat-Sun unselected
+- **Start Time**: Dropdown with 30-min intervals (e.g., 06:00, 06:30, ..., 23:30)
+- **End Time**: Dropdown with 30-min intervals (e.g., 06:00, 06:30, ..., 23:30)
+- **Validation**: End time must be after start time
+- **Use Case**: OEE shift calculations, production planning, user notifications
+
+### 5. Validation
 - **Required**: Organization name, contact email, timezone, language, currency
 - **Email**: RFC 5322 format
 - **Phone**: E.164 format (optional)
+- **Website**: Valid URL format (optional, must start with http:// or https://)
 - **Tax ID**: Country-specific format validation
 - **Logo**: File type, size checks
+- **Business Hours**: At least 1 working day selected, end time > start time
 
 ---
 
@@ -194,10 +231,14 @@
 |-------|------|---------------|
 | Organization Name | Required, 2-100 chars | "Organization name is required" |
 | Contact Email | Required, valid email | "Invalid email format" |
+| Website | Optional, valid URL (http/https) | "Invalid URL format (must start with http:// or https://)" |
 | Logo | PNG/JPG/GIF, max 2MB | "Logo must be under 2MB" / "Only PNG, JPG, or GIF allowed" |
 | Timezone | Required, valid IANA | "Timezone is required" |
 | Language | Required, one of PL/EN/DE/FR | "Language is required" |
 | Currency | Required, valid ISO 4217 | "Currency is required" |
+| Working Days | At least 1 day selected | "Select at least one working day" |
+| Start Time | Valid time (00:00-23:30) | "Invalid start time" |
+| End Time | Valid time, > start time | "End time must be after start time" |
 | Tax ID | Country-specific format | "Invalid VAT/NIP format for Poland" |
 | Phone | E.164 format (optional) | "Invalid phone number format" |
 
@@ -207,9 +248,10 @@
 
 - **Touch Targets**: All buttons >= 48dp mobile, inputs 48dp height mobile
 - **Contrast**: All text >= 4.5:1, form labels Slate-700 on white
-- **Keyboard**: Tab order: name → logo → email → phone → address → settings → tax → Save
+- **Keyboard**: Tab order: name → logo → email → phone → website → address → settings → business hours → tax → Save
 - **Screen Reader**: Labels for all inputs, aria-required on required fields, aria-invalid on errors
 - **Focus**: Visible focus ring (2px blue outline), auto-focus on first error field after validation
+- **Checkboxes**: 48dp touch targets on mobile, keyboard accessible (Space to toggle)
 
 ---
 
@@ -231,6 +273,34 @@
 PATCH /api/settings/organization
 Body: OrganizationUpdateSchema
 Response: { success: true, organization: {...} }
+```
+
+**Payload Schema**:
+```typescript
+{
+  name: string;              // Required, 2-100 chars
+  email: string;             // Required, valid email
+  phone?: string;            // Optional, E.164 format
+  website?: string;          // Optional, valid URL
+  address?: {
+    street?: string;
+    city?: string;
+    postal_code?: string;
+    country?: string;        // ISO country code
+  };
+  timezone: string;          // Required, IANA timezone
+  language: string;          // Required, PL/EN/DE/FR
+  currency: string;          // Required, ISO 4217
+  date_format: string;       // DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD
+  number_format: string;     // 1.234,56 or 1,234.56
+  business_hours: {
+    working_days: string[];  // ["mon", "tue", "wed", "thu", "fri"]
+    start_time: string;      // HH:MM format (e.g., "08:00")
+    end_time: string;        // HH:MM format (e.g., "17:00")
+  };
+  tax_id?: string;           // Country-specific format
+  default_tax_rate?: number; // From tax_codes table
+}
 ```
 
 **Related**: Logo upload via `POST /api/settings/organization/logo` (multipart/form-data)

@@ -82,9 +82,19 @@ supabase/
 - **Skills**: 52 skills (API, Next.js, React, Supabase, Testing, TypeScript)
 
 ## Current Phase
-**Phase**: PRD Complete | Ready for Implementation Planning
+**Phase**: UX Design Complete (Settings) | Ready for Implementation
 **Last Update**: 2025-12-11
 **Next Steps**:
-1. Create tech specs from PRDs
-2. Generate stories for Epic 5 (Warehouse)
-3. Continue Epic 4 (Production) implementation
+1. Implement Settings wireframes (SET-001 to SET-029)
+2. Continue UX for Technical/Production/Warehouse modules
+3. Create PR from newDoc to main
+
+## Auto-Update Rules
+
+**IMPORTANT**: After EVERY git commit, you MUST update `.claude/PROJECT-STATE.md`:
+1. Update "Last Updated" timestamp
+2. Add new commit to "Recent Commits" section
+3. Update "Current Status" if phase changed
+4. Update module status table if applicable
+
+This ensures context is preserved across sessions.

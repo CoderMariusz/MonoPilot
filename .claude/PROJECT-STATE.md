@@ -3,9 +3,9 @@
 > Last Updated: 2025-12-11
 > Use this file to restore context after /clear or new session
 
-## Current Status: PRD + ARCHITECTURE COMPLETE
+## Current Status: UX DESIGN COMPLETE (Settings Module)
 
-All documentation complete. Branch `newDoc` pushed to remote.
+Settings module UX wireframes complete with 97-98% quality score.
 
 ## What Was Done
 
@@ -28,8 +28,8 @@ All 11 module PRDs created from scratch:
 | 7 | Shipping | 1,345 | Carrier integration, GS1 labels, Dock scheduling |
 | 8 | NPD | 1,004 | Stage-gate, Trials, Competitor benchmarking |
 | 9 | Finance | 892 | Cost variance (MPV/MQV/LRV/LEV), Comarch export |
-| 10 | OEE | 914 | **NEW** - Machine dashboard, Six Big Losses, Energy |
-| 11 | Integrations | 1,647 | **NEW** - Comarch Optima, EDI, Portals |
+| 10 | OEE | 914 | Machine dashboard, Six Big Losses, Energy |
+| 11 | Integrations | 1,647 | Comarch Optima, EDI, Portals |
 
 **Total**: 13,540 lines, 607+ FRs, 50+ NFRs
 
@@ -44,42 +44,57 @@ docs/1-BASELINE/architecture/
 ├── integration-map.md        # External/internal integrations
 ├── modules/                  # 12 module architecture files
 └── decisions/                # 8 ADRs (all ACCEPTED)
-    ├── ADR-001 License Plate Inventory
-    ├── ADR-002 BOM Snapshot Pattern
-    ├── ADR-003 Multi-Tenancy RLS
-    ├── ADR-004 GS1 Barcode Compliance
-    ├── ADR-005 FIFO/FEFO Picking Strategy
-    ├── ADR-006 Scanner-First Mobile UX
-    ├── ADR-007 Work Order State Machine
-    └── ADR-008 Audit Trail Strategy
 ```
 
-### Phase 4: Cache System Added (NEW)
-Universal cache system for token savings:
+### Phase 4: UX Design - Settings Module (97-98% Quality Score) ✅ NEW
+29 wireframes for Epic 1 (Settings):
 
 ```
-.claude/cache/
-├── cache_manager.py          # Main cache manager
-├── semantic_cache.py         # ChromaDB semantic search
-├── config.json               # Configuration
-├── cold/                     # Cold storage (gzip)
-├── semantic/                 # ChromaDB vector DB
-└── logs/                     # Metrics
+docs/3-ARCHITECTURE/ux/wireframes/
+├── SET-001 to SET-006       # Onboarding Wizard (6 screens)
+├── SET-007 to SET-011       # Organization & Users (5 screens)
+├── SET-012 to SET-019       # Infrastructure (8 screens)
+├── SET-020 to SET-022       # Master Data (3 screens)
+├── SET-023 to SET-024       # Integrations (2 screens)
+├── SET-025 to SET-027       # Security & Audit (3 screens)
+└── SET-028 to SET-029       # Advanced (2 screens)
 ```
 
-Supporting files:
-- `CACHE-README.md` - Quick start guide
-- `CACHE-DOCUMENTATION-INDEX.md` - Full documentation index
-- `scripts/cache-*.sh` - Helper scripts
+**UX Audit Results**:
+- PRD Coverage: 108/110 FRs (98.2%)
+- Architecture Alignment: 98%
+- All 4 states defined (Loading, Empty, Error, Success)
+- UI Pattern: Tables = Pages, CRUD = Modals
+
+**Key Fixes Applied**:
+- Added 5 missing onboarding wireframes (SET-001 to SET-005)
+- Added 13 new DB tables to architecture
+- Added 3 missing roles (picker, guest, api)
+- Added session management, machine capacity, business hours
+- Added line-product compatibility
 
 ## Git Status
 
-**Branch**: `newDoc` (pushed to origin)
+**Branch**: `newDoc`
 
-**Commits**:
-- `c1a6158` - docs: Complete PRD (95%) and Architecture (97%) documentation
+**Recent Commits**:
+- `c008431` - docs(ux): Add Settings module wireframes (29 screens)
+- `56e0f5f` - feat: Add universal cache system for token savings
 
 ## File Locations
+
+### UX Wireframes (NEW)
+```
+docs/3-ARCHITECTURE/ux/
+├── README.md                           # UX documentation hub
+├── UX-AUDIT-AND-ROADMAP.md            # Audit and roadmap
+├── patterns/
+│   ├── ui-navigation-patterns.md      # Modals vs Pages
+│   ├── accessibility-checklist.md     # WCAG 2.1 AA
+│   └── scanner-ui-patterns.md         # Scanner components
+└── wireframes/
+    └── SET-*.md                       # 29 Settings wireframes
+```
 
 ### PRD
 ```
@@ -96,64 +111,48 @@ docs/1-BASELINE/architecture/
 ├── system-overview.md        # High-level design
 ├── tech-debt.md              # 17 items
 ├── integration-map.md        # Integration flows
-├── modules/                  # 12 files
+├── modules/                  # 12 files (settings.md updated with 13 new tables)
 └── decisions/                # 8 ADRs
-```
-
-### Discovery
-```
-docs/0-DISCOVERY/
-├── FEATURE-GAP-ANALYSIS.md   # Competitive gaps
-├── DISCOVERY-MARKET-REPORT.md
-└── DISCOVERY-REPORT.md
-```
-
-### Cache
-```
-.claude/cache/                # Cache system
-CACHE-README.md               # Documentation
-scripts/cache-*.sh            # Scripts
 ```
 
 ## Code Implementation Status
 
-| Module | DB Tables | API Endpoints | Pages | Status |
-|--------|-----------|---------------|-------|--------|
-| Settings | ✅ 7 | ✅ 15 | ✅ 8 | ~80% |
-| Technical | ✅ 10 | ✅ 20 | ✅ 12 | ~80% |
-| Planning | ✅ 11 | ✅ 26 | ✅ 10 | ~70% |
-| Production | ✅ 7 | ✅ 18 | ✅ 8 | ~60% |
-| Warehouse | ⚠️ 3 | ⚠️ 5 | ⚠️ 3 | ~20% |
-| Quality | ❌ 0 | ❌ 0 | ❌ 0 | 0% |
-| Shipping | ❌ 0 | ❌ 0 | ❌ 0 | 0% |
+| Module | DB Tables | API Endpoints | Pages | UX Wireframes | Status |
+|--------|-----------|---------------|-------|---------------|--------|
+| Settings | ✅ 7 | ✅ 15 | ✅ 8 | ✅ 29 | ~85% |
+| Technical | ✅ 10 | ✅ 20 | ✅ 12 | ⏳ Planned | ~80% |
+| Planning | ✅ 11 | ✅ 26 | ✅ 10 | ⏳ Planned | ~70% |
+| Production | ✅ 7 | ✅ 18 | ✅ 8 | ⏳ Planned | ~60% |
+| Warehouse | ⚠️ 3 | ⚠️ 5 | ⚠️ 3 | ⏳ Planned | ~20% |
+| Quality | ❌ 0 | ❌ 0 | ❌ 0 | ⏳ Planned | 0% |
+| Shipping | ❌ 0 | ❌ 0 | ❌ 0 | ⏳ Planned | 0% |
 
 ## Recommended Next Steps
 
-### Option A: Epic Breakdown (Phase 5)
-1. Use architect-agent to break PRDs into INVEST stories
-2. Start with Epic 1 (Settings) Phase 1A - Onboarding Wizard
-3. Generate stories for Epic 5 (Warehouse)
+### Option A: Continue UX Design
+1. Technical Module (Epic 2) - Products, Materials, BOMs, Recipes
+2. Production Module (Epic 4) - Work Orders, Scanner workflows
+3. Warehouse Module (Epic 5) - LP Management, Scanner workflows
 
-### Option B: Continue Implementation
-1. Complete Epic 4 (Production) - Stories 4.15+
-2. Start Epic 5 (Warehouse) - Critical for inventory
+### Option B: Start Implementation
+1. Implement Settings wireframes (SET-001 to SET-029)
+2. Focus on Onboarding Wizard first (critical differentiator)
 
-### Option C: Cleanup
-1. Commit cache system files
-2. Commit deleted files (cleanup commit)
-3. Create PR to main
+### Option C: Create PR
+1. Commit pending changes
+2. Create PR from newDoc to main
 
 ## Key Decisions
 
 1. **Target Market**: SMB food manufacturers (5-100 employees)
 2. **Pricing**: Freemium + $50/user/month
 3. **Scope**: MES only, NOT full ERP (Finance = costing only)
-4. **Integrations**: Comarch Optima (Polish market), EDI basic
-5. **New Epics**: Added OEE (10) and Integrations (11)
+4. **UI Pattern**: Tables = Pages, CRUD = Modals (lightweight)
+5. **UX Quality Gate**: 97%+ score required before development
 
 ## Session Notes
 
-- PRD agents: use <1500 line limit, tech-writer over pm-agent
-- Architecture: 97% quality, all ADRs accepted
-- Cache system: 95% token savings potential
-- Branch strategy: newDoc for documentation, merge to main when ready
+- UX agents: 4 parallel for speed, auto-approve mode
+- Wireframe format: ASCII + 4 states + components + actions
+- Review cycle: Create → Audit → Fix → Re-audit until 97%+
+- Architecture updated with 13 new tables for Settings module
