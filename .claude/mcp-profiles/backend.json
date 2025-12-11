@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/mcp-config.json",
+  "name": "backend",
+  "description": "Backend development profile with Supabase MCP",
+  "usage": "Use when EXECUTING database operations, not just writing code",
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "${SUPABASE_ACCESS_TOKEN}"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
+      }
+    }
+  },
+  "notes": {
+    "when_to_use": [
+      "Running live database queries",
+      "Debugging data issues",
+      "Executing migrations",
+      "Managing Supabase resources"
+    ],
+    "when_not_to_use": [
+      "Writing query code (use supabase-queries skill)",
+      "Designing RLS policies (use supabase-rls skill)",
+      "Code review",
+      "Planning/architecture"
+    ],
+    "token_cost": "~10k tokens per session"
+  }
+}

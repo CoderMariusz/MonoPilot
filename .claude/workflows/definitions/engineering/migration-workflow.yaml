@@ -1,0 +1,846 @@
+# Migration Workflow v2.0
+# Migrate existing projects to Agent Methodology Pack
+#
+# Documentation: @.claude/workflows/documentation/MIGRATION-WORKFLOW.md
+#
+# FLOW (10 phases - aligned with new-project.yaml):
+# 1. AUDIT + DISCOVERY   → AUDIT-REPORT.md, MIGRATION-CONTEXT.md    [commit: audit complete]
+# 2. PRD/BASELINE        → prd.md, migration-scope.md               [commit: prd complete]
+# 3. ARCHITECTURE        → system-overview.md, ADRs, tech-debt.md   [commit: architecture assessed]
+# 4. UX AUDIT            → ux-audit.md (conditional)                [commit: ux audited]
+# 5. EPIC BREAKDOWN      → epic-catalog.md, test-strategy.md        [commit: epics defined]
+# 6. STORY BREAKDOWN     → {XX}.{N}.{slug}.md stories               [commit: stories ready]
+# 7. SCOPE VALIDATION    → scope-review.md                          [commit: scope validated]
+# 8. EXECUTION           → .claude/*, CLAUDE.md, docs/*             [commit: structure ready]
+# 9. VERIFICATION        → validation passed                        [commit: verified]
+# 10. SPRINT PLANNING    → sprint-01-plan.md                        [commit: sprint planned]
+#
+# NEXT WORKFLOWS (integration, not consolidation):
+# → epic-workflow.yaml (for ongoing epic work)
+# → story-delivery.yaml (TDD implementation)
+# → sprint-workflow.yaml (sprint management)
+
+name: migration-workflow
+description: Complete workflow for migrating existing projects to Agent Methodology Pack
+trigger: "migration | onboarding | methodology_setup"
+
+# Expected duration: 1-3 days depending on project size
+documentation: "@.claude/workflows/documentation/MIGRATION-WORKFLOW.md"
+
+# =============================================================================
+# STATE & COMMIT CONFIGURATION
+# =============================================================================
+config:
+  state_management:
+    enabled: true
+    state_file: "PROJECT-STATE.md"
+    sync_to_root: true
+    sync_script: "scripts/sync-state.sh"
+
+  auto_commit:
+    enabled: true
+    after_each_phase: true
+    commit_format: "{emoji} checkpoint: {message}"
+    emojis:
+      audit: "🔍"
+      prd: "📋"
+      architecture: "🏗️"
+      ux_audit: "🎨"
+      epic: "📦"
+      stories: "📝"
+      scope: "✅"
+      execution: "🔧"
+      verification: "✅"
+      sprint: "🏃"
+
+# Migration strategies based on project size
+strategies:
+  auto:
+    when: "Small projects (<50 files), simple structure"
+    duration: "4-6 hours"
+  manual:
+    when: "Large projects (>200 files), complex structure"
+    duration: "2-3 days"
+  hybrid:
+    when: "Medium projects (50-200 files)"
+    duration: "1-2 days"
+
+# =============================================================================
+# PHASES
+# =============================================================================
+phases:
+  # ===========================================================================
+  # PHASE 1: AUDIT + DISCOVERY
+  # ===========================================================================
+  - id: audit_discovery
+    name: "Audit + Discovery"
+    duration: "30-60 minutes"
+    steps:
+      - id: project_scan
+        agent: DOC-AUDITOR
+        type: audit
+        description: "Scan entire project and inventory documentation"
+        activities:
+          - "Scan entire project directory"
+          - "Inventory all documentation files"
+          - "Identify large files (>500 lines)"
+          - "Detect orphaned documentation"
+          - "Analyze tech stack from code"
+          - "Map existing documentation structure"
+          - "Flag context gaps for interview"
+        output:
+          deliverables:
+            - "AUDIT-REPORT.md"
+        checkpoint:
+          - "All project files scanned"
+          - "Large files identified"
+          - "Tech stack detected"
+          - "Issues documented"
+
+      - id: context_interview
+        agent: DISCOVERY-AGENT
+        type: interview
+        description: "Quick interview to fill context gaps"
+        config:
+          depth: quick
+          min_clarity: 60
+          target_clarity: 70
+
+        # MANDATORY: Clarification questions
+        interview_phases:
+          - phase: migration_goals
+            questions:
+              - "What is the main goal of this migration?"
+              - "What pain points are you trying to solve?"
+              - "What areas should NOT be touched?"
+
+          - phase: current_state
+            questions:
+              - "What works well in the current setup?"
+              - "What is broken or problematic?"
+              - "Are there any critical files/features?"
+
+          - phase: business_logic_gaps
+            description: "Fill gaps from audit"
+            questions:
+              - "How does {unclear_process} work?"
+              - "What happens when {edge_case}?"
+              - "Who is responsible for {area}?"
+
+        output:
+          deliverables:
+            - "docs/0-DISCOVERY/MIGRATION-CONTEXT.md"
+            - "docs/0-DISCOVERY/CLARIFICATIONS.md"
+
+    gate:
+      id: DISCOVERY_COMPLETE
+      type: quality_gate
+      enforcer: DOC-AUDITOR + DISCOVERY-AGENT
+      criteria:
+        - "All project files scanned"
+        - "Tech stack detected"
+        - "Context gaps addressed"
+        - "Migration goals documented"
+        - "AUDIT-REPORT.md generated"
+      on_pass: prd_baseline
+      on_fail:
+        action: ask_user
+        message: "Need more context about the project"
+
+    on_complete:
+      state_update:
+        phase: "discovery"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete migration audit and discovery"
+
+  # ===========================================================================
+  # PHASE 2: PRD/BASELINE CREATION
+  # ===========================================================================
+  - id: prd_baseline
+    name: "PRD/Baseline Creation"
+    duration: "1-2 hours"
+    agent: PM-AGENT
+    type: create_prd
+    description: "Create PRD from existing docs with clarification"
+
+    input:
+      context_refs:
+        - "@AUDIT-REPORT.md"
+        - "@docs/0-DISCOVERY/MIGRATION-CONTEXT.md"
+
+    # MANDATORY: Clarification process
+    clarification_process:
+      - step: analyze_existing
+        description: "Analyze existing documentation"
+        activities:
+          - "Review all existing docs"
+          - "Extract requirements"
+          - "Identify current vs target state"
+
+      - step: verify_understanding
+        description: "Verify understanding with user"
+        questions:
+          - "I understand that {requirement}. Is this correct?"
+          - "The current system does {behavior}. Should this change?"
+          - "I see {feature} exists. Is it working correctly?"
+
+      - step: define_scope
+        description: "Define migration scope"
+        categories:
+          stays: "Features that work and stay unchanged"
+          changes: "Features that need modification"
+          new: "New features to add during migration"
+          removes: "Features to deprecate/remove"
+
+      - step: list_assumptions
+        description: "Document assumptions for validation"
+        format: "I assume {assumption}. Please confirm."
+
+    output:
+      deliverables:
+        - "docs/1-BASELINE/product/prd.md"
+        - "docs/1-BASELINE/product/prd-assumptions.md"
+        - "docs/1-BASELINE/product/migration-scope.md"
+
+    checkpoint:
+      - "PRD created from existing docs"
+      - "Current vs target state documented"
+      - "Migration scope defined (stays/changes/new/removes)"
+      - "Assumptions validated with user"
+
+    gate:
+      id: PRD_APPROVED
+      type: approval_gate
+      enforcer: PM-AGENT + PRODUCT-OWNER + USER
+      criteria:
+        - "PRD document complete"
+        - "User confirmed understanding"
+        - "Migration scope approved"
+        - "All assumptions validated"
+      on_pass: architecture_assessment
+      on_fail:
+        action: iterate
+        max_iterations: 2
+
+    on_complete:
+      state_update:
+        phase: "prd"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete PRD for migration - scope defined"
+
+  # ===========================================================================
+  # PHASE 3: ARCHITECTURE ASSESSMENT
+  # ===========================================================================
+  - id: architecture_assessment
+    name: "Architecture Assessment"
+    duration: "1-2 hours"
+    agent: ARCHITECT-AGENT
+    type: technical_assessment
+    description: "Assess current architecture - TECHNICAL ONLY, no epic breakdown!"
+
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+        - "@AUDIT-REPORT.md"
+
+    activities:
+      - "Assess current architecture"
+      - "Document existing patterns"
+      - "Identify technical debt"
+      - "Map integration points"
+      - "Validate/update tech stack"
+      - "Create ADRs for changes needed"
+
+    # Clarification for technical decisions
+    clarification_required:
+      - "How does {integration} currently work?"
+      - "Why was {technology} chosen?"
+      - "What are the constraints for {component}?"
+      - "What happens when {external_system} is unavailable?"
+
+    output:
+      deliverables:
+        - "docs/1-BASELINE/architecture/system-overview.md"
+        - "docs/1-BASELINE/architecture/adrs/*.md"
+        - "docs/1-BASELINE/architecture/tech-debt.md"
+        - "docs/1-BASELINE/architecture/integration-map.md"
+
+    checkpoint:
+      - "Current architecture documented"
+      - "Tech debt inventoried"
+      - "Integration points mapped"
+      - "ADRs created for changes"
+
+    gate:
+      id: ARCHITECTURE_ASSESSED
+      type: review_gate
+      enforcer: ARCHITECT-AGENT
+      criteria:
+        - "Current architecture documented"
+        - "Tech debt identified"
+        - "Integration points mapped"
+        - "ADRs for major changes"
+      on_pass: ux_audit
+      on_fail:
+        action: iterate
+
+    on_complete:
+      state_update:
+        phase: "architecture"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete architecture assessment"
+
+  # ===========================================================================
+  # PHASE 4: UX AUDIT (conditional)
+  # ===========================================================================
+  - id: ux_audit
+    name: "UX Audit"
+    duration: "1-2 hours"
+    condition: "project.has_ui_component == true"
+    agent: UX-DESIGNER
+    type: ux_audit
+    description: "Audit existing UI/UX - skip if backend-only"
+
+    skip_check:
+      question: "Does this project have a user interface?"
+      if_no: "Skip to epic_breakdown"
+
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+        - "@docs/1-BASELINE/architecture/system-overview.md"
+
+    activities:
+      - "Audit existing UI/UX"
+      - "Document current user flows"
+      - "Identify UX debt/issues"
+      - "Propose improvements (if any)"
+
+    # USER approval for UX changes
+    user_approval_process:
+      - step: present_findings
+        format: |
+          ## UX Audit Findings
+          ### Current State: {screen_name}
+          - What works: {positives}
+          - Issues: {problems}
+          - Proposed changes: {changes}
+
+          [Approve] [Request Changes] [Keep As-Is]
+
+    output:
+      deliverables:
+        - "docs/3-ARCHITECTURE/ux/ux-audit.md"
+        - "docs/3-ARCHITECTURE/ux/user-flows-current.md"
+        - "docs/3-ARCHITECTURE/ux/ux-improvements.md"
+
+    gate:
+      id: UX_AUDITED
+      type: approval_gate
+      enforcer: UX-DESIGNER + USER
+      criteria:
+        - "UX audit complete OR backend-only skip"
+        - "User approved findings"
+      on_pass: epic_breakdown
+      on_fail:
+        action: iterate
+        max_iterations: 2
+
+    on_complete:
+      state_update:
+        phase: "ux_design"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete UX audit"
+
+  # ===========================================================================
+  # PHASE 5: EPIC BREAKDOWN (OSOBNE - nie konsolidować z ARCHITECT!)
+  # ===========================================================================
+  - id: epic_breakdown
+    name: "Epic Breakdown"
+    duration: "2-3 hours"
+    description: "Break migration into epics - PARALLEL execution"
+    type: parallel_execution
+
+    parallel:
+      # 5A: Epic Structure (ARCHITECT-AGENT)
+      - id: epic_structure
+        agent: ARCHITECT-AGENT
+        type: epic_identification
+        description: "Create migration epics with dependencies"
+
+        input:
+          context_refs:
+            - "@docs/1-BASELINE/product/prd.md"
+            - "@docs/1-BASELINE/product/migration-scope.md"
+            - "@docs/1-BASELINE/architecture/system-overview.md"
+
+        # MANDATORY: Clarification per epic
+        clarification_required:
+          - category: "business_logic"
+            questions:
+              - "How should {migrated_feature} work after migration?"
+              - "What validations are needed for {entity}?"
+              - "What happens when {edge_case}?"
+
+          - category: "dependencies"
+            questions:
+              - "Does {epic_A} depend on {epic_B}?"
+              - "Can {epic} be done independently?"
+
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/epics/epic-catalog.md"
+            - "docs/2-MANAGEMENT/epics/dependency-graph.md"
+          per_epic:
+            folder: "docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/"
+            files:
+              - "{XX}.0.epic-overview.md"
+              - "{XX}.0.clarifications.md"
+
+      # 5B: Test Strategy (TEST-ENGINEER)
+      - id: test_strategy
+        agent: TEST-ENGINEER
+        type: test_audit
+        description: "Audit existing tests and create test strategy"
+
+        activities:
+          - "Audit existing tests"
+          - "Identify coverage gaps"
+          - "Create test strategy per epic"
+          - "Define naming conventions"
+          - "Plan test migration"
+
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/{XX}.0.test-strategy.md"
+
+        strategy_includes:
+          naming_convention: "describe('{XX}_{N}_{feature}', () => { it('should_{action}_{expected}') })"
+          file_structure: "tests/{XX}-{epic-slug}/{XX}.{N}.{story-slug}.test.ts"
+          coverage_target: "80% for migrated code"
+
+    checkpoint:
+      - "All migration work mapped to epics"
+      - "Epic boundaries clear"
+      - "Dependencies identified"
+      - "Test strategy per epic"
+      - "Business logic clarified per epic"
+
+    gate:
+      id: EPICS_DEFINED
+      type: quality_gate
+      enforcer: ARCHITECT-AGENT + PRODUCT-OWNER + TEST-ENGINEER
+      criteria:
+        - "Migration scope mapped to epics"
+        - "Epic dependencies documented"
+        - "Test strategy defined per epic"
+        - "Business logic clarified"
+      on_pass: story_breakdown
+      on_fail:
+        action: iterate
+
+    on_complete:
+      state_update:
+        phase: "epic"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete epic breakdown - {epic_count} migration epics"
+
+  # ===========================================================================
+  # PHASE 6: STORY BREAKDOWN (OSOBNE!)
+  # ===========================================================================
+  - id: story_breakdown
+    name: "Story Breakdown"
+    duration: "2-4 hours"
+    agent: ARCHITECT-AGENT
+    type: story_creation
+    description: "Break NOW epics into INVEST-compliant stories"
+
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+        - "@docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/{XX}.0.clarifications.md"
+        - "@docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/{XX}.0.test-strategy.md"
+
+    output:
+      per_story:
+        folder: "docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/"
+        file_pattern: "{XX}.{N}.{story-slug}.md"
+      examples:
+        - "docs/2-MANAGEMENT/epics/01-structure-setup/01.1.create-claude-dir.md"
+        - "docs/2-MANAGEMENT/epics/01-structure-setup/01.2.migrate-docs.md"
+        - "docs/2-MANAGEMENT/epics/02-core-files/02.1.create-claude-md.md"
+
+    checkpoint:
+      - "NOW epics broken into stories"
+      - "Stories follow INVEST"
+      - "AC in Given/When/Then"
+      - "Hierarchical naming followed"
+      - "Test scenarios mapped from strategy"
+
+    gate:
+      id: STORIES_CREATED
+      type: quality_gate
+      enforcer: ARCHITECT-AGENT
+      criteria:
+        - "All NOW epics have stories"
+        - "Stories INVEST compliant"
+        - "AC in Given/When/Then"
+        - "Test scenarios mapped"
+      on_pass: scope_validation
+      on_fail:
+        action: iterate
+        max_iterations: 2
+
+    on_complete:
+      state_update:
+        phase: "stories"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete story breakdown - {story_count} stories"
+
+  # ===========================================================================
+  # PHASE 7: SCOPE VALIDATION
+  # ===========================================================================
+  - id: scope_validation
+    name: "Scope Validation"
+    duration: "30-60 minutes"
+    agent: PRODUCT-OWNER
+    type: scope_review
+    description: "Validate scope and prioritize"
+
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+        - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+
+    activities:
+      - "Validate INVEST compliance"
+      - "Check for scope creep"
+      - "Verify AC testability"
+      - "Prioritize: P0 quick wins first"
+
+    output:
+      deliverable: "docs/2-MANAGEMENT/reviews/scope-review-migration.md"
+
+    gate:
+      id: STORIES_READY
+      type: approval_gate
+      enforcer: PRODUCT-OWNER
+      criteria:
+        - "All stories INVEST compliant"
+        - "No scope creep"
+        - "AC testable"
+        - "Priority assigned"
+      on_pass: execution
+      on_fail:
+        action: return_to_phase
+        target: story_breakdown
+
+    on_complete:
+      state_update:
+        phase: "scope_validation"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Scope validated - stories ready"
+
+  # ===========================================================================
+  # PHASE 8: EXECUTION (struktura .claude/)
+  # ===========================================================================
+  - id: execution
+    name: "Execution"
+    duration: "2-6 hours"
+    description: "Execute migration - create .claude/ structure"
+
+    steps:
+      - id: setup_structure
+        agent: TECH-WRITER
+        activities:
+          - "Create .claude/ directory structure"
+          - "Copy agent definitions"
+          - "Copy workflow files"
+          - "Create state files"
+          - "Setup docs/ directory structure"
+
+      - id: create_core_files
+        agent: TECH-WRITER
+        activities:
+          - "Generate CLAUDE.md (<70 lines)"
+          - "Create PROJECT-STATE.md"
+          - "Initialize state files"
+
+      - id: migrate_documentation
+        agent: TECH-WRITER
+        activities:
+          - "Map existing docs to standard structure"
+          - "Move/copy files to appropriate locations"
+          - "Update cross-references"
+
+      - id: shard_large_files
+        agent: TECH-WRITER
+        condition: "large_files_exist"
+        activities:
+          - "Split files >500 lines"
+          - "Create index files"
+          - "Update references"
+
+      - id: generate_workspaces
+        agent: ARCHITECT-AGENT
+        activities:
+          - "Create agent workspace definitions"
+          - "Map files to agent responsibilities"
+
+      - id: infrastructure_setup
+        agent: DEVOPS-AGENT
+        condition: "project_has_deployment_needs == true"
+        activities:
+          - "Migrate CI/CD pipeline"
+          - "Setup deployment configs"
+          - "Configure security scanning"
+
+    gate:
+      id: MIGRATION_EXECUTED
+      type: quality_gate
+      enforcer: ORCHESTRATOR
+      criteria:
+        - ".claude/ structure complete"
+        - "Core files created"
+        - "Documentation migrated"
+        - "Large files sharded"
+      on_pass: verification
+      on_fail:
+        action: return_to_phase
+        target: execution.setup_structure
+
+    on_complete:
+      state_update:
+        phase: "development"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Execute migration - structure ready"
+
+  # ===========================================================================
+  # PHASE 9: VERIFICATION
+  # ===========================================================================
+  - id: verification
+    name: "Verification"
+    duration: "30-60 minutes"
+
+    steps:
+      - id: validation_script
+        command: "bash scripts/validate-migration.sh"
+        checks:
+          - ".claude/ directory exists"
+          - "CLAUDE.md < 70 lines"
+          - "All @references valid"
+          - "No files > 500 lines"
+
+      - id: test_agent_loading
+        verify:
+          - "All agents can load"
+          - "@references resolve"
+          - "Context within budget"
+
+      - id: deployment_validation
+        agent: DEVOPS-AGENT
+        condition: "infrastructure_setup_completed"
+        activities:
+          - "Validate CI/CD pipeline"
+          - "Test deployment configs"
+
+    gate:
+      id: VERIFICATION_PASSED
+      type: quality_gate
+      enforcer: DOC-AUDITOR
+      criteria:
+        - "All validation checks pass"
+        - "Agents can load"
+        - "References valid"
+      on_pass: sprint_planning
+      on_fail:
+        action: return_to_phase
+        target: execution
+
+    on_complete:
+      state_update:
+        phase: "testing"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Verification passed"
+
+  # ===========================================================================
+  # PHASE 10: SPRINT PLANNING
+  # ===========================================================================
+  - id: sprint_planning
+    name: "Sprint Planning"
+    duration: "1 hour"
+    agent: SCRUM-MASTER
+    type: sprint_planning
+    description: "Plan Sprint 1 from validated stories"
+
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+        - "@docs/2-MANAGEMENT/reviews/scope-review-migration.md"
+
+    activities:
+      - "Create Sprint 1 backlog"
+      - "Prioritize P0 quick wins first"
+      - "Plan capacity"
+      - "Finalize rollback plan"
+      - "Define Definition of Done"
+
+    output:
+      deliverable: "docs/2-MANAGEMENT/sprints/sprint-01-plan.md"
+
+    gate:
+      id: SPRINT_PLANNED
+      type: quality_gate
+      enforcer: SCRUM-MASTER
+      criteria:
+        - "Sprint backlog defined"
+        - "Capacity allocated"
+        - "P0 items prioritized"
+        - "Rollback plan ready"
+      on_pass: complete
+      on_fail:
+        action: iterate
+
+    on_complete:
+      state_update:
+        phase: "sprint_planning"
+        set_active_sprint: 1
+        update_root: true
+      commit:
+        enabled: true
+        message: "Sprint 1 planned - migration ready for development"
+
+  # ===========================================================================
+  # COMPLETE
+  # ===========================================================================
+  - id: complete
+    type: migration_complete
+    summary: "Migration to Agent Methodology Pack complete"
+
+    # INTEGRATION WITH OTHER WORKFLOWS (not consolidation!)
+    # FLOW: migration → sprint-workflow → story-delivery
+    next_workflows:
+      description: "Continue with these workflows for implementation"
+
+      # STEP 1: Plan implementation (FIRST!)
+      immediate:
+        - workflow: "engineering/sprint-workflow.yaml"
+          description: "Plan implementation: tracks, dependencies, roadmap"
+          activities:
+            - "Decide how many stories per sprint"
+            - "Create parallel tracks (frontend/backend/infra)"
+            - "Map dependencies between stories"
+            - "Build implementation roadmap"
+            - "Assign stories to tracks"
+          trigger: "IMMEDIATELY after migration completes"
+
+      # STEP 2: Implement stories (per sprint)
+      per_story:
+        - workflow: "engineering/story-delivery.yaml"
+          description: "Implement each story using TDD (RED→GREEN→REFACTOR)"
+          trigger: "For each story in sprint backlog"
+
+      # Supporting workflows
+      supporting:
+        - workflow: "engineering/epic-workflow.yaml"
+          description: "Continue with next epic after current completes"
+          trigger: "When all stories in epic are done"
+
+    on_complete:
+      state_update:
+        phase: "release"
+        update_root: true
+        script: "bash scripts/sync-state.sh --phase release --commit"
+      commit:
+        enabled: true
+        message: "Migration complete - ready for story-delivery workflow"
+
+# =============================================================================
+# NAMING CONVENTIONS (same as new-project.yaml)
+# =============================================================================
+naming_conventions:
+  pattern: "{XX}.{N}.{M}.{slug}"
+  components:
+    XX: "Epic number (2 digits): 01, 02..."
+    N: "Story number: 1, 2, 3..."
+    M: "Subtask number (optional)"
+    slug: "kebab-case description"
+  docs:
+    epic_folder: "docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/"
+    epic_overview: "{XX}.0.epic-overview.md"
+    test_strategy: "{XX}.0.test-strategy.md"
+    story: "{XX}.{N}.{story-slug}.md"
+  tests:
+    folder: "tests/{XX}-{epic-slug}/"
+    unit: "{XX}.{N}.{story-slug}.test.ts"
+
+# =============================================================================
+# ROLLBACK PROCEDURES
+# =============================================================================
+rollback:
+  any_phase:
+    steps:
+      - "STOP migration"
+      - "Document issue"
+      - "Revert to backup"
+      - "Adjust plan"
+      - "Re-attempt"
+  emergency:
+    commands:
+      - "git checkout main"
+      - "rm -rf .claude/"
+      - "cp -r backup/. ."
+
+# =============================================================================
+# QUALITY GATES SUMMARY
+# =============================================================================
+quality_gates:
+  DISCOVERY_COMPLETE:
+    phase: audit_discovery
+    enforcer: DOC-AUDITOR + DISCOVERY-AGENT
+  PRD_APPROVED:
+    phase: prd_baseline
+    enforcer: PM-AGENT + PRODUCT-OWNER + USER
+  ARCHITECTURE_ASSESSED:
+    phase: architecture_assessment
+    enforcer: ARCHITECT-AGENT
+  UX_AUDITED:
+    phase: ux_audit
+    enforcer: UX-DESIGNER + USER
+    optional: true
+  EPICS_DEFINED:
+    phase: epic_breakdown
+    enforcer: ARCHITECT-AGENT + PRODUCT-OWNER + TEST-ENGINEER
+  STORIES_CREATED:
+    phase: story_breakdown
+    enforcer: ARCHITECT-AGENT
+  STORIES_READY:
+    phase: scope_validation
+    enforcer: PRODUCT-OWNER
+  MIGRATION_EXECUTED:
+    phase: execution
+    enforcer: ORCHESTRATOR
+  VERIFICATION_PASSED:
+    phase: verification
+    enforcer: DOC-AUDITOR
+  SPRINT_PLANNED:
+    phase: sprint_planning
+    enforcer: SCRUM-MASTER

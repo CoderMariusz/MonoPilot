@@ -1,0 +1,488 @@
+# Epic Workflow
+# End-to-end epic delivery: Discovery -> Design -> Planning -> Implementation -> Quality -> Documentation
+#
+# Documentation: @.claude/workflows/documentation/EPIC-WORKFLOW.md
+
+name: epic-workflow
+description: Complete workflow for delivering an epic from conception to completion
+trigger: "epic_implementation | new_feature | major_development"
+
+# Expected duration: 1-4 weeks depending on epic size
+# Parallelization: Design phase (Architecture + UX) can run in parallel
+
+documentation: "@.claude/workflows/documentation/EPIC-WORKFLOW.md"
+
+prerequisites:
+  - epic_defined_in_backlog
+  - stakeholder_approval
+  - resources_available
+
+phases:
+  # Phase 1: Discovery [MANDATORY]
+  - id: discovery
+    name: "Discovery"
+    mandatory: true
+    steps:
+      - id: doc_sync_check
+        agent: DOC-AUDITOR
+        type: documentation_audit
+        description: "Check existing documentation health, identify gaps before discovery"
+        duration: "30 minutes - 1 hour"
+        checkpoint:
+          - "Inventory existing docs for epic scope"
+          - "Check for stale or outdated documentation"
+          - "Identify documentation gaps"
+          - "Flag undocumented prior changes"
+        output:
+          deliverables:
+            - "docs/reviews/epic-{N}-doc-baseline.md"
+        drift_score:
+          green: "0-10% - proceed with discovery"
+          yellow: "11-25% - note doc updates needed during epic"
+          red: "26%+ - prioritize doc sync before epic work"
+        decision:
+          green: research
+          yellow: research_with_doc_tasks
+          red: escalate_to_product_owner
+
+      - id: research
+        agent: RESEARCH-AGENT
+        type: market_analysis
+        description: "Gather requirements, research market context"
+        duration: "0.5-1 day"
+        output:
+          deliverables:
+            - "docs/1-BASELINE/research/research-report.md"
+        checkpoint:
+          - "Requirements documented"
+          - "Risks identified"
+
+      - id: prd_creation
+        agent: PM-AGENT
+        type: prd
+        description: "Create PRD with user stories and acceptance criteria"
+        input:
+          context_refs:
+            - "@docs/1-BASELINE/research/research-report.md"
+        output:
+          deliverables:
+            - "docs/1-BASELINE/product/prd.md"
+        checkpoint:
+          - "All user stories have AC"
+          - "Success metrics defined"
+          - "Scope clearly defined"
+
+    gate:
+      name: "PRD Review"
+      type: APPROVAL_GATE
+      enforcer: PRODUCT-OWNER
+      criteria:
+        - "All user stories have acceptance criteria"
+        - "Success metrics are measurable"
+        - "Scope is clearly defined"
+        - "Dependencies identified"
+      next: design
+
+  # Phase 2: Design (Parallel) [MANDATORY]
+  - id: design
+    name: "Design"
+    mandatory: true
+    parallel:
+      - id: architecture
+        agent: ARCHITECT-AGENT
+        type: system_design
+        description: "Design system architecture, database schema, API contracts"
+        duration: "1-2 days"
+        output:
+          deliverables:
+            - "docs/1-BASELINE/architecture/architecture-overview.md"
+            - "docs/1-BASELINE/architecture/database-schema.md"
+            - "docs/1-BASELINE/architecture/api-spec.md"
+            - "docs/1-BASELINE/architecture/decisions/ADR-*.md"
+
+      - id: ux_design
+        agent: UX-DESIGNER
+        type: wireframes
+        description: "Create user flows, wireframes, UI specifications"
+        condition: "epic.has_ui_component == true"
+        optional_for: "backend-only epics"
+        duration: "1-2 days"
+        output:
+          deliverables:
+            - "docs/1-BASELINE/ux/user-flows.md"
+            - "docs/1-BASELINE/ux/wireframes/"
+            - "docs/1-BASELINE/ux/ui-spec.md"
+
+    gate:
+      name: "Design Review"
+      type: REVIEW_GATE
+      enforcer: ARCHITECT-AGENT
+      criteria:
+        - "Architecture supports all PRD requirements"
+        - "ADRs documented for key decisions"
+        - "UX flows cover all user stories"
+        - "No blocking technical questions"
+      next: planning
+
+  # Phase 3: Planning [MANDATORY]
+  - id: planning
+    name: "Planning"
+    mandatory: true
+    steps:
+      - id: backlog_refinement
+        agent: PRODUCT-OWNER
+        type: prioritization
+        description: "Review epic breakdown, prioritize stories using MoSCoW"
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/epics/current/epic-{N}.md"
+
+      - id: sprint_planning
+        agent: SCRUM-MASTER
+        type: sprint_setup
+        description: "Calculate capacity, select stories, create sprint backlog"
+        output:
+          deliverables:
+            - ".claude/state/TASK-QUEUE.md"
+            - "docs/2-MANAGEMENT/sprints/sprint-{N}.md"
+
+    gate:
+      name: "Sprint Ready"
+      type: QUALITY_GATE
+      enforcer: SCRUM-MASTER
+      criteria:
+        - "Stories are INVEST compliant"
+        - "Dependencies resolved or planned"
+        - "Capacity matches commitment"
+        - "Sprint goal defined"
+      next: implementation
+
+  # Phase 4: Implementation Loop [MANDATORY]
+  - id: implementation
+    name: "Implementation Loop"
+    mandatory: true
+    description: "TDD cycle for each story in sprint"
+    loop:
+      for_each: "story in sprint.stories"
+      workflow: "engineering/story-delivery.yaml"
+    parallel_tracks:
+      enabled: true
+      detection: "ORCHESTRATOR detects parallel opportunities"
+      safety_check:
+        - "No file dependencies between tracks"
+        - "No data dependencies between tracks"
+        - "Agents available for both tracks"
+
+    gate:
+      name: "Story Done"
+      type: TEST_GATE
+      criteria:
+        - "All tests pass"
+        - "Code review approved"
+        - "Acceptance criteria met"
+        - "Documentation updated"
+      next: quality
+
+  # Phase 5: Quality Assurance [MANDATORY]
+  - id: quality
+    name: "Quality Assurance"
+    mandatory: true
+    steps:
+      - id: integration_testing
+        agent: QA-AGENT
+        type: e2e_testing
+        description: "Execute E2E test suite, regression, performance, security"
+        duration: "1-2 days"
+        scope:
+          - "E2E testing"
+          - "Regression testing"
+          - "Performance testing"
+          - "Security scanning"
+        checkpoint:
+          - "All E2E tests pass"
+          - "No regression issues"
+          - "Performance meets SLAs"
+          - "Security scan passed"
+
+    gate:
+      name: "Quality Approved"
+      type: QUALITY_GATE
+      enforcer: QA-AGENT
+      criteria:
+        - "All E2E tests pass"
+        - "No regression issues"
+        - "Performance meets SLAs"
+        - "Security scan passed"
+      next: documentation
+
+  # Phase 6: Documentation [MANDATORY]
+  - id: documentation
+    name: "Documentation"
+    mandatory: true
+    steps:
+      - id: tech_docs
+        agent: TECH-WRITER
+        type: documentation
+        description: "Update API docs, user guides, release notes"
+        output:
+          deliverables:
+            - "docs/3-IMPLEMENTATION/api/"
+            - "docs/4-RELEASE/release-notes.md"
+            - "docs/4-RELEASE/changelog.md"
+
+      - id: doc_audit
+        agent: DOC-AUDITOR
+        type: documentation_audit
+        description: "Validate all documentation is complete, consistent, and accurate"
+        duration: "1-2 hours"
+        checkpoint:
+          - "All completed features documented"
+          - "API changes reflected in docs"
+          - "Cross-references valid (PRD <-> Architecture <-> Implementation)"
+          - "No CRITICAL documentation issues"
+          - "Code examples tested and working"
+        output:
+          deliverables:
+            - "docs/reviews/epic-{N}-doc-audit.md"
+        quality_score:
+          pass: "Score >= 75%, no CRITICAL issues"
+          pass_with_warnings: "Score 60-74%, no CRITICAL issues"
+          fail: "Score < 60% or CRITICAL issues present"
+        decision:
+          pass: deployment
+          pass_with_warnings: deployment
+          fail: route_to_tech_writer
+
+    gate:
+      name: "Documentation Complete"
+      type: APPROVAL_GATE
+      enforcer: PRODUCT-OWNER
+      criteria:
+        - "API docs up to date"
+        - "User guides accurate"
+        - "Release notes written"
+        - "All changes documented"
+        - "DOC_AUDIT_PASSED"
+      next: deployment
+
+  # Phase 7: Deployment [MANDATORY]
+  - id: deployment
+    name: "Deployment"
+    mandatory: true
+    steps:
+      - id: cicd_setup
+        agent: DEVOPS-AGENT
+        type: pipeline_configuration
+        description: "Configure CI/CD pipeline, deployment configs, infrastructure"
+        duration: "0.5-1 day"
+        activities:
+          - "Setup/update CI/CD pipeline"
+          - "Configure deployment environments"
+          - "Setup infrastructure as code"
+          - "Configure security scanning"
+          - "Test rollback procedures"
+        output:
+          deliverables:
+            - ".github/workflows/"
+            - "Dockerfile"
+            - "docker-compose.yml"
+            - "docs/deployment/deployment-guide.md"
+        checkpoint:
+          - "Pipeline stages configured"
+          - "All tests passing in CI"
+          - "Security scan passed"
+          - "Rollback tested"
+
+      - id: staging_deployment
+        agent: DEVOPS-AGENT
+        type: deployment
+        description: "Deploy to staging environment and verify"
+        duration: "2-4 hours"
+        activities:
+          - "Deploy to staging"
+          - "Run smoke tests"
+          - "Verify all features"
+          - "Performance validation"
+        checkpoint:
+          - "Staging deployment successful"
+          - "Smoke tests pass"
+          - "No critical issues"
+
+      - id: production_deployment
+        agent: DEVOPS-AGENT
+        type: deployment
+        description: "Deploy to production with monitoring"
+        duration: "2-4 hours"
+        condition: "staging_verified == true"
+        activities:
+          - "Deploy to production"
+          - "Monitor deployment health"
+          - "Verify production functionality"
+          - "Update deployment documentation"
+        checkpoint:
+          - "Production deployment successful"
+          - "Health checks passing"
+          - "Monitoring active"
+
+    gate:
+      name: "Deployment Complete"
+      type: QUALITY_GATE
+      enforcer: DEVOPS-AGENT
+      criteria:
+        - "CI/CD pipeline operational"
+        - "Staging deployment verified"
+        - "Production deployment successful"
+        - "Rollback capability confirmed"
+        - "Monitoring in place"
+
+  # Completion
+  - id: complete
+    type: epic_complete
+    summary: "Epic implemented and verified"
+    actions:
+      - "Update PROJECT-STATE.md"
+      - "Mark epic as Done"
+      - "Archive to completed/"
+      - "Update METRICS.md"
+
+    # AUTO STATE UPDATE + COMMIT
+    on_complete:
+      state_update:
+        update_root: true
+        script: "bash scripts/sync-state.sh --commit"
+      commit:
+        enabled: true
+        message: "Complete epic {epic_id}: {epic_name}"
+
+# Quality Gates Summary
+quality_gates:
+  discovery_to_design:
+    - prd_complete
+    - requirements_have_ac
+    - scope_defined
+
+  design_to_planning:
+    - architecture_approved
+    - adrs_documented
+    - ux_specs_complete
+
+  planning_to_implementation:
+    - stories_invest_compliant
+    - capacity_matched
+    - sprint_goal_defined
+
+  implementation_to_quality:
+    - all_stories_complete
+    - tests_passing
+    - reviews_approved
+
+  quality_to_documentation:
+    - e2e_passing
+    - no_regressions
+    - security_approved
+
+  documentation_to_deployment:
+    - docs_complete
+    - release_notes_written
+    - doc_audit_passed
+    - deployment_ready
+
+  deployment_to_complete:
+    - cicd_operational
+    - staging_verified
+    - production_deployed
+    - rollback_confirmed
+
+# Error handling
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalate_to: ORCHESTRATOR
+
+error_recovery:
+  unclear_requirements:
+    action: return_to_discovery
+    agent: RESEARCH-AGENT
+
+  architecture_conflict:
+    action: create_adr
+    agent: ARCHITECT-AGENT
+
+  tests_failing:
+    action: return_to_implementation
+    agent: TEST-ENGINEER
+
+  security_vulnerability:
+    action: immediate_fix
+    agent: SENIOR-DEV
+
+  deployment_failed:
+    action: rollback_and_investigate
+    agent: DEVOPS-AGENT
+
+  pipeline_broken:
+    action: fix_pipeline
+    agent: DEVOPS-AGENT
+
+  documentation_drift:
+    action: prioritize_doc_sync
+    agent: DOC-AUDITOR
+    options:
+      - "Schedule doc updates as part of epic work"
+      - "Create separate doc-sync stories"
+      - "Route critical gaps to tech-writer immediately"
+
+  doc_audit_failed:
+    action: fix_documentation
+    agent: TECH-WRITER
+    escalate_to: DOC-AUDITOR
+    options:
+      - "Fix CRITICAL issues immediately"
+      - "Address MAJOR issues before deployment"
+      - "Log MINOR issues for future sprints"
+
+# Artifacts
+artifacts:
+  research_report:
+    path: "docs/1-BASELINE/research/research-report.md"
+    created_by: discovery.research
+
+  prd:
+    path: "docs/1-BASELINE/product/prd.md"
+    created_by: discovery.prd_creation
+
+  architecture:
+    path: "docs/1-BASELINE/architecture/architecture-overview.md"
+    created_by: design.architecture
+
+  epic_doc:
+    path: "docs/2-MANAGEMENT/epics/current/epic-{N}.md"
+    created_by: planning.backlog_refinement
+
+  sprint_doc:
+    path: "docs/2-MANAGEMENT/sprints/sprint-{N}.md"
+    created_by: planning.sprint_planning
+
+  release_notes:
+    path: "docs/4-RELEASE/release-notes.md"
+    created_by: documentation.tech_docs
+
+  cicd_pipeline:
+    path: ".github/workflows/"
+    created_by: deployment.cicd_setup
+
+  deployment_guide:
+    path: "docs/deployment/deployment-guide.md"
+    created_by: deployment.cicd_setup
+
+  docker_config:
+    path: "Dockerfile"
+    created_by: deployment.cicd_setup
+
+  doc_baseline:
+    path: "docs/reviews/epic-{N}-doc-baseline.md"
+    created_by: discovery.doc_sync_check
+
+  doc_audit_report:
+    path: "docs/reviews/epic-{N}-doc-audit.md"
+    created_by: documentation.doc_audit

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json.schemastore.org/mcp-config.json",
+  "name": "full",
+  "description": "Full MCP profile with all available servers - use sparingly",
+  "usage": "Use only when multiple external services needed in single session",
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "${SUPABASE_ACCESS_TOKEN}"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropics/mcp-server-filesystem",
+        "${PROJECT_ROOT}"
+      ]
+    }
+  },
+  "placeholder_servers": {
+    "_docker": {
+      "comment": "Add when Docker MCP needed",
+      "command": "docker-mcp-server",
+      "args": []
+    },
+    "_github": {
+      "comment": "Add when GitHub MCP needed",
+      "command": "npx",
+      "args": ["-y", "@anthropics/mcp-server-github"]
+    }
+  },
+  "notes": {
+    "warning": "High token cost - only use when absolutely necessary",
+    "estimated_cost": "~25k+ tokens per session",
+    "alternatives": [
+      "Use 'minimal' profile + skills for most tasks",
+      "Use 'backend' profile for Supabase-only operations",
+      "Consider splitting work across multiple focused sessions"
+    ]
+  }
+}

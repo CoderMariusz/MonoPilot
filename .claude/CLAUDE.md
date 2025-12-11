@@ -1,184 +1,82 @@
-# MonoPilot - AI Guide
+# MonoPilot
 
-## Priorytet: Efektywność Tokenów
+## Overview
+Food Manufacturing MES system for small-to-medium food manufacturers (5-100 employees). Handles product lifecycle from formulation through production to shipping, with full traceability and quality management. Multi-tenant SaaS architecture.
 
-### Zasady Podstawowe
-- **NIE czytaj plików bez potrzeby** - użyj indeksów poniżej
-- **NIE używaj Task/Explore** - najpierw Grep/Glob
-- **NIE generuj długich odpowiedzi** - zwięźle i konkretnie
-- **Pokazuj TYLKO zmiany**, nie cały plik
-- **Używaj Haiku** dla prostych zadań (docs, review, testy)
+**Positioning**: Cloud-native, easy-deploy MES - between Excel and enterprise ERP
+**Pricing Model**: Freemium + $50/user/month
 
----
+## Tech Stack
+- Frontend: Next.js 15.5, React 19, TypeScript, TailwindCSS, ShadCN UI
+- Backend: Supabase (PostgreSQL + Auth + RLS + Edge Functions)
+- Validation: Zod schemas
+- Cache: Redis
+- Testing: Vitest (unit), Playwright (e2e)
+- Monorepo: pnpm workspaces
 
-## Quick Lookup - Zanim zaczniesz szukać
-
-| Potrzebuję | Przeczytaj | NIE rób |
-|------------|------------|---------|
-| Gdzie jest plik/komponent? | `.claude/FILE-MAP.md` | Glob całego projektu |
-| Jakie są tabele/pola? | `.claude/TABLES.md` | Czytaj migracje SQL |
-| Wzorzec API/Component/Test | `.claude/PATTERNS.md` | Czytaj podobne pliki |
-| Jak sformułować prompt? | `.claude/PROMPTS.md` | Zgadywać |
-| Status projektu | `sprint-status.yaml` | Skanować docs/ |
-
----
-
-## Quick Reference
-
-### Stack
-`Next.js 15` | `React` | `TypeScript` | `Tailwind` | `shadcn/ui` | `Supabase` | `pnpm`
-
-### Struktura (zapamiętaj, nie skanuj)
+## Project Structure
 ```
 apps/frontend/
-  app/                    # Pages + API routes
-  components/             # React components
-  lib/supabase/           # client.ts, server.ts, migrations/
-docs/sprint-artifacts/    # Sprint status + stories
-.claude/                  # AI helper files
-.bmad/                    # BMAD workflows
+  app/(authenticated)/[module]/  - Module pages (45 pages)
+  app/api/[module]/              - API routes (99 endpoints)
+  lib/services/                  - Business logic (25+ services)
+  lib/validation/                - Zod schemas (18 files)
+  components/                    - UI components (70+)
+docs/
+  0-DISCOVERY/                   - Market research, competitive analysis
+  1-BASELINE/product/            - PRD modules (11 modules, 13.5K lines)
+supabase/
+  migrations/                    - Database migrations (42 files)
+  functions/                     - Edge functions
 ```
 
-### Komendy
-```bash
-pnpm dev        # Dev server
-pnpm build      # Build
-pnpm type-check # TypeScript
-pnpm test       # Playwright E2E
-```
+## Modules (11 Total)
 
----
+### Core Modules (Epic 1-7)
+| Epic | Module | PRD Lines | Code Status | Path |
+|------|--------|-----------|-------------|------|
+| 1 | Settings | 703 | ~80% Done | /settings/* |
+| 2 | Technical | 772 | ~80% Done | /technical/* |
+| 3 | Planning | 2,793 | ~70% Done | /planning/* |
+| 4 | Production | 1,328 | ~60% Done | /production/* |
+| 5 | Warehouse | 1,147 | Planned | /warehouse/* |
+| 6 | Quality | 731 | Planned | /quality/* |
+| 7 | Shipping | 1,345 | Planned | /shipping/* |
 
-## Workflow: Zanim cokolwiek zrobisz
+### Premium & New Modules (Epic 8-11)
+| Epic | Module | PRD Lines | Code Status | Path |
+|------|--------|-----------|-------------|------|
+| 8 | NPD | 1,004 | Planned | /npd/* |
+| 9 | Finance | 892 | Planned | /finance/* |
+| 10 | OEE | 914 | NEW - Planned | /oee/* |
+| 11 | Integrations | 1,647 | NEW - Planned | /integrations/* |
 
-```
-1. Użytkownik prosi o X
-       ↓
-2. Czy wiem gdzie to jest?
-   NIE → Sprawdź FILE-MAP.md
-   TAK → Idź dalej
-       ↓
-3. Czy potrzebuję schematu DB?
-   TAK → Sprawdź TABLES.md (NIE czytaj migracji)
-       ↓
-4. Czy tworzę nowy API/Component/Test?
-   TAK → Sprawdź PATTERNS.md
-       ↓
-5. Zrób zadanie, pokaż TYLKO diff
-       ↓
-6. Czy to story? → Update sprint-status.yaml
-```
+## Key Patterns
+- **Multi-tenancy**: All tables have org_id, RLS on every query
+- **License Plate (LP)**: Atomic inventory unit, no loose qty, full genealogy
+- **BOM Snapshot**: WO captures BOM at creation, immutable
+- **GS1 Compliance**: GTIN-14 products, GS1-128 lot/expiry, SSCC-18 pallets
+- **FIFO/FEFO**: Pick suggestions by receipt date or expiry
+- **API Routes**: /api/[module]/[resource]/[id]/[action]
+- **Service Layer**: lib/services/*-service.ts
+- **Validation**: Zod schemas in lib/validation/
 
----
+## Key Files
+- `.claude/PROJECT-STATE.md` - Current project state after context clear
+- `.claude/PATTERNS.md` - Code patterns and conventions
+- `.claude/TABLES.md` - Database schema reference (43 tables)
+- `docs/1-BASELINE/product/prd.md` - PRD index (11 modules)
+- `docs/0-DISCOVERY/FEATURE-GAP-ANALYSIS.md` - Competitive analysis
 
-## Po każdym COMMICIE - Aktualizuj Status
+## Database
+- **43 tables** organized by module
+- **~100 RLS policies** for multi-tenancy
+- **42 migrations** in supabase/migrations/
 
-### 1. Sprawdź co zrobiłeś
-```bash
-git log -1 --oneline
-```
-
-### 2. Zaktualizuj sprint-status.yaml
-Lokalizacja: `docs/sprint-artifacts/sprint-status.yaml`
-
-Statusy: `backlog` → `drafted` → `ready-for-dev` → `in-progress` → `review` → `done`
-
-### 3. Jeśli story ukończone
-- Update story file w `docs/sprint-artifacts/batch-XXX/stories/`
-- Zmień status na `done` + data
-
----
-
-## Kiedy czytać które pliki?
-
-### FILE-MAP.md - Szukam lokalizacji
-- Gdzie jest komponent X?
-- Gdzie jest API dla Y?
-- Jaka jest struktura modułu Z?
-
-### TABLES.md - Potrzebuję schematu DB
-- Jakie pola ma tabela X?
-- Jaki jest typ kolumny Y?
-- Jakie są relacje między tabelami?
-
-### PATTERNS.md - Tworzę nowy element
-- Nowy API endpoint
-- Nowa migracja + RLS
-- Nowy komponent z Supabase
-- Nowy test E2E
-
-### PROMPTS.md - Nie wiem jak sformułować
-- Szablony promptów dla typowych zadań
-- Quick fix, nowy endpoint, story implementation
-
----
-
-## Optymalizacja Tokenów
-
-| Zamiast | Użyj |
-|---------|------|
-| Task/Explore agent | Grep → Read znalezione |
-| Czytaj migracje SQL | TABLES.md |
-| Czytaj podobne pliki | PATTERNS.md |
-| Czytaj cały stack | Grep błąd → Read plik |
-| Code review workflow | `git diff --stat` |
-
----
-
-## BMAD Workflows
-
-### Używaj TYLKO gdy:
-| Workflow | Kiedy |
-|----------|-------|
-| `workflow-status` | Sprawdzenie statusu projektu |
-| `dev-story` | Implementacja całego story |
-| `code-review` | Review DUŻYCH zmian (>5 plików) |
-
-### NIE używaj gdy:
-- Mała zmiana → po prostu zrób
-- Bug fix → napraw bezpośrednio
-- Docs → `/quick-docs`
-
----
-
-## Quick Commands (Haiku)
-
-- `/quick-docs` - Update dokumentacji
-- `/quick-test` - Generowanie testów
-- `/quick-review` - Szybkie code review
-
----
-
-## Komunikacja
-
-- **Polski** język
-- **Zwięźle** - bez wyjaśnień
-- **Tylko diff** - nie cały plik
-- **Pytaj** - nie zgaduj
-
-### Dobra odpowiedź:
-```
-Dodam endpoint.
-
-apps/frontend/app/api/products/route.ts:15:
-+ export async function POST(req: Request) { ... }
-
-Gotowe.
-```
-
----
-
-## Index .claude/
-
-| Plik | Kiedy czytać |
-|------|--------------|
-| `CLAUDE.md` | Zawsze załadowany |
-| `FILE-MAP.md` | Szukam gdzie jest plik |
-| `TABLES.md` | Potrzebuję DB schema |
-| `PATTERNS.md` | Tworzę nowy API/component/test |
-| `PROMPTS.md` | Szablony promptów |
-| `WORKFLOW-GUIDE.md` | Multi-model setup |
-
----
-
-**Pamiętaj: Najpierw sprawdź indeksy, potem szukaj. Każdy token kosztuje.**
+## Current Phase
+**Phase**: PRD Complete | Ready for Implementation Planning
+**Last Update**: 2025-12-10
+**Next Steps**:
+1. Create tech specs from PRDs
+2. Generate stories for Epic 5 (Warehouse)
+3. Continue Epic 4 (Production) implementation

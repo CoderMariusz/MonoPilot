@@ -1,0 +1,980 @@
+# New Project Workflow
+# Full project setup from idea to sprint-ready state
+#
+# Documentation: @.claude/workflows/documentation/NEW-PROJECT-FLOW.md
+#
+# CORRECT FLOW (Option B - Sequential):
+# 1. DISCOVERY      → PROJECT-UNDERSTANDING.md       [commit: discovery complete]
+# 2. PRD            → prd.md                         [commit: prd complete]
+# 3. ARCHITECTURE   → system-overview.md, ADRs       [commit: architecture complete]
+# 4. UX DESIGN      → user-flows.md, wireframes      [commit: ux approved]
+# 5. EPIC BREAKDOWN → epic-catalog.md, dependencies  [commit: epics defined]
+# 6. STORY BREAKDOWN → stories INVEST validated      [commit: stories ready]
+# 7. SCOPE VALIDATION → scope review                 [commit: scope validated]
+# 8. SPRINT PLANNING → sprint plan                   [commit: sprint 1 planned]
+#
+# AUTOMATIC STATE + COMMIT:
+# After each phase completion:
+# - PROJECT-STATE.md updated in root
+# - Auto-commit with descriptive message
+# - Use: bash scripts/sync-state.sh --phase <phase>
+
+name: new-project
+description: Complete workflow for new project initialization
+trigger: "new_project | major_feature | greenfield"
+
+# Expected duration: Multiple sessions
+# Parallelization: Limited (sequential dependencies)
+# Note: UX comes AFTER Architecture to have technical context
+
+# =============================================================================
+# STATE & COMMIT CONFIGURATION
+# =============================================================================
+config:
+  state_management:
+    enabled: true
+    state_file: "PROJECT-STATE.md"
+    sync_to_root: true
+    sync_script: "scripts/sync-state.sh"
+
+  auto_commit:
+    enabled: true
+    after_each_phase: true
+    commit_format: "{emoji} checkpoint: {message}"
+    emojis:
+      discovery: "🔍"
+      prd: "📋"
+      architecture: "🏗️"
+      ux_design: "🎨"
+      epic: "📦"
+      stories: "📝"
+      scope: "✅"
+      sprint: "🏃"
+
+  commit_messages:
+    discovery: "Complete discovery phase - clarity {clarity_score}%"
+    prd: "Complete PRD phase - requirements documented"
+    architecture: "Complete architecture phase - {adrs_count} ADRs"
+    ux_design: "Complete UX design phase - wireframes approved"
+    epic: "Complete epic breakdown - {epic_count} epics"
+    stories: "Complete story breakdown - {story_count} stories"
+    scope: "Scope validated - stories ready for sprint"
+    sprint: "Sprint 1 planned - project ready for development"
+
+steps:
+  # =========================================================================
+  # STEP 1: DISCOVERY (Deep Business Logic Interview)
+  # =========================================================================
+  - id: discovery
+    agent: DISCOVERY-AGENT
+    type: new_project
+    depth: deep                  # Full discovery for new projects
+    description: "Gather requirements through structured interview with deep business logic exploration"
+    input:
+      context_refs:
+        - "@CLAUDE.md"
+        - "@docs/1-BASELINE/product/project-brief.md"
+    output:
+      deliverable: "docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+      min_clarity: 75            # Min to proceed, target is 85%
+      target_clarity: 85
+
+    # MANDATORY: Deep business logic questions
+    interview_phases:
+      - phase: general_understanding
+        questions:
+          - "What is the primary purpose of this project?"
+          - "Who are the target users?"
+          - "What problem does it solve?"
+
+      - phase: business_logic_deep_dive
+        description: "CRITICAL: Ask specific questions about business processes"
+        questions:
+          - "How does {process} work step by step?"
+          - "What triggers {workflow}?"
+          - "How is {resource} transported/moved/consumed?"
+          - "What validations are required for {entity}?"
+          - "What happens when {edge_case} occurs?"
+          - "How do you handle {exception_scenario}?"
+        examples:
+          - "How is stock consumed in production?"
+          - "How do you trigger a production order?"
+          - "What happens when supplier delivery is late?"
+          - "How do you check available inventory?"
+
+      - phase: entity_details
+        description: "For each entity/table mentioned, clarify fields"
+        questions:
+          - "What fields does {entity} have?"
+          - "Which fields are required vs optional?"
+          - "What are the validation rules?"
+          - "What relationships exist with other entities?"
+
+      - phase: assumptions_validation
+        description: "List assumptions and ask user to confirm"
+        questions:
+          - "I assume {assumption}. Is this correct?"
+          - "Please confirm or correct these assumptions: {list}"
+
+    checkpoint:
+      - "Business context documented"
+      - "User personas identified"
+      - "Scope boundaries defined"
+      - "Business logic processes documented"
+      - "Entity fields clarified"
+      - "Assumptions validated with user"
+
+    gate:
+      id: DISCOVERY_COMPLETE
+      type: quality_gate
+      enforcer: DISCOVERY-AGENT
+      criteria:
+        - "Requirements clarity score >= 85%"
+        - "Key stakeholders interviewed"
+        - "Business context documented"
+        - "User personas identified"
+        - "Scope boundaries defined"
+        - "Business logic deep-dive completed"
+        - "All assumptions validated"
+      on_pass: prd_creation
+      on_fail:
+        action: ask_user
+        message: "Clarification needed - business logic not fully understood"
+      block_message: |
+        Cannot proceed to PRD Creation:
+        - Requirements clarity: {clarity_score}% (need >= 85%)
+        - Business logic documented: {business_logic_complete}
+        - Assumptions validated: {assumptions_validated}
+        - Complete discovery interview before proceeding
+
+    # AUTO STATE UPDATE + COMMIT
+    on_complete:
+      state_update:
+        phase: "discovery"
+        status: "completed"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete discovery phase - clarity {clarity_score}%"
+
+    next: prd_creation
+    on_blocked: ask_user
+
+  # =========================================================================
+  # STEP 2: PRD CREATION (With Clarification Loop)
+  # =========================================================================
+  - id: prd_creation
+    agent: PM-AGENT
+    type: create_prd
+    description: "Create Product Requirements Document with user clarification"
+    input:
+      context_refs:
+        - "@docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+    output:
+      deliverable: "docs/1-BASELINE/product/prd.md"
+
+    # MANDATORY: Clarification before finalizing PRD
+    clarification_process:
+      - step: draft_prd
+        description: "Create initial PRD draft"
+
+      - step: verify_understanding
+        description: "Present key requirements to user for confirmation"
+        questions:
+          - "I understand that {requirement}. Is this correct?"
+          - "The success metric for {feature} is {metric}. Correct?"
+          - "This is IN scope: {in_scope}. This is OUT of scope: {out_scope}. Correct?"
+
+      - step: list_assumptions
+        description: "Present all assumptions for validation"
+        format: |
+          ## Assumptions Made
+          1. {assumption_1} - Please confirm or correct
+          2. {assumption_2} - Please confirm or correct
+          ...
+        output: "docs/1-BASELINE/product/prd-assumptions.md"
+
+      - step: identify_gaps
+        description: "Identify and ask about any gaps"
+        questions:
+          - "I'm unclear about {gap}. Can you clarify?"
+          - "What should happen when {edge_case}?"
+          - "How does {integration} work with {system}?"
+
+    checkpoint:
+      - "All requirements have MoSCoW priority"
+      - "Success metrics are SMART"
+      - "Scope is explicit (in/out/future)"
+      - "User confirmed understanding is correct"
+      - "All assumptions validated"
+
+    gate:
+      id: PRD_APPROVED
+      type: approval_gate
+      enforcer: PM-AGENT + PRODUCT-OWNER
+      criteria:
+        - "PRD document complete"
+        - "All requirements have MoSCoW priority"
+        - "Success metrics are SMART"
+        - "Scope validated (in/out/future explicit)"
+        - "User confirmed requirements understanding"
+        - "All assumptions documented and validated"
+        - "Stakeholder sign-off obtained"
+      on_pass: architecture
+      on_fail:
+        action: return_to_phase
+        target: discovery
+        message: "PRD incomplete or not approved"
+      block_message: |
+        Cannot proceed to Architecture:
+        - PRD complete: {prd_complete}
+        - Requirements prioritized: {requirements_prioritized}
+        - Scope validated: {scope_validated}
+        - User confirmed: {user_confirmed}
+        - PRD must be approved by PM and Product Owner
+
+    # AUTO STATE UPDATE + COMMIT
+    on_complete:
+      state_update:
+        phase: "prd"
+        status: "completed"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete PRD phase - requirements documented"
+
+    next: architecture
+    on_blocked: return_to_discovery
+
+  # =========================================================================
+  # STEP 3: ARCHITECTURE (Technical Design ONLY - no epic breakdown!)
+  # =========================================================================
+  - id: architecture
+    agent: ARCHITECT-AGENT
+    type: technical_design
+    description: "Design system architecture and make technical decisions"
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+        - "@docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+    output:
+      deliverables:
+        - "docs/1-BASELINE/architecture/system-overview.md"
+        - "docs/1-BASELINE/architecture/tech-stack.md"
+        - "docs/1-BASELINE/architecture/adrs/*.md"
+    checkpoint:
+      - "System architecture designed"
+      - "Tech stack decisions documented"
+      - "ADRs created for major decisions"
+      - "Technical constraints identified"
+      - "Integration points defined"
+    gate:
+      id: ARCHITECTURE_APPROVED
+      type: review_gate
+      enforcer: ARCHITECT-AGENT
+      criteria:
+        - "System design complete"
+        - "Tech stack justified"
+        - "ADRs documented for major decisions"
+        - "Technical feasibility confirmed"
+        - "Security architecture defined"
+        - "Scalability approach documented"
+      on_pass: ux_design
+      on_fail:
+        action: return_to_phase
+        target: prd_creation
+        message: "Architecture design incomplete or infeasible"
+      block_message: |
+        Cannot proceed to UX Design:
+        - System design complete: {system_design_complete}
+        - Tech stack defined: {tech_stack_defined}
+        - ADRs documented: {adrs_count} ADRs created
+        - Architecture must be complete before UX design
+
+    # AUTO STATE UPDATE + COMMIT
+    on_complete:
+      state_update:
+        phase: "architecture"
+        status: "completed"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete architecture phase - {adrs_count} ADRs created"
+
+    next: ux_design
+    on_blocked: return_to_pm
+
+  # =========================================================================
+  # STEP 4: UX DESIGN (After Architecture - WITH USER APPROVAL)
+  # =========================================================================
+  - id: ux_design
+    agent: UX-DESIGNER
+    type: ux_design
+    description: "Design user experience with technical context - REQUIRES USER APPROVAL for wireframes"
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+        - "@docs/0-DISCOVERY/PROJECT-UNDERSTANDING.md"
+        - "@docs/1-BASELINE/architecture/system-overview.md"
+    output:
+      deliverables:
+        - "docs/3-ARCHITECTURE/ux/user-flows.md"
+        - "docs/3-ARCHITECTURE/ux/wireframes/*.md"
+        - "docs/3-ARCHITECTURE/ux/interaction-specs.md"
+        - "docs/3-ARCHITECTURE/ux/component-specs.md"
+
+    # MANDATORY: User approval process for wireframes
+    user_approval_process:
+      - step: check_approval_mode
+        description: "Ask user if they want to approve each screen or auto-approve"
+        question: |
+          How would you like to handle UX approval?
+          1. Review and approve each screen (recommended for new projects)
+          2. Auto-approve - trust UX-DESIGNER decisions
+        default: "review_each"
+
+      - step: present_user_flows
+        description: "Present user flows for approval before wireframes"
+        format: |
+          ## User Flow: {flow_name}
+          1. {step_1}
+          2. {step_2}
+          ...
+
+          Does this flow look correct? [Approve / Request Changes]
+
+      - step: present_wireframes
+        condition: "approval_mode == 'review_each'"
+        description: "Present each key screen wireframe for approval"
+        format: |
+          ## Screen: {screen_name}
+
+          {ascii_wireframe_or_description}
+
+          Key elements:
+          - {element_1}: {description}
+          - {element_2}: {description}
+
+          Interactions:
+          - {interaction_1}
+          - {interaction_2}
+
+          Do you approve this screen? [Approve / Request Changes / Skip]
+
+      - step: collect_feedback
+        description: "If user requests changes, iterate"
+        max_iterations: 3
+        on_feedback: "Revise wireframe based on user feedback"
+
+    checkpoint:
+      - "User flows documented"
+      - "Key screens wireframed"
+      - "Interaction patterns defined"
+      - "Technical constraints respected"
+      - "Accessibility requirements addressed"
+      - "USER APPROVED wireframes (or explicit auto-approve)"
+
+    gate:
+      id: UX_APPROVED
+      type: approval_gate
+      enforcer: UX-DESIGNER + PRODUCT-OWNER + USER
+      criteria:
+        - "User flows complete for all personas"
+        - "Wireframes for key screens"
+        - "Interaction specs defined"
+        - "Accessibility requirements documented"
+        - "Technical feasibility validated with architecture"
+        - "USER explicitly approved OR opted for auto-approve"
+      on_pass: epic_breakdown
+      on_fail:
+        action: iterate
+        target: ux_design
+        max_iterations: 3
+        message: "UX design needs revision based on user feedback"
+      block_message: |
+        Cannot proceed to Epic Breakdown:
+        - User flows complete: {user_flows_complete}
+        - Wireframes ready: {wireframes_ready}
+        - Interaction specs: {interaction_specs_complete}
+        - User approval: {user_approval_status}
+        - UX must be approved by USER before epic breakdown
+
+    # AUTO STATE UPDATE + COMMIT
+    on_complete:
+      state_update:
+        phase: "ux_design"
+        status: "completed"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete UX design phase - wireframes approved"
+
+    next: epic_breakdown
+    on_blocked: return_to_architecture
+
+  # =========================================================================
+  # STEP 5: EPIC BREAKDOWN (Parallel: ARCHITECT + TEST-ENGINEER)
+  # =========================================================================
+  - id: epic_breakdown
+    description: "Break PRD into epics with test strategy"
+    type: parallel_execution
+
+    parallel:
+      # 5A: Epic Structure (ARCHITECT-AGENT)
+      - id: epic_structure
+        agent: ARCHITECT-AGENT
+        type: epic_identification
+        description: "Break PRD requirements into epics with dependencies"
+        input:
+          context_refs:
+            - "@docs/1-BASELINE/product/prd.md"
+            - "@docs/1-BASELINE/architecture/system-overview.md"
+            - "@docs/3-ARCHITECTURE/ux/user-flows.md"
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/epics/epic-catalog.md"
+            - "docs/2-MANAGEMENT/epics/dependency-graph.md"
+            - "docs/2-MANAGEMENT/risks/risk-registry.md"
+            - "docs/2-MANAGEMENT/roadmap.md"
+          # Per-epic folder structure (XX = epic number, padded)
+          per_epic:
+            folder: "docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/"
+            files:
+              - "{XX}.0.epic-overview.md"      # Epic overview
+              - "{XX}.0.clarifications.md"     # Business logic clarifications
+        checkpoint:
+          - "All PRD requirements mapped to epics"
+          - "Epic boundaries clear"
+          - "Dependencies identified"
+          - "Critical path defined"
+          - "Risks assessed"
+
+        # CLARIFICATION: Ask business logic questions per epic
+        clarification_required:
+          trigger: "For each epic with entities/tables"
+          questions:
+            - "What fields does {entity} have?"
+            - "What validations are required?"
+            - "What are the business rules for {process}?"
+            - "How does {workflow} work step by step?"
+            - "What happens when {edge_case}?"
+          output: "docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/{XX}.0.clarifications.md"
+
+      # 5B: Test Strategy (TEST-ENGINEER) - runs in parallel
+      - id: test_strategy
+        agent: TEST-ENGINEER
+        type: test_planning
+        description: "Design test strategy and scenarios for each epic"
+        input:
+          context_refs:
+            - "@docs/1-BASELINE/product/prd.md"
+            - "@docs/1-BASELINE/architecture/system-overview.md"
+            - "@docs/3-ARCHITECTURE/ux/user-flows.md"
+        output:
+          deliverables:
+            - "docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/{XX}.0.test-strategy.md"
+        checkpoint:
+          - "Test scenarios defined per epic"
+          - "Test naming conventions established"
+          - "Test file structure defined"
+          - "Coverage requirements specified"
+          - "E2E scenarios identified"
+
+        # Test strategy template for each epic
+        strategy_includes:
+          - naming_convention: "describe('{XX}_{N}_{feature}', () => { it('should_{action}_{expected}') })"
+          - file_structure: "tests/{XX}-{epic-slug}/{XX}.{N}.{story-slug}.test.ts"
+          - test_types: ["unit", "integration", "e2e"]
+          - scenarios_per_story: "List of Given/When/Then mapped to test cases"
+          - mocks_needed: "External services, APIs to mock"
+          - fixtures_needed: "Test data definitions"
+
+    gate:
+      id: EPICS_DEFINED
+      type: quality_gate
+      enforcer: ARCHITECT-AGENT + PRODUCT-OWNER + TEST-ENGINEER
+      criteria:
+        - "Each PRD requirement mapped to epic"
+        - "Epic boundaries are clear (no overlap)"
+        - "No circular dependencies"
+        - "Critical path identified"
+        - "Risks documented with mitigations"
+        - "Roadmap (NOW/NEXT/LATER) created"
+        - "Test strategy defined for each epic"
+        - "Business logic clarified for each epic"
+      on_pass: story_breakdown
+      on_fail:
+        action: iterate
+        target: epic_breakdown
+        max_iterations: 2
+        message: "Epic structure or test strategy needs revision"
+      block_message: |
+        Cannot proceed to Story Breakdown:
+        - PRD mapping complete: {prd_mapping_complete}
+        - Epic boundaries clear: {boundaries_clear}
+        - Dependencies valid: {dependencies_valid}
+        - Test strategy defined: {test_strategy_complete}
+        - Business logic clarified: {clarifications_complete}
+        - All epics must be defined before story breakdown
+
+    # AUTO STATE UPDATE + COMMIT
+    on_complete:
+      state_update:
+        phase: "epic"
+        status: "completed"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete epic breakdown - {epic_count} epics with test strategies"
+
+    next: story_breakdown
+    on_blocked: return_to_ux
+
+  # =========================================================================
+  # STEP 6: STORY BREAKDOWN
+  # =========================================================================
+  - id: story_breakdown
+    agent: ARCHITECT-AGENT
+    type: story_creation
+    description: "Break NOW epics into INVEST-compliant stories"
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/epic-catalog.md"
+        - "@docs/2-MANAGEMENT/roadmap.md"
+        - "@docs/3-ARCHITECTURE/ux/user-flows.md"
+        - "@docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/{XX}.0.clarifications.md"
+    output:
+      # Stories go into epic folders with hierarchical naming
+      # Pattern: {XX}.{N}.{story-slug}.md where XX=epic, N=story number
+      per_story:
+        folder: "docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/"
+        file_pattern: "{XX}.{N}.{story-slug}.md"
+        # Subtasks (optional): {XX}.{N}.{M}.{subtask-slug}.md
+      examples:
+        - "docs/2-MANAGEMENT/epics/01-user-auth/01.1.db-schema-setup.md"
+        - "docs/2-MANAGEMENT/epics/01-user-auth/01.2.login-endpoint.md"
+        - "docs/2-MANAGEMENT/epics/01-user-auth/01.2.1.validation-logic.md"  # subtask
+        - "docs/2-MANAGEMENT/epics/01-user-auth/01.3.ux-login-form.md"
+        - "docs/2-MANAGEMENT/epics/02-supplier-mgmt/02.1.supplier-model.md"
+    checkpoint:
+      - "NOW bucket epics broken into stories"
+      - "Stories follow INVEST criteria"
+      - "Acceptance criteria in Given/When/Then"
+      - "Complexity estimated (S/M/L)"
+      - "Hierarchical naming convention followed (XX.N.slug)"
+    gate:
+      id: STORIES_CREATED
+      type: quality_gate
+      enforcer: ARCHITECT-AGENT
+      criteria:
+        - "All NOW epics have stories"
+        - "Stories are INVEST compliant"
+        - "AC in Given/When/Then format"
+        - "Complexity estimated"
+      on_pass: scope_validation
+      on_fail:
+        action: iterate
+        target: story_breakdown
+        max_iterations: 2
+        message: "Stories need revision for INVEST compliance"
+      block_message: |
+        Cannot proceed to Scope Validation:
+        - NOW epics covered: {now_epics_covered}
+        - INVEST compliance: {invest_pass_rate}%
+        - AC format valid: {ac_format_valid}
+
+    # AUTO STATE UPDATE + COMMIT
+    on_complete:
+      state_update:
+        phase: "stories"
+        status: "completed"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Complete story breakdown - {story_count} stories INVEST validated"
+
+    next: scope_validation
+    on_blocked: return_to_epic_breakdown
+
+  # =========================================================================
+  # STEP 7: SCOPE VALIDATION
+  # =========================================================================
+  - id: scope_validation
+    agent: PRODUCT-OWNER
+    type: scope_review
+    description: "Validate scope and INVEST compliance"
+    input:
+      context_refs:
+        - "@docs/1-BASELINE/product/prd.md"
+        - "@docs/2-MANAGEMENT/epics/epic-01-stories.md"
+        - "@docs/3-ARCHITECTURE/ux/user-flows.md"
+    output:
+      deliverable: "docs/2-MANAGEMENT/reviews/scope-review-epic-01.md"
+    checkpoint:
+      - "All stories pass INVEST"
+      - "No scope creep detected"
+      - "AC are testable"
+      - "UX alignment verified"
+    gate:
+      id: STORIES_READY
+      type: approval_gate
+      enforcer: PRODUCT-OWNER
+      criteria:
+        - "All stories pass INVEST compliance"
+        - "Acceptance criteria defined for all stories"
+        - "No scope creep detected"
+        - "AC are testable"
+        - "Story estimates provided"
+        - "UX requirements reflected in stories"
+      on_pass: sprint_planning
+      on_fail:
+        action: return_to_phase
+        target: story_breakdown
+        message: "Stories do not meet INVEST criteria"
+      block_message: |
+        Cannot proceed to Sprint Planning:
+        - Stories INVEST compliant: {invest_pass_count}/{total_stories}
+        - AC defined: {ac_defined_count}/{total_stories}
+        - Scope validated: {scope_validated}
+        - All stories must be sprint-ready before planning
+    decision:
+      approved: sprint_planning
+      needs_revision: return_to_story_breakdown
+
+    # AUTO STATE UPDATE + COMMIT
+    on_complete:
+      state_update:
+        phase: "scope_validation"
+        status: "completed"
+        update_root: true
+      commit:
+        enabled: true
+        message: "Scope validated - stories ready for sprint"
+
+    on_blocked: ask_user
+
+  # =========================================================================
+  # STEP 8: SPRINT PLANNING
+  # =========================================================================
+  - id: sprint_planning
+    agent: SCRUM-MASTER
+    type: sprint_planning
+    description: "Plan first sprint"
+    input:
+      context_refs:
+        - "@docs/2-MANAGEMENT/epics/epic-01-stories.md"
+        - "@docs/2-MANAGEMENT/reviews/scope-review-epic-01.md"
+        - "@docs/2-MANAGEMENT/roadmap.md"
+    output:
+      deliverable: "docs/2-MANAGEMENT/sprints/sprint-01-plan.md"
+    checkpoint:
+      - "Capacity not exceeded"
+      - "Dependencies respected"
+      - "Stories have estimates"
+    gate:
+      id: SPRINT_PLANNED
+      type: quality_gate
+      enforcer: SCRUM-MASTER
+      criteria:
+        - "Sprint backlog defined"
+        - "Capacity allocated and not exceeded"
+        - "Dependencies respected in ordering"
+        - "All stories have estimates"
+        - "Sprint goal defined"
+      on_pass: complete
+      on_fail:
+        action: return_to_phase
+        target: scope_validation
+        message: "Sprint planning incomplete"
+      block_message: |
+        Cannot start Sprint:
+        - Sprint backlog defined: {backlog_defined}
+        - Capacity: {capacity_used}/{capacity_available}
+        - Dependencies valid: {dependencies_valid}
+        - Sprint planning must be complete before development
+
+    # AUTO STATE UPDATE + COMMIT (MAJOR CHECKPOINT)
+    on_complete:
+      state_update:
+        phase: "sprint_planning"
+        status: "completed"
+        update_root: true
+        set_active_sprint: 1
+      commit:
+        enabled: true
+        message: "Sprint 1 planned - project ready for development"
+
+    next: complete
+
+  # =========================================================================
+  # COMPLETE
+  # =========================================================================
+  - id: complete
+    type: workflow_complete
+    summary: "Project ready for development"
+
+    # INTEGRATION WITH OTHER WORKFLOWS (not consolidation!)
+    # FLOW: new-project → sprint-workflow → story-delivery
+    next_workflows:
+      description: "Continue with these workflows for implementation"
+
+      # STEP 1: Plan implementation (FIRST!)
+      immediate:
+        - workflow: "engineering/sprint-workflow.yaml"
+          description: "Plan implementation: tracks, dependencies, roadmap"
+          activities:
+            - "Decide how many stories per sprint"
+            - "Create parallel tracks (frontend/backend/infra)"
+            - "Map dependencies between stories"
+            - "Build implementation roadmap"
+            - "Assign stories to tracks"
+          trigger: "IMMEDIATELY after new-project completes"
+
+      # STEP 2: Implement stories (per sprint)
+      per_story:
+        - workflow: "engineering/story-delivery.yaml"
+          description: "Implement each story using TDD (RED→GREEN→REFACTOR)"
+          trigger: "For each story in sprint backlog"
+
+      # Supporting workflows
+      supporting:
+        - workflow: "engineering/epic-workflow.yaml"
+          description: "Continue with next epic after current completes"
+          trigger: "When all stories in epic are done"
+        - workflow: "engineering/feature-flow.yaml"
+          description: "Add new features during development"
+          trigger: "When new feature request comes in mid-sprint"
+
+# =============================================================================
+# QUALITY GATES SUMMARY (Updated with clarification requirements)
+# =============================================================================
+quality_gates:
+  # Discovery phase gate - UPDATED: 85% clarity, business logic required
+  DISCOVERY_COMPLETE:
+    phase: discovery
+    enforcer: DISCOVERY-AGENT
+    blocker: "Cannot proceed to PRD creation"
+    criteria:
+      - "Requirements clarity >= 85%"          # RAISED from 70%
+      - "Stakeholders interviewed"
+      - "Business context documented"
+      - "Business logic deep-dive completed"   # NEW
+      - "Entity details clarified"             # NEW
+      - "All assumptions validated with user"  # NEW
+
+  # PRD phase gate - UPDATED: User confirmation required
+  PRD_APPROVED:
+    phase: prd_creation
+    enforcer: PM-AGENT + PRODUCT-OWNER
+    blocker: "Cannot proceed to architecture"
+    criteria:
+      - "PRD document complete"
+      - "Requirements prioritized (MoSCoW)"
+      - "Scope validated"
+      - "User confirmed understanding"         # NEW
+      - "All assumptions documented"           # NEW
+
+  # Architecture phase gate
+  ARCHITECTURE_APPROVED:
+    phase: architecture
+    enforcer: ARCHITECT-AGENT
+    blocker: "Cannot proceed to UX design"
+    criteria:
+      - "System design complete"
+      - "Tech stack justified"
+      - "ADRs documented"
+      - "Technical feasibility confirmed"
+
+  # UX phase gate - UPDATED: USER approval required
+  UX_APPROVED:
+    phase: ux_design
+    enforcer: UX-DESIGNER + PRODUCT-OWNER + USER  # USER added
+    blocker: "Cannot proceed to epic breakdown"
+    criteria:
+      - "User flows complete"
+      - "Wireframes ready"
+      - "Interaction specs defined"
+      - "Technical feasibility validated"
+      - "USER approved wireframes OR opted for auto-approve"  # NEW
+
+  # Epic breakdown gate - UPDATED: Test strategy + clarifications required
+  EPICS_DEFINED:
+    phase: epic_breakdown
+    enforcer: ARCHITECT-AGENT + PRODUCT-OWNER + TEST-ENGINEER  # TEST-ENGINEER added
+    blocker: "Cannot proceed to story breakdown"
+    criteria:
+      - "All PRD requirements mapped"
+      - "Epic boundaries clear"
+      - "Dependencies mapped"
+      - "Risks assessed"
+      - "Test strategy defined per epic"       # NEW
+      - "Business logic clarified per epic"    # NEW
+
+  # Story creation gate
+  STORIES_CREATED:
+    phase: story_breakdown
+    enforcer: ARCHITECT-AGENT
+    blocker: "Cannot proceed to scope validation"
+    criteria:
+      - "NOW epics have stories"
+      - "INVEST compliant"
+      - "AC in Given/When/Then"
+      - "Test scenarios mapped from test strategy"  # NEW
+
+  # Story validation gate
+  STORIES_READY:
+    phase: scope_validation
+    enforcer: PRODUCT-OWNER
+    blocker: "Cannot proceed to sprint planning"
+    criteria:
+      - "All stories INVEST compliant"
+      - "Acceptance criteria defined"
+      - "Estimates provided"
+      - "UX alignment verified"
+
+  # Sprint planning gate
+  SPRINT_PLANNED:
+    phase: sprint_planning
+    enforcer: SCRUM-MASTER
+    blocker: "Cannot start development sprint"
+    criteria:
+      - "Sprint backlog defined"
+      - "Capacity allocated"
+      - "Dependencies respected"
+
+# =============================================================================
+# ERROR HANDLING
+# =============================================================================
+on_error:
+  log_to: "@.claude/logs/workflows/"
+  retry_count: 1
+  escalation:
+    discovery: PM-AGENT
+    prd_creation: PRODUCT-OWNER
+    architecture: SENIOR-DEV
+    ux_design: PRODUCT-OWNER
+    epic_breakdown: ARCHITECT-AGENT
+    story_breakdown: ARCHITECT-AGENT
+    scope_validation: ARCHITECT-AGENT
+    sprint_planning: PRODUCT-OWNER
+
+# =============================================================================
+# ERROR RECOVERY
+# =============================================================================
+error_recovery:
+  discovery_incomplete:
+    actions:
+      - "Request additional stakeholder input"
+      - "Clarify ambiguous requirements"
+      - "Document assumptions"
+    if_still_blocked:
+      - "Escalate to product-owner"
+      - "Schedule discovery session"
+
+  prd_rejected:
+    actions:
+      - "Review feedback from product-owner"
+      - "Revise PRD sections"
+      - "Clarify scope boundaries"
+    if_still_blocked:
+      - "Return to discovery phase"
+      - "Re-interview stakeholders"
+
+  architecture_infeasible:
+    actions:
+      - "Review technical constraints"
+      - "Propose alternative approaches"
+      - "Create ADR for decision"
+    if_still_blocked:
+      - "Escalate to senior-dev"
+      - "May require PRD scope adjustment"
+
+  ux_rejected:
+    actions:
+      - "Review UX feedback"
+      - "Revise wireframes"
+      - "Validate technical constraints"
+    if_still_blocked:
+      - "Joint session with architect"
+      - "Escalate to product-owner"
+
+  epic_structure_invalid:
+    actions:
+      - "Review epic boundaries"
+      - "Resolve circular dependencies"
+      - "Validate PRD mapping"
+    if_still_blocked:
+      - "Return to UX for alignment"
+      - "Escalate to product-owner"
+
+  stories_not_invest:
+    actions:
+      - "Refine story granularity"
+      - "Add missing acceptance criteria"
+      - "Validate testability"
+    if_still_blocked:
+      - "Return to epic breakdown"
+      - "Review story breakdown approach"
+
+  capacity_exceeded:
+    actions:
+      - "Reprioritize sprint backlog"
+      - "Move stories to next sprint"
+      - "Adjust velocity assumptions"
+    if_still_blocked:
+      - "Escalate to product-owner for prioritization"
+      - "Consider scope reduction"
+
+# =============================================================================
+# NAMING CONVENTIONS
+# =============================================================================
+naming_conventions:
+  # Hierarchical naming: EPIC.STORY.SUBTASK.description
+  pattern: "{XX}.{N}.{M}.{slug}"
+
+  components:
+    XX: "Epic number (2 digits, zero-padded): 01, 02, 03..."
+    N: "Story number within epic: 1, 2, 3..."
+    M: "Subtask number within story (optional): 1, 2, 3..."
+    slug: "Short kebab-case description: db-schema, login-endpoint, ux-form"
+
+  special_values:
+    "XX.0.*": "Epic-level documents (overview, clarifications, test-strategy)"
+
+  # Documentation files
+  docs:
+    epic_folder: "docs/2-MANAGEMENT/epics/{XX}-{epic-slug}/"
+    epic_overview: "{XX}.0.epic-overview.md"
+    clarifications: "{XX}.0.clarifications.md"
+    test_strategy: "{XX}.0.test-strategy.md"
+    story: "{XX}.{N}.{story-slug}.md"
+    subtask: "{XX}.{N}.{M}.{subtask-slug}.md"
+
+  # Test files (mirror doc structure)
+  tests:
+    folder: "tests/{XX}-{epic-slug}/"
+    unit: "{XX}.{N}.{story-slug}.test.ts"
+    integration: "{XX}.{N}.{story-slug}.integration.test.ts"
+    e2e: "{XX}.0.{epic-slug}.e2e.test.ts"
+
+  # Examples
+  examples:
+    docs:
+      - "docs/2-MANAGEMENT/epics/01-user-auth/"
+      - "docs/2-MANAGEMENT/epics/01-user-auth/01.0.epic-overview.md"
+      - "docs/2-MANAGEMENT/epics/01-user-auth/01.0.clarifications.md"
+      - "docs/2-MANAGEMENT/epics/01-user-auth/01.0.test-strategy.md"
+      - "docs/2-MANAGEMENT/epics/01-user-auth/01.1.db-schema-setup.md"
+      - "docs/2-MANAGEMENT/epics/01-user-auth/01.2.login-endpoint.md"
+      - "docs/2-MANAGEMENT/epics/01-user-auth/01.2.1.input-validation.md"
+      - "docs/2-MANAGEMENT/epics/01-user-auth/01.2.2.error-handling.md"
+      - "docs/2-MANAGEMENT/epics/01-user-auth/01.3.ux-login-form.md"
+      - "docs/2-MANAGEMENT/epics/02-supplier-mgmt/"
+      - "docs/2-MANAGEMENT/epics/02-supplier-mgmt/02.0.epic-overview.md"
+      - "docs/2-MANAGEMENT/epics/02-supplier-mgmt/02.1.supplier-model.md"
+      - "docs/2-MANAGEMENT/epics/02-supplier-mgmt/02.2.supplier-crud-api.md"
+    tests:
+      - "tests/01-user-auth/01.1.db-schema-setup.test.ts"
+      - "tests/01-user-auth/01.2.login-endpoint.test.ts"
+      - "tests/01-user-auth/01.0.user-auth.e2e.test.ts"
+      - "tests/02-supplier-mgmt/02.1.supplier-model.test.ts"
