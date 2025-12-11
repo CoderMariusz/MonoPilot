@@ -91,10 +91,25 @@ supabase/
 
 ## Auto-Update Rules
 
-**IMPORTANT**: After EVERY git commit, you MUST update `.claude/PROJECT-STATE.md`:
-1. Update "Last Updated" timestamp
-2. Add new commit to "Recent Commits" section
-3. Update "Current Status" if phase changed
-4. Update module status table if applicable
+**IMPORTANT**: After EVERY session/run, you MUST:
 
-This ensures context is preserved across sessions.
+1. **Update `.claude/PROJECT-STATE.md`**:
+   - Update "Last Updated" timestamp
+   - Add new commits to "Recent Commits" section
+   - Update "Current Status" if phase changed
+   - Update module status table if applicable
+
+2. **Declare at end of each run**:
+   ```
+   ## Session Summary
+   ### Done:
+   - [list completed tasks]
+
+   ### To Fix/Continue:
+   - [list pending issues or next steps]
+
+   ### Commits:
+   - [hash] - [message]
+   ```
+
+This ensures nothing is lost between sessions and context is preserved.
