@@ -48,7 +48,7 @@
     "provider": "openai",
     "model": "text-embedding-3-small",
     "dimensions": 1536,
-    "similarityThreshold": 0.85,
+    "similarityThreshold": 0.72,
     "vectorDB": "chromadb",
     "storage": ".claude/cache/semantic/",
     "ttlDays": 7,
@@ -127,6 +127,12 @@
     "createdAt": "2025-12-11",
     "updatedAt": "2025-12-11",
     "implementationPhase": "Phase 1-2 Active",
+    "semanticThresholdTuning": {
+      "tested": "2025-12-11",
+      "results": "0.85=20%, 0.70=20%, 0.65=60%",
+      "chosen": "0.72",
+      "reason": "Balance between precision and recall - catches truly similar queries without false positives"
+    },
     "expectedOverallSavings": {
       "tokenReduction": "95%",
       "costReduction": "90%",

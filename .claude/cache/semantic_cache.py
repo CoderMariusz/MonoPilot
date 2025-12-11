@@ -19,14 +19,14 @@ try:
     CHROMADB_AVAILABLE = True
 except ImportError:
     CHROMADB_AVAILABLE = False
-    print("⚠️  ChromaDB not installed. Run: pip install chromadb")
+    print("[WARN] ChromaDB not installed. Run: pip install chromadb")
 
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-    print("⚠️  OpenAI SDK not installed. Run: pip install openai")
+    print("[WARN] OpenAI SDK not installed. Run: pip install openai")
 
 
 class SemanticCache:
@@ -41,13 +41,18 @@ class SemanticCache:
     - Usage tracking
     """
 
-    def __init__(self, config_path: str = ".claude/cache/config.json"):
+    def __init__(self, config_path: str = None):
         """Initialize semantic cache"""
         if not CHROMADB_AVAILABLE:
             raise ImportError("ChromaDB required. Install: pip install chromadb")
 
         if not OPENAI_AVAILABLE:
             raise ImportError("OpenAI SDK required. Install: pip install openai")
+
+        # Auto-detect config path (relative to script location)
+        if config_path is None:
+            script_dir = Path(__file__).parent
+            config_path = script_dir / "config.json"
 
         # Load config
         with open(config_path, 'r') as f:
@@ -97,7 +102,7 @@ class SemanticCache:
             return response.data[0].embedding
 
         except Exception as e:
-            print(f"❌ Error generating embedding: {e}")
+            print(f"[ERROR] Error generating embedding: {e}")
             raise
 
     def search_similar(self, query: str, top_k: int = 3) -> Optional[Dict]:
@@ -155,7 +160,7 @@ class SemanticCache:
             return None
 
         except Exception as e:
-            print(f"❌ Error searching semantic cache: {e}")
+            print(f"[ERROR] Error searching semantic cache: {e}")
             return None
 
     def store(
@@ -198,10 +203,10 @@ class SemanticCache:
                 metadatas=[full_metadata]
             )
 
-            print(f"✅ Stored in semantic cache: {query[:50]}...")
+            print(f"[OK] Stored in semantic cache: {query[:50]}...")
 
         except Exception as e:
-            print(f"❌ Error storing in semantic cache: {e}")
+            print(f"[ERROR] Error storing in semantic cache: {e}")
 
     def _increment_usage(self, doc_id: str):
         """Increment usage count for a cache entry"""
@@ -218,7 +223,7 @@ class SemanticCache:
                     metadatas=[metadata]
                 )
         except Exception as e:
-            print(f"⚠️  Error incrementing usage: {e}")
+            print(f"[WARN] Error incrementing usage: {e}")
 
     def search_by_tags(self, tags: List[str], top_k: int = 10) -> List[Dict]:
         """Search Q&A patterns by tags"""
@@ -243,7 +248,7 @@ class SemanticCache:
             return matching_docs[:top_k]
 
         except Exception as e:
-            print(f"❌ Error searching by tags: {e}")
+            print(f"[ERROR] Error searching by tags: {e}")
             return []
 
     def get_popular_patterns(self, top_k: int = 10) -> List[Dict]:
@@ -265,7 +270,7 @@ class SemanticCache:
             return patterns[:top_k]
 
         except Exception as e:
-            print(f"❌ Error getting popular patterns: {e}")
+            print(f"[ERROR] Error getting popular patterns: {e}")
             return []
 
     def get_metrics(self) -> Dict[str, Any]:
@@ -288,20 +293,20 @@ class SemanticCache:
                 name="semantic_cache",
                 metadata={"description": "Semantic cache for Q&A patterns"}
             )
-            print("✅ Semantic cache cleared")
+            print("[OK] Semantic cache cleared")
         except Exception as e:
-            print(f"❌ Error clearing cache: {e}")
+            print(f"[ERROR] Error clearing cache: {e}")
 
 
 # Example usage
 if __name__ == "__main__":
-    print("🧠 Semantic Cache Demo\n")
+    print("Semantic Cache Demo\n")
 
     # Initialize
     try:
         cache = SemanticCache()
     except ImportError as e:
-        print(f"❌ {e}")
+        print(f"[ERROR] {e}")
         exit(1)
 
     # Test queries (similar but not identical)
@@ -314,7 +319,7 @@ if __name__ == "__main__":
     ]
 
     # Store first query
-    print("📝 Storing first query...")
+    print("Storing first query...")
     cache.store(
         query=queries[0],
         response={
@@ -330,22 +335,22 @@ if __name__ == "__main__":
     )
 
     # Test similar queries
-    print("\n🔍 Testing similar queries:\n")
+    print("\nTesting similar queries:\n")
     for query in queries[1:]:
         print(f"Query: {query}")
         result = cache.search_similar(query)
 
         if result and result["cache_hit"]:
-            print(f"  ✅ CACHE HIT! Similarity: {result['similarity']:.2f}")
+            print(f"  [HIT] CACHE HIT! Similarity: {result['similarity']:.2f}")
             print(f"  Original: {result['original_query'][:50]}...")
         else:
-            print(f"  ❌ CACHE MISS")
+            print(f"  [MISS] CACHE MISS")
         print()
 
     # Display metrics
-    print("📊 Semantic Cache Metrics:")
+    print("Semantic Cache Metrics:")
     metrics = cache.get_metrics()
     for key, value in metrics.items():
         print(f"  {key}: {value}")
 
-    print("\n✅ Semantic cache working!")
+    print("\n[OK] Semantic cache working!")

@@ -24,13 +24,18 @@ class CacheManager:
     - Layer 4: Semantic Cache (OpenAI embeddings)
     """
 
-    def __init__(self, config_path: str = ".claude/cache/config.json"):
+    def __init__(self, config_path: str = None):
         """Initialize cache manager with configuration"""
-        self.config_path = config_path
+        # Auto-detect config path (relative to script location)
+        if config_path is None:
+            script_dir = Path(__file__).parent
+            config_path = script_dir / "config.json"
+
+        self.config_path = Path(config_path)
         self.config = self._load_config()
 
-        # Cache directories
-        self.cache_dir = Path(".claude/cache")
+        # Cache directories (relative to config location)
+        self.cache_dir = self.config_path.parent
         self.hot_dir = self.cache_dir / "hot"
         self.cold_dir = self.cache_dir / "cold"
         self.semantic_dir = self.cache_dir / "semantic"

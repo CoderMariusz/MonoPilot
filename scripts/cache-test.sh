@@ -33,21 +33,15 @@ fi
 # Export API keys
 export $(cat .env.local | grep -v '^#' | xargs)
 
-# Test 1: Cache Manager
-echo -e "${YELLOW}Test 1: Cache Manager (Hot + Cold Cache)${NC}"
-echo "Running cache_manager.py..."
+# Test 1: Unified Cache System (All Layers)
+echo -e "${YELLOW}Test 1: Unified Cache System (ALL 4 LAYERS)${NC}"
+echo "Running unified_cache.py..."
 cd .claude/cache
-python3 cache_manager.py
+python3 unified_cache.py
 echo ""
 
-# Test 2: Semantic Cache
-echo -e "${YELLOW}Test 2: Semantic Cache (OpenAI + ChromaDB)${NC}"
-echo "Running semantic_cache.py..."
-python3 semantic_cache.py
-echo ""
-
-# Test 3: Display Dashboard
-echo -e "${YELLOW}Test 3: Cache Dashboard${NC}"
+# Test 2: Display Dashboard
+echo -e "${YELLOW}Test 2: Cache Dashboard${NC}"
 cd ../..
 bash scripts/cache-stats.sh
 

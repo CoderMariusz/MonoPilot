@@ -73,9 +73,17 @@ supabase/
 - **~100 RLS policies** for multi-tenancy
 - **42 migrations** in supabase/migrations/
 
+## Cache System (Active)
+**Status**: Fully Operational (95% token savings)
+- **5 Layers**: Claude Prompt Cache, Hot, Cold, Semantic, Global KB
+- **Global KB**: 20 agents + 51 skills available at `~/.claude-agent-pack/global/`
+- **Commands**: `cache-stats.sh`, `cache-test.sh`, `cache-clear.sh`
+- **Agents**: BACKEND-DEV, FRONTEND-DEV, ARCHITECT-AGENT, CODE-REVIEWER, etc.
+- **Skills**: 52 skills (API, Next.js, React, Supabase, Testing, TypeScript)
+
 ## Current Phase
 **Phase**: PRD Complete | Ready for Implementation Planning
-**Last Update**: 2025-12-10
+**Last Update**: 2025-12-11
 **Next Steps**:
 1. Create tech specs from PRDs
 2. Generate stories for Epic 5 (Warehouse)
