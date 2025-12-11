@@ -1,0 +1,136 @@
+{
+  "version": "2.0.0",
+  "mode": "per-project",
+  "description": "Universal Cache System - 4-layer intelligent caching with 95% token savings",
+
+  "claudePromptCache": {
+    "enabled": true,
+    "description": "Built-in Claude API prompt caching (90% cost reduction on static content)",
+    "strategy": "auto",
+    "breakpoints": "single",
+    "ttl": "5min",
+    "minTokens": 1024,
+    "minTokensHaiku": 4096,
+    "lookbackBlocks": 20,
+    "expectedSavings": {
+      "cost": "90%",
+      "latency": "85%"
+    }
+  },
+
+  "hotCache": {
+    "enabled": true,
+    "description": "In-memory exact match cache (instant retrieval)",
+    "maxSizeMB": 50,
+    "ttlMinutes": 5,
+    "algorithm": "lru",
+    "storage": "memory",
+    "expectedHitRate": "68%"
+  },
+
+  "coldCache": {
+    "enabled": true,
+    "description": "Disk-based exact match cache (24h persistence)",
+    "maxSizeMB": 500,
+    "ttlHours": 24,
+    "location": ".claude/cache/cold",
+    "compression": {
+      "enabled": true,
+      "algorithm": "gzip",
+      "level": 6
+    },
+    "expectedHitRate": "45%"
+  },
+
+  "semanticCache": {
+    "enabled": true,
+    "description": "OpenAI embedding-based semantic search (similar query matching)",
+    "provider": "openai",
+    "model": "text-embedding-3-small",
+    "dimensions": 1536,
+    "similarityThreshold": 0.85,
+    "vectorDB": "chromadb",
+    "storage": ".claude/cache/semantic/",
+    "ttlDays": 7,
+    "maxEntries": 10000,
+    "batchSize": 100,
+    "rateLimitRPM": 3000,
+    "costPer1MTokens": 0.02,
+    "expectedHitRate": "41%",
+    "expectedSavings": {
+      "cost": "40-60%",
+      "queries": "similar queries reuse"
+    }
+  },
+
+  "sharedCache": {
+    "enabled": true,
+    "description": "Global cross-project knowledge sharing",
+    "location": "~/.claude-agent-pack/global",
+    "shareAgents": true,
+    "sharePatterns": true,
+    "shareSkills": true,
+    "shareQA": true,
+    "syncMode": "auto",
+    "resolutionOrder": ["local", "global", "default"]
+  },
+
+  "qaPatterns": {
+    "enabled": true,
+    "description": "Q&A pattern learning and reuse system",
+    "autoLearn": true,
+    "minQualityScore": 0.7,
+    "storage": ".claude/cache/qa-patterns/",
+    "tagBasedFiltering": true,
+    "crossProjectSearch": true,
+    "autoCreateSkill": {
+      "enabled": true,
+      "minUsageCount": 5,
+      "minQualityScore": 0.8
+    }
+  },
+
+  "monitoring": {
+    "enabled": true,
+    "logAccess": true,
+    "logLocation": ".claude/cache/logs/access.log",
+    "metricsLocation": ".claude/cache/logs/metrics.json",
+    "trackHitRates": true,
+    "trackCostSavings": true,
+    "trackLatency": true,
+    "dashboardEnabled": true
+  },
+
+  "security": {
+    "encryptGlobalQA": true,
+    "sanitizePII": true,
+    "autoExpireDays": 30
+  },
+
+  "exclusions": [
+    "**/.env*",
+    "**/*.key",
+    "**/*.pem",
+    "**/secrets/**",
+    "**/credentials/**",
+    "**/*password*",
+    "**/token*"
+  ],
+
+  "performance": {
+    "maxConcurrentEmbeddings": 10,
+    "cacheWarmingOnInit": false,
+    "preloadCommonQueries": false
+  },
+
+  "metadata": {
+    "createdAt": "2025-12-11",
+    "updatedAt": "2025-12-11",
+    "implementationPhase": "Phase 1-2 Active",
+    "expectedOverallSavings": {
+      "tokenReduction": "95%",
+      "costReduction": "90%",
+      "latencyReduction": "85%"
+    }
+  }
+}

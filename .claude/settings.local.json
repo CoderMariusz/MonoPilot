@@ -62,18 +62,16 @@
       "EnterPlanMode",
       "ExitPlanMode",
       "mcp__ide__getDiagnostics",
-      "mcp__ide__executeCode"
+      "mcp__ide__executeCode",
+      "Bash(bash scripts/cache-test.sh:*)",
+      "Bash(bash:*)",
+      "Bash(python3:*)",
+      "Bash(GIT_SEQUENCE_EDITOR='sed -i \"\"1s/pick/edit/\"\"' git rebase -i HEAD~2)"
     ],
     "deny": [],
     "ask": []
   },
   "disabledMcpjsonServers": [
     "supabase"
-  ],
-  {"contextCompression": {
-      "enabled": true,
-      "threshold": 0.8,
-      "strategy": "auto"
-    }}
-    
+  ]
 }
