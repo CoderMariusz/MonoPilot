@@ -1,10 +1,10 @@
 # Planning Module - PRD Specification
 
-**Version:** 2.0
+**Version:** 2.1
 **Status:** Phase 1 Complete | Phase 2-3 Planned
 **Priority:** P0 - Core Module
-**Last Updated:** 2025-12-10
-**Owner:** PM-AGENT
+**Last Updated:** 2025-12-14
+**Owner:** ARCHITECT-AGENT
 
 ---
 
@@ -213,8 +213,6 @@ Suppliers represent external vendors from whom the organization purchases raw ma
 | `currency` | enum | Yes | Default currency (PLN, EUR, USD, GBP) |
 | `tax_code_id` | UUID | Yes | Default tax code (FK to tax_codes) |
 | `payment_terms` | string | No | Payment terms (e.g., "Net 30", "2/10 Net 30") |
-| `lead_time_days` | integer | Yes | Default lead time in days |
-| `moq` | decimal | No | Minimum Order Quantity (default) |
 | `notes` | text | No | Internal notes |
 | `is_active` | boolean | Yes | Active/inactive status |
 | `approved_supplier` | boolean | No | Phase 3: Approved supplier list flag |
@@ -225,6 +223,13 @@ Suppliers represent external vendors from whom the organization purchases raw ma
 | `updated_at` | timestamp | Auto | Last update time |
 | `created_by` | UUID | Auto | Creator user ID |
 | `updated_by` | UUID | Auto | Last updater user ID |
+
+**Note on Lead Time and MOQ:**
+- Lead time and MOQ are **product-specific**, not supplier-specific
+- These fields are stored in the `products` table (see Technical Module PRD):
+  - `products.supplier_lead_time_days` - Default procurement lead time for the product
+  - `products.moq` - Minimum order quantity for the product
+- Supplier-product assignments (below) can override these values for specific supplier-product combinations
 
 ### 4.3 Supplier-Product Assignments
 
@@ -237,10 +242,10 @@ Links suppliers to products they can provide, with optional overrides for pricin
 | `product_id` | UUID | Yes | FK to products |
 | `is_default` | boolean | Yes | Default supplier for this product |
 | `supplier_product_code` | string | No | Supplier's product code/SKU |
-| `lead_time_days` | integer | No | Override supplier default |
+| `lead_time_days` | integer | No | Override product.supplier_lead_time_days for this supplier |
 | `unit_price` | decimal | No | Negotiated price |
 | `currency` | enum | No | Price currency (default from supplier) |
-| `moq` | decimal | No | Override supplier default |
+| `moq` | decimal | No | Override product.moq for this supplier |
 | `order_multiple` | decimal | No | Must order in multiples (e.g., 100) |
 | `last_purchase_date` | date | No | Auto-updated on PO |
 | `last_purchase_price` | decimal | No | Auto-updated on PO |
@@ -668,6 +673,34 @@ Work Orders (WO) represent production jobs. When created, the WO captures a snap
 3. If multiple match, select most recent `effective_from`
 4. User can override selection
 5. If no active BOM found, show warning but allow manual selection
+
+### 7.3.1 BOM-Routing Relationship
+
+**Key Concept:** Work Orders inherit routing from BOM, not directly from product.
+
+**Data Model:**
+- `boms` table has `routing_id` FK to `routings` table (added in migration 045)
+- BOM references a specific routing version
+- When WO is created, routing is inherited from the selected BOM
+
+**Cascade Logic:**
+```
+Product → BOM (with routing_id) → Work Order
+         ↓
+      Routing → WO Operations (snapshot)
+```
+
+**Business Rules:**
+- BOM can have `routing_id = NULL` (no routing assigned)
+- If BOM has routing, WO inherits that routing by default
+- If BOM has no routing, user can optionally assign routing at WO creation
+- WO routing snapshot is immutable after WO release (same as BOM snapshot)
+- Changing BOM's routing does NOT affect existing WOs (immutability)
+
+**Why BOM → Routing instead of Product → Routing:**
+- Different BOM versions may use different routings
+- Allows routing evolution over time alongside BOM changes
+- Maintains full traceability: WO knows exact BOM + Routing combination used
 
 ### 7.4 WO Materials (BOM Snapshot)
 
@@ -1585,14 +1618,15 @@ External System (Retailer)
   - User can override supplier selection
   - Only one default per product enforced
 
-**FR-PLAN-004: Supplier Lead Time Management**
+**FR-PLAN-004: Product Lead Time Management**
 - **Priority:** Must Have
-- **Description:** Track lead times at supplier and product level
+- **Description:** Track lead times at product level with optional supplier overrides
 - **Acceptance Criteria:**
-  - Supplier has default lead time
-  - Supplier-product can override lead time
-  - Lead time used in expected delivery calculation
-  - Lead time displayed in supplier/product views
+  - Product has default lead time (products.supplier_lead_time_days)
+  - Supplier-product assignment can override product lead time
+  - Expected delivery date = order_date + COALESCE(supplier_products.lead_time_days, products.supplier_lead_time_days)
+  - Lead time displayed in product and supplier-product views
+  - Warning if product has no supplier_lead_time_days configured
 
 #### Purchase Orders
 
@@ -1888,8 +1922,6 @@ CREATE TABLE suppliers (
   currency TEXT NOT NULL DEFAULT 'PLN',
   tax_code_id UUID NOT NULL REFERENCES tax_codes(id),
   payment_terms TEXT,
-  lead_time_days INTEGER NOT NULL DEFAULT 7,
-  moq NUMERIC(15,4),
   notes TEXT,
   is_active BOOLEAN NOT NULL DEFAULT true,
   -- Phase 3 fields
@@ -2769,6 +2801,7 @@ Response:
 |---------|------|--------|---------|
 | 1.0 | 2025-11-23 | PM-AGENT | Initial PRD |
 | 2.0 | 2025-12-10 | PM-AGENT | Complete rewrite with Phase 2/3 features |
+| 2.1 | 2025-12-14 | ARCHITECT-AGENT | Schema updates: Removed lead_time_days and moq from suppliers table (moved to products table); Updated FR-PLAN-004 to reflect product-level lead times; Added BOM-Routing relationship documentation (section 7.3.1); Clarified supplier_products overrides reference products table |
 
 ---
 

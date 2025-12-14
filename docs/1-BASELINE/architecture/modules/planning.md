@@ -40,8 +40,8 @@ contact_phone       TEXT
 currency            TEXT DEFAULT 'PLN'      -- PLN, EUR, USD, GBP
 tax_code_id         UUID REFERENCES tax_codes(id)
 payment_terms       TEXT                    -- Net 30, 2/10 Net 30
-lead_time_days      INTEGER DEFAULT 7
-moq                 DECIMAL(15,4)           -- Minimum Order Quantity
+-- REMOVED: lead_time_days (moved to products table - ADR-010)
+-- REMOVED: moq (moved to products table - ADR-010)
 notes               TEXT
 is_active           BOOLEAN DEFAULT true
 approved_supplier   BOOLEAN DEFAULT false   -- Phase 3: ASL
@@ -56,6 +56,11 @@ updated_by          UUID REFERENCES users(id)
 UNIQUE(org_id, code)
 ```
 
+**Schema Change (2025-12-14 - ADR-010):**
+- **REMOVED**: `lead_time_days` - moved to `products.lead_time_days`
+- **REMOVED**: `moq` - moved to `products.moq`
+- **Rationale**: Lead time and MOQ are product-specific, not supplier-specific. Enables granular procurement planning.
+
 #### supplier_products
 ```sql
 id                  UUID PRIMARY KEY DEFAULT gen_random_uuid()
@@ -63,10 +68,10 @@ supplier_id         UUID NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE
 product_id          UUID NOT NULL REFERENCES products(id)
 is_default          BOOLEAN DEFAULT false
 supplier_product_code TEXT                  -- Supplier's SKU
-lead_time_days      INTEGER                 -- Override supplier default
+-- REMOVED: lead_time_days (use products.lead_time_days instead)
 unit_price          DECIMAL(15,4)
 currency            TEXT
-moq                 DECIMAL(15,4)           -- Override supplier default
+-- REMOVED: moq (use products.moq instead)
 order_multiple      DECIMAL(15,4)           -- Must order in multiples
 last_purchase_date  DATE
 last_purchase_price DECIMAL(15,4)
@@ -75,6 +80,8 @@ created_at          TIMESTAMPTZ DEFAULT now()
 
 UNIQUE(supplier_id, product_id)
 ```
+
+**Note**: Lead time and MOQ are now managed at product level. Future enhancement could add supplier-specific overrides if needed.
 
 #### purchase_orders
 ```sql
