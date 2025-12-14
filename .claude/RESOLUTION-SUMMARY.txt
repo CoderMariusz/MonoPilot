@@ -1,0 +1,235 @@
+================================================================================
+RESOLUTION SUMMARY: expected_yield Schema Gap in TEC-010
+================================================================================
+
+DATE: 2025-12-14
+STATUS: ANALYSIS COMPLETE - READY TO IMPLEMENT
+RISK LEVEL: VERY LOW
+
+================================================================================
+THE ISSUE
+================================================================================
+
+TEC-010 Operation Modal wireframe references "expected_yield" field that:
+- Does NOT exist in routing_operations database schema (Migration 044)
+- Is NOT required by Technical PRD (no FR for operation-level yield)
+- Does NOT fit the design pattern (operations define work, not yield expectations)
+
+SCHEMA MISMATCH: UI references field that doesn't exist in database
+
+================================================================================
+THE DECISION
+================================================================================
+
+ACTION: REMOVE expected_yield from TEC-010 wireframe
+
+WHY:
+1. Schema Reality: routing_operations has no expected_yield column
+2. PRD Requirement: FR-2.43 mentions only setup/run/cleanup time
+3. Design Pattern: Yield tracked at BOM level (scrap %) or WO level (actual %)
+
+This aligns TEC-010 with:
+  ✅ Actual database schema (Migration 044)
+  ✅ Technical PRD requirements (no operation yield FR)
+  ✅ Design pattern (operations = definition, yield = execution)
+
+================================================================================
+EVIDENCE
+================================================================================
+
+SOURCE 1: DATABASE SCHEMA (Migration 044)
+---
+ALTER TABLE routing_operations ADD COLUMN cleanup_time INTEGER;
+ALTER TABLE routing_operations ADD COLUMN instructions TEXT;
+-- NO expected_yield column
+
+CONCLUSION: Field doesn't exist in schema
+
+SOURCE 2: TECHNICAL PRD (technical.md)
+---
+FR-2.43: "Operation time tracking (setup, run, cleanup)" - time fields only
+FR-2.27: "BOM byproducts (yield %)" - at BOM item level
+FR-2.34: "BOM yield calculation" - at BOM level
+No FR for operation-level yield expectations
+
+CONCLUSION: No requirement for operation yield
+
+SOURCE 3: DESIGN PATTERN (Architecture)
+---
+BOM level yields:     bom_items.scrap_percent (input waste)
+                      bom_items.yield_percent (byproduct output)
+
+WO execution level:   work_order_operations.actual_yield_percent
+                      (measured after operation completion)
+
+Operation definition: STATIC (what to do, when, where, duration)
+Operation execution:  DYNAMIC (how it actually performed)
+
+Keep separate: routing operations = definitions, WO = execution
+
+CONCLUSION: Yield doesn't belong at operation definition level
+
+================================================================================
+IMPACT ASSESSMENT
+================================================================================
+
+FILES TO CHANGE: 2
+1. docs/3-ARCHITECTURE/ux/wireframes/TEC-010-routing-detail.md
+2. docs/3-ARCHITECTURE/ux/wireframes/TEC-WIREFRAMES-SUMMARY.md
+
+LINES AFFECTED: ~40 (mostly deletions)
+NET CHANGE: -10 lines
+
+SPECIFIC DELETIONS IN TEC-010:
+- Validation rules object (3 lines)
+- API response field (1 line)
+- Request body field (1 line)
+- Zod schema validation (4 lines)
+- Field checklist items (2 lines)
+
+ADDITIONS IN TEC-010:
+- "Note on Yield Tracking" section explaining yield model
+
+SPECIFIC DELETIONS IN SUMMARY:
+- One row from field matrix
+
+DATABASE CHANGES: NONE (schema already correct)
+CODE CHANGES: NONE (field never existed)
+API CHANGES: NONE (field not in API)
+
+RISK LEVEL: VERY LOW (design-only change)
+TIME TO FIX: 10-15 minutes
+
+================================================================================
+IMPLEMENTATION
+================================================================================
+
+QUICK START: See IMPLEMENTATION-READY-TEC010-fix.md for copy-paste ready changes
+
+DETAILED STEPS:
+1. Open TEC-010-routing-detail.md
+2. Delete 6 references to expected_yield
+3. Add "Note on Yield Tracking" section
+4. Open TEC-WIREFRAMES-SUMMARY.md
+5. Delete 1 field matrix row
+6. Verify no references remain (grep check)
+7. Commit with provided message
+8. Done
+
+VERIFICATION:
+  grep -n "expected_yield" docs/3-ARCHITECTURE/ux/wireframes/TEC-010-routing-detail.md
+  → Should return: (no matches)
+
+  grep -n "expected_yield" docs/3-ARCHITECTURE/ux/wireframes/TEC-WIREFRAMES-SUMMARY.md
+  → Should return: (no matches)
+
+GIT COMMIT MESSAGE:
+  docs(ux): Remove expected_yield from TEC-010 operation modal
+
+  Issue: TEC-010 references expected_yield field that doesn't exist
+  in routing_operations schema and has no PRD requirement.
+
+  Decision: Remove field to align with:
+  - routing_operations schema (Migration 044: no expected_yield)
+  - Technical PRD FR-2.43 (operation time only)
+  - Design pattern (operations=definition, yield=execution)
+
+  Files:
+    M docs/3-ARCHITECTURE/ux/wireframes/TEC-010-routing-detail.md
+    M docs/3-ARCHITECTURE/ux/wireframes/TEC-WIREFRAMES-SUMMARY.md
+
+================================================================================
+SUPPORTING ANALYSIS
+================================================================================
+
+ANALYSIS: ANALYSIS-expected_yield-schema-gap.md
+  → Detailed technical analysis with all evidence
+
+DECISION: DECISION-expected_yield.md
+  → Decision record with options considered
+
+SUMMARY: SUMMARY-expected_yield-resolution.md
+  → Comprehensive overview
+
+FIXPLAN: FIXPLAN-TEC010-remove-expected_yield.md
+  → Detailed line-by-line fix plan with examples
+
+IMPLEMENTATION: IMPLEMENTATION-READY-TEC010-fix.md
+  → Ready-to-copy implementation with exact text
+
+EXECUTIVE: EXEC-SUMMARY-expected_yield.md
+  → Executive summary for decision makers
+
+INDEX: INDEX-expected_yield-resolution.md
+  → Navigation guide and document structure
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+IMMEDIATE (15 minutes):
+1. Read EXEC-SUMMARY-expected_yield.md (3 pages)
+2. Read IMPLEMENTATION-READY-TEC010-fix.md (4 pages)
+3. Make the 2 file changes (find & delete operations)
+4. Verify with grep (no results)
+5. Commit
+
+DOWNSTREAM:
+1. TEC-010 will be schema-correct for FRONTEND-DEV
+2. No field mismatch between UI and database
+3. Clear documentation of yield tracking model
+4. Ready for implementation phase
+
+================================================================================
+RISK ASSESSMENT
+================================================================================
+
+Implementation Risk:        VERY LOW (design-only)
+Rollback Risk:             VERY LOW (simple revert)
+Frontend Impact:           NONE (field never existed)
+Backend Impact:            NONE (no code changes)
+Database Impact:           NONE (schema already correct)
+Testing Impact:            LOW (remove field from validation tests)
+
+MITIGATION: Follow implementation guide exactly, verify with grep
+
+================================================================================
+CONCLUSION
+================================================================================
+
+The expected_yield field in TEC-010 is a wireframe design error caused by
+confusion between operation definition (static) and operation execution (dynamic).
+
+MonoPilot's yield model is:
+  BOM Level:  Ingredient scrap (scrap_percent) + byproducts (yield_percent)
+  WO Level:   Measured actual output (actual_yield_percent)
+
+NOT at operation definition level because operations describe work, not results.
+
+Removing expected_yield from TEC-010 aligns the wireframe with:
+  ✅ Actual database schema
+  ✅ PRD requirements
+  ✅ Design patterns
+  ✅ Implementation reality
+
+The fix is trivial (2 files, ~10 minutes), low-risk, and correct.
+
+RECOMMENDATION: Proceed with implementation immediately.
+
+================================================================================
+
+LOCATION OF ANALYSIS DOCUMENTS:
+C:\Users\Mariusz K\Documents\Programowanie\MonoPilot\.claude\
+
+Files created:
+  1. EXEC-SUMMARY-expected_yield.md
+  2. DECISION-expected_yield.md
+  3. SUMMARY-expected_yield-resolution.md
+  4. ANALYSIS-expected_yield-schema-gap.md
+  5. FIXPLAN-TEC010-remove-expected_yield.md
+  6. IMPLEMENTATION-READY-TEC010-fix.md
+  7. INDEX-expected_yield-resolution.md
+
+Start with: EXEC-SUMMARY or IMPLEMENTATION-READY
+
+================================================================================

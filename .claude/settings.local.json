@@ -66,11 +66,25 @@
       "Bash(bash scripts/cache-test.sh:*)",
       "Bash(bash:*)",
       "Bash(python3:*)",
-      "Bash(GIT_SEQUENCE_EDITOR='sed -i \"\"1s/pick/edit/\"\"' git rebase -i HEAD~2)"
+      "Bash(GIT_SEQUENCE_EDITOR='sed -i \"\"1s/pick/edit/\"\"' git rebase -i HEAD~2)",
+      "Bash(git commit:*)",
+      "Bash(OPENAI_API_KEY=\"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\" python3 test_threshold.py)",
+      "Bash(OPENAI_API_KEY=\"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\" python3 unified_cache.py)",
+      "Bash(OPENAI_API_KEY=\"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\" python3 validate_all_layers.py)",
+      "Bash(export:*)",
+      "Bash(psql:*)",
+      "Bash(supabase:*)",
+      "Bash(export SUPABASE_ACCESS_TOKEN=\"sbp_4961d25895d8adacf842f7e8c8073c3716ad9262\"):*",
+      "*"
+      
     ],
     "deny": [],
     "ask": []
   },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
   "disabledMcpjsonServers": [
     "supabase"
   ]

@@ -29,7 +29,9 @@ export const CreateBOMSchema = z.object({
   routing_id: z.string().uuid('Invalid routing ID').optional().nullable(),
   // Story 2.28: Packaging fields
   units_per_box: z.number().int().positive().max(10000, 'Max 10000 units per box').optional().nullable(),
-  boxes_per_pallet: z.number().int().positive().max(200, 'Max 200 boxes per pallet').optional().nullable()
+  boxes_per_pallet: z.number().int().positive().max(200, 'Max 200 boxes per pallet').optional().nullable(),
+  // FR-2.34: Yield percentage
+  yield_percent: z.number().min(0.01, 'Yield percent must be at least 0.01').max(100, 'Yield percent cannot exceed 100').optional().default(100)
 })
 
 export type CreateBOMInput = z.input<typeof CreateBOMSchema>
@@ -41,7 +43,9 @@ export const UpdateBOMSchema = CreateBOMSchema.omit({ product_id: true }).partia
   effective_to: dateStringSchema.or(z.date()).optional().nullable(),
   // Story 2.28: Packaging can be cleared
   units_per_box: z.number().int().positive().max(10000).nullable().optional(),
-  boxes_per_pallet: z.number().int().positive().max(200).nullable().optional()
+  boxes_per_pallet: z.number().int().positive().max(200).nullable().optional(),
+  // FR-2.34: Yield percentage
+  yield_percent: z.number().min(0.01).max(100).optional()
 })
 
 export type UpdateBOMInput = z.input<typeof UpdateBOMSchema>
@@ -63,6 +67,8 @@ export interface BOM {
   // Story 2.28: Packaging fields
   units_per_box: number | null
   boxes_per_pallet: number | null
+  // FR-2.34: Yield percentage
+  yield_percent: number
   created_by: string
   updated_by: string
   created_at: string | Date

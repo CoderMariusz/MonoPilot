@@ -319,6 +319,133 @@ export async function updateRouting(id: string, input: UpdateRoutingInput): Prom
 }
 
 /**
+ * Clone routing with all operations
+ * FR-2.47: Routing templates (simple version)
+ *
+ * Creates a new routing by copying an existing one:
+ * 1. Copies routing metadata (description, is_active)
+ * 2. User must provide new unique name
+ * 3. Copies all operations with same sequence and properties
+ * 4. New routing starts at version 1
+ *
+ * @param sourceRoutingId - ID of routing to clone
+ * @param newData - New routing data (name is required, description optional)
+ * @returns New routing ID and count of copied operations
+ */
+export async function cloneRouting(
+  sourceRoutingId: string,
+  newData: {
+    name: string
+    description?: string
+  }
+): Promise<ServiceResult<{ routingId: string; operationsCount: number }>> {
+  try {
+    const supabaseAdmin = createServerSupabaseAdmin()
+    const orgId = await getCurrentOrgId()
+
+    if (!orgId) {
+      return { success: false, error: 'Organization not found', code: 'INVALID_INPUT' }
+    }
+
+    // 1. Get source routing
+    const { data: source, error: sourceError } = await supabaseAdmin
+      .from('routings')
+      .select('*')
+      .eq('id', sourceRoutingId)
+      .eq('org_id', orgId)
+      .single()
+
+    if (sourceError || !source) {
+      return { success: false, error: 'Source routing not found', code: 'NOT_FOUND' }
+    }
+
+    // 2. Check duplicate name
+    const { data: existing } = await supabaseAdmin
+      .from('routings')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('name', newData.name)
+      .single()
+
+    if (existing) {
+      return { success: false, error: 'Routing with this name already exists', code: 'DUPLICATE_NAME' }
+    }
+
+    // 3. Create new routing with copied fields
+    const { data: newRouting, error: createError } = await supabaseAdmin
+      .from('routings')
+      .insert({
+        org_id: orgId,
+        name: newData.name,
+        description: newData.description ?? source.description,
+        is_active: source.is_active
+      })
+      .select()
+      .single()
+
+    if (createError || !newRouting) {
+      if (createError?.code === '23505') {
+        return { success: false, error: 'Routing with this name already exists', code: 'DUPLICATE_NAME' }
+      }
+      return { success: false, error: createError?.message || 'Failed to create routing', code: 'DATABASE_ERROR' }
+    }
+
+    // 4. Clone operations
+    const { data: sourceOps, error: opsError } = await supabaseAdmin
+      .from('routing_operations')
+      .select('*')
+      .eq('routing_id', sourceRoutingId)
+      .order('sequence', { ascending: true })
+
+    if (opsError) {
+      // Rollback: delete the newly created routing
+      await supabaseAdmin.from('routings').delete().eq('id', newRouting.id)
+      return { success: false, error: 'Failed to fetch source operations', code: 'DATABASE_ERROR' }
+    }
+
+    let operationsCount = 0
+
+    if (sourceOps && sourceOps.length > 0) {
+      const clonedOps = sourceOps.map(op => ({
+        routing_id: newRouting.id,
+        sequence: op.sequence,
+        name: op.name,
+        description: op.description,
+        machine_id: op.machine_id,
+        estimated_duration_minutes: op.estimated_duration_minutes,
+        labor_cost_per_hour: op.labor_cost_per_hour
+      }))
+
+      const { error: insertError } = await supabaseAdmin
+        .from('routing_operations')
+        .insert(clonedOps)
+
+      if (insertError) {
+        // Rollback: delete the newly created routing
+        await supabaseAdmin.from('routings').delete().eq('id', newRouting.id)
+        return { success: false, error: 'Failed to clone operations', code: 'DATABASE_ERROR' }
+      }
+
+      operationsCount = clonedOps.length
+    }
+
+    return {
+      success: true,
+      data: {
+        routingId: newRouting.id,
+        operationsCount
+      }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      code: 'DATABASE_ERROR'
+    }
+  }
+}
+
+/**
  * Delete routing
  * AC-2.24.5: DELETE /api/technical/routings/:id
  */

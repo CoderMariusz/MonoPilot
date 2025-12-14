@@ -296,6 +296,7 @@ export async function createBOM(input: CreateBOMInput): Promise<BOM> {
       routing_id: input.routing_id || null,
       units_per_box: input.units_per_box || null,
       boxes_per_pallet: input.boxes_per_pallet || null,
+      yield_percent: input.yield_percent || 100,
       created_by: userInfo.userId,
       updated_by: userInfo.userId
     })
@@ -697,4 +698,55 @@ export async function calculateLaborCost(
   const total_labor_cost = breakdown.reduce((sum, op) => sum + op.cost, 0)
 
   return { total_labor_cost, breakdown }
+}
+
+// ============================================================================
+// BOM YIELD CALCULATION - FR-2.34
+// ============================================================================
+
+export interface YieldCalculation {
+  plannedQuantity: number
+  yieldPercent: number
+  actualQuantity: number
+  wasteQuantity: number
+}
+
+/**
+ * Calculate actual output quantity accounting for yield percentage
+ * FR-2.34 Simple scope: Basic yield calculation
+ *
+ * Formula: actualOutput = plannedOutput × (yield_percent / 100)
+ *
+ * @param bomId - BOM ID to get yield_percent from
+ * @param plannedQuantity - Planned production quantity
+ * @returns Yield calculation breakdown
+ */
+export async function calculateBOMYield(
+  bomId: string,
+  plannedQuantity: number
+): Promise<YieldCalculation> {
+  const supabase = await createServerSupabase()
+
+  // Get BOM yield setting
+  const { data: bom, error } = await supabase
+    .from('boms')
+    .select('yield_percent')
+    .eq('id', bomId)
+    .single()
+
+  if (error) {
+    console.error('Error fetching BOM for yield calculation:', error)
+    throw new Error(`Failed to fetch BOM: ${error.message}`)
+  }
+
+  const yieldPercent = bom?.yield_percent || 100
+  const actualQuantity = (plannedQuantity * yieldPercent) / 100
+  const wasteQuantity = plannedQuantity - actualQuantity
+
+  return {
+    plannedQuantity,
+    yieldPercent,
+    actualQuantity,
+    wasteQuantity
+  }
 }
