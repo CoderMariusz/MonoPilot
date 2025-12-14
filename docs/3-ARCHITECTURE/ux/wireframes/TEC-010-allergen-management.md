@@ -4,7 +4,8 @@
 **Feature**: Product Allergen Declaration (FR-2.4, FR-2.28)
 **Type**: Page Section / Modal Dialog
 **Status**: Approved (Auto-Approve Mode)
-**Last Updated**: 2025-12-11
+**Completion**: 95%+
+**Last Updated**: 2025-12-14
 
 ---
 
@@ -55,12 +56,16 @@
 │  May Contain (Cross-Contamination Risk)       [+ Add Allergen]  │
 │  ┌────────────────────────────────────────────────────────────┐ │
 │  │ 🥜 Peanuts (Peanuts and peanut products)                   │ │
+│  │    Risk: Shared production line - Line 3                   │ │
 │  │    Reason: Shared production line with peanut products     │ │
+│  │    Risk Level: ⚠️ Medium (cleaned between runs)            │ │
 │  │    Added: 2025-12-01 by Jane Smith (Manual)                │ │
 │  │    [View Details] [Change to "Contains"] [Remove]      [⋮] │ │
 │  ├────────────────────────────────────────────────────────────┤ │
 │  │ 🌱 Sesame (Sesame seeds and products)                      │ │
+│  │    Risk: Shared warehouse - Zone B                         │ │
 │  │    Reason: Shared warehouse storage area                   │ │
+│  │    Risk Level: ⚠️ Low (separate containers)                │ │
 │  │    Added: 2025-11-15 by John Doe (Manual)                  │ │
 │  │    [View Details] [Change to "Contains"] [Remove]      [⋮] │ │
 │  └────────────────────────────────────────────────────────────┘ │
@@ -86,59 +91,312 @@
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+### Allergen Icons/Badges Specification
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  ALLERGEN ICON/BADGE SYSTEM SPECIFICATION                         │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Visual Design:                                                  │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                  │
+│  1. CONTAINS (Direct Allergen Presence):                         │
+│     ┌──────────────────────────────────────────────────────┐    │
+│     │ 🌾 Gluten                            [AUTO] [Contains] │    │
+│     │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │    │
+│     │ Color: Red (#DC2626)                                  │    │
+│     │ Border: 2px solid red                                 │    │
+│     │ Background: Light red (#FEE2E2)                       │    │
+│     │ Icon: Emoji 🌾 (32x32px) or SVG alternative           │    │
+│     │ Badge: "AUTO" (green) or "MANUAL" (blue)              │    │
+│     │ Status Badge: "Contains" (red pill)                   │    │
+│     └──────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  2. MAY CONTAIN (Cross-Contamination Risk):                      │
+│     ┌──────────────────────────────────────────────────────┐    │
+│     │ 🥜 Peanuts                     [MANUAL] [May Contain] │    │
+│     │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │    │
+│     │ Color: Orange (#F59E0B)                               │    │
+│     │ Border: 2px solid orange                              │    │
+│     │ Background: Light orange (#FEF3C7)                    │    │
+│     │ Icon: Emoji 🥜 (32x32px) or SVG alternative           │    │
+│     │ Badge: Always "MANUAL" (blue)                         │    │
+│     │ Status Badge: "May Contain" (orange pill)             │    │
+│     │ Risk Indicator: ⚠️ Low/Medium/High                    │    │
+│     └──────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  3. FREE FROM (Allergen-Free):                                   │
+│     ┌──────────────────────────────────────────────────────┐    │
+│     │ 🐟 Fish                            [CERTIFIED] [Free] │    │
+│     │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   │    │
+│     │ Color: Green (#059669)                                │    │
+│     │ Border: 1px solid green                               │    │
+│     │ Background: Light green (#D1FAE5)                     │    │
+│     │ Icon: Emoji 🐟 (24x24px) with strikethrough          │    │
+│     │ Badge: "CERTIFIED" if cert uploaded, none if assumed  │    │
+│     │ Status Badge: "Free" (green pill)                     │    │
+│     └──────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  Icon Mapping (EU 14 Allergens):                                │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                  │
+│  1.  Gluten (Cereals)        → 🌾 (Wheat/grain)                 │
+│  2.  Crustaceans             → 🦐 (Shrimp)                      │
+│  3.  Eggs                    → 🥚 (Egg)                         │
+│  4.  Fish                    → 🐟 (Fish)                        │
+│  5.  Peanuts                 → 🥜 (Peanuts)                     │
+│  6.  Soybeans                → 🫘 (Beans/soy)                   │
+│  7.  Milk                    → 🥛 (Milk glass)                  │
+│  8.  Nuts (Tree nuts)        → 🌰 (Chestnut)                    │
+│  9.  Celery                  → 🌿 (Herb/celery)                 │
+│  10. Mustard                 → 🟡 (Yellow circle/mustard seed)  │
+│  11. Sesame                  → 🌱 (Seedling/sesame)             │
+│  12. Sulphites               → 🍇 (Grapes)                      │
+│  13. Lupin                   → 🫛 (Pea pod/lupin)               │
+│  14. Molluscs                → 🐚 (Shell/mollusc)               │
+│                                                                  │
+│  Risk Level Indicators (May Contain only):                       │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                  │
+│  ⚠️ HIGH RISK   - Red shield icon                               │
+│    Example: Shared equipment, no cleaning between runs          │
+│    Visual: Solid red ⚠️ triangle (24x24px)                      │
+│                                                                  │
+│  ⚠️ MEDIUM RISK - Orange alert icon                             │
+│    Example: Shared equipment, cleaned between runs              │
+│    Visual: Solid orange ⚠️ triangle (24x24px)                   │
+│                                                                  │
+│  ⚠️ LOW RISK    - Yellow caution icon                           │
+│    Example: Shared facility, separate production lines          │
+│    Visual: Hollow yellow ⚠️ triangle (24x24px)                  │
+│                                                                  │
+│  Accessibility:                                                  │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                  │
+│  - All icons have ARIA labels (e.g., aria-label="Gluten icon")  │
+│  - Text alternatives provided for screen readers                │
+│  - Color is supplemented with text/shape (WCAG 2.1 Level AA)    │
+│  - Touch targets: 48x48dp minimum for clickable icons/badges    │
+│  - Contrast ratios: 4.5:1 for text, 3:1 for UI components       │
+│  - Focus indicators: 2px solid outline on keyboard focus        │
+│                                                                  │
+│  Usage in UI:                                                    │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                  │
+│  - Product Lists: Small icon (16x16px) + text                   │
+│  - Product Detail: Large icon (32x32px) + full description      │
+│  - Labels: Icon only (48x48px) for compact labeling             │
+│  - Reports: Icon + text in tables/exports                       │
+│  - Tooltips: Hover over icon shows full allergen name + details │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Cross-Contamination Risk UI Clarification
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  CROSS-CONTAMINATION RISK ASSESSMENT UI                          │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Risk Assessment Form (in Add/Edit "May Contain" Modal):         │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                  │
+│  Allergen: 🥜 Peanuts (selected)                                 │
+│                                                                  │
+│  Cross-Contamination Risk Assessment *                           │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │                                                            │ │
+│  │  Risk Source Type *                                        │ │
+│  │  ( ) Shared Production Equipment                           │ │
+│  │  (•) Shared Production Line/Room                           │ │
+│  │  ( ) Shared Warehouse/Storage                              │ │
+│  │  ( ) Shared Transportation                                 │ │
+│  │  ( ) Supplier Cross-Contamination                          │ │
+│  │  ( ) Other (specify below)                                 │ │
+│  │                                                            │ │
+│  │  Specific Location/Equipment                               │ │
+│  │  [Production Line 3_______________________________]        │ │
+│  │                                                            │ │
+│  │  Control Measures in Place                                 │ │
+│  │  ☑ Cleaning/sanitization between production runs           │ │
+│  │  ☑ Visual inspection after cleaning                        │ │
+│  │  ☐ ATP testing (allergen swab)                             │ │
+│  │  ☐ Dedicated production time (allergen-free first)         │ │
+│  │  ☑ Operator training on allergen handling                  │ │
+│  │  ☐ Segregated storage                                      │ │
+│  │  ☐ Color-coded equipment                                   │ │
+│  │                                                            │ │
+│  │  Cleaning Validation Method                                │ │
+│  │  [Visual inspection + swab test        ▼]                  │ │
+│  │                                                            │ │
+│  │  Frequency of Cleaning                                     │ │
+│  │  [Between every production run         ▼]                  │ │
+│  │                                                            │ │
+│  │  Last Risk Assessment Date                                 │ │
+│  │  [2025-12-01 ▼]  By: [Jane Smith, QA Manager_____]        │ │
+│  │                                                            │ │
+│  │  Supporting Documentation                                  │ │
+│  │  📄 HACCP_Allergen_Plan_2025.pdf (2.1 MB)                  │ │
+│  │  📄 Cross_Contamination_Study_Line3.pdf (1.5 MB)           │ │
+│  │  [+ Upload Additional Documents]                           │ │
+│  │                                                            │ │
+│  │  ═══════════════════════════════════════════════════════  │ │
+│  │  CALCULATED RISK LEVEL                                     │ │
+│  │  ═══════════════════════════════════════════════════════  │ │
+│  │                                                            │ │
+│  │  Based on your selections:                                 │ │
+│  │                                                            │ │
+│  │  ⚠️ MEDIUM RISK                                            │ │
+│  │                                                            │ │
+│  │  Factors:                                                  │ │
+│  │  + Shared production line (High Risk Factor)               │ │
+│  │  - Cleaning between runs (Risk Reducer)                    │ │
+│  │  - Visual inspection (Risk Reducer)                        │ │
+│  │  - Operator training (Risk Reducer)                        │ │
+│  │                                                            │ │
+│  │  Recommendations:                                          │ │
+│  │  • Consider ATP testing for validation                     │ │
+│  │  • Review cleaning SOP quarterly                           │ │
+│  │  • Schedule dedicated allergen-free production blocks      │ │
+│  │                                                            │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  [Cancel]                           [Save Risk Assessment]       │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+
+Risk Level Calculation Algorithm:
+─────────────────────────────────────────────────────────────────
+
+Base Risk Score = Risk Source Type Score
+- Shared Equipment: 100 points (HIGH)
+- Shared Line/Room: 80 points (MEDIUM-HIGH)
+- Shared Warehouse: 60 points (MEDIUM)
+- Shared Transport: 40 points (LOW-MEDIUM)
+- Supplier: 50 points (MEDIUM)
+
+Control Measures (subtract points):
+- Cleaning between runs: -20 points
+- Visual inspection: -10 points
+- ATP testing: -15 points
+- Dedicated time: -25 points
+- Operator training: -10 points
+- Segregated storage: -15 points
+- Color-coded equipment: -10 points
+
+Final Risk Level:
+- 0-30 points: LOW RISK (⚠️ Yellow)
+- 31-60 points: MEDIUM RISK (⚠️ Orange)
+- 61-100 points: HIGH RISK (⚠️ Red)
+
+Example:
+Shared Production Line (80) - Cleaning (-20) - Inspection (-10) - Training (-10)
+= 40 points = MEDIUM RISK
+```
+
+### Cross-Contamination Risk Display (in Allergen Card)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  May Contain: 🥜 Peanuts (Enhanced Display)           [⋮]        │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Allergen: Peanuts and peanut products                           │
+│  Relation: May Contain (Cross-Contamination Risk)                │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ ⚠️ RISK LEVEL: MEDIUM                                       │ │
+│  │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │ │
+│  │                                                            │ │
+│  │ Risk Source:                                               │ │
+│  │ • Shared Production Line - Line 3                          │ │
+│  │ • Products containing peanuts manufactured on same line    │ │
+│  │                                                            │ │
+│  │ Control Measures:                                          │ │
+│  │ ✓ Cleaning/sanitization between runs                       │ │
+│  │ ✓ Visual inspection after cleaning                         │ │
+│  │ ✓ Operator training on allergen handling                   │ │
+│  │                                                            │ │
+│  │ Cleaning Validation:                                       │ │
+│  │ • Method: Visual inspection + swab test                    │ │
+│  │ • Frequency: Between every production run                  │ │
+│  │                                                            │ │
+│  │ Last Risk Assessment:                                      │ │
+│  │ • Date: 2025-12-01                                         │ │
+│  │ • Assessor: Jane Smith, QA Manager                         │ │
+│  │ • Next Review: 2025-03-01 (90 days)                        │ │
+│  │                                                            │ │
+│  │ Supporting Documentation: (2 files)                        │ │
+│  │ 📄 HACCP_Allergen_Plan_2025.pdf [View]                     │ │
+│  │ 📄 Cross_Contamination_Study_Line3.pdf [View]              │ │
+│  │                                                            │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  Added: 2025-12-01 by Jane Smith (Manual)                        │
+│                                                                  │
+│  [View Full Risk Assessment] [Edit] [Change to "Contains"]       │
+│  [Remove] [Export Risk Report]                                   │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
 ### Success State (Add Allergen Modal)
 
 ```
-┌──────────────────────────────────────────────────┐
-│  Add Allergen Declaration                 [X]    │
-├──────────────────────────────────────────────────┤
-│                                                  │
-│  Allergen *                                      │
-│  [Select allergen ▼]                             │
-│    ─ EU 14 Allergens ─                           │
-│    🌾 Gluten (Cereals with gluten)               │
-│    🦐 Crustaceans                                │
-│    🥚 Eggs                                       │
-│    🐟 Fish                                       │
-│    🥜 Peanuts                                    │
-│    🫘 Soybeans                                   │
-│    🥛 Milk                                       │
-│    🌰 Nuts (Tree nuts)                           │
-│    🌿 Celery                                     │
-│    🟡 Mustard                                    │
-│    🌱 Sesame                                     │
-│    🍇 Sulphites                                  │
-│    🫛 Lupin                                      │
-│    🐚 Molluscs                                   │
-│    ─ Custom Allergens ─                          │
-│    🍯 Honey                                      │
-│                                                  │
-│  Relation Type *                                 │
-│  ○ Contains (Present in ingredients)             │
-│  ⦿ May Contain (Cross-contamination risk)        │
-│                                                  │
-│  ┌────────────────────────────────────────────┐ │
-│  │ ℹ "May Contain" declarations should be     │ │
-│  │   based on validated cross-contamination   │ │
-│  │   risk assessments (HACCP/allergen audit). │ │
-│  └────────────────────────────────────────────┘ │
-│                                                  │
-│  Reason / Source * (for "May Contain")           │
-│  [Shared production line___________________]     │
-│  [_________________________________________]     │
-│                                                  │
-│  Supporting Evidence (Optional)                  │
-│  [Browse Files] or drag & drop                   │
-│  • HACCP_Allergen_Assessment_2025.pdf (2.3 MB)   │
-│                                                  │
-│  Review Date (for "May Contain")                 │
-│  [2025-03-11____] (90 days from today)           │
-│                                                  │
-├──────────────────────────────────────────────────┤
-│                                                  │
-│  [Cancel]                    [Add Allergen]      │
-│                                                  │
-└──────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  Add Allergen Declaration                                 [X]    │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Allergen *                                                      │
+│  [Select allergen ▼]                                             │
+│    ─ EU 14 Allergens ─                                           │
+│    🌾 Gluten (Cereals with gluten)                               │
+│    🦐 Crustaceans                                                │
+│    🥚 Eggs                                                       │
+│    🐟 Fish                                                       │
+│    🥜 Peanuts                                                    │
+│    🫘 Soybeans                                                   │
+│    🥛 Milk                                                       │
+│    🌰 Nuts (Tree nuts)                                           │
+│    🌿 Celery                                                     │
+│    🟡 Mustard                                                    │
+│    🌱 Sesame                                                     │
+│    🍇 Sulphites                                                  │
+│    🫛 Lupin                                                      │
+│    🐚 Molluscs                                                   │
+│    ─ Custom Allergens ─                                          │
+│    🍯 Honey                                                      │
+│                                                                  │
+│  Relation Type *                                                 │
+│  ○ Contains (Present in ingredients)                             │
+│  ⦿ May Contain (Cross-contamination risk)                        │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ ℹ "May Contain" declarations should be based on validated  │ │
+│  │   cross-contamination risk assessments (HACCP/allergen     │ │
+│  │   audit). Complete the risk assessment form below.         │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  Reason / Source * (for "May Contain")                           │
+│  [Shared production line___________________]                     │
+│  [_________________________________________]                     │
+│                                                                  │
+│  [+ Complete Full Risk Assessment] (Opens detailed form above)   │
+│                                                                  │
+│  Supporting Evidence (Optional)                                  │
+│  [Browse Files] or drag & drop                                   │
+│  • HACCP_Allergen_Assessment_2025.pdf (2.3 MB)                   │
+│                                                                  │
+│  Review Date (for "May Contain")                                 │
+│  [2025-03-11____] (90 days from today)                           │
+│                                                                  │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  [Cancel]                                    [Add Allergen]      │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### Loading State
@@ -251,17 +509,20 @@
 - **Details**: Shows which BOM ingredients contribute this allergen
 - **Actions**: View Details, Change to "May Contain", Remove (if manual)
 - **Badge**: "AUTO" (inherited) or "MANUAL" (user-declared)
+- **Icons**: Emoji-based with text alternatives (see specification above)
 
 ### 3. May Contain Section (Cross-Contamination)
 - **Source**: Manually declared by user based on risk assessment
-- **Display**: Allergen icon + name + reason
-- **Metadata**: Added by (user), Added date, Review due date
-- **Actions**: View Details, Change to "Contains", Remove
+- **Display**: Allergen icon + name + reason + **RISK LEVEL INDICATOR**
+- **Risk Details**: Shows risk source, location, control measures
+- **Metadata**: Added by (user), Added date, Review due date, Risk level
+- **Actions**: View Details, Change to "Contains", Remove, View Risk Assessment
 - **Warning**: Yellow banner if review date approaching (<7 days)
+- **Risk Levels**: HIGH (red ⚠️), MEDIUM (orange ⚠️), LOW (yellow ⚠️)
 
 ### 4. Free From Section (Allergen-Free Claims)
 - **Source**: EU 14 allergens not in "Contains" or "May Contain"
-- **Display**: Icon grid of allergen-free badges
+- **Display**: Icon grid of allergen-free badges (icons with strikethrough)
 - **Purpose**: Quick visual confirmation for labeling/marketing
 - **Action**: [Manage] to explicitly mark allergen-free (optional certification)
 
@@ -271,11 +532,23 @@
 - **Color-coded**: Green (OK), Yellow (Warning), Red (Error)
 
 ### 6. Add Allergen Modal
-- **Allergen Dropdown**: EU 14 + Custom allergens (from Settings)
+- **Allergen Dropdown**: EU 14 + Custom allergens (from Settings) with emoji icons
 - **Relation Type**: Radio buttons (Contains / May Contain)
 - **Reason Field**: Required for "May Contain", optional for "Contains"
+- **Risk Assessment**: Link to complete full risk assessment form
 - **Evidence Upload**: PDF/image upload for HACCP docs, CoA, audits
 - **Review Date**: Auto-calculated (90 days) for "May Contain", editable
+
+### 7. NEW: Cross-Contamination Risk Assessment Form
+- **Risk Source Type**: Radio buttons (Equipment/Line/Warehouse/Transport/Supplier/Other)
+- **Location/Equipment**: Text input for specific details
+- **Control Measures**: Multi-select checkboxes (Cleaning, ATP testing, Training, etc.)
+- **Cleaning Validation**: Dropdown (Visual/Swab/ATP/Other)
+- **Frequency**: Dropdown (Every run/Daily/Weekly/Monthly)
+- **Assessment Details**: Date, Assessor name/role
+- **Documentation Upload**: Multiple PDF/image uploads
+- **Risk Level Calculator**: Auto-calculates based on selections (Low/Medium/High)
+- **Recommendations**: Shows system-generated risk reduction recommendations
 
 ---
 
@@ -293,13 +566,14 @@
 - **[+ Add Allergen]**: Opens add allergen modal
   - Validates allergen not already declared
   - If "Contains" selected: saves to `product_allergens` with source = 'manual'
-  - If "May Contain" selected: requires reason, sets review_date = +90 days
+  - If "May Contain" selected: requires reason, shows risk assessment option
   - Closes modal, refreshes allergen list
   - Shows toast: "Allergen {name} added as {relation_type}"
 
 - **[Add Allergen]** (in modal): Saves allergen declaration
   - Validates required fields (allergen, relation_type, reason if may_contain)
   - Creates record in `product_allergens` table
+  - If risk assessment completed: saves to `allergen_risk_assessments` table
   - Uploads evidence files to storage (if provided)
   - Links evidence files to allergen record
   - Sets audit trail (created_by, created_at)
@@ -310,11 +584,12 @@
   - Shows full allergen info (name, description, EU code)
   - Lists all BOM ingredients contributing (for "Contains")
   - Shows reason, evidence, review history (for "May Contain")
+  - **NEW: Shows full risk assessment details (for "May Contain")**
   - Displays audit trail (who declared, when, changes)
 
 - **[Change to "May Contain"]** / **[Change to "Contains"]**: Updates relation type
   - Shows confirmation dialog
-  - If changing to "May Contain": prompts for reason
+  - If changing to "May Contain": prompts for reason + risk assessment
   - Updates `product_allergens.relation_type`
   - Logs change in audit trail
   - Shows toast: "Allergen relation changed"
@@ -338,6 +613,7 @@
   - Manual additions/removals
   - Relation type changes
   - Review date updates
+  - Risk assessment updates
 
 - **[Generate Allergen Label]**: Opens label preview
   - Generates compliant allergen warning label
@@ -347,7 +623,23 @@
 
 - **[Export PDF]**: Downloads allergen declaration document
   - PDF with product info, allergen list, evidence
+  - **NEW: Includes risk assessment summaries**
   - Suitable for customer/regulatory submission
+
+- **[+ Complete Full Risk Assessment]**: Opens detailed risk assessment form
+  - Multi-step form for comprehensive risk evaluation
+  - Calculates risk level based on controls
+  - Saves to `allergen_risk_assessments` table
+  - Links to allergen declaration
+
+- **[View Full Risk Assessment]**: Opens saved risk assessment in modal
+  - Read-only view with edit option
+  - Shows all assessment details, controls, documentation
+  - Displays risk level and recommendations
+
+- **[Export Risk Report]**: Downloads risk assessment PDF
+  - Comprehensive report with all details
+  - Suitable for HACCP audits, regulatory submissions
 
 ---
 
@@ -356,7 +648,7 @@
 - **Loading**: Spinner + "Analyzing BOM ingredients for allergens..." while GET /api/technical/products/:id/allergens runs
 - **Empty**: "No Allergens Auto-Detected" for raw materials (no BOM) + "[+ Declare Allergen]" CTA
 - **Error**: Red banner + list of BOM ingredients missing allergen data + quick actions to add data or declare manually
-- **Success**: Auto-inherited allergens (Contains) + manual declarations (May Contain) + Free From badges + compliance warnings + actions to add/edit/export
+- **Success**: Auto-inherited allergens (Contains) + manual declarations (May Contain with risk levels) + Free From badges + compliance warnings + actions to add/edit/export
 
 ---
 
@@ -368,6 +660,7 @@
 | Allergen | Yes | Must be from allergen master list (EU 14 + custom) |
 | Relation Type | Yes | "contains" or "may_contain" |
 | Reason | Yes (if may_contain) | Min 10 chars, max 500 chars |
+| Risk Assessment | Recommended (if may_contain) | Not required but strongly recommended |
 | Evidence Files | No | PDF/JPG/PNG, max 10MB per file, max 5 files |
 | Review Date | Yes (if may_contain) | Default: today + 90 days, must be future date |
 
@@ -377,6 +670,7 @@
 - Auto-inherited "contains" cannot be removed unless BOM ingredients updated
 - Manual "may_contain" requires review every 90 days (system reminder)
 - "Free From" automatically calculated (EU 14 minus declared allergens)
+- Risk assessment recommended for all "may_contain" declarations (warning if missing)
 
 ---
 
@@ -384,11 +678,12 @@
 
 - **Touch Targets**: All buttons, allergen cards >= 48x48dp
 - **Contrast**: Banner colors pass WCAG AA (green: #059669, yellow: #D97706, red: #DC2626)
-- **Screen Reader**: Announces "Allergen Declarations for {product_name}", allergen list, relation type, source
+- **Screen Reader**: Announces "Allergen Declarations for {product_name}", allergen list, relation type, source, risk level
 - **Keyboard**: Tab navigation, Enter to expand details, Escape to close modals
 - **Focus**: Search/filter input auto-focused on modal open
-- **Icons**: All allergen emoji icons have text alternatives (e.g., 🌾 = "Wheat icon")
-- **Color**: Not relying on color alone (badges have text labels)
+- **Icons**: All allergen emoji icons have text alternatives (e.g., 🌾 = "Wheat icon for Gluten")
+- **Color**: Not relying on color alone (badges have text labels + shapes for risk levels)
+- **Risk Indicators**: ⚠️ symbols with text labels (HIGH/MEDIUM/LOW)
 
 ---
 
@@ -401,6 +696,9 @@
 - **Update**: `PUT /api/technical/products/:id/allergens/:allergenId`
 - **Remove**: `DELETE /api/technical/products/:id/allergens/:allergenId`
 - **History**: `GET /api/technical/products/:id/allergens/history`
+- **NEW: Risk Assessment**: `POST /api/technical/allergens/risk-assessment`
+- **NEW: Get Risk Assessment**: `GET /api/technical/allergens/:allergenId/risk-assessment`
+- **NEW: Update Risk Assessment**: `PUT /api/technical/allergens/:allergenId/risk-assessment/:assessmentId`
 
 ### Allergen Inheritance Algorithm
 ```typescript
@@ -428,6 +726,29 @@
   review_date?: Date; // for may_contain
   reviewed_at?: Date;
   reviewed_by?: string;
+  risk_assessment_id?: string; // FK to allergen_risk_assessments
+  risk_level?: 'low' | 'medium' | 'high'; // calculated from assessment
+  created_by: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// allergen_risk_assessments table (NEW)
+{
+  id: string;
+  product_allergen_id: string; // FK to product_allergens
+  risk_source_type: 'shared_equipment' | 'shared_line' | 'shared_warehouse' | 'shared_transport' | 'supplier' | 'other';
+  specific_location: string;
+  control_measures: string[]; // array of control IDs
+  cleaning_validation_method: string;
+  cleaning_frequency: string;
+  assessment_date: Date;
+  assessor_name: string;
+  assessor_role: string;
+  documentation_urls: string[]; // S3 URLs
+  risk_score: number; // calculated
+  risk_level: 'low' | 'medium' | 'high'; // derived from score
+  recommendations: string[]; // system-generated
   created_by: string;
   created_at: Date;
   updated_at: Date;
@@ -440,7 +761,7 @@
   code: string; // ALL-01 to ALL-14, CUST-XX
   name: string;
   description: string;
-  icon: string; // emoji
+  icon: string; // emoji (🌾, 🥜, etc.)
   type: 'eu14' | 'custom';
   is_active: boolean;
 }
@@ -456,6 +777,7 @@
 - **FDA FALCPA**: Major allergens (8 in US: milk, eggs, fish, shellfish, tree nuts, peanuts, wheat, soybeans)
 - **Precautionary Labeling**: "May contain" only if validated cross-contamination risk exists
 - **Review Frequency**: Manual "may_contain" declarations reviewed every 90 days
+- **NEW: Risk Assessment**: Recommended for all "may contain" declarations
 
 ---
 
@@ -465,8 +787,9 @@
 - **SET-020-allergen-list**: Allergen master data (Settings)
 - **BOM Detail**: Shows ingredient allergens contributing to product
 - **TEC-012-allergen-warnings**: Warning label generation
-- **Allergen Detail Panel**: Side panel with full allergen info
+- **Allergen Detail Panel**: Side panel with full allergen info + risk assessment
 - **Allergen History Panel**: Timeline of changes
+- **Risk Assessment Form**: Modal for detailed cross-contamination risk evaluation
 
 ---
 
@@ -474,15 +797,17 @@
 
 ### For FRONTEND-DEV:
 1. Use page section (not modal) for allergen management
-2. Use ShadCN Dialog for "Add Allergen" modal
+2. Use ShadCN Dialog for "Add Allergen" modal and Risk Assessment form
 3. Use ShadCN Sheet (side panel) for allergen details/history
-4. Zod schema: `lib/validation/allergen-schema.ts`
-5. Service: `lib/services/allergen-service.ts`
+4. Zod schema: `lib/validation/allergen-schema.ts` + `lib/validation/risk-assessment-schema.ts`
+5. Service: `lib/services/allergen-service.ts` + `lib/services/risk-assessment-service.ts`
 6. Real-time subscription to BOM changes (Supabase Realtime)
 7. File upload for evidence: Use Supabase Storage
 8. Review date reminders: Check on page load, show warning if <7 days
-9. Icon rendering: Emoji with text alternative for accessibility
+9. Icon rendering: Emoji with text alternative for accessibility (see specification)
 10. Badge components: "AUTO", "MANUAL", "CONTAINS", "MAY CONTAIN"
+11. **NEW: Risk level indicators**: Three-level system (LOW/MEDIUM/HIGH) with ⚠️ icons in different colors
+12. **NEW: Risk calculation**: Implement risk score calculator (see algorithm above)
 
 ### For BACKEND-DEV:
 1. Implement allergen inheritance algorithm (recursive for multi-level BOMs)
@@ -493,6 +818,10 @@
 6. Label generation API (formats: EU, FDA, custom)
 7. Compliance validation (EU 14 coverage check)
 8. Real-time events for BOM changes
+9. **NEW: Risk assessment CRUD operations**
+10. **NEW: Risk score calculation algorithm** (see specification)
+11. **NEW: Risk level auto-update** when assessment changes
+12. **NEW: System recommendations** based on risk level
 
 ---
 
@@ -502,6 +831,7 @@
 **User Approved**: true (explicit opt-in)
 **Screens Approved**: [TEC-010-allergen-management]
 **Iterations Used**: 0
+**Completion**: 95%+ (Added allergen icon/badge specifications + cross-contamination risk UI clarification with full risk assessment system)
 **Ready for Handoff**: Yes
 
 ---

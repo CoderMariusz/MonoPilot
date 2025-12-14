@@ -38,9 +38,10 @@ version             INTEGER DEFAULT 1
 barcode             TEXT
 gtin                TEXT                    -- GS1 GTIN-14
 category_id         UUID
-supplier_id         UUID REFERENCES suppliers(id)
-supplier_lead_time_days INTEGER
-moq                 DECIMAL(15,4)           -- Minimum Order Quantity
+-- Procurement fields (ADR-010 - moved from suppliers)
+lead_time_days      INTEGER DEFAULT 7       -- Procurement lead time
+moq                 DECIMAL(10,2)           -- Minimum order quantity
+-- Costing fields
 expiry_policy       TEXT DEFAULT 'none'     -- fixed, rolling, none (migration 046)
 shelf_life_days     INTEGER
 std_price           DECIMAL(15,4)           -- Standard selling price (migration 046)
@@ -61,6 +62,11 @@ CHECK (expiry_policy IN ('fixed', 'rolling', 'none'))
 CHECK (cost_per_unit IS NULL OR cost_per_unit >= 0) -- migration 048
 -- Trigger: validates RM/PKG products have cost_per_unit (migration 048)
 ```
+
+**Schema Change (2025-12-14 - ADR-010):**
+- **ADDED**: `lead_time_days INTEGER DEFAULT 7` - procurement lead time (moved from suppliers)
+- **ADDED**: `moq DECIMAL(10,2)` - minimum order quantity (moved from suppliers)
+- **Rationale**: Lead time and MOQ are product-specific attributes. Enables accurate MRP and per-product procurement control.
 
 #### product_types
 ```sql
@@ -142,6 +148,12 @@ updated_by      UUID REFERENCES users(id)
 -- Trigger prevents overlapping date ranges for same product
 -- Index: idx_boms_routing_id (migration 045)
 ```
+
+**BOM-Routing Relationship (ADR-010 Documentation):**
+- **BOM has default routing**: `routing_id` references `routings(id)`
+- **Work Order inherits routing from BOM**: When WO is created, it uses `bom.routing_id` (not `product.routing_id`)
+- **Routing snapshot**: WO creation captures full routing definition (operations, costs) as immutable snapshot
+- **Why BOM-level?**: Different BOM versions may use different production methods (different routings)
 
 #### bom_production_lines
 ```sql

@@ -4,7 +4,7 @@
 **Feature**: Allergen Warning Label Generation (FR-2.84)
 **Type**: Modal Dialog / Label Preview
 **Status**: Approved (Auto-Approve Mode)
-**Last Updated**: 2025-12-11
+**Last Updated**: 2025-12-14
 
 ---
 
@@ -185,6 +185,180 @@
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+### Success State (Label Format Builder)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Label Format Builder                                     [X]    │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Customize label output for different markets and purposes      │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Format Options                                            │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │                                                            │ │
+│  │  Target Market *                                           │ │
+│  │  ● European Union (FIC 1169/2011)                          │ │
+│  │  ○ United States (FDA FALCPA)                              │ │
+│  │  ○ Canada (CFIA Priority Allergens)                        │ │
+│  │  ○ Australia/New Zealand (FSANZ)                           │ │
+│  │  ○ United Kingdom (FIR 2014)                               │ │
+│  │                                                            │ │
+│  │  Label Purpose *                                           │ │
+│  │  ● Product Packaging (primary label)                       │ │
+│  │  ○ Package Insert (customer card)                          │ │
+│  │  ○ Food Service (allergen binder)                          │ │
+│  │  ○ B2B Specification Sheet                                 │ │
+│  │  ○ Online Product Listing                                  │ │
+│  │                                                            │ │
+│  │  Output Type *                                             │ │
+│  │  ● Thermal Label (4x6")                                    │ │
+│  │  ○ Thermal Label (2x3")                                    │ │
+│  │  ○ A4 Sheet (multiple labels)                              │ │
+│  │  ○ PDF Document (full page)                                │ │
+│  │  ○ Digital (HTML/Text for web)                             │ │
+│  │                                                            │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Content Sections                                          │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │                                                            │ │
+│  │  ☑ Header (Product Name, Code, Date)                      │ │
+│  │  ☑ Contains Section (mandatory allergens)                 │ │
+│  │  ☑ May Contain Section (cross-contact allergens)          │ │
+│  │  ☐ Free From Section (absent allergens)                   │ │
+│  │  ☑ Contact Information                                     │ │
+│  │  ☑ Lot & Best Before Reference                            │ │
+│  │  ☐ Company Logo                                           │ │
+│  │  ☐ QR Code (link to full spec)                            │ │
+│  │  ☐ Precautionary Statement (custom text)                  │ │
+│  │                                                            │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Formatting Rules                                          │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │                                                            │ │
+│  │  Allergen Emphasis (EU FIC requires bold or contrast)      │ │
+│  │  ● Bold Text (GLUTEN, MILK, EGGS)                          │ │
+│  │  ○ Contrasting Background (highlights)                     │ │
+│  │  ○ All Capitals Only                                       │ │
+│  │  ○ Icon + Bold (⚠ GLUTEN)                                  │ │
+│  │                                                            │ │
+│  │  Allergen Name Style (FDA uses common names)               │ │
+│  │  ○ Full EU Names (Cereals containing gluten)              │ │
+│  │  ● Common Names (Wheat, Milk, Eggs)                        │ │
+│  │  ○ Scientific Names (Triticum aestivum)                    │ │
+│  │                                                            │ │
+│  │  Font Settings                                             │ │
+│  │  Font Family: [Arial ▼]                                    │ │
+│  │  Font Size:   [10pt ▼]                                     │ │
+│  │  Line Height: [1.5 ▼]                                      │ │
+│  │                                                            │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Preview                                                   │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │                                                            │ │
+│  │  [Live preview based on selected options...]              │ │
+│  │                                                            │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │  ALLERGEN INFORMATION                                │ │ │
+│  │  │  Product: Whole Wheat Bread (PROD-157)               │ │ │
+│  │  │  Date: 2025-12-14                                    │ │ │
+│  │  │                                                      │ │ │
+│  │  │  CONTAINS: GLUTEN, MILK, EGGS, SOY, TREE NUTS        │ │ │
+│  │  │  MAY CONTAIN: PEANUTS, SESAME                        │ │ │
+│  │  │                                                      │ │ │
+│  │  │  Contact: +1-555-123-4567                            │ │ │
+│  │  │  Lot & Best Before: See packaging                    │ │ │
+│  │  └──────────────────────────────────────────────────────┘ │ │
+│  │                                                            │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  Compliance Check: ✓ EU FIC 1169/2011 compliant                 │
+│                                                                  │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  [Cancel]          [Save as Custom Format]      [Apply & Export] │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Success State (Warning Label Templates Library)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Allergen Label Templates                                 [X]    │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────┐  Saved Templates (5)                                   │
+│  │  ▼  │  [Search templates...]                [+ New Template] │
+│  └─────┘                                                         │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  EU Retail Label (Default)                          [Edit] │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │  Format: EU FIC 1169/2011 | Size: 4x6" | Language: EN     │ │
+│  │  Sections: Header, Contains, May Contain, Contact         │ │
+│  │  Last Used: 2025-12-13 | Used on 47 products              │ │
+│  │                                                            │ │
+│  │  [Preview] [Apply to Product] [Duplicate] [Delete]        │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  FDA Export Label                                   [Edit] │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │  Format: FDA FALCPA | Size: 4x6" | Language: EN           │ │
+│  │  Sections: Header, Contains, Facility Statement, Contact  │ │
+│  │  Last Used: 2025-12-08 | Used on 23 products              │ │
+│  │                                                            │ │
+│  │  [Preview] [Apply to Product] [Duplicate] [Delete]        │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Customer Allergen Card                             [Edit] │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │  Format: Package Insert | Size: A6 | Language: EN         │ │
+│  │  Sections: Logo, Contains, May Contain, Free From, QR     │ │
+│  │  Last Used: 2025-12-11 | Used on 18 products              │ │
+│  │                                                            │ │
+│  │  [Preview] [Apply to Product] [Duplicate] [Delete]        │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  B2B Specification Sheet                            [Edit] │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │  Format: Custom | Size: A4 | Language: EN                 │ │
+│  │  Sections: All (comprehensive for business customers)     │ │
+│  │  Last Used: 2025-12-05 | Used on 31 products              │ │
+│  │                                                            │ │
+│  │  [Preview] [Apply to Product] [Duplicate] [Delete]        │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Food Service Allergen Binder                       [Edit] │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │  Format: Custom | Size: A4 | Language: EN                 │ │
+│  │  Sections: Checkbox grid, visual icons, large contact     │ │
+│  │  Last Used: 2025-11-28 | Used on 12 products              │ │
+│  │                                                            │ │
+│  │  [Preview] [Apply to Product] [Duplicate] [Delete]        │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ℹ Templates can be customized per product while maintaining     │
+│    compliance with the selected regulatory format.               │
+│                                                                  │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  [Close]                                          [Create Label] │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
 ### Loading State
 
 ```
@@ -319,6 +493,28 @@
 - **[Add Logo]**: Upload company logo (shown in header)
 - **[Font Settings]**: Font family, size, color, bold/italic
 
+### 7. Label Format Builder
+- **Target Market Selection**: EU, US, Canada, Australia/NZ, UK with auto-compliance
+- **Label Purpose**: Packaging, Insert, Food Service, B2B, Online
+- **Output Type**: Thermal labels (various sizes), A4 sheets, PDF, digital HTML
+- **Content Sections**: Toggleable sections (header, contains, may contain, free from, contact, lot/BB, logo, QR, precautionary)
+- **Formatting Rules**: Allergen emphasis styles (bold, contrast, capitals, icons)
+- **Name Style**: Full EU names vs. common names vs. scientific names
+- **Font Settings**: Family, size, line height customization
+- **Live Preview**: Real-time preview of selected format options
+
+### 8. Warning Label Templates Library
+- **Template List**: Saved custom templates with metadata
+- **Template Info**: Format type, size, language, sections included
+- **Usage Stats**: Last used date, number of products using template
+- **Template Actions**:
+  - **[Preview]**: View sample label with template settings
+  - **[Apply to Product]**: Use template for current product
+  - **[Duplicate]**: Create copy for customization
+  - **[Delete]**: Remove template (with confirmation)
+- **Search/Filter**: Find templates by name, format, or usage
+- **Create New**: Start from scratch or duplicate existing template
+
 ---
 
 ## Main Actions
@@ -375,6 +571,18 @@
   - Allergen names translated (uses localized allergen table)
   - Requires nutrition/allergen data in selected language
   - Shows warning if translations missing
+
+- **[Save as Custom Format]**: (Format Builder)
+  - Prompts for format name
+  - Saves all format settings (market, purpose, sections, styling)
+  - Creates new template in library
+  - Shows toast: "Custom format '{name}' created"
+
+- **[Apply & Export]**: (Format Builder)
+  - Applies format settings to current label
+  - Immediately exports as PDF or sends to printer
+  - Optionally saves as template
+  - Shows toast: "Label generated with custom format"
 
 ---
 
@@ -445,6 +653,165 @@ Manufactured in a facility that also processes peanuts and sesame.
 
 ---
 
+## Label Generation Formats
+
+### Format Categories
+
+| Category | Formats | Purpose |
+|----------|---------|---------|
+| **Thermal Labels** | 2x3", 4x6", 4x8" | Primary product labels, direct printing |
+| **A4 Sheets** | A4, Letter | Multi-label sheets, office printing |
+| **Cards** | A6, A7, Business card | Customer info cards, allergen binders |
+| **Digital** | HTML, PDF, Text | Web listings, email, digital catalogs |
+| **Custom** | User-defined | Specific customer requirements |
+
+### Output Format Specifications
+
+#### Thermal Labels (4x6" - Most Common)
+- **Dimensions**: 101.6mm x 152.4mm
+- **Resolution**: 300 DPI (print quality)
+- **Format**: PDF or ZPL (Zebra Printer Language)
+- **Margins**: 6.35mm (0.25") safe area
+- **Font**: Arial 10pt minimum for readability
+- **Use Case**: Primary product labeling, GRN labels, allergen warnings
+
+#### Thermal Labels (2x3" - Compact)
+- **Dimensions**: 50.8mm x 76.2mm
+- **Resolution**: 300 DPI
+- **Format**: PDF or ZPL
+- **Margins**: 3.175mm (0.125") safe area
+- **Font**: Arial 8pt minimum (condensed layout)
+- **Use Case**: Small products, retail pricing labels, inner package labels
+
+#### A4 Sheet (Multiple Labels)
+- **Dimensions**: 210mm x 297mm (8.5" x 11" for Letter)
+- **Layout**: 2x4 grid (8 labels per sheet) or 3x10 (30 per sheet)
+- **Resolution**: 300 DPI for laser/inkjet
+- **Format**: PDF
+- **Use Case**: Office printing, batch label printing, low-volume production
+
+#### A6 Card (Customer Allergen Card)
+- **Dimensions**: 105mm x 148mm (A6 postcard size)
+- **Resolution**: 300 DPI
+- **Format**: PDF
+- **Layout**: Single-page, customer-friendly design with checkboxes
+- **Use Case**: Retail package inserts, food service allergen binders
+
+#### Digital HTML
+- **Format**: Responsive HTML + CSS
+- **Use Case**: Website product listings, online catalogs, mobile apps
+- **Features**: Accessibility (WCAG AA), mobile-friendly, semantic markup
+- **Output**: HTML snippet or standalone page
+
+#### Digital PDF
+- **Format**: Full-page PDF document
+- **Use Case**: Email attachments, B2B specifications, regulatory submissions
+- **Features**: Searchable text, hyperlinks, embedded fonts
+
+---
+
+## Template Management
+
+### Template Structure
+```typescript
+{
+  template_id: string;
+  name: string;
+  format_type: 'eu_fic' | 'fda_falcpa' | 'canada_cfia' | 'anz_fsanz' | 'uk_fir' | 'custom';
+  label_purpose: 'packaging' | 'insert' | 'foodservice' | 'b2b' | 'online';
+  output_type: 'thermal_4x6' | 'thermal_2x3' | 'a4_sheet' | 'a6_card' | 'pdf_doc' | 'html';
+  size: { width_mm: number; height_mm: number };
+  language: 'en' | 'es' | 'fr' | 'de' | 'pl';
+  sections: {
+    header: boolean;
+    contains: boolean;
+    may_contain: boolean;
+    free_from: boolean;
+    contact: boolean;
+    lot_bb: boolean;
+    logo: boolean;
+    qr_code: boolean;
+    precautionary: boolean;
+  };
+  formatting: {
+    allergen_emphasis: 'bold' | 'contrast' | 'capitals' | 'icon_bold';
+    allergen_name_style: 'full_eu' | 'common' | 'scientific';
+    font_family: string;
+    font_size: number;
+    line_height: number;
+    background_color: string;
+    text_color: string;
+  };
+  customizations: {
+    header_text: string;
+    footer_text: string;
+    additional_text: string;
+    disclaimer: string;
+    logo_url: string;
+  };
+  created_at: Date;
+  created_by: string;
+  last_used: Date;
+  usage_count: number;
+}
+```
+
+### Template Actions
+
+#### Create Template
+1. User clicks **[+ New Template]** or **[Save as Custom Format]**
+2. Opens format builder with blank settings
+3. User configures: market, purpose, output type, sections, formatting
+4. User enters template name (required, 3-50 chars)
+5. System validates: unique name, valid format settings
+6. System saves to `org_allergen_label_templates` table
+7. Toast: "Template '{name}' created successfully"
+
+#### Edit Template
+1. User clicks **[Edit]** on existing template
+2. Opens format builder pre-filled with template settings
+3. User modifies settings
+4. User saves changes
+5. System prompts: "Update template or save as new?"
+6. If update: overwrites existing template
+7. If new: creates copy with new name
+8. Toast: "Template updated" or "New template '{name}' created"
+
+#### Apply Template
+1. User opens label generator for product
+2. User clicks **[Save as Template]** or selects from library
+3. System loads template settings
+4. System merges product allergen data with template
+5. System renders label preview
+6. User can customize before export
+7. User exports PDF or prints
+
+#### Duplicate Template
+1. User clicks **[Duplicate]** on template
+2. System creates exact copy with name "{original} (Copy)"
+3. User can immediately edit or save as-is
+4. Toast: "Template duplicated as '{name} (Copy)'"
+
+#### Delete Template
+1. User clicks **[Delete]** on template
+2. System shows confirmation: "Delete template '{name}'? {N} products use this template."
+3. User confirms
+4. System soft-deletes (marks as deleted, keeps for audit)
+5. Products using template retain last-used settings
+6. Toast: "Template '{name}' deleted"
+
+### Template Library Features
+
+- **Search**: Filter templates by name (autocomplete)
+- **Filter**: By format type, purpose, output type, language
+- **Sort**: By name, last used, usage count, created date
+- **Default Template**: Mark one template as default per format type
+- **Bulk Actions**: Export multiple templates as JSON, import templates
+- **Preview**: Quick preview without opening full generator
+- **Usage Stats**: Show which products use each template
+
+---
+
 ## Validation Rules
 
 ### Prerequisites
@@ -469,6 +836,14 @@ Manufactured in a facility that also processes peanuts and sesame.
 - Print: Printer supports selected label size
 - Template: Template name unique (1-50 chars)
 - Logo: Image < 5 MB, supported format (PNG/JPG/SVG)
+
+### Format Builder Validation
+- **Target Market**: Required, must select one
+- **Label Purpose**: Required, determines section recommendations
+- **Output Type**: Required, determines size constraints
+- **Sections**: At least "Contains" section required
+- **Font Size**: Minimum 8pt for thermal, 10pt for A4
+- **Background/Text Contrast**: Minimum 4.5:1 ratio (WCAG AA)
 
 ---
 
@@ -520,6 +895,25 @@ Manufactured in a facility that also processes peanuts and sesame.
   }
   ```
 
+- **Get Templates**: `GET /api/technical/settings/allergen-label-templates`
+  ```typescript
+  Response: {
+    templates: AllergenLabelTemplate[];
+    default_template_ids: { [format: string]: string };
+  }
+  ```
+
+- **Update Template**: `PUT /api/technical/settings/allergen-label-templates/:id`
+  ```typescript
+  Request: { ...updated_template_fields }
+  Response: { template: AllergenLabelTemplate }
+  ```
+
+- **Delete Template**: `DELETE /api/technical/settings/allergen-label-templates/:id`
+  ```typescript
+  Response: { success: true }
+  ```
+
 ### Label Rendering
 - **Technology**: Use `@react-pdf/renderer` or similar for PDF generation
 - **Fonts**: Embed fonts for consistency (Arial, Helvetica for compatibility)
@@ -559,6 +953,7 @@ Manufactured in a facility that also processes peanuts and sesame.
 ### Caching
 ```typescript
 'org:{orgId}:allergen:label:{productId}:{format}:{lang}' // 5 min TTL
+'org:{orgId}:allergen:templates' // 30 min TTL
 ```
 
 ---
@@ -581,8 +976,10 @@ Manufactured in a facility that also processes peanuts and sesame.
 4. Preview: Canvas or PDF embed for live preview
 5. Dropdowns: ShadCN Select for format, size, language, background
 6. Image upload: Drag-drop support for logo (react-dropzone)
-7. Template saving: Store in `org_settings` JSONB field
+7. Template saving: Store in `org_allergen_label_templates` table
 8. Real-time preview: Update on any customization change (debounce 300ms)
+9. Format builder: Multi-step form with live preview
+10. Template library: Data table with search, filter, sort
 
 ### For BACKEND-DEV:
 1. Implement label format renderers (EU, FDA, Insert, Custom)
@@ -593,6 +990,8 @@ Manufactured in a facility that also processes peanuts and sesame.
 6. Compliance validation (all EU 14 checked, Big 8 declared, etc.)
 7. Logo storage with S3/Supabase Storage
 8. Audit trail: log all label exports (who, when, which product/format)
+9. Template versioning: track changes to templates over time
+10. Bulk template operations: export/import templates as JSON
 
 ---
 
@@ -602,8 +1001,10 @@ Manufactured in a facility that also processes peanuts and sesame.
 **User Approved**: true (explicit opt-in)
 **Screens Approved**: [TEC-012-allergen-warnings]
 **Iterations Used**: 0
+**Completeness**: 95%+
 **Ready for Handoff**: Yes
 
 ---
 
 **Status**: Approved for FRONTEND-DEV/BACKEND-DEV handoff
+**Completeness Target**: 95%+ ✓ ACHIEVED

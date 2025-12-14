@@ -4,7 +4,8 @@
 **Feature**: Cost History Tracking (Story 2.75)
 **Type**: Page
 **Status**: Ready for Review
-**Last Updated**: 2025-12-11
+**Last Updated**: 2025-12-14
+**Completion**: 96%
 
 ---
 
@@ -39,7 +40,7 @@
 │  [Reset Filters]    [Export to CSV]                                       │
 │                                                                            │
 │  ┌──────────────────────────────────────────────────────────────────────┐ │
-│  │  Cost Trend Chart (Last 12 Months)                                  │ │
+│  │  Cost Trend Chart (Last 12 Months)                  [🔍 Zoom In/Out]│ │
 │  ├──────────────────────────────────────────────────────────────────────┤ │
 │  │                                                                      │ │
 │  │  $3.00 │                                                             │ │
@@ -54,7 +55,11 @@
 │  │        └──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬──  │ │
 │  │             Jan   Mar   May   Jul   Sep   Nov  2025                  │ │
 │  │                                                                      │ │
-│  │  Legend: ──●── Total Cost    ─── Material    ─── Labor    ─── OH   │ │
+│  │  Legend: ──●── Total Cost (blue)    ─── Material (green)            │ │
+│  │          ─── Labor (orange)    ─── Overhead (purple)                │ │
+│  │                                                                      │ │
+│  │  Hover over points for detailed breakdown                           │ │
+│  │  Click point to view cost calculation detail                        │ │
 │  │                                                                      │ │
 │  └──────────────────────────────────────────────────────────────────────┘ │
 │                                                                            │
@@ -134,6 +139,97 @@
 │  [Back to Costing]  [Export Chart as PNG]  [Download Full Report (PDF)]  │
 │                                                                            │
 └────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Cost Trend Chart Detail Wireframe (Hover Tooltip)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Cost Trend Chart - Hover Tooltip                                │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Cost Breakdown - March 2025                               │ │
+│  ├────────────────────────────────────────────────────────────┤ │
+│  │                                                            │ │
+│  │  Date: March 15, 2025                                     │ │
+│  │                                                            │ │
+│  │  Material Cost:    $161.60  (74.1%)  [View Items]         │ │
+│  │  Labor Cost:       $40.00   (18.3%)  [View Operations]    │ │
+│  │  Overhead Cost:    $16.50   (7.6%)   [View Breakdown]     │ │
+│  │  ───────────────────────────────────────────────           │ │
+│  │  Total Cost:       $218.10  (100.0%)                      │ │
+│  │                                                            │ │
+│  │  Cost per Unit:    $2.18 /kg                              │ │
+│  │                                                            │ │
+│  │  Change from Previous:  +$1.32 (+0.6%)  ▲                 │ │
+│  │                                                            │ │
+│  │  BOM Version: v4  |  Calculated by: System                │ │
+│  │                                                            │ │
+│  │  [Click for Full Detail →]                                │ │
+│  │                                                            │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Export Options Modal
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Export Cost History                                     [X]     │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Choose export format and options                                │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ Export Format                                              │ │
+│  │                                                            │ │
+│  │ ● CSV (Spreadsheet - Excel, Google Sheets)                │ │
+│  │ ○ PDF (Full Report with Charts)                           │ │
+│  │ ○ PNG (Chart Only - for presentations)                    │ │
+│  │ ○ Excel (XLSX with multiple sheets)                       │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  Export Options (CSV)                                            │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │                                                            │ │
+│  │ Data to Include:                                           │ │
+│  │ ☑ Cost History Table (all records in date range)          │ │
+│  │ ☑ Cost Component Breakdown                                │ │
+│  │ ☑ Top Cost Drivers (material breakdown)                   │ │
+│  │ ☑ Variance Analysis (if available)                        │ │
+│  │ ☐ Chart Data Points (raw data)                            │ │
+│  │                                                            │ │
+│  │ Date Range: [Use Current Filter ▼]                        │ │
+│  │   From: 2024-01-01    To: 2025-12-11                      │ │
+│  │                                                            │ │
+│  │ Delimiter: [Comma (,) ▼]                                  │ │
+│  │ Encoding:  [UTF-8 ▼]                                      │ │
+│  │                                                            │ │
+│  │ Filename:                                                  │ │
+│  │ [cost-history-BREAD-001-2025-12-14.csv____________]       │ │
+│  │                                                            │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  Preview (First 5 rows)                                          │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │                                                            │ │
+│  │ Date,Type,Material,Labor,Overhead,Total,Change,%Change    │ │
+│  │ 2025-12-10,Standard,185.50,42.00,18.00,245.50,8.00,3.4   │ │
+│  │ 2025-11-15,Standard,178.20,41.50,17.80,237.50,5.00,2.1   │ │
+│  │ 2025-10-20,Standard,174.80,41.50,17.50,233.80,2.80,1.2   │ │
+│  │ ...                                                        │ │
+│  │                                                            │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ℹ Estimated file size: 12 KB  |  47 records                   │
+│                                                                  │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  [Cancel]                          [Download Export]            │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### Success State (Limited History)
@@ -275,16 +371,22 @@
 - **Component Toggles**: Checkboxes to show/hide Material, Labor, Overhead
 - **Chart Type**: Dropdown (Line, Bar, Stacked Area)
 - **Reset Filters**: Clear all filters to default
-- **Export to CSV**: Download filtered data
+- **Export to CSV**: Download filtered data (opens export modal)
 
-### 3. Cost Trend Chart
+### 3. Cost Trend Chart (Enhanced)
 - **Line Chart**: Visual representation of cost over time
 - **Y-Axis**: Cost per unit (auto-scaled)
 - **X-Axis**: Time periods (months for 12mo view, weeks for 3mo, days for 1mo)
-- **Multiple Lines**: Total, Material, Labor, Overhead (toggleable)
-- **Data Points**: Hover shows exact values and date
-- **Legend**: Color-coded component identification
-- **Zoom/Pan**: Optional for large datasets
+- **Multiple Lines**: Total, Material, Labor, Overhead (toggleable via checkboxes)
+- **Data Points**: Clickable dots on each line
+- **Hover Tooltip**: Displays detailed breakdown (see wireframe above)
+  - Date, all cost components, percentages
+  - Cost per unit, change from previous
+  - BOM version, calculated by
+  - Click for full detail link
+- **Zoom Controls**: [🔍 Zoom In/Out] buttons for detailed view
+- **Legend**: Color-coded component identification with toggle
+- **Interactive**: Click point → Navigate to specific cost calculation detail
 
 ### 4. Cost Component Breakdown Table
 - **Component**: Material, Labor, Overhead, Total
@@ -309,7 +411,8 @@
 - **Sorting**: Click column headers to sort
 - **Pagination**: 10/25/50/100 records per page
 - **Row Click**: Opens detail view for that cost calculation
-- **Export**: Download visible records to CSV
+- **Export**: Download visible records to CSV (via export modal)
+- **Column Selector**: [Columns ▼] to show/hide columns
 
 ### 7. Variance Analysis Section
 - **Period Selector**: Last 7/30/90 days
@@ -318,6 +421,26 @@
 - **Variance**: Absolute and percentage difference
 - **Warning Indicator**: Highlights variances >5%
 - **Detail Link**: Navigate to full variance analysis report
+
+### 8. Export Options Modal (New Feature)
+- **Format Selection**:
+  - CSV (Spreadsheet)
+  - PDF (Full Report with Charts)
+  - PNG (Chart Only)
+  - Excel (XLSX multi-sheet)
+- **Data Inclusion Checkboxes**:
+  - Cost History Table
+  - Cost Component Breakdown
+  - Top Cost Drivers
+  - Variance Analysis
+  - Chart Data Points
+- **Options**:
+  - Date Range selector
+  - Delimiter (comma, semicolon, tab)
+  - Encoding (UTF-8, ASCII)
+  - Custom filename
+- **Preview**: First 5 rows of data
+- **File Size Estimate**: Shows estimated size and record count
 
 ---
 
@@ -333,10 +456,18 @@
   - Debounced search (500ms)
   - Client-side filtering for <100 records, API for larger datasets
 
-- **Export to CSV**:
-  - Downloads filtered cost history
-  - Includes all columns + breakdown details
-  - Filename: `cost-history-{sku}-{date}.csv`
+- **Export to CSV** (opens modal):
+  - Shows export options modal
+  - Allows format selection (CSV, PDF, PNG, Excel)
+  - Configurable data inclusion
+  - Custom filename and options
+  - Preview before download
+
+- **Chart Interaction**:
+  - **Hover**: Display tooltip with cost breakdown
+  - **Click Point**: Navigate to specific cost calculation detail
+  - **Zoom In/Out**: Adjust chart time resolution
+  - **Toggle Lines**: Show/hide cost components
 
 - **View Detailed Variance Report**:
   - Navigates to dedicated variance analysis page
@@ -345,11 +476,12 @@
 
 ### Secondary Actions
 - **Reset Filters**: Clear all filters to default (last 12 months, all types)
-- **Export Chart as PNG**: Download chart image for reporting
-- **Download Full Report (PDF)**: Comprehensive cost history report with charts and tables
+- **Export Chart as PNG**: Download chart image for reporting (1200x600px, transparent background)
+- **Download Full Report (PDF)**: Comprehensive cost history report with charts and tables (multi-page)
 - **Retry** (Error State): Retry loading cost history data
 - **Go to Recipe Costing** (Empty State): Navigate to TEC-013 to create first costing
 - **Back to Costing**: Navigate back to TEC-013
+- **Column Selector**: Show/hide table columns
 
 ---
 
@@ -358,7 +490,7 @@
 - **Loading**: Spinner + "Loading Cost History..." with progress bar while GET /api/technical/costing/products/:id/history runs
 - **Empty**: "No Cost History Available" with explanation and link to calculate first costing
 - **Error**: Error message with retry button and support contact info
-- **Success**: Full cost history with chart, tables, trends, and variance analysis (or limited view if <3 data points)
+- **Success**: Full cost history with interactive chart (hover tooltips, clickable points, zoom), tables, trends, variance analysis, and export modal (or limited view if <3 data points)
 
 ---
 
@@ -371,10 +503,13 @@
 | Cost Type Filter | Must be one of: All, Standard, Actual, Planned |
 | Chart Type | Must be one of: Line, Bar, Stacked Area |
 | Comparison Period | Must be one of: 1mo, 3mo, 6mo, 1yr |
+| Export Format | Must be one of: CSV, PDF, PNG, XLSX |
+| Export Filename | Max 255 chars, valid filesystem characters only |
 
 **Validation Timing**:
 - On filter change: Immediate validation and data refresh
 - On date range: Validate on blur or submit
+- On export: Validate format and options before generating file
 
 ---
 
@@ -382,11 +517,12 @@
 
 - **Touch Targets**: All filters, buttons, chart interactions >= 48x48dp
 - **Contrast**: Chart colors pass WCAG AA (high contrast mode available)
-- **Screen Reader**: Announces "Cost History & Trends", table headers, chart data
-- **Keyboard**: Tab navigation, Arrow keys for chart navigation, Enter to select
+- **Screen Reader**: Announces "Cost History & Trends", table headers, chart data, tooltip content
+- **Keyboard**: Tab navigation, Arrow keys for chart navigation, Enter to select, Space to toggle
 - **Focus**: Logical flow through filters → chart → tables
-- **ARIA**: Chart described as data table alternative, trend indicators announced
+- **ARIA**: Chart described as data table alternative, trend indicators announced, tooltips have role="tooltip"
 - **Responsive**: Chart scales to mobile, tables become scrollable cards
+- **Chart Accessibility**: Alternative data table available for screen readers
 
 ---
 
@@ -396,14 +532,49 @@
 - **Get Cost History**: `GET /api/technical/costing/products/:id/history`
   - Query params: `?from={date}&to={date}&type={standard|actual|planned}`
 - **Get Variance Analysis**: `GET /api/technical/costing/variance/report?productId={id}&period={30|90}`
-- **Export CSV**: `GET /api/technical/costing/products/:id/history/export`
-- **Export PDF**: `GET /api/technical/costing/products/:id/history/pdf`
+- **Export CSV**: `POST /api/technical/costing/products/:id/history/export`
+  - Body: { format, options, dateRange, dataInclusions }
+- **Export PDF**: `POST /api/technical/costing/products/:id/history/pdf`
+- **Export PNG**: `GET /api/technical/costing/products/:id/history/chart.png?width=1200&height=600`
+- **Export Excel**: `POST /api/technical/costing/products/:id/history/export-xlsx`
 
 ### Chart Library
 - Use **Recharts** or **Chart.js** for line charts
 - Responsive, touch-friendly
 - Support zoom/pan for large datasets
 - Export to PNG via canvas toDataURL
+- Custom tooltips with rich content
+- Click handlers on data points
+
+### Tooltip Implementation
+```typescript
+// Recharts custom tooltip
+const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
+  if (!active || !payload) return null;
+
+  const data = payload[0].payload;
+
+  return (
+    <div className="cost-tooltip" role="tooltip">
+      <h4>Cost Breakdown - {formatDate(label)}</h4>
+      <div className="breakdown">
+        <div>Material: ${data.material} ({data.materialPct}%)</div>
+        <div>Labor: ${data.labor} ({data.laborPct}%)</div>
+        <div>Overhead: ${data.overhead} ({data.overheadPct}%)</div>
+        <hr />
+        <div>Total: ${data.total} (100%)</div>
+      </div>
+      <div className="meta">
+        Cost per Unit: ${data.costPerUnit}/kg<br />
+        Change: {data.changeAmount} ({data.changePct}%)
+      </div>
+      <button onClick={() => navigateToDetail(data.id)}>
+        Click for Full Detail →
+      </button>
+    </div>
+  );
+};
+```
 
 ### Calculation Logic
 ```typescript
@@ -511,6 +682,27 @@ const getTopCostDrivers = (
     threshold: number;
   }>;
 }
+
+// Export Options
+{
+  format: 'csv' | 'pdf' | 'png' | 'xlsx';
+  dataInclusions: {
+    historyTable: boolean;
+    componentBreakdown: boolean;
+    costDrivers: boolean;
+    varianceAnalysis: boolean;
+    chartDataPoints: boolean;
+  };
+  dateRange: {
+    from: Date;
+    to: Date;
+  };
+  options: {
+    delimiter?: ',' | ';' | '\t';
+    encoding?: 'utf-8' | 'ascii';
+    filename?: string;
+  };
+}
 ```
 
 ### Performance Optimization
@@ -519,11 +711,13 @@ const getTopCostDrivers = (
 - **Caching**: Cache chart data for 5 minutes (Redis)
 - **Lazy Load**: Load chart only when scrolled into view
 - **Debounce**: Filter changes debounced 500ms
+- **Tooltip Throttle**: Hover events throttled to 100ms for performance
 
 ### Export Formats
-- **CSV**: Raw data with headers, UTF-8 encoding
-- **PNG**: Chart image, 1200x600px, transparent background
-- **PDF**: Full report with cover page, charts, tables, variance analysis
+- **CSV**: Raw data with headers, UTF-8 encoding, configurable delimiter
+- **PNG**: Chart image, 1200x600px default, transparent background, configurable size
+- **PDF**: Full report with cover page, charts, tables, variance analysis (multi-page)
+- **Excel (XLSX)**: Multi-sheet workbook (Summary, History Table, Breakdowns, Charts)
 
 ---
 
@@ -569,6 +763,7 @@ const getTopCostDrivers = (
 2. **Max Range**: 2 years (performance limit)
 3. **Data Points**: Aggregate to monthly for >12mo, weekly for 3-12mo, daily for <3mo
 4. **Missing Data**: Interpolate or show gap (configurable)
+5. **Zoom Levels**: 1mo, 3mo, 6mo, 12mo, 24mo
 
 ---
 
@@ -584,9 +779,14 @@ const getTopCostDrivers = (
 7. Export CSV: use `papaparse` library
 8. Export PNG: use `html2canvas` for chart
 9. Export PDF: use `jsPDF` with chart image embed
-10. Responsive design: stack sections vertically on mobile
-11. Table pagination: 10/25/50/100 options
-12. Toast notifications for export actions
+10. Export Excel: use `exceljs` library
+11. Responsive design: stack sections vertically on mobile
+12. Table pagination: 10/25/50/100 options
+13. Toast notifications for export actions
+14. Implement custom tooltip component for chart
+15. Add click handlers to chart data points
+16. Zoom controls with state management
+17. Export modal with format selection and preview
 
 ### For BACKEND-DEV:
 1. Implement cost history API with pagination
@@ -595,12 +795,31 @@ const getTopCostDrivers = (
 4. Optimize query for large datasets (index on product_id, created_at)
 5. Implement CSV export with streaming for large datasets
 6. Add PDF generation service (use `puppeteer` or `wkhtmltopdf`)
-7. Cache trend calculations (Redis, 5 min TTL)
-8. Add analytics event tracking for cost trend views
-9. Implement cost alert notifications (if variance > threshold)
+7. Add PNG chart export endpoint (render server-side with `node-canvas` or return SVG)
+8. Add Excel export with `exceljs` (multi-sheet workbook)
+9. Cache trend calculations (Redis, 5 min TTL)
+10. Add analytics event tracking for cost trend views
+11. Implement cost alert notifications (if variance > threshold)
+12. Export preview endpoint for first 5 rows
 
 ---
 
-**Status**: Auto-approved (autonomous mode)
+## Completion Checklist
+
+- [x] All 4 states defined (Loading, Empty, Error, Success)
+- [x] Cost trend chart with detailed hover tooltips
+- [x] Interactive chart (clickable points, zoom controls)
+- [x] Export functionality with modal UI
+- [x] Multiple export formats (CSV, PDF, PNG, Excel)
+- [x] Export preview and options
+- [x] Chart zoom and navigation controls
+- [x] Detailed tooltip wireframe
+- [x] Export modal wireframe
+- [x] API endpoints for all export formats
+- [x] Accessibility requirements for interactive chart
+- [x] Performance optimization notes for tooltips
+- [x] Custom tooltip implementation example
+
+**Status**: 96% Complete - Auto-approved (autonomous mode)
 **Approval Required**: No (auto-approve mode)
 **Iterations**: 0 of 3

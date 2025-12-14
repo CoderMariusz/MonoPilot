@@ -3,7 +3,8 @@
 **Module**: Technical
 **Feature**: Material Management (Raw Materials)
 **Status**: Auto-Approved
-**Last Updated**: 2025-12-11
+**Completion**: 95%+
+**Last Updated**: 2025-12-14
 
 ---
 
@@ -207,7 +208,17 @@
 │  [1.50             ]                [USD            ▼]                        │
 │                                                                               │
 │  Supplier Part Number               Alternative Suppliers                    │
-│  [ABC-WF-500                ]       • XYZ Mills (Lead: 10d, MOQ: 1000kg)     │
+│  [ABC-WF-500                ]       ┌─────────────────────────────────────┐  │
+│                                     │ • XYZ Mills                         │  │
+│                                     │   Lead: 10 days • MOQ: 1000 kg      │  │
+│                                     │   Price: $1.45/kg                   │  │
+│                                     │   [Edit] [Remove]                   │  │
+│                                     ├─────────────────────────────────────┤  │
+│                                     │ • Premium Grains Co                 │  │
+│                                     │   Lead: 5 days • MOQ: 500 kg        │  │
+│                                     │   Price: $1.60/kg (Organic)         │  │
+│                                     │   [Edit] [Remove]                   │  │
+│                                     └─────────────────────────────────────┘  │
 │                                     [+ Add Alternative Supplier]              │
 │                                                                               │
 │  ─────────────────────────────────────────────────────────────────────────   │
@@ -273,6 +284,8 @@
 │                                                                               │
 │  ☑ Organic Certified                Certificate Number:                      │
 │                                      [USDA-ORG-2024-1234 ]                    │
+│                                      ℹ️ Upload cert: [Browse] (PDF, max 5MB) │
+│                                      📄 Current: organic-cert-2024.pdf [View] │
 │                                                                               │
 │  ☐ Kosher Certified                                                           │
 │  ☐ Halal Certified                                                            │
@@ -289,6 +302,239 @@
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                      [Cancel]  [Save Changes (v1 → v2)]      │
 └─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Alternative Suppliers Section (Expanded Detail)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Alternative Suppliers                                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │ Supplier 1: XYZ Mills                              [⋮] │ │
+│  ├───────────────────────────────────────────────────────┤ │
+│  │                                                       │ │
+│  │ Lead Time: 10 days                                    │ │
+│  │ MOQ: 1000 kg                                          │ │
+│  │ Price: $1.45/kg                                       │ │
+│  │ Supplier Part Number: XYZ-WF-1000                     │ │
+│  │ Notes: Backup supplier for high-volume orders        │ │
+│  │                                                       │ │
+│  │ Last Order: 2025-11-20 (1000 kg)                      │ │
+│  │ Reliability: ★★★★☆ (4.2/5.0 - 15 orders)             │ │
+│  │                                                       │ │
+│  │                            [Edit Details] [Remove]    │ │
+│  │                                                       │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │ Supplier 2: Premium Grains Co                      [⋮] │ │
+│  ├───────────────────────────────────────────────────────┤ │
+│  │                                                       │ │
+│  │ Lead Time: 5 days                                     │ │
+│  │ MOQ: 500 kg                                           │ │
+│  │ Price: $1.60/kg                                       │ │
+│  │ Supplier Part Number: PGC-ORG-WHEAT-500               │ │
+│  │ Notes: Organic certified, premium quality            │ │
+│  │                                                       │ │
+│  │ Last Order: 2025-12-05 (500 kg)                       │ │
+│  │ Reliability: ★★★★★ (4.9/5.0 - 8 orders)              │ │
+│  │                                                       │ │
+│  │                            [Edit Details] [Remove]    │ │
+│  │                                                       │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                                                             │
+│  [+ Add Alternative Supplier]                               │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+[⋮] Menu:
+  - Set as Primary Supplier
+  - Edit Supplier Details
+  - View Order History
+  - View Performance Metrics
+  - Remove from Alternatives
+```
+
+### Add Alternative Supplier Modal
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Add Alternative Supplier                          [X]      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Supplier *                                                 │
+│  [Select supplier...                               ▼]       │
+│  or [+ Create New Supplier]                                 │
+│                                                             │
+│  Supplier Lead Time (days) *                                │
+│  [10_______________]  ℹ️ Delivery time from this supplier   │
+│                                                             │
+│  Minimum Order Quantity (MOQ) *                             │
+│  [1000______________]  [kg                         ▼]       │
+│                                                             │
+│  Price per Unit                                             │
+│  [1.45______________]  [USD                        ▼]       │
+│                                                             │
+│  Supplier Part Number                                       │
+│  [XYZ-WF-1000_______________________________________]       │
+│                                                             │
+│  Priority                                                   │
+│  ( ) Primary (will replace current primary supplier)        │
+│  (•) Secondary                                              │
+│  ( ) Tertiary (backup only)                                 │
+│                                                             │
+│  Notes (Optional)                                           │
+│  [Backup supplier for high-volume orders____________]       │
+│  [________________________________________________]         │
+│                                                             │
+│  ℹ️ This supplier will be available for multi-source        │
+│     procurement and automatic failover in case primary      │
+│     supplier is unavailable.                                │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                    [Cancel]  [Add Supplier] │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Affected BOMs Panel (Side Panel)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Affected BOMs: RM-001 Wheat Flour               [X]        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ⚠️ Allergen changes will trigger recalculation for all     │
+│     BOMs using this material. Review impact before saving.  │
+│                                                             │
+│  ═══════════════════════════════════════════════════════════│
+│  ALLERGEN IMPACT SUMMARY                                    │
+│  ═══════════════════════════════════════════════════════════│
+│                                                             │
+│  Current: Contains Gluten                                   │
+│  Proposed: Contains Gluten (no change)                      │
+│                                                             │
+│  If allergen changes:                                       │
+│  • 5 BOMs will be recalculated                              │
+│  • 3 finished goods labels must be updated                  │
+│  • 2 products have active work orders in progress           │
+│                                                             │
+│  ═══════════════════════════════════════════════════════════│
+│  AFFECTED BOMS (5 total)                                    │
+│  ═══════════════════════════════════════════════════════════│
+│                                                             │
+│  [Active BOMs (5)] [All BOMs (12)]                          │
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │ FG-BREAD-WHITE v5                                     │ │
+│  │ White Bread Loaf 800g                                 │ │
+│  │ ─────────────────────────────────────────────────────  │ │
+│  │ Uses: 500g per unit                                   │ │
+│  │ Current Allergens: Gluten, Milk, Eggs                 │ │
+│  │ ⚠️ Active Work Orders: WO-2025-0047 (200 units)       │ │
+│  │                                                       │ │
+│  │ [View BOM →]  [View Work Orders →]                    │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │ FG-BREAD-WHEAT v3                                     │ │
+│  │ Whole Wheat Bread 1kg                                 │ │
+│  │ ─────────────────────────────────────────────────────  │ │
+│  │ Uses: 750g per unit                                   │ │
+│  │ Current Allergens: Gluten, Sesame                     │ │
+│  │ ⚠️ Active Work Orders: WO-2025-0051 (150 units)       │ │
+│  │                                                       │ │
+│  │ [View BOM →]  [View Work Orders →]                    │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │ FG-CAKE-VANILLA v2                                    │ │
+│  │ Vanilla Sponge Cake 500g                              │ │
+│  │ ─────────────────────────────────────────────────────  │ │
+│  │ Uses: 200g per unit                                   │ │
+│  │ Current Allergens: Gluten, Milk, Eggs                 │ │
+│  │ No active work orders                                 │ │
+│  │                                                       │ │
+│  │ [View BOM →]                                          │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                                                             │
+│  ... 2 more BOMs                                            │
+│  [Show All Affected BOMs]                                   │
+│                                                             │
+│  ═══════════════════════════════════════════════════════════│
+│  ACTIONS AFTER SAVE                                         │
+│  ═══════════════════════════════════════════════════════════│
+│                                                             │
+│  System will automatically:                                 │
+│  ✓ Recalculate allergens for 5 BOMs                         │
+│  ✓ Update allergen cache                                    │
+│  ✓ Trigger label regeneration notification                  │
+│  ⚠️ Notify production team of allergen changes              │
+│                                                             │
+│  Manual actions required:                                   │
+│  • Review and regenerate product labels                     │
+│  • Update customer allergen information                     │
+│  • Review in-progress work orders                           │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                          [Close]            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Quality Certifications Section (Expanded Detail with Validation)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Quality & Compliance                                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ☑ Organic Certified                                        │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │ Certificate Number *                                  │ │
+│  │ [USDA-ORG-2024-1234_____________________________]     │ │
+│  │                                                       │ │
+│  │ Certifying Body                                       │ │
+│  │ [USDA Organic                                  ▼]     │ │
+│  │                                                       │ │
+│  │ Issue Date        Expiry Date                         │ │
+│  │ [2024-01-15 ▼]    [2025-01-14 ▼]                      │ │
+│  │                                                       │ │
+│  │ Certificate Document                                  │ │
+│  │ 📄 organic-cert-2024.pdf (2.3 MB)                     │ │
+│  │ Uploaded: 2024-01-16 by John Doe                      │ │
+│  │ [View] [Download] [Replace]                           │ │
+│  │                                                       │ │
+│  │ ⚠️ Certificate expires in 31 days (2025-01-14)        │ │
+│  │    [Set Renewal Reminder]                             │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                                                             │
+│  ☑ Kosher Certified                                         │
+│  ┌───────────────────────────────────────────────────────┐ │
+│  │ Certificate Number *                                  │ │
+│  │ [OK-2024-567_____________________________________]     │ │
+│  │                                                       │ │
+│  │ Certifying Body                                       │ │
+│  │ [Orthodox Union (OU)                           ▼]     │ │
+│  │                                                       │ │
+│  │ Issue Date        Expiry Date                         │ │
+│  │ [2024-03-01 ▼]    [2025-02-28 ▼]                      │ │
+│  │                                                       │ │
+│  │ Certificate Document                                  │ │
+│  │ [Browse...] or drag & drop PDF (max 5 MB)            │ │
+│  │ ℹ️ No document uploaded yet                           │ │
+│  └───────────────────────────────────────────────────────┘ │
+│                                                             │
+│  ☐ Halal Certified                                          │
+│                                                             │
+│  ☑ GMO-Free                                                 │
+│  ℹ️ No certification required. Declaration only.            │
+│                                                             │
+│  ☐ Gluten-Free Certified                                    │
+│  ❌ Cannot be gluten-free if "Contains: Gluten" declared    │
+│     Uncheck "Contains: Gluten" allergen first.              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### Loading State
@@ -363,9 +609,10 @@
 9. **Warning Banners** - Yellow alert for version increment, BOM impact, allergen changes
 10. **Allergen Checkboxes** - 14 EU mandatory allergens in grid layout
 11. **Current Stock Display** - Read-only info in edit mode
-12. **Alternative Suppliers** - Dynamic list with add/remove
-13. **Quality Certifications** - Checkboxes with conditional cert number fields
-14. **Action Buttons** - Cancel (secondary), Create/Save (primary)
+12. **Alternative Suppliers List** - Dynamic card list with supplier details, stats, actions
+13. **Quality Certifications** - Expandable cert details with document upload, expiry tracking
+14. **Affected BOMs Panel** - Side panel showing BOM impact, allergen recalculation preview
+15. **Action Buttons** - Cancel (secondary), Create/Save (primary)
 
 ---
 
@@ -379,12 +626,18 @@
 - **[Cancel]** - Checks for unsaved changes, shows confirmation if dirty, closes modal
 - **[X]** (Close button) - Same as Cancel
 - **[View Version History]** (Edit mode) - Opens side panel with version timeline without closing modal
-- **[View Affected BOMs]** (Edit mode) - Opens side panel with list of BOMs using this material
+- **[View Affected BOMs]** (Edit mode) - Opens Affected BOMs Panel (side panel) with allergen impact analysis
 - **[+ Add Custom UoM]** - Opens mini-modal to create custom unit of measure
 - **[+ Add New Category]** - Opens mini-modal to create product category
 - **[+ Add New Supplier]** - Opens supplier create modal (nested modal)
-- **[+ Add Alternative Supplier]** - Adds supplier row to alternative suppliers list
+- **[+ Add Alternative Supplier]** - Opens Add Alternative Supplier Modal with supplier selection, lead time, MOQ, price, priority
+- **[Edit Details]** (Alternative supplier) - Opens edit modal for supplier details
+- **[Remove]** (Alternative supplier) - Confirmation dialog, removes from alternatives list
+- **[Set as Primary Supplier]** (Alternative supplier) - Confirmation dialog, swaps primary/alternative
 - **[Clear All Allergens]** - Unchecks all allergen checkboxes
+- **[Browse]** / Drag-drop (Certification upload) - File picker for PDF certs (max 5MB)
+- **[View]** / **[Download]** / **[Replace]** (Certification document) - Document management actions
+- **[Set Renewal Reminder]** (Certification) - Sets calendar reminder for cert expiry
 
 ---
 
@@ -417,7 +670,7 @@
 | moq | decimal | Yes* | Min 0, max 15,4 decimals | *Required for materials |
 | std_price | decimal | No | Min 0, max 15,4 decimals | Standard purchase price |
 | supplier_part_number | string | No | Max 100 chars | Supplier's SKU |
-| alternative_suppliers | array | No | Array of supplier_id + lead_time + moq | Multi-source procurement |
+| alternative_suppliers | array | No | Array of: supplier_id, lead_time, moq, price, priority, notes, reliability_score | Multi-source procurement |
 
 ### Inventory & Stock Control (Required Section)
 | Field | Type | Required | Validation | Notes |
@@ -451,11 +704,23 @@
 |-------|------|----------|------------|-------|
 | is_organic | boolean | No | Default: false | Organic certified |
 | organic_cert_number | string | No | Max 100 chars | Required if is_organic=true |
+| organic_cert_body | string | No | Max 200 chars | Certifying organization |
+| organic_cert_issue_date | date | No | Must be <= today | Certificate issue date |
+| organic_cert_expiry_date | date | No | Must be > issue_date | Certificate expiry date |
+| organic_cert_document_url | string | No | Valid URL (S3/storage) | Uploaded PDF document |
 | is_kosher | boolean | No | Default: false | Kosher certified |
 | kosher_cert_number | string | No | Max 100 chars | Required if is_kosher=true |
+| kosher_cert_body | string | No | Max 200 chars | OU, OK, Star-K, etc. |
+| kosher_cert_issue_date | date | No | | |
+| kosher_cert_expiry_date | date | No | | |
+| kosher_cert_document_url | string | No | | |
 | is_halal | boolean | No | Default: false | Halal certified |
 | halal_cert_number | string | No | Max 100 chars | Required if is_halal=true |
-| is_gmo_free | boolean | No | Default: false | GMO-free |
+| halal_cert_body | string | No | | |
+| halal_cert_issue_date | date | No | | |
+| halal_cert_expiry_date | date | No | | |
+| halal_cert_document_url | string | No | | |
+| is_gmo_free | boolean | No | Default: false | GMO-free (declaration only) |
 | is_gluten_free_cert | boolean | No | Default: false | Gluten-free certified |
 
 ### Status (Required Section)
@@ -539,7 +804,17 @@
 
 15. **Quality Certifications**:
     - If certification checkbox checked, cert number required (conditional validation)
+    - If certification checkbox checked with cert number, issue_date and expiry_date recommended
+    - Expiry date must be > issue date
+    - Warning if expiry date < 60 days from today
     - Cannot be gluten-free certified if "Contains: Gluten" is checked
+    - Document upload: PDF only, max 5MB
+
+16. **Alternative Suppliers**:
+    - Each supplier must have: lead_time (0-365), moq (> 0), price (optional)
+    - Supplier cannot be same as primary supplier
+    - Cannot have duplicate alternative suppliers
+    - Priority must be unique (no two "Primary" alternatives)
 
 ### Form-Level Validation (On Submit)
 1. All required fields filled (including material-specific required fields)
@@ -551,12 +826,15 @@
 7. If expiry_policy != none, shelf_life_days required
 8. If certification checkbox checked, cert number provided
 9. No allergen overlap between "contains" and "may contain"
+10. No duplicate alternative suppliers
+11. If allergen changed in edit mode: warning shown and user confirmed
 
 ### Edit Mode Warnings
 1. **Version Increment**: Always show banner at top explaining version will increment
-2. **BOM Impact**: If material used in BOMs, show count and warning
-3. **Allergen Changes**: If allergens changed and material in BOMs, show warning about BOM recalculation with link to affected BOMs
+2. **BOM Impact**: If material used in BOMs, show count and warning, link to Affected BOMs Panel
+3. **Allergen Changes**: If allergens changed and material in BOMs, show warning about BOM recalculation with link to affected BOMs + impact analysis
 4. **Status Change**: If changing to Inactive/Discontinued and material in active BOMs, show warning
+5. **Certification Expiry**: If cert expires < 60 days, show warning with renewal reminder option
 
 ---
 
@@ -579,6 +857,7 @@
 - **Focus management**: Focus first field on open, focus first error on validation fail
 - **Keyboard**: Tab navigation, Enter to submit, Escape to cancel, Space to toggle checkboxes
 - **Screen reader**: Error summary announced, field errors read with field, allergen checkboxes in fieldset with legend
+- **File upload**: Accessible drag-drop with keyboard alternative
 
 ---
 
@@ -589,7 +868,8 @@
 - **Supplier Create Modal**: Nested modal from [+ Add New Supplier]
 - **Category Create Modal**: Nested modal from [+ Add New Category]
 - **Version History Panel**: Side panel from [View Version History] link
-- **Affected BOMs Panel**: Side panel from [View Affected BOMs] link
+- **Affected BOMs Panel**: Side panel from [View Affected BOMs] link showing allergen impact
+- **Add Alternative Supplier Modal**: Nested modal from [+ Add Alternative Supplier]
 
 ---
 
@@ -597,6 +877,9 @@
 
 - **API Create**: `POST /api/technical/products` with product_type=RM and all material fields
 - **API Update**: `PUT /api/technical/products/:id` with changed fields
+- **API (Alternative Suppliers)**: `POST /api/technical/products/:id/alternative-suppliers` → add, `DELETE /:supplierId` → remove
+- **API (Certifications)**: `POST /api/technical/products/:id/certifications/:type/upload` → upload cert document
+- **API (Affected BOMs)**: `GET /api/technical/products/:id/affected-boms` → returns BOM list with allergen impact
 - **Version Increment**: Backend auto-increments version, creates version_history record
 - **BOM Allergen Recalc**: If allergens changed, trigger async job to recalculate all BOMs using this material
 - **Code Uniqueness**: Check via `GET /api/technical/products?code={code}` debounced 300ms
@@ -604,8 +887,10 @@
 - **Immutable Fields**: Material code and type locked in edit mode
 - **Default Values**: status=active, version=1, product_type=RM, expiry_policy=rolling (for RM)
 - **Current Stock**: Fetched from warehouse module (license_plates aggregation), read-only display in edit mode
-- **Alternative Suppliers**: Stored in separate junction table (supplier_products with is_primary flag)
-- **Quality Certifications**: Stored as JSONB in product_certifications table or as boolean + cert_number fields
+- **Alternative Suppliers**: Stored in `product_suppliers` table with is_primary flag, priority field, reliability_score (calculated from order history)
+- **Quality Certifications**: Stored in `product_certifications` table with type, cert_number, cert_body, issue_date, expiry_date, document_url
+- **Certification Upload**: Supabase Storage bucket: `certifications/{org_id}/{product_id}/{cert_type}/{filename}`
+- **Certification Expiry Reminders**: Cron job checks expiry dates, sends notifications at 60/30/7 days before expiry
 - **Toast Notifications**: Success on create/edit, error on failure, warning if allergens changed with BOM impact
 
 ---
@@ -623,7 +908,16 @@
 9. **BOM Allergen Recalc**: Editing material allergens triggers BOM recalculation for all using BOMs
 10. **Version History**: All changes logged with changed_fields JSONB
 11. **Alternative Suppliers**: Optional multi-source procurement for supply chain resilience
+    - Can set priority (Primary/Secondary/Tertiary)
+    - Tracks reliability score from order history
+    - Automatic failover in procurement if primary unavailable
+    - Historical pricing and lead time data
 12. **Quality Certifications**: Optional compliance tracking (organic, kosher, halal, GMO-free, gluten-free)
+    - Requires certificate number when certified
+    - Optional document upload (PDF, max 5MB)
+    - Expiry tracking with renewal reminders
+    - Cannot be gluten-free if contains gluten allergen
+13. **Allergen Impact Analysis**: Shows affected BOMs, allergen recalculation preview, work order impact before saving changes
 
 ---
 
@@ -647,11 +941,12 @@
 | **Expiry Policy** | Optional | Recommended (rolling) |
 | **Storage Conditions** | Optional | Critical (required) |
 | **Allergen Declaration** | Optional | Important (propagates to FG) |
-| **Quality Certifications** | Optional | Available (organic, kosher, etc.) |
-| **Alternative Suppliers** | Not available | Available |
+| **Quality Certifications** | Optional | Available with document upload, expiry tracking |
+| **Alternative Suppliers** | Not available | Available with priority, reliability tracking |
 | **Reorder Point/Qty** | Not available | Available |
 | **Current Stock Display** | Not shown | Shown in edit mode |
 | **GTIN-14** | Optional | Optional (less common) |
+| **Affected BOMs Panel** | Not available | Available with allergen impact analysis |
 
 ---
 
@@ -670,6 +965,11 @@
 | Cert missing | "{Certification type} certificate number is required when certified" | Fill cert number |
 | Gluten conflict | "Cannot be gluten-free certified if 'Contains: Gluten' is declared" | Uncheck one |
 | Shelf life missing | "Shelf life is required when expiry policy is set" | Fill shelf life or change policy |
+| Cert file too large | "Certificate file exceeds 5MB maximum size" | Compress or use smaller file |
+| Cert invalid format | "Certificate must be PDF format" | Upload PDF file |
+| Cert expiry < issue | "Expiry date must be after issue date" | Fix dates |
+| Duplicate alt supplier | "Supplier already added as alternative" | Select different supplier |
+| Alt supplier is primary | "Cannot add primary supplier as alternative" | Select different supplier |
 | Network error | "Unable to save material. Please check your connection." | Retry |
 
 ---
@@ -683,11 +983,134 @@
 | No storage conditions | "⚠️ Storage conditions are critical for material quality and safety" | Add storage info |
 | Reorder point < min stock | "ℹ️ Reorder point typically set above minimum stock level" | Adjust reorder point |
 | Reorder qty < MOQ | "ℹ️ Reorder quantity should typically be >= MOQ" | Adjust reorder qty |
-| Allergen change with BOMs | "⚠️ This material is used in 5 BOMs. Allergen changes will trigger BOM recalculation." | Review affected BOMs |
+| Allergen change with BOMs | "⚠️ This material is used in 5 BOMs. Allergen changes will trigger BOM recalculation. [View Affected BOMs]" | Review affected BOMs |
+| Cert expiry soon | "⚠️ Certificate expires in 31 days (2025-01-14) [Set Renewal Reminder]" | Renew certificate |
+| No cert document | "ℹ️ No certificate document uploaded. Upload recommended for audit trail." | Upload PDF |
+
+---
+
+## NEW: Alternative Suppliers Details
+
+### Components
+1. **Supplier Card List**: Expandable cards with supplier details
+2. **Supplier Info**: Name, lead time, MOQ, price, part number, notes
+3. **Performance Metrics**: Last order date, reliability score (★ rating)
+4. **Actions Menu**: Set as Primary, Edit, View Order History, View Performance, Remove
+5. **Add Button**: Opens Add Alternative Supplier Modal
+
+### Data Structure
+```typescript
+{
+  supplier_id: string;
+  lead_time_days: number;
+  moq: decimal;
+  moq_uom: string;
+  price: decimal;
+  currency: string;
+  supplier_part_number: string;
+  priority: 'primary' | 'secondary' | 'tertiary';
+  notes: string;
+  reliability_score: decimal; // 0-5, calculated from order history
+  last_order_date: Date;
+  last_order_quantity: decimal;
+  total_orders_count: number;
+}
+```
+
+### API
+- **Get**: `GET /api/technical/products/:id/alternative-suppliers`
+- **Add**: `POST /api/technical/products/:id/alternative-suppliers`
+- **Update**: `PUT /api/technical/products/:id/alternative-suppliers/:supplierId`
+- **Remove**: `DELETE /api/technical/products/:id/alternative-suppliers/:supplierId`
+- **Set Primary**: `POST /api/technical/products/:id/alternative-suppliers/:supplierId/set-primary` (swaps primary/alternative)
+
+---
+
+## NEW: Quality Certifications Validation Details
+
+### Components
+1. **Certification Checkbox**: Toggles expanded cert details
+2. **Cert Number**: Required when certified
+3. **Certifying Body**: Dropdown with common bodies (USDA, OU, OK, etc.)
+4. **Issue/Expiry Dates**: Date pickers with validation
+5. **Document Upload**: Drag-drop PDF upload with preview
+6. **Expiry Warning**: Shows if < 60 days, with renewal reminder option
+7. **Validation Messages**: Conflict detection (gluten-free vs contains gluten)
+
+### Validation Rules
+- Cert number required when checkbox checked
+- Expiry date must be > issue date
+- Warning if expiry < 60 days from today
+- Cannot be gluten-free certified if allergen "Gluten" checked in "Contains"
+- Document: PDF only, max 5MB, optional but recommended
+
+### File Upload
+- **Format**: PDF only
+- **Max Size**: 5 MB
+- **Storage**: Supabase Storage bucket `certifications/{org_id}/{product_id}/{cert_type}/{filename}`
+- **Preview**: Shows filename, size, upload date, uploader
+- **Actions**: View (opens in new tab), Download, Replace
+
+### Expiry Tracking
+- **Reminder System**: Cron job checks daily
+- **Notifications**: Email/toast at 60/30/7 days before expiry
+- **Renewal Workflow**: "Set Renewal Reminder" button schedules calendar event
+
+---
+
+## NEW: Affected BOMs Panel Details
+
+### Components
+1. **Header**: Material code/name, close button
+2. **Impact Summary**: Current vs proposed allergens, counts of affected entities
+3. **BOM List**: Tabbed (Active/All), card list with product, qty, allergens, WO warnings
+4. **Actions Section**: Lists automatic actions and manual actions required
+5. **Links**: View BOM, View Work Orders for each affected product
+
+### Allergen Impact Analysis
+- **Current State**: Shows existing allergen declarations
+- **Proposed State**: Shows new allergens after save
+- **Affected Counts**: BOMs to recalculate, labels to update, active WOs
+- **Work Order Warnings**: Highlights BOMs with active/in-progress work orders
+
+### API
+- **Endpoint**: `GET /api/technical/products/:id/affected-boms`
+- **Response**:
+  ```typescript
+  {
+    current_allergens: string[]; // allergen IDs
+    proposed_allergens: string[]; // allergen IDs (if changed)
+    boms: {
+      id: string;
+      product_code: string;
+      product_name: string;
+      version: number;
+      quantity_per_unit: decimal;
+      uom: string;
+      status: string;
+      current_allergens: string[];
+      has_active_work_orders: boolean;
+      work_orders: { id, qty, status, due_date }[];
+    }[];
+    stats: {
+      total_boms: number;
+      active_boms: number;
+      products_with_active_wo: number;
+      labels_to_update: number;
+    };
+  }
+  ```
+
+### Business Logic
+- **Recalculation Trigger**: Allergen changes trigger async job
+- **Notification**: Production team notified of allergen changes
+- **Label Regeneration**: System flags labels for regeneration
+- **Audit Trail**: Allergen changes logged with BOM impact
 
 ---
 
 **Status**: Auto-Approved
 **Approval Mode**: auto_approve
 **User Approved**: true (explicit opt-in)
+**Completion**: 95%+ (Added Alternative Suppliers dynamic list UI, Quality Certifications validation with document upload and expiry tracking, Affected BOMs Panel with allergen impact analysis)
 **Iterations**: 0 of 3

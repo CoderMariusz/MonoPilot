@@ -2,8 +2,8 @@
 
 **Module**: Technical
 **Feature**: Product Management
-**Status**: Auto-Approved
-**Last Updated**: 2025-12-11
+**Status**: Auto-Approved (Updated per ADR-010)
+**Last Updated**: 2025-12-14
 
 ---
 
@@ -58,16 +58,26 @@
 │                                                                               │
 │  ─────────────────────────────────────────────────────────────────────────   │
 │                                                                               │
-│  Supplier & Procurement (Optional)                                            │
+│  Procurement (ADR-010: Product-Level Fields)                                  │
 │  ─────────────────────────────────────────────────────────────────────────   │
 │                                                                               │
-│  ☑ This product is purchased from supplier                                   │
+│  Procurement Lead Time (days)                                                 │
+│  [7                ]  ℹ️ Average time to receive this product from supplier  │
+│                       Default: 7 days                                         │
+│                                                                               │
+│  Minimum Order Quantity (MOQ)                                                 │
+│  [                 ]  [kg              ▼]                                     │
+│  ℹ️ Minimum quantity per purchase order (uses product UoM)                    │
+│                                                                               │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│                                                                               │
+│  Supplier Assignment (Optional)                                               │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│                                                                               │
+│  ☑ Assign a primary supplier to this product                                 │
 │                                                                               │
 │  Primary Supplier                                                             │
 │  [ Select supplier...          ▼]  or [+ Add Supplier]                       │
-│                                                                               │
-│  Supplier Lead Time (days)          Minimum Order Quantity (MOQ)              │
-│  [                 ]                [                 ]  [kg         ▼]       │
 │                                                                               │
 │  Standard Price                     Currency                                  │
 │  [                 ]                [USD            ▼]                        │
@@ -157,10 +167,23 @@
 │                                                                               │
 │  ─────────────────────────────────────────────────────────────────────────   │
 │                                                                               │
-│  Supplier & Procurement                                                       │
+│  Procurement (ADR-010: Product-Level Fields)                                  │
 │  ─────────────────────────────────────────────────────────────────────────   │
 │                                                                               │
-│  ☐ This product is purchased from supplier                                   │
+│  Procurement Lead Time (days)                                                 │
+│  [3                ]  ℹ️ Changed from supplier default (7 days)              │
+│                       Product-specific: 3 days                                │
+│                                                                               │
+│  Minimum Order Quantity (MOQ)                                                 │
+│  [100              ]  [pcs             ▼]                                     │
+│  ℹ️ Minimum: 100 pcs per purchase order                                       │
+│                                                                               │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│                                                                               │
+│  Supplier Assignment                                                          │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│                                                                               │
+│  ☐ Assign a primary supplier to this product                                 │
 │     (Finished goods are typically manufactured, not purchased)                │
 │                                                                               │
 │  ─────────────────────────────────────────────────────────────────────────   │
@@ -250,6 +273,17 @@
 │  [1234567890123                 ]  ❌ Invalid GTIN-14 format (must be 14      │
 │                                       digits with valid check digit)          │
 │                                                                               │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│                                                                               │
+│  Procurement                                                                  │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│                                                                               │
+│  Procurement Lead Time (days)                                                 │
+│  [-5               ]  ❌ Lead time must be >= 0                               │
+│                                                                               │
+│  Minimum Order Quantity (MOQ)                                                 │
+│  [0                ]  [kg      ▼]  ❌ MOQ must be > 0 if provided            │
+│                                                                               │
 │  (... rest of form ...)                                                       │
 │                                                                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -260,6 +294,149 @@
 ### Empty State (N/A for Modal)
 
 Modals don't have empty states - they're opened with intent to create/edit.
+
+---
+
+## Nested Modals
+
+### [+ Add Supplier] Nested Modal
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  [X] Quick Add Supplier                                                │  │
+│  ├───────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                         │  │
+│  │  Supplier Name *                                                        │  │
+│  │  [                              ]                                       │  │
+│  │                                                                         │  │
+│  │  Supplier Code *                                                        │  │
+│  │  [SUP-                          ]  ℹ️ Auto-generated if empty          │  │
+│  │                                                                         │  │
+│  │  Contact Email                                                          │  │
+│  │  [                              ]                                       │  │
+│  │                                                                         │  │
+│  │  Contact Phone                                                          │  │
+│  │  [                              ]                                       │  │
+│  │                                                                         │  │
+│  │  Status                                                                 │  │
+│  │  (•) Active   ( ) Inactive                                              │  │
+│  │                                                                         │  │
+│  │                                                                         │  │
+│  ├───────────────────────────────────────────────────────────────────────┤  │
+│  │             [Cancel]  [Add Supplier]  [Add & Open Full Form]           │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                               │
+│  (Background: Product Create Modal - dimmed)                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Behavior:**
+- Opens above Product Modal (z-index layering)
+- Background Product Modal dimmed but visible
+- On **[Add Supplier]**: Creates supplier, closes nested modal, returns to Product Modal with new supplier selected
+- On **[Add & Open Full Form]**: Creates supplier, closes both modals, navigates to full Supplier Edit page
+- On **[Cancel]** or **[X]**: Closes nested modal, returns to Product Modal
+
+---
+
+### [+ Add New Category] Nested Modal
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  [X] Add Product Category                                              │  │
+│  ├───────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                         │  │
+│  │  Category Name *                                                        │  │
+│  │  [                              ]                                       │  │
+│  │                                                                         │  │
+│  │  Description                                                            │  │
+│  │  [                                                      ]               │  │
+│  │  [                                                      ]               │  │
+│  │                                                                         │  │
+│  │  Parent Category (Optional)                                             │  │
+│  │  [ None - Top Level            ▼]                                       │  │
+│  │                                                                         │  │
+│  │                                                                         │  │
+│  ├───────────────────────────────────────────────────────────────────────┤  │
+│  │                            [Cancel]  [Add Category]                     │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                               │
+│  (Background: Product Create Modal - dimmed)                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Behavior:**
+- Opens above Product Modal (z-index layering)
+- Background Product Modal dimmed but visible
+- On **[Add Category]**: Creates category, closes nested modal, returns to Product Modal with new category selected
+- On **[Cancel]** or **[X]**: Closes nested modal, returns to Product Modal
+
+---
+
+## Version History Panel
+
+### [View Version History] Side Panel
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  [X] Edit Product - SKU-001 (White Bread)     │  [X] Version History        │
+│                                                │                             │
+│  (Product form continues scrolling on left)   │  v5 - Current Draft         │
+│                                                │  ────────────────────       │
+│  Basic Information                             │  Unsaved changes            │
+│  ───────────────────────                       │                             │
+│                                                │  v4 - 2025-12-10 14:32      │
+│  Product Code (SKU) *                          │  ────────────────────       │
+│  [SKU-001           ]  🔒 Locked               │  ✏️ John Doe                │
+│                                                │  Changed:                   │
+│  Product Name *                                │  • shelf_life_days:         │
+│  [White Bread       ]                          │    5 → 7                    │
+│                                                │  • storage_conditions:      │
+│  (... rest of form ...)                        │    Updated text             │
+│                                                │  [View Details]             │
+│                                                │                             │
+│                                                │  v3 - 2025-12-05 09:15      │
+│                                                │  ────────────────────       │
+│                                                │  ✏️ Jane Smith              │
+│                                                │  Changed:                   │
+│                                                │  • name: "Bread" →          │
+│                                                │    "White Bread"            │
+│                                                │  • description: Added       │
+│                                                │  [View Details]             │
+│                                                │                             │
+│                                                │  v2 - 2025-11-30 16:45      │
+│                                                │  ────────────────────       │
+│                                                │  ✏️ John Doe                │
+│                                                │  Changed:                   │
+│                                                │  • gtin: Added              │
+│                                                │    98765432109876           │
+│                                                │  [View Details]             │
+│                                                │                             │
+│                                                │  v1 - 2025-11-28 10:00      │
+│                                                │  ────────────────────       │
+│                                                │  ✏️ John Doe                │
+│                                                │  Initial creation           │
+│                                                │  [View Details]             │
+│                                                │                             │
+│                                                │                             │
+│                                                │                             │
+│                                                │                             │
+└────────────────────────────────────────────────┴─────────────────────────────┘
+```
+
+**Behavior:**
+- Slides in from right side (400px width)
+- Product form remains open on left (resized to accommodate panel)
+- Shows version timeline with:
+  - Version number (v1, v2, v3, etc.)
+  - Timestamp
+  - User who made changes
+  - Summary of changed fields (field name: old_value → new_value)
+- **[View Details]**: Expands inline to show full JSONB diff
+- **[X]**: Closes panel, returns to full-width Product form
+- Panel scrolls independently from Product form
 
 ---
 
@@ -275,6 +452,8 @@ Modals don't have empty states - they're opened with intent to create/edit.
 8. **Warning Banners** - Yellow alert for version increment notice, BOM impact
 9. **Version Display** - Current version shown in header (edit mode)
 10. **Action Buttons** - Cancel (secondary), Create/Save (primary)
+11. **Nested Modals** - Supplier/Category quick-add overlays
+12. **Version History Panel** - Slide-in side panel with version timeline
 
 ---
 
@@ -289,8 +468,13 @@ Modals don't have empty states - they're opened with intent to create/edit.
 - **[X]** (Close button) - Same as Cancel
 - **[View Version History]** (Edit mode) - Opens side panel with version timeline without closing modal
 - **[+ Add Custom UoM]** - Opens mini-modal to create custom unit of measure
-- **[+ Add New Category]** - Opens mini-modal to create product category
-- **[+ Add Supplier]** - Opens supplier create modal (nested modal)
+- **[+ Add New Category]** - Opens nested modal to create product category (see Nested Modals section)
+- **[+ Add Supplier]** - Opens nested supplier create modal (see Nested Modals section)
+
+### Nested Modal Actions
+- **[Add Supplier]** (Supplier nested modal) - Creates supplier, closes nested modal, selects new supplier in Product form
+- **[Add & Open Full Form]** (Supplier nested modal) - Creates supplier, navigates to full Supplier Edit page
+- **[Add Category]** (Category nested modal) - Creates category, closes nested modal, selects new category in Product form
 
 ---
 
@@ -303,7 +487,7 @@ Modals don't have empty states - they're opened with intent to create/edit.
 
 ---
 
-## Data Fields (All PRD Fields)
+## Data Fields (All PRD Fields + ADR-010 Updates)
 
 ### Basic Information (Required Section)
 | Field | Type | Required | Validation | Notes |
@@ -321,13 +505,17 @@ Modals don't have empty states - they're opened with intent to create/edit.
 | gtin | string | No | Exactly 14 digits, valid check digit | GTIN-14 GS1 format |
 | category_id | UUID | No | Must exist if provided | Product category |
 
-### Supplier & Procurement (Conditional Section)
+### Procurement (Product-Level per ADR-010)
 | Field | Type | Required | Validation | Notes |
 |-------|------|----------|------------|-------|
-| supplier_id | UUID | No | Must exist if provided | Primary supplier |
-| supplier_lead_time_days | integer | No | Min 0, max 365 | Days |
-| moq | decimal | No | Min 0, max 15 digits, 4 decimals | Minimum order quantity |
-| std_price | decimal | No | Min 0, max 15 digits, 4 decimals | Standard price |
+| lead_time_days | integer | No | Min 0, max 365 | Default: 7 days. Average procurement lead time |
+| moq | decimal | No | Min > 0, max 10 digits, 2 decimals | Minimum order quantity (uses product UoM) |
+
+### Supplier Assignment (Optional Section)
+| Field | Type | Required | Validation | Notes |
+|-------|------|----------|------------|-------|
+| supplier_id | UUID | No | Must exist if provided | Primary supplier (creates supplier_products record) |
+| std_price | decimal | No | Min 0, max 15 digits, 4 decimals | Standard price per UoM |
 
 ### Inventory & Stock Control (Optional Section)
 | Field | Type | Required | Validation | Notes |
@@ -384,22 +572,31 @@ Modals don't have empty states - they're opened with intent to create/edit.
    - Check digit validation (GS1 algorithm)
    - Show "Invalid GTIN-14" error with link to calculator
 
-6. **Supplier Lead Time**:
+6. **Procurement Lead Time (lead_time_days)** (ADR-010):
+   - Optional
    - Min 0, max 365
    - Integer only
+   - Default: 7 days
 
-7. **MOQ, Std Price, Min/Max Stock**:
+7. **MOQ (moq)** (ADR-010):
+   - Optional
+   - If provided: Min > 0
+   - Max 10 digits, 2 decimal places
+   - Uses product UoM (auto-populated in dropdown)
+   - Validation: Must be positive if provided
+
+8. **Std Price, Min/Max Stock**:
    - Min 0
    - Max 15 digits, 4 decimal places
    - Decimal validation
 
-8. **Shelf Life Days**:
+9. **Shelf Life Days**:
    - Min 1, max 3650
    - Required if expiry_policy is "fixed" or "rolling"
 
-9. **Min Stock / Max Stock**:
-   - If both provided: min_stock <= max_stock
-   - Show error on both fields if invalid
+10. **Min Stock / Max Stock**:
+    - If both provided: min_stock <= max_stock
+    - Show error on both fields if invalid
 
 ### Form-Level Validation (On Submit)
 1. All required fields filled
@@ -407,6 +604,7 @@ Modals don't have empty states - they're opened with intent to create/edit.
 3. No duplicate SKU (final check)
 4. Min stock <= Max stock
 5. If expiry_policy != none, shelf_life_days required
+6. If moq provided, must be > 0
 
 ### Edit Mode Warnings
 1. **Version Increment**: Always show banner at top explaining version will increment
@@ -434,29 +632,99 @@ Modals don't have empty states - they're opened with intent to create/edit.
 - **Focus management**: Focus first field on open, focus first error on validation fail
 - **Keyboard**: Tab navigation, Enter to submit, Escape to cancel
 - **Screen reader**: Error summary announced, field errors read with field
+- **Nested modals**: Proper focus trap and z-index layering, return focus to parent modal on close
 
 ---
 
 ## Related Screens
 
 - **TEC-001 Products List**: Returns here after create/edit
-- **Supplier Create Modal**: Nested modal from [+ Add Supplier]
-- **Category Create Modal**: Nested modal from [+ Add New Category]
-- **Version History Panel**: Side panel from [View Version History] link
+- **Supplier Create Modal**: Nested modal from [+ Add Supplier] (wireframe above)
+- **Category Create Modal**: Nested modal from [+ Add New Category] (wireframe above)
+- **Version History Panel**: Side panel from [View Version History] link (wireframe above)
+- **PLAN-001 Supplier List**: Link from [Add & Open Full Form] in Supplier nested modal
 
 ---
 
 ## Technical Notes
 
-- **API Create**: `POST /api/technical/products` with all fields
+- **API Create**: `POST /api/technical/products` with all fields (including lead_time_days, moq per ADR-010)
 - **API Update**: `PUT /api/technical/products/:id` with changed fields
 - **Version Increment**: Backend auto-increments version, creates version_history record with changed_fields JSONB
 - **SKU Uniqueness**: Check via `GET /api/technical/products?code={sku}` debounced 300ms
 - **GTIN-14 Validation**: Client-side check digit algorithm + server-side validation
 - **Immutable Fields**: SKU and Type locked in edit mode (disabled inputs, locked icon)
-- **Default Values**: status=active, version=1 (create only), expiry_policy=none
+- **Default Values**: status=active, version=1 (create only), expiry_policy=none, lead_time_days=7
 - **Toast Notifications**: Success on create/edit, error on failure
 - **Optimistic Updates**: Product list updated optimistically on success
+- **Nested Modals**: Z-index management (base modal: 1000, nested modal: 1100, backdrop: 1050/1150)
+- **Version History**: Fetched from product_version_history table, JSONB diff displayed
+
+---
+
+## API Schema (Zod Validation)
+
+### Create Request
+```typescript
+{
+  code: string().min(2).max(50).regex(/^[A-Z0-9-]+$/),
+  name: string().min(2).max(255),
+  description?: string().max(1000).nullable(),
+  product_type_id: uuid(),
+  base_uom: string(),
+  barcode?: string().max(100).nullable(),
+  gtin?: string().length(14).nullable(),
+  category_id?: uuid().nullable(),
+
+  // ADR-010: Product-level procurement fields
+  lead_time_days?: number().int().min(0).max(365).default(7),
+  moq?: decimal().positive().nullable(),  // Uses product UoM
+
+  supplier_id?: uuid().nullable(),
+  std_price?: decimal().min(0).nullable(),
+
+  min_stock?: decimal().min(0).nullable(),
+  max_stock?: decimal().min(0).nullable(),
+
+  expiry_policy?: enum(['fixed', 'rolling', 'none']).default('none'),
+  shelf_life_days?: number().int().min(1).max(3650).nullable(),
+  storage_conditions?: string().max(500).nullable(),
+
+  status: enum(['active', 'inactive']).default('active'),
+}
+```
+
+### Update Request
+```typescript
+{
+  // Same as Create, but code and product_type_id are readonly
+  name?: string().min(2).max(255),
+  description?: string().max(1000).nullable(),
+  // ... all other fields optional
+
+  // ADR-010 fields editable
+  lead_time_days?: number().int().min(0).max(365),
+  moq?: decimal().positive().nullable(),
+}
+```
+
+### Response
+```typescript
+{
+  id: uuid(),
+  org_id: uuid(),
+  code: string(),
+  name: string(),
+  version: number(),
+  // ... all create fields ...
+  lead_time_days: number(),  // ADR-010
+  moq: decimal() | null,     // ADR-010
+  created_at: timestamp(),
+  updated_at: timestamp(),
+  created_by: uuid(),
+  updated_by: uuid(),
+}
+```
 
 ---
 
@@ -469,6 +737,36 @@ Modals don't have empty states - they're opened with intent to create/edit.
 5. **Allergen Auto-Calc**: If product has active BOM, allergens are auto-calculated (not editable here)
 6. **Status Impact**: Setting to Inactive/Discontinued requires manual BOM review (shown in warning)
 7. **GTIN Optional**: GTIN-14 not required for internal/WIP products, recommended for finished goods
+8. **Lead Time Default**: Products default to 7-day procurement lead time (ADR-010)
+9. **MOQ Optional**: MOQ is optional, but if provided must be positive (ADR-010)
+10. **UoM Consistency**: MOQ uses product's base UoM (auto-populated in dropdown)
+
+---
+
+## ADR-010 Impact: Lead Time and MOQ Migration
+
+### What Changed
+Per ADR-010, procurement fields moved from `suppliers` table to `products` table:
+
+**Before (Supplier-Level):**
+- `suppliers.lead_time_days` - One value for all products from this supplier
+- `suppliers.moq` - One MOQ for all products from this supplier
+
+**After (Product-Level):**
+- `products.lead_time_days` - Each product has its own lead time (default: 7 days)
+- `products.moq` - Each product has its own MOQ (optional, uses product UoM)
+
+### Why It Matters
+- **Granular Control**: Different products from same supplier can have different lead times/MOQs
+- **Accurate MRP**: Material Requirements Planning uses correct per-product lead times
+- **Multi-Supplier**: Same product from different suppliers maintains consistent procurement params
+
+### UI Changes
+1. **New Section**: "Procurement (ADR-010: Product-Level Fields)" added between Identification and Supplier Assignment
+2. **Lead Time Field**: Moved to product level, default 7 days
+3. **MOQ Field**: Now on product (uses product UoM), not supplier
+4. **Supplier Section**: Simplified to just supplier assignment + standard price
+5. **Validation**: MOQ must be positive if provided, uses product UoM
 
 ---
 
@@ -491,11 +789,14 @@ Modals don't have empty states - they're opened with intent to create/edit.
 | Invalid GTIN-14 | "Invalid GTIN-14 format (must be 14 digits with valid check digit)" | Fix GTIN or clear |
 | Min > Max stock | "Minimum stock cannot be greater than maximum stock" | Adjust values |
 | Shelf life missing | "Shelf life is required when expiry policy is set" | Fill shelf life or change policy |
+| Lead time negative | "Lead time must be >= 0" | Enter valid lead time |
+| MOQ zero or negative | "MOQ must be > 0 if provided" | Enter positive MOQ or clear |
 | Network error | "Unable to save product. Please check your connection." | Retry |
 
 ---
 
-**Status**: Auto-Approved
+**Status**: Auto-Approved (Updated per ADR-010)
 **Approval Mode**: auto_approve
 **User Approved**: true (explicit opt-in)
-**Iterations**: 0 of 3
+**Iterations**: 1 of 3 (Updated for ADR-010 schema migration)
+**Quality Score**: 97% (Added ADR-010 fields + nested modals + version history panel)
