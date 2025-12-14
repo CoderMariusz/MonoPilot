@@ -750,3 +750,93 @@ export async function calculateBOMYield(
     wasteQuantity
   }
 }
+
+// ============================================================================
+// BOM SCALING - FR-2.35
+// ============================================================================
+
+export interface ScaledBOMItem {
+  itemId: string
+  productCode: string
+  productName: string
+  originalQty: number
+  scaledQty: number
+  uom: string
+}
+
+export interface BOMScaleResult {
+  originalOutputQty: number
+  newOutputQty: number
+  multiplier: number
+  scaledItems: ScaledBOMItem[]
+}
+
+/**
+ * Scale BOM quantities by multiplier
+ * FR-2.35 Simple scope: One-time batch adjustment
+ *
+ * Multiplies output_qty and all bom_items quantities by given multiplier.
+ * Returns scaled results without saving (read-only calculation).
+ *
+ * @param bomId - BOM ID to scale
+ * @param multiplier - Scaling factor (e.g., 2.5 for 2.5x batch)
+ * @returns Scaled output and item quantities
+ */
+export async function scaleBOM(
+  bomId: string,
+  multiplier: number
+): Promise<BOMScaleResult> {
+  if (multiplier <= 0) {
+    throw new Error('Multiplier must be positive')
+  }
+
+  const supabase = await createServerSupabase()
+
+  // Get BOM with items
+  const { data: bom, error } = await supabase
+    .from('boms')
+    .select(`
+      output_qty,
+      output_uom,
+      items:bom_items(
+        id,
+        quantity,
+        uom,
+        product:products!component_id(id, code, name)
+      )
+    `)
+    .eq('id', bomId)
+    .single()
+
+  if (error) {
+    console.error('Error fetching BOM for scaling:', error)
+    throw new Error(`Failed to fetch BOM: ${error.message}`)
+  }
+
+  if (!bom) {
+    throw new Error('BOM not found')
+  }
+
+  // Scale output
+  const newOutputQty = bom.output_qty * multiplier
+
+  // Scale all items
+  const scaledItems: ScaledBOMItem[] = (bom.items || []).map((item: any) => {
+    const product = item.product
+    return {
+      itemId: item.id,
+      productCode: product.code,
+      productName: product.name,
+      originalQty: item.quantity,
+      scaledQty: item.quantity * multiplier,
+      uom: item.uom
+    }
+  })
+
+  return {
+    originalOutputQty: bom.output_qty,
+    newOutputQty,
+    multiplier,
+    scaledItems
+  }
+}

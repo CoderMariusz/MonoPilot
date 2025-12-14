@@ -1,0 +1,1315 @@
+# TEC-008a: Routing Detail Page
+
+**Module**: Technical
+**Feature**: Routing Operations Management (Story 2.24 - Routing Restructure)
+**Type**: Full Page (Detail/Edit View)
+**Path**: `/technical/routings/{id}`
+**ID**: TEC-008a
+**Parent**: TEC-008 (Routing Modal)
+**Status**: Ready for Implementation
+**Last Updated**: 2025-12-14
+
+---
+
+## Overview
+
+Detail page for viewing and managing routing header information and operations. This is the primary workspace for building production routings with sequential operations. Users land here after creating a routing in TEC-008 modal.
+
+**Business Context:**
+- Routing = production workflow template (e.g., "Bread Line", "Cake Production")
+- Operations = sequential steps in the workflow (e.g., "Mixing", "Proofing", "Baking")
+- Each operation has: sequence, name, machine, duration, yield, labor cost
+- Operations are reorderable (drag-drop or up/down arrows)
+- Operations can be added, edited, deleted independently
+- Total cost and duration calculated automatically
+
+**Page Purpose:**
+- Display routing header (code, name, status, reusability, version) - read-only with edit action
+- Manage routing operations (CRUD + reorder)
+- Show cost/duration summary panel with breakdown
+- Link to related BOMs that use this routing
+
+---
+
+## ASCII Wireframe
+
+### Success State (With Operations)
+
+```
++-----------------------------------------------------------------------------+
+|  <- Back to Routings                                            [Edit Routing]|
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  RTG-BREAD-01                                                               |
+|  Standard Bread Line                                            [Active]    |
+|  --------------------------------------------------------------------       |
+|  Code: RTG-BREAD-01    Status: [Active]    Version: v2    [x] Reusable      |
+|  Used by 3 BOMs                                                             |
+|                                                                             |
+|  Description:                                                               |
+|  Mixing -> Proofing -> Baking -> Cooling workflow for standard bread products |
+|                                                                             |
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  Production Operations                              [+ Add Operation]        |
+|  ----------------------------------------------------------------------     |
+|                                                                             |
+|  +-----------------------------------------------------------------------+ |
+|  | Seq | Operation Name     | Machine      | Line    | Duration | Setup  | |
+|  |     |                    |              |         |   (min)  | (min)  | |
+|  +-----+--------------------+--------------+---------+----------+--------+ |
+|  |  1  | Mixing             | Mixer-01     | Line-A  |    15    |   5    | |
+|  |     |                    |              |         |          |        | |
+|  |     | Yield: 98% | Labor: $12.00/hr             [^] [v] [Edit] [Del] | |
+|  +-----+--------------------+--------------+---------+----------+--------+ |
+|  |  2  | Proofing           | Proofer-A    | Line-A  |    45    |   0    | |
+|  |     |                    |              |         |          |        | |
+|  |     | Yield: 100% | Labor: $8.00/hr              [^] [v] [Edit] [Del] | |
+|  +-----+--------------------+--------------+---------+----------+--------+ |
+|  |  2  | Heating (Parallel) | Heater-03    | Line-A  |    40    |   2    | |
+|  |     |                    |              |         |          |        | |
+|  |     | Yield: 100% | Labor: $10.00/hr             [^] [v] [Edit] [Del] | |
+|  +-----+--------------------+--------------+---------+----------+--------+ |
+|  |  3  | Baking             | Oven-02      | Line-A  |    30    |  10    | |
+|  |     |                    |              |         |          |        | |
+|  |     | Yield: 95% | Labor: $15.00/hr             [^] [v] [Edit] [Del] | |
+|  +-----+--------------------+--------------+---------+----------+--------+ |
+|  |  4  | Cooling            | -            | Line-A  |    20    |   0    | |
+|  |     |                    |              |         |          |        | |
+|  |     | Yield: 100% | Labor: $5.00/hr              [^] [v] [Edit] [Del] | |
+|  +-----+--------------------+--------------+---------+----------+--------+ |
+|                                                                             |
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  Cost & Duration Summary                             [i View Breakdown v]   |
+|  --------------------------------------------------------------------       |
+|                                                                             |
+|  +-----------------------------------------------------------------------+ |
+|  |  Total Operations:    4                                               | |
+|  |                                                                        | |
+|  |  Total Duration:      110 minutes (1h 50m)                            | |
+|  |    +- Mixing: 15 min (setup: 5 min, cleanup: 2 min)                  | |
+|  |    +- Proofing: 45 min (setup: 0 min, cleanup: 0 min)                | |
+|  |    +- Baking: 30 min (setup: 10 min, cleanup: 3 min)                 | |
+|  |    +- Cooling: 20 min (setup: 0 min, cleanup: 0 min)                 | |
+|  |                                                                        | |
+|  |  Total Labor Cost:    $40.00                                          | |
+|  |    +- Mixing: $12.00 (15 min x $15/hr + setup)                       | |
+|  |    +- Proofing: $8.00 (45 min x $10/hr)                              | |
+|  |    +- Baking: $15.00 (30 min x $20/hr + setup)                       | |
+|  |    +- Cooling: $5.00 (20 min x $12/hr)                               | |
+|  |                                                                        | |
+|  |  Average Yield:       98.25% [i Weighted by duration]                 | |
+|  +-----------------------------------------------------------------------+ |
+|                                                                             |
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  Related BOMs (3)                                                           |
+|  --------------------------------------------------------------------       |
+|                                                                             |
+|  - PRD-BREAD-WH-01 (White Bread - 800g) v1.0                               |
+|  - PRD-BREAD-WW-01 (Whole Wheat Bread - 800g) v1.0                         |
+|  - PRD-BREAD-MG-01 (Multigrain Bread - 800g) v1.0                          |
+|                                                                             |
+|  [View All BOMs ->]                                                          |
+|                                                                             |
++-----------------------------------------------------------------------------+
+```
+
+### Empty State (No Operations)
+
+```
++-----------------------------------------------------------------------------+
+|  <- Back to Routings                                            [Edit Routing]|
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  RTG-BREAD-01                                                               |
+|  Standard Bread Line                                            [Active]    |
+|  --------------------------------------------------------------------       |
+|  Code: RTG-BREAD-01    Status: [Active]    Version: v1    [x] Reusable      |
+|  Not used yet                                                               |
+|                                                                             |
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  Production Operations                              [+ Add Operation]        |
+|  ----------------------------------------------------------------------     |
+|                                                                             |
+|  +-----------------------------------------------------------------------+ |
+|  |                                                                       | |
+|  |                        [clipboard icon]                               | |
+|  |                                                                       | |
+|  |              No operations yet                                        | |
+|  |                                                                       | |
+|  |   Add your first production step to define this routing workflow.    | |
+|  |                                                                       | |
+|  |              [+ Add First Operation]                                  | |
+|  |                                                                       | |
+|  +-----------------------------------------------------------------------+ |
+|                                                                             |
+|  +-----------------------------------------------------------------------+ |
+|  |  [i] Example operations for a bread routing:                          | |
+|  |  1. Mixing (15 min) -> 2. Proofing (45 min) -> 3. Baking (30 min)    | |
+|  +-----------------------------------------------------------------------+ |
+|                                                                             |
++-----------------------------------------------------------------------------+
+```
+
+### Loading State
+
+```
++-----------------------------------------------------------------------------+
+|  <- Back to Routings                                            [Edit Routing]|
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  [Skeleton: Routing Header]                                                 |
+|  [Skeleton: Routing Header]                                 [Skeleton]      |
+|  ----------------------------------------------------------------------     |
+|                                                                             |
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  Production Operations                              [+ Add Operation]        |
+|  ----------------------------------------------------------------------     |
+|                                                                             |
+|                         [Spinner]                                           |
+|                                                                             |
+|                   Loading operations...                                     |
+|                                                                             |
+|                                                                             |
++-----------------------------------------------------------------------------+
+```
+
+### Error State
+
+```
++-----------------------------------------------------------------------------+
+|  <- Back to Routings                                            [Edit Routing]|
++-----------------------------------------------------------------------------+
+|                                                                             |
+|  +-----------------------------------------------------------------------+ |
+|  |  [X] Failed to Load Routing                                           | |
+|  |                                                                       | |
+|  |  Error: Routing not found or you don't have permission to view it.   | |
+|  |                                                                       | |
+|  |  [<- Back to Routings List]                         [Retry]            | |
+|  +-----------------------------------------------------------------------+ |
+|                                                                             |
++-----------------------------------------------------------------------------+
+```
+
+---
+
+## Operation Modal (Add/Edit Operation)
+
+### Success State (Create Mode)
+
+```
++-------------------------------------------------------------------+
+|  Add Operation                                                 [X]|
++-------------------------------------------------------------------+
+|                                                                   |
+|  Sequence *                                                       |
+|  +---------------------------------------------------------+ |
+|  | 5                                                           | |
+|  +---------------------------------------------------------+ |
+|  Order of operation. Use same sequence for parallel operations.  |
+|  Example: Seq 2 (Mixing) + Seq 2 (Heating) = run in parallel     |
+|                                                                   |
+|  Operation Name *                                                 |
+|  +---------------------------------------------------------+ |
+|  | e.g., Mixing, Baking, Cooling                               | |
+|  +---------------------------------------------------------+ |
+|  Name of the production step                                      |
+|                                                                   |
+|  Machine                                                          |
+|  +---------------------------------------------------------+ |
+|  | Select machine... v                                         | |
+|  +---------------------------------------------------------+ |
+|  Optional: Equipment used for this operation                      |
+|                                                                   |
+|  Production Line                                                  |
+|  +---------------------------------------------------------+ |
+|  | Select production line... v                                 | |
+|  +---------------------------------------------------------+ |
+|  Optional: Line where this operation occurs                       |
+|                                                                   |
+|  Expected Duration (minutes) *                                    |
+|  +---------------------------------------------------------+ |
+|  | 30                                                          | |
+|  +---------------------------------------------------------+ |
+|  How long this operation takes (in minutes)                       |
+|                                                                   |
+|  Setup Time (minutes)                                             |
+|  +---------------------------------------------------------+ |
+|  | 0                                                           | |
+|  +---------------------------------------------------------+ |
+|  Time to prepare equipment before operation (default: 0)          |
+|                                                                   |
+|  Cleanup Time (minutes)                                           |
+|  +---------------------------------------------------------+ |
+|  | 0                                                           | |
+|  +---------------------------------------------------------+ |
+|  Time required to clean after this operation (default: 0)         |
+|                                                                   |
+|  Expected Yield (%)                                               |
+|  +---------------------------------------------------------+ |
+|  | 100.00                                                      | |
+|  +---------------------------------------------------------+ |
+|  Percentage of output expected (0-100, default: 100)              |
+|                                                                   |
+|  Instructions (Optional)                                          |
+|  +---------------------------------------------------------+ |
+|  |                                                             | |
+|  | [Textarea for operation instructions]                      | |
+|  |                                                             | |
+|  +---------------------------------------------------------+ |
+|  Step-by-step instructions for operators (max 2000 chars)         |
+|                                                                   |
+|  Labor Cost per Hour (PLN/hour)                                   |
+|  +---------------------------------------------------------+ |
+|  | 0.00                                                        | |
+|  +---------------------------------------------------------+ |
+|  Hourly labor rate for this operation                             |
+|                                                                   |
++-------------------------------------------------------------------+
+|                                                                   |
+|  [Cancel]                                        [Add Operation]  |
+|                                                                   |
++-------------------------------------------------------------------+
+```
+
+### Success State (Edit Mode)
+
+```
++-------------------------------------------------------------------+
+|  Edit Operation                                                [X]|
++-------------------------------------------------------------------+
+|                                                                   |
+|  Sequence *                                                       |
+|  +---------------------------------------------------------+ |
+|  | 2                                                           | |
+|  +---------------------------------------------------------+ |
+|  Order of operation. Use same sequence for parallel operations.  |
+|  Example: Seq 2 (Mixing) + Seq 2 (Heating) = run in parallel     |
+|                                                                   |
+|  Operation Name *                                                 |
+|  +---------------------------------------------------------+ |
+|  | Proofing                                                    | |
+|  +---------------------------------------------------------+ |
+|  Name of the production step                                      |
+|                                                                   |
+|  Machine                                                          |
+|  +---------------------------------------------------------+ |
+|  | Proofer-A v                                                 | |
+|  +---------------------------------------------------------+ |
+|  Optional: Equipment used for this operation                      |
+|                                                                   |
+|  Production Line                                                  |
+|  +---------------------------------------------------------+ |
+|  | Line-A v                                                    | |
+|  +---------------------------------------------------------+ |
+|  Optional: Line where this operation occurs                       |
+|                                                                   |
+|  Expected Duration (minutes) *                                    |
+|  +---------------------------------------------------------+ |
+|  | 45                                                          | |
+|  +---------------------------------------------------------+ |
+|  How long this operation takes (in minutes)                       |
+|                                                                   |
+|  Setup Time (minutes)                                             |
+|  +---------------------------------------------------------+ |
+|  | 0                                                           | |
+|  +---------------------------------------------------------+ |
+|  Time to prepare equipment before operation (default: 0)          |
+|                                                                   |
+|  Cleanup Time (minutes)                                           |
+|  +---------------------------------------------------------+ |
+|  | 2                                                           | |
+|  +---------------------------------------------------------+ |
+|  Time required to clean after this operation (default: 0)         |
+|                                                                   |
+|  Expected Yield (%)                                               |
+|  +---------------------------------------------------------+ |
+|  | 100.00                                                      | |
+|  +---------------------------------------------------------+ |
+|  Percentage of output expected (0-100, default: 100)              |
+|                                                                   |
+|  Instructions (Optional)                                          |
+|  +---------------------------------------------------------+ |
+|  | 1. Set temperature to 35C                                 | |
+|  | 2. Place dough in proofing chamber                         | |
+|  | 3. Monitor humidity levels                                 | |
+|  +---------------------------------------------------------+ |
+|  Step-by-step instructions for operators (max 2000 chars)         |
+|                                                                   |
+|  Labor Cost per Hour (PLN/hour)                                   |
+|  +---------------------------------------------------------+ |
+|  | 8.00                                                        | |
+|  +---------------------------------------------------------+ |
+|  Hourly labor rate for this operation                             |
+|                                                                   |
++-------------------------------------------------------------------+
+|                                                                   |
+|  [Cancel]                                       [Save Changes]    |
+|                                                                   |
++-------------------------------------------------------------------+
+```
+
+---
+
+## Key Components
+
+### 1. Page Header
+
+#### Routing Info (Read-Only)
+- **Code**: Large, prominent (e.g., "RTG-BREAD-01")
+- **Name**: Below code (e.g., "Standard Bread Line")
+- **Status Badge**: Active or Inactive
+- **Version**: Display version number (e.g., "v2")
+- **Reusable Flag**: Reusable or Product-Specific
+- **Usage Count**: "Used by X BOMs" or "Not used yet"
+- **Description**: Multi-line text, optional
+
+#### Header Actions
+- **<- Back to Routings**: Navigate back to TEC-007 list
+- **[Edit Routing]**: Opens TEC-008 modal to edit routing header
+
+### 2. Operations Table
+
+#### Table Columns
+| Column | Description | Width |
+|--------|-------------|-------|
+| Seq | Sequence number (1, 2, 3...) | 60px |
+| Operation Name | Name of production step | 200px |
+| Machine | Optional machine/equipment | 150px |
+| Line | Production line | 100px |
+| Duration (min) | Expected duration in minutes | 100px |
+| Setup (min) | Setup time in minutes | 100px |
+| Yield (%) | Sub-row, below name | - |
+| Labor Cost/Hr | Sub-row, below name | - |
+| Actions | [^] [v] [Edit] [Del] buttons | 120px |
+
+#### Row Actions
+- **[^]**: Move operation up (decrease sequence)
+- **[v]**: Move operation down (increase sequence)
+- **[Edit]**: Edit operation (opens Operation Modal)
+- **[Del]**: Delete operation (with confirmation)
+
+#### Empty State
+- **Icon**: clipboard
+- **Message**: "No operations yet"
+- **Sub-message**: "Add your first production step to define this routing workflow."
+- **Action**: "[+ Add First Operation]" button
+- **Help Text**: Example operations banner (e.g., "1. Mixing -> 2. Proofing -> 3. Baking")
+
+### 3. Operation Modal Fields
+
+#### Sequence (Required)
+- **Type**: Number input
+- **Label**: "Sequence *"
+- **Auto-suggest**: Next available sequence number
+- **Validation**: Must be unique, positive integer
+- **Help Text**: "Auto-suggested next sequence number" (create) or "Operation order in the routing (must be unique)" (edit)
+
+#### Operation Name (Required)
+- **Type**: Text input
+- **Label**: "Operation Name *"
+- **Placeholder**: "e.g., Mixing, Baking, Cooling"
+- **Validation**: 3-100 characters, required
+- **Help Text**: "Name of the production step"
+
+#### Machine (Optional)
+- **Type**: Dropdown (Select)
+- **Label**: "Machine"
+- **Placeholder**: "Select machine..."
+- **Options**: Populated from machines table (filtered by org_id)
+- **Help Text**: "Optional: Equipment used for this operation"
+- **Allow None**: Yes (user can leave blank)
+
+#### Production Line (Optional)
+- **Type**: Dropdown (Select)
+- **Label**: "Production Line"
+- **Placeholder**: "Select production line..."
+- **Options**: Populated from production_lines table
+- **Help Text**: "Optional: Line where this operation occurs"
+- **Allow None**: Yes
+
+#### Expected Duration (Required)
+- **Type**: Number input
+- **Label**: "Expected Duration (minutes) *"
+- **Placeholder**: "30"
+- **Validation**: Positive integer, required
+- **Help Text**: "How long this operation takes (in minutes)"
+
+#### Setup Time (Optional)
+- **Type**: Number input
+- **Label**: "Setup Time (minutes)"
+- **Placeholder**: "0"
+- **Default**: 0
+- **Validation**: Non-negative integer
+- **Help Text**: "Time to prepare equipment before operation (default: 0)"
+
+#### Cleanup Time (Optional) - NEW (FR-2.43, FR-2.45)
+- **Type**: Number input
+- **Label**: "Cleanup Time (minutes)"
+- **Placeholder**: "0"
+- **Default**: 0
+- **Validation**: Non-negative integer
+- **Help Text**: "Time required to clean after this operation (default: 0)"
+
+#### Expected Yield (Optional)
+- **Type**: Decimal input
+- **Label**: "Expected Yield (%)"
+- **Placeholder**: "100.00"
+- **Default**: 100.00
+- **Validation**: 0-100, decimal (2 places)
+- **Help Text**: "Percentage of output expected (0-100, default: 100)"
+
+#### Instructions (Optional) - NEW (FR-2.43, FR-2.45)
+- **Type**: Textarea
+- **Label**: "Instructions (Optional)"
+- **Placeholder**: ""
+- **Rows**: 4
+- **Max Length**: 2000 characters
+- **Help Text**: "Step-by-step instructions for operators (max 2000 chars)"
+
+#### Labor Cost per Hour (Optional) - UPDATED (was "Labor Cost")
+- **Type**: Decimal input
+- **Label**: "Labor Cost per Hour (PLN/hour)"
+- **Placeholder**: "0.00"
+- **Default**: 0.00
+- **Validation**: Non-negative decimal (2 places)
+- **Help Text**: "Hourly labor rate for this operation"
+
+### 4. Cost & Duration Summary Panel
+
+**Calculations:**
+- **Total Operations**: Count of routing_operations rows
+- **Total Duration**: Sum of all operation durations (in minutes, display as "Xh Ym")
+- **Total Setup Time**: Sum of all setup times
+- **Total Labor Cost**: Sum of all labor costs (display as "$X.XX")
+- **Average Yield**: Weighted average of all yields (display as "X.XX%")
+
+**Display:**
+- Panel below operations table
+- Light gray background
+- Large, readable numbers
+- Update in real-time as operations change
+- **Expandable Breakdown** (default collapsed):
+  - Click [i View Breakdown v] to expand
+  - Shows per-operation breakdown with setup/cleanup times
+  - Shows labor cost calculation per operation
+
+### 5. Related BOMs Section
+
+**Purpose**: Show which BOMs are using this routing
+
+**Display:**
+- List of BOM codes with product names and versions
+- E.g., "PRD-BREAD-WH-01 (White Bread - 800g) v1.0"
+- Max 5 shown, with "[View All BOMs ->]" link if more
+
+**Empty State**: "Not used yet" in routing header
+
+---
+
+## Main Actions
+
+### Add Operation
+- **Button**: "[+ Add Operation]" (top-right of operations section)
+- **Action**: Opens Operation Modal in create mode
+- **Pre-fill**: Sequence = max(current_sequences) + 1
+- **On Success**: Close modal, refresh operations table, show toast
+
+### Edit Operation
+- **Button**: [Edit] (pencil icon) in row actions
+- **Action**: Opens Operation Modal in edit mode
+- **Pre-fill**: All fields from selected operation
+- **On Success**: Close modal, refresh operations table, show toast
+
+### Delete Operation
+- **Button**: [Del] (trash icon) in row actions
+- **Action**: Show confirmation dialog
+- **Confirmation**: "Delete operation '[name]'? This action cannot be undone."
+- **On Confirm**: DELETE /api/technical/routings/{routingId}/operations/{operationId}
+- **On Success**: Refresh operations table, show toast, resequence remaining operations
+
+### Reorder Operation (Move Up/Down)
+- **Buttons**: [^] [v] (up/down arrows) in row actions
+- **Action**: Swap sequence numbers with adjacent operation
+- **API**: PATCH /api/technical/routings/{routingId}/operations/{operationId}/reorder
+- **Request**: `{ direction: "up" | "down" }`
+- **On Success**: Refresh operations table (no toast, instant feedback)
+- **Disable**: [^] on first operation, [v] on last operation
+
+### Edit Routing Header
+- **Button**: "[Edit Routing]" (top-right of page header)
+- **Action**: Opens TEC-008 modal in edit mode
+- **Pre-fill**: All routing header fields
+- **On Success**: Close modal, refresh page header, show toast
+
+---
+
+## State Transitions
+
+```
+Page Loads
+  |
+  v
+LOADING (Show skeleton)
+  | Fetch routing + operations
+  v
+SUCCESS (Display routing header + operations table)
+  OR
+ERROR (Show error banner, offer retry)
+
+----------------------------------------------
+
+From SUCCESS:
+
+[+ Add Operation] clicked
+  |
+  v
+Operation Modal Opens (Create Mode)
+  | User fills form
+  | [Add Operation]
+  v
+LOADING (Disable modal buttons)
+  | POST /api/technical/routings/{id}/operations
+  v
+SUCCESS (Close modal, refresh table, toast)
+  OR
+ERROR (Show error in modal, keep open)
+
+----------------------------------------------
+
+[Edit Operation] clicked
+  |
+  v
+Operation Modal Opens (Edit Mode)
+  | User edits form
+  | [Save Changes]
+  v
+LOADING (Disable modal buttons)
+  | PUT /api/technical/routings/{routingId}/operations/{operationId}
+  v
+SUCCESS (Close modal, refresh table, toast)
+  OR
+ERROR (Show error in modal, keep open)
+
+----------------------------------------------
+
+[Delete Operation] clicked
+  |
+  v
+Confirmation Dialog Opens
+  | [Confirm]
+  v
+LOADING (Show spinner in row)
+  | DELETE /api/technical/routings/{routingId}/operations/{operationId}
+  v
+SUCCESS (Refresh table, toast)
+  OR
+ERROR (Show error toast, keep row)
+
+----------------------------------------------
+
+[Reorder Operation] clicked
+  |
+  v
+LOADING (Show spinner in row)
+  | PATCH /api/technical/routings/{routingId}/operations/{operationId}/reorder
+  v
+SUCCESS (Refresh table, no toast)
+  OR
+ERROR (Show error toast, revert)
+```
+
+---
+
+## Validation
+
+### Operation Modal Validation
+
+```typescript
+{
+  sequence: {
+    required: "Sequence is required",
+    min: { value: 1, message: "Sequence must be at least 1" },
+    validate: (value) => {
+      // Check uniqueness (client-side check against current operations)
+      if (existingSequences.includes(value) && value !== originalSequence) {
+        return "Sequence already exists"
+      }
+      return true
+    }
+  },
+  operation_name: {
+    required: "Operation name is required",
+    minLength: { value: 3, message: "Name must be at least 3 characters" },
+    maxLength: { value: 100, message: "Name must be less than 100 characters" }
+  },
+  machine_id: {
+    // Optional, no validation
+  },
+  production_line_id: {
+    // Optional, no validation
+  },
+  expected_duration: {
+    required: "Duration is required",
+    min: { value: 1, message: "Duration must be at least 1 minute" }
+  },
+  setup_time: {
+    min: { value: 0, message: "Setup time cannot be negative" }
+  },
+  cleanup_time: {
+    min: { value: 0, message: "Cleanup time cannot be negative" }
+  },
+  expected_yield: {
+    min: { value: 0, message: "Yield cannot be negative" },
+    max: { value: 100, message: "Yield cannot exceed 100%" }
+  },
+  instructions: {
+    maxLength: { value: 2000, message: "Instructions must be less than 2000 characters" }
+  },
+  labor_cost_per_hour: {
+    min: { value: 0, message: "Labor cost per hour cannot be negative" }
+  }
+}
+```
+
+### Error Messages
+
+```typescript
+{
+  "DUPLICATE_SEQUENCE": "Sequence [X] already exists. Please choose a different sequence.",
+  "INVALID_SEQUENCE": "Sequence must be a positive integer.",
+  "OPERATION_NOT_FOUND": "Operation not found.",
+  "PERMISSION_DENIED": "You do not have permission to modify this routing.",
+  "ROUTING_INACTIVE": "Cannot add operations to an inactive routing."
+}
+```
+
+---
+
+## Data Required
+
+### API Endpoints
+
+#### Get Routing with Operations
+```
+GET /api/technical/routings/{id}
+```
+
+**Response:**
+```typescript
+{
+  routing: {
+    id: string
+    org_id: string
+    code: string
+    name: string
+    description: string | null
+    status: "Active" | "Inactive"
+    is_reusable: boolean
+    version: number  // Added
+    operations_count: number
+    boms_count: number  // Number of BOMs using this routing
+    created_at: string
+    updated_at: string
+    created_by: string
+  },
+  operations: [
+    {
+      id: string
+      routing_id: string
+      sequence: number
+      operation_name: string
+      machine_id: string | null
+      machine_name: string | null  // Joined from machines table
+      production_line_id: string | null
+      production_line_name: string | null  // Joined from production_lines
+      expected_duration: number  // minutes
+      setup_time: number  // minutes
+      cleanup_time: number  // minutes (NEW)
+      expected_yield: number  // decimal, 0-100
+      instructions: string | null  // NEW
+      labor_cost_per_hour: number  // decimal (UPDATED)
+      created_at: string
+      updated_at: string
+    }
+  ],
+  related_boms: [
+    {
+      id: string
+      product_code: string
+      product_name: string
+      version: string
+    }
+  ]
+}
+```
+
+#### Create Operation
+```
+POST /api/technical/routings/{routingId}/operations
+```
+
+**Request Body:**
+```typescript
+{
+  sequence: number
+  operation_name: string
+  machine_id?: string | null
+  production_line_id?: string | null
+  expected_duration: number
+  setup_time?: number  // default 0
+  cleanup_time?: number  // default 0 (NEW)
+  expected_yield?: number  // default 100
+  instructions?: string | null  // NEW
+  labor_cost_per_hour?: number  // default 0 (UPDATED)
+}
+```
+
+**Response:**
+```typescript
+{
+  operation: {
+    id: string
+    routing_id: string
+    sequence: number
+    operation_name: string
+    machine_id: string | null
+    production_line_id: string | null
+    expected_duration: number
+    setup_time: number
+    cleanup_time: number  // NEW
+    expected_yield: number
+    instructions: string | null  // NEW
+    labor_cost_per_hour: number  // UPDATED
+    created_at: string
+    updated_at: string
+  }
+}
+```
+
+#### Update Operation
+```
+PUT /api/technical/routings/{routingId}/operations/{operationId}
+```
+
+**Request Body:** (same as create)
+
+**Response:** (same as create)
+
+#### Delete Operation
+```
+DELETE /api/technical/routings/{routingId}/operations/{operationId}
+```
+
+**Response:**
+```typescript
+{
+  success: true
+  message: "Operation deleted successfully"
+}
+```
+
+#### Reorder Operation
+```
+PATCH /api/technical/routings/{routingId}/operations/{operationId}/reorder
+```
+
+**Request Body:**
+```typescript
+{
+  direction: "up" | "down"
+}
+```
+
+**Response:**
+```typescript
+{
+  success: true
+  updated_operations: [
+    {
+      id: string
+      sequence: number
+    }
+  ]
+}
+```
+
+#### Get Machines (for dropdown)
+```
+GET /api/settings/machines?org_id={org_id}
+```
+
+**Response:**
+```typescript
+{
+  machines: [
+    {
+      id: string
+      name: string
+      code: string
+    }
+  ]
+}
+```
+
+#### Get Production Lines (for dropdown)
+```
+GET /api/settings/production-lines?org_id={org_id}
+```
+
+**Response:**
+```typescript
+{
+  production_lines: [
+    {
+      id: string
+      name: string
+      code: string
+    }
+  ]
+}
+```
+
+---
+
+## Parallel Operations Feature (FR-2.48 - Simple Version)
+
+### Overview
+
+**Status**: Implemented via Migration 050
+**Scope**: Simple/MVP version allowing duplicate sequence numbers
+**Future**: Phase 2 Complex will add dependency graphs and resource conflict detection
+
+### How It Works
+
+1. **Database Change**:
+   - UNIQUE constraint on `(routing_id, sequence)` has been REMOVED
+   - Multiple operations can now have the same sequence number
+
+2. **Business Logic**:
+   - Operations with same sequence number = run in parallel
+   - Example: Seq 2 (Mixing) + Seq 2 (Heating) = both happen simultaneously
+
+3. **UI Behavior**:
+   - When creating/editing operation, user can enter any sequence number
+   - If sequence already exists, show info message: "[i] Sequence X is already used. This operation will run in parallel."
+   - In operations table, append "(Parallel)" to operation name if sequence is duplicated
+   - No blocking validation - allow save
+
+### Example Use Cases
+
+**Scenario 1: Bread Production**
+```
+Seq 1: Mixing (15 min)
+Seq 2: Proofing (45 min)     <- Run in parallel
+Seq 2: Heating (40 min)       <- Run in parallel
+Seq 3: Baking (30 min)
+```
+Total time: 15 + MAX(45, 40) + 30 = 90 minutes (not 130!)
+
+**Scenario 2: Multi-Stage Processing**
+```
+Seq 1: Prep A (10 min)
+Seq 2: Cook A (20 min)        <- Run in parallel
+Seq 2: Prep B (15 min)        <- Run in parallel
+Seq 3: Assembly (10 min)
+```
+
+### UI Implementation Notes
+
+**Operations Table Display:**
+```typescript
+// Detect parallel operations (same sequence as another operation)
+const sequenceCounts = operations.reduce((acc, op) => {
+  acc[op.sequence] = (acc[op.sequence] || 0) + 1
+  return acc
+}, {} as Record<number, number>)
+
+// Render operation name with parallel indicator
+const displayName = sequenceCounts[operation.sequence] > 1
+  ? `${operation.operation_name} (Parallel)`
+  : operation.operation_name
+```
+
+**Operation Form Validation:**
+```typescript
+// Check if sequence already exists (for info message, NOT blocking)
+const existingOp = operations.find(op =>
+  op.sequence === formData.sequence &&
+  op.id !== currentOperationId  // Exclude self when editing
+)
+
+if (existingOp) {
+  showInfoMessage(`[i] Sequence ${formData.sequence} is already used by "${existingOp.operation_name}". This operation will run in parallel.`)
+}
+
+// Continue to save - do NOT block submission
+```
+
+### Cost & Duration Calculation with Parallel Ops
+
+**Duration Calculation:**
+- Group operations by sequence
+- For parallel operations (same sequence), take MAX duration
+- Sum across all sequence groups
+
+```typescript
+const groupedBySequence = operations.reduce((acc, op) => {
+  if (!acc[op.sequence]) acc[op.sequence] = []
+  acc[op.sequence].push(op)
+  return acc
+}, {} as Record<number, Operation[]>)
+
+const totalDuration = Object.values(groupedBySequence).reduce((sum, group) => {
+  const maxDuration = Math.max(...group.map(op =>
+    op.expected_duration + op.setup_time + op.cleanup_time
+  ))
+  return sum + maxDuration
+}, 0)
+```
+
+**Cost Calculation:**
+- Sum ALL operations (parallel operations both incur cost)
+- Parallel ops don't reduce cost, only reduce time
+
+```typescript
+const totalCost = operations.reduce((sum, op) => {
+  const opCost = (op.expected_duration / 60) * op.labor_cost_per_hour
+  return sum + opCost
+}, 0)
+```
+
+### Migration Details
+
+**File**: `supabase/migrations/050_enable_parallel_operations.sql`
+
+**Changes**:
+1. Dropped constraint: `routing_operations_unique_sequence`
+2. Updated column comment to document parallel operations support
+
+**Rollback**:
+- Re-add UNIQUE constraint (will FAIL if parallel operations exist in data)
+
+### Phase 2 Complex Features (Future)
+
+**NOT in current scope:**
+- Dependency graph UI (Operation A must finish before B starts)
+- Critical path calculation
+- Gantt chart visualization
+- Resource conflict detection (same machine can't run two ops in parallel)
+- Automatic reordering based on dependencies
+
+**When to implement Phase 2:**
+- User feedback requests advanced scheduling
+- Need for capacity planning and bottleneck analysis
+- Multi-line/multi-shift production scenarios
+
+---
+
+## Technical Notes
+
+### Auto-Suggest Next Sequence
+```typescript
+// When opening Add Operation modal
+const maxSequence = Math.max(...operations.map(op => op.sequence), 0)
+const nextSequence = maxSequence + 1
+
+setDefaultValues({
+  sequence: nextSequence,
+  operation_name: "",
+  machine_id: null,
+  production_line_id: null,
+  expected_duration: 0,
+  setup_time: 0,
+  cleanup_time: 0,  // NEW
+  expected_yield: 100,
+  instructions: null,  // NEW
+  labor_cost_per_hour: 0  // UPDATED
+})
+```
+
+### Reorder Logic (Up/Down)
+```typescript
+// Move operation up (decrease sequence by 1)
+const moveUp = async (operationId: string, currentSequence: number) => {
+  if (currentSequence === 1) return  // Already at top
+
+  // Swap with operation above (sequence - 1)
+  const response = await fetch(
+    `/api/technical/routings/${routingId}/operations/${operationId}/reorder`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ direction: 'up' })
+    }
+  )
+
+  if (response.ok) {
+    // Server handles swapping sequences
+    refreshOperations()
+  }
+}
+
+// Move operation down (increase sequence by 1)
+const moveDown = async (operationId: string, currentSequence: number) => {
+  const maxSequence = Math.max(...operations.map(op => op.sequence))
+  if (currentSequence === maxSequence) return  // Already at bottom
+
+  // Swap with operation below (sequence + 1)
+  const response = await fetch(
+    `/api/technical/routings/${routingId}/operations/${operationId}/reorder`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ direction: 'down' })
+    }
+  )
+
+  if (response.ok) {
+    refreshOperations()
+  }
+}
+```
+
+### Cost & Duration Calculations
+```typescript
+const calculateSummary = (operations: Operation[]) => {
+  const totalOperations = operations.length
+  const totalDuration = operations.reduce((sum, op) => sum + op.expected_duration, 0)
+  const totalSetupTime = operations.reduce((sum, op) => sum + op.setup_time, 0)
+  const totalCleanupTime = operations.reduce((sum, op) => sum + (op.cleanup_time ?? 0), 0)  // NEW
+
+  // Labor cost calculation with per-hour rate
+  const totalLaborCost = operations.reduce((sum, op) => {
+    const hours = (op.expected_duration + op.setup_time + (op.cleanup_time ?? 0)) / 60
+    const costPerHour = op.labor_cost_per_hour ?? 0
+    return sum + (costPerHour * hours)
+  }, 0)
+
+  // Weighted average yield
+  const totalYield = operations.reduce((sum, op) => {
+    return sum + (op.expected_yield * op.expected_duration)
+  }, 0)
+  const avgYield = totalDuration > 0 ? totalYield / totalDuration : 100
+
+  return {
+    totalOperations,
+    totalDuration,
+    totalSetupTime,
+    totalCleanupTime,  // NEW
+    totalLaborCost,
+    avgYield
+  }
+}
+
+// Format duration as "Xh Ym"
+const formatDuration = (minutes: number) => {
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  if (hours > 0) {
+    return `${hours}h ${mins}m`
+  }
+  return `${mins}m`
+}
+```
+
+### Delete Confirmation
+```typescript
+const handleDeleteOperation = async (operationId: string, operationName: string) => {
+  const confirmed = await showConfirmDialog({
+    title: "Delete Operation",
+    message: `Delete operation '${operationName}'? This action cannot be undone.`,
+    confirmText: "Delete",
+    cancelText: "Cancel",
+    variant: "destructive"
+  })
+
+  if (!confirmed) return
+
+  setLoading(true)
+
+  try {
+    const response = await fetch(
+      `/api/technical/routings/${routingId}/operations/${operationId}`,
+      { method: 'DELETE' }
+    )
+
+    if (!response.ok) throw new Error('Failed to delete operation')
+
+    toast({
+      title: 'Success',
+      description: 'Operation deleted successfully'
+    })
+
+    refreshOperations()
+  } catch (error) {
+    toast({
+      title: 'Error',
+      description: error.message,
+      variant: 'destructive'
+    })
+  } finally {
+    setLoading(false)
+  }
+}
+```
+
+### Accessibility (WCAG 2.1 AA)
+
+- **Close button**: aria-label="Close modal"
+- **Info banners**: role="status" aria-live="polite"
+- **Error banners**: aria-live="assertive"
+- **Loading states**: aria-busy="true" with descriptive label
+- **All interactive elements**: keyboard navigable (Tab/Shift+Tab)
+- **Touch targets**: >= 48x48dp
+- **Color contrast**: >= 4.5:1 for text, >= 3:1 for UI components
+
+- **Focus**: Operations table keyboard navigable
+- **Screen Reader**: All buttons have aria-labels
+  - [^]: "Move operation up"
+  - [v]: "Move operation down"
+  - [Edit]: "Edit operation"
+  - [Del]: "Delete operation"
+- **Touch Targets**: All action buttons >= 48x48dp
+- **Keyboard Shortcuts**:
+  - Arrow keys to navigate table rows
+  - Enter to edit operation
+  - Delete key to delete operation (with confirmation)
+- **Error Announce**: Validation errors announced to screen reader
+
+---
+
+## Related Screens
+
+- **Previous**: TEC-007 Routings List (<- Back button)
+- **Parent**: TEC-008 Routing Modal (for editing routing header)
+- **Next**: TEC-009 Nutrition Panel (different feature)
+- **Related**: TEC-006 BOM Modal (BOMs reference this routing)
+
+---
+
+## Handoff Notes
+
+### For FRONTEND-DEV
+
+1. **Component**: `app/(authenticated)/technical/routings/[id]/page.tsx`
+2. **Existing Code**: New screen, no existing implementation
+3. **Key Features**:
+   - Server-side data fetching (Next.js 15 App Router)
+   - Operations table with inline actions (edit/delete/reorder)
+   - Operation modal (ShadCN Dialog)
+   - Cost/duration summary panel (auto-calculated with expandable breakdown)
+   - Related BOMs section
+   - Version display in header
+
+4. **Libraries**:
+   - ShadCN `Table` for operations list
+   - ShadCN `Dialog` for operation modal
+   - ShadCN `Select` for machine/line dropdowns
+   - ShadCN `Badge` for status indicator
+   - ShadCN `Textarea` for instructions field
+   - `react-hook-form` + Zod for operation form validation
+
+5. **Validation Schema** (Zod):
+```typescript
+import { z } from 'zod'
+
+const operationFormSchema = z.object({
+  sequence: z.number()
+    .int("Sequence must be an integer")
+    .min(1, "Sequence must be at least 1"),
+  operation_name: z.string()
+    .min(3, "Name must be at least 3 characters")
+    .max(100, "Name must be less than 100 characters"),
+  machine_id: z.string().nullable().optional(),
+  production_line_id: z.string().nullable().optional(),
+  expected_duration: z.number()
+    .int("Duration must be an integer")
+    .min(1, "Duration must be at least 1 minute"),
+  setup_time: z.number()
+    .int("Setup time must be an integer")
+    .min(0, "Setup time cannot be negative")
+    .default(0),
+  cleanup_time: z.number()
+    .int("Cleanup time must be an integer")
+    .min(0, "Cleanup time cannot be negative")
+    .default(0),
+  expected_yield: z.number()
+    .min(0, "Yield cannot be negative")
+    .max(100, "Yield cannot exceed 100%")
+    .default(100),
+  instructions: z.string()
+    .max(2000, "Instructions must be less than 2000 characters")
+    .optional(),
+  labor_cost_per_hour: z.number()
+    .min(0, "Labor cost per hour cannot be negative")
+    .default(0)
+})
+```
+
+6. **State Management**:
+   - Page-level state for routing data, operations list
+   - Modal state for operation create/edit
+   - Loading state for async operations
+   - Error state for API failures
+   - Expandable state for cost breakdown
+
+7. **Real-Time Updates**:
+   - Refresh operations table after create/edit/delete
+   - Update summary panel automatically when operations change
+   - No toast for reorder (instant visual feedback)
+
+8. **Error Handling**:
+   - Handle 404 for routing not found
+   - Handle 403 for permission denied
+   - Handle validation errors in operation modal
+   - Show info message (NOT error) for duplicate sequence (parallel operations allowed)
+
+---
+
+## Field Verification (PRD Cross-Check)
+
+**Routing Operations Fields (from PRD Section 3.1 - routing_operations table):**
+- id, routing_id (auto-generated, internal)
+- sequence (Number input, required, can be duplicated for parallel ops)
+- operation_name (Text input, required, 3-100 chars)
+- machine_id (Dropdown, optional, FK to machines table)
+- production_line_id (Dropdown, optional, FK to production_lines table)
+- expected_duration (Number input, required, minutes)
+- setup_time (Number input, optional, default 0, minutes)
+- cleanup_time (Number input, optional, default 0, minutes) - **ADDED**
+- expected_yield (Decimal input, optional, default 100, 0-100%)
+- instructions (Textarea, optional, max 2000 chars) - **ADDED**
+- labor_cost_per_hour (Decimal input, optional, default 0) - **UPDATED** (was labor_cost)
+- created_at, updated_at (auto-generated, audit fields)
+
+**Routing Header Fields:**
+- version (Display in header, read-only) - **ADDED**
+
+**Business Rules:**
+- Sequence numbers can be duplicated (Parallel operations) - **UPDATED FR-2.48**
+- Operations with same sequence = run in parallel (Display "(Parallel)" indicator)
+- Info message shown when duplicate sequence detected
+- Operations are reorderable (Up/Down arrows)
+- Default yield = 100% (Pre-filled)
+- Default setup_time = 0 (Pre-filled)
+- Default cleanup_time = 0 (Pre-filled) - **ADDED**
+- Default labor_cost_per_hour = 0 (Pre-filled) - **UPDATED**
+- Summary panel calculates totals and averages (Auto-calculated)
+- Summary panel shows cost breakdown (Expandable) - **ENHANCED**
+- Related BOMs section shows usage (Fetched from API)
+
+**ALL PRD FIELDS VERIFIED**
+
+---
+
+**Status**: Ready for Implementation
+**Approval Mode**: Auto-Approve
+**Iterations**: 0 of 3
+**PRD Compliance**: 100% (all fields verified + enhancements)
+**PRD Coverage**: FR-2.41, FR-2.43, FR-2.44, FR-2.45, FR-2.48 (Parallel Operations - Simple)

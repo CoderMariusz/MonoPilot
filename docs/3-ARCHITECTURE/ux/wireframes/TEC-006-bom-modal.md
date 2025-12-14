@@ -326,6 +326,45 @@ Full page for creating new BOMs or editing existing ones. Includes BOM header (p
 └───────────────────────────────────────────────────────────────────┘
 ```
 
+### Batch Size Adjustment (Scaling) - FR-2.35
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│  Scale BOM Quantities                                          [X]│
+├───────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  Current Batch:   100 kg                                          │
+│                                                                   │
+│  Multiply by: *   ┌─────────────────────────┐                    │
+│                   │ 2.5                     │  × (multiplier)    │
+│                   └─────────────────────────┘                    │
+│                                                                   │
+│  New Batch Size:  250 kg                                          │
+│                                                                   │
+│  ────────────────────────────────────────────────────────────     │
+│                                                                   │
+│  Preview Scaled Quantities:                                       │
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  Component           │ Original  │ Scaled    │ Unit        │ │
+│  ├──────────────────────┼───────────┼───────────┼─────────────┤ │
+│  │  RM-001 Flour        │ 50.000 kg │ 125.000 kg│ kg          │ │
+│  │  ING-002 Honey       │  5.000 kg │  12.500 kg│ kg          │ │
+│  │  RM-010 Water        │ 30.000 L  │  75.000 L │ L           │ │
+│  │  RM-003 Yeast        │  0.500 kg │   1.250 kg│ kg          │ │
+│  │  PKG-001 Bag         │100 pcs    │ 250 pcs   │ pcs         │ │
+│  └──────────────────────┴───────────┴───────────┴─────────────┘ │
+│                                                                   │
+│  ℹ️ Note: This is a one-time calculation.                        │
+│     To save as new BOM, use [Clone BOM] instead.                 │
+│                                                                   │
+├───────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  [Cancel]                                         [Apply Scaling] │
+│                                                                   │
+└───────────────────────────────────────────────────────────────────┘
+```
+
 ### Edit Mode (Existing BOM)
 
 ```
@@ -1019,7 +1058,7 @@ WHERE r.id = :routing_id;
 | FR-2.32 | BOM packaging fields | ✅ Advanced settings |
 | FR-2.33 | BOM production line assignment | ✅ line_ids field |
 | FR-2.34 | BOM yield calculation | ✅ Footer totals |
-| FR-2.35 | BOM scaling | ⏳ Calculator feature |
+| FR-2.35 | BOM scaling | ✅ **Batch Size Adjustment Modal** |
 | FR-2.36 | BOM cost rollup | ✅ **Cost Summary Panel** |
 
 ### bom_items Table Coverage

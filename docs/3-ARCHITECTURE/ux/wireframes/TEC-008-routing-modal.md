@@ -34,213 +34,213 @@ Modal dialog for creating new routings or editing existing ones. Captures routin
 ### Success State (Create Mode)
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│  Create Routing                                                [X]│
-├───────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  Routing Code *                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ RTG-BREAD-01                                                │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Unique identifier (uppercase alphanumeric + hyphens)             │
-│                                                                   │
-│  Routing Name *                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ e.g., Standard Bread Line                                   │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Descriptive name for this production workflow                    │
-│                                                                   │
-│  Description                                                      │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ Optional description of the routing process...              │ │
-│  │                                                             │ │
-│  │                                                             │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Describe the production steps or purpose (optional)              │
-│                                                                   │
-│  Status *                                                         │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ Active ▼                                                    │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Active routings can be assigned to BOMs                          │
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ ☑ Reusable Routing                                          │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  If checked, this routing can be assigned to multiple products    │
-│                                                                   │
-│  Cost Configuration (Optional)       [ℹ️ Cost fields for Phase 2C-2]│
-│  ────────────────────────────────────────────                     │
-│                                                                   │
-│  Setup Cost *                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ 0.00                                                        │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Fixed cost per routing run (e.g., machine setup)   [PLN]         │
-│                                                                   │
-│  Working Cost per Unit *                                          │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ 0.00                                                        │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Variable cost per output unit (e.g., energy, consumables) [PLN]  │
-│                                                                   │
-│  Overhead Percentage                                              │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ 0.00                                                        │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Factory overhead percentage (0-100%)                             │
-│                                                                   │
-│  Currency                                                         │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ PLN ▼                                                       │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Currency for all cost fields (PLN, EUR, USD, GBP)                │
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │  ℹ Note: You'll add production operations (steps) after     │ │
-│  │  creating the routing.                                      │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                   │
-├───────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  [Cancel]                                      [Create Routing]   │
-│                                                                   │
-└───────────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------------+
+|  Create Routing                                                [X]|
++-------------------------------------------------------------------+
+|                                                                   |
+|  Routing Code *                                                   |
+|  +---------------------------------------------------------+ |
+|  | RTG-BREAD-01                                                | |
+|  +---------------------------------------------------------+ |
+|  Unique identifier (uppercase alphanumeric + hyphens)             |
+|                                                                   |
+|  Routing Name *                                                   |
+|  +---------------------------------------------------------+ |
+|  | e.g., Standard Bread Line                                   | |
+|  +---------------------------------------------------------+ |
+|  Descriptive name for this production workflow                    |
+|                                                                   |
+|  Description                                                      |
+|  +---------------------------------------------------------+ |
+|  | Optional description of the routing process...              | |
+|  |                                                             | |
+|  |                                                             | |
+|  +---------------------------------------------------------+ |
+|  Describe the production steps or purpose (optional)              |
+|                                                                   |
+|  Status *                                                         |
+|  +---------------------------------------------------------+ |
+|  | Active v                                                    | |
+|  +---------------------------------------------------------+ |
+|  Active routings can be assigned to BOMs                          |
+|                                                                   |
+|  +---------------------------------------------------------+ |
+|  | [x] Reusable Routing                                        | |
+|  +---------------------------------------------------------+ |
+|  If checked, this routing can be assigned to multiple products    |
+|                                                                   |
+|  Cost Configuration (Optional)       [i Cost fields for Phase 2C-2]|
+|  ----------------------------------------                     |
+|                                                                   |
+|  Setup Cost *                                                     |
+|  +---------------------------------------------------------+ |
+|  | 0.00                                                        | |
+|  +---------------------------------------------------------+ |
+|  Fixed cost per routing run (e.g., machine setup)   [PLN]         |
+|                                                                   |
+|  Working Cost per Unit *                                          |
+|  +---------------------------------------------------------+ |
+|  | 0.00                                                        | |
+|  +---------------------------------------------------------+ |
+|  Variable cost per output unit (e.g., energy, consumables) [PLN]  |
+|                                                                   |
+|  Overhead Percentage                                              |
+|  +---------------------------------------------------------+ |
+|  | 0.00                                                        | |
+|  +---------------------------------------------------------+ |
+|  Factory overhead percentage (0-100%)                             |
+|                                                                   |
+|  Currency                                                         |
+|  +---------------------------------------------------------+ |
+|  | PLN v                                                       | |
+|  +---------------------------------------------------------+ |
+|  Currency for all cost fields (PLN, EUR, USD, GBP)                |
+|                                                                   |
+|  +---------------------------------------------------------+ |
+|  |  [i] Note: You'll add production operations (steps) after   | |
+|  |  creating the routing.                                      | |
+|  +---------------------------------------------------------+ |
+|                                                                   |
++-------------------------------------------------------------------+
+|                                                                   |
+|  [Cancel]                                      [Create Routing]   |
+|                                                                   |
++-------------------------------------------------------------------+
 ```
 
 ### Success State (Edit Mode)
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│  Edit Routing - RTG-BREAD-01                         Version: v2 [X]│
-├───────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  Routing Code *                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ RTG-BREAD-01                                                │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Unique identifier (uppercase alphanumeric + hyphens)             │
-│                                                                   │
-│  Routing Name *                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ Standard Bread Line                                         │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Descriptive name for this production workflow                    │
-│                                                                   │
-│  Description                                                      │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ Mixing → Proofing → Baking → Cooling workflow for standard │ │
-│  │ bread products. Used across multiple bread SKUs.            │ │
-│  │                                                             │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Describe the production steps or purpose (optional)              │
-│                                                                   │
-│  Status *                                                         │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ Active ▼                                                    │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Active routings can be assigned to BOMs                          │
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ ☑ Reusable Routing                                          │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  If checked, this routing can be assigned to multiple products    │
-│                                                                   │
-│  Cost Configuration (Optional)       [ℹ️ Cost fields for Phase 2C-2]│
-│  ────────────────────────────────────────────                     │
-│                                                                   │
-│  Setup Cost *                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ 50.00                                                       │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Fixed cost per routing run (e.g., machine setup)   [PLN]         │
-│                                                                   │
-│  Working Cost per Unit *                                          │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ 0.25                                                        │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Variable cost per output unit (e.g., energy, consumables) [PLN]  │
-│                                                                   │
-│  Overhead Percentage                                              │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ 15.00                                                       │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Factory overhead percentage (0-100%)                             │
-│                                                                   │
-│  Currency                                                         │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ PLN ▼                                                       │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  Currency for all cost fields (PLN, EUR, USD, GBP)                │
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │  ⚠ Warning: This routing is used by 3 BOM(s). Marking it   │ │
-│  │  inactive will prevent assignment to new BOMs but won't    │ │
-│  │  affect existing ones.                                      │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                   │
-├───────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  [Cancel]                                        [Save Changes]   │
-│                                                                   │
-└───────────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------------+
+|  Edit Routing - RTG-BREAD-01                         Version: v2 [X]|
++-------------------------------------------------------------------+
+|                                                                   |
+|  Routing Code *                                                   |
+|  +---------------------------------------------------------+ |
+|  | RTG-BREAD-01                                                | |
+|  +---------------------------------------------------------+ |
+|  Unique identifier (uppercase alphanumeric + hyphens)             |
+|                                                                   |
+|  Routing Name *                                                   |
+|  +---------------------------------------------------------+ |
+|  | Standard Bread Line                                         | |
+|  +---------------------------------------------------------+ |
+|  Descriptive name for this production workflow                    |
+|                                                                   |
+|  Description                                                      |
+|  +---------------------------------------------------------+ |
+|  | Mixing -> Proofing -> Baking -> Cooling workflow for standard | |
+|  | bread products. Used across multiple bread SKUs.            | |
+|  |                                                             | |
+|  +---------------------------------------------------------+ |
+|  Describe the production steps or purpose (optional)              |
+|                                                                   |
+|  Status *                                                         |
+|  +---------------------------------------------------------+ |
+|  | Active v                                                    | |
+|  +---------------------------------------------------------+ |
+|  Active routings can be assigned to BOMs                          |
+|                                                                   |
+|  +---------------------------------------------------------+ |
+|  | [x] Reusable Routing                                        | |
+|  +---------------------------------------------------------+ |
+|  If checked, this routing can be assigned to multiple products    |
+|                                                                   |
+|  Cost Configuration (Optional)       [i Cost fields for Phase 2C-2]|
+|  ----------------------------------------                     |
+|                                                                   |
+|  Setup Cost *                                                     |
+|  +---------------------------------------------------------+ |
+|  | 50.00                                                       | |
+|  +---------------------------------------------------------+ |
+|  Fixed cost per routing run (e.g., machine setup)   [PLN]         |
+|                                                                   |
+|  Working Cost per Unit *                                          |
+|  +---------------------------------------------------------+ |
+|  | 0.25                                                        | |
+|  +---------------------------------------------------------+ |
+|  Variable cost per output unit (e.g., energy, consumables) [PLN]  |
+|                                                                   |
+|  Overhead Percentage                                              |
+|  +---------------------------------------------------------+ |
+|  | 15.00                                                       | |
+|  +---------------------------------------------------------+ |
+|  Factory overhead percentage (0-100%)                             |
+|                                                                   |
+|  Currency                                                         |
+|  +---------------------------------------------------------+ |
+|  | PLN v                                                       | |
+|  +---------------------------------------------------------+ |
+|  Currency for all cost fields (PLN, EUR, USD, GBP)                |
+|                                                                   |
+|  +---------------------------------------------------------+ |
+|  |  [!] Warning: This routing is used by 3 BOM(s). Marking it   | |
+|  |  inactive will prevent assignment to new BOMs but won't    | |
+|  |  affect existing ones.                                      | |
+|  +---------------------------------------------------------+ |
+|                                                                   |
++-------------------------------------------------------------------+
+|                                                                   |
+|  [Cancel]                                        [Save Changes]   |
+|                                                                   |
++-------------------------------------------------------------------+
 ```
 
 ### Loading State
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│  Create Routing                                                [X]│
-├───────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│                         [Spinner]                                 │
-│                                                                   │
-│                    Creating routing...                            │
-│                                                                   │
-│                 Please wait a moment.                             │
-│                                                                   │
-│  [Disabled form fields shown as skeleton]                         │
-│                                                                   │
-│                                                                   │
-│                                                                   │
-├───────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  [Cancel (disabled)]                     [Create Routing (disabled)]│
-│                                                                   │
-└───────────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------------+
+|  Create Routing                                                [X]|
++-------------------------------------------------------------------+
+|                                                                   |
+|                         [Spinner]                                 |
+|                                                                   |
+|                    Creating routing...                            |
+|                                                                   |
+|                 Please wait a moment.                             |
+|                                                                   |
+|  [Disabled form fields shown as skeleton]                         |
+|                                                                   |
+|                                                                   |
+|                                                                   |
++-------------------------------------------------------------------+
+|                                                                   |
+|  [Cancel (disabled)]                     [Create Routing (disabled)]|
+|                                                                   |
++-------------------------------------------------------------------+
 ```
 
 ### Error State
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│  Create Routing                                                [X]│
-├───────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │  ❌ Failed to Create Routing                                │ │
-│  │                                                             │ │
-│  │  Error: Code "RTG-BREAD-01" already exists in your         │ │
-│  │  organization.                                             │ │
-│  │                                                             │ │
-│  │  Please choose a different code.                           │ │
-│  │                                                             │ │
-│  │  [Dismiss]                                                  │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                   │
-│  Routing Code * [Error highlighted in red]                        │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │ RTG-BREAD-01                                                │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│  ⚠ Code already exists                                           │
-│                                                                   │
-│  [Rest of form...]                                                │
-│                                                                   │
-├───────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  [Cancel]                                      [Create Routing]   │
-│                                                                   │
-└───────────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------------+
+|  Create Routing                                                [X]|
++-------------------------------------------------------------------+
+|                                                                   |
+|  +---------------------------------------------------------+ |
+|  |  [X] Failed to Create Routing                              | |
+|  |                                                             | |
+|  |  Error: Code "RTG-BREAD-01" already exists in your         | |
+|  |  organization.                                             | |
+|  |                                                             | |
+|  |  Please choose a different code.                           | |
+|  |                                                             | |
+|  |  [Dismiss]                                                  | |
+|  +---------------------------------------------------------+ |
+|                                                                   |
+|  Routing Code * [Error highlighted in red]                        |
+|  +---------------------------------------------------------+ |
+|  | RTG-BREAD-01                                                | |
+|  +---------------------------------------------------------+ |
+|  [!] Code already exists                                           |
+|                                                                   |
+|  [Rest of form...]                                                |
+|                                                                   |
++-------------------------------------------------------------------+
+|                                                                   |
+|  [Cancel]                                      [Create Routing]   |
+|                                                                   |
++-------------------------------------------------------------------+
 ```
 
 ### Empty State
@@ -306,7 +306,7 @@ Modal dialog for creating new routings or editing existing ones. Captures routin
 - **Rows**: 3
 - **Help Text**: "Describe the production steps or purpose (optional)"
 - **Examples**:
-  - "Mixing → Proofing → Baking → Cooling workflow for standard bread products"
+  - "Mixing -> Proofing -> Baking -> Cooling workflow for standard bread products"
   - "Basic cake workflow with mixing, baking, and decorating stages"
 
 #### Status (Required)
@@ -317,7 +317,7 @@ Modal dialog for creating new routings or editing existing ones. Captures routin
   - "Inactive"
 - **Help Text**: "Active routings can be assigned to BOMs"
 - **Edit Mode Warning** (if changing to Inactive and routing is used):
-  - "⚠ Warning: This routing is used by X BOM(s). Marking it inactive will prevent assignment to new BOMs but won't affect existing ones."
+  - "[!] Warning: This routing is used by X BOM(s). Marking it inactive will prevent assignment to new BOMs but won't affect existing ones."
 
 #### Is Reusable (Checkbox)
 - **Type**: Checkbox
@@ -367,7 +367,7 @@ Modal dialog for creating new routings or editing existing ones. Captures routin
 
 ### 4. Info Banner
 - **Create Mode**: Blue info banner
-  - "ℹ Note: You'll add production operations (steps) after creating the routing."
+  - "[i] Note: You'll add production operations (steps) after creating the routing."
   - Purpose: Set expectation that this is step 1 of 2
 - **Edit Mode**: Warning banner (if routing is used by BOMs and being deactivated)
 
@@ -382,7 +382,7 @@ Modal dialog for creating new routings or editing existing ones. Captures routin
   - On success:
     - Close modal
     - Show toast: "Routing created successfully"
-    - Navigate to detail page: `/technical/routings/{id}` (TEC-010)
+    - Navigate to detail page: `/technical/routings/{id}` (TEC-008a)
     - Detail page prompts user to add operations
   - On error: Show error banner in modal
 
@@ -407,35 +407,45 @@ Modal dialog for creating new routings or editing existing ones. Captures routin
 
 ```
 Modal Opens (Create Mode)
-  ↓
+  |
+  v
 SUCCESS (Empty form with defaults)
-  ↓ User fills code + name
+  | User fills code + name
+  v
 DIRTY (Form has changes)
-  ↓ [Create Routing]
+  | [Create Routing]
+  v
 LOADING (Show spinner, disable buttons)
-  ↓ Success
-CLOSE + Toast notification + Navigate to TEC-010 detail page
+  | Success
+  v
+CLOSE + Toast notification + Navigate to TEC-008a detail page
 
 OR
 
 LOADING
-  ↓ Failure (validation error, e.g., duplicate code)
+  | Failure (validation error, e.g., duplicate code)
+  v
 ERROR (Show error banner, enable buttons)
-  ↓ User fixes error
+  | User fixes error
+  v
 DIRTY
-  ↓ Retry
+  | Retry
 
 OR
 
 Modal Opens (Edit Mode)
-  ↓
+  |
+  v
 LOADING (Show spinner)
-  ↓ Fetch routing data
+  | Fetch routing data
+  v
 SUCCESS (Pre-filled form)
-  ↓ User edits
+  | User edits
+  v
 DIRTY
-  ↓ [Save Changes]
-LOADING → SUCCESS (close + refresh) OR ERROR (stay open)
+  | [Save Changes]
+  v
+LOADING -> SUCCESS (close + refresh) OR ERROR (stay open)
 ```
 
 ---
@@ -516,7 +526,7 @@ POST /api/technical/routings
 {
   code: string                // "RTG-BREAD-01"
   name: string                // "Standard Bread Line"
-  description?: string | null // "Mixing → Baking..."
+  description?: string | null // "Mixing -> Baking..."
   status: "Active" | "Inactive" // "Active" (default)
   is_reusable: boolean        // true (default)
   setup_cost?: number         // 0.00 (default) - ADR-009
@@ -679,7 +689,7 @@ if (editMode && formData.status === 'Inactive' && originalData.status === 'Activ
 ## Related Screens
 
 - **Previous**: TEC-007 Routings List (opens modal)
-- **Next (Create)**: TEC-010 Routing Detail Page (for adding operations)
+- **Next (Create)**: TEC-008a Routing Detail Page (for adding operations)
 - **Next (Edit)**: Returns to TEC-007 list
 - **Related**: TEC-006 BOM Modal (BOMs reference routings)
 
@@ -748,7 +758,7 @@ const routingFormSchema = z.object({
    - POST for create, PUT for edit
    - Handle 409 Conflict for duplicate codes
    - Handle 400 Bad Request for validation errors
-   - Navigate to TEC-010 detail page on create success
+   - Navigate to TEC-008a detail page on create success
    - Refresh parent list on edit success
 
 ### Create Flow
@@ -847,32 +857,32 @@ const handleEdit = async (data: FormData) => {
 ## Field Verification (PRD Cross-Check)
 
 **Routing Core Fields (from PRD Section 3.1 - routings table):**
-- ✅ id, org_id (auto-generated, internal)
-- ✅ code (Text input, required, unique, uppercase, 2-50 chars)
-- ✅ name (Text input, required, 3-100 chars)
-- ✅ description (Textarea, optional, max 500 chars)
-- ✅ status (Dropdown: Active/Inactive, replaces is_active)
-- ✅ is_reusable (Checkbox, defaults to true)
-- ✅ version (Read-only, display in edit mode header, auto-set to 1 on create)
-- ✅ setup_cost (Decimal input, optional, default 0) - **ADR-009**
-- ✅ working_cost_per_unit (Decimal input, optional, default 0) - **ADR-009**
-- ✅ overhead_percent (Decimal input, optional, default 0, 0-100) - **ADR-009**
-- ✅ currency (Dropdown, optional, default PLN) - **ADR-009**
-- ✅ created_at, updated_at, created_by (auto-generated, audit fields)
+- id, org_id (auto-generated, internal)
+- code (Text input, required, unique, uppercase, 2-50 chars)
+- name (Text input, required, 3-100 chars)
+- description (Textarea, optional, max 500 chars)
+- status (Dropdown: Active/Inactive, replaces is_active)
+- is_reusable (Checkbox, defaults to true)
+- version (Read-only, display in edit mode header, auto-set to 1 on create)
+- setup_cost (Decimal input, optional, default 0) - **ADR-009**
+- working_cost_per_unit (Decimal input, optional, default 0) - **ADR-009**
+- overhead_percent (Decimal input, optional, default 0, 0-100) - **ADR-009**
+- currency (Dropdown, optional, default PLN) - **ADR-009**
+- created_at, updated_at, created_by (auto-generated, audit fields)
 
-**Note:** Routing operations (routing_operations table) are NOT managed in this modal. They are added in TEC-010 detail view after routing creation.
+**Note:** Routing operations (routing_operations table) are NOT managed in this modal. They are added in TEC-008a detail view after routing creation.
 
 **Business Rules:**
-- ✅ Code must be unique within organization (Server validation)
-- ✅ Code auto-uppercase transform (Client-side)
-- ✅ Default status = Active (Pre-filled)
-- ✅ Default is_reusable = true (Pre-filled)
-- ✅ Operations added separately (Info banner in create mode)
-- ✅ Inactive routings cannot be assigned to new BOMs (Help text)
-- ✅ Deactivating used routing shows warning (Edit mode)
-- ✅ Cost fields optional for Phase 2C-2 (ADR-009)
+- Code must be unique within organization (Server validation)
+- Code auto-uppercase transform (Client-side)
+- Default status = Active (Pre-filled)
+- Default is_reusable = true (Pre-filled)
+- Operations added separately (Info banner in create mode)
+- Inactive routings cannot be assigned to new BOMs (Help text)
+- Deactivating used routing shows warning (Edit mode)
+- Cost fields optional for Phase 2C-2 (ADR-009)
 
-**ALL PRD FIELDS VERIFIED ✅**
+**ALL PRD FIELDS VERIFIED**
 
 ---
 

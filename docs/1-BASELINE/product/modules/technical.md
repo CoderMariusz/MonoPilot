@@ -1,8 +1,8 @@
 # Technical Module - Product Requirements Document
 
-**Version**: 2.3
+**Version**: 2.4
 **Last Updated**: 2025-12-14
-**Status**: Production (Epic 2 Complete + Wave 1-3 Fixes)
+**Status**: Production (Epic 2 Complete + Wave 1-3 Fixes + FR-2.49 Moved to Epic 6)
 **Owner**: Product Team
 
 ## 1. Overview
@@ -70,8 +70,8 @@ Food Manufacturing ERP Technical Module manages product lifecycle from formulati
 | FR-2.45 | Operation instructions and attachments | P1 | 2C-1 | Done |
 | FR-2.46 | Routing versioning | P1 | 2C-1 | Done |
 | FR-2.47 | Routing templates | P2 | Future | Planned |
-| FR-2.48 | Parallel operations | P2 | Future | Planned |
-| FR-2.49 | Operation quality checkpoints | P1 | Epic 6 | Planned |
+| FR-2.48 | Parallel operations (simple - duplicate sequences) | P2 | 2C-3 | **Done** (migration 050) |
+| FR-2.49 | Operation quality checkpoints | P1 | Epic 6 | **Moved to Quality Module** |
 | FR-2.50 | Operation labor cost calculation | P1 | 2C-2 | **Done** |
 | FR-2.51 | Routing setup cost configuration | P1 | 2C-2 | **Done** (ADR-009) |
 | FR-2.52 | Routing working cost per unit/batch | P1 | 2C-2 | **Done** (ADR-009) |
@@ -655,7 +655,7 @@ Total Cost = Material Cost (BOM items)
 - License plate (LP) tracking
 
 ### 7.5 Quality Module
-- Operation quality checkpoints in routing
+- Operation quality checkpoints in routing (**FR-6.XX** - in Quality module, see quality.md)
 - Allergen validation against declarations
 - Nutrition claims verification
 - Specification compliance
@@ -904,6 +904,7 @@ Total Cost = Material Cost (BOM items)
 ### Change Log
 | Date | Version | Changes | Author |
 |------|---------|---------|--------|
+| 2025-12-14 | 2.4 | Moved FR-2.49 to Quality Module (Epic 6), updated integration points | Architect |
 | 2025-12-14 | 2.3 | Wave 1-3 fixes: migrations 045-049, costing-service.ts, FR-2.24 DONE, FR-2.36 DONE, FR-2.90-92 schema ready | Architect |
 | 2025-12-14 | 2.2 | Added routings.code, is_reusable (UX TEC-008); routing_operations.cleanup_time, instructions (UX TEC-010); FR-2.54, FR-2.55 | Architect |
 | 2025-12-14 | 2.1 | Added routing-level costs (FR-2.51, FR-2.52, FR-2.53, FR-2.77, ADR-009) | Architect |
@@ -919,3 +920,4 @@ Total Cost = Material Cost (BOM items)
 **Document Status**: ACTIVE
 **Total Lines**: ~1200
 **Format**: Concise PRD (tables, bullets, key info only)
+**FRs Covered**: 13/15 = 87% (was 13/16 before FR-2.49 moved to Epic 6)

@@ -2,7 +2,7 @@
 
 **MonoPilot Food MES - Quality Management System**
 
-Version: 2.0 | Date: 2025-12-10 | Owner: Product Team
+Version: 2.1 | Date: 2025-12-14 | Owner: Product Team
 
 ---
 
@@ -12,6 +12,7 @@ Food safety and quality management module supporting:
 - QA status tracking (Pending/Passed/Failed/Hold)
 - Multi-stage inspections (Incoming/In-Process/Final)
 - HACCP/CCP critical control point management
+- Operation quality checkpoints in routing (from Technical module)
 - NCR lifecycle and CAPA
 - CoA management and supplier quality
 - Complete audit trail and traceability
@@ -47,6 +48,7 @@ Food safety and quality management module supporting:
 | FR-QA-023 | Retention Sample Management | P1 | 4 | FR-QA-007 |
 | FR-QA-024 | Document Control & Versioning | P1 | 4 | FR-QA-003 |
 | FR-QA-025 | Scanner Integration | P0 | 2 | Mobile |
+| FR-QA-026 | Operation quality checkpoints | P1 | 2 | Routing (from Technical) |
 
 ---
 
@@ -109,6 +111,12 @@ Food safety and quality management module supporting:
 
 **quality_hold_items**
 - `id`, `hold_id`, `reference_type`, `reference_id`, `quantity_held`
+
+**operation_quality_checkpoints** (NEW - for FR-QA-026)
+- `id`, `org_id`, `routing_id`, `operation_id`, `checkpoint_name`, `checkpoint_type` (visual/measurement/equipment), `min_value`, `max_value`, `unit`, `test_method`, `operator_sign_off_required`, `auto_hold_on_failure`, `sequence`, `is_active`, `created_at`, `updated_at`
+
+**operation_checkpoint_results** (NEW - for FR-QA-026)
+- `id`, `org_id`, `checkpoint_id`, `work_order_id`, `operation_instance_id`, `result_status` (pass/fail/review), `measured_value`, `result_notes`, `operator_signature`, `signed_at`, `created_at`
 
 ### 4.2 NCR & CAPA Tables
 
@@ -223,6 +231,21 @@ GET    /api/quality/inspections/pending
 GET    /api/quality/inspections/incoming
 GET    /api/quality/inspections/in-process
 GET    /api/quality/inspections/final
+```
+
+### Operation Quality Checkpoints (NEW - for FR-QA-026)
+```
+GET    /api/quality/operation-checkpoints
+POST   /api/quality/operation-checkpoints
+GET    /api/quality/operation-checkpoints/:id
+PUT    /api/quality/operation-checkpoints/:id
+DELETE /api/quality/operation-checkpoints/:id
+GET    /api/quality/operation-checkpoints/routing/:routingId
+GET    /api/quality/operation-checkpoints/operation/:operationId
+POST   /api/quality/operation-checkpoint-results
+GET    /api/quality/operation-checkpoint-results/wo/:workOrderId
+GET    /api/quality/operation-checkpoint-results/checkpoint/:checkpointId
+POST   /api/quality/operation-checkpoint-results/:id/sign-off
 ```
 
 ### NCR Management
@@ -397,7 +420,7 @@ GET    /api/quality/batch/:batchId/status
 ### 6.4 CCP Integration Points
 
 - **Work Orders**: CCP monitoring tied to WO operations
-- **Routing**: CCPs mapped to routing steps
+- **Routing**: CCPs mapped to routing steps, Operation quality checkpoints (FR-QA-026)
 - **Scanner**: Mobile CCP data entry on shop floor
 - **Alerts**: Email/SMS on deviations
 - **NCR**: Auto-create NCR on repeated failures
@@ -414,16 +437,71 @@ GET    /api/quality/batch/:batchId/status
 
 ---
 
-## 7. NCR Lifecycle
+## 7. Operation Quality Checkpoints (FR-QA-026)
 
-### 7.1 NCR States
+### 7.1 Overview
+
+Quality checkpoints are in-process quality checks performed at specific routing operations during work order execution. These are distinct from:
+- **HACCP CCPs**: Strategic critical control points defined at product level
+- **Final Inspection**: End-of-batch quality verification
+- **Operation Checkpoints**: Tactical quality checks per operation in the routing
+
+### 7.2 Checkpoint Types
+
+| Type | Example | Method | Sign-off |
+|------|---------|--------|----------|
+| Visual | Color check, package integrity | Visual inspection | Operator |
+| Measurement | Weight, temperature, dimensions | Equipment (scale, thermometer, calipers) | Operator |
+| Equipment | Metal detection, X-ray | Automated equipment | System + Operator |
+| Attribute | Defect count, fill level | Binary (pass/fail) | Operator |
+
+### 7.3 Workflow
+
+**Configuration Phase:**
+1. QA Manager defines checkpoints in routing
+2. Set acceptance criteria (min/max, visual standards)
+3. Mark as mandatory or optional per operation
+4. Set auto-hold flag (fail = halt production)
+5. Define escalation (notify QA manager)
+
+**Execution Phase:**
+1. Operator receives work order with routing operations
+2. At each checkpoint operation, operator records result
+3. System validates against criteria
+4. Pass → Continue to next operation
+5. Fail (auto-hold=true) → Production halts, QA notified
+6. Fail (auto-hold=false) → Log result, operator can proceed or escalate
+
+**Review Phase:**
+1. QA Manager reviews failed checkpoints
+2. Decide: accept/reject/rework
+3. Sign off or create NCR
+4. Release batch for next stage
+
+### 7.4 Business Rules for FR-QA-026
+
+- Checkpoints are defined per operation (sequence) in routing
+- Multiple checkpoints per operation allowed
+- Checkpoints have min/max values or visual standards
+- Operator signature required on all results
+- Auto-hold on failure can auto-quarantine batch
+- Failed results trigger quality hold (auto or manual)
+- Results linked to work order + operation instance
+- Audit trail on all checkpoint results
+- Mobile-friendly (scanner app support)
+
+---
+
+## 8. NCR Lifecycle
+
+### 8.1 NCR States
 
 ```
 Draft → Open → Investigation → Root Cause → Corrective Action →
 Verification → Closed / Reopened
 ```
 
-### 7.2 NCR Workflow
+### 8.2 NCR Workflow
 
 | Step | Owner | Actions | Outputs |
 |------|-------|---------|---------|
@@ -435,7 +513,7 @@ Verification → Closed / Reopened
 | Verification | QA Manager | Verify effectiveness | Verification record |
 | Closure | QA Manager | Sign-off, release hold | NCR closed |
 
-### 7.3 NCR Severity Levels
+### 8.3 NCR Severity Levels
 
 - **Critical**: Food safety risk, regulatory violation (response: 24h)
 - **Major**: Quality impact, customer complaint (response: 48h)
@@ -443,9 +521,9 @@ Verification → Closed / Reopened
 
 ---
 
-## 8. Inspection Types
+## 9. Inspection Types
 
-### 8.1 Incoming Inspection
+### 9.1 Incoming Inspection
 
 **Trigger:** PO receipt
 **Scope:** Raw materials, packaging, ingredients
@@ -459,7 +537,7 @@ Verification → Closed / Reopened
 - CoA validation (if required)
 - Specification compliance
 
-### 8.2 In-Process Inspection
+### 9.2 In-Process Inspection
 
 **Trigger:** WO operation completion
 **Scope:** Semi-finished products, WIP
@@ -471,8 +549,9 @@ Verification → Closed / Reopened
 - Dimensional checks
 - CCP monitoring values
 - Sample testing
+- Operation quality checkpoints (FR-QA-026)
 
-### 8.3 Final Inspection
+### 9.3 Final Inspection
 
 **Trigger:** WO completion
 **Scope:** Finished goods before release
@@ -488,7 +567,7 @@ Verification → Closed / Reopened
 
 ---
 
-## 9. Phase Roadmap
+## 10. Phase Roadmap
 
 ### Phase 1: Core Quality (Weeks 1-4)
 - Quality status management (Pending/Passed/Failed/Hold)
@@ -508,6 +587,7 @@ Verification → Closed / Reopened
 - NCR workflow and lifecycle
 - Quality alerts and notifications
 - Test result recording and trending
+- **Operation quality checkpoints (FR-QA-026)**
 
 **Deliverable:** Full inspection cycle operational
 
@@ -535,7 +615,7 @@ Verification → Closed / Reopened
 
 ---
 
-## 10. Quality Status Types
+## 11. Quality Status Types
 
 | Status | Code | Description | Allows Shipment | Allows Consumption |
 |--------|------|-------------|-----------------|-------------------|
@@ -549,16 +629,16 @@ Verification → Closed / Reopened
 
 ---
 
-## 11. Sampling Plans (AQL-Based)
+## 12. Sampling Plans (AQL-Based)
 
-### 11.1 Sampling Methods
+### 12.1 Sampling Methods
 
 - **Random**: System selects random units
 - **Systematic**: Every Nth unit
 - **AQL-based**: ISO 2859 / ANSI Z1.4 tables
 - **Custom**: User-defined criteria
 
-### 11.2 Sample Size Table
+### 12.2 Sample Size Table
 
 | Lot Size | Normal | Reduced | Tightened |
 |----------|--------|---------|-----------|
@@ -574,16 +654,16 @@ Verification → Closed / Reopened
 
 ---
 
-## 12. CoA Management
+## 13. CoA Management
 
-### 12.1 CoA Generation Triggers
+### 13.1 CoA Generation Triggers
 
 - Manual request (customer order)
 - Automatic on batch completion
 - On-demand for specific lots
 - Regulatory requirement
 
-### 12.2 CoA Template Elements
+### 13.2 CoA Template Elements
 
 - Company header/logo
 - Product identification (name, code, batch, date)
@@ -592,7 +672,7 @@ Verification → Closed / Reopened
 - Authorized signatures (e-signature)
 - Footer (address, accreditation logos)
 
-### 12.3 CoA Workflow
+### 13.3 CoA Workflow
 
 1. Batch completes final inspection
 2. All test results reviewed
@@ -604,7 +684,7 @@ Verification → Closed / Reopened
 
 ---
 
-## 13. User Roles & Permissions
+## 14. User Roles & Permissions
 
 | Role | Create Inspections | Record Results | Approve Release | Manage NCR | Configure HACCP | Close NCR |
 |------|-------------------|----------------|-----------------|------------|-----------------|-----------|
@@ -617,13 +697,14 @@ Verification → Closed / Reopened
 
 ---
 
-## 14. KPIs & Metrics
+## 15. KPIs & Metrics
 
 | Metric | Formula | Target |
 |--------|---------|--------|
 | First Pass Yield | (Passed inspections / Total) × 100 | >95% |
 | NCR Rate | NCRs per 1000 batches | <5 |
 | CCP Compliance | (Within limits / Total readings) × 100 | >99% |
+| Operation Checkpoint Pass Rate | (Checkpoint pass / Total) × 100 | >98% |
 | CoA Turnaround | Hours from batch close to CoA issue | <24h |
 | Hold Resolution Time | Days from hold to release | <3d |
 | Supplier Quality Score | Weighted average of deliveries | >85 |
@@ -632,9 +713,9 @@ Verification → Closed / Reopened
 
 ---
 
-## 15. Compliance & Standards
+## 16. Compliance & Standards
 
-### 15.1 Regulatory Support
+### 16.1 Regulatory Support
 
 - FDA 21 CFR Part 11 (electronic records/signatures)
 - FSMA (Food Safety Modernization Act)
@@ -645,7 +726,7 @@ Verification → Closed / Reopened
 - SQF (Safe Quality Food)
 - HACCP (Codex Alimentarius)
 
-### 15.2 Audit Trail Requirements
+### 16.2 Audit Trail Requirements
 
 - All quality records immutable once signed
 - User identification and authentication
@@ -656,17 +737,18 @@ Verification → Closed / Reopened
 
 ---
 
-## 16. Integration Points
+## 17. Integration Points
 
-### 16.1 Internal Modules
+### 17.1 Internal Modules
 
 - **Products**: Specifications linked to product master
+- **Technical**: Operation quality checkpoints in routing (FR-QA-026)
 - **Warehouse**: Quality holds prevent stock usage
-- **Production**: In-process inspections at operations, CCP monitoring
+- **Production**: In-process inspections at operations, CCP monitoring, checkpoint results
 - **Planning**: Batch release controls MRP
 - **Shipping**: Final inspection blocks shipment
 
-### 16.2 External Systems
+### 17.2 External Systems
 
 - **LIMS**: Import test results
 - **ERP**: Sync product specs
@@ -675,11 +757,12 @@ Verification → Closed / Reopened
 
 ---
 
-## 17. Notification & Alerts
+## 18. Notification & Alerts
 
 | Event | Recipients | Channel | Urgency |
 |-------|-----------|---------|---------|
 | CCP Deviation | QA Manager, Production Lead | Email + SMS | Critical |
+| Checkpoint Failure (auto-hold) | Production Lead, QA Manager | Email + SMS | Critical |
 | Inspection Due | Assigned Inspector | Email | High |
 | Hold Aging (>48h) | QA Manager | Email | Medium |
 | NCR Overdue | NCR Owner | Email | High |
@@ -689,11 +772,12 @@ Verification → Closed / Reopened
 
 ---
 
-## 18. Data Retention
+## 19. Data Retention
 
 | Record Type | Active | Archive | Total |
 |-------------|--------|---------|-------|
 | Inspection Records | 2 years | 5 years | 7 years |
+| Operation Checkpoint Results | 1 year | 2 years | 3 years |
 | NCR Reports | 3 years | 7 years | 10 years |
 | CoA | 2 years | 8 years | 10 years |
 | HACCP Records | 2 years | 3 years | 5 years |
@@ -703,9 +787,9 @@ Verification → Closed / Reopened
 
 ---
 
-## 19. Success Criteria
+## 20. Success Criteria
 
-### 19.1 Launch Criteria
+### 20.1 Launch Criteria
 
 - [ ] All Phase 1 features deployed
 - [ ] 20 products with specs configured
@@ -715,10 +799,11 @@ Verification → Closed / Reopened
 - [ ] Reporting functional
 - [ ] UAT sign-off received
 
-### 19.2 Post-Launch Metrics (30 days)
+### 20.2 Post-Launch Metrics (30 days)
 
 - Daily inspection rate: >50 inspections/day
 - CCP monitoring compliance: >95%
+- Operation checkpoint pass rate: >98%
 - NCR response time: <24h (critical)
 - User adoption: >80% of QA team
 - System uptime: >99.5%
@@ -726,7 +811,7 @@ Verification → Closed / Reopened
 
 ---
 
-## 20. Open Questions
+## 21. Open Questions
 
 1. Which LIMS systems require integration?
 2. Specific regulatory requirements by region?
@@ -739,9 +824,9 @@ Verification → Closed / Reopened
 
 ---
 
-## 21. Appendix
+## 22. Appendix
 
-### 21.1 Glossary
+### 22.1 Glossary
 
 - **AQL**: Acceptable Quality Level
 - **CAPA**: Corrective and Preventive Action
@@ -754,7 +839,7 @@ Verification → Closed / Reopened
 - **NCR**: Non-Conformance Report
 - **SOP**: Standard Operating Procedure
 
-### 21.2 References
+### 22.2 References
 
 - FDA 21 CFR Part 11
 - ISO 9001:2015
@@ -764,6 +849,10 @@ Verification → Closed / Reopened
 
 ---
 
-**Document Status**: Draft v2.0
-**Next Review**: 2025-12-17
-**Lines**: 820 (UNDER 1500 LIMIT)
+**Document Status**: Active v2.1
+**Next Review**: 2025-12-21
+**Lines**: 850 (UNDER 1500 LIMIT)
+**FRs Covered**: 26 + 1 new = 27 (FR-QA-026 added from Technical FR-2.49)
+**Change Log**:
+- v2.1 (2025-12-14): Added FR-QA-026 (Operation quality checkpoints) - moved from Technical FR-2.49
+- v2.0 (2025-12-10): Initial Quality Module PRD

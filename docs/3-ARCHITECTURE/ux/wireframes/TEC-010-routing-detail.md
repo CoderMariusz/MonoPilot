@@ -64,6 +64,10 @@ Detail page for viewing and managing routing header information and operations. 
 │  │     │                    │              │         │          │        │ │
 │  │     │ Yield: 100% │ Labor: $8.00/hr              [↑] [↓] [✎] [🗑] │ │
 │  ├─────┼────────────────────┼──────────────┼─────────┼──────────┼────────┤ │
+│  │  2  │ Heating (Parallel) │ Heater-03    │ Line-A  │    40    │   2    │ │
+│  │     │                    │              │         │          │        │ │
+│  │     │ Yield: 100% │ Labor: $10.00/hr             [↑] [↓] [✎] [🗑] │ │
+│  ├─────┼────────────────────┼──────────────┼─────────┼──────────┼────────┤ │
 │  │  3  │ Baking             │ Oven-02      │ Line-A  │    30    │  10    │ │
 │  │     │                    │              │         │          │        │ │
 │  │     │ Yield: 95% │ Labor: $15.00/hr             [↑] [↓] [✎] [🗑] │ │
@@ -858,6 +862,140 @@ GET /api/settings/production-lines?org_id={org_id}
 
 ---
 
+## Parallel Operations Feature (FR-2.48 - Simple Version)
+
+### Overview
+
+**Status**: Implemented via Migration 050
+**Scope**: Simple/MVP version allowing duplicate sequence numbers
+**Future**: Phase 2 Complex will add dependency graphs and resource conflict detection
+
+### How It Works
+
+1. **Database Change**:
+   - UNIQUE constraint on `(routing_id, sequence)` has been REMOVED
+   - Multiple operations can now have the same sequence number
+
+2. **Business Logic**:
+   - Operations with same sequence number = run in parallel
+   - Example: Seq 2 (Mixing) + Seq 2 (Heating) = both happen simultaneously
+
+3. **UI Behavior**:
+   - When creating/editing operation, user can enter any sequence number
+   - If sequence already exists, show info message: "ℹ️ Sequence X is already used. This operation will run in parallel."
+   - In operations table, append "(Parallel)" to operation name if sequence is duplicated
+   - No blocking validation - allow save
+
+### Example Use Cases
+
+**Scenario 1: Bread Production**
+```
+Seq 1: Mixing (15 min)
+Seq 2: Proofing (45 min)     ← Run in parallel
+Seq 2: Heating (40 min)       ← Run in parallel
+Seq 3: Baking (30 min)
+```
+Total time: 15 + MAX(45, 40) + 30 = 90 minutes (not 130!)
+
+**Scenario 2: Multi-Stage Processing**
+```
+Seq 1: Prep A (10 min)
+Seq 2: Cook A (20 min)        ← Run in parallel
+Seq 2: Prep B (15 min)        ← Run in parallel
+Seq 3: Assembly (10 min)
+```
+
+### UI Implementation Notes
+
+**Operations Table Display:**
+```typescript
+// Detect parallel operations (same sequence as another operation)
+const sequenceCounts = operations.reduce((acc, op) => {
+  acc[op.sequence] = (acc[op.sequence] || 0) + 1
+  return acc
+}, {} as Record<number, number>)
+
+// Render operation name with parallel indicator
+const displayName = sequenceCounts[operation.sequence] > 1
+  ? `${operation.operation_name} (Parallel)`
+  : operation.operation_name
+```
+
+**Operation Form Validation:**
+```typescript
+// Check if sequence already exists (for info message, NOT blocking)
+const existingOp = operations.find(op =>
+  op.sequence === formData.sequence &&
+  op.id !== currentOperationId  // Exclude self when editing
+)
+
+if (existingOp) {
+  showInfoMessage(`ℹ️ Sequence ${formData.sequence} is already used by "${existingOp.operation_name}". This operation will run in parallel.`)
+}
+
+// Continue to save - do NOT block submission
+```
+
+### Cost & Duration Calculation with Parallel Ops
+
+**Duration Calculation:**
+- Group operations by sequence
+- For parallel operations (same sequence), take MAX duration
+- Sum across all sequence groups
+
+```typescript
+const groupedBySequence = operations.reduce((acc, op) => {
+  if (!acc[op.sequence]) acc[op.sequence] = []
+  acc[op.sequence].push(op)
+  return acc
+}, {} as Record<number, Operation[]>)
+
+const totalDuration = Object.values(groupedBySequence).reduce((sum, group) => {
+  const maxDuration = Math.max(...group.map(op =>
+    op.expected_duration + op.setup_time + op.cleanup_time
+  ))
+  return sum + maxDuration
+}, 0)
+```
+
+**Cost Calculation:**
+- Sum ALL operations (parallel operations both incur cost)
+- Parallel ops don't reduce cost, only reduce time
+
+```typescript
+const totalCost = operations.reduce((sum, op) => {
+  const opCost = (op.expected_duration / 60) * op.labor_cost_per_hour
+  return sum + opCost
+}, 0)
+```
+
+### Migration Details
+
+**File**: `supabase/migrations/050_enable_parallel_operations.sql`
+
+**Changes**:
+1. Dropped constraint: `routing_operations_unique_sequence`
+2. Updated column comment to document parallel operations support
+
+**Rollback**:
+- Re-add UNIQUE constraint (will FAIL if parallel operations exist in data)
+
+### Phase 2 Complex Features (Future)
+
+**NOT in current scope:**
+- Dependency graph UI (Operation A must finish before B starts)
+- Critical path calculation
+- Gantt chart visualization
+- Resource conflict detection (same machine can't run two ops in parallel)
+- Automatic reordering based on dependencies
+
+**When to implement Phase 2:**
+- User feedback requests advanced scheduling
+- Need for capacity planning and bottleneck analysis
+- Multi-line/multi-shift production scenarios
+
+---
+
 ## Technical Notes
 
 ### Auto-Suggest Next Sequence
@@ -1115,7 +1253,7 @@ const operationFormSchema = z.object({
    - Handle 404 for routing not found
    - Handle 403 for permission denied
    - Handle validation errors in operation modal
-   - Handle duplicate sequence errors
+   - Show info message (NOT error) for duplicate sequence (parallel operations allowed)
 
 ---
 
@@ -1123,7 +1261,7 @@ const operationFormSchema = z.object({
 
 **Routing Operations Fields (from PRD Section 3.1 - routing_operations table):**
 - ✅ id, routing_id (auto-generated, internal)
-- ✅ sequence (Number input, required, unique per routing)
+- ✅ sequence (Number input, required, can be duplicated for parallel ops)
 - ✅ operation_name (Text input, required, 3-100 chars)
 - ✅ machine_id (Dropdown, optional, FK to machines table)
 - ✅ production_line_id (Dropdown, optional, FK to production_lines table)
@@ -1139,7 +1277,9 @@ const operationFormSchema = z.object({
 - ✅ version (Display in header, read-only) - **ADDED**
 
 **Business Rules:**
-- ✅ Sequence must be unique within routing (Validation)
+- ✅ Sequence numbers can be duplicated (Parallel operations) - **UPDATED FR-2.48**
+- ✅ Operations with same sequence = run in parallel (Display "(Parallel)" indicator)
+- ✅ Info message shown when duplicate sequence detected
 - ✅ Operations are reorderable (Up/Down arrows)
 - ✅ Default yield = 100% (Pre-filled)
 - ✅ Default setup_time = 0 (Pre-filled)
@@ -1157,4 +1297,4 @@ const operationFormSchema = z.object({
 **Approval Mode**: Auto-Approve
 **Iterations**: 0 of 3
 **PRD Compliance**: 100% (all fields verified + enhancements)
-**PRD Coverage**: FR-2.41, FR-2.43, FR-2.44, FR-2.45
+**PRD Coverage**: FR-2.41, FR-2.43, FR-2.44, FR-2.45, FR-2.48 (Parallel Operations - Simple)
