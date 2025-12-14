@@ -32,6 +32,15 @@ node_modules/
 # Agent workspaces (generated per-project)
 .claude/state/workspaces/
 
+# Cache files (auto-generated)
+.claude/cache/
+
+# External agent packs (not part of this project)
+agent-methodology-pack/
+
+# Local config files
+claude_desktop_config.json.NEW
+
 # Logs
 *.log
 
