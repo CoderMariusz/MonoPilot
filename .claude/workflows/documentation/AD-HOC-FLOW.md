@@ -233,8 +233,8 @@ This workflow is triggered when:
 | Quick improvement | Enhancement request | "Improve error messages" |
 
 **NOT triggered when:**
-- Task is part of an Epic (use STORY-WORKFLOW)
-- Task requires formal planning (use EPIC-WORKFLOW)
+- Task is part of an Epic (use 3-STORY-DELIVERY)
+- Task requires formal planning (use 1-EPIC-DELIVERY)
 - Task is a complex bug (use BUG-WORKFLOW with COMPLEX path)
 
 ## Phase Details
@@ -654,14 +654,14 @@ Update in `.claude/state/METRICS.md`
 
 | Scenario | Integration |
 |----------|-------------|
-| Ad-hoc reveals complex issue | Escalate to STORY-WORKFLOW or BUG-WORKFLOW |
-| Ad-hoc part of larger feature | Convert to Epic, use EPIC-WORKFLOW |
+| Ad-hoc reveals complex issue | Escalate to 3-STORY-DELIVERY or BUG-WORKFLOW |
+| Ad-hoc part of larger feature | Convert to Epic, use 1-EPIC-DELIVERY |
 | Ad-hoc requires architecture change | ARCHITECT-AGENT review first |
 | Multiple related ad-hocs | Consider creating Epic |
 
-## Key Differences from STORY-WORKFLOW
+## Key Differences from 3-STORY-DELIVERY
 
-| Aspect | AD-HOC-FLOW | STORY-WORKFLOW |
+| Aspect | AD-HOC-FLOW | 3-STORY-DELIVERY |
 |--------|-------------|----------------|
 | Trigger | Direct user request | From Epic/Sprint |
 | Planning | None | Full planning phase |

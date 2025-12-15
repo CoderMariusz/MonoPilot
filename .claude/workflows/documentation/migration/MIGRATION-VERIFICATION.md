@@ -265,10 +265,10 @@ ls -la
 
 | Scenario | Integration |
 |----------|-------------|
-| After migration, start first epic | → EPIC-WORKFLOW.md |
+| After migration, start first epic | → 1-EPIC-DELIVERY.md |
 | Need to fix migration issues | → BUG-WORKFLOW.md |
-| Define first sprint | → SPRINT-WORKFLOW.md |
-| Implement first story | → STORY-WORKFLOW.md |
+| Define first sprint | → 2-SPRINT-WORKFLOW.md |
+| Implement first story | → 3-STORY-DELIVERY.md |
 | Ongoing doc maintenance | → tech-writer agent |
 
 ---

@@ -19,18 +19,18 @@
 │  [Search users...               ] [Filter: All ▼] [Sort: Name ▼]     │
 │                                                                       │
 │  ┌───────────────────────────────────────────────────────────────┐   │
-│  │ Name           Email                Role      Status   Actions │   │
+│  │ Name           Email                Role              Status   │   │
 │  ├───────────────────────────────────────────────────────────────┤   │
-│  │ John Smith     john@acme.com        Admin     Active   [⋮]    │   │
+│  │ John Smith     john@acme.com        Super Admin      Active   │   │
 │  │                Last login: 2 hours ago                         │   │
 │  ├───────────────────────────────────────────────────────────────┤   │
-│  │ Jane Doe       jane@acme.com        Manager   Active   [⋮]    │   │
+│  │ Jane Doe       jane@acme.com        Prod. Manager    Active   │   │
 │  │                Last login: Yesterday                           │   │
 │  ├───────────────────────────────────────────────────────────────┤   │
-│  │ Bob Wilson     bob@acme.com         Operator  Invited  [⋮]    │   │
+│  │ Bob Wilson     bob@acme.com         Warehouse Op.    Invited  │   │
 │  │                Invited: 3 days ago • [Resend Invite]           │   │
 │  ├───────────────────────────────────────────────────────────────┤   │
-│  │ Alice Chen     alice@acme.com       Viewer    Disabled [⋮]    │   │
+│  │ Alice Chen     alice@acme.com       Quality Mgr      Disabled │   │
 │  │                Disabled: 2025-12-08 by John Smith              │   │
 │  └───────────────────────────────────────────────────────────────┘   │
 │                                                                       │
@@ -56,7 +56,7 @@
 │  [Skeleton: Search bar...              ] [Filter ▼] [Sort ▼]         │
 │                                                                       │
 │  ┌───────────────────────────────────────────────────────────────┐   │
-│  │ [████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]    │   │
+│  │ [████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]    │   │
 │  │ [████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]    │   │
 │  │ [██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]    │   │
 │  └───────────────────────────────────────────────────────────────┘   │
@@ -113,7 +113,7 @@
 3. **Invite User Button** - Primary CTA (top-right), opens invite modal
 4. **Actions Menu ([⋮])** - Edit, Change Role, Disable/Enable, Resend Invite, Activity Log
 5. **Status Badges** - Active (green), Invited (yellow), Disabled (gray)
-6. **Role Badges** - Super Admin, Admin, Manager, Operator, Viewer (color-coded)
+6. **Role Badges** - All 10 roles (color-coded): Super Admin, Admin, Production Manager, Quality Manager, Warehouse Manager, Production Operator, Quality Inspector, Warehouse Operator, Planner, Viewer
 7. **Pagination** - Bottom-right, 20 users per page
 
 ---
@@ -133,7 +133,7 @@
 
 ### Filters/Search
 - **Search** - Real-time filter by name or email
-- **Filter by Role** - Dropdown (All, Admin, Manager, Operator, Viewer)
+- **Filter by Role** - Dropdown (All, Super Admin, Admin, Production Manager, Quality Manager, Warehouse Manager, Production Operator, Quality Inspector, Warehouse Operator, Planner, Viewer)
 - **Filter by Status** - Dropdown (All, Active, Invited, Disabled)
 - **Sort** - Name, Email, Role, Last Login (asc/desc)
 
@@ -154,7 +154,7 @@
 |-------|------|-------|
 | name | string | Full name |
 | email | string | Unique per org |
-| role | enum | Super Admin, Admin, Manager, Operator, Viewer |
+| role | enum | Super Admin, Admin, Production Manager, Quality Manager, Warehouse Manager, Production Operator, Quality Inspector, Warehouse Operator, Planner, Viewer |
 | status | enum | active, invited, disabled |
 | last_login | timestamp | "2 hours ago", "Yesterday", "Never" |
 | invited_at | timestamp | For status: invited |
@@ -169,8 +169,13 @@
 |------|----------|------------|----------|-----------------|-------------|
 | Super Admin | All | Yes | All | All | All |
 | Admin | All | Yes | All | Admin & below | Admin & below |
-| Manager | All | No | Self only | No | No |
-| Operator | All | No | Self only | No | No |
+| Production Manager | All | No | Self only | No | No |
+| Quality Manager | All | No | Self only | No | No |
+| Warehouse Manager | All | No | Self only | No | No |
+| Production Operator | All | No | Self only | No | No |
+| Quality Inspector | All | No | Self only | No | No |
+| Warehouse Operator | All | No | Self only | No | No |
+| Planner | All | No | Self only | No | No |
 | Viewer | All | No | Self only | No | No |
 
 ---
@@ -202,10 +207,20 @@
 
 ## Technical Notes
 
-- **RLS**: Users see only users in their organization (`org_id` filter)
-- **API**: `GET /api/settings/users?search={query}&role={role}&status={status}&page={N}`
+### API Endpoints
+- **List**: `GET /api/settings/users?search={query}&role={role}&status={status}&page={N}`
+- **Filter Options**: `GET /api/settings/users/roles` returns all 10 valid roles
 - **Real-time**: Subscribe to user updates via Supabase Realtime (status changes, new invites)
 - **Pagination**: 20 users per page, server-side pagination
+
+### Role-Specific Display
+- Role values: SUPER_ADMIN, ADMIN, PRODUCTION_MANAGER, QUALITY_MANAGER, WAREHOUSE_MANAGER, PRODUCTION_OPERATOR, QUALITY_INSPECTOR, WAREHOUSE_OPERATOR, PLANNER, VIEWER
+- Display labels: Super Admin, Admin, Production Manager, Quality Manager, Warehouse Manager, Production Operator, Quality Inspector, Warehouse Operator, Planner, Viewer
+
+### RLS (Row Level Security)
+- Users see only users in their organization (`org_id` filter)
+- Admins can see all org users
+- Non-admins can see all org users but can only edit self
 
 ---
 

@@ -227,11 +227,11 @@ After migration completes, continue with these workflows:
 
 | Workflow | Purpose | When |
 |----------|---------|------|
-| **sprint-workflow.yaml** | Plan implementation: tracks, dependencies, roadmap | IMMEDIATELY after migration |
-| **story-delivery.yaml** | Implement each story using TDD (RED→GREEN→REFACTOR) | For each story in sprint backlog |
-| **epic-workflow.yaml** | Continue with next epic | When all stories in epic are done |
+| **2-SPRINT-WORKFLOW** | Plan implementation: tracks, dependencies, roadmap | IMMEDIATELY after migration |
+| **3-STORY-DELIVERY** | Implement each story using TDD (RED→GREEN→REFACTOR) | For each story in sprint backlog |
+| **1-EPIC-DELIVERY** | Continue with next epic | When all stories in epic are done |
 
-**Flow:** migration → sprint-workflow → story-delivery
+**Flow:** migration → 2-SPRINT-WORKFLOW → 3-STORY-DELIVERY
 
 ---
 
@@ -484,9 +484,9 @@ cp -r backup/. .
 ## Related Documentation
 
 - **Workflow Definition:** @.claude/workflows/definitions/engineering/migration-workflow.yaml
-- **Sprint Planning:** @.claude/workflows/documentation/SPRINT-WORKFLOW.md
-- **Story Delivery:** @.claude/workflows/documentation/STORY-DELIVERY-WORKFLOW.md
-- **Epic Management:** @.claude/workflows/documentation/EPIC-WORKFLOW.md
+- **Sprint Planning:** @.claude/workflows/documentation/2-SPRINT-WORKFLOW.md
+- **Story Delivery:** @.claude/workflows/documentation/3-STORY-DELIVERY.md
+- **Epic Management:** @.claude/workflows/documentation/1-EPIC-DELIVERY.md
 - **Orchestrator Agent:** @.claude/agents/ORCHESTRATOR.md
 - **Tech Writer Agent:** @.claude/agents/TECH-WRITER.md
 - **Doc Auditor Agent:** @.claude/agents/DOC-AUDITOR.md

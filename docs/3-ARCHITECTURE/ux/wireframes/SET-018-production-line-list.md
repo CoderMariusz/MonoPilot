@@ -3,7 +3,7 @@
 **Module**: Settings
 **Feature**: Production Line Management
 **Status**: Approved (Auto-Approve Mode)
-**Last Updated**: 2025-12-11
+**Last Updated**: 2025-12-15
 
 ---
 
@@ -149,15 +149,29 @@
 
 ---
 
-## Permissions
+## Permissions Matrix (10 PRD Roles)
 
 | Role | Can View | Can Add | Can Edit | Can Manage Machines | Can Disable |
 |------|----------|---------|----------|---------------------|-------------|
 | Super Admin | All | Yes | All | Yes | Yes |
 | Admin | All | Yes | All | Yes | Yes |
-| Manager | All | Yes | All | Yes | No |
-| Operator | All | No | No | No | No |
+| Production Manager | All | Yes | Yes | Yes | No |
+| Quality Manager | All | No | No | No | No |
+| Warehouse Manager | All | No | No | No | No |
+| Production Operator | Own Only | No | No | No | No |
+| Quality Inspector | All | No | No | No | No |
+| Warehouse Operator | Own Only | No | No | No | No |
+| Planner | All | Yes | Yes | No | No |
 | Viewer | All | No | No | No | No |
+
+**Rationale**:
+- **Super Admin, Admin**: Full access to all operations
+- **Production Manager**: Manages production lines (add, edit, manage machines) - FR-SET-027
+- **Planner**: Can add/edit lines for scheduling (view all)
+- **Quality Manager, Quality Inspector**: View-only (all lines) for quality oversight
+- **Warehouse Manager**: View-only (all) for inventory context
+- **Production Operator, Warehouse Operator**: View only own line(s) (assigned via shift/WO)
+- **Viewer**: View-only (read-only role)
 
 ---
 
@@ -209,6 +223,7 @@
 **Screens Approved**: [SET-018-production-line-list]
 **Iterations Used**: 0
 **Ready for Handoff**: Yes
+**Alignment**: Aligned with 10 PRD roles (FR-SET-020 to FR-SET-029)
 
 ---
 

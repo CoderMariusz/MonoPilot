@@ -1,7 +1,7 @@
 # NAMING-CONVENTIONS
 
-> **Version:** 1.0
-> **Updated:** 2025-12-10
+> **Version:** 2.0
+> **Updated:** 2025-12-15
 
 ---
 

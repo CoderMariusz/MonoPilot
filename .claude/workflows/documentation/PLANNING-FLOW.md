@@ -9,7 +9,7 @@
 
 ## Workflow Purpose
 
-PLANNING-FLOW connects DISCOVERY-FLOW outputs to EPIC-WORKFLOW inputs. It handles:
+PLANNING-FLOW connects DISCOVERY-FLOW outputs to 1-EPIC-DELIVERY inputs. It handles:
 
 1. **Input consolidation** from discovery and research
 2. **PRD creation/update** with measurable outcomes
@@ -92,8 +92,8 @@ PLANNING-FLOW connects DISCOVERY-FLOW outputs to EPIC-WORKFLOW inputs. It handle
                                              │
                                              ▼
                                     ┌───────────────┐
-                                    │ EPIC-WORKFLOW │
-                                    │  (Phase 2+)   │
+                                    │ 1-EPIC-DELIVERY│
+                                    │  (Phase 1+)   │
                                     └───────────────┘
 ```
 
@@ -489,7 +489,7 @@ Score = (BV * 0.30) + (UI * 0.25) + ((6-TR) * 0.20) + ((4-DW) * 0.15) + (SA * 0.
 
 1. Verify all artifacts
 2. Confirm stakeholder alignment
-3. Prepare handoff to EPIC-WORKFLOW
+3. Prepare handoff to 1-EPIC-DELIVERY
 
 **Output:** `docs/2-MANAGEMENT/planning-summary.md`
 
@@ -525,7 +525,7 @@ Score = (BV * 0.30) + (UI * 0.25) + ((6-TR) * 0.20) + ((4-DW) * 0.15) + (SA * 0.
 - [ ] Handoff package complete
 
 **Next Workflow:**
-- -> EPIC-WORKFLOW (Phase 2: Story Breakdown) for implementation
+- -> 1-EPIC-DELIVERY (Phase 1: Planning) for implementation
 - or -> new-project.yaml (scope_validation) for full validation
 
 ---
@@ -568,7 +568,7 @@ STORY BREAKDOWN ──────────────────► SPRINT
          ├─ ac_testable
          └─ stories_prioritized
 
-SPRINT PLANNING ──────────────────► EPIC-WORKFLOW
+SPRINT PLANNING ──────────────────► 1-EPIC-DELIVERY
          SPRINT_PLANNED
          ├─ sprint_backlog_defined
          └─ handoff_complete
@@ -627,13 +627,13 @@ DISCOVERY-FLOW
 PROJECT-UNDERSTANDING.md ─────► PLANNING-FLOW (Discovery)
 ```
 
-### Output: EPIC-WORKFLOW
+### Output: 1-EPIC-DELIVERY
 
 ```
 PLANNING-FLOW (Sprint Planning)
     │
     ▼
-epic-{N}-stories.md ──────────► EPIC-WORKFLOW (Phase 2+)
+epic-{N}-stories.md ──────────► 1-EPIC-DELIVERY (Phase 1+)
 ```
 
 ---
@@ -684,7 +684,7 @@ ORCHESTRATOR: "Starting PLANNING-FLOW in PORTFOLIO mode"
 # Phase 7: SPRINT PLANNING
 -> Creates roadmap: NOW=[Epic-1, Epic-2], NEXT=[Epic-3, Epic-5], LATER=[Epic-4]
 -> Planning summary created
--> Handoff to EPIC-WORKFLOW
+-> Handoff to 1-EPIC-DELIVERY
 -> Gate: SPRINT_PLANNED
 ```
 
@@ -692,7 +692,7 @@ ORCHESTRATOR: "Starting PLANNING-FLOW in PORTFOLIO mode"
 
 **Related:**
 - @.claude/workflows/documentation/DISCOVERY-FLOW.md
-- @.claude/workflows/documentation/EPIC-WORKFLOW.md
+- @.claude/workflows/documentation/1-EPIC-DELIVERY.md
 - @.claude/agents/PM-AGENT.md
 - @.claude/agents/ARCHITECT-AGENT.md
 - @.claude/agents/UX-DESIGNER.md

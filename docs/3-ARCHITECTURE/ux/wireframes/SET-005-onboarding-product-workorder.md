@@ -4,7 +4,7 @@
 **Feature**: Onboarding Wizard (Story 1.12)
 **Step**: 4-5 of 6 (Combined)
 **Status**: Ready for Review
-**Last Updated**: 2025-12-11
+**Last Updated**: 2025-12-15
 
 ---
 
@@ -104,8 +104,8 @@ Combined fourth and fifth steps of onboarding wizard. Creates organization's fir
 │  │  Planned Quantity                                       │ │
 │  │  [100____] EA                                           │ │
 │  │                                                         │ │
-│  │  Production Line                                        │ │
-│  │  [PROD-01 (Production Floor) ▼]                         │ │
+│  │  Production Location                                    │ │
+│  │  [DEFAULT (Storage) ▼]                                  │ │
 │  │                                                         │ │
 │  │  Start Date                  Due Date                   │ │
 │  │  [2025-12-12___]             [2025-12-13___]            │ │
@@ -250,9 +250,27 @@ Combined fourth and fifth steps of onboarding wizard. Creates organization's fir
   - WO Number: Auto-generated (WO-DEMO-001)
   - Product: From Step 4 (read-only)
   - Quantity: Default 100 EA
-  - Production Line: Dropdown (from Step 3 locations)
+  - Production Location: Dropdown (from Step 3 locations)
   - Start/Due Date: Today + 1 day
 - **Disabled**: If checkbox unchecked
+
+---
+
+## Production Location Field - CLARIFICATION
+
+**Field Name**: "Production Location" (was "Production Line")
+
+**IMPORTANT**: This dropdown shows **locations created in Step 3**, not production_lines table.
+
+Specifically:
+- Shows all locations from Step 3 warehouse
+- Display format: `[LOCATION_CODE] ([location_name])`
+- Example: `[DEFAULT (Default Location)]` or `[PROD-ZONE (Production Zone)]`
+- Any location type can be used (STORAGE, RECEIVING, PRODUCTION, etc.)
+- NOT limited to type=PRODUCTION locations
+- This is for informational/demo purposes, actual production constraints handled in Production module
+
+**Why clarification needed**: Previous wording "Production Line" could be confused with a `production_lines` database table, which doesn't exist. Step 3 creates locations (zones/shelves), not production lines.
 
 ---
 
@@ -341,7 +359,7 @@ Step 6 (no demo order created)
   wo_number: z.string().min(2).max(50).optional(), // if create_demo = true
   product_id: z.string().uuid().optional(), // from step4
   quantity: z.number().positive().optional(),
-  production_line_id: z.string().uuid().optional(), // from step3
+  location_id: z.string().uuid().optional(), // from step3 - ANY location type
   start_date: z.date().optional(),
   due_date: z.date().optional()
 }
@@ -376,7 +394,7 @@ Steps 4-5 save to `organizations.wizard_progress`:
     "create_demo": true,
     "wo_number": "WO-DEMO-001",
     "quantity": 100,
-    "production_line_id": "{location_id_from_step3}",
+    "location_id": "{location_id_from_step3}",
     "start_date": "2025-12-12",
     "due_date": "2025-12-13"
   }
@@ -415,6 +433,13 @@ Steps 4-5 save to `organizations.wizard_progress`:
 - **Skip Product**: Disables Demo Order tab (can't create WO without product)
 - **Skip Demo Order**: Proceeds to completion without WO
 
+### Production Location Field (Clarified)
+- Field name: "Production Location" (not "Production Line")
+- Pulls from locations created in Step 3
+- Shows format: `[CODE] (name)`
+- No filtering by type (demo purposes)
+- Maps to `location_id` field in work order
+
 ---
 
 ## Accessibility
@@ -444,6 +469,7 @@ Steps 4-5 save to `organizations.wizard_progress`:
 4. Tab 1 → Tab 2 requires valid product
 5. Tab 2 optional (checkbox controls form enable/disable)
 6. Save both steps to `wizard_progress` on completion
+7. **IMPORTANT**: "Production Location" field loads from Step 3 locations, displays as `[CODE] (name)`, accepts ANY location type
 
 ### API Endpoints:
 ```
@@ -463,3 +489,4 @@ Response: { success: true }
 **Status**: Ready for Implementation
 **Approval Mode**: Auto-Approve (Concise Format)
 **Iterations**: 0 of 3
+**Last Fixed**: 2025-12-15 (Clarified "Production Location" field - shows Step 3 locations, not production_lines table)

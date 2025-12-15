@@ -3,7 +3,7 @@
 **Module**: Settings
 **Feature**: User Management
 **Status**: Auto-Approved
-**Last Updated**: 2025-12-11
+**Last Updated**: 2025-12-15
 
 ---
 
@@ -19,16 +19,20 @@
 │  [Search email...           ] [Filter: All ▼] [Sort: Sent Date ▼]    │
 │                                                                       │
 │  ┌───────────────────────────────────────────────────────────────┐   │
-│  │ Email              Role      Invited By    Sent      Expires   │   │
+│  │ Email              Role                    Invited By Sent     │   │
+│  │                                            Expires            │   │
 │  ├───────────────────────────────────────────────────────────────┤   │
-│  │ bob@acme.com       Operator  John Smith    3d ago    4d left   │   │
-│  │ [PENDING]                               [Resend] [Revoke]      │   │
+│  │ bob@acme.com       Production Operator     John Smith 3d ago  │   │
+│  │ [PENDING]                                           4d left   │   │
+│  │                                          [Resend] [Revoke]    │   │
 │  ├───────────────────────────────────────────────────────────────┤   │
-│  │ mary@acme.com      Manager   Jane Doe      1w ago    Expired   │   │
-│  │ [EXPIRED]                                          [Revoke]    │   │
+│  │ mary@acme.com      Quality Manager        Jane Doe   1w ago  │   │
+│  │ [EXPIRED]                                        Expired      │   │
+│  │                                                      [Revoke]  │   │
 │  ├───────────────────────────────────────────────────────────────┤   │
-│  │ frank@acme.com     Viewer    John Smith    2d ago    5d left   │   │
-│  │ [PENDING]                               [Resend] [Revoke]      │   │
+│  │ frank@acme.com     Warehouse Operator     John Smith 2d ago  │   │
+│  │ [PENDING]                                           5d left   │   │
+│  │                                          [Resend] [Revoke]    │   │
 │  └───────────────────────────────────────────────────────────────┘   │
 │                                                                       │
 │  Showing 3 of 3 pending invitations                  [1] [2] [>]     │
@@ -120,13 +124,30 @@
 | Field | Type | Notes |
 |-------|------|-------|
 | email | string | Invited user email |
-| role | enum | Admin, Manager, Operator, Viewer |
+| role | enum | Super Admin, Admin, Production Manager, Quality Manager, Warehouse Manager, Production Operator, Quality Inspector, Warehouse Operator, Planner, Viewer |
 | invited_by | user_id | Name of inviter |
 | sent_at | timestamp | "3 days ago", "1 week ago" |
 | expires_at | timestamp | "4 days left", "Expired" |
 | status | enum | pending, expired |
 
 **Expiration**: 7 days from sent_at
+
+---
+
+## Role Definitions (from PRD FR-SET-020 to FR-SET-029)
+
+| Role | Access Level | Primary Function |
+|------|--------------|------------------|
+| Super Admin | Full CRUD | System administration, full access to all modules |
+| Admin | Full CRUD (except Super Admin) | Organization administration |
+| Production Manager | Full CRUD Production | Production planning and execution management |
+| Quality Manager | Full CRUD Quality | Quality assurance and inspection management |
+| Warehouse Manager | Full CRUD Warehouse + Shipping | Warehouse and shipping operations |
+| Production Operator | CRU Production (no delete) | Execute production tasks and record consumption |
+| Quality Inspector | CRU Quality (no delete) | Perform quality inspections and record results |
+| Warehouse Operator | CRU Warehouse (no delete) | Warehouse receiving, stock moves, picking |
+| Planner | Full CRUD Planning | Create and manage purchase/transfer/work orders |
+| Viewer | Read-only all modules | View-only access for reporting/audits |
 
 ---
 
@@ -151,6 +172,27 @@
 
 - **RLS**: Users see only invitations in their organization (`org_id`)
 - **API**: `GET /api/settings/invitations?status={status}&page={N}`
+- **API Response**:
+  ```json
+  {
+    "data": [
+      {
+        "id": "inv_123",
+        "email": "bob@acme.com",
+        "role": "PROD_OPERATOR",
+        "invited_by": "user_456",
+        "sent_at": "2025-12-12T10:00:00Z",
+        "expires_at": "2025-12-19T10:00:00Z",
+        "status": "pending"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "total": 3,
+      "per_page": 20
+    }
+  }
+  ```
 - **Real-time**: Subscribe to invitation updates (acceptance removes from list)
 - **Pagination**: 20 per page, server-side
 

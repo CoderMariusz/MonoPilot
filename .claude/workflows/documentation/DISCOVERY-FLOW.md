@@ -185,7 +185,7 @@ This workflow is MANDATORY before:
                     |   DISCOVERY COMPLETE        |
                     | - Next workflow:            |
                     |   - PLANNING-FLOW           |
-                    |   - EPIC-WORKFLOW           |
+                    |   - 1-EPIC-DELIVERY         |
                     |   - MIGRATION-FLOW          |
                     +-----------------------------+
 ```
@@ -707,7 +707,7 @@ PLANNING-FLOW begins
    STORIES -> SPRINT
 ```
 
-### DISCOVERY-FLOW -> EPIC-WORKFLOW
+### DISCOVERY-FLOW -> 1-EPIC-DELIVERY
 
 ```
 DISCOVERY-FLOW completes (for new Epic)
@@ -716,12 +716,12 @@ DISCOVERY-FLOW completes (for new Epic)
 USER_CONFIRMED gate passes
         |
         v
-Outputs passed to EPIC-WORKFLOW:
+Outputs passed to 1-EPIC-DELIVERY:
 - PROJECT-UNDERSTANDING.md (Epic section)
 - Domain requirements
         |
         v
-EPIC-WORKFLOW Phase 1 (Discovery) can be shortened
+1-EPIC-DELIVERY Phase 1 (Planning) begins with existing context
 ```
 
 ### DISCOVERY-FLOW -> MIGRATION-FLOW
@@ -860,7 +860,7 @@ After Discovery:
 - Phase: Planning (or appropriate next phase)
 - Last Activity: Discovery completed
 - Discovery Status: COMPLETE
-- Next: {PLANNING-FLOW | EPIC-WORKFLOW | MIGRATION-FLOW}
+- Next: {PLANNING-FLOW | 1-EPIC-DELIVERY | MIGRATION-FLOW}
 - Key Outputs:
   - PROJECT-UNDERSTANDING.md (approved)
   - GAPS-AND-QUESTIONS.md

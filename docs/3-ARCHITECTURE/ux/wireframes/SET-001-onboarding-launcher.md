@@ -4,7 +4,7 @@
 **Feature**: Onboarding Wizard (Story 1.12)
 **Step**: 0 of 6 (Entry Point)
 **Status**: Ready for Review
-**Last Updated**: 2025-12-11
+**Last Updated**: 2025-12-15
 
 ---
 
@@ -52,7 +52,7 @@ Entry screen for 15-minute onboarding wizard. Shown to new organizations on firs
 │                                                               │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
-│  [Skip for Now]                [Start Onboarding Wizard →]   │
+│  [Skip Onboarding]                [Start Onboarding Wizard →]   │
 │                                                               │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -142,9 +142,9 @@ Entry screen for 15-minute onboarding wizard. Shown to new organizations on firs
 - **Purpose**: Confirm registration successful
 
 ### 4. Skip Option
-- **Display**: "Skip for Now" button (secondary)
+- **Display**: "Skip Onboarding" button (secondary)
 - **Purpose**: Allow opt-out of wizard
-- **Behavior**: Go directly to dashboard with incomplete setup
+- **Behavior**: Trigger confirmation dialog (see below)
 
 ---
 
@@ -159,10 +159,9 @@ Entry screen for 15-minute onboarding wizard. Shown to new organizations on firs
 - **Color**: Primary blue
 
 ### Secondary Action
-- **Button**: "Skip for Now"
+- **Button**: "Skip Onboarding"
 - **Behavior**:
-  - Navigate to `/dashboard`
-  - Show banner: "Complete onboarding wizard anytime from Settings"
+  - Display confirmation dialog (see "Skip Confirmation Dialog" below)
 - **Size**: Medium (40dp height)
 - **Color**: Neutral gray
 
@@ -171,6 +170,48 @@ Entry screen for 15-minute onboarding wizard. Shown to new organizations on firs
 - **Behavior**: Reload launcher screen
 - **Button**: "Contact Support"
 - **Behavior**: Open support email or chat
+
+---
+
+## Skip Confirmation Dialog
+
+**Status**: Modal overlay on launcher screen
+**Triggered by**: "Skip Onboarding" button
+
+### Dialog Content
+
+```
+┌─────────────────────────────────────┐
+│  Skip Onboarding Wizard?            │
+├─────────────────────────────────────┤
+│                                     │
+│  We'll create a demo warehouse and  │
+│  default location so you can start  │
+│  exploring MonoPilot immediately.   │
+│                                     │
+│  You can configure everything       │
+│  manually in Settings.              │
+│                                     │
+│  [Skip Wizard]   [Continue Setup]   │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+### Dialog Actions
+
+**"Skip Wizard" Button**:
+- **Behavior**:
+  1. Create warehouse: `DEMO-WH` (Demo Warehouse) [FR-SET-187]
+  2. Create location: `DEFAULT` (Default Location) in DEMO-WH [FR-SET-187]
+  3. Set `organizations.onboarding_skipped = true`
+  4. Close dialog
+  5. Navigate to `/dashboard`
+  6. Show banner: "Setup skipped - Configure anytime from Settings"
+
+**"Continue Setup" Button**:
+- **Behavior**:
+  1. Close dialog
+  2. Return to launcher (or current wizard step if not on launcher)
 
 ---
 
@@ -188,8 +229,17 @@ Step 1 (Organization Profile)
 OR
 
 SUCCESS
-  ↓ [Skip for Now]
+  ↓ [Skip Onboarding]
+MODAL (Show confirmation dialog)
+  ↓ [Skip Wizard]
+  ↓ Create DEMO-WH + DEFAULT location
 Dashboard (/dashboard)
+
+OR
+
+MODAL
+  ↓ [Continue Setup]
+SUCCESS (Return to launcher)
 
 OR
 
@@ -221,8 +271,32 @@ From session/context:
 ## Technical Notes
 
 ### When to Show
-- **Show if**: `organizations.wizard_completed = false`
-- **Don't show if**: `wizard_completed = true` OR user manually skipped
+- **Show if**: `organizations.wizard_completed = false` AND `onboarding_skipped = false`
+- **Don't show if**: `wizard_completed = true` OR `onboarding_skipped = true`
+
+### Skip Behavior (Creates Minimal Viable Setup)
+
+When user clicks "Skip Wizard", create:
+
+```sql
+-- 1. Create demo warehouse
+INSERT INTO warehouses (org_id, name, code, address, city, state, country)
+VALUES (:org_id, 'Demo Warehouse', 'DEMO-WH', 'N/A', 'N/A', 'N/A', 'N/A');
+
+-- 2. Create default location in DEMO-WH
+INSERT INTO locations (warehouse_id, code, name, type, capacity, is_active)
+VALUES (:warehouse_id, 'DEFAULT', 'Default Location', 'STORAGE', NULL, true);
+
+-- 3. Set location as default for warehouse
+UPDATE warehouses
+SET default_receiving_location_id = :location_id, transit_location_id = :location_id
+WHERE id = :warehouse_id;
+
+-- 4. Mark wizard as skipped
+UPDATE organizations
+SET onboarding_skipped = true, wizard_completed = true
+WHERE id = :org_id;
+```
 
 ### Persistence
 ```sql
@@ -230,11 +304,12 @@ From session/context:
 UPDATE organizations
 SET wizard_progress = jsonb_build_object('step', 0, 'started_at', now())
 WHERE id = :org_id;
-```
 
-### Skip Behavior
-- User can re-access wizard from Settings → "Onboarding Wizard"
-- Skip creates minimal viable setup (org only, no warehouse)
+-- Track wizard skip
+UPDATE organizations
+SET onboarding_skipped = true, wizard_completed = true, skipped_at = now()
+WHERE id = :org_id;
+```
 
 ---
 
@@ -243,8 +318,9 @@ WHERE id = :org_id;
 - **Touch targets**: All buttons >= 48x48dp
 - **Contrast**: Text on white background passes WCAG AA (4.5:1)
 - **Screen reader**: Announces "Welcome to MonoPilot Onboarding Wizard"
-- **Keyboard**: Tab navigation, Enter to start wizard
+- **Keyboard**: Tab navigation, Enter to start wizard or open dialog
 - **Focus**: Primary button auto-focused on load
+- **Modal**: Dialog has focus trap, escape key closes dialog
 
 ---
 
@@ -263,15 +339,25 @@ WHERE id = :org_id;
 2. Check `wizard_completed` flag before showing
 3. Load organization data via `GET /api/settings/organization`
 4. On "Start": save wizard progress, navigate to Step 1
-5. On "Skip": navigate to dashboard, set skip flag
+5. On "Skip": show confirmation modal
+6. On "Skip Wizard" in modal: call `POST /api/settings/wizard/skip` endpoint
+7. On "Continue Setup" in modal: close modal, stay on launcher
 
 ### API Endpoints:
 ```
 GET /api/settings/organization
-Response: { id, name, wizard_completed, wizard_progress }
+Response: { id, name, wizard_completed, onboarding_skipped, wizard_progress }
 
 POST /api/settings/wizard/start
 Response: { success: true, next_step: '/wizard/organization' }
+
+POST /api/settings/wizard/skip
+Response: {
+  success: true,
+  warehouse: { id, code: "DEMO-WH" },
+  location: { id, code: "DEFAULT" },
+  redirect: '/dashboard'
+}
 ```
 
 ---
@@ -279,3 +365,4 @@ Response: { success: true, next_step: '/wizard/organization' }
 **Status**: Ready for Implementation
 **Approval Mode**: Auto-Approve (Concise Format)
 **Iterations**: 0 of 3
+**Last Fixed**: 2025-12-15 (FR-SET-187 alignment)

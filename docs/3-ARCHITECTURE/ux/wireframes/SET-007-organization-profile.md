@@ -51,7 +51,7 @@
 │  │  [DD/MM/YYYY          ▼] [1.234,56      ▼]                 │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                   │
-│  Business Hours                                                   │
+│  Business Hours  (Phase 1B)                                       │
 │  ┌─────────────────────────────────────────────────────────────┐ │
 │  │  Working Days                                               │ │
 │  │  ☑ Mon  ☑ Tue  ☑ Wed  ☑ Thu  ☑ Fri  ☐ Sat  ☐ Sun         │ │
@@ -173,13 +173,17 @@
 - **Tax Rate**: Predefined rates from tax_codes table
 - **Start/End Time**: 30-minute intervals (00:00 - 23:30)
 
-### 4. Business Hours
+### 4. Business Hours (Phase 1B - FR-SET-005)
+
+**Phase**: This section represents Phase 1B features (FR-SET-005: Business Hours Configuration). While included in this wireframe for organizational completeness, the configuration UI can be implemented in a later phase if needed for Phase 1A launch. The API endpoint and schema are ready but front-end configuration is optional for Phase 1A MVP.
+
 - **Working Days**: 7 checkboxes (Mon-Sun), multi-select
 - **Default**: Mon-Fri selected, Sat-Sun unselected
 - **Start Time**: Dropdown with 30-min intervals (e.g., 06:00, 06:30, ..., 23:30)
 - **End Time**: Dropdown with 30-min intervals (e.g., 06:00, 06:30, ..., 23:30)
 - **Validation**: End time must be after start time
 - **Use Case**: OEE shift calculations, production planning, user notifications
+- **Planned Implementation**: Phase 1B (can defer to later phase if needed)
 
 ### 5. Validation
 - **Required**: Organization name, contact email, timezone, language, currency

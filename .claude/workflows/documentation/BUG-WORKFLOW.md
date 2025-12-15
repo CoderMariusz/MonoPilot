@@ -289,7 +289,7 @@ Bug fix workflow with complexity-based routing. Bugs are triaged by severity and
 |   |   +------------------------------------------------------------+      |      |
 |   |   | Can fix within bug workflow?                                |      |      |
 |   |   |   YES -> Continue to FIX phase                              |      |      |
-|   |   |   NO  -> Convert to Story -> STORY-WORKFLOW                 |      |      |
+|   |   |   NO  -> Convert to Story -> 3-STORY-DELIVERY                |      |      |
 |   |   +------------------------------------------------------------+      |      |
 |   |                            |                                           |      |
 |   |                    FIX HERE | CONVERT TO STORY                         |      |
@@ -297,7 +297,7 @@ Bug fix workflow with complexity-based routing. Bugs are triaged by severity and
 |   +-----------------------------------------------------------------------+      |
 |                                |         |                                        |
 |                                v         +-----> Create Story                     |
-|                                |                 -> STORY-WORKFLOW                |
+|                                |                 -> 3-STORY-DELIVERY               |
 |   +-----------------------------------------------------------------------+      |
 |   |                    PHASE C2: SENIOR DEV FIX                           |      |
 |   +-----------------------------------------------------------------------+      |
@@ -710,7 +710,7 @@ Decision: APPROVE / REJECT
 
 **Decision Point:**
 - If fix can be contained: Continue to C2
-- If major refactor needed: Convert to Story -> STORY-WORKFLOW
+- If major refactor needed: Convert to Story -> 3-STORY-DELIVERY
 
 ### Step C2: Senior Dev Fix (SENIOR-DEV)
 **Model:** Opus
@@ -891,7 +891,7 @@ C1: ARCHITECT reviews:
     - Decision: Convert to Story
 
 -> Creates Story S-3.5: "Implement pagination and optimize queries"
--> Routes to STORY-WORKFLOW
+-> Routes to 3-STORY-DELIVERY
 -> Bug linked to story, closed when story done
 ```
 
@@ -927,5 +927,5 @@ NEW -> TRIAGED -> ASSIGNED -> IN PROGRESS -> IN REVIEW -> VERIFIED -> CLOSED
 |----------|-------------|
 | Bug found during Story QA | BUG-WORKFLOW, return to Story QA when fixed |
 | Bug causes Sprint delay | SCRUM-MASTER notified, sprint adjusted |
-| Bug converts to Story | STORY-WORKFLOW, link bug to story |
+| Bug converts to Story | 3-STORY-DELIVERY, link bug to story |
 | Critical bug during release | Immediate BUG-WORKFLOW, block release |

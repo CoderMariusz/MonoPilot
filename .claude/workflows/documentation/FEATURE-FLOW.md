@@ -8,7 +8,7 @@
 
 ## Overview
 
-Lightweight workflow for adding features to existing projects. Faster than STORY-WORKFLOW but maintains quality through streamlined TDD. Includes automatic PRD/Architecture updates to keep documentation in sync.
+Lightweight workflow for adding features to existing projects. Faster than 3-STORY-DELIVERY but maintains quality through streamlined TDD. Includes automatic PRD/Architecture updates to keep documentation in sync.
 
 **Use when:**
 - Adding single feature to existing codebase
@@ -18,7 +18,7 @@ Lightweight workflow for adding features to existing projects. Faster than STORY
 
 **Don't use when:**
 - New project (use DISCOVERY-FLOW → EPIC-FLOW)
-- Major refactoring (use STORY-WORKFLOW)
+- Major refactoring (use 3-STORY-DELIVERY)
 - Architectural changes needed (use EPIC-FLOW with ADR)
 
 ## Phase System Integration
@@ -457,7 +457,7 @@ Features are always assigned to a project phase:
 
 | Scenario | Integration |
 |----------|-------------|
-| Feature too big | Escalate to STORY-WORKFLOW |
+| Feature too big | Escalate to 3-STORY-DELIVERY |
 | Needs architecture change | Escalate to EPIC-FLOW for ADR |
 | Bug found during feature | BUG-WORKFLOW (can interrupt) |
 | Phase complete | Notify SCRUM-MASTER for transition |
@@ -480,7 +480,7 @@ Features are always assigned to a project phase:
       - "migrate"
   workflow: "engineering/feature.yaml"
 
-# Override to full STORY-WORKFLOW if:
+# Override to full 3-STORY-DELIVERY if:
 - feature_grows_beyond: "4 hours estimate"
 - requires: "ADR"
 - impacts: "multiple epics"

@@ -3,7 +3,7 @@
 **Module**: Settings
 **Feature**: Warehouse Management
 **Status**: Approved (Auto-Approve Mode)
-**Last Updated**: 2025-12-11
+**Last Updated**: 2025-12-15
 
 ---
 
@@ -150,15 +150,27 @@
 
 ---
 
-## Permissions
+## Permissions Matrix (10 PRD Roles)
 
 | Role | Can View | Can Add | Can Edit | Can Set Default | Can Disable |
 |------|----------|---------|----------|-----------------|-------------|
 | Super Admin | All | Yes | All | Yes | Yes |
 | Admin | All | Yes | All | Yes | Yes |
-| Manager | All | No | No | No | No |
-| Operator | All | No | No | No | No |
+| Production Manager | All | No | No | No | No |
+| Quality Manager | All | No | No | No | No |
+| Warehouse Manager | All | Yes | Yes | Yes | Yes |
+| Production Operator | Own Only | No | No | No | No |
+| Quality Inspector | Own Only | No | No | No | No |
+| Warehouse Operator | Own Only | No | No | No | No |
+| Planner | All | No | No | No | No |
 | Viewer | All | No | No | No | No |
+
+**Rationale**:
+- **Super Admin, Admin**: Full access to all operations
+- **Warehouse Manager**: Manages warehouse operations (add, edit, set default, disable) - FR-SET-026
+- **Production Manager, Quality Manager, Planner**: View-only (all warehouses) for operational context
+- **Production Operator, Quality Inspector, Warehouse Operator**: View only own warehouse(s)
+- **Viewer**: View-only (read-only role)
 
 ---
 
@@ -206,6 +218,7 @@
 **Screens Approved**: [SET-012-warehouse-list]
 **Iterations Used**: 0
 **Ready for Handoff**: Yes
+**Alignment**: Aligned with 10 PRD roles (FR-SET-020 to FR-SET-029)
 
 ---
 
