@@ -7,7 +7,7 @@ ACCEPTED
 2025-12-15
 
 ## Context
-Epic 01a-Settings
+Epic 01-Settings
 
 We need to store 10 predefined roles with their permission matrix. Two approaches:
 1. Enum string in `users.role` column + hardcoded permissions in code
@@ -310,6 +310,6 @@ Migration: 055_migrate_user_roles.sql
 - SET-006: User Create/Edit (role selection)
 
 ### Stories
-- Story 01a.3: Role Seeding API
-- Story 01a.4: Permission Check Middleware
-- Story 01a.5: User Role Assignment
+- Story 01.3: Role Seeding API
+- Story 01.4: Permission Check Middleware
+- Story 01.5: User Role Assignment

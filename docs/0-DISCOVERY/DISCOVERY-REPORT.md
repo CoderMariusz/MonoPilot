@@ -922,36 +922,12 @@ Nice to Have (Can launch without):
  Accounting system integration
 
 
-13. Documentation Audit (Old PRD Analysis)
-13.1 Old Documentation Structure
-Found in docs-old/:
+13. Documentation Audit (Legacy Docs)
+13.1 Legacy Documentation
 
-prd-index.md - Module map + dependencies
-Modules (planned but not created): No separate module PRD files found
-Epics (created):
+Legacy documentation previously existed in an archived folder and was used as an input during early discovery. The current source of truth is now the `docs/` directory.
 
-epics/completed/01-settings.md - 19 stories DONE
-epics/completed/02-technical.md - 28 stories DONE
-epics/completed/03-planning.md - 30 stories DONE
-epics/completed/04-production.md - 21 stories DONE
-epics/current/06-quality.md - 28 stories PLANNED
-epics/current/07-shipping.md - 28 stories PLANNED
-epics/current/08-npd.md - TBD stories PLANNED
-epics/current/09-performance-optimization.md - TBD stories PLANNED
-
-
-
-UX Design Specs (docs-old/3-ARCHITECTURE/ux/specs/):
-
-Full set of UX specifications for all modules
-
-Reference Docs (docs-old/1-BASELINE/reference/):
-
-database-schema.md - Database documentation (complete)
-code-architecture.md - Code architecture (complete)
-rls-and-supabase-clients.md - RLS patterns
-shared-templates-library.md - Reusable templates
-test-design-system.md - Test strategy
+This section intentionally avoids referencing removed/archived paths and focuses on patterns to preserve and improve within the current documentation set.
 
 13.2 Key Patterns to Preserve
 From Old Documentation:
@@ -1017,9 +993,10 @@ Appendix B: File Paths Reference
 Key Documentation:
 
 This report: docs/0-DISCOVERY/DISCOVERY-REPORT.md
-Old PRD index: docs-old/prd-index.md
-Database schema: docs-old/1-BASELINE/reference/database-schema.md
-Code architecture: docs-old/1-BASELINE/reference/code-architecture.md
+Settings PRD: docs/1-BASELINE/product/modules/settings.md
+Settings Architecture: docs/1-BASELINE/architecture/modules/settings.md
+Epics (current): docs/2-MANAGEMENT/epics/current/
+Wireframes: docs/3-ARCHITECTURE/ux/wireframes/
 Bug tracker: docs/BUGS.md
 MVP Phases: docs/MVP-PHASES.md
 Project state: PROJECT-STATE.md

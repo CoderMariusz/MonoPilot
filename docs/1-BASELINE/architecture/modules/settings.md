@@ -1,5 +1,17 @@
 # Settings Module Architecture
 
+---
+
+**Architecture Decision Records (ADRs):**
+This baseline reflects the following ACCEPTED ADRs:
+- [ADR-011: Module Toggle Storage](../../decisions/ADR-011-module-toggle-storage.md) - Junction table pattern for module toggles
+- [ADR-012: Role Permission Storage](../../decisions/ADR-012-role-permission-storage.md) - UUID FK + JSONB permissions
+- [ADR-013: RLS Org Isolation Pattern](../../decisions/ADR-013-rls-org-isolation-pattern.md) - Users table lookup pattern
+
+For detailed rationale and alternatives, see individual ADR documents.
+
+---
+
 ## Overview
 
 The Settings Module provides centralized configuration and administration for MonoPilot Food MES. It manages organization setup, user access, infrastructure configuration, master data, and system preferences.
@@ -61,13 +73,42 @@ created_at      TIMESTAMPTZ DEFAULT now()
 updated_at      TIMESTAMPTZ DEFAULT now()
 ```
 
+#### roles
+```sql
+-- Roles table (ADR-012: Role Permission Storage)
+CREATE TABLE roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  permissions JSONB NOT NULL,
+  is_system BOOLEAN DEFAULT true,
+  org_id UUID REFERENCES organizations(id), -- NULL for system roles
+  display_order INT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Permissions JSONB Structure (ADR-012):
+-- {
+--   "settings": "CRUD",
+--   "users": "CRUD",
+--   "technical": "R",
+--   "planning": "CRU",
+--   ...
+-- }
+-- Values: C=Create, R=Read, U=Update, D=Delete, "-"=No access
+
+-- See ADR-012 for full 10 system roles seed data
+```
+
 #### users
 ```sql
 id              UUID PRIMARY KEY REFERENCES auth.users(id)
 org_id          UUID NOT NULL REFERENCES organizations(id)
 email           TEXT NOT NULL
 name            TEXT NOT NULL
-role            TEXT NOT NULL           -- enum: super_admin, admin, production_manager, etc.
+role_id         UUID NOT NULL REFERENCES roles(id)  -- FK to roles table (ADR-012)
 language        TEXT DEFAULT 'en'
 is_active       BOOLEAN DEFAULT true
 last_login_at   TIMESTAMPTZ
@@ -192,18 +233,43 @@ created_at      TIMESTAMPTZ DEFAULT now()
 UNIQUE(org_id, code)
 ```
 
-#### module_settings
+#### modules
 ```sql
-id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
-org_id          UUID NOT NULL REFERENCES organizations(id) UNIQUE
-planning_enabled    BOOLEAN DEFAULT true
-production_enabled  BOOLEAN DEFAULT true
-quality_enabled     BOOLEAN DEFAULT false
-warehouse_enabled   BOOLEAN DEFAULT true
-shipping_enabled    BOOLEAN DEFAULT false
-technical_enabled   BOOLEAN DEFAULT true
-created_at      TIMESTAMPTZ DEFAULT now()
-updated_at      TIMESTAMPTZ DEFAULT now()
+-- Modules table (ADR-011: Module Toggle Storage)
+CREATE TABLE modules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  icon VARCHAR(50),
+  dependencies TEXT[],
+  can_disable BOOLEAN DEFAULT true,
+  display_order INT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Seed data for 11 modules (settings, technical always enabled)
+-- See ADR-011 for full seed data
+```
+
+#### organization_modules
+```sql
+-- Organization-specific module state (ADR-011)
+CREATE TABLE organization_modules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  module_id UUID NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+  enabled BOOLEAN DEFAULT false,
+  enabled_at TIMESTAMPTZ,
+  enabled_by UUID REFERENCES users(id),
+  disabled_at TIMESTAMPTZ,
+  disabled_by UUID REFERENCES users(id),
+  settings JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(org_id, module_id)
+);
+
+-- See ADR-011 for full schema with audit fields
 ```
 
 ### API & Integration Tables
@@ -421,6 +487,7 @@ created_at      TIMESTAMPTZ DEFAULT now()
 -- Core tables indexes
 CREATE INDEX idx_users_org_email ON users(org_id, email);
 CREATE INDEX idx_users_org_active ON users(org_id, is_active);
+CREATE INDEX idx_users_role ON users(role_id);
 CREATE INDEX idx_warehouses_org_type ON warehouses(org_id, warehouse_type);
 CREATE INDEX idx_locations_warehouse ON locations(warehouse_id);
 CREATE INDEX idx_locations_parent ON locations(parent_id);
@@ -428,6 +495,17 @@ CREATE INDEX idx_locations_status ON locations(org_id, status);
 CREATE INDEX idx_machines_org_type ON machines(org_id, machine_type);
 CREATE INDEX idx_machines_status ON machines(org_id, status);
 CREATE INDEX idx_production_lines_org ON production_lines(org_id);
+
+-- Module tables indexes (ADR-011)
+CREATE INDEX idx_modules_code ON modules(code);
+CREATE INDEX idx_organization_modules_org ON organization_modules(org_id);
+CREATE INDEX idx_organization_modules_module ON organization_modules(module_id);
+CREATE INDEX idx_organization_modules_enabled ON organization_modules(org_id, enabled);
+
+-- Role tables indexes (ADR-012)
+CREATE INDEX idx_roles_code ON roles(code);
+CREATE INDEX idx_roles_org ON roles(org_id);
+CREATE INDEX idx_roles_system ON roles(is_system);
 
 -- API & Integration indexes
 CREATE INDEX idx_api_keys_org ON api_keys(org_id);
@@ -535,10 +613,20 @@ PUT    /api/settings/tax-codes/:id
 DELETE /api/settings/tax-codes/:id
 ```
 
-### Module Settings Endpoints
+### Roles API (ADR-012)
 ```
-GET    /api/settings/modules
-PUT    /api/settings/modules
+GET    /api/settings/roles                    -- List all roles (system + custom)
+GET    /api/settings/roles/:id                -- Get role details
+POST   /api/settings/roles                    -- Create custom role (future)
+PUT    /api/settings/roles/:id                -- Update custom role (future)
+DELETE /api/settings/roles/:id                -- Delete custom role (future)
+```
+
+### Modules API (ADR-011)
+```
+GET    /api/settings/modules                  -- List all modules with enabled status
+GET    /api/settings/modules/:id              -- Get module details
+PATCH  /api/settings/modules/:id/toggle       -- Enable/disable module
 ```
 
 ### API Keys Endpoints (SET-023)
@@ -628,6 +716,51 @@ interface ErrorResponse {
 }
 ```
 
+### Permission Checks (ADR-012)
+
+All protected endpoints use the role-based permission system:
+
+```typescript
+// Service layer permission check
+async function hasPermission(userId: string, module: string, action: 'C' | 'R' | 'U' | 'D'): Promise<boolean> {
+  const { data: user } = await supabase
+    .from('users')
+    .select('role:roles(permissions)')
+    .eq('id', userId)
+    .single();
+
+  const modulePerms = user?.role?.permissions?.[module] || '-';
+  return modulePerms.includes(action);
+}
+
+// Usage in API route
+if (!await hasPermission(userId, 'users', 'C')) {
+  return { error: 'Forbidden', code: 'PERMISSION_DENIED' };
+}
+```
+
+### Module Checks (ADR-011)
+
+Check if a module is enabled for an organization:
+
+```typescript
+async function isModuleEnabled(orgId: string, moduleCode: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('organization_modules')
+    .select('enabled, module:modules(code)')
+    .eq('org_id', orgId)
+    .eq('module.code', moduleCode)
+    .single();
+
+  return data?.enabled ?? false;
+}
+
+// Usage in API route
+if (!await isModuleEnabled(orgId, 'planning')) {
+  return { error: 'Module not enabled', code: 'MODULE_DISABLED' };
+}
+```
+
 ---
 
 ## Component Architecture
@@ -704,12 +837,13 @@ apps/frontend/app/(authenticated)/settings/
 lib/services/
 ├── organization-service.ts     -- Organization CRUD
 ├── user-service.ts            -- User management + invitations
+├── role-service.ts            -- Role management (ADR-012)
 ├── warehouse-service.ts       -- Warehouse + location CRUD
 ├── machine-service.ts         -- Machine management
 ├── production-line-service.ts -- Line + machine assignments
 ├── allergen-service.ts        -- Allergen CRUD
 ├── tax-code-service.ts        -- Tax code CRUD
-├── module-settings-service.ts -- Module activation
+├── module-service.ts          -- Module activation (ADR-011)
 ├── api-key-service.ts         -- API key management + hashing
 ├── webhook-service.ts         -- Webhook CRUD + delivery
 ├── security-policy-service.ts -- Security policies + IP whitelist
@@ -743,12 +877,12 @@ lib/services/
 +-------------+     +----------------+
 ```
 
-### Module Activation Flow
+### Module Activation Flow (ADR-011)
 ```
-+-------------+     +----------------+     +----------------+
-|   Admin     | --> |  Modules API   | --> | module_settings|
-|   Toggle    |     |   Route        |     |   table        |
-+-------------+     +----------------+     +----------------+
++-------------+     +----------------+     +--------------------+
+|   Admin     | --> |  Modules API   | --> | organization_      |
+|   Toggle    |     |   Route        |     | modules table      |
++-------------+     +----------------+     +--------------------+
       |                    |
       |                    v
       |             +----------------+
@@ -767,7 +901,25 @@ lib/services/
 
 ## Security
 
-### RLS Policies
+### Row Level Security (RLS) Policies
+
+**Standard Pattern (ADR-013: Users Table Lookup):**
+
+All RLS policies use the users table lookup pattern for org_id isolation:
+
+```sql
+-- Standard org isolation pattern (ADR-013)
+CREATE POLICY "org_isolation" ON {table_name}
+FOR ALL
+USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+```
+
+**Note:** All RLS policies in this document use the Users Table Lookup pattern per ADR-013. This ensures:
+- Single source of truth (users table is authoritative)
+- Immediate effect when user org changes (no JWT refresh needed)
+- Works without custom JWT claim configuration
+
+---
 
 ```sql
 -- organizations: Only own organization
@@ -785,11 +937,72 @@ CREATE POLICY "Admins can manage users"
 ON users FOR ALL
 USING (
   org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-  AND (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  AND EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
--- All other tables: org_id filter
+-- roles: System roles visible to all, custom roles org-scoped (ADR-012)
+CREATE POLICY "roles_select_system" ON roles FOR SELECT
+USING (is_system = true);
+
+CREATE POLICY "roles_select_custom" ON roles FOR SELECT
+USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+CREATE POLICY "roles_insert_custom" ON roles FOR INSERT
+WITH CHECK (
+  org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+  AND is_system = false
+);
+
+CREATE POLICY "roles_update_custom" ON roles FOR UPDATE
+USING (
+  org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+  AND is_system = false
+);
+
+-- modules: Read-only for all authenticated (ADR-011)
+CREATE POLICY "modules_select" ON modules FOR SELECT
+USING (true);
+
+-- organization_modules: Org-scoped (ADR-011)
+CREATE POLICY "org_modules_select" ON organization_modules FOR SELECT
+USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+CREATE POLICY "org_modules_insert" ON organization_modules FOR INSERT
+WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+CREATE POLICY "org_modules_update" ON organization_modules FOR UPDATE
+USING (
+  org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+  AND EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
+);
+
+-- All other tables: org_id filter (ADR-013 pattern)
 CREATE POLICY "Org isolation" ON warehouses FOR ALL
+USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+CREATE POLICY "Org isolation" ON locations FOR ALL
+USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+CREATE POLICY "Org isolation" ON machines FOR ALL
+USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+CREATE POLICY "Org isolation" ON production_lines FOR ALL
+USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+CREATE POLICY "Org isolation" ON allergens FOR ALL
+USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+CREATE POLICY "Org isolation" ON tax_codes FOR ALL
 USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
 
 -- API Keys: Admin only
@@ -797,7 +1010,12 @@ CREATE POLICY "Admins can manage API keys"
 ON api_keys FOR ALL
 USING (
   org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-  AND (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  AND EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 -- Webhooks: Admin only
@@ -805,14 +1023,22 @@ CREATE POLICY "Admins can manage webhooks"
 ON webhooks FOR ALL
 USING (
   org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-  AND (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  AND EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 -- Webhook deliveries: Via webhook org_id
 CREATE POLICY "View deliveries for own webhooks"
 ON webhook_deliveries FOR SELECT
 USING (
-  webhook_id IN (SELECT id FROM webhooks WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))
+  webhook_id IN (
+    SELECT id FROM webhooks
+    WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+  )
 );
 
 -- Security policies: Admin only
@@ -820,7 +1046,12 @@ CREATE POLICY "Admins can manage security policies"
 ON org_security_policies FOR ALL
 USING (
   org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-  AND (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  AND EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 -- IP whitelist: Admin only
@@ -828,7 +1059,12 @@ CREATE POLICY "Admins can manage IP whitelist"
 ON ip_whitelist FOR ALL
 USING (
   org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-  AND (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  AND EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 -- Notification preferences: Own preferences only
@@ -841,13 +1077,23 @@ CREATE POLICY "View warehouse access"
 ON user_warehouse_access FOR SELECT
 USING (
   user_id = auth.uid()
-  OR (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  OR EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 CREATE POLICY "Admins can manage warehouse access"
 ON user_warehouse_access FOR ALL
 USING (
-  (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 -- Subscription: Admin only
@@ -855,7 +1101,12 @@ CREATE POLICY "Admins can manage subscription"
 ON org_subscriptions FOR ALL
 USING (
   org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-  AND (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  AND EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 -- Invoices: Admin only
@@ -863,7 +1114,12 @@ CREATE POLICY "Admins can view invoices"
 ON invoices FOR SELECT
 USING (
   org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-  AND (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  AND EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 -- Payment methods: Admin only
@@ -871,7 +1127,12 @@ CREATE POLICY "Admins can manage payment methods"
 ON payment_methods FOR ALL
 USING (
   org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-  AND (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  AND EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 -- Import history: Admin only
@@ -879,7 +1140,12 @@ CREATE POLICY "Admins can manage imports"
 ON import_history FOR ALL
 USING (
   org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-  AND (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  AND EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 -- Login attempts: User can see own, admin can see all
@@ -887,7 +1153,12 @@ CREATE POLICY "View login attempts"
 ON login_attempts FOR SELECT
 USING (
   user_id = auth.uid()
-  OR (SELECT role FROM users WHERE id = auth.uid()) IN ('super_admin', 'admin')
+  OR EXISTS (
+    SELECT 1 FROM users u
+    JOIN roles r ON u.role_id = r.id
+    WHERE u.id = auth.uid()
+    AND r.code IN ('owner', 'admin')
+  )
 );
 
 -- Password history: User can see own only (for system use)
@@ -901,21 +1172,23 @@ USING (user_id = auth.uid());
 | Endpoint | Required Role |
 |----------|---------------|
 | GET /users | Any authenticated |
-| POST /users | Admin, Super Admin |
-| DELETE /users | Admin, Super Admin |
-| PUT /organization | Admin, Super Admin |
-| PUT /modules | Admin, Super Admin |
+| POST /users | Admin, Owner |
+| DELETE /users | Admin, Owner |
+| PUT /organization | Admin, Owner |
+| GET /roles | Any authenticated |
+| GET /modules | Any authenticated |
+| PATCH /modules/:id/toggle | Admin, Owner |
 | * /warehouses | Admin, Warehouse Manager |
 | * /machines | Admin, Production Manager |
-| * /api-keys | Admin, Super Admin |
-| * /webhooks | Admin, Super Admin |
-| * /security | Admin, Super Admin |
+| * /api-keys | Admin, Owner |
+| * /webhooks | Admin, Owner |
+| * /security | Admin, Owner |
 | GET /notifications | Any authenticated (own) |
 | PUT /notifications | Any authenticated (own) |
-| * /subscription | Admin, Super Admin |
-| * /billing | Admin, Super Admin |
-| * /import | Admin, Super Admin |
-| * /export | Admin, Super Admin |
+| * /subscription | Owner |
+| * /billing | Owner |
+| * /import | Admin, Owner |
+| * /export | Admin, Owner |
 
 ---
 
@@ -927,6 +1200,9 @@ USING (user_id = auth.uid());
 |--------|--------------|-----------|
 | Organizations | 1 | 1 |
 | Users per org | 20-50 | 500 |
+| Roles (system) | 10 | 10 |
+| Roles (custom) | 0-5 | 50 |
+| Modules | 11 | 20 |
 | Warehouses | 1-5 | 20 |
 | Locations | 50-500 | 5,000 |
 | Machines | 10-50 | 200 |
@@ -947,25 +1223,41 @@ USING (user_id = auth.uid());
 
 2. **User List:**
    - Paginate with limit 50
-   - Index on (org_id, is_active, role)
+   - Index on (org_id, is_active, role_id)
    - Full-text search on name, email
+   - JOIN roles table for permission display
 
 3. **Settings Dashboard:**
    - Single query for all counts
    - Cache dashboard data (30 sec TTL)
+
+4. **Module Status (ADR-011):**
+   - Single JOIN between modules and organization_modules
+   - Cache enabled modules per org (5 min TTL)
+
+5. **Role Permissions (ADR-012):**
+   - Cache user permissions in Redis (1 min TTL)
+   - Load role permissions on user session init
+
+6. **RLS Performance (ADR-013):**
+   - Users table lookup adds <1ms overhead per query
+   - Primary key index on users.id ensures fast lookup
+   - PostgreSQL query planner optimizes repeated lookups
 
 ### Caching Strategy
 
 ```typescript
 // Redis keys
 'org:{orgId}:settings'         // 5 min TTL
-'org:{orgId}:modules'          // 5 min TTL
+'org:{orgId}:modules'          // 5 min TTL (ADR-011)
 'org:{orgId}:locations:tree'   // 5 min TTL
-'user:{userId}:permissions'    // 1 min TTL
+'user:{userId}:permissions'    // 1 min TTL (ADR-012)
+'user:{userId}:role'           // 1 min TTL (ADR-012)
 'org:{orgId}:security-policy'  // 5 min TTL
 'org:{orgId}:subscription'     // 5 min TTL
 'user:{userId}:notifications'  // 5 min TTL
 'api-key:{keyPrefix}'          // 1 min TTL (for validation)
+'roles:system'                 // 1 hour TTL (ADR-012)
 ```
 
 ---
@@ -991,9 +1283,13 @@ Settings Module
 |-------|---------|-----------|
 | `user.created` | User invitation accepted | Audit log |
 | `user.deactivated` | User deactivated | Session manager |
+| `user.role_changed` | User role updated | Permission cache invalidation |
 | `warehouse.created` | Warehouse created | Warehouse module |
 | `machine.status_changed` | Status update | Production dashboard |
 | `module.enabled` | Module toggled | Navigation, RLS |
+| `module.disabled` | Module toggled | Navigation, RLS |
+| `role.created` | Custom role created | Permission cache invalidation |
+| `role.updated` | Role permissions changed | Permission cache invalidation |
 | `api_key.created` | API key generated | Audit log |
 | `api_key.revoked` | API key revoked | Audit log |
 | `webhook.triggered` | Webhook event fired | Webhook delivery queue |
@@ -1017,8 +1313,9 @@ Settings Module
 
 ### Unit Tests
 - User service: CRUD, invitation flow, role validation
+- Role service: CRUD, permission checks (ADR-012)
 - Warehouse service: CRUD, location hierarchy
-- Module settings: Dependency validation
+- Module service: Enable/disable, dependency validation (ADR-011)
 - API key service: Key generation, hashing, validation
 - Webhook service: HMAC signing, delivery retry logic
 - Security policy service: Password validation, lockout logic
@@ -1026,18 +1323,62 @@ Settings Module
 
 ### Integration Tests
 - API endpoint coverage (80%+)
-- RLS policy enforcement
-- Role-based access control
+- RLS policy enforcement (ADR-013)
+- Role-based access control (ADR-012)
+- Module toggle with dependencies (ADR-011)
 - Stripe webhook handling
 - API key authentication flow
 - Webhook delivery and retry
 
 ### E2E Tests
 - User invitation flow (invite -> accept -> login)
+- Role assignment and permission enforcement
+- Module enable/disable with navigation update
 - Warehouse + location creation
-- Module toggle and navigation update
 - API key creation and API authentication
 - Webhook configuration and test delivery
 - Security policy enforcement (password, session, MFA)
 - Data import with validation errors
 - Subscription upgrade flow
+
+---
+
+## Migration from Legacy Schema
+
+**Status:** In Progress
+**Target Date:** Phase 1A completion
+
+### Key Migrations
+
+1. **ADR-011 (Modules):** Migrate flat columns to organization_modules junction table
+   - Migration: `supabase/migrations/053_create_modules_tables.sql`
+   - Deprecates: `module_settings` table (if exists)
+
+2. **ADR-012 (Roles):** Migrate users.role TEXT to role_id UUID FK
+   - Migration: `supabase/migrations/054_create_roles_table.sql`
+   - Migration: `supabase/migrations/055_migrate_user_roles.sql`
+   - Deprecates: `users.role` column (TEXT enum)
+
+3. **ADR-013 (RLS):** Standardize all policies to users lookup pattern
+   - Migration: `supabase/migrations/056_standardize_rls_policies.sql`
+   - Replaces: JWT claim pattern `auth.jwt() ->> 'org_id'`
+   - New pattern: `(SELECT org_id FROM users WHERE id = auth.uid())`
+
+### Migration Checklist
+
+- [ ] Backup production database before migration
+- [ ] Run migrations on staging environment
+- [ ] Verify all RLS policies use ADR-013 pattern
+- [ ] Test user org reassignment (immediate effect)
+- [ ] Verify module enable/disable with dependencies
+- [ ] Test permission checks across all modules
+- [ ] Update application code to use new schema
+- [ ] Monitor performance after migration (<1ms RLS overhead)
+
+---
+
+## Document Version
+
+**Version:** 2.0
+**Last Updated:** 2025-12-15
+**ADRs Reflected:** ADR-011, ADR-012, ADR-013

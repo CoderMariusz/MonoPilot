@@ -7,11 +7,11 @@ ACCEPTED
 2025-12-15
 
 ## Context
-Epic 01a-Settings
+Epic 01-Settings
 
 We need to store which modules are enabled for each organization. Two approaches exist:
 1. Flat columns in `module_settings` table (current architecture doc)
-2. Junction table `organization_modules` (proposed in story 01a.7)
+2. Junction table `organization_modules` (proposed in story 01.7)
 
 **Problem:**
 The flat column approach requires schema migration every time a new module is added. With Epics 10 (OEE) and 11 (Integrations) being new additions, this inflexibility becomes a significant maintenance burden.
@@ -213,4 +213,4 @@ Migration: 053_create_modules_tables.sql
 - SET-013: Module Toggle Confirmation
 
 ### Stories
-- Story 01a.7: Module Enable/Disable API
+- Story 01.7: Module Enable/Disable API

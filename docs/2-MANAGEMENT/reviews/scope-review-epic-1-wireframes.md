@@ -1,11 +1,11 @@
 # Scope Validation Report: Settings Wireframes vs PRD
 
-**Review Date**: 2025-12-11
+**Review Date**: 2025-12-15
 **Reviewer**: PRODUCT-OWNER Agent
 **Epic**: Epic 1 - Settings Module
 **Documents Reviewed**:
 - PRD: `docs/1-BASELINE/product/modules/settings.md` (2,124 lines, 183 FRs)
-- Wireframes: 24 SET-*.md files (SET-006 through SET-029)
+- Wireframes: 33 SET-*.md files (SET-001 through SET-031, including SET-021a/SET-021b)
 
 ---
 
@@ -13,14 +13,14 @@
 
 | Metric | Count | Status |
 |--------|-------|--------|
-| **In Scope** | 23 wireframes | PASS |
-| **Scope Creep** | 1 minor issue | WARNING |
-| **Missing PRD Coverage** | 6 FRs need wireframes | ACTION REQUIRED |
-| **Phase Alignment** | 22 correct, 2 minor issues | PASS |
+| **In Scope** | 33 wireframes | PASS |
+| **Scope Creep** | 0 issues | PASS |
+| **Missing PRD Coverage** | 3 FRs need wireframes | ACTION REQUIRED |
+| **Phase Alignment** | 31 correct, 2 minor issues | PASS |
 
 **Overall Decision**: **APPROVED WITH NOTES**
 
-The wireframes are well-aligned with the PRD. Only minor scope creep detected. Missing wireframes for onboarding steps 1-5 should be addressed.
+The wireframes are well-aligned with the PRD. Previously reported missing onboarding wireframes (SET-001 to SET-005) are now present. Remaining gaps are limited to a small set of PRD requirements that still lack explicit wireframes.
 
 ---
 
@@ -212,14 +212,14 @@ The wireframes are well-aligned with the PRD. Only minor scope creep detected. M
 
 | PRD FR | Phase | Priority | Wireframe | Coverage |
 |--------|-------|----------|-----------|----------|
-| FR-SET-180 Setup Wizard Launcher | 1A | P0 | - | MISSING |
-| FR-SET-181 Organization Profile Step | 1A | P0 | - | MISSING |
-| FR-SET-182 First Warehouse Step | 1A | P0 | - | MISSING |
-| FR-SET-183 First Location Step | 1A | P0 | - | MISSING |
-| FR-SET-184 First Product Step | 1A | P0 | - | MISSING |
-| FR-SET-185 First Work Order Step | 1A | P0 | - | MISSING |
-| FR-SET-186 Wizard Progress | 1A | P0 | - | MISSING |
-| FR-SET-187 Skip Wizard | 1A | P0 | - | MISSING |
+| FR-SET-180 Setup Wizard Launcher | 1A | P0 | SET-001 | FULL |
+| FR-SET-181 Organization Profile Step | 1A | P0 | SET-002 | FULL |
+| FR-SET-182 First Warehouse Step | 1A | P0 | SET-003 | FULL |
+| FR-SET-183 First Location Step | 1A | P0 | SET-004 | FULL |
+| FR-SET-184 First Product Step | 1A | P0 | SET-005 | FULL |
+| FR-SET-185 First Work Order Step | 1A | P0 | SET-005 | FULL |
+| FR-SET-186 Wizard Progress | 1A | P0 | SET-001 | FULL |
+| FR-SET-187 Skip Wizard | 1A | P0 | SET-001 | FULL |
 | FR-SET-188 Wizard Completion | 1A | P0 | SET-006 | FULL |
 
 ---
@@ -230,19 +230,15 @@ The wireframes are well-aligned with the PRD. Only minor scope creep detected. M
 
 | Wireframe | Feature | PRD Backing | Recommendation |
 |-----------|---------|-------------|----------------|
-| SET-009 | Warehouse Access Multi-Select per User | No | **SCOPE CREEP** - Not in FR-SET-010. Consider removing or adding to PRD. |
+| SET-009 | Warehouse Access Multi-Select per User | FR-SET-018 | In scope (Phase 1B) |
 | SET-027 | SMS Notifications | Implicit in FR-SET-160 | **ACCEPTABLE** - Premium feature, adds value |
 | SET-028 | Enterprise Plan | Not explicitly defined | **ACCEPTABLE** - Natural extension of subscription model |
 
 ### 2.2 Scope Creep Verdict
 
-**Minor scope creep identified:**
+**Scope creep verdict:**
 
-1. **SET-009 Warehouse Access Per User**: The PRD specifies role-based permissions (FR-SET-020-031) but wireframe adds warehouse-level user access. This is a useful feature but NOT in the PRD.
-
-   **RECOMMENDATION**: Either:
-   - (A) Add FR-SET-018 "User-Warehouse Assignment" to PRD, OR
-   - (B) Remove from wireframe and use role-based access only
+- **No scope creep requiring action**. The previously flagged SET-009 warehouse access is now explicitly covered by **FR-SET-018** in the PRD.
 
 ---
 
@@ -250,18 +246,7 @@ The wireframes are well-aligned with the PRD. Only minor scope creep detected. M
 
 ### 3.1 Critical Missing Wireframes (Phase 1A - P0)
 
-| PRD FR | Feature | Phase | Priority | Risk Level |
-|--------|---------|-------|----------|------------|
-| FR-SET-180 | Setup Wizard Launcher | 1A | P0 | **HIGH** |
-| FR-SET-181 | Organization Profile Wizard Step | 1A | P0 | **HIGH** |
-| FR-SET-182 | First Warehouse Wizard Step | 1A | P0 | **HIGH** |
-| FR-SET-183 | First Location Wizard Step | 1A | P0 | **HIGH** |
-| FR-SET-184 | First Product Wizard Step | 1A | P0 | **HIGH** |
-| FR-SET-185 | First Work Order Wizard Step | 1A | P0 | **HIGH** |
-| FR-SET-186 | Wizard Progress Tracking | 1A | P0 | **HIGH** |
-| FR-SET-187 | Skip Wizard Option | 1A | P0 | **HIGH** |
-
-**NOTE**: Only SET-006 (Onboarding Completion) exists. Steps 1-5 wireframes are MISSING.
+None. All onboarding wizard wireframes (SET-001 to SET-006) are present and mapped to FR-SET-180 to FR-SET-188.
 
 ### 3.2 Non-Critical Missing Wireframes (Phase 1B+ or P2)
 
@@ -324,20 +309,10 @@ The wireframes are well-aligned with the PRD. Only minor scope creep detected. M
 
 ### 6.1 Required Actions (Before Development)
 
-1. **Create Onboarding Wizard Wireframes (SET-001 to SET-005)**
-   - FR-SET-180: SET-001-wizard-launcher.md
-   - FR-SET-181: SET-002-wizard-organization.md
-   - FR-SET-182: SET-003-wizard-warehouse.md
-   - FR-SET-183: SET-004-wizard-location.md
-   - FR-SET-184-185: SET-005-wizard-product-workorder.md
-   - FR-SET-186-187: Include in SET-001 (progress + skip)
-
-   **Priority**: HIGH - These are P0 MVP features
-
-2. **Resolve Warehouse Access Scope Creep**
-   - Decision needed: Add to PRD or remove from SET-009
-
-   **Priority**: MEDIUM
+1. **Add/clarify wireframes for remaining uncovered PRD items**
+   - FR-SET-065 (Line-Product Compatibility) — add explicit UI coverage or clarify it is handled inside SET-019
+   - FR-SET-005 (Business Hours) — add a wireframe section (likely within SET-007 Organization Profile) or create a dedicated screen
+   - FR-SET-174 (GDPR Compliance Tools) — add wireframe (new screen) or document as Phase 3 backend-only until UI exists
 
 ### 6.2 Optional Enhancements
 
@@ -359,8 +334,8 @@ The wireframes are well-aligned with the PRD. Only minor scope creep detected. M
 
 The Settings wireframes (SET-006 through SET-029) are **APPROVED** for development with the following conditions:
 
-1. **BLOCKING**: Create onboarding wizard wireframes (SET-001 to SET-005) before Phase 1A development begins
-2. **NON-BLOCKING**: Resolve warehouse access scope creep (SET-009) before user management development
+1. **BLOCKING**: Address missing wireframes for FR-SET-065 (P1) if it requires a dedicated UI beyond current line management screens
+2. **NON-BLOCKING**: FR-SET-005 and FR-SET-174 are P2; UI can be deferred but should be explicitly tracked
 3. **INFORMATIONAL**: Phase 3 features (IP whitelist, GDPR, subscription) may be deferred without blocking MVP
 
 ---
@@ -374,11 +349,12 @@ epic: 1
 module: Settings
 decision: approved_with_conditions
 blocking_issues:
-  - "Missing onboarding wizard wireframes SET-001 to SET-005"
+  - "FR-SET-065 missing explicit wireframe coverage (verify/add)"
 non_blocking_issues:
-  - "Warehouse access per user scope creep in SET-009"
-wireframes_ready: 24
-wireframes_missing: 5
+  - "FR-SET-005 business hours UI missing (P2 ok)"
+  - "FR-SET-174 GDPR tools UI missing (P2 ok)"
+wireframes_ready: 33
+wireframes_missing: 0
 estimated_stories: 30-35
 phases_covered: [1A, 1B, 2, 3]
 ```
@@ -389,13 +365,10 @@ phases_covered: [1A, 1B, 2, 3]
 epic: 1
 decision: needs_wireframes
 required_wireframes:
-  - SET-001-wizard-launcher.md (FR-SET-180, FR-SET-186, FR-SET-187)
-  - SET-002-wizard-organization.md (FR-SET-181)
-  - SET-003-wizard-warehouse.md (FR-SET-182)
-  - SET-004-wizard-location.md (FR-SET-183)
-  - SET-005-wizard-product-workorder.md (FR-SET-184, FR-SET-185)
-scope_creep_resolution:
-  - SET-009: Remove warehouse_access field OR add FR-SET-018 to PRD
+  - "FR-SET-065: add explicit UI coverage or confirm it is fully covered by SET-019"
+optional_wireframes:
+  - "FR-SET-005: business hours UI (could be integrated into SET-007)"
+  - "FR-SET-174: GDPR tools UI (likely dedicated wireframe)"
 ```
 
 ---

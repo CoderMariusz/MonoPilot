@@ -246,9 +246,9 @@ The Epic 02 story documentation has been significantly improved since the initia
   |
   +-> 02.2 Versioning (depends on 02.1) VALID
   |
-  +-> 02.3 Allergens (depends on 02.1, 01a.x, 02.4) VALID
+  +-> 02.3 Allergens (depends on 02.1, 01.x, 02.4) VALID
   |
-  +-> 02.4 BOMs CRUD (depends on 02.1, 01a.1) VALID
+  +-> 02.4 BOMs CRUD (depends on 02.1, 01.1) VALID
        |
        +-> 02.5 BOM Items (depends on 02.4, 02.7) VALID
             |
@@ -260,9 +260,9 @@ The Epic 02 story documentation has been significantly improved since the initia
             |
             +-> 02.13 Nutrition (depends on 02.5) VALID
 
-02.7 Routings CRUD (depends on 02.1, 01a.1) VALID
+02.7 Routings CRUD (depends on 02.1, 01.1) VALID
   |
-  +-> 02.8 Operations (depends on 02.7, 01a.7) VALID
+  +-> 02.8 Operations (depends on 02.7, 01.7) VALID
 
 02.10 Traceability (depends on 02.1, 05.x) VALID - Cross-epic dependency documented
   |

@@ -1,16 +1,16 @@
 # Settings Module - Product Requirements Document
 
 **Module:** Settings
-**Version:** 2.2
-**Last Updated:** 2025-12-10
+**Version:** 2.3
+**Last Updated:** 2025-12-15
 **Status:** Baseline
 
 ## Phase Mapping
 
 | Phase | Timeline | Focus |
 |-------|----------|-------|
-| 1A | MVP Core (Weeks 1-2) | Organization setup, user management with 10 roles, multi-language support, module toggles, 15-minute onboarding wizard |
-| 1B | MVP Complete (Weeks 3-4) | Warehouse/location/machine infrastructure, production lines, audit trail, security policies |
+| 1A | MVP Core (Weeks 1-2) | Organization setup, user management with 10 roles, module toggles, 15-minute onboarding wizard |
+| 1B | MVP Complete (Weeks 3-4) | Warehouse/location/machine infrastructure, production lines, audit trail, security policies, multi-language support |
 | 2 | Growth (Weeks 5-6) | Master data (allergens, tax codes), API keys, webhooks, notification settings |
 | 3 | Enterprise (Weeks 7-8) | Subscription/billing, import/export utilities, IP whitelist, GDPR compliance, usage analytics |
 
@@ -54,6 +54,7 @@ The Settings Module provides centralized configuration and administration for Mo
 | FR-SET-015 | MFA/2FA support | P1 | 1B | Users |
 | FR-SET-016 | User activity tracking | P2 | 2 | Users |
 | FR-SET-017 | User deactivation/archiving | P1 | 1A | Users |
+| FR-SET-018 | User warehouse access restrictions | P1 | 1B | Users |
 | **ROLES & PERMISSIONS** |
 | FR-SET-020 | Super Admin role | P0 | 1A | Roles |
 | FR-SET-021 | Admin role | P0 | 1A | Roles |
@@ -120,13 +121,13 @@ The Settings Module provides centralized configuration and administration for Mo
 | FR-SET-105 | Usage metrics tracking | P2 | 3 | Billing |
 | FR-SET-106 | Subscription upgrade/downgrade | P1 | 3 | Billing |
 | **MULTI-LANGUAGE** |
-| FR-SET-110 | Language selection (PL/EN/DE/FR) | P0 | 1A | Localization |
-| FR-SET-111 | UI translation management | P0 | 1A | Localization |
-| FR-SET-112 | User-level language preference | P0 | 1A | Localization |
-| FR-SET-113 | Organization default language | P0 | 1A | Localization |
-| FR-SET-114 | Date/time format localization | P1 | 1A | Localization |
-| FR-SET-115 | Number format localization | P1 | 1A | Localization |
-| FR-SET-116 | Translation fallback (EN default) | P1 | 1A | Localization |
+| FR-SET-110 | Language selection (PL/EN/DE/FR) | P1 | 1B | Localization |
+| FR-SET-111 | UI translation management | P1 | 1B | Localization |
+| FR-SET-112 | User-level language preference | P1 | 1B | Localization |
+| FR-SET-113 | Organization default language | P1 | 1B | Localization |
+| FR-SET-114 | Date/time format localization | P1 | 1B | Localization |
+| FR-SET-115 | Number format localization | P1 | 1B | Localization |
+| FR-SET-116 | Translation fallback (EN default) | P1 | 1B | Localization |
 | **API KEYS** |
 | FR-SET-120 | API key generation | P1 | 2 | Integrations |
 | FR-SET-121 | API key revocation | P1 | 2 | Integrations |
@@ -461,6 +462,51 @@ Deactivate user accounts without deleting them, preserving audit history and all
 
 ---
 
+#### FR-SET-018: User Warehouse Access Restrictions
+
+**Priority:** P1 (Phase 1B - Infrastructure)
+**Phase:** 1B
+**Module Area:** Users
+**Dependencies:** FR-SET-040 (Warehouses CRUD)
+
+**Description:**
+Restrict user access to specific warehouses. Users can only view and modify inventory in warehouses they have been granted access to. Super admins and admins have access to all warehouses by default.
+
+**User Story:**
+As an admin, I want to restrict which warehouses a user can access, so that multi-warehouse operations maintain proper data isolation and users only see relevant inventory.
+
+**Acceptance Criteria:**
+- GIVEN user has access to WH-001 only, WHEN viewing inventory module, THEN only WH-001 inventory displays
+- GIVEN admin assigns warehouse access in user profile, WHEN user logs in, THEN only assigned warehouses appear in warehouse dropdown filters
+- GIVEN user has no warehouse access assigned, WHEN accessing warehouse-dependent modules, THEN error message "No warehouse access configured" displays
+- GIVEN super_admin or admin role, WHEN accessing any module, THEN all warehouses are accessible (bypass restriction)
+- GIVEN user warehouse access is changed, WHEN user refreshes page, THEN new access permissions apply immediately
+
+**Business Rules:**
+- Default: New users have NO warehouse access (must be explicitly granted)
+- Exception: super_admin and admin roles bypass restrictions (access all)
+- Access levels: read, write (future: admin per warehouse)
+- Cascading delete: If warehouse is deleted, remove all user_warehouse_access records
+- Audit: Track who granted/revoked access and when
+
+**UI/UX:**
+- User profile modal: Multi-select dropdown for warehouse access assignment
+- Warehouse filter: Only show warehouses user has access to
+- Error handling: Clear message if user tries to access restricted warehouse
+
+**API:**
+- GET /api/settings/users/:id/warehouse-access
+- PUT /api/settings/users/:id/warehouse-access
+
+**Database:**
+- Table: user_warehouse_access (user_id, warehouse_id, access_level, created_at, created_by)
+
+**Related:**
+- Wireframe: SET-009 (User Create/Edit Modal, lines 49-105)
+- Architecture: user_warehouse_access table (lines 338-348)
+
+---
+
 ### 2.4 Phase 1A - Roles & Permissions Requirements
 
 #### FR-SET-020 to FR-SET-029: Role Definitions
@@ -596,12 +642,15 @@ Validate module dependencies when enabling/disabling modules. Some modules requi
 
 ---
 
-### 2.6 Phase 1A - Multi-Language Requirements
+### 2.6 Phase 1B - Multi-Language Requirements
+
+> **Note:** Multi-language support (FR-SET-110 to FR-SET-116) was deferred from Phase 1A to Phase 1B.
+> See "Multi-Language Deferral Justification" section below for details.
 
 #### FR-SET-110: Language Selection
 
-**Priority:** P0 (MVP)
-**Phase:** 1A
+**Priority:** P1 (MVP)
+**Phase:** 1B
 **Module Area:** Localization
 
 **Description:**
@@ -618,10 +667,27 @@ Support for 4 languages: Polish, English, German, and French. Users can select t
 
 ---
 
+#### FR-SET-111: UI Translation Management
+
+**Priority:** P1 (MVP)
+**Phase:** 1B
+**Module Area:** Localization
+
+**Description:**
+Manage UI translations for all supported languages. Translations are stored in the database and can be updated without code deployment.
+
+**Acceptance Criteria:**
+- GIVEN admin navigates to translation management, WHEN page loads, THEN all translation keys display with values for each language
+- GIVEN translation key "settings.title" exists, WHEN admin updates Polish value, THEN change reflects immediately for Polish users
+- GIVEN new feature added with missing translation, WHEN UI renders, THEN English fallback displays
+- GIVEN translation export requested, WHEN export completes, THEN JSON/CSV file downloads with all translations
+
+---
+
 #### FR-SET-112: User-Level Language Preference
 
-**Priority:** P0 (MVP)
-**Phase:** 1A
+**Priority:** P1 (MVP)
+**Phase:** 1B
 **Module Area:** Localization
 
 **Description:**
@@ -638,8 +704,8 @@ Each user can set their own language preference, overriding the organization def
 
 #### FR-SET-113: Organization Default Language
 
-**Priority:** P0 (MVP)
-**Phase:** 1A
+**Priority:** P1 (MVP)
+**Phase:** 1B
 **Module Area:** Localization
 
 **Description:**
@@ -656,7 +722,7 @@ Set organization-wide default language for new users and system communications.
 #### FR-SET-114: Date/Time Format Localization
 
 **Priority:** P1 (MVP)
-**Phase:** 1A
+**Phase:** 1B
 **Module Area:** Localization
 
 **Description:**
@@ -673,10 +739,27 @@ Display dates and times according to locale conventions.
 
 ---
 
+#### FR-SET-115: Number Format Localization
+
+**Priority:** P1 (MVP)
+**Phase:** 1B
+**Module Area:** Localization
+
+**Description:**
+Display numbers according to locale conventions (decimal separator, thousands separator).
+
+**Acceptance Criteria:**
+- GIVEN locale is "en-US", WHEN number 1234.56 displayed, THEN format is "1,234.56"
+- GIVEN locale is "pl-PL", WHEN number 1234.56 displayed, THEN format is "1 234,56"
+- GIVEN locale is "de-DE", WHEN number 1234.56 displayed, THEN format is "1.234,56"
+- GIVEN currency display, WHEN locale changes, THEN currency position and format update accordingly
+
+---
+
 #### FR-SET-116: Translation Fallback
 
 **Priority:** P1 (MVP)
-**Phase:** 1A
+**Phase:** 1B
 **Module Area:** Localization
 
 **Description:**
@@ -687,6 +770,36 @@ Fallback to English when translation is missing for selected language.
 - GIVEN all translations present for German, WHEN UI renders in German, THEN no English fallbacks visible
 - GIVEN translation key missing entirely, WHEN UI renders, THEN key displays as-is (e.g., "settings.new_label")
 - GIVEN fallback used, WHEN console checked (dev mode), THEN warning "Missing translation: settings.new_label for pl" logged
+
+---
+
+#### Multi-Language Deferral Justification
+
+**Date:** 2025-12-15
+**Decision:** Defer multi-language support (FR-SET-110 to FR-SET-116) from Phase 1A to Phase 1B
+**Affected Requirements:** FR-SET-110, FR-SET-111, FR-SET-112, FR-SET-113, FR-SET-114, FR-SET-115, FR-SET-116
+
+**Rationale:**
+1. **Phase 1A Focus:** Core functionality (authentication, users, organizations, roles, module toggles, onboarding wizard) takes priority
+2. **MVP Viability:** English-only MVP is sufficient for initial customers and market validation
+3. **Complexity Reduction:** Multi-language adds i18n infrastructure complexity without blocking core workflows
+4. **UI Stabilization:** Phase 1B timing allows UI patterns to stabilize before adding translation layer
+5. **Epic 01 Scope:** Epic 01 already contains 7 stories (maximum recommended); adding multi-language would exceed optimal batch size
+
+**Impact:**
+- MVP launches English-only
+- Multi-language added in Phase 1B alongside infrastructure configuration
+- No technical debt created: i18n library already chosen (next-intl), translation keys reserved in codebase
+
+**Technical Preparation (Phase 1A):**
+- Install next-intl package
+- Configure i18n routing structure
+- Use translation keys in new components (hardcoded English values for MVP)
+- Translation files created with English values only
+
+**Related Epic:**
+- Epic 01: Core Settings (7 stories) - Phase 1A
+- Epic 01b: Infrastructure Config (includes multi-language story) - Phase 1B
 
 ---
 
@@ -1599,6 +1712,8 @@ PUT    /api/v1/settings/users/:id
 DELETE /api/v1/settings/users/:id
 PATCH  /api/v1/settings/users/:id/deactivate
 PATCH  /api/v1/settings/users/:id/activate
+GET    /api/v1/settings/users/:id/warehouse-access
+PUT    /api/v1/settings/users/:id/warehouse-access
 ```
 
 ### 4.3 User Invitation Endpoints
@@ -1897,7 +2012,6 @@ GET    /api/v1/settings/onboarding/templates/locations
 - User CRUD with 10 roles
 - User invitations (email)
 - Session management
-- Multi-language support (PL/EN/DE/FR)
 - Module toggles
 - Basic authentication
 - **15-minute Onboarding Wizard (FR-SET-180 to FR-SET-188)**
@@ -1911,10 +2025,12 @@ GET    /api/v1/settings/onboarding/templates/locations
 - Story 1.11: Module activation
 - **Story 1.16: Onboarding Wizard**
 
+**Note:** Multi-language support (FR-SET-110-116) deferred to Phase 1B.
+
 ---
 
 ### Phase 1B: Infrastructure Setup (Weeks 3-4)
-**Goal:** Physical infrastructure configuration
+**Goal:** Physical infrastructure configuration + Multi-language support
 
 **Deliverables:**
 - Warehouse CRUD
@@ -1923,12 +2039,14 @@ GET    /api/v1/settings/onboarding/templates/locations
 - Production line configuration
 - Audit trail (basic)
 - Security policies
+- **Multi-language support (PL/EN/DE/FR)**
 
 **User Stories:**
 - Story 1.5: Warehouse configuration
 - Story 1.6: Location management
 - Story 1.7: Machine configuration
 - Story 1.8: Production line configuration
+- **Story 1.x: Multi-language support**
 
 ---
 
@@ -2110,6 +2228,8 @@ GET    /api/v1/settings/onboarding/templates/locations
 
 | Date | Version | Changes | Author |
 |---|---|---|---|
+| 2025-12-15 | 2.3 | Deferred multi-language (FR-SET-110-116) from Phase 1A to Phase 1B; added deferral justification; added FR-SET-111, FR-SET-115 detailed specs | PM-Agent |
+| 2025-12-15 | 2.3 | Added FR-SET-018 (User Warehouse Access Restrictions) | PM-Agent |
 | 2025-12-10 | 2.2 | Added Gherkin AC to Phase 1A/1B FRs (FR-SET-001 to FR-SET-173) | PM-Agent |
 | 2025-12-10 | 2.1 | Standardized phase naming (1A/1B/2/3) | Tech Writer |
 | 2025-12-10 | 2.1 | Added Onboarding Wizard requirements (FR-SET-180 to FR-SET-188) | PM-Agent |
@@ -2120,5 +2240,5 @@ GET    /api/v1/settings/onboarding/templates/locations
 
 **Document Status:** Approved for Development
 **Next Review Date:** 2025-12-31
-**Total Requirements:** 183 FRs (174 + 9 Onboarding Wizard)
-**Lines:** ~1750
+**Total Requirements:** 184 FRs (174 + 9 Onboarding Wizard + FR-SET-018)
+**Lines:** ~2200

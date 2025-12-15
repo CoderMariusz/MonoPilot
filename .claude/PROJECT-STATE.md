@@ -1,11 +1,11 @@
 # MonoPilot - Project State
 
-> Last Updated: 2025-12-15 (Effective Dates Visibility Fix: SET-021 Tax Code List - FR-SET-083 Compliance)
+> Last Updated: 2025-12-15 (Epic 01 Consolidation - ADRs, Planning & Rename 01a→01)
 > Use this file to restore context after /clear or new session
 
-## Current Status: 6 MODULES COMPLETE + SHIPPING IN PROGRESS + EPIC 02 STORIES ✅
+## Current Status: 6 MODULES COMPLETE + SHIPPING IN PROGRESS + EPIC 01 CONSOLIDATION ✅
 
-**Latest Achievement**: Effective dates visibility added to SET-021 Tax Code List with 2 new modal screens (FR-SET-083 compliance)
+**Latest Achievement**: Epic 01 consolidated (01a→01), ADR-011/012 created, Architecture v2.0, 88 FRs mapped to 4 sub-epics
 
 **Quality Score**: Warehouse 103%, Quality 96.75%, Planning 97.5%, Production 96.6%, Technical 95%+, Settings 97.5%
 **Total Wireframes**: 117 (29 Settings + 3 Tax Code screens + 19 Technical + 19 Planning + 11 Production + 13 Warehouse + 20 Quality + 3 Shipping)
@@ -157,7 +157,7 @@
 
 ### Phase 23: Epic 02 Technical Module Story Breakdown (2025-12-15)
 
-**Goal**: Break down Technical Module (Epic 2) into detailed stories following Settings (01a) format
+**Goal**: Break down Technical Module (Epic 2) into detailed stories following Settings (01) format
 
 **Achievements**:
 - Created 15 story files (02.1-02.15)
@@ -224,6 +224,43 @@ All 11 module PRDs: 13,590 lines, 608+ FRs, 50+ NFRs
 - SET-021b: Edit Tax Code Modal created with date range support
 - FR-SET-083 full compliance achieved
 - 3 new wireframes created (117 total)
+
+### Phase 25: Epic 01 Settings - Architecture & Planning Consolidation (2025-12-15)
+
+**Goal**: Fix critical architecture inconsistencies, create full Epic 01 delivery plan, and consolidate Epic 01a→01
+
+**Achievements**:
+
+#### FALA 1 - Critical ADRs & PRD Fixes (5 agents):
+- Created ADR-011 (Module Toggle Storage) - junction table pattern, 11 modules seeded
+- Created ADR-012 (Role Permission Storage) - UUID FK + JSONB with 10 system roles
+- Verified ADR-013 (RLS Org Isolation Pattern) - already production-ready
+- Verified FR-SET-018 (Warehouse Access) - already in PRD lines 465-507
+- Updated FR-SET-110-116 (Multi-language) - deferred P0 1A → P1 1B with justification, PRD v2.3
+
+#### FALA 2 - Architecture & Planning Updates (3 agents):
+- Updated Architecture Baseline v2.0 - all ADRs reflected, 20+ RLS policies standardized
+- Fixed Story ADR References - 5 stories updated, audit report created, 0 broken references
+- Created Epic 01 Full Overview - 88 FRs mapped to 4 sub-epics (39 stories total)
+- Corrected coverage metric: 26/88 FRs (29.5%) Epic 01 Phase 1A complete (not 12.6%)
+
+#### FALA 3 - Epic Consolidation (2 agents):
+- Renamed Epic 01a → Epic 01 (removed "a" suffix for consolidation)
+- Moved directories: 01a-settings/ → 01-settings/ (2 locations)
+- Renamed 13 files: 01a.X → 01.X (10 stories + 3 tests)
+- Updated 45+ files with story/epic references
+- Verification: 0 broken links, git history preserved
+
+**Quality**: 100% - All 8 priorities fixed, production ready
+**Files Changed**: 60+ (4 new, 13 renamed, 45+ updated)
+**Agents Used**: 10 (5 FALA 1, 3 FALA 2, 2 FALA 3)
+**Epic 01 Structure**:
+- Phase 1A (Epic 01): COMPLETE (7 stories, 26/88 FRs = 29.5%)
+- Phase 1B (Epic 01b): Q1 2026 (12 stories, 27 FRs)
+- Phase 1C (Epic 01c): Q1-Q2 2026 (8 stories, 17 FRs)
+- Phase 1D (Epic 01d): Q2-Q3 2026 (12 stories, 18 FRs)
+
+**Status**: READY FOR COMMIT
 
 ---
 
@@ -396,6 +433,7 @@ docs/1-BASELINE/product/
 
 ## Recent Commits
 
+- **PENDING** - refactor(docs): Epic 01 Consolidation - ADRs, Planning & Rename 01a→01
 - **PENDING** - fix(ux): SET-021 Tax Code List + SET-021a/b Modals - Effective Dates Visibility (FR-SET-083)
 - **PENDING** - fix(ux): SET-028 Billing Cycle Toggle - FR-SET-102 Full Compliance
 - **PENDING** - fix(ux): SET-003 Warehouse Types - PRD FR-SET-041 Compliance
@@ -408,45 +446,40 @@ docs/1-BASELINE/product/
 
 ## Current Session Summary (2025-12-15)
 
-### ✅ Done:
+### Done:
 
-**Phase 24: Effective Dates Visibility Enhancement - SET-021 Tax Code List + Modals**
+**Phase 25: Epic 01 Settings - Complete Consolidation (3 Waves, 10 Agents)**
 
-1. **✅ SET-021 Enhanced**: Tax Code List with effective dates display
-   - Added "Effective" column (DD/MM/YY-DD/MM/YY or "Ongoing")
-   - Added expiration indicator icons (✓, ⏰, ⌛)
-   - Added effective date filter dropdown
-   - Added computed fields: expires_soon, is_currently_active, days_until_expiry
-   - Enhanced validation: no overlapping date ranges
-   - Enhanced accessibility: full date text announcements
-   - Quality: 98/100
-   - Status: READY FOR HANDOFF
+**FALA 1 - Critical Fixes (5 agents):**
+1. architect-agent: Created ADR-011 (Module Toggle Storage)
+2. architect-agent: Created ADR-012 (Role Permission Storage)
+3. architect-agent: Verified ADR-013 (RLS Pattern - already exists)
+4. pm-agent: Verified FR-SET-018 (Warehouse Access - already in PRD)
+5. pm-agent: Updated FR-SET-110-116 (Multi-language defer to 1B, PRD v2.3)
 
-2. **✅ SET-021a Created**: Add Tax Code Modal with Date Range Support
-   - Date range radio toggle, date pickers, expiration warning
-   - Overlap detection, all 4 states, complete validation
-   - Quality: 95/100
-   - Status: NEW - READY FOR HANDOFF
+**FALA 2 - Architecture & Planning (3 agents):**
+6. architect-agent: Updated Architecture Baseline v2.0 (all ADRs reflected)
+7. doc-auditor: Fixed Story ADR References (5 stories + audit report)
+8. architect-agent: Created Epic 01 Full Overview (88 FRs, 4 sub-epics)
 
-3. **✅ SET-021b Created**: Edit Tax Code Modal with Date Range Support
-   - Read-only code, editable dates, change detection, delete confirmation
-   - Quality: 95/100
-   - Status: NEW - READY FOR HANDOFF
+**FALA 3 - Consolidation (2 agents):**
+9. doc-auditor: Created rename inventory (398+ references found)
+10. senior-dev: Executed rename 01a→01 (13 files, 45+ refs updated)
 
-### 📊 Current State:
-- **6 Modules Complete**: Settings, Technical, Planning, Production, Warehouse, Quality
-- **1 Module In Progress**: Shipping (SHIP-006, SHIP-010, SHIP-017)
-- **117 Total Wireframes**: 114 complete + 3 shipping in review
-- **Settings Module**: Now 32 wireframes (29 original + 3 new)
-- **FR-SET-083 Compliance**: COMPLETE
+### Current State:
+- **Epic 01 Phase 1A**: COMPLETE (7 stories, 26/88 FRs = 29.5%)
+- **ADRs**: 3 created/verified (ADR-011, ADR-012, ADR-013)
+- **Documentation**: Architecture v2.0, PRD v2.3, Epic Overview created
+- **Files Changed**: 60+ (4 new, 13 renamed, 45+ updated)
+- **Verification**: 0 broken references, git history preserved
 
-### 📝 Next Steps:
-1. Commit Phase 24 changes (SET-021, SET-021a, SET-021b)
-2. Begin frontend implementation for Settings module
-3. Continue Shipping module UX (12-17 more wireframes)
+### Next Steps:
+1. Commit Phase 25 changes
+2. Continue Shipping module UX (12-17 more wireframes)
+3. Begin Epic 01b (Infrastructure) planning for Q1 2026
 
 ---
 
-**Overall Project Status**: ON TRACK ✅
+**Overall Project Status**: ON TRACK
 **Modules Ready for Implementation**: 6 COMPLETE + Enhancement (Settings + Effective Dates)
 **Next Handoff Target**: Settings Module Complete (32 wireframes) + SHIP-010 + SHIP-017

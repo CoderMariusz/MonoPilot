@@ -22,7 +22,7 @@ The Epic 02 Technical Module is **APPROVED FOR DEVELOPMENT** with minor conditio
 | Stories Passing INVEST | 15/15 | ALL PASS |
 | Testable AC | 100% | ALL AC TESTABLE |
 | Scope Creep Items | 0 | NONE DETECTED |
-| External Dependencies | 1 (01a.1) | DOCUMENTED |
+| External Dependencies | 1 (01.1) | DOCUMENTED |
 
 ---
 
@@ -32,7 +32,7 @@ The Epic 02 Technical Module is **APPROVED FOR DEVELOPMENT** with minor conditio
 
 | Criteria | Score | Notes |
 |----------|-------|-------|
-| **I**ndependent | PASS | Only depends on 01a.1 (Settings) |
+| **I**ndependent | PASS | Only depends on 01.1 (Settings) |
 | **N**egotiable | PASS | Implementation flexible, API/UI patterns negotiable |
 | **V**aluable | PASS | Core foundation for entire Technical module |
 | **E**stimable | PASS | M-size, clear deliverables |
@@ -62,7 +62,7 @@ The Epic 02 Technical Module is **APPROVED FOR DEVELOPMENT** with minor conditio
 
 | Criteria | Score | Notes |
 |----------|-------|-------|
-| **I**ndependent | PASS | Depends on 02.1 and 01a.x (allergens master) |
+| **I**ndependent | PASS | Depends on 02.1 and 01.x (allergens master) |
 | **N**egotiable | PASS | Inheritance algorithm details negotiable |
 | **V**aluable | PASS | Food safety compliance requirement |
 | **E**stimable | PASS | M-size with clear scope |
@@ -77,7 +77,7 @@ The Epic 02 Technical Module is **APPROVED FOR DEVELOPMENT** with minor conditio
 
 | Criteria | Score | Notes |
 |----------|-------|-------|
-| **I**ndependent | PASS | Clean dependency on 02.1, 01a.1 |
+| **I**ndependent | PASS | Clean dependency on 02.1, 01.1 |
 | **N**egotiable | PASS | Timeline visualization style negotiable |
 | **V**aluable | PASS | Core BOM management functionality |
 | **E**stimable | PASS | M-size, version timeline adds scope |
@@ -122,7 +122,7 @@ The Epic 02 Technical Module is **APPROVED FOR DEVELOPMENT** with minor conditio
 
 | Criteria | Score | Notes |
 |----------|-------|-------|
-| **I**ndependent | PASS | Clean dependency on 01a.1 only |
+| **I**ndependent | PASS | Clean dependency on 01.1 only |
 | **N**egotiable | PASS | Cost field implementation negotiable |
 | **V**aluable | PASS | Production workflow definition |
 | **E**stimable | PASS | M-size |
@@ -137,7 +137,7 @@ The Epic 02 Technical Module is **APPROVED FOR DEVELOPMENT** with minor conditio
 
 | Criteria | Score | Notes |
 |----------|-------|-------|
-| **I**ndependent | PASS | Depends on 02.7, 01a.7 (Machines) |
+| **I**ndependent | PASS | Depends on 02.7, 01.7 (Machines) |
 | **N**egotiable | PASS | Parallel ops UI negotiable |
 | **V**aluable | PASS | Production step definition |
 | **E**stimable | PASS | L-size acknowledged |
@@ -328,11 +328,11 @@ All exclusions are justified by PRD phase designations.
 
 | Dependency | Provider | Status | Impact |
 |------------|----------|--------|--------|
-| 01a.1 Org Context + Base RLS | Epic 01 Settings | REQUIRED | Blocking for all stories |
-| 01a.x Allergens Master | Epic 01 Settings | REQUIRED | Blocking for 02.3 |
-| 01a.7 Machines | Epic 01 Settings | REQUIRED | Blocking for 02.8 |
+| 01.1 Org Context + Base RLS | Epic 01 Settings | REQUIRED | Blocking for all stories |
+| 01.x Allergens Master | Epic 01 Settings | REQUIRED | Blocking for 02.3 |
+| 01.7 Machines | Epic 01 Settings | REQUIRED | Blocking for 02.8 |
 
-**Assessment:** External dependency on 01a.1 is documented in all relevant stories. Epic 01 should be delivered before Epic 02 begins.
+**Assessment:** External dependency on 01.1 is documented in all relevant stories. Epic 01 should be delivered before Epic 02 begins.
 
 ### Internal Dependencies (Acyclic)
 
@@ -429,7 +429,7 @@ All AC follow Given/When/Then format with specific values:
 | All stories pass INVEST | PASS | 15/15 |
 | All AC testable | PASS | 100% |
 | No scope creep | PASS | 0 items |
-| Dependencies documented | PASS | 01a.1 noted |
+| Dependencies documented | PASS | 01.1 noted |
 | Sprint assignment logical | PASS | 5 sprints |
 | Test strategy aligned | PASS | Coverage targets defined |
 | UX wireframes referenced | PASS | TEC-001 to TEC-017 |
@@ -441,9 +441,9 @@ All AC follow Given/When/Then format with specific values:
 ### Condition 1: External Dependency Confirmation
 
 Before starting Sprint 1, confirm that:
-- Story 01a.1 (Org Context + Base RLS) is complete
-- Story 01a.x (Allergens Master Data) is complete
-- Story 01a.7 (Machines) is complete (needed for Sprint 3)
+- Story 01.1 (Org Context + Base RLS) is complete
+- Story 01.x (Allergens Master Data) is complete
+- Story 01.7 (Machines) is complete (needed for Sprint 3)
 
 ### Condition 2: Migration for Operation Attachments
 
@@ -489,13 +489,13 @@ L-size stories should be monitored for sprint fit:
 **DECISION:** APPROVED WITH CONDITIONS
 
 **Conditions:**
-1. External dependency confirmation (01a.1, 01a.x, 01a.7 complete)
+1. External dependency confirmation (01.1, 01.x, 01.7 complete)
 2. Operation attachments migration created during 02.8 implementation
 3. L-size story monitoring for sprint fit
 
 **Ready for Handoff to:** SCRUM-MASTER
 
-**Recommended Start:** When Epic 01 (Settings) foundation stories (01a.1, 01a.x, 01a.7) are complete.
+**Recommended Start:** When Epic 01 (Settings) foundation stories (01.1, 01.x, 01.7) are complete.
 
 ---
 
@@ -510,7 +510,7 @@ stories_count: 15
 invest_pass_rate: 100%
 scope_creep_items: 0
 conditions:
-  - "Confirm 01a.1, 01a.x, 01a.7 complete before Sprint 1"
+  - "Confirm 01.1, 01.x, 01.7 complete before Sprint 1"
   - "Create operation_attachments migration during 02.8"
   - "Monitor L-size stories (02.5, 02.8, 02.12, 02.13) for sprint fit"
 caveats:

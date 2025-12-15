@@ -46,6 +46,12 @@
 │    - Planner                                     │
 │    - Viewer                                      │
 │                                                  │
+│  ─────────────────────────────────────────────   │
+│  PRD Reference: FR-SET-018                       │
+│  (User Warehouse Access Restrictions)            │
+│  Phase: 1B - Infrastructure                      │
+│  ─────────────────────────────────────────────   │
+│                                                  │
 │  Warehouse Access *                              │
 │  [Select warehouses ▼]        [0 selected]       │
 │    ☐ MAIN - Main Warehouse                       │
@@ -96,6 +102,12 @@
 │    - Warehouse Operator                          │
 │    - Planner                                     │
 │    - Viewer                                      │
+│                                                  │
+│  ─────────────────────────────────────────────   │
+│  PRD Reference: FR-SET-018                       │
+│  (User Warehouse Access Restrictions)            │
+│  Phase: 1B - Infrastructure                      │
+│  ─────────────────────────────────────────────   │
 │                                                  │
 │  Warehouse Access *                              │
 │  [Select warehouses ▼]        [2 selected]       │
@@ -179,7 +191,7 @@
 - **Email**: Email input, required, format validation
 - **Preferred Language**: Dropdown, required, 4 options (Polish, English, German, French), defaults to organization default language (FR-SET-112)
 - **Role**: Dropdown, required, 10 options (Super Admin, Admin, Production Manager, Quality Manager, Warehouse Manager, Production Operator, Quality Inspector, Warehouse Operator, Planner, Viewer)
-- **Warehouse Access**: Multi-select dropdown, required, min 1 selection
+- **Warehouse Access**: Multi-select dropdown, required, min 1 selection (FR-SET-018)
 - **Active Toggle**: Checkbox, default OFF for create, preserves state for edit
 
 ### 2. Preferred Language Dropdown (NEW - FR-SET-112)
@@ -212,12 +224,16 @@
 - **Behavior**: Role determines default permissions (details in PRD FR-SET-011)
 - **Touch Target**: 48x48dp
 
-### 4. Warehouse Access Multi-Select
+### 4. Warehouse Access Multi-Select (FR-SET-018)
+- **PRD Reference**: FR-SET-018 (User Warehouse Access Restrictions)
+- **Phase**: 1B (Infrastructure - after warehouses exist)
 - **Type**: Checkbox dropdown (remains open while selecting)
 - **Counter**: Shows "X selected" badge
-- **Validation**: Min 1 warehouse required
+- **Validation**: Min 1 warehouse required (unless role = super_admin/admin)
 - **Behavior**: User can only access selected warehouses
 - **Touch Target**: 48x48dp per checkbox
+- **Default Behavior (Phase 1A)**: All users have access to all warehouses
+- **Future Behavior (Phase 1B)**: User-specific warehouse restrictions enforced via RLS
 
 ### 5. Active Toggle
 - **Type**: Checkbox
@@ -234,6 +250,7 @@
   - Validates all fields (required, format, uniqueness)
   - Creates user record with `status: 'INVITED'`
   - Sets language_preference from selected dropdown
+  - Creates user_warehouse_access records (FR-SET-018)
   - Sends invitation email via Supabase Auth
   - Closes modal, shows toast: "User created. Invitation sent to {email}"
   - Refreshes user list table
@@ -242,6 +259,7 @@
   - Validates all fields
   - Updates user record (preserves created_at, created_by)
   - Updates language_preference if changed
+  - Updates user_warehouse_access records (FR-SET-018)
   - If email changed: sends new invitation
   - If role changed: updates permissions immediately
   - Closes modal, shows toast: "User updated successfully"
@@ -271,12 +289,20 @@
 | Email | Required, valid email format, unique per org |
 | Preferred Language | Required, must be one of 4 valid languages (PL, EN, DE, FR) |
 | Role | Required, must be one of 10 valid roles |
-| Warehouse Access | Required, min 1 warehouse selected |
+| Warehouse Access | Required, min 1 warehouse (unless role = super_admin/admin) - FR-SET-018 |
 | Active | Optional, boolean |
 
 **Validation Timing**:
 - On blur: Email uniqueness check (async)
 - On submit: All fields validated before API call
+
+### Warehouse Access Validation (FR-SET-018)
+- **PRD**: FR-SET-018 (User Warehouse Access Restrictions)
+- **Required**: At least 1 warehouse if role != super_admin/admin
+- **Default**: super_admin/admin bypass (access all warehouses)
+- **Error**: "Please select at least one warehouse" if none selected and role requires it
+- **Phase 1A Behavior**: Field visible but not enforced (all users access all warehouses)
+- **Phase 1B Behavior**: Field enforced, RLS policies restrict access based on user_warehouse_access table
 
 ---
 
@@ -284,10 +310,11 @@
 
 - **Touch Targets**: All inputs, dropdowns, buttons >= 48x48dp
 - **Contrast**: Error text red (#DC2626) passes WCAG AA (4.5:1)
-- **Screen Reader**: Announces "Create User Modal" on open, field labels, errors, language options
+- **Screen Reader**: Announces "Create User Modal" on open, field labels, errors, language options, warehouse access count
 - **Keyboard**: Tab navigation, Escape closes modal, Enter submits form
 - **Focus**: First Name field auto-focused on modal open
 - **Language Label**: Associates preference dropdown with clear label "Preferred Language"
+- **Warehouse Access Label**: Associates warehouse multi-select with clear label "Warehouse Access" + count badge
 
 ---
 
@@ -299,6 +326,7 @@
 - **Validation**: `GET /api/settings/users/validate-email?email={email}`
 - **Role List**: `GET /api/settings/roles` returns all 10 valid roles
 - **Language List**: `GET /api/settings/languages` returns [PL, EN, DE, FR]
+- **Warehouse List**: `GET /api/settings/warehouses` returns available warehouses for multi-select (FR-SET-018)
 
 ### Data Structure
 ```typescript
@@ -308,7 +336,7 @@
   email: string;
   language_preference: 'PL' | 'EN' | 'DE' | 'FR'; // NEW - FR-SET-112
   role: 'SUPER_ADMIN' | 'ADMIN' | 'PRODUCTION_MANAGER' | 'QUALITY_MANAGER' | 'WAREHOUSE_MANAGER' | 'PRODUCTION_OPERATOR' | 'QUALITY_INSPECTOR' | 'WAREHOUSE_OPERATOR' | 'PLANNER' | 'VIEWER';
-  warehouse_access: string[]; // array of warehouse IDs
+  warehouse_access?: string[]; // FR-SET-018: Array of warehouse IDs
   active: boolean;
   org_id: string; // auto-populated from session
 }
@@ -367,6 +395,23 @@
 
 ---
 
+## Implementation Notes
+
+### Warehouse Access (FR-SET-018)
+- **Phase**: 1B (deferred from 01a demo MVP)
+- **Dependency**: Requires warehouses module (FR-SET-040 to FR-SET-046)
+- **Default Behavior (Phase 1A)**: All users have access to all warehouses
+- **Future Behavior (Phase 1B)**: User-specific warehouse restrictions enforced via RLS
+- **Table**: user_warehouse_access (user_id, warehouse_id, access_level)
+- **RLS Policy**: Users can only query data from warehouses in their user_warehouse_access records
+- **Super Admin/Admin Bypass**: These roles bypass warehouse restrictions (access all)
+- **UI Behavior**:
+  - Phase 1A: Field visible, data saved, but not enforced
+  - Phase 1B: Field visible, data saved AND enforced via RLS
+- **Migration Path**: Existing users (created in Phase 1A) will need warehouse_access backfilled when Phase 1B is deployed
+
+---
+
 ## Related Screens
 
 - **User List Table**: [SET-008-user-list.md] (parent screen)
@@ -380,22 +425,26 @@
 1. Use ShadCN Dialog component for modal
 2. Role options must match PRD FR-SET-011, FR-SET-020 to FR-SET-029
 3. Language preference options must match PRD FR-SET-112 (PL, EN, DE, FR)
-4. Zod schema: `lib/validation/user-schema.ts` (add language_preference field)
-5. Service: `lib/services/user-service.ts` (add language_preference handling)
-6. Email uniqueness check: debounce 500ms on blur
-7. Multi-select: use Popover + Checkbox from ShadCN
-8. Toast notifications: use `toast()` from ShadCN
-9. Language dropdown: position after Email field, before Role field
-10. Default language: fetch from organization settings (org.default_language)
-11. Ensure role enum values: SUPER_ADMIN, ADMIN, PRODUCTION_MANAGER, QUALITY_MANAGER, WAREHOUSE_MANAGER, PRODUCTION_OPERATOR, QUALITY_INSPECTOR, WAREHOUSE_OPERATOR, PLANNER, VIEWER
-12. Ensure language enum values: PL, EN, DE, FR
-13. Add help text below Preferred Language: "User interface language for this user"
-14. Language preference is required field (marked with *)
+4. Warehouse access field must reference FR-SET-018 (User Warehouse Access Restrictions)
+5. Zod schema: `lib/validation/user-schema.ts` (add language_preference field, warehouse_access array)
+6. Service: `lib/services/user-service.ts` (add language_preference handling, user_warehouse_access CRUD)
+7. Email uniqueness check: debounce 500ms on blur
+8. Multi-select: use Popover + Checkbox from ShadCN
+9. Toast notifications: use `toast()` from ShadCN
+10. Language dropdown: position after Email field, before Role field
+11. Default language: fetch from organization settings (org.default_language)
+12. Ensure role enum values: SUPER_ADMIN, ADMIN, PRODUCTION_MANAGER, QUALITY_MANAGER, WAREHOUSE_MANAGER, PRODUCTION_OPERATOR, QUALITY_INSPECTOR, WAREHOUSE_OPERATOR, PLANNER, VIEWER
+13. Ensure language enum values: PL, EN, DE, FR
+14. Add help text below Preferred Language: "User interface language for this user"
+15. Language preference is required field (marked with *)
+16. Warehouse access validation: conditional based on role (super_admin/admin can skip)
+17. Phase 1A implementation: Save warehouse_access data but do NOT enforce RLS yet
+18. Phase 1B implementation: Enable RLS policies on warehouse-related tables based on user_warehouse_access
 
 ---
 
 **Status**: Ready for user approval
 **Approval Required**: Yes
-**Iterations**: 1 of 3
+**Iterations**: 2 of 3
 **Last Updated**: 2025-12-15
-**Compliance**: FR-SET-112 (User-level language preference)
+**Compliance**: FR-SET-112 (User-level language preference), FR-SET-018 (User Warehouse Access Restrictions)

@@ -124,14 +124,14 @@ Based on Epic Overview, these stories are documented but have NO corresponding f
 
 | Story File | Declares Dependencies |
 |------------|----------------------|
-| 02.1 | 01a.1 (Settings Org Context) |
+| 02.1 | 01.1 (Settings Org Context) |
 | 02.2 | 02.1 |
-| 02.3 | 02.1, 01a.x (Settings allergens), 02.2 (BOM CRUD - note: wrong ref) |
-| 02.4 | 02.1, 01a.1 |
+| 02.3 | 02.1, 01.x (Settings allergens), 02.2 (BOM CRUD - note: wrong ref) |
+| 02.4 | 02.1, 01.1 |
 | 02.5 | 02.4, 02.2 (actually 02.3 Routings), Migration 049 |
 | 02.6 | 02.4, 02.5, 02.3 (actually 02.7 Routings) |
-| 02.7 | 02.1, 01a.1, 01a.3 (Machines) |
-| 02.8 | 02.7, 01a.7 (Machines), Migration 044, 050 |
+| 02.7 | 02.1, 01.1, 01.3 (Machines) |
+| 02.8 | 02.7, 01.7 (Machines), Migration 044, 050 |
 | 02.9 | 02.5, 02.8, Migration 043, 045 |
 | 02.10 | 02.1, 05.x (Warehouse LP structure) |
 | 02.11 | 02.1, 02.4, 02.10 |
@@ -140,22 +140,22 @@ Based on Epic Overview, these stories are documented but have NO corresponding f
 
 **NO circular dependencies detected** - all dependencies are forward-pointing.
 
-### External Dependencies (Epic 01a Settings)
+### External Dependencies (Epic 01 Settings)
 
 | From Story | Depends On | Explicit in File? |
 |------------|------------|-------------------|
-| 02.1 | 01a.1 (Org Context + RLS) | YES |
-| 02.3 | 01a.x (Settings allergens) | YES |
-| 02.4 | 01a.1 (Org Context + RLS) | YES |
-| 02.5 | - | NO (should depend on 01a.1) |
-| 02.6 | - | NO (should depend on 01a.1) |
-| 02.7 | 01a.1, 01a.3 (Machines) | YES |
-| 02.8 | 01a.7 (Machines) | YES but wrong ref (should be 01a.3) |
-| 02.9 | - | NO (should depend on 01a.1) |
-| 02.10 | - | NO (should depend on 01a.1) |
-| 02.11 | - | NO (should depend on 01a.1) |
+| 02.1 | 01.1 (Org Context + RLS) | YES |
+| 02.3 | 01.x (Settings allergens) | YES |
+| 02.4 | 01.1 (Org Context + RLS) | YES |
+| 02.5 | - | NO (should depend on 01.1) |
+| 02.6 | - | NO (should depend on 01.1) |
+| 02.7 | 01.1, 01.3 (Machines) | YES |
+| 02.8 | 01.7 (Machines) | YES but wrong ref (should be 01.3) |
+| 02.9 | - | NO (should depend on 01.1) |
+| 02.10 | - | NO (should depend on 01.1) |
+| 02.11 | - | NO (should depend on 01.1) |
 
-**Issue:** Stories 02.5, 02.6, 02.9, 02.10, 02.11 do not explicitly declare dependency on Epic 01a.1 (Org Context + RLS) even though they all use org_id for multi-tenancy.
+**Issue:** Stories 02.5, 02.6, 02.9, 02.10, 02.11 do not explicitly declare dependency on Epic 01.1 (Org Context + RLS) even though they all use org_id for multi-tenancy.
 
 ---
 
@@ -253,7 +253,7 @@ Based on Epic Overview, these stories are documented but have NO corresponding f
 
 ### Structure Comparison
 
-| Aspect | Epic 01a (Settings) | Epic 02 (Technical) |
+| Aspect | Epic 01 (Settings) | Epic 02 (Technical) |
 |--------|---------------------|---------------------|
 | Story count (overview) | 7 | 20 |
 | Story count (actual files) | 8 | 11 |
@@ -264,7 +264,7 @@ Based on Epic Overview, these stories are documented but have NO corresponding f
 
 ### Structural Quality
 
-**Epic 01a:** Well-structured, files match overview, dependencies are explicit and valid.
+**Epic 01:** Well-structured, files match overview, dependencies are explicit and valid.
 
 **Epic 02:** Significant mismatch between overview and files, dependency graph references wrong story numbers, test strategy references non-existent files.
 
@@ -289,8 +289,8 @@ Based on Epic Overview, these stories are documented but have NO corresponding f
 | MAJ-03 | No story file for Cost History (FR-2.75) | Feature may be skipped |
 | MAJ-04 | No story file for Materials List (distinct from BOM items) | Scope unclear |
 | MAJ-05 | Delivery order violates 02.6 dependency on 02.9 | Sprint 2 blocked |
-| MAJ-06 | External dependencies on 01a.1 not explicit in 5 stories | RLS may be missed |
-| MAJ-07 | Story 02.8 routing-operations.md references 01a.7 (Machines) but that's the wrong story (should be 01a.3 or Settings machines) | Wrong dependency |
+| MAJ-06 | External dependencies on 01.1 not explicit in 5 stories | RLS may be missed |
+| MAJ-07 | Story 02.8 routing-operations.md references 01.7 (Machines) but that's the wrong story (should be 01.3 or Settings machines) | Wrong dependency |
 
 ### MINOR Issues (Fix When Possible)
 
@@ -316,7 +316,7 @@ Based on Epic Overview, these stories are documented but have NO corresponding f
 
 3. **Fix delivery order** - Either move 02.9 (Routing CRUD) to Sprint 2 OR remove the 02.9 dependency from 02.6.
 
-4. **Add explicit 01a.1 dependency** to stories 02.5, 02.6, 02.9, 02.10, 02.11.
+4. **Add explicit 01.1 dependency** to stories 02.5, 02.6, 02.9, 02.10, 02.11.
 
 ### Documentation Actions
 
@@ -362,7 +362,7 @@ priority_fixes:
   - "Align story file numbering with epic overview"
   - "Create missing story files (Dashboard, Nutrition, Cost History)"
   - "Fix delivery order Sprint 2 dependency violation"
-  - "Add explicit 01a.1 dependencies to stories 02.5, 02.6, 02.9, 02.10, 02.11"
+  - "Add explicit 01.1 dependencies to stories 02.5, 02.6, 02.9, 02.10, 02.11"
 ```
 
 ---
@@ -381,8 +381,8 @@ priority_fixes:
 | MAJ-03: No Cost History story file | OPEN | **RESOLVED** | 02.15.cost-history-variance.md created |
 | MAJ-04: No Materials List story file | OPEN | **N/A** | Removed from scope - materials handled in 02.4 BOMs |
 | MAJ-05: Delivery order violates deps | OPEN | **RESOLVED** | Sprint assignment updated in overview |
-| MAJ-06: Missing 01a.1 dependencies | OPEN | **RESOLVED** | All stories now declare 01a.1 where needed |
-| MAJ-07: Wrong machine ref (01a.7) | OPEN | **RESOLVED** | Fixed to reference Epic 01 (Settings) Machines |
+| MAJ-06: Missing 01.1 dependencies | OPEN | **RESOLVED** | All stories now declare 01.1 where needed |
+| MAJ-07: Wrong machine ref (01.7) | OPEN | **RESOLVED** | Fixed to reference Epic 01 (Settings) Machines |
 
 ### Story File Verification
 
@@ -428,19 +428,19 @@ priority_fixes:
 
 | Story | Declared Dependencies | Valid? | Notes |
 |-------|----------------------|--------|-------|
-| 02.1 | 01a.1 | YES | Org Context required |
+| 02.1 | 01.1 | YES | Org Context required |
 | 02.2 | 02.1 | YES | Products foundation |
-| 02.3 | 02.1, 01a.x, 02.4 | PARTIAL | 02.4 listed as dependency but 02.3 should come before 02.4 |
-| 02.4 | 02.1, 01a.1 | YES | Products + Org Context |
-| 02.5 | 01a.1, 02.4, 02.1, 02.7 | YES | Explicit 01a.1 now listed |
-| 02.6 | 01a.1, 02.4, 02.5, 02.7 | YES | All dependencies valid |
-| 02.7 | 02.1, 01a.1, 01a.3 | YES | Correct Settings reference |
+| 02.3 | 02.1, 01.x, 02.4 | PARTIAL | 02.4 listed as dependency but 02.3 should come before 02.4 |
+| 02.4 | 02.1, 01.1 | YES | Products + Org Context |
+| 02.5 | 01.1, 02.4, 02.1, 02.7 | YES | Explicit 01.1 now listed |
+| 02.6 | 01.1, 02.4, 02.5, 02.7 | YES | All dependencies valid |
+| 02.7 | 02.1, 01.1, 01.3 | YES | Correct Settings reference |
 | 02.8 | 02.7, Epic 01 (Settings) | YES | Fixed machine reference |
-| 02.9 | 01a.1, 02.5, 02.8 | YES | Now includes 01a.1 |
-| 02.10 | 01a.1, 02.1 | YES | Core dependencies |
-| 02.11 | 01a.1, 02.1, 02.4, 02.10 | YES | Full chain documented |
-| 02.12 | 01a.1, 02.1, 02.3, 02.4, 02.7, 02.9 | YES | Dashboard needs many |
-| 02.13 | 01a.1, 02.1, 02.3, 02.4, 02.5 | YES | Nutrition needs BOM items |
+| 02.9 | 01.1, 02.5, 02.8 | YES | Now includes 01.1 |
+| 02.10 | 01.1, 02.1 | YES | Core dependencies |
+| 02.11 | 01.1, 02.1, 02.4, 02.10 | YES | Full chain documented |
+| 02.12 | 01.1, 02.1, 02.3, 02.4, 02.7, 02.9 | YES | Dashboard needs many |
+| 02.13 | 01.1, 02.1, 02.3, 02.4, 02.5 | YES | Nutrition needs BOM items |
 | 02.14 | 02.4, 02.5, 02.6 | YES | BOM advanced extends BOM |
 | 02.15 | 02.9 | YES | Cost history extends costs |
 
@@ -488,9 +488,9 @@ priority_fixes:
 
 | External Dep | Stories Using | Documented In All? |
 |--------------|---------------|-------------------|
-| 01a.1 (Org Context) | 02.1, 02.4, 02.5, 02.6, 02.7, 02.9, 02.10, 02.11, 02.12, 02.13 | YES |
-| 01a.x (Settings allergens) | 02.3 | YES |
-| 01a.3 (Machines) | 02.7 | YES |
+| 01.1 (Org Context) | 02.1, 02.4, 02.5, 02.6, 02.7, 02.9, 02.10, 02.11, 02.12, 02.13 | YES |
+| 01.x (Settings allergens) | 02.3 | YES |
+| 01.3 (Machines) | 02.7 | YES |
 | Epic 01 (Settings) | 02.8 | YES |
 | 05.x (Warehouse LP) | 02.10 | YES |
 | 04.x (Production) | 02.15 | YES |
@@ -528,7 +528,7 @@ All 3 critical issues from the original review have been fixed:
 3. Cost History story - FIXED (02.15.cost-history-variance.md)
 4. Materials List - N/A (scope clarified)
 5. Delivery order - FIXED (sprint assignments updated)
-6. Missing 01a.1 deps - FIXED (all stories now declare)
+6. Missing 01.1 deps - FIXED (all stories now declare)
 7. Machine ref - FIXED (corrected to Epic 01)
 
 ### Remaining Issues
