@@ -62,14 +62,14 @@ acceptance_criteria:
 unit_tests:
   useSettingsGuard:
     - name: "returns allowed:true for admin roles"
-      setup: "Mock context with role_code: 'ADMIN'"
-      params: ["['ADMIN', 'SUPER_ADMIN']"]
-      expected: "{ allowed: true, loading: false, role: 'ADMIN' }"
+      setup: "Mock context with role: 'admin'"
+      params: ["['admin', 'super_admin']"]
+      expected: "{ allowed: true, loading: false, role: 'admin' }"
 
     - name: "returns allowed:false for viewer role"
-      setup: "Mock context with role_code: 'VIEWER'"
-      params: ["['ADMIN', 'SUPER_ADMIN']"]
-      expected: "{ allowed: false, loading: false, role: 'VIEWER' }"
+      setup: "Mock context with role: 'viewer'"
+      params: ["['admin', 'super_admin']"]
+      expected: "{ allowed: false, loading: false, role: 'viewer' }"
 
     - name: "returns loading:true while context is loading"
       setup: "Mock isLoading: true"
@@ -83,11 +83,11 @@ unit_tests:
 
   SettingsNav:
     - name: "renders correct sections for admin"
-      setup: "Mock context with role_code: 'ADMIN'"
+      setup: "Mock context with role: 'admin'"
       expected: "All 6 sections visible (Organization, Users, Infrastructure, Master Data, Integrations, System)"
 
     - name: "hides restricted sections for non-admin"
-      setup: "Mock context with role_code: 'WAREHOUSE_MANAGER'"
+      setup: "Mock context with role: 'warehouse_manager'"
       expected: "Only shows Infrastructure section items user has access to"
 
     - name: "renders skeleton while loading"

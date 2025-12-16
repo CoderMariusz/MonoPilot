@@ -203,13 +203,13 @@ hooks:
           if (!context) return false;
           if (!requiredRole) return true;
           const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-          return roles.includes(context.role_code as RoleCode);
+          return roles.includes(context.role as RoleCode);
         }, [context, requiredRole]);
 
         return {
           allowed,
           loading: isLoading,
-          role: context?.role_code as RoleCode | null,
+          role: context?.role as RoleCode | null,
         };
       }
 

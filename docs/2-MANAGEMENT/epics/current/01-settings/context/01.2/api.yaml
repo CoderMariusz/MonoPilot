@@ -16,10 +16,8 @@ endpoints_consumed:
     response:
       org_id: "uuid"
       user_id: "uuid"
-      role_code: "string"
-      role_name: "string"
-      permissions: "Record<string, string>"
-      organization: "object"
+      role: "string"
+      permissions: "object"
 
   - method: "GET"
     path: "/api/settings/modules"
@@ -81,14 +79,14 @@ services:
         {
           section: 'Organization',
           items: [
-            { name: 'Organization Profile', path: '/settings/organization', icon: Building, roles: ['SUPER_ADMIN', 'ADMIN'], implemented: true },
+            { name: 'Organization Profile', path: '/settings/organization', icon: Building, roles: ['super_admin', 'admin'], implemented: true },
           ],
         },
         {
           section: 'Users & Roles',
           items: [
-            { name: 'Users', path: '/settings/users', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'], implemented: true },
-            { name: 'Invitations', path: '/settings/invitations', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'], implemented: false },
+            { name: 'Users', path: '/settings/users', icon: Users, roles: ['super_admin', 'admin'], implemented: true },
+            { name: 'Invitations', path: '/settings/invitations', icon: Users, roles: ['super_admin', 'admin'], implemented: false },
           ],
         },
         // ... more sections
@@ -102,7 +100,7 @@ services:
           section: section.section,
           items: section.items.filter(item => {
             // Filter by role
-            const hasRole = item.roles.includes(context.role_code);
+            const hasRole = item.roles.includes(context.role);
             // Filter by module (if specified)
             const moduleEnabled = !item.moduleCode || enabledModules.includes(item.moduleCode);
             return hasRole && moduleEnabled;
