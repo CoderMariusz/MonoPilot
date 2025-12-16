@@ -1,0 +1,349 @@
+# Story 01.3 - Frontend Specification
+# Purpose: Wizard modal, guard, hooks, components
+# Agent: FRONTEND-DEV
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/onboarding/page.tsx"
+    description: "Wizard launcher page (redirect target)"
+    pattern: |
+      'use client';
+
+      import { useEffect } from 'react';
+      import { useRouter } from 'next/navigation';
+      import { useOnboardingStatus } from '@/lib/hooks/use-onboarding-status';
+
+      export default function OnboardingPage() {
+        const router = useRouter();
+        const { data: status, isLoading } = useOnboardingStatus();
+
+        useEffect(() => {
+          if (!isLoading && status?.is_complete) {
+            router.push('/dashboard');
+          }
+        }, [status, isLoading, router]);
+
+        // Wizard modal is shown via OnboardingGuard wrapper
+        return null;
+      }
+
+# Components
+components:
+  - path: "apps/frontend/components/onboarding/OnboardingWizardModal.tsx"
+    description: "Full-screen wizard modal with step navigation"
+    props:
+      - "currentStep: number"
+      - "onNext: () => void"
+      - "onBack: () => void"
+      - "onSkip: () => void"
+      - "children: React.ReactNode"
+    features:
+      - "Full-screen overlay, cannot dismiss by clicking outside"
+      - "Step indicator (Step X of 6) with checkmarks"
+      - "Back/Next navigation buttons"
+      - "Skip Setup Wizard link"
+      - "Progress bar showing completion percentage"
+    pattern: |
+      'use client';
+
+      import {
+        Dialog,
+        DialogContent,
+        DialogHeader,
+        DialogTitle,
+      } from '@/components/ui/dialog';
+      import { Button } from '@/components/ui/button';
+      import { Progress } from '@/components/ui/progress';
+      import { Check } from 'lucide-react';
+
+      interface Props {
+        currentStep: number;
+        totalSteps?: number;
+        onNext: () => void;
+        onBack: () => void;
+        onSkip: () => void;
+        isNextDisabled?: boolean;
+        children: React.ReactNode;
+      }
+
+      export function OnboardingWizardModal({
+        currentStep,
+        totalSteps = 6,
+        onNext,
+        onBack,
+        onSkip,
+        isNextDisabled = false,
+        children,
+      }: Props) {
+        const progress = (currentStep / totalSteps) * 100;
+
+        return (
+          <Dialog open modal>
+            <DialogContent
+              className="max-w-2xl max-h-[90vh] overflow-y-auto"
+              onPointerDownOutside={(e) => e.preventDefault()}
+              onEscapeKeyDown={(e) => e.preventDefault()}
+            >
+              <DialogHeader>
+                <div className="flex items-center justify-between mb-4">
+                  <DialogTitle>Setup Your Organization</DialogTitle>
+                  <span className="text-sm text-muted-foreground">
+                    Step {currentStep} of {totalSteps}
+                  </span>
+                </div>
+                <Progress value={progress} className="h-2" />
+              </DialogHeader>
+
+              <div className="py-6">{children}</div>
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <Button
+                  variant="ghost"
+                  onClick={onSkip}
+                  className="text-muted-foreground"
+                >
+                  Skip Setup Wizard
+                </Button>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={onBack}
+                    disabled={currentStep === 1}
+                  >
+                    Back
+                  </Button>
+                  <Button onClick={onNext} disabled={isNextDisabled}>
+                    {currentStep === totalSteps ? 'Complete' : 'Next'}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      }
+
+  - path: "apps/frontend/components/onboarding/OnboardingGuard.tsx"
+    description: "Wrapper that checks onboarding status on authenticated routes"
+    props:
+      - "children: React.ReactNode"
+    features:
+      - "Checks onboarding status on mount"
+      - "Shows wizard modal if incomplete for admins"
+      - "Shows 'Setup in progress' for non-admins"
+      - "Allows access if onboarding complete"
+    pattern: |
+      'use client';
+
+      import { useOnboardingStatus } from '@/lib/hooks/use-onboarding-status';
+      import { useOrgContext } from '@/lib/hooks/use-org-context';
+      import { OnboardingWizardModal } from './OnboardingWizardModal';
+      import { SetupInProgressMessage } from './SetupInProgressMessage';
+      import { Skeleton } from '@/components/ui/skeleton';
+
+      interface Props {
+        children: React.ReactNode;
+      }
+
+      export function OnboardingGuard({ children }: Props) {
+        const { data: status, isLoading: statusLoading } = useOnboardingStatus();
+        const { data: context, isLoading: contextLoading } = useOrgContext();
+
+        if (statusLoading || contextLoading) {
+          return <Skeleton className="h-screen w-full" />;
+        }
+
+        // Onboarding complete - show content
+        if (status?.is_complete) {
+          return <>{children}</>;
+        }
+
+        // Non-admin user - show setup in progress
+        const isAdmin = ['SUPER_ADMIN', 'ADMIN'].includes(context?.role_code || '');
+        if (!isAdmin) {
+          return <SetupInProgressMessage />;
+        }
+
+        // Admin user - show wizard
+        // Step content is injected by parent route
+        return <>{children}</>;
+      }
+
+  - path: "apps/frontend/components/onboarding/SkipConfirmationDialog.tsx"
+    description: "Confirmation dialog for skipping wizard"
+    props:
+      - "open: boolean"
+      - "onOpenChange: (open: boolean) => void"
+      - "onConfirm: () => void"
+      - "isLoading: boolean"
+    pattern: |
+      import {
+        AlertDialog,
+        AlertDialogAction,
+        AlertDialogCancel,
+        AlertDialogContent,
+        AlertDialogDescription,
+        AlertDialogFooter,
+        AlertDialogHeader,
+        AlertDialogTitle,
+      } from '@/components/ui/alert-dialog';
+      import { Loader2 } from 'lucide-react';
+
+      interface Props {
+        open: boolean;
+        onOpenChange: (open: boolean) => void;
+        onConfirm: () => void;
+        isLoading: boolean;
+      }
+
+      export function SkipConfirmationDialog({
+        open,
+        onOpenChange,
+        onConfirm,
+        isLoading,
+      }: Props) {
+        return (
+          <AlertDialog open={open} onOpenChange={onOpenChange}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Skip Setup Wizard?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  We'll create demo data for you to explore MonoPilot:
+                  <ul className="mt-2 list-disc list-inside text-sm">
+                    <li>Main Warehouse (DEMO-WH)</li>
+                    <li>Default Location</li>
+                    <li>Sample Product (SAMPLE-001)</li>
+                  </ul>
+                  <p className="mt-2">
+                    You can configure your real data later in Settings.
+                  </p>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={onConfirm} disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Skip & Create Demo Data
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        );
+      }
+
+  - path: "apps/frontend/components/onboarding/SetupInProgressMessage.tsx"
+    description: "Message shown to non-admin users during onboarding"
+    props: []
+    pattern: |
+      import { Clock } from 'lucide-react';
+
+      export function SetupInProgressMessage() {
+        return (
+          <div className="flex flex-col items-center justify-center h-screen text-center px-4">
+            <Clock className="h-16 w-16 text-muted-foreground mb-6" />
+            <h1 className="text-2xl font-bold mb-2">Setup in Progress</h1>
+            <p className="text-muted-foreground max-w-md">
+              Your administrator is setting up the organization.
+              Please check back later or contact your administrator for access.
+            </p>
+          </div>
+        );
+      }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-onboarding-status.ts"
+    description: "Hook for fetching/caching onboarding state"
+    exports:
+      - name: "useOnboardingStatus"
+        returns: "UseQueryResult<OnboardingStatus>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { getOnboardingStatus, OnboardingStatus } from '@/lib/services/onboarding-service';
+
+      export function useOnboardingStatus() {
+        return useQuery<OnboardingStatus>({
+          queryKey: ['onboarding-status'],
+          queryFn: getOnboardingStatus,
+          staleTime: 30 * 1000, // 30 seconds
+          refetchOnWindowFocus: true,
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-skip-onboarding.ts"
+    description: "Mutation hook for skipping onboarding"
+    exports:
+      - name: "useSkipOnboarding"
+        returns: "UseMutationResult<SkipResult>"
+    pattern: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+      import { skipOnboarding } from '@/lib/services/onboarding-service';
+
+      export function useSkipOnboarding() {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: skipOnboarding,
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['onboarding-status'] });
+          },
+        });
+      }
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "SET-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-001-onboarding-launcher.md"
+      components:
+        - "MonoPilot Logo"
+        - "Wizard Overview Card (6 steps with time estimates)"
+        - "Progress Status Card"
+        - "Start Onboarding Wizard button (primary)"
+        - "Skip Onboarding button (secondary)"
+        - "Skip Confirmation Dialog"
+
+  patterns:
+    modal: "ShadCN Dialog - full-screen overlay, cannot dismiss by clicking outside"
+    progress: "Step indicator showing current/total (Step 1 of 6) with checkmarks"
+    navigation: "Back (disabled on step 1), Next, Skip Setup Wizard link"
+    confirmation: "ShadCN AlertDialog for skip confirmation"
+
+  states:
+    - name: "loading"
+      description: "Spinner with skeleton while loading organization data"
+      component: "Skeleton"
+    - name: "success"
+      description: "Wizard overview with Start and Skip buttons"
+    - name: "error"
+      description: "Error message with Try Again and Contact Support buttons"
+    - name: "non_admin"
+      description: "Setup in progress message for non-admin users"
+      component: "SetupInProgressMessage"
+
+  wizard_steps:
+    - step: 1
+      name: "Organization Profile"
+      story: "01.4"
+      time_estimate: "2 min"
+    - step: 2
+      name: "First Warehouse"
+      story: "01.14"
+      time_estimate: "2 min"
+    - step: 3
+      name: "First Locations"
+      story: "01.14"
+      time_estimate: "3 min"
+    - step: 4
+      name: "First Product"
+      story: "01.14"
+      time_estimate: "3 min"
+    - step: 5
+      name: "First Work Order"
+      story: "01.14"
+      time_estimate: "3 min"
+      optional: true
+    - step: 6
+      name: "Completion"
+      story: "01.14"
+      time_estimate: "2 min"

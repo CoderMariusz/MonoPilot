@@ -1,0 +1,242 @@
+# Story 01.10 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/machine-service.test.ts"
+    type: "unit"
+    description: "Unit tests for machine service methods"
+  - path: "apps/frontend/app/api/v1/settings/machines/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for machine API endpoints"
+  - path: "apps/frontend/e2e/settings/machines.spec.ts"
+    type: "e2e"
+    description: "E2E tests for machine CRUD flows"
+
+# Acceptance Criteria (from flat file)
+acceptance_criteria:
+  machine_list_page:
+    - id: "AC-ML-01"
+      given: "admin navigates to /settings/machines"
+      when: "page loads"
+      then: "machine list displays within 300ms"
+      priority: "P0"
+
+    - id: "AC-ML-02"
+      given: "machine list has 50 items"
+      when: "admin filters by type 'Mixer'"
+      then: "only mixer machines display within 200ms"
+      priority: "P1"
+
+    - id: "AC-ML-03"
+      given: "machine list displayed"
+      when: "admin filters by status 'Maintenance'"
+      then: "only machines in maintenance status appear"
+      priority: "P1"
+
+    - id: "AC-ML-04"
+      given: "machine list displayed"
+      when: "admin searches 'MIX'"
+      then: "machines with code or name matching 'MIX' display within 200ms"
+      priority: "P1"
+
+    - id: "AC-ML-05"
+      given: "machine list displayed"
+      when: "columns rendered"
+      then: "columns show: Code, Name, Type (badge), Status (badge), Capacity, Location, Actions"
+      priority: "P0"
+
+  create_machine:
+    - id: "AC-MC-01"
+      given: "admin clicks 'Add Machine'"
+      when: "modal opens"
+      then: "form displays: code, name, type, status, capacity fields, location dropdown"
+      priority: "P0"
+
+    - id: "AC-MC-02"
+      given: "admin enters machine code 'MIX-001'"
+      when: "save clicked with valid data"
+      then: "machine created with default status 'Active' within 500ms"
+      priority: "P0"
+
+    - id: "AC-MC-03"
+      given: "machine code 'MIX-001' exists in organization"
+      when: "duplicate code entered"
+      then: "error 'Machine code must be unique' displays inline"
+      priority: "P0"
+
+    - id: "AC-MC-04"
+      given: "admin sets capacity fields (units_per_hour: 500, setup_time: 30, max_batch_size: 1000)"
+      when: "form submitted"
+      then: "machine created with all capacity values stored"
+      priority: "P1"
+
+  edit_machine:
+    - id: "AC-ME-01"
+      given: "admin clicks edit on existing machine 'MIX-001'"
+      when: "modal opens"
+      then: "current machine data pre-populates all form fields"
+      priority: "P0"
+
+    - id: "AC-ME-02"
+      given: "admin updates machine name from 'Primary Mixer' to 'Main Mixer'"
+      when: "save completes"
+      then: "updated name displays immediately in list"
+      priority: "P0"
+
+  delete_machine:
+    - id: "AC-MD-01"
+      given: "machine has no assignments (not on any production line)"
+      when: "delete confirmed"
+      then: "machine removed within 500ms"
+      priority: "P0"
+
+    - id: "AC-MD-02"
+      given: "machine is assigned to production line 'LINE-001'"
+      when: "delete attempted"
+      then: "error 'Machine is assigned to line [LINE-001]. Remove from line first.' displays"
+      priority: "P0"
+
+    - id: "AC-MD-03"
+      given: "machine has historical work order references"
+      when: "delete attempted"
+      then: "soft-delete performed (is_deleted=true) instead of hard delete"
+      priority: "P1"
+
+  permission_enforcement:
+    - id: "AC-PE-01"
+      given: "user has PROD_MANAGER role or higher"
+      when: "/settings/machines accessed"
+      then: "full CRUD access available"
+      priority: "P0"
+
+    - id: "AC-PE-02"
+      given: "user has VIEWER role"
+      when: "/settings/machines accessed"
+      then: "'Add Machine' button hidden, edit/delete actions hidden (read-only)"
+      priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  machine_service:
+    - name: "Create machine with valid data"
+      test_id: "UT-01"
+      expected: "Machine created with all fields"
+
+    - name: "Create machine with duplicate code"
+      test_id: "UT-02"
+      expected: "Throws 'Code already exists' error"
+
+    - name: "Update machine status from ACTIVE to MAINTENANCE"
+      test_id: "UT-03"
+      expected: "Status updated successfully"
+
+    - name: "Delete machine with no line assignments"
+      test_id: "UT-04"
+      expected: "Machine soft-deleted"
+
+    - name: "Delete machine with line assignments"
+      test_id: "UT-05"
+      expected: "Throws 'Machine assigned to line' error"
+
+    - name: "Get machines with type filter"
+      test_id: "UT-06"
+      expected: "Only matching type returned"
+
+    - name: "Validate code format (uppercase, alphanumeric, hyphens)"
+      test_id: "UT-10"
+      expected: "Invalid codes rejected"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /machines returns org-scoped list"
+      test_id: "IT-01"
+      expected: "Only org machines returned"
+
+    - name: "POST /machines creates with valid data"
+      test_id: "IT-02"
+      expected: "201 with machine object"
+
+    - name: "POST /machines with duplicate code"
+      test_id: "IT-03"
+      expected: "409 conflict error"
+
+    - name: "PUT /machines/:id updates machine"
+      test_id: "IT-04"
+      expected: "200 with updated machine"
+
+    - name: "PATCH /machines/:id/status updates status"
+      test_id: "IT-05"
+      expected: "200 with new status"
+
+    - name: "DELETE /machines/:id with no assignments"
+      test_id: "IT-06"
+      expected: "204 no content"
+
+    - name: "DELETE /machines/:id with assignments"
+      test_id: "IT-07"
+      expected: "409 conflict error"
+
+    - name: "RLS prevents cross-org access"
+      test_id: "IT-10"
+      expected: "Empty results for other org"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Create new machine end-to-end"
+    test_id: "E2E-01"
+    steps:
+      - "Navigate to /settings/machines"
+      - "Click 'Add Machine'"
+      - "Fill form with valid data"
+      - "Submit"
+    expected: "Machine appears in list"
+
+  - name: "Edit existing machine"
+    test_id: "E2E-02"
+    expected: "Changes reflected immediately"
+
+  - name: "Filter by type"
+    test_id: "E2E-04"
+    expected: "Only filtered machines shown"
+
+  - name: "Delete machine (no assignments)"
+    test_id: "E2E-08"
+    expected: "Machine removed from list"
+
+  - name: "Permission: VIEWER sees read-only"
+    test_id: "E2E-10"
+    expected: "Add/Edit/Delete hidden"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/machine-service.ts: 80%"
+  integration:
+    target: 80
+    files:
+      - "app/api/v1/settings/machines/route.ts: 80%"
+  e2e:
+    critical_paths:
+      - "Create machine flow"
+      - "Edit machine flow"
+      - "Delete machine flow"
+      - "Permission enforcement"
+
+# Definition of Done
+definition_of_done:
+  - "Database migration creates machines table with enums (machine_type, machine_status)"
+  - "RLS policies enforce org isolation (ADR-013 pattern)"
+  - "Machine list page loads within 300ms for 100 machines"
+  - "Create/Edit modal with all form fields working"
+  - "Soft delete for machines with historical references"
+  - "Delete blocked for machines assigned to production lines"
+  - "Search and filter work within 200ms"
+  - "Permission enforcement hides unauthorized actions"
+  - "Unit tests for machine-service (>80% coverage)"
+  - "Integration tests for all API endpoints"
+  - "E2E tests for critical flows"

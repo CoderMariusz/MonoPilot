@@ -1,0 +1,428 @@
+# Story 01.14 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+# Story: Wizard Steps Complete (Steps 2-6)
+
+gap_summary:
+  overall_readiness: "35%"
+  critical_blockers: 2
+  components_done: 2
+  components_partial: 3
+  components_missing: 15
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "organizations.wizard_progress"
+    expected: "JSONB column storing step completion data"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No wizard_progress column exists.
+      Required structure:
+      {
+        "step_2": { "completed_at": "timestamp", "warehouse_id": "uuid", "skipped": false },
+        "step_3": { "completed_at": "timestamp", "location_ids": ["uuid"], "template": "basic" },
+        "step_4": { "completed_at": "timestamp", "product_id": "uuid", "skipped": false },
+        "step_5": { "completed_at": "timestamp", "work_order_id": "uuid", "skipped": true },
+        "step_6": { "completed_at": "timestamp", "duration_seconds": 754 }
+      }
+    refactor_action: "Migration XXX_add_wizard_progress_badges.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "organizations.badges"
+    expected: "JSONB column storing earned badges"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No badges column exists.
+      Required structure:
+      [
+        { "code": "speed_champion", "name": "Speed Setup Champion", "earned_at": "timestamp" }
+      ]
+    refactor_action: "Migration XXX_add_wizard_progress_badges.sql"
+    priority: "P0"
+
+  - component: "warehouses table"
+    expected: "From story 01.8"
+    found: "UNKNOWN - depends on 01.8 completion"
+    status: "DEPENDENCY"
+    gap_description: "Warehouses table must exist before step 2 can create warehouses"
+    refactor_action: "Verify 01.8 completed"
+    priority: "P0-BLOCKER"
+
+  - component: "locations table"
+    expected: "From story 01.9"
+    found: "UNKNOWN - depends on 01.9 completion"
+    status: "DEPENDENCY"
+    gap_description: "Locations table must exist before step 3 can create locations"
+    refactor_action: "Verify 01.9 completed"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "wizard-service.ts"
+    expected: "apps/frontend/lib/services/wizard-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No wizard service exists.
+      Required methods:
+      - saveStep2Warehouse(data, skip)
+      - saveStep3Locations(template, customLocations, skip)
+      - saveStep4Product(data, skip)
+      - saveStep5WorkOrder(data, skip)
+      - completeWizard()
+      - calculateDuration()
+      - checkSpeedChampion(duration)
+      - getSummary()
+    refactor_action: "Create new service"
+    priority: "P0-BLOCKER"
+
+  - component: "warehouse-service.ts"
+    expected: "From story 01.8"
+    found: "UNKNOWN - depends on 01.8 completion"
+    status: "DEPENDENCY"
+    gap_description: "Step 2 uses warehouse-service.create()"
+    refactor_action: "Verify 01.8 completed"
+    priority: "P0"
+
+  - component: "location-service.ts"
+    expected: "From story 01.9"
+    found: "UNKNOWN - depends on 01.9 completion"
+    status: "DEPENDENCY"
+    gap_description: "Step 3 uses location-service.createMany()"
+    refactor_action: "Verify 01.9 completed"
+    priority: "P0"
+
+# =============================================================================
+# VALIDATION GAPS
+# =============================================================================
+validation_gaps:
+  - component: "wizard-steps.ts schemas"
+    expected: "apps/frontend/lib/validation/wizard-steps.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No validation schemas for wizard steps.
+      Required:
+      - step2WarehouseSchema
+      - step3LocationsSchema
+      - step4ProductSchema
+      - step5WorkOrderSchema
+    refactor_action: "Create wizard-steps.ts with Zod schemas"
+    priority: "P0"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  # Step Components
+  - component: "WizardStep2Warehouse.tsx"
+    expected: "apps/frontend/components/settings/onboarding/WizardStep2Warehouse.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Step 2 warehouse creation form"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  - component: "WizardStep3Locations.tsx"
+    expected: "apps/frontend/components/settings/onboarding/WizardStep3Locations.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Step 3 location template selector"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  - component: "WizardStep4Product.tsx"
+    expected: "apps/frontend/components/settings/onboarding/WizardStep4Product.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Step 4 product creation with industry templates"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  - component: "WizardStep5WorkOrder.tsx"
+    expected: "apps/frontend/components/settings/onboarding/WizardStep5WorkOrder.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Step 5 demo work order creation"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "WizardStep6Complete.tsx"
+    expected: "apps/frontend/components/settings/onboarding/WizardStep6Complete.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Step 6 celebration screen with confetti and summary"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  # Template Components
+  - component: "TemplateSelector.tsx"
+    expected: "apps/frontend/components/settings/onboarding/templates/TemplateSelector.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Reusable template card selector"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "IndustrySelector.tsx"
+    expected: "apps/frontend/components/settings/onboarding/templates/IndustrySelector.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Industry icon grid (Bakery, Dairy, etc.)"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  # Celebration Components
+  - component: "ConfettiAnimation.tsx"
+    expected: "apps/frontend/components/settings/onboarding/celebration/ConfettiAnimation.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Canvas-based confetti animation (3 seconds)"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "SpeedBadge.tsx"
+    expected: "apps/frontend/components/settings/onboarding/celebration/SpeedBadge.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Speed Setup Champion badge (<15 min)"
+    refactor_action: "Create component"
+    priority: "P2"
+
+  - component: "CompletionSummary.tsx"
+    expected: "apps/frontend/components/settings/onboarding/celebration/CompletionSummary.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Summary of all created entities"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "NextStepsSection.tsx"
+    expected: "apps/frontend/components/settings/onboarding/celebration/NextStepsSection.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Contextual next steps cards"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "WelcomeBanner.tsx"
+    expected: "apps/frontend/components/settings/onboarding/celebration/WelcomeBanner.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Dashboard welcome banner (post-wizard)"
+    refactor_action: "Create component"
+    priority: "P2"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "POST /api/v1/settings/onboarding/step/2"
+    expected: "Save warehouse (Step 2)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Step 2 warehouse creation endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "POST /api/v1/settings/onboarding/step/3"
+    expected: "Save locations with template (Step 3)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Step 3 location template endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "POST /api/v1/settings/onboarding/step/4"
+    expected: "Save product (Step 4)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Step 4 product creation endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "POST /api/v1/settings/onboarding/step/5"
+    expected: "Save demo work order (Step 5)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Step 5 work order endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P1"
+
+  - component: "POST /api/v1/settings/onboarding/step/6"
+    expected: "Complete wizard, award badge (Step 6)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Step 6 completion endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "GET /api/v1/settings/onboarding/templates/locations"
+    expected: "Get location template definitions"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Template definitions for Simple/Basic/Full"
+    refactor_action: "Create route.ts"
+    priority: "P1"
+
+  - component: "GET /api/v1/settings/onboarding/templates/products"
+    expected: "Get industry + product templates"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Industry templates (Bakery, Dairy, Meat, etc.)"
+    refactor_action: "Create route.ts"
+    priority: "P1"
+
+# =============================================================================
+# CONSTANTS GAPS
+# =============================================================================
+constants_gaps:
+  - component: "wizard-templates.ts"
+    expected: "apps/frontend/lib/constants/wizard-templates.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No template constants file.
+      Required:
+      - LOCATION_TEMPLATES (simple, basic, full)
+      - INDUSTRY_TEMPLATES (6 industries x 4 product templates each)
+    refactor_action: "Create constants file"
+    priority: "P1"
+
+# =============================================================================
+# DEPENDENCY GAPS (Story Dependencies)
+# =============================================================================
+dependency_gaps:
+  - component: "Story 01.3 - Wizard Modal Framework"
+    expected: "WizardModal component with step navigation"
+    found: "UNKNOWN - depends on 01.3 completion"
+    status: "DEPENDENCY"
+    gap_description: "Step 2-6 components render within wizard modal from 01.3"
+    refactor_action: "Verify 01.3 completed"
+    priority: "P0-BLOCKER"
+
+  - component: "Story 01.4 - Org Profile Step (Step 1)"
+    expected: "Step 1 completion triggers step 2"
+    found: "UNKNOWN - depends on 01.4 completion"
+    status: "DEPENDENCY"
+    gap_description: "Step 1 must advance to step 2 when completed"
+    refactor_action: "Verify 01.4 completed"
+    priority: "P0-BLOCKER"
+
+  - component: "Story 01.8 - Warehouses CRUD"
+    expected: "Warehouse table, service, validation"
+    found: "UNKNOWN - depends on 01.8 completion"
+    status: "DEPENDENCY"
+    gap_description: "Step 2 creates warehouse using existing infrastructure"
+    refactor_action: "Verify 01.8 completed"
+    priority: "P0-BLOCKER"
+
+  - component: "Story 01.9 - Locations CRUD"
+    expected: "Location table, service, validation, hierarchy support"
+    found: "UNKNOWN - depends on 01.9 completion"
+    status: "DEPENDENCY"
+    gap_description: "Step 3 creates locations using existing infrastructure"
+    refactor_action: "Verify 01.9 completed"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# CRITICAL BLOCKERS (Must fix before story can be implemented)
+# =============================================================================
+critical_blockers:
+  - blocker: "Story 01.3 Not Completed"
+    description: "Wizard modal framework required for steps 2-6 to render"
+    dependency: "01.3"
+    risk: "HIGH - cannot start development"
+
+  - blocker: "Story 01.8 Not Completed"
+    description: "Warehouse service and table required for step 2"
+    dependency: "01.8"
+    risk: "HIGH - step 2 cannot function"
+
+  - blocker: "Story 01.9 Not Completed"
+    description: "Location service and table required for step 3"
+    dependency: "01.9"
+    risk: "HIGH - step 3 cannot function"
+
+  - blocker: "No wizard_progress column"
+    description: "Cannot track step completion without wizard_progress JSONB"
+    migration: "XXX_add_wizard_progress_badges.sql"
+    risk: "MEDIUM - can work around initially"
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  phase_1_database:
+    - "XXX_add_wizard_progress_badges.sql"
+
+  phase_2_constants:
+    - "lib/constants/wizard-templates.ts"
+
+  phase_3_services:
+    - "lib/services/wizard-service.ts"
+
+  phase_4_validation:
+    - "lib/validation/wizard-steps.ts"
+
+  phase_5_api:
+    - "app/api/v1/settings/onboarding/step/2/route.ts"
+    - "app/api/v1/settings/onboarding/step/3/route.ts"
+    - "app/api/v1/settings/onboarding/step/4/route.ts"
+    - "app/api/v1/settings/onboarding/step/5/route.ts"
+    - "app/api/v1/settings/onboarding/step/6/route.ts"
+    - "app/api/v1/settings/onboarding/templates/locations/route.ts"
+    - "app/api/v1/settings/onboarding/templates/products/route.ts"
+
+  phase_6_shared_components:
+    - "components/settings/onboarding/templates/TemplateSelector.tsx"
+    - "components/settings/onboarding/templates/IndustrySelector.tsx"
+    - "components/settings/onboarding/shared/WizardTooltip.tsx"
+    - "components/settings/onboarding/shared/SkipStepButton.tsx"
+
+  phase_7_step_components:
+    - "components/settings/onboarding/WizardStep2Warehouse.tsx"
+    - "components/settings/onboarding/WizardStep3Locations.tsx"
+    - "components/settings/onboarding/WizardStep4Product.tsx"
+    - "components/settings/onboarding/WizardStep5WorkOrder.tsx"
+
+  phase_8_celebration:
+    - "components/settings/onboarding/celebration/ConfettiAnimation.tsx"
+    - "components/settings/onboarding/celebration/SpeedBadge.tsx"
+    - "components/settings/onboarding/celebration/CompletionSummary.tsx"
+    - "components/settings/onboarding/celebration/NextStepsSection.tsx"
+    - "components/settings/onboarding/WizardStep6Complete.tsx"
+
+  phase_9_dashboard:
+    - "components/settings/onboarding/celebration/WelcomeBanner.tsx"
+
+  phase_10_tests:
+    - "All test files per tests.yaml"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] wizard_progress JSONB column exists on organizations"
+  - "[ ] badges JSONB column exists on organizations"
+  - "[ ] Step 2 creates warehouse with is_default=true"
+  - "[ ] Step 2 skip creates DEMO-WH"
+  - "[ ] Step 3 simple template creates 1 RECEIVING location"
+  - "[ ] Step 3 basic template creates 3 locations"
+  - "[ ] Step 3 full template creates 9 locations with hierarchy"
+  - "[ ] Step 4 industry selector works"
+  - "[ ] Step 4 template pre-fills form correctly"
+  - "[ ] Step 4 SKU uniqueness validated"
+  - "[ ] Step 5 disabled when product skipped"
+  - "[ ] Step 6 confetti plays for 3 seconds"
+  - "[ ] Speed badge awarded under 15 min"
+  - "[ ] Back navigation preserves data"
+  - "[ ] All API endpoints functional"
+  - "[ ] All validation schemas working"
+  - "[ ] All tests passing"

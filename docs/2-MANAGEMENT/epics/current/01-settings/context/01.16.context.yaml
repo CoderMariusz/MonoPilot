@@ -1,0 +1,989 @@
+# Story Context: 01.16 User Invitations (Email)
+# Generated: 2025-12-16
+# Purpose: AI agent context for implementing user invitation flow with email delivery
+
+story:
+  id: "01.16"
+  name: "User Invitations (Email)"
+  slug: "user-invitations"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P0"
+  story_file: "docs/2-MANAGEMENT/epics/current/01-settings/01.16.user-invitations.md"
+
+# -----------------------------------------------------------------------------
+# DEPENDENCIES
+# -----------------------------------------------------------------------------
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table schema"
+        - "org_id context"
+        - "RLS policies for tenant isolation"
+    - story: "01.5a"
+      name: "Users CRUD"
+      provides:
+        - "users table"
+        - "user creation patterns"
+        - "role assignment to users"
+    - story: "01.6"
+      name: "Role-Based Permissions"
+      provides:
+        - "roles table with 10 predefined roles"
+        - "role dropdown component"
+        - "permission checks (ADMIN/SUPER_ADMIN for invitations)"
+  blocked_by: []
+  blocks: []
+
+# -----------------------------------------------------------------------------
+# FILES TO READ (Context for Implementation)
+# -----------------------------------------------------------------------------
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections:
+      - "FR-SET-012"  # User invitations (email)
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections:
+      - "User Management"
+      - "Email Integration"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.16.user-invitations.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for invitation isolation"
+  patterns:
+    - "apps/frontend/lib/validation/*.ts"    # Existing Zod schema patterns
+    - "apps/frontend/lib/services/*.ts"      # Existing service patterns
+    - "apps/frontend/components/ui/dialog.tsx"  # ShadCN Dialog for modal
+    - "apps/frontend/components/ui/table.tsx"   # ShadCN Table for invitations list
+    - "apps/frontend/components/settings/role-dropdown.tsx"  # Role selection (from 01.6)
+
+# -----------------------------------------------------------------------------
+# FILES TO CREATE
+# -----------------------------------------------------------------------------
+files_to_create:
+  pages:
+    - path: "apps/frontend/app/(public)/invite/[token]/page.tsx"
+      description: "Public accept invitation page with password setup"
+
+  components:
+    - path: "apps/frontend/components/settings/users/InviteUserModal.tsx"
+      description: "Modal for sending user invitations (email + role)"
+    - path: "apps/frontend/components/settings/users/PendingInvitationsTable.tsx"
+      description: "Table listing pending invitations"
+    - path: "apps/frontend/components/settings/users/InvitationRow.tsx"
+      description: "Single invitation row with actions"
+    - path: "apps/frontend/components/settings/users/InvitationStatusBadge.tsx"
+      description: "Status badge (pending, accepted, expired, cancelled)"
+    - path: "apps/frontend/components/settings/users/ResendConfirmDialog.tsx"
+      description: "Confirmation dialog for resending invitation"
+    - path: "apps/frontend/components/settings/users/CancelInvitationDialog.tsx"
+      description: "Confirmation dialog for cancelling invitation"
+    - path: "apps/frontend/components/auth/AcceptInvitationForm.tsx"
+      description: "Password setup form for invitation acceptance"
+    - path: "apps/frontend/components/auth/InvitationExpiredPage.tsx"
+      description: "Error page for expired/invalid invitations"
+
+  validation:
+    - path: "apps/frontend/lib/validation/invitation-schemas.ts"
+      description: "Zod schemas for invitation operations"
+
+  services:
+    - path: "apps/frontend/lib/services/invitation-service.ts"
+      description: "Invitation CRUD, send, resend, cancel, accept"
+    - path: "apps/frontend/lib/services/email-service.ts"
+      description: "Email sending via Resend API"
+
+  api:
+    - path: "apps/frontend/app/api/v1/settings/users/invite/route.ts"
+      methods: ["POST"]
+      description: "Send new invitation"
+    - path: "apps/frontend/app/api/v1/settings/users/invitations/route.ts"
+      methods: ["GET"]
+      description: "List pending invitations"
+    - path: "apps/frontend/app/api/v1/settings/users/invitations/[id]/route.ts"
+      methods: ["DELETE"]
+      description: "Cancel invitation"
+    - path: "apps/frontend/app/api/v1/settings/users/invitations/[id]/resend/route.ts"
+      methods: ["POST"]
+      description: "Resend invitation"
+    - path: "apps/frontend/app/api/auth/invitation/[token]/route.ts"
+      methods: ["GET"]
+      description: "Get invitation details (public)"
+    - path: "apps/frontend/app/api/auth/accept-invitation/route.ts"
+      methods: ["POST"]
+      description: "Accept invitation and create account (public)"
+
+  migrations:
+    - path: "supabase/migrations/XXX_user_invitations.sql"
+      description: "user_invitations table with indexes and RLS"
+
+  edge_functions:
+    - path: "supabase/functions/expire-invitations/index.ts"
+      description: "Cron job to expire old invitations"
+
+  tests:
+    - path: "apps/frontend/lib/services/__tests__/invitation-service.test.ts"
+      description: "Unit tests for invitation service"
+    - path: "apps/frontend/lib/services/__tests__/email-service.test.ts"
+      description: "Unit tests for email service"
+    - path: "apps/frontend/app/api/v1/settings/users/__tests__/invite.test.ts"
+      description: "Integration tests for invitation API"
+    - path: "apps/frontend/app/api/auth/__tests__/accept-invitation.test.ts"
+      description: "Integration tests for accept invitation API"
+    - path: "e2e/settings/user-invitations.spec.ts"
+      description: "E2E tests for full invitation flow"
+
+# -----------------------------------------------------------------------------
+# DATABASE SCHEMA
+# -----------------------------------------------------------------------------
+database:
+  tables:
+    - name: "user_invitations"
+      description: "Tracks pending, accepted, and cancelled user invitations"
+      columns:
+        - name: "id"
+          type: "UUID"
+          constraints: "PRIMARY KEY DEFAULT gen_random_uuid()"
+        - name: "org_id"
+          type: "UUID"
+          constraints: "NOT NULL REFERENCES organizations(id)"
+        - name: "email"
+          type: "VARCHAR(255)"
+          constraints: "NOT NULL"
+        - name: "role_id"
+          type: "UUID"
+          constraints: "NOT NULL REFERENCES roles(id)"
+        - name: "token"
+          type: "VARCHAR(64)"
+          constraints: "UNIQUE NOT NULL"
+        - name: "expires_at"
+          type: "TIMESTAMPTZ"
+          constraints: "NOT NULL"
+        - name: "invited_by"
+          type: "UUID"
+          constraints: "NOT NULL REFERENCES users(id)"
+        - name: "status"
+          type: "VARCHAR(20)"
+          constraints: "NOT NULL DEFAULT 'pending'"
+          notes: "'pending', 'accepted', 'expired', 'cancelled'"
+        - name: "accepted_at"
+          type: "TIMESTAMPTZ"
+          constraints: ""
+        - name: "cancelled_at"
+          type: "TIMESTAMPTZ"
+          constraints: ""
+        - name: "created_at"
+          type: "TIMESTAMPTZ"
+          constraints: "DEFAULT NOW()"
+        - name: "updated_at"
+          type: "TIMESTAMPTZ"
+          constraints: "DEFAULT NOW()"
+      constraints:
+        - "UNIQUE(org_id, email, status) -- Only one pending per email per org"
+        - "CHECK (status IN ('pending', 'accepted', 'expired', 'cancelled'))"
+      indexes:
+        - "idx_user_invitations_token ON user_invitations(token) WHERE status = 'pending'"
+        - "idx_user_invitations_org_status ON user_invitations(org_id, status)"
+        - "idx_user_invitations_email ON user_invitations(email)"
+        - "idx_user_invitations_expires ON user_invitations(expires_at) WHERE status = 'pending'"
+      rls: true
+      rls_policies:
+        - name: "invitations_org_isolation"
+          operation: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "invitations_admin_write"
+          operation: "ALL"
+          using: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')
+
+# -----------------------------------------------------------------------------
+# API ENDPOINTS
+# -----------------------------------------------------------------------------
+api:
+  endpoints:
+    # Admin Invitation Management
+    - method: "POST"
+      path: "/api/v1/settings/users/invite"
+      description: "Send new user invitation"
+      auth: true
+      roles: ["SUPER_ADMIN", "ADMIN"]
+      request_body:
+        email: "string (required, valid email)"
+        role_id: "UUID (required, references roles.id)"
+      response:
+        invitation_id: "UUID"
+        email: "string"
+        expires_at: "timestamp (7 days from now)"
+      side_effects:
+        - "Sends invitation email via Resend"
+        - "Creates pending invitation record"
+      errors:
+        400: "Invalid email format"
+        400: "Invalid role_id"
+        409: "User with this email already exists"
+        409: "An invitation is already pending for this email"
+        403: "Only Super Admin can invite Super Admin role"
+      performance: "< 5 seconds (includes email send)"
+
+    - method: "GET"
+      path: "/api/v1/settings/users/invitations"
+      description: "List pending invitations for organization"
+      auth: true
+      roles: ["SUPER_ADMIN", "ADMIN"]
+      query_params:
+        - "status: 'pending' | 'all' (default 'pending')"
+      response:
+        invitations: "Invitation[]"
+        total: "number"
+      fields_per_invitation:
+        - "id: UUID"
+        - "email: string"
+        - "role_id: UUID"
+        - "role_name: string (joined)"
+        - "status: string"
+        - "invited_by_name: string (joined)"
+        - "expires_at: timestamp"
+        - "created_at: timestamp"
+
+    - method: "POST"
+      path: "/api/v1/settings/users/invitations/:id/resend"
+      description: "Resend invitation (resets expiry)"
+      auth: true
+      roles: ["SUPER_ADMIN", "ADMIN"]
+      response:
+        invitation_id: "UUID"
+        new_expires_at: "timestamp"
+      side_effects:
+        - "Generates new token"
+        - "Resets expiry to 7 days"
+        - "Sends new invitation email"
+      errors:
+        404: "Invitation not found"
+        400: "Cannot resend non-pending invitation"
+
+    - method: "DELETE"
+      path: "/api/v1/settings/users/invitations/:id"
+      description: "Cancel/revoke invitation"
+      auth: true
+      roles: ["SUPER_ADMIN", "ADMIN"]
+      response: 204
+      side_effects:
+        - "Sets status to 'cancelled'"
+        - "Sets cancelled_at timestamp"
+      errors:
+        404: "Invitation not found"
+        400: "Invitation already accepted or cancelled"
+
+    # Public Invitation Acceptance
+    - method: "GET"
+      path: "/api/auth/invitation/:token"
+      description: "Get invitation details for accept page"
+      auth: false
+      response:
+        email: "string"
+        role_name: "string"
+        org_name: "string"
+        expires_at: "timestamp"
+        is_expired: "boolean"
+        days_until_expiry: "number"
+      errors:
+        404: "Invitation not found or invalid"
+
+    - method: "POST"
+      path: "/api/auth/accept-invitation"
+      description: "Accept invitation and create user account"
+      auth: false
+      request_body:
+        token: "string (64 chars)"
+        password: "string (must meet complexity requirements)"
+      response:
+        user_id: "UUID"
+        access_token: "string (JWT)"
+        org_name: "string"
+      side_effects:
+        - "Creates user record with assigned role"
+        - "Creates Supabase Auth user"
+        - "Marks invitation as accepted"
+        - "Creates initial session"
+      errors:
+        400: "Invalid token"
+        400: "Invitation has expired"
+        400: "Invitation already accepted"
+        400: "Password does not meet requirements"
+
+# -----------------------------------------------------------------------------
+# EMAIL SERVICE
+# -----------------------------------------------------------------------------
+email:
+  provider: "Resend"
+  free_tier: "3,000 emails/month"
+  alternatives:
+    - "SendGrid"
+    - "AWS SES"
+
+  environment_variables:
+    - "RESEND_API_KEY=re_xxxxx"
+    - "INVITATION_BASE_URL=https://app.monopilot.io/invite"
+    - "INVITATION_EXPIRY_DAYS=7"
+
+  template:
+    subject: "You're invited to join {{orgName}} on MonoPilot"
+    body: |
+      Hi there,
+
+      {{inviterName}} has invited you to join {{orgName}} on MonoPilot as a {{roleName}}.
+
+      Click the button below to set up your account:
+
+      [Accept Invitation]({{inviteUrl}})
+
+      This invitation will expire on {{expiryDate}}.
+
+      If you didn't expect this invitation, you can safely ignore this email.
+
+      Best regards,
+      The MonoPilot Team
+
+  service_interface: |
+    // email-service.ts
+    import { Resend } from 'resend';
+
+    export class EmailService {
+      private resend: Resend;
+
+      constructor() {
+        this.resend = new Resend(process.env.RESEND_API_KEY);
+      }
+
+      async sendInvitationEmail(params: {
+        to: string;
+        orgName: string;
+        inviterName: string;
+        roleName: string;
+        inviteUrl: string;
+        expiresAt: Date;
+      }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+        try {
+          const { data } = await this.resend.emails.send({
+            from: 'MonoPilot <noreply@monopilot.io>',
+            to: params.to,
+            subject: `You're invited to join ${params.orgName} on MonoPilot`,
+            html: this.renderInvitationTemplate(params),
+          });
+          return { success: true, messageId: data?.id };
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      }
+    }
+
+# -----------------------------------------------------------------------------
+# UX COMPONENTS
+# -----------------------------------------------------------------------------
+ux:
+  components:
+    - name: "InviteUserModal"
+      description: "Modal for sending user invitations"
+      props:
+        - "isOpen: boolean"
+        - "onClose: () => void"
+        - "onSuccess: () => void"
+      fields:
+        - "Email input with validation"
+        - "Role dropdown (from 01.6, excludes Super Admin for non-Super Admin)"
+      layout: |
+        +------------------------------------------+
+        | Invite User                          [X] |
+        +------------------------------------------+
+        | Email                                    |
+        | [new@company.com                    ]    |
+        |                                          |
+        | Role                                     |
+        | [Production Operator           v]       |
+        |                                          |
+        | The user will receive an email with a    |
+        | link to set up their account.            |
+        |                                          |
+        |        [Cancel]  [Send Invitation]       |
+        +------------------------------------------+
+      states:
+        - "default: Form ready for input"
+        - "loading: Spinner on button, form disabled"
+        - "error: Inline error message below field"
+        - "success: Modal closes, toast shown"
+
+    - name: "PendingInvitationsTable"
+      description: "Table showing pending invitations"
+      props:
+        - "invitations: Invitation[]"
+        - "onResend: (id: string) => void"
+        - "onCancel: (id: string) => void"
+        - "isLoading: boolean"
+      columns:
+        - "Email"
+        - "Role"
+        - "Invited By"
+        - "Sent Date"
+        - "Expires"
+        - "Actions"
+      layout: |
+        +------------------------------------------------------------------------+
+        | Email           | Role            | Sent      | Expires   | Actions    |
+        +------------------------------------------------------------------------+
+        | new@company.com | Prod Operator   | Dec 15    | Dec 22    | [..] Menu  |
+        | test@company.com| Viewer          | Dec 14    | Dec 21    | [..] Menu  |
+        +------------------------------------------------------------------------+
+        | No pending invitations                                                 |
+        +------------------------------------------------------------------------+
+      empty_state: "'No pending invitations' with illustration"
+
+    - name: "AcceptInvitationForm"
+      description: "Public form for accepting invitation"
+      props:
+        - "invitation: InvitationDetails"
+        - "onSuccess: () => void"
+      fields:
+        - "Organization name (display only)"
+        - "Role (display only)"
+        - "Email (readonly, pre-filled)"
+        - "Password (with PasswordRequirements from 01.15)"
+        - "Confirm Password"
+      layout: |
+        +------------------------------------------+
+        | Welcome to MonoPilot                     |
+        +------------------------------------------+
+        | You've been invited to join              |
+        | **Acme Foods Inc.** as a                 |
+        | **Production Operator**                  |
+        |                                          |
+        | Email                                    |
+        | [new@company.com              ] (locked) |
+        |                                          |
+        | Create Password                          |
+        | [**************]                         |
+        |                                          |
+        | Password Requirements:                   |
+        | [x] At least 8 characters                |
+        | [x] One uppercase letter                 |
+        | [x] One lowercase letter                 |
+        | [ ] One number                           |
+        | [ ] One special character                |
+        |                                          |
+        | Confirm Password                         |
+        | [**************]                         |
+        |                                          |
+        | [     Create Account     ]               |
+        |                                          |
+        | Already have an account? [Log in]        |
+        +------------------------------------------+
+
+    - name: "InvitationExpiredPage"
+      description: "Error page for expired/invalid invitations"
+      props:
+        - "reason: 'expired' | 'invalid' | 'cancelled'"
+      layout: |
+        +------------------------------------------+
+        |          [Warning Icon]                  |
+        |                                          |
+        |   This invitation has expired            |
+        |                                          |
+        |   The invitation link you used is        |
+        |   no longer valid.                       |
+        |                                          |
+        |   [Request New Invitation]               |
+        |                                          |
+        |   Contact your administrator for a       |
+        |   new invitation.                        |
+        +------------------------------------------+
+
+  states:
+    loading: "Skeleton table for invitations, disabled form for accept"
+    empty: "'No pending invitations' with 'Invite Your First User' CTA"
+    error: "Error alert with retry button"
+    success: "Success toast on action completion"
+
+  patterns:
+    modal: "ShadCN Dialog with Form inside"
+    table: "ShadCN Table with row actions dropdown"
+    form: "react-hook-form with Zod resolver"
+    toast: "ShadCN Toast for success/error messages"
+    dropdown_menu: "ShadCN DropdownMenu for row actions"
+
+# -----------------------------------------------------------------------------
+# VALIDATION RULES
+# -----------------------------------------------------------------------------
+validation_rules:
+  email:
+    type: "string"
+    required: true
+    format: "email"
+    max: 255
+    unique_per_org: true
+    unique_pending: true
+    error_messages:
+      required: "Email is required"
+      format: "Invalid email format"
+      duplicate_user: "User with this email already exists"
+      duplicate_pending: "An invitation is already pending for this email"
+
+  role_id:
+    type: "uuid"
+    required: true
+    references: "roles.id"
+    restrictions:
+      - "Only Super Admin can invite Super Admin role"
+    error_messages:
+      required: "Role is required"
+      invalid: "Invalid role"
+      super_admin: "Only Super Admin can invite Super Admin"
+
+  token:
+    type: "string"
+    length: 64
+    format: "hex"
+    error_messages:
+      invalid: "Invalid invitation token"
+
+  invitation_expiry:
+    days: 7
+
+# -----------------------------------------------------------------------------
+# PATTERNS
+# -----------------------------------------------------------------------------
+patterns:
+  token_generation:
+    description: "Secure token generation for invitations"
+    code: |
+      import { randomBytes } from 'crypto';
+
+      function generateInvitationToken(): string {
+        return randomBytes(32).toString('hex'); // 64 chars
+      }
+
+  invitation_service:
+    description: "Invitation management service"
+    code: |
+      // invitation-service.ts
+      export class InvitationService {
+        async createInvitation(
+          orgId: string,
+          invitedBy: string,
+          data: { email: string; role_id: string }
+        ): Promise<Invitation> {
+          // 1. Validate email not in users table for org
+          // 2. Validate no pending invitation for email
+          // 3. Generate secure token
+          // 4. Create invitation record
+          // 5. Send email via EmailService
+          // 6. Return invitation
+        }
+
+        async getInvitationByToken(token: string): Promise<InvitationDetails | null> {
+          // Return invitation with org name, role name
+          // Check if expired
+        }
+
+        async acceptInvitation(token: string, password: string): Promise<{
+          user: User;
+          accessToken: string;
+        }> {
+          // 1. Validate token exists and is pending
+          // 2. Validate not expired
+          // 3. Validate password meets requirements
+          // 4. Create Supabase Auth user
+          // 5. Create users table record
+          // 6. Mark invitation as accepted
+          // 7. Return user and access token
+        }
+
+        async resendInvitation(invitationId: string, orgId: string): Promise<Invitation> {
+          // 1. Validate invitation exists and is pending
+          // 2. Generate new token
+          // 3. Reset expires_at to 7 days
+          // 4. Send new email
+          // 5. Return updated invitation
+        }
+
+        async cancelInvitation(invitationId: string, orgId: string): Promise<void> {
+          // 1. Validate invitation exists and is pending
+          // 2. Set status to 'cancelled'
+          // 3. Set cancelled_at timestamp
+        }
+      }
+
+  zod_schemas:
+    description: "Zod validation schemas for invitations"
+    code: |
+      // invitation-schemas.ts
+      import { z } from 'zod';
+
+      export const inviteUserSchema = z.object({
+        email: z
+          .string()
+          .email('Invalid email format')
+          .max(255, 'Email too long'),
+        role_id: z
+          .string()
+          .uuid('Invalid role ID'),
+      });
+
+      export const acceptInvitationSchema = z.object({
+        token: z
+          .string()
+          .length(64, 'Invalid invitation token'),
+        password: z
+          .string()
+          .min(8, 'Password must be at least 8 characters')
+          .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+          .regex(/[0-9]/, 'Password must contain at least one number')
+          .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/,
+            'Password must contain at least one special character'),
+      });
+
+# -----------------------------------------------------------------------------
+# ACCEPTANCE CRITERIA
+# -----------------------------------------------------------------------------
+acceptance_criteria:
+  send_invitation:
+    - id: "AC-01"
+      given: "admin is on the Users page"
+      when: "admin clicks 'Invite User'"
+      then: "an invitation modal displays with email and role fields"
+      test_type: "e2e"
+
+    - id: "AC-02"
+      given: "admin enters email 'new@company.com' and selects role 'PROD_OPERATOR'"
+      when: "'Send Invitation' is clicked"
+      then: "invitation email is sent within 5 seconds"
+      test_type: "integration"
+
+    - id: "AC-03"
+      given: "invitation sent successfully"
+      when: "action completes"
+      then: "success toast displays 'Invitation sent to new@company.com'"
+      test_type: "e2e"
+
+  email_content:
+    - id: "AC-04"
+      given: "invitation is sent to 'john@company.com'"
+      when: "email is delivered"
+      then: "subject is 'You're invited to join [Organization Name] on MonoPilot'"
+      test_type: "integration"
+
+    - id: "AC-05"
+      given: "invitation email"
+      when: "rendered"
+      then: "body contains organization name, inviter name, role name, activation link, and expiry notice"
+      test_type: "unit"
+
+  accept_invitation:
+    - id: "AC-06"
+      given: "recipient receives invitation email"
+      when: "recipient clicks the activation link"
+      then: "password setup page displays with org name, role, and pre-filled email"
+      test_type: "e2e"
+
+    - id: "AC-07"
+      given: "recipient submits valid password"
+      when: "form is submitted"
+      then: "account is activated, user logged in, and redirected to dashboard"
+      test_type: "e2e"
+
+    - id: "AC-08"
+      given: "account activated successfully"
+      when: "redirect completes"
+      then: "welcome toast displays 'Welcome to [Organization Name]!'"
+      test_type: "e2e"
+
+  invitation_expiry:
+    - id: "AC-09"
+      given: "invitation link is older than 7 days"
+      when: "recipient clicks the link"
+      then: "error page displays 'This invitation has expired'"
+      test_type: "e2e"
+
+    - id: "AC-10"
+      given: "invitation is 6 days old"
+      when: "recipient clicks the link"
+      then: "warning banner shows 'This invitation expires in 1 day'"
+      test_type: "unit"
+
+  pending_invitations:
+    - id: "AC-11"
+      given: "admin navigates to Users page"
+      when: "'Pending Invitations' tab is clicked"
+      then: "pending invitations list displays with email, role, sent date, expires date"
+      test_type: "e2e"
+
+    - id: "AC-12"
+      given: "invitation list"
+      when: "sorted"
+      then: "invitations ordered by sent date (newest first)"
+      test_type: "unit"
+
+  resend_invitation:
+    - id: "AC-13"
+      given: "pending invitation exists for 'test@company.com'"
+      when: "admin clicks 'Resend' and confirms"
+      then: "new invitation email is sent and expiry reset to 7 days"
+      test_type: "integration"
+
+  cancel_invitation:
+    - id: "AC-14"
+      given: "pending invitation exists for 'cancel@company.com'"
+      when: "admin clicks 'Cancel' and confirms"
+      then: "invitation is invalidated and removed from pending list"
+      test_type: "integration"
+
+    - id: "AC-15"
+      given: "cancelled invitation token"
+      when: "recipient clicks old link"
+      then: "error page displays 'This invitation is no longer valid'"
+      test_type: "e2e"
+
+  duplicate_handling:
+    - id: "AC-16"
+      given: "user 'existing@company.com' already has an active account"
+      when: "admin attempts to invite 'existing@company.com'"
+      then: "error displays 'User with this email already exists'"
+      test_type: "integration"
+
+    - id: "AC-17"
+      given: "pending invitation exists for 'pending@company.com'"
+      when: "admin attempts to invite 'pending@company.com' again"
+      then: "error displays 'An invitation is already pending for this email'"
+      test_type: "integration"
+
+  permission_enforcement:
+    - id: "AC-18"
+      given: "user with VIEWER role"
+      when: "accessing invite functionality"
+      then: "'Invite User' button is hidden"
+      test_type: "unit"
+
+    - id: "AC-19"
+      given: "user with ADMIN role"
+      when: "inviting user with SUPER_ADMIN role"
+      then: "error displays 'Only Super Admin can invite Super Admin'"
+      test_type: "integration"
+
+# -----------------------------------------------------------------------------
+# DEFINITION OF DONE
+# -----------------------------------------------------------------------------
+definition_of_done:
+  - "user_invitations table created with correct indexes and RLS"
+  - "Email service integrated with Resend"
+  - "POST /api/v1/settings/users/invite sends email end-to-end"
+  - "GET /api/v1/settings/users/invitations returns org invitations"
+  - "POST /api/v1/settings/users/invitations/:id/resend resets expiry and sends email"
+  - "DELETE /api/v1/settings/users/invitations/:id cancels invitation"
+  - "POST /api/auth/accept-invitation creates user and logs in"
+  - "GET /api/auth/invitation/:token returns invitation details"
+  - "InviteUserModal implemented with role selection"
+  - "PendingInvitationsTable implemented with resend/cancel actions"
+  - "AcceptInvitationPage implemented (public route)"
+  - "Email template sends correctly with all required fields"
+  - "Duplicate email validation works for both users and pending invitations"
+  - "Expiry handling works (7 days)"
+  - "Super Admin invitation restricted to Super Admins"
+  - "Cron job or trigger to expire old invitations"
+  - "Unit tests pass (>80% coverage)"
+  - "Integration tests pass"
+  - "E2E test for full invitation flow passes"
+
+# -----------------------------------------------------------------------------
+# TESTS
+# -----------------------------------------------------------------------------
+tests:
+  unit:
+    invitation_service:
+      - "createInvitation generates unique 64-char token"
+      - "createInvitation sets expiry to 7 days from now"
+      - "createInvitation rejects duplicate pending invitation for same email"
+      - "createInvitation rejects invitation for existing user email"
+      - "createInvitation rejects Super Admin role for non-Super Admin inviter"
+      - "acceptInvitation creates user with correct role"
+      - "acceptInvitation marks invitation as accepted"
+      - "acceptInvitation returns valid access token"
+      - "acceptInvitation rejects expired invitation"
+      - "acceptInvitation rejects cancelled invitation"
+      - "acceptInvitation rejects invalid token"
+      - "resendInvitation generates new token"
+      - "resendInvitation resets expiry to 7 days"
+      - "resendInvitation rejects non-pending invitation"
+      - "cancelInvitation sets status to cancelled"
+    email_service:
+      - "sendInvitationEmail calls Resend API correctly"
+      - "sendInvitationEmail renders template with all fields"
+      - "sendInvitationEmail handles API errors gracefully"
+
+  integration:
+    invitation_api:
+      - "POST /invite creates and sends invitation"
+      - "POST /invite returns 400 for invalid email"
+      - "POST /invite returns 409 for duplicate email"
+      - "POST /invite returns 403 for non-admin"
+      - "POST /invite returns 403 when non-Super Admin invites Super Admin role"
+      - "GET /invitations returns org invitations only"
+      - "GET /invitations excludes other org invitations"
+      - "POST /invitations/:id/resend resets invitation"
+      - "POST /invitations/:id/resend returns 404 for invalid id"
+      - "DELETE /invitations/:id cancels invitation"
+      - "DELETE /invitations/:id returns 404 for invalid id"
+    accept_api:
+      - "POST /auth/accept-invitation creates user with correct role"
+      - "POST /auth/accept-invitation returns 400 for expired token"
+      - "POST /auth/accept-invitation returns 400 for invalid token"
+      - "POST /auth/accept-invitation returns 400 for weak password"
+      - "GET /auth/invitation/:token returns invitation details"
+      - "GET /auth/invitation/:token returns 404 for invalid token"
+
+  e2e:
+    - "Admin can invite user via modal and user receives email"
+    - "User can accept invitation and is logged in"
+    - "Expired invitation shows error page"
+    - "Admin can resend invitation from pending list"
+    - "Admin can cancel invitation from pending list"
+    - "Cancelled invitation shows invalid page to recipient"
+    - "Duplicate email shows error in modal"
+
+# -----------------------------------------------------------------------------
+# DELIVERABLES
+# -----------------------------------------------------------------------------
+deliverables:
+  - type: "migration"
+    path: "supabase/migrations/XXX_user_invitations.sql"
+    description: "user_invitations table with indexes and RLS"
+
+  - type: "service"
+    path: "apps/frontend/lib/services/invitation-service.ts"
+    description: "Invitation CRUD and acceptance"
+
+  - type: "service"
+    path: "apps/frontend/lib/services/email-service.ts"
+    description: "Email sending via Resend"
+
+  - type: "validation"
+    path: "apps/frontend/lib/validation/invitation-schemas.ts"
+    description: "Invitation Zod schemas"
+
+  - type: "component"
+    path: "apps/frontend/components/settings/users/InviteUserModal.tsx"
+    description: "Invitation modal"
+
+  - type: "component"
+    path: "apps/frontend/components/settings/users/PendingInvitationsTable.tsx"
+    description: "Pending invitations table"
+
+  - type: "component"
+    path: "apps/frontend/components/auth/AcceptInvitationForm.tsx"
+    description: "Accept invitation form"
+
+  - type: "page"
+    path: "apps/frontend/app/(public)/invite/[token]/page.tsx"
+    description: "Public accept invitation page"
+
+  - type: "api"
+    path: "apps/frontend/app/api/v1/settings/users/invite/route.ts"
+    description: "Send invitation API"
+
+  - type: "api"
+    path: "apps/frontend/app/api/auth/accept-invitation/route.ts"
+    description: "Accept invitation API (public)"
+
+  - type: "edge_function"
+    path: "supabase/functions/expire-invitations/index.ts"
+    description: "Daily cron to expire old invitations"
+
+  - type: "test"
+    path: "apps/frontend/lib/services/__tests__/invitation-service.test.ts"
+    description: "Invitation service unit tests"
+
+  - type: "test"
+    path: "e2e/settings/user-invitations.spec.ts"
+    description: "E2E tests for invitation flow"
+
+# -----------------------------------------------------------------------------
+# RISKS
+# -----------------------------------------------------------------------------
+risks:
+  - id: "RISK-01"
+    description: "Email deliverability issues (spam folder)"
+    mitigation: "Use Resend with proper SPF/DKIM setup, add retry logic"
+    severity: "medium"
+
+  - id: "RISK-02"
+    description: "Token exposure in email"
+    mitigation: "Tokens are single-use, expire after 7 days, and invalidate on use"
+    severity: "low"
+
+  - id: "RISK-03"
+    description: "Race condition on invitation acceptance"
+    mitigation: "Database unique constraint on token, transaction on accept"
+    severity: "low"
+
+# -----------------------------------------------------------------------------
+# IMPLEMENTATION NOTES
+# -----------------------------------------------------------------------------
+implementation_notes:
+  email:
+    - "Use Resend as primary email provider (simple API, good DX)"
+    - "Free tier: 3,000 emails/month (sufficient for MVP)"
+    - "Consider React Email for better template management later"
+    - "Implement exponential backoff for email retries"
+
+  security:
+    - "Tokens must be cryptographically secure (crypto.randomBytes)"
+    - "Token is 64 chars (32 bytes hex-encoded)"
+    - "Public accept endpoint has rate limiting (10 attempts/minute)"
+    - "Password requirements same as 01.15"
+
+  cron_job:
+    - "Run daily to mark expired invitations"
+    - "Can use Supabase Edge Function with cron schedule"
+    - "Or Vercel Cron for simpler setup"
+
+  user_creation:
+    - "Accept invitation creates both auth.users and public.users records"
+    - "Use Supabase Admin API for auth.users creation"
+    - "Transaction to ensure both succeed or both fail"
+
+# -----------------------------------------------------------------------------
+# HANDOFF TO DEV AGENTS
+# -----------------------------------------------------------------------------
+handoff:
+  story: "01.16.user-invitations"
+  story_file: "docs/2-MANAGEMENT/epics/current/01-settings/01.16.user-invitations.md"
+  epic_folder: "docs/2-MANAGEMENT/epics/current/01-settings/"
+  adrs:
+    - "ADR-013: RLS Org Isolation Pattern"
+  technical_notes: |
+    Implement complete user invitation flow:
+    - Admin sends invitation via modal (email + role)
+    - System sends email via Resend with activation link
+    - Recipient clicks link, sets password, account created
+    - Invitation expires after 7 days
+    - Admin can resend (resets expiry) or cancel invitations
+
+    Key security considerations:
+    - Secure token generation (32 bytes, hex-encoded)
+    - Public accept endpoint with rate limiting
+    - Password validation same as 01.15
+    - Transaction on accept to ensure data integrity
+  dependencies:
+    - "01.1: Org Context + Base RLS (provides tenant isolation)"
+    - "01.5a: Users CRUD (provides user creation patterns)"
+    - "01.6: Role Permissions (provides role dropdown, admin checks)"
+  priority: "P0"
+  estimated_effort: "3 days"

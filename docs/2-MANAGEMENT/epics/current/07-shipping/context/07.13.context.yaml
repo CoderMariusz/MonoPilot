@@ -1,0 +1,419 @@
+story:
+  id: "07.13"
+  name: "SSCC Generation + BOL + Shipping Labels"
+  epic: "07-shipping"
+  phase: "1C"
+  complexity: "L"
+  estimate_days: 4-5
+  priority: "P0"
+  type: "backend + frontend"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "roles", "RLS"]
+      epic: "01-settings"
+    - story: "01.7"
+      provides: ["organization settings", "gs1_company_prefix configuration"]
+      epic: "01-settings"
+    - story: "02.1"
+      provides: ["products"]
+      epic: "02-technical"
+    - story: "02.3"
+      provides: ["allergens", "product allergen tracking"]
+      epic: "02-technical"
+      soft: true
+    - story: "07.1"
+      provides: ["customers table"]
+      epic: "07-shipping"
+    - story: "07.2"
+      provides: ["customer_addresses table"]
+      epic: "07-shipping"
+    - story: "07.3"
+      provides: ["sales_orders table"]
+      epic: "07-shipping"
+    - story: "07.11"
+      provides: ["shipments", "shipment_boxes", "shipment_box_contents tables", "packed shipments"]
+      epic: "07-shipping"
+      blocker: true
+
+  provides_to:
+    - story: "07.14"
+      needs: ["SSCC-labeled shipments", "BOL documents"]
+      description: "Ship confirmation requires SSCC and BOL"
+    - story: "07.15"
+      needs: ["SSCC generation metrics"]
+      description: "Dashboard displays label print success rates"
+    - epic: "11"
+      needs: ["SSCC data for EDI ASN 856"]
+      description: "Integration module uses SSCC for ASN generation"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/shipping.md"
+  prd_sections: ["FR-7.38", "FR-7.39", "FR-7.40", "FR-7.41"]
+  architecture: "docs/1-BASELINE/architecture/modules/shipping.md"
+  architecture_sections:
+    - lines: "189-191"
+      description: "shipments.sscc field"
+    - lines: "209-219"
+      description: "shipment_boxes.sscc unique constraint"
+    - lines: "444-447"
+      description: "SSCC/BOL/label API endpoints"
+    - lines: "1035-1072"
+      description: "GS1 SSCC generation rules, BOL requirements"
+  story: "docs/2-MANAGEMENT/epics/current/07-shipping/07.13.sscc-bol-labels.md"
+  related_stories:
+    - "docs/2-MANAGEMENT/epics/current/07-shipping/07.11.packing-shipment-creation.md"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-004-gs1-barcode-compliance.md"
+  wireframes:
+    - "docs/3-ARCHITECTURE/ux/wireframes/SHIP-019-sscc-labels.md"
+    - "docs/3-ARCHITECTURE/ux/wireframes/SHIP-020-packing-slip.md"
+    - "docs/3-ARCHITECTURE/ux/wireframes/SHIP-021-bill-of-lading.md"
+  patterns:
+    - "docs/1-BASELINE/architecture/patterns/ADR-013-rls-policies.md"
+    - "lib/services/shipment-service.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_add_sscc_support.sql"
+      type: "migration"
+      includes:
+        - "ALTER organizations ADD gs1_company_prefix TEXT"
+        - "ALTER organizations ADD next_sscc_sequence BIGINT DEFAULT 1"
+        - "CHECK constraint for GS1 prefix format (7-10 digits)"
+        - "generate_sscc_for_org() function (PL/pgSQL)"
+        - "calculate_gs1_check_digit() function (PL/pgSQL)"
+        - "Verify UNIQUE constraint on shipment_boxes.sscc"
+        - "Index on shipment_boxes.sscc"
+
+  api:
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/generate-sscc/route.ts"
+      methods: ["POST"]
+      auth: true
+      roles: ["Warehouse", "Manager", "Admin"]
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/generate-bol/route.ts"
+      methods: ["POST"]
+      auth: true
+      roles: ["Warehouse", "Manager", "Admin"]
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/print-labels/route.ts"
+      methods: ["POST"]
+      auth: true
+      roles: ["Warehouse", "Manager", "Admin"]
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/print-packing-slip/route.ts"
+      methods: ["POST"]
+      auth: true
+      roles: ["Warehouse", "Manager", "Admin"]
+    - path: "apps/frontend/app/api/shipping/shipments/[id]/boxes/[boxId]/label-preview/route.ts"
+      methods: ["GET"]
+      auth: true
+      roles: ["Any authenticated"]
+
+  services:
+    - path: "lib/services/sscc-service.ts"
+      methods:
+        - "generateSSCCForShipment(shipmentId)"
+        - "calculateCheckDigit(base17)"
+        - "validateSSCC(sscc)"
+        - "formatSSCC(sscc)"
+        - "generateSSCC(gs1Prefix, serial, extension)"
+    - path: "lib/services/label-service.ts"
+      methods:
+        - "generateZPL(box, customer, format)"
+        - "generateBarcodeImage(sscc)"
+        - "getLabelPreview(shipmentId, boxId)"
+    - path: "lib/services/document-service.ts"
+      methods:
+        - "generateBOL(shipmentId)"
+        - "generatePackingSlip(shipmentId)"
+        - "storeDocument(type, orgId, shipmentId, pdfBuffer)"
+
+  validation:
+    - path: "lib/validation/sscc-schema.ts"
+      schemas:
+        - "generateSSCCSchema"
+        - "printLabelsSchema"
+        - "generateBOLSchema"
+        - "ssccFormatSchema"
+        - "gs1PrefixSchema"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/page.tsx"
+      description: "Update: Add label generation actions to shipment detail page"
+
+  components:
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/LabelActions.tsx"
+      description: "Action buttons for SSCC, BOL, Labels, Packing Slip"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/SSCCLabelPreview.tsx"
+      description: "GS1-128 barcode preview with metadata"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/BOLPreview.tsx"
+      description: "PDF.js viewer for BOL document"
+    - path: "apps/frontend/app/(authenticated)/shipping/shipments/[id]/components/PackingSlipPreview.tsx"
+      description: "PDF.js viewer for packing slip"
+
+  tests:
+    - path: "lib/services/__tests__/sscc-service.test.ts"
+      type: "unit"
+      coverage: ">95%"
+      scenarios:
+        - "MOD 10 check digit calculation"
+        - "SSCC validation (valid/invalid)"
+        - "SSCC generation with various prefix lengths"
+        - "formatSSCC produces readable format"
+        - "Serial overflow handling"
+    - path: "lib/services/__tests__/label-service.test.ts"
+      type: "unit"
+      coverage: ">80%"
+      scenarios:
+        - "ZPL template generation"
+        - "Barcode image generation"
+        - "Label preview data assembly"
+    - path: "lib/services/__tests__/document-service.test.ts"
+      type: "unit"
+      coverage: ">80%"
+      scenarios:
+        - "BOL PDF generation"
+        - "Packing slip PDF generation"
+        - "Storage URL generation"
+    - path: "tests/e2e/shipping/sscc-bol-workflow.spec.ts"
+      type: "e2e"
+      scenarios:
+        - "Generate SSCC for all boxes"
+        - "Idempotent SSCC generation"
+        - "Print labels (ZPL and PDF)"
+        - "Generate BOL with all sections"
+        - "Generate packing slip"
+        - "RLS blocks cross-org access"
+
+database:
+  tables_modified:
+    - name: "organizations"
+      columns_added:
+        - "gs1_company_prefix (text, nullable, 7-10 digit constraint)"
+        - "next_sscc_sequence (bigint, default 1)"
+      rls: "existing"
+      indexes: []
+
+    - name: "shipment_boxes"
+      columns_existing:
+        - "sscc (text, UNIQUE, populated by this story)"
+      rls: true
+      indexes:
+        - "idx_shipment_boxes_sscc (sscc) WHERE sscc IS NOT NULL"
+
+  functions:
+    - name: "generate_sscc_for_org(org_uuid UUID, extension_digit TEXT)"
+      returns: "TEXT"
+      description: "Atomically generate SSCC with sequence increment"
+    - name: "calculate_gs1_check_digit(digits TEXT)"
+      returns: "TEXT"
+      description: "MOD 10 check digit calculation per GS1 spec"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/generate-sscc"
+    auth: true
+    roles: ["Warehouse", "Manager", "Admin"]
+    input: {}
+    output:
+      generated_count: "number"
+      skipped_count: "number"
+      boxes: "Array<{ box_id, box_number, sscc, sscc_formatted }>"
+    business_logic:
+      - "Validate shipment exists and status = 'packed'"
+      - "Fetch all boxes with sscc = NULL"
+      - "For each box, call generate_sscc_for_org()"
+      - "Update shipment_boxes.sscc"
+      - "Return generated count and SSCC list"
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/generate-bol"
+    auth: true
+    roles: ["Warehouse", "Manager", "Admin"]
+    input:
+      force_regenerate: "boolean (optional)"
+      include_product_list: "boolean (optional)"
+    output:
+      bol_number: "string"
+      pdf_url: "string"
+      generated_at: "string"
+      file_size_kb: "number"
+    business_logic:
+      - "Validate all boxes have SSCC"
+      - "Fetch shipment, boxes, contents, customer, org data"
+      - "Generate PDF using pdfmake"
+      - "Store in Supabase Storage: bol/{org_id}/{shipment_id}.pdf"
+      - "Return signed URL"
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/print-labels"
+    auth: true
+    roles: ["Warehouse", "Manager", "Admin"]
+    input:
+      format: "'4x6' | '4x8' (default: '4x6')"
+      output: "'zpl' | 'pdf' (default: 'zpl')"
+      box_ids: "string[] (optional, specific boxes)"
+    output:
+      labels: "Array<{ box_id, box_number, sscc, zpl?, pdf_url? }>"
+    business_logic:
+      - "Validate all target boxes have SSCC"
+      - "For each box, generate ZPL or PDF"
+      - "ZPL: return raw ZPL string"
+      - "PDF: store and return URL"
+
+  - method: "POST"
+    path: "/api/shipping/shipments/:id/print-packing-slip"
+    auth: true
+    roles: ["Warehouse", "Manager", "Admin"]
+    input:
+      force_regenerate: "boolean (optional)"
+    output:
+      pdf_url: "string"
+      generated_at: "string"
+      file_size_kb: "number"
+    business_logic:
+      - "Fetch shipment, SO, lines, box contents with lot numbers"
+      - "Generate PDF with line items, lots, allergen warnings"
+      - "Store in Supabase Storage"
+      - "Return signed URL"
+
+  - method: "GET"
+    path: "/api/shipping/shipments/:id/boxes/:boxId/label-preview"
+    auth: true
+    roles: ["Any authenticated"]
+    query_params:
+      format: "'4x6' | '4x8' (optional)"
+    output:
+      sscc: "string"
+      sscc_formatted: "string"
+      barcode_image_base64: "string"
+      label_content: "object (ship_to, order_number, box_number, weight, handling)"
+    business_logic:
+      - "Fetch box with SSCC"
+      - "Generate barcode PNG using bwip-js"
+      - "Return base64 image and label metadata"
+
+ux:
+  wireframes:
+    - id: "SHIP-019"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-019-sscc-labels.md"
+      components: ["SSCCLabelPreview", "LabelFormatSelector", "PrintSettings"]
+    - id: "SHIP-020"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-020-packing-slip.md"
+      components: ["PackingSlipPreview", "PrintButton", "EmailModal"]
+    - id: "SHIP-021"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SHIP-021-bill-of-lading.md"
+      components: ["BOLPreview", "PrintButton", "EmailModal", "DownloadButton"]
+  patterns:
+    modal: "ShadCN Dialog for label/document preview"
+    pdf_viewer: "PDF.js for document rendering"
+    barcode: "bwip-js for GS1-128 generation"
+  components:
+    - "LabelActions: Row of action buttons (Generate SSCC, Print Labels, BOL, Packing Slip)"
+    - "SSCCLabelPreview: Barcode image + metadata + format selector"
+    - "BOLPreview: PDF.js modal with zoom, print, download, email"
+    - "PackingSlipPreview: PDF.js modal with same controls"
+  states:
+    - "loading: Spinner while generating documents"
+    - "empty: 'Generate SSCC first' message if no SSCC"
+    - "error: Toast with error message and retry"
+    - "success: Document preview with actions"
+
+validation_rules:
+  sscc_format: "18 digits exactly, all numeric"
+  sscc_check_digit: "MOD 10 algorithm validation"
+  gs1_prefix: "7-10 digits, numeric only"
+  serial: "Positive integer, auto-incremented"
+  label_format: "'4x6' or '4x8' enum"
+  output_format: "'zpl' or 'pdf' enum"
+  shipment_status: "Must be 'packed' or later for document generation"
+
+patterns:
+  rls: "ADR-013 - All tables have org_id filter"
+  api: "REST with org_id filter from auth context"
+  service: "Class-based with static methods"
+  validation: "Zod schemas for all inputs"
+  pdf_generation: "pdfmake for BOL and packing slip"
+  barcode_generation: "bwip-js for GS1-128"
+  zpl_generation: "Template-based ZPL string construction"
+  storage: "Supabase Storage with org_id path prefix"
+
+business_rules:
+  - "SSCC format: 18 digits = Extension(1) + GS1 Prefix(7-10) + Serial(6-9) + Check(1)"
+  - "Extension digit: 0 = carton, 9 = pallet"
+  - "GS1 Company Prefix: Required in org settings before SSCC generation"
+  - "Serial Reference: Auto-incremented per org, atomic (FOR UPDATE)"
+  - "Check Digit: MOD 10 algorithm per GS1 specification"
+  - "SSCC Uniqueness: Global (UNIQUE constraint across all orgs)"
+  - "Idempotency: generate-sscc only creates for boxes with NULL sscc"
+  - "BOL Prerequisite: All boxes must have SSCC before BOL generation"
+  - "Storage Path: Documents stored at {type}/{org_id}/{shipment_id}.pdf"
+  - "Caching: PDF cached for 24h, invalidated on shipment update"
+  - "ZPL Format: Primary output for Zebra printers, PDF as fallback"
+  - "Label Sizes: 4x6\" standard (carton), 4x8\" for pallets"
+
+gs1_compliance:
+  sscc_structure:
+    extension_digit: "1 digit (0=carton, 9=pallet)"
+    gs1_company_prefix: "7-10 digits (assigned by GS1)"
+    serial_reference: "Remaining digits to reach 17"
+    check_digit: "1 digit (MOD 10 calculated)"
+    total: "18 digits"
+  application_identifiers:
+    - ai: "(00)"
+      description: "SSCC"
+      format: "18 digits"
+    - ai: "(01)"
+      description: "GTIN (future)"
+      format: "14 digits"
+    - ai: "(10)"
+      description: "Batch/Lot"
+      format: "up to 20 alphanumeric"
+    - ai: "(15)"
+      description: "Best Before Date"
+      format: "YYMMDD"
+  barcode_format: "GS1-128 (Code 128 with FNC1)"
+  human_readable: "SSCC with spaces: 00 1234 5678 9012 3456 78"
+
+acceptance_checklist:
+  - "SSCC generates valid 18-digit codes with correct check digit"
+  - "MOD 10 check digit calculation >95% test coverage"
+  - "validateSSCC identifies valid/invalid SSCCs correctly"
+  - "formatSSCC produces human-readable format with spaces"
+  - "generate-sscc endpoint is idempotent (skips existing SSCCs)"
+  - "SSCC uniqueness enforced globally (UNIQUE constraint)"
+  - "GS1-128 barcode renders correctly using bwip-js"
+  - "ZPL template produces valid Zebra printer output"
+  - "BOL PDF contains all required sections (header, shipper, consignee, freight, signatures)"
+  - "Packing slip includes line items, lot numbers, allergen warnings"
+  - "PDFs stored in Supabase Storage with org_id prefix"
+  - "SSCCLabelPreview displays barcode and metadata"
+  - "BOLPreview renders PDF with PDF.js and zoom controls"
+  - "LabelActions component provides all document generation buttons"
+  - "RLS policies enforce document access control"
+  - "Unit tests pass (>90% coverage for SSCC service)"
+  - "E2E tests verify Generate SSCC -> Print Labels -> BOL workflow"
+  - "Multi-tenant isolation verified"
+
+output_artifacts:
+  - "Database migration adding SSCC support columns and functions"
+  - "5 API endpoints (generate-sscc, generate-bol, print-labels, print-packing-slip, label-preview)"
+  - "3 service classes (SSCCService, LabelService, DocumentService)"
+  - "5 Zod validation schemas"
+  - "4 React components (LabelActions, SSCCLabelPreview, BOLPreview, PackingSlipPreview)"
+  - "Unit tests (>90% coverage for SSCC service)"
+  - "E2E tests (4 scenarios)"
+
+notes:
+  - "This is a COMPLIANCE-CRITICAL story for food manufacturing traceability"
+  - "GS1 Company Prefix must be configured in org settings (Epic 01.7)"
+  - "SSCC uniqueness is enforced at database level (UNIQUE constraint)"
+  - "Check digit algorithm must exactly match GS1 MOD 10 specification"
+  - "ZPL is the preferred format for warehouse label printers"
+  - "PDF fallback ensures universal compatibility"
+  - "BOL cannot be generated until all boxes have SSCC"
+  - "pdfmake library recommended for PDF generation (lightweight, Edge Function compatible)"
+  - "bwip-js library recommended for GS1-128 barcode generation"
+  - "Storage uses Supabase Storage with org_id path prefix for RLS"
+  - "Related wireframes: SHIP-019 (SSCC labels), SHIP-020 (packing slip), SHIP-021 (BOL)"
+  - "Related ADR: ADR-004 (GS1 Barcode Compliance)"

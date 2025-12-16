@@ -1,0 +1,287 @@
+# Story 01.6-roles-viewer - Frontend Specification
+# Purpose: Components, hooks, pages (read-only viewer focus)
+# Agent: FRONTEND-DEV
+
+is_backend_focused: false
+
+# Pages to Create
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/roles/page.tsx"
+    description: "Roles viewer page (list + permissions matrix)"
+    layout: "Settings layout with sidebar"
+    sections:
+      - "Page header with title and description"
+      - "RolesTable component (list view)"
+      - "PermissionsMatrix component (matrix view)"
+      - "Toggle between list/matrix view"
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/settings/roles/RolesTable.tsx"
+    description: "ShadCN DataTable showing all roles"
+    props:
+      roles: "Role[]"
+    columns:
+      - { key: "name", label: "Role Name", sortable: true }
+      - { key: "description", label: "Description", sortable: false }
+      - { key: "permissions_summary", label: "Access Level", sortable: false }
+      - { key: "display_order", label: "Order", sortable: true, hidden: true }
+    features:
+      - "Sort by name or display_order"
+      - "No pagination (only 10 roles)"
+      - "Click row to expand permissions detail"
+      - "No edit/delete buttons (read-only)"
+    states:
+      - "loading: Skeleton table rows"
+      - "success: Populated table"
+      - "error: Error message with retry"
+      - "empty: Should never happen (roles always seeded)"
+
+  - path: "apps/frontend/components/settings/roles/PermissionsMatrix.tsx"
+    description: "Grid showing roles x modules permissions"
+    props:
+      matrix: "PermissionsMatrix"
+    layout:
+      - "Header row: Module names (Settings, Technical, Planning, etc.)"
+      - "Left column: Role names (Super Admin, Admin, etc.)"
+      - "Cells: Permission badges (CRUD, CRU, R, -)"
+    features:
+      - "Responsive grid (horizontal scroll on mobile)"
+      - "Color-coded badges: CRUD=green, CRU=blue, R=gray, -=red"
+      - "Hover tooltip showing full permission explanation"
+      - "Export as CSV/PDF button (optional)"
+    states:
+      - "loading: Skeleton grid"
+      - "success: Populated matrix"
+      - "error: Error message"
+
+  - path: "apps/frontend/components/settings/roles/PermissionBadge.tsx"
+    description: "Reusable badge for permission display"
+    props:
+      permission: "PermissionSet"
+      module: "string (optional)"
+    variants:
+      - "CRUD: green with checkmark icon"
+      - "CRU: blue with edit icon"
+      - "R: gray with eye icon"
+      - "-: red with X icon"
+    tooltip: "Hover shows: 'Create, Read, Update, Delete'"
+
+  - path: "apps/frontend/components/settings/roles/RoleDetailDialog.tsx"
+    description: "Modal showing detailed role permissions"
+    props:
+      role: "Role | null"
+      open: "boolean"
+      onClose: "() => void"
+    content:
+      - "Role name and description"
+      - "List of modules with permission badges"
+      - "No edit button (read-only)"
+      - "Close button only"
+
+# Hooks to Create
+hooks:
+  - path: "apps/frontend/lib/hooks/use-roles.ts"
+    description: "React Query hook for roles data"
+    exports:
+      - name: "useRoles"
+        returns: "UseQueryResult<Role[]>"
+        description: "Fetch all system roles"
+        pattern: |
+          import { useQuery } from '@tanstack/react-query';
+          import { getAllRoles } from '@/lib/services/role-service';
+
+          export function useRoles() {
+            return useQuery({
+              queryKey: ['settings', 'roles'],
+              queryFn: getAllRoles,
+              staleTime: 5 * 60 * 1000, // 5 minutes
+            });
+          }
+
+      - name: "usePermissionsMatrix"
+        returns: "UseQueryResult<PermissionsMatrix>"
+        description: "Fetch permissions matrix"
+        pattern: |
+          import { useQuery } from '@tanstack/react-query';
+          import { getPermissionsMatrix } from '@/lib/services/role-service';
+
+          export function usePermissionsMatrix() {
+            return useQuery({
+              queryKey: ['settings', 'permissions-matrix'],
+              queryFn: getPermissionsMatrix,
+              staleTime: 5 * 60 * 1000, // 5 minutes
+            });
+          }
+
+# UX Wireframe References
+ux:
+  wireframes:
+    - id: "SET-011"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-011-roles-viewer.md"
+      description: "Roles viewer page layout"
+      components:
+        - "Page header: 'Roles & Permissions'"
+        - "View toggle: List / Matrix"
+        - "RolesTable (default view)"
+        - "PermissionsMatrix (alternate view)"
+        - "Info callout: 'Roles are system-defined and cannot be edited'"
+
+  patterns:
+    table: "ShadCN DataTable with sorting"
+    badge: "ShadCN Badge for permission indicators"
+    dialog: "ShadCN Dialog for role details"
+    tooltip: "ShadCN Tooltip for permission explanations"
+    toggle: "ShadCN Tabs for List/Matrix view switch"
+
+  states:
+    - "loading: Skeleton table or grid (6 rows)"
+    - "success: Populated roles table or matrix"
+    - "error: Error message with retry button"
+    - "empty: N/A (roles always seeded)"
+
+  accessibility:
+    - "ARIA labels for permission badges"
+    - "Keyboard navigation in table"
+    - "Screen reader announcements for expanded rows"
+    - "High contrast mode support"
+
+# Color Coding
+color_scheme:
+  permissions:
+    CRUD:
+      color: "green"
+      bg: "bg-green-100"
+      text: "text-green-800"
+      border: "border-green-300"
+      icon: "CheckCircle"
+    CRU:
+      color: "blue"
+      bg: "bg-blue-100"
+      text: "text-blue-800"
+      border: "border-blue-300"
+      icon: "Edit"
+    R:
+      color: "gray"
+      bg: "bg-gray-100"
+      text: "text-gray-800"
+      border: "border-gray-300"
+      icon: "Eye"
+    DASH:
+      color: "red"
+      bg: "bg-red-100"
+      text: "text-red-800"
+      border: "border-red-300"
+      icon: "XCircle"
+
+# Sample Component Code
+sample_code:
+  RolesTable: |
+    'use client';
+
+    import { Role } from '@/lib/types/role';
+    import { DataTable } from '@/components/ui/data-table';
+    import { ColumnDef } from '@tanstack/react-table';
+    import { PermissionBadge } from './PermissionBadge';
+
+    interface RolesTableProps {
+      roles: Role[];
+    }
+
+    export function RolesTable({ roles }: RolesTableProps) {
+      const columns: ColumnDef<Role>[] = [
+        {
+          accessorKey: 'name',
+          header: 'Role Name',
+          cell: ({ row }) => (
+            <div>
+              <div className="font-medium">{row.original.name}</div>
+              <div className="text-sm text-muted-foreground">
+                {row.original.description}
+              </div>
+            </div>
+          ),
+        },
+        {
+          id: 'permissions_summary',
+          header: 'Access Level',
+          cell: ({ row }) => {
+            const perms = Object.values(row.original.permissions);
+            const hasCRUD = perms.includes('CRUD');
+            const hasWrite = perms.some(p => p.includes('C') || p.includes('U'));
+            const level = hasCRUD ? 'Full Access' : hasWrite ? 'Moderate' : 'Read-Only';
+            return <span className="text-sm">{level}</span>;
+          },
+        },
+      ];
+
+      return <DataTable columns={columns} data={roles} />;
+    }
+
+  PermissionBadge: |
+    import { Badge } from '@/components/ui/badge';
+    import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+    import { CheckCircle, Edit, Eye, XCircle } from 'lucide-react';
+
+    interface PermissionBadgeProps {
+      permission: string;
+      module?: string;
+    }
+
+    export function PermissionBadge({ permission, module }: PermissionBadgeProps) {
+      const config = {
+        CRUD: { label: 'Full', color: 'green', icon: CheckCircle, tooltip: 'Create, Read, Update, Delete' },
+        CRU: { label: 'Edit', color: 'blue', icon: Edit, tooltip: 'Create, Read, Update' },
+        R: { label: 'View', color: 'gray', icon: Eye, tooltip: 'Read-only' },
+        '-': { label: 'None', color: 'red', icon: XCircle, tooltip: 'No Access' },
+      }[permission] || { label: permission, color: 'gray', icon: Eye, tooltip: permission };
+
+      const Icon = config.icon;
+
+      return (
+        <Tooltip>
+          <TooltipTrigger>
+            <Badge variant={config.color as any} className="gap-1">
+              <Icon className="h-3 w-3" />
+              {config.label}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            {module && <div className="font-semibold">{module}</div>}
+            <div>{config.tooltip}</div>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+# Integration Points
+integration:
+  user_management:
+    description: "Role dropdown in Users CRUD (story 01.5)"
+    usage: "useRoles() hook provides role list for dropdown"
+    component: "apps/frontend/components/settings/users/UserForm.tsx"
+    pattern: |
+      const { data: roles } = useRoles();
+      <Select>
+        {roles?.map(role => (
+          <SelectItem key={role.id} value={role.id}>
+            {role.name}
+          </SelectItem>
+        ))}
+      </Select>
+
+  permission_checks:
+    description: "Permission enforcement in UI (story 01.6)"
+    usage: "PermissionBadge component used in permission checks"
+    pattern: "Reusable across all modules for permission display"
+
+# Navigation
+navigation:
+  path: "/settings/roles"
+  sidebar_label: "Roles & Permissions"
+  icon: "Shield"
+  order: 3
+  parent: "Settings"
+  breadcrumbs:
+    - { label: "Settings", href: "/settings" }
+    - { label: "Roles & Permissions", href: "/settings/roles" }

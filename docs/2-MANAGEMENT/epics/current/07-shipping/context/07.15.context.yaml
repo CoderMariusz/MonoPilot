@@ -1,0 +1,287 @@
+story:
+  id: "07.15"
+  name: "Shipping Dashboard + KPIs"
+  epic: "07-shipping"
+  phase: "1D"
+  complexity: "M"
+  estimate_days: 2-3
+
+dependencies:
+  required:
+    - story: "07.1"
+      provides: ["customers"]
+    - story: "07.2"
+      provides: ["sales_orders", "sales_order_lines"]
+    - story: "07.3"
+      provides: ["SO status workflow"]
+    - story: "07.7"
+      provides: ["inventory_allocations", "backorder logic"]
+    - story: "07.8"
+      provides: ["pick_lists", "pick_list_lines"]
+    - story: "07.11"
+      provides: ["shipments", "shipment_boxes"]
+    - story: "07.14"
+      provides: ["ship confirmation", "shipped_at timestamps"]
+  optional:
+    - story: "02.3"
+      provides: ["allergens for conflict alerts"]
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/shipping.md"
+  prd_sections: ["FR-7.66", "FR-7.67"]
+  architecture: "docs/1-BASELINE/architecture/modules/shipping.md"
+  architecture_sections: ["Dashboard & Reports Endpoints (lines 519-531)", "Component Architecture (lines 546-555)"]
+  story: "docs/2-MANAGEMENT/epics/current/07-shipping/07.15.shipping-dashboard.md"
+  patterns:
+    - "apps/frontend/app/(authenticated)/shipping/customers/page.tsx"
+    - "apps/frontend/app/(authenticated)/production/dashboard/page.tsx"
+    - "apps/frontend/components/ui/card.tsx"
+    - "lib/services/customer-service.ts"
+
+files_to_create:
+  api:
+    - path: "apps/frontend/app/api/shipping/dashboard/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/shipping/dashboard/alerts/route.ts"
+      methods: ["GET"]
+    - path: "apps/frontend/app/api/shipping/dashboard/recent-activity/route.ts"
+      methods: ["GET"]
+  services:
+    - path: "apps/frontend/lib/services/dashboard-service.ts"
+  validation:
+    - path: "apps/frontend/lib/validation/dashboard-schema.ts"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/page.tsx"
+  components:
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/DashboardKPIs.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/KPICard.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/OrdersByStatusChart.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/ShipmentsByDateChart.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/AlertsSection.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/AlertBadge.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/RecentActivityTimeline.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/ActivityItem.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/QuickActionsPanel.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/DateRangeFilter.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/DashboardSkeleton.tsx"
+    - path: "apps/frontend/app/(authenticated)/shipping/dashboard/components/EmptyDashboard.tsx"
+
+database:
+  tables:
+    - name: "sales_orders"
+      columns: ["id", "org_id", "order_number", "status", "order_date", "promised_ship_date", "total_amount", "created_at", "shipped_at", "allergen_validated"]
+      rls: true
+      indexes: ["idx_sales_orders_org_date_status", "idx_sales_orders_promised_date"]
+    - name: "sales_order_lines"
+      columns: ["id", "org_id", "sales_order_id", "product_id", "quantity_ordered", "quantity_allocated", "unit_price"]
+      rls: true
+      indexes: ["idx_sales_order_lines_allocated"]
+    - name: "pick_lists"
+      columns: ["id", "org_id", "pick_list_number", "status", "created_at", "completed_at"]
+      rls: true
+      indexes: ["idx_pick_lists_org_created_status"]
+    - name: "shipments"
+      columns: ["id", "org_id", "shipment_number", "status", "created_at", "shipped_at"]
+      rls: true
+      indexes: ["idx_shipments_org_shipped_status"]
+    - name: "activity_log"
+      columns: ["id", "org_id", "activity_type", "entity_type", "entity_id", "entity_number", "description", "created_at", "created_by"]
+      rls: true
+      indexes: ["idx_activity_log_org_created"]
+      notes: "May need to create this table if it doesn't exist for activity tracking"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/shipping/dashboard"
+    auth: true
+    roles: ["ADMIN", "SALES", "WAREHOUSE", "VIEWER"]
+    query_params: ["date_from", "date_to"]
+    response: "DashboardKPIs object"
+  - method: "GET"
+    path: "/api/shipping/dashboard/alerts"
+    auth: true
+    roles: ["ADMIN", "SALES", "WAREHOUSE", "VIEWER"]
+    query_params: ["date_from", "date_to"]
+    response: "DashboardAlerts object"
+  - method: "GET"
+    path: "/api/shipping/dashboard/recent-activity"
+    auth: true
+    roles: ["ADMIN", "SALES", "WAREHOUSE", "VIEWER"]
+    query_params: ["limit"]
+    response: "Array of Activity objects"
+
+ux:
+  layout: "4-column grid for KPI cards, 2-column grid for charts, stacked alerts and activity"
+  patterns:
+    - "ShadCN Card component for KPI cards"
+    - "Recharts library for pie and line charts"
+    - "Badge component for alert indicators"
+    - "Timeline component for recent activity"
+    - "Skeleton loaders for loading states"
+    - "Empty state components when no data"
+  responsive:
+    mobile: "Single column layout, stacked cards, full-width charts"
+    tablet: "2-column layout for KPI cards"
+    desktop: "4-column layout for KPI cards, side-by-side charts"
+  states:
+    - "loading" # Skeleton loaders
+    - "success" # Data displayed
+    - "empty" # No data for date range
+    - "error" # API failure, show retry button
+    - "cached" # Data from cache (show indicator)
+
+charts:
+  orders_by_status:
+    type: "pie"
+    library: "recharts"
+    data_source: "sales_orders.status aggregation"
+    colors:
+      draft: "#9CA3AF"
+      confirmed: "#3B82F6"
+      allocated: "#8B5CF6"
+      picking: "#F59E0B"
+      packing: "#F97316"
+      shipped: "#10B981"
+      delivered: "#06B6D4"
+    interactive: true
+    click_action: "Navigate to filtered sales orders list"
+  shipments_by_date:
+    type: "line"
+    library: "recharts"
+    data_source: "shipments.shipped_at daily count"
+    x_axis: "Date"
+    y_axis: "Shipment Count"
+    line_color: "#10B981"
+    interactive: true
+    tooltip: "Show date and count on hover"
+
+kpis:
+  - name: "Orders"
+    metric: "Total count"
+    breakdown: ["Draft", "Confirmed", "Shipped"]
+    trend: "Compare to previous period"
+    icon: "ShoppingCart"
+  - name: "Pick Lists"
+    metric: "Total count"
+    breakdown: ["Pending", "In Progress", "Completed"]
+    trend: "Compare to previous period"
+    icon: "ClipboardList"
+  - name: "Shipments"
+    metric: "Total count"
+    breakdown: ["Pending", "Packed", "Shipped"]
+    trend: "Compare to previous period"
+    icon: "Truck"
+  - name: "Backorders"
+    metric: "Count and total value"
+    breakdown: "None"
+    trend: "None"
+    icon: "AlertTriangle"
+    color: "red"
+
+alerts:
+  - name: "Backorders"
+    query: "sales_order_lines where qty_allocated < qty_ordered"
+    color: "red"
+    icon: "AlertTriangle"
+    click_action: "/shipping/sales-orders?filter=backorders"
+  - name: "Delayed Shipments"
+    query: "sales_orders where promised_ship_date < today AND status != shipped"
+    color: "orange"
+    icon: "Clock"
+    click_action: "/shipping/sales-orders?filter=delayed"
+  - name: "Pending Picks >24h"
+    query: "pick_lists where status = pending AND created_at < now() - 24h"
+    color: "yellow"
+    icon: "AlertCircle"
+    click_action: "/shipping/pick-lists?status=pending&overdue=true"
+  - name: "Allergen Conflicts"
+    query: "sales_orders where allergen_validated = false"
+    color: "purple"
+    icon: "AlertOctagon"
+    click_action: "/shipping/sales-orders?filter=allergen_conflict"
+
+validation_rules:
+  date_range:
+    - "date_from and date_to are optional ISO date strings"
+    - "date_to must be >= date_from"
+    - "date range cannot exceed 365 days"
+    - "default date_from: 30 days ago"
+    - "default date_to: today"
+  activity_limit:
+    - "limit is optional integer"
+    - "minimum: 1"
+    - "maximum: 50"
+    - "default: 10"
+
+caching:
+  provider: "Redis"
+  ttl: 60 # seconds (1 minute)
+  keys:
+    - "dashboard:kpis:{org_id}:{date_range_hash}"
+    - "dashboard:alerts:{org_id}:{date_range_hash}"
+    - "dashboard:activity:{org_id}:{limit}"
+  strategy: "Passive invalidation (TTL-based), active invalidation in Phase 2"
+  fallback: "Direct database queries if Redis unavailable"
+
+performance:
+  targets:
+    dashboard_load: "< 500ms (p95)"
+    kpis_api: "< 200ms (p95)"
+    alerts_api: "< 150ms (p95)"
+    activity_api: "< 100ms (p95)"
+    cache_hit_rate: "> 90%"
+  optimizations:
+    - "Use database aggregation functions (COUNT, SUM, AVG)"
+    - "Apply org_id filter early in WHERE clause"
+    - "Use LIMIT for recent activity"
+    - "Ensure indexes exist on key columns"
+    - "Consider materialized views for complex queries (Phase 2)"
+
+patterns:
+  rls: "ADR-013 (All queries org-scoped)"
+  api: "REST with org_id filter from auth context"
+  service: "Class-based with static methods, Redis caching layer"
+  validation: "Zod schemas for query parameters"
+  charts: "Recharts declarative API"
+  components: "Server components for data fetching, client components for interactivity"
+
+acceptance_checklist:
+  - "Dashboard loads within 500ms with all sections visible"
+  - "4 KPI cards display with correct data and trend indicators"
+  - "Orders by Status pie chart renders with correct segments and colors"
+  - "Shipments by Date line chart renders with daily data points"
+  - "Alerts section displays 4 alert types with correct counts"
+  - "Recent activity timeline displays last 10 activities with links"
+  - "Quick actions panel provides navigation to create SO, pick list, backorders"
+  - "Date range filter works for Today, Last 7 days, Last 30 days, Custom"
+  - "Redis caching functional with 1min TTL and >90% hit rate"
+  - "All queries are org-scoped (RLS enforced, multi-tenant test passes)"
+  - "Skeleton loaders display during data fetch"
+  - "Empty states display when no data exists"
+  - "Error handling shows retry button on API failure"
+  - "Mobile responsive (stacked layout < 768px width)"
+  - "Permission checks hide unauthorized quick actions for VIEWER role"
+  - "Chart clicks navigate to filtered list views"
+  - "Alert badges are clickable and navigate to correct filtered views"
+
+output_artifacts:
+  - "GET /api/shipping/dashboard endpoint (KPIs)"
+  - "GET /api/shipping/dashboard/alerts endpoint (alerts)"
+  - "GET /api/shipping/dashboard/recent-activity endpoint (activity log)"
+  - "dashboard-service.ts with Redis caching logic"
+  - "Dashboard page at /shipping/dashboard"
+  - "12 React components (KPIs, charts, alerts, activity, quick actions, filters)"
+  - "Zod validation schemas for query parameters"
+  - "Unit tests for dashboard-service (>80% coverage)"
+  - "Integration tests for 3 API endpoints"
+  - "E2E test for dashboard load and interaction"
+
+notes:
+  - "This is Phase 1D (final MVP story), completing basic shipping operations visibility"
+  - "Real-time updates via polling (30s) acceptable for MVP, SSE/WebSockets in Phase 2"
+  - "Recharts is recommended but any chart library is acceptable (Chart.js, Victory, Nivo)"
+  - "Activity log table may need to be created if it doesn't exist (or use audit_logs)"
+  - "Cache invalidation is passive (TTL) for MVP, active invalidation in Phase 2"
+  - "Trend calculations compare current period to previous period of equal length"
+  - "Empty state for charts should be visually clear with actionable message"
+  - "Consider adding 'Refresh' button for manual cache bypass if needed"

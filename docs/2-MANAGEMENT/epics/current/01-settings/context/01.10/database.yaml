@@ -1,0 +1,116 @@
+# Story 01.10 - Database Schema
+# Purpose: Tables, RLS policies, indexes, enums
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/054_create_machines_table.sql"
+    type: "migration"
+    description: "Create machine_type enum, machine_status enum, and machines table with indexes and RLS"
+
+enums:
+  - name: "machine_type"
+    values:
+      - "MIXER"
+      - "OVEN"
+      - "FILLER"
+      - "PACKAGING"
+      - "CONVEYOR"
+      - "BLENDER"
+      - "CUTTER"
+      - "LABELER"
+      - "OTHER"
+    description: "Production machine types"
+
+  - name: "machine_status"
+    values:
+      - "ACTIVE"
+      - "MAINTENANCE"
+      - "OFFLINE"
+      - "DECOMMISSIONED"
+    description: "Machine operational status"
+
+tables:
+  - name: "machines"
+    description: "Production machine master data with type, status, capacity, and location"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "NOT NULL" }
+      - { name: "name", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "type", type: "machine_type", constraints: "NOT NULL DEFAULT 'OTHER'" }
+      - { name: "status", type: "machine_status", constraints: "NOT NULL DEFAULT 'ACTIVE'" }
+      - { name: "units_per_hour", type: "INTEGER", constraints: "" }
+      - { name: "setup_time_minutes", type: "INTEGER", constraints: "" }
+      - { name: "max_batch_size", type: "INTEGER", constraints: "" }
+      - { name: "location_id", type: "UUID", constraints: "REFERENCES locations(id) ON DELETE SET NULL" }
+      - { name: "is_deleted", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "deleted_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_machines_org_id ON machines(org_id)"
+      - "idx_machines_type ON machines(type)"
+      - "idx_machines_status ON machines(status)"
+      - "idx_machines_location ON machines(location_id)"
+      - "idx_machines_org_code_unique ON machines(org_id, code) UNIQUE"
+    constraints:
+      - "UNIQUE(org_id, code)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "machines"
+      name: "machines_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND is_deleted = false"
+
+    - table: "machines"
+      name: "machines_insert"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+            IN ('SUPER_ADMIN', 'ADMIN', 'PROD_MANAGER')
+
+    - table: "machines"
+      name: "machines_update"
+      operation: "UPDATE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+            IN ('SUPER_ADMIN', 'ADMIN', 'PROD_MANAGER')
+
+    - table: "machines"
+      name: "machines_delete"
+      operation: "DELETE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+            IN ('SUPER_ADMIN', 'ADMIN')
+
+# Delete Validation Logic
+delete_validation:
+  description: "Validate before deleting machine"
+  rules:
+    - "Check if machine is assigned to any production line (production_line_machines table)"
+    - "If assigned, return 409 with line codes"
+    - "Check if machine has historical work order references (work_order_operations table)"
+    - "If has history, perform soft delete (is_deleted=true, deleted_at=NOW())"
+    - "If no history and no line assignment, perform hard delete"
+
+# Location Assignment
+location_assignment:
+  description: "Machines can be assigned to a location for physical tracking"
+  implementation:
+    - "location_id is nullable FK to locations table"
+    - "ON DELETE SET NULL preserves machine if location deleted"
+    - "Location dropdown shows hierarchical path: 'WH-001 > ZONE-A > RACK-01'"
+  display_format: "{warehouse_code}/{zone_code}/{rack_code}"

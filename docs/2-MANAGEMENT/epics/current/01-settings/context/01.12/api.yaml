@@ -1,0 +1,127 @@
+# Story 01.12 - API Specification
+# Purpose: Endpoints (read-only), request/response schemas
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/allergens"
+    description: "List all 14 EU allergens with optional search"
+    file: "apps/frontend/app/api/v1/settings/allergens/route.ts"
+    auth: true
+    roles: ["*"]  # All authenticated users can view
+    query_params:
+      - "search: string (optional, searches code and all name columns)"
+      - "lang: 'en' | 'pl' | 'de' | 'fr' (optional, for primary name sorting)"
+    response:
+      status: 200
+      schema:
+        allergens: "Allergen[]"
+        total: "number (always 14 for EU allergens)"
+    performance: "< 200ms"
+    notes: "No pagination needed - only 14 items"
+
+  - method: "GET"
+    path: "/api/v1/settings/allergens/:id"
+    description: "Get single allergen by ID"
+    file: "apps/frontend/app/api/v1/settings/allergens/[id]/route.ts"
+    auth: true
+    roles: ["*"]  # All authenticated users can view
+    response:
+      status: 200
+      schema:
+        allergen: "Allergen"
+    errors:
+      - code: 404
+        message: "Allergen not found"
+
+  - method: "POST"
+    path: "/api/v1/settings/allergens"
+    description: "NOT IMPLEMENTED - Read-only in MVP"
+    auth: true
+    response:
+      status: 405
+      message: "Method Not Allowed"
+
+  - method: "PUT"
+    path: "/api/v1/settings/allergens/:id"
+    description: "NOT IMPLEMENTED - Read-only in MVP"
+    auth: true
+    response:
+      status: 405
+      message: "Method Not Allowed"
+
+  - method: "DELETE"
+    path: "/api/v1/settings/allergens/:id"
+    description: "NOT IMPLEMENTED - Read-only in MVP"
+    auth: true
+    response:
+      status: 405
+      message: "Method Not Allowed"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/allergen-service.ts"
+    description: "Allergen read-only service (list, get, search, select options)"
+    exports:
+      - name: "AllergenService"
+        type: "class"
+        methods:
+          - "static async getAllergens(search?: string): Promise<Allergen[]>"
+          - "static async getAllergenById(id: string): Promise<Allergen>"
+          - "static async getAllergenByCode(code: string): Promise<Allergen>"
+          - "static async searchAllergens(query: string): Promise<Allergen[]>"
+          - "static getName(allergen: Allergen, lang: string): string"
+          - "static async getAllergensForSelect(lang?: string): Promise<AllergenSelectOption[]>"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/allergen-schema.ts"
+    description: "Zod schemas for allergen responses (read-only)"
+    schemas:
+      - name: "allergenResponseSchema"
+        fields:
+          id: "z.string().uuid()"
+          code: "z.string().regex(/^A[0-9]{2}$/)"
+          name_en: "z.string().min(1).max(100)"
+          name_pl: "z.string().min(1).max(100)"
+          name_de: "z.string().max(100).nullable()"
+          name_fr: "z.string().max(100).nullable()"
+          icon_url: "z.string().url().nullable()"
+          is_eu_mandatory: "z.boolean()"
+          display_order: "z.number().int().min(0)"
+
+      - name: "allergenSearchSchema"
+        fields:
+          search: "z.string().max(100).optional()"
+          lang: "z.enum(['en', 'pl', 'de', 'fr']).optional()"
+
+# Read-Only Pattern
+patterns:
+  read_only: |
+    // MVP is read-only - no write operations
+    // POST/PUT/DELETE return 405 Method Not Allowed
+    if (req.method !== 'GET') {
+      return NextResponse.json(
+        { error: 'Method Not Allowed' },
+        { status: 405 }
+      );
+    }
+
+  language_helper: |
+    // Get allergen name in user's preferred language
+    getName(allergen: Allergen, lang: string): string {
+      const key = `name_${lang}` as keyof Allergen;
+      return (allergen[key] as string) || allergen.name_en;
+    }
+
+  select_options: |
+    // For product forms (Technical module)
+    async getAllergensForSelect(lang?: string): Promise<AllergenSelectOption[]> {
+      const allergens = await this.getAllergens();
+      return allergens.map(a => ({
+        value: a.id,
+        label: `${a.code} - ${this.getName(a, lang || 'en')}`,
+        code: a.code,
+        icon_url: a.icon_url
+      }));
+    }

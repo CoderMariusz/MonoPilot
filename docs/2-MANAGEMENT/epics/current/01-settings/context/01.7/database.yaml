@@ -1,0 +1,260 @@
+# Story 01.6-roles-viewer - Database Schema
+# Purpose: Tables, RLS policies (reuses roles table from 01.1)
+# Agent: BACKEND-DEV (database focus)
+
+# Note: This story REUSES the roles table created in 01.1
+reuses_from_story:
+  story: "01.1"
+  tables:
+    - "roles"
+  reason: "Roles table already created with 10 system roles seeded"
+
+migrations:
+  - path: "supabase/migrations/002_create_roles_table.sql"
+    type: "migration"
+    description: "10 system roles with JSONB permissions (ADR-012)"
+    status: "CREATED_IN_01.1"
+    note: "No new migration needed - reuses existing"
+
+tables:
+  - name: "roles"
+    description: "System roles with JSONB permissions (ADR-012)"
+    status: "EXISTS_FROM_01.1"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "UNIQUE NOT NULL" }
+      - { name: "name", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "permissions", type: "JSONB", constraints: "NOT NULL" }
+      - { name: "is_system", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "display_order", type: "INT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "is_system = true (public read for system roles)"
+    indexes:
+      - "idx_roles_code ON roles(code)"
+      - "idx_roles_system ON roles(is_system)"
+      - "idx_roles_display_order ON roles(display_order)"
+
+# RLS Policies (from 01.1)
+rls_policies:
+  pattern: "Public Read for System Roles"
+  pattern_sql: "is_system = true"
+  rationale:
+    - "All authenticated users need to see roles (for role assignment)"
+    - "No org_id on roles table (global system data)"
+    - "Only system roles (is_system = true) are readable"
+    - "Write operations blocked for system roles"
+
+  policies:
+    - table: "roles"
+      name: "roles_select_system"
+      operation: "SELECT"
+      using: "is_system = true"
+      note: "All authenticated users can read system roles"
+
+    - table: "roles"
+      name: "roles_no_insert"
+      operation: "INSERT"
+      using: "false"
+      note: "Block all inserts (system roles only)"
+
+    - table: "roles"
+      name: "roles_no_update"
+      operation: "UPDATE"
+      using: "false"
+      note: "Block all updates (system roles are immutable)"
+
+    - table: "roles"
+      name: "roles_no_delete"
+      operation: "DELETE"
+      using: "false"
+      note: "Block all deletes (system roles cannot be removed)"
+
+# Seed Data (from 01.1 - reference only)
+seed_data:
+  roles:
+    description: "10 system roles per ADR-012 (seeded in 01.1)"
+    status: "SEEDED_IN_01.1"
+    data:
+      - code: "SUPER_ADMIN"
+        name: "Super Administrator"
+        description: "Full system access, can assign any role"
+        permissions:
+          settings: "CRUD"
+          users: "CRUD"
+          technical: "CRUD"
+          planning: "CRUD"
+          production: "CRUD"
+          warehouse: "CRUD"
+          quality: "CRUD"
+          shipping: "CRUD"
+        display_order: 1
+
+      - code: "ADMIN"
+        name: "Administrator"
+        description: "Organization-wide access, cannot assign Super Admin"
+        permissions:
+          settings: "CRUD"
+          users: "CRUD"
+          technical: "CRUD"
+          planning: "CRUD"
+          production: "CRUD"
+          warehouse: "CRUD"
+          quality: "CRUD"
+          shipping: "CRUD"
+        display_order: 2
+
+      - code: "PRODUCTION_MANAGER"
+        name: "Production Manager"
+        description: "Full Production, Planning, Quality access"
+        permissions:
+          settings: "R"
+          users: "R"
+          technical: "CRUD"
+          planning: "CRUD"
+          production: "CRUD"
+          warehouse: "R"
+          quality: "CRU"
+          shipping: "R"
+        display_order: 3
+
+      - code: "WAREHOUSE_MANAGER"
+        name: "Warehouse Manager"
+        description: "Full Warehouse and Shipping access"
+        permissions:
+          settings: "R"
+          users: "R"
+          technical: "R"
+          planning: "R"
+          production: "R"
+          warehouse: "CRUD"
+          quality: "R"
+          shipping: "CRU"
+        display_order: 4
+
+      - code: "QUALITY_MANAGER"
+        name: "Quality Manager"
+        description: "Full Quality, read Production"
+        permissions:
+          settings: "R"
+          users: "R"
+          technical: "R"
+          planning: "R"
+          production: "R"
+          warehouse: "R"
+          quality: "CRUD"
+          shipping: "R"
+        display_order: 5
+
+      - code: "PLANNER"
+        name: "Planner"
+        description: "Full Planning, read Production"
+        permissions:
+          settings: "R"
+          users: "R"
+          technical: "R"
+          planning: "CRUD"
+          production: "R"
+          warehouse: "R"
+          quality: "R"
+          shipping: "R"
+        display_order: 6
+
+      - code: "OPERATOR"
+        name: "Operator"
+        description: "CRU Production, read Quality"
+        permissions:
+          settings: "-"
+          users: "-"
+          technical: "R"
+          planning: "R"
+          production: "CRU"
+          warehouse: "CRU"
+          quality: "CRU"
+          shipping: "-"
+        display_order: 7
+
+      - code: "WAREHOUSE_OPERATOR"
+        name: "Warehouse Operator"
+        description: "CRU Warehouse and Shipping"
+        permissions:
+          settings: "-"
+          users: "-"
+          technical: "R"
+          planning: "R"
+          production: "R"
+          warehouse: "CRU"
+          quality: "R"
+          shipping: "CRU"
+        display_order: 8
+
+      - code: "VIEWER"
+        name: "Viewer"
+        description: "Read-only all modules"
+        permissions:
+          settings: "R"
+          users: "R"
+          technical: "R"
+          planning: "R"
+          production: "R"
+          warehouse: "R"
+          quality: "R"
+          shipping: "R"
+        display_order: 9
+
+      - code: "EXTERNAL"
+        name: "External User"
+        description: "Limited read access for external stakeholders"
+        permissions:
+          settings: "-"
+          users: "-"
+          technical: "R"
+          planning: "R"
+          production: "R"
+          warehouse: "R"
+          quality: "R"
+          shipping: "R"
+        display_order: 10
+
+# Database queries needed for this story
+queries:
+  list_all_roles:
+    description: "Get all system roles ordered by display_order"
+    sql: |
+      SELECT
+        id,
+        code,
+        name,
+        description,
+        permissions,
+        display_order,
+        created_at
+      FROM roles
+      WHERE is_system = true
+      ORDER BY display_order ASC;
+
+  get_role_by_code:
+    description: "Get single role by code"
+    sql: |
+      SELECT
+        id,
+        code,
+        name,
+        description,
+        permissions,
+        display_order,
+        created_at
+      FROM roles
+      WHERE is_system = true AND code = $1;
+
+  get_permissions_matrix:
+    description: "Get all roles with their permissions (for matrix view)"
+    sql: |
+      SELECT
+        code,
+        name,
+        permissions
+      FROM roles
+      WHERE is_system = true
+      ORDER BY display_order ASC;

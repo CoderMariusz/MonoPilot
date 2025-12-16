@@ -1,0 +1,660 @@
+# Story Context: 07.5 SO Clone/Template + CSV Import
+# Generated: 2025-12-16
+# Purpose: AI agent context for implementing SO clone and CSV import features
+
+story:
+  id: "07.5"
+  name: "SO Clone/Template + CSV Import"
+  epic: "07-shipping"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 2-3
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P1"
+  story_file: "docs/2-MANAGEMENT/epics/current/07-shipping/07.5.so-clone-import.md"
+
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "org_id context"
+        - "RLS policies for tenant isolation"
+    - story: "02.1"
+      name: "Products CRUD"
+      provides:
+        - "products table (for CSV product_code validation)"
+        - "products.product_code column"
+    - story: "07.1"
+      name: "Customers & Addresses"
+      provides:
+        - "customers table (for CSV customer_code validation)"
+        - "customers.customer_code column"
+        - "customer_addresses table"
+    - story: "07.2"
+      name: "Sales Orders Core CRUD"
+      provides:
+        - "sales_orders table"
+        - "sales_order_lines table"
+        - "SalesOrderService (base CRUD methods)"
+        - "generateOrderNumber method"
+        - "createSalesOrder method"
+        - "createSalesOrderLine method"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/shipping.md"
+  prd_sections:
+    - "FR-7.14"  # SO Clone/Template
+    - "FR-7.20"  # SO Import (CSV/API)
+  architecture: "docs/1-BASELINE/architecture/modules/shipping.md"
+  architecture_sections:
+    - "lines 382-405"  # Sales Order endpoints (includes /clone and /import)
+  story: "docs/2-MANAGEMENT/epics/current/07-shipping/07.5.so-clone-import.md"
+  related_stories:
+    - "docs/2-MANAGEMENT/epics/current/07-shipping/07.2.sales-orders-core.md"  # Base SO CRUD
+  brief: "docs/2-MANAGEMENT/epics/current/07-shipping/STORY-WRITING-BRIEF.md"
+  patterns:
+    - "apps/frontend/lib/services/sales-order-service.ts"  # Extend this service
+    - "apps/frontend/lib/validation/*.ts"  # Zod schema patterns
+    - "apps/frontend/components/ui/dialog.tsx"  # ShadCN Dialog for clone/import
+
+files_to_create:
+  api:
+    - path: "apps/frontend/app/api/shipping/sales-orders/[id]/clone/route.ts"
+      methods: ["POST"]
+      description: "Clone existing sales order"
+    - path: "apps/frontend/app/api/shipping/sales-orders/import/route.ts"
+      methods: ["POST"]
+      description: "Import sales orders from CSV"
+  services:
+    - path: "apps/frontend/lib/services/sales-order-service.ts"
+      description: "Extend with cloneSalesOrder and importSalesOrdersFromCSV methods"
+    - path: "apps/frontend/lib/utils/csv-parser.ts"
+      description: "CSV parsing and validation utility"
+  validation:
+    - path: "apps/frontend/lib/validation/sales-order-schema.ts"
+      description: "Extend with CSV row validation schema"
+  components:
+    - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/components/CloneOrderDialog.tsx"
+      description: "Confirmation dialog for cloning SO"
+    - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/components/ImportOrdersDialog.tsx"
+      description: "CSV upload dialog with preview and import"
+    - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/components/ImportPreviewTable.tsx"
+      description: "Preview CSV rows with validation status (green checkmark / red X)"
+    - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/components/ImportResultSummary.tsx"
+      description: "Success/error summary after import"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/page.tsx"
+      description: "Add 'Clone Order' button to SO detail page"
+    - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/page.tsx"
+      description: "Add 'Import Orders' button to SO list page"
+
+database:
+  tables:
+    - name: "sales_orders"
+      note: "Existing table from Story 07.2 - no schema changes needed"
+    - name: "sales_order_lines"
+      note: "Existing table from Story 07.2 - no schema changes needed"
+    - name: "customers"
+      note: "Existing table from Story 07.1 - CSV validation uses customer_code column"
+    - name: "products"
+      note: "Existing table from Epic 02 - CSV validation uses product_code column"
+
+  operations:
+    clone:
+      - "SELECT original SO + lines by id (with RLS)"
+      - "INSERT new SO with transformed data (new order_number, status=draft, cleared dates)"
+      - "INSERT new SO lines with renumbered line_number (1, 2, 3...)"
+      - "UPDATE new SO with calculated total_amount"
+    import:
+      - "Parse CSV file"
+      - "Validate each row (customer exists, product exists, quantity > 0)"
+      - "Group valid rows by customer_code"
+      - "INSERT one SO per unique customer_code"
+      - "INSERT SO lines for each row in customer group"
+      - "Return created orders + validation errors"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/shipping/sales-orders/:id/clone"
+    description: "Clone existing sales order (preserves customer, lines, pricing)"
+    auth: true
+    roles: ["SALES", "MANAGER", "ADMIN", "SUPER_ADMIN"]
+    request_body: null
+    response:
+      original_order_number: "string (e.g., SO-2025-00123)"
+      cloned_order:
+        id: "UUID"
+        order_number: "string (new auto-generated)"
+        status: "draft"
+        customer_id: "UUID (preserved)"
+        shipping_address_id: "UUID (preserved)"
+        order_date: "date (today)"
+        total_amount: "number"
+        lines: "SalesOrderLine[] (cloned)"
+    side_effects:
+      - "Generate new order_number (SO-YYYY-NNNNN)"
+      - "Set status = 'draft'"
+      - "Set order_date = today"
+      - "Clear customer_po, promised_ship_date, required_delivery_date, confirmed_at, shipped_at"
+      - "Reset quantities: allocated, picked, packed, shipped = 0"
+      - "Preserve customer_id, shipping_address_id, lines (product, quantity, unit_price), notes"
+      - "Reset allergen_validated = false"
+      - "Renumber lines sequentially (1, 2, 3...)"
+    errors:
+      404: "Sales order not found (or not in user's org - RLS)"
+      400: "Invalid sales order id"
+
+  - method: "POST"
+    path: "/api/shipping/sales-orders/import"
+    description: "Import sales orders from CSV (bulk creation)"
+    auth: true
+    roles: ["SALES", "MANAGER", "ADMIN", "SUPER_ADMIN"]
+    request_body:
+      csv_data: "string (Base64 or raw CSV string)"
+      # OR multipart form data:
+      file: "File (CSV file upload)"
+    csv_format:
+      required_columns:
+        - "customer_code: string (maps to customers.customer_code)"
+        - "product_code: string (maps to products.product_code)"
+        - "quantity: number (quantity_ordered)"
+      optional_columns:
+        - "unit_price: number (defaults to product.unit_price)"
+        - "customer_po: string (max 100)"
+        - "promised_ship_date: string (ISO date YYYY-MM-DD)"
+        - "required_delivery_date: string (ISO date YYYY-MM-DD)"
+        - "notes: string (max 1000)"
+    response:
+      success: "boolean"
+      summary:
+        orders_created: "number"
+        lines_imported: "number"
+        rows_processed: "number (excludes header)"
+        errors_count: "number"
+      created_orders:
+        - id: "UUID"
+          order_number: "string"
+          customer_code: "string"
+          lines_count: "number"
+      errors:
+        - row: "number (1-based, excludes header)"
+          customer_code: "string (optional)"
+          product_code: "string (optional)"
+          error: "string (human-readable error message)"
+    validation_rules:
+      customer_code: "Must exist in customers table (org-scoped)"
+      product_code: "Must exist in products table (org-scoped)"
+      quantity: "Must be number > 0"
+      unit_price: "Must be number >= 0 (if provided)"
+      dates: "Must be valid ISO date format (YYYY-MM-DD)"
+    side_effects:
+      - "Parse CSV file"
+      - "Validate each row (customer, product, quantity, price)"
+      - "Group valid rows by customer_code"
+      - "Create one SO per unique customer_code with status='draft'"
+      - "Create SO lines for each row in customer group"
+      - "Calculate line_total and total_amount"
+      - "Return created orders + validation errors"
+    errors:
+      400: "CSV file is empty"
+      400: "CSV must have header row: customer_code, product_code, quantity"
+      400: "Missing required columns: [column_names]"
+      400: "Only CSV files (.csv) are supported"
+      413: "File size exceeds 5MB limit"
+
+ux:
+  clone_workflow:
+    - step: 1
+      action: "User opens SO detail page"
+    - step: 2
+      action: "User clicks 'Clone Order' button (top right)"
+    - step: 3
+      action: "Confirmation dialog displays: 'Clone this order? A new draft order will be created with the same customer and products.'"
+    - step: 4
+      action: "User confirms"
+    - step: 5
+      action: "API creates cloned SO"
+    - step: 6
+      action: "User redirected to new SO detail page"
+    - step: 7
+      action: "Toast notification: 'Cloned from SO-2025-00123'"
+
+  import_workflow:
+    - step: 1
+      action: "User clicks 'Import Orders' button on SO list page"
+    - step: 2
+      action: "Import dialog opens with instructions and 'Download sample CSV' link"
+    - step: 3
+      action: "User drags/drops or selects CSV file"
+    - step: 4
+      action: "System parses and validates CSV"
+    - step: 5
+      action: "Preview table displays all rows with validation status (green checkmark / red X)"
+    - step: 6
+      action: "User reviews preview, clicks 'Import X Orders' button"
+    - step: 7
+      action: "System creates SOs for valid rows"
+    - step: 8
+      action: "Success dialog displays summary: '3 orders created, 5 lines imported', error list (if any), 'View Orders' button"
+
+  patterns:
+    dialog: "ShadCN Dialog for clone confirmation and import"
+    file_upload: "Dropzone component with drag-and-drop + file select"
+    preview_table: "DataTable with validation status column (icon + error message)"
+    toast: "ShadCN Toast for success notifications"
+
+  states:
+    clone:
+      loading: "Cloning order... (spinner in dialog)"
+      success: "Order cloned successfully (toast notification)"
+      error: "Failed to clone order: [error message] (error dialog)"
+    import:
+      loading: "Parsing CSV... (spinner in dialog)"
+      preview: "Preview table with validation status"
+      importing: "Importing X orders... (progress bar)"
+      success: "Success summary dialog with created orders list"
+      error: "Failed to import: [error message] (error dialog)"
+
+  components:
+    CloneOrderDialog:
+      trigger: "'Clone Order' button on SO detail page"
+      title: "Clone Order"
+      description: "A new draft order will be created with the same customer and products."
+      actions:
+        - "Cancel"
+        - "Clone Order (primary button)"
+
+    ImportOrdersDialog:
+      trigger: "'Import Orders' button on SO list page"
+      title: "Import Sales Orders"
+      description: "Upload CSV with columns: customer_code, product_code, quantity, unit_price (optional)"
+      actions:
+        - "'Download Sample CSV' link"
+        - "File dropzone (drag-and-drop or select)"
+        - "'Import X Orders' button (after preview)"
+        - "Cancel"
+
+    ImportPreviewTable:
+      columns:
+        - "Row # (1-based, excludes header)"
+        - "Customer Code"
+        - "Product Code"
+        - "Quantity"
+        - "Unit Price"
+        - "Status (icon: green checkmark / red X)"
+        - "Error (if invalid)"
+      features:
+        - "Scrollable table (max height 400px)"
+        - "Valid rows highlighted in green"
+        - "Invalid rows highlighted in red"
+
+    ImportResultSummary:
+      title: "Import Complete"
+      summary:
+        - "X orders created"
+        - "Y lines imported"
+        - "Z rows skipped due to errors"
+      created_orders_list:
+        - "SO-2025-00456 (ACME001, 2 lines)"
+        - "SO-2025-00457 (BETA002, 1 line)"
+      errors_list:
+        - "Row 3: Customer 'INVALID' not found"
+        - "Row 7: Quantity must be greater than zero"
+      actions:
+        - "'View Orders' button (navigates to SO list filtered by today)"
+        - "Close"
+
+validation_rules:
+  clone:
+    original_so_id:
+      type: "uuid"
+      required: true
+      error_invalid: "Invalid sales order id"
+      error_not_found: "Sales order not found (or not in user's org)"
+
+  csv_import:
+    file:
+      type: "File"
+      required: true
+      allowed_types: ["text/csv"]
+      max_size: "5MB (5 * 1024 * 1024 bytes)"
+      error_empty: "CSV file is empty"
+      error_type: "Only CSV files (.csv) are supported"
+      error_size: "File size exceeds 5MB limit"
+
+    header:
+      required_columns:
+        - "customer_code"
+        - "product_code"
+        - "quantity"
+      error_missing_header: "CSV must have header row: customer_code, product_code, quantity"
+      error_missing_columns: "Missing required columns: [column_names]"
+
+    row:
+      customer_code:
+        type: "string"
+        required: true
+        validation: "Must exist in customers table (org-scoped)"
+        error_not_found: "Customer '[customer_code]' not found"
+
+      product_code:
+        type: "string"
+        required: true
+        validation: "Must exist in products table (org-scoped)"
+        error_not_found: "Product '[product_code]' not found"
+
+      quantity:
+        type: "number"
+        required: true
+        min: 0.0001
+        max: 999999.9999
+        precision: 4
+        error_invalid: "Quantity must be a number greater than zero"
+
+      unit_price:
+        type: "number"
+        required: false
+        default: "product.unit_price"
+        min: 0
+        max: 999999.9999
+        precision: 4
+        error_invalid: "Unit price cannot be negative"
+
+      customer_po:
+        type: "string"
+        required: false
+        max: 100
+
+      promised_ship_date:
+        type: "string"
+        required: false
+        format: "ISO date (YYYY-MM-DD)"
+        error_invalid: "Invalid promised_ship_date format (use YYYY-MM-DD)"
+
+      required_delivery_date:
+        type: "string"
+        required: false
+        format: "ISO date (YYYY-MM-DD)"
+        error_invalid: "Invalid required_delivery_date format (use YYYY-MM-DD)"
+
+      notes:
+        type: "string"
+        required: false
+        max: 1000
+
+patterns:
+  rls: "Standard org_id isolation on sales_orders and sales_order_lines"
+  api: "REST with org_id filter from auth context"
+  service: "Extend SalesOrderService with cloneSalesOrder and importSalesOrdersFromCSV methods"
+  validation: "Zod schemas for CSV row validation"
+
+  clone_logic: |
+    async cloneSalesOrder(originalId: string): Promise<ClonedSalesOrder> {
+      // 1. Fetch original SO + lines (with RLS)
+      const original = await getSalesOrder(originalId);
+
+      // 2. Generate new order number
+      const newOrderNumber = await generateOrderNumber(original.org_id);
+
+      // 3. Create new SO (transformed data)
+      const clonedSO = await createSalesOrder({
+        org_id: original.org_id,
+        order_number: newOrderNumber,
+        customer_id: original.customer_id,
+        shipping_address_id: original.shipping_address_id,
+        order_date: new Date(), // Today
+        status: 'draft',
+        notes: original.notes, // Preserve notes
+        allergen_validated: false, // Must re-validate
+        // Cleared fields:
+        customer_po: null,
+        promised_ship_date: null,
+        required_delivery_date: null,
+        confirmed_at: null,
+        shipped_at: null,
+      });
+
+      // 4. Clone lines (sequential line_number)
+      for (let i = 0; i < original.lines.length; i++) {
+        const line = original.lines[i];
+        await createSalesOrderLine({
+          sales_order_id: clonedSO.id,
+          line_number: i + 1, // Sequential 1-N
+          product_id: line.product_id,
+          quantity_ordered: line.quantity_ordered,
+          unit_price: line.unit_price,
+          requested_lot: line.requested_lot,
+          notes: line.notes,
+          // Reset quantities:
+          quantity_allocated: 0,
+          quantity_picked: 0,
+          quantity_packed: 0,
+          quantity_shipped: 0,
+        });
+      }
+
+      // 5. Recalculate totals
+      // ... (see service implementation)
+
+      return clonedSO;
+    }
+
+  csv_import_logic: |
+    async importSalesOrdersFromCSV(orgId: string, csvData: string): Promise<ImportResult> {
+      // 1. Parse CSV
+      const rows = parseCSV(csvData);
+
+      // 2. Validate header
+      validateCSVHeader(rows[0], ['customer_code', 'product_code', 'quantity']);
+
+      // 3. Validate and transform rows
+      const validatedRows: ValidatedRow[] = [];
+      const errors: ImportError[] = [];
+
+      for (let i = 1; i < rows.length; i++) { // Skip header
+        const row = rows[i];
+        const validation = await validateCSVRow(orgId, row, i);
+
+        if (validation.valid) {
+          validatedRows.push(validation.data);
+        } else {
+          errors.push({ row: i, error: validation.error });
+        }
+      }
+
+      // 4. Group by customer_code
+      const groupedByCustomer = groupBy(validatedRows, 'customer_id');
+
+      // 5. Create SOs (one per customer)
+      const createdOrders: CreatedOrder[] = [];
+
+      for (const [customerId, customerRows] of Object.entries(groupedByCustomer)) {
+        // Generate order number
+        const orderNumber = await generateOrderNumber(orgId);
+
+        // Create SO
+        const so = await createSalesOrder({ ... });
+
+        // Create lines
+        for (let lineNum = 0; lineNum < customerRows.length; lineNum++) {
+          const row = customerRows[lineNum];
+          await createSalesOrderLine({ ... });
+        }
+
+        createdOrders.push({ ... });
+      }
+
+      return {
+        success: true,
+        summary: { orders_created, lines_imported, rows_processed, errors_count },
+        created_orders: createdOrders,
+        errors: errors,
+      };
+    }
+
+acceptance_checklist:
+  clone:
+    - "GIVEN clerk views SO detail page, WHEN 'Clone Order' clicked, THEN confirmation dialog displays"
+    - "GIVEN confirmation accepted, WHEN clone completes, THEN new SO created with status='draft'"
+    - "GIVEN original SO has 10 lines, WHEN cloned, THEN all 10 lines cloned with new line_numbers (1-10)"
+    - "GIVEN original SO has line_numbers 1,5,10, WHEN cloned, THEN renumbered as 1,2,3"
+    - "GIVEN original SO has allergen_validated=true, WHEN cloned, THEN new SO has allergen_validated=false"
+    - "GIVEN clerk from org B tries to clone org A's SO, WHEN API called, THEN 404 error (RLS)"
+
+  csv_import_valid:
+    - "GIVEN clerk uploads valid CSV with 3 rows (2 customers), WHEN import completes, THEN 2 SOs created"
+    - "GIVEN CSV has rows for ACME (2 lines) and BETA (1 line), WHEN import completes, THEN ACME SO has 2 lines, BETA SO has 1 line"
+    - "GIVEN import completes, WHEN success dialog displays, THEN summary shows '2 orders created, 3 lines imported'"
+
+  csv_import_validation_errors:
+    - "GIVEN CSV has invalid customer_code, WHEN preview displays, THEN error 'Customer not found'"
+    - "GIVEN CSV has invalid product_code, WHEN preview displays, THEN error 'Product not found'"
+    - "GIVEN CSV has quantity=0, WHEN preview displays, THEN error 'Quantity must be greater than zero'"
+    - "GIVEN CSV has negative unit_price, WHEN preview displays, THEN error 'Unit price cannot be negative'"
+    - "GIVEN CSV has invalid date format, WHEN preview displays, THEN error 'Invalid date format (use YYYY-MM-DD)'"
+
+  csv_import_file_errors:
+    - "GIVEN clerk uploads empty CSV, WHEN parsed, THEN error 'CSV file is empty'"
+    - "GIVEN clerk uploads CSV without header, WHEN parsed, THEN error 'CSV must have header row'"
+    - "GIVEN clerk uploads CSV missing 'quantity' column, WHEN parsed, THEN error 'Missing required columns: quantity'"
+    - "GIVEN clerk uploads .xlsx file, WHEN upload attempted, THEN error 'Only CSV files (.csv) are supported'"
+
+  csv_import_extended_format:
+    - "GIVEN CSV includes customer_po, promised_ship_date, notes, WHEN import completes, THEN SO created with these fields populated"
+
+  permissions:
+    - "GIVEN user with VIEWER role, WHEN SO detail page loads, THEN 'Clone Order' button hidden"
+    - "GIVEN user with SALES role, WHEN SO list page loads, THEN 'Import Orders' button visible"
+    - "GIVEN user without shipping permissions, WHEN import endpoint called directly, THEN 403 'Access Denied'"
+
+  multi_tenancy:
+    - "GIVEN user from org A imports CSV, WHEN orders created, THEN all SOs have org_id = org A"
+    - "GIVEN CSV references customer from org B, WHEN org A user imports, THEN validation error 'Customer not found'"
+
+definition_of_done:
+  - "POST /api/shipping/sales-orders/:id/clone endpoint works"
+  - "Clone preserves customer, address, lines, pricing"
+  - "Clone resets order_number, status, dates, quantities"
+  - "Clone renumbers lines sequentially (1, 2, 3)"
+  - "Clone resets allergen_validated to false"
+  - "POST /api/shipping/sales-orders/import endpoint works"
+  - "CSV import validates customer_code, product_code, quantity, price"
+  - "CSV import groups rows by customer_code"
+  - "CSV import creates one SO per customer"
+  - "CSV import returns row-level error messages"
+  - "Import preview table displays validation status"
+  - "Import result summary shows success/error counts"
+  - "'Clone Order' button visible on SO detail page (authorized users)"
+  - "'Import Orders' button visible on SO list page (authorized users)"
+  - "CloneOrderDialog component works"
+  - "ImportOrdersDialog component works"
+  - "Permission checks hide buttons for unauthorized users"
+  - "Multi-tenant isolation verified (clone and import)"
+  - "Unit tests cover clone logic (>80% coverage)"
+  - "Unit tests cover CSV validation (>80% coverage)"
+  - "Integration tests for clone API"
+  - "Integration tests for import API"
+  - "E2E test: Clone SO and verify new order created"
+  - "E2E test: Import CSV and verify orders created"
+
+tests:
+  unit:
+    - "SalesOrderService.cloneSalesOrder preserves customer_id, shipping_address_id"
+    - "SalesOrderService.cloneSalesOrder resets status to 'draft'"
+    - "SalesOrderService.cloneSalesOrder generates new order_number"
+    - "SalesOrderService.cloneSalesOrder renumbers lines sequentially"
+    - "SalesOrderService.cloneSalesOrder resets allergen_validated to false"
+    - "SalesOrderService.importSalesOrdersFromCSV parses valid CSV"
+    - "SalesOrderService.importSalesOrdersFromCSV validates customer_code exists"
+    - "SalesOrderService.importSalesOrdersFromCSV validates product_code exists"
+    - "SalesOrderService.importSalesOrdersFromCSV validates quantity > 0"
+    - "SalesOrderService.importSalesOrdersFromCSV groups rows by customer_code"
+    - "SalesOrderService.importSalesOrdersFromCSV creates one SO per customer"
+    - "SalesOrderService.importSalesOrdersFromCSV returns row-level errors"
+    - "CSV validation rejects empty file"
+    - "CSV validation rejects missing header row"
+    - "CSV validation rejects missing required columns"
+    - "CSV validation rejects invalid date format"
+
+  integration:
+    - "POST /api/shipping/sales-orders/:id/clone returns cloned SO with new order_number"
+    - "POST /api/shipping/sales-orders/:id/clone preserves customer_id, lines"
+    - "POST /api/shipping/sales-orders/:id/clone resets status to 'draft'"
+    - "POST /api/shipping/sales-orders/:id/clone returns 404 for invalid SO id"
+    - "POST /api/shipping/sales-orders/:id/clone blocks cross-org access (RLS)"
+    - "POST /api/shipping/sales-orders/import creates SOs for valid CSV"
+    - "POST /api/shipping/sales-orders/import groups rows by customer_code"
+    - "POST /api/shipping/sales-orders/import returns validation errors for invalid rows"
+    - "POST /api/shipping/sales-orders/import returns 400 for empty CSV"
+    - "POST /api/shipping/sales-orders/import returns 400 for missing header"
+    - "POST /api/shipping/sales-orders/import blocks cross-org customer/product references"
+
+  e2e:
+    - "Clone SO: Open SO detail → Click 'Clone Order' → Confirm → Verify new SO created"
+    - "Clone SO: Verify new SO has status='draft', new order_number"
+    - "Clone SO: Verify new SO has same customer, address, lines"
+    - "Import CSV: Open SO list → Click 'Import Orders' → Upload valid CSV → Verify preview → Import → Verify success summary"
+    - "Import CSV: Verify created SOs have status='draft', correct lines"
+    - "Import CSV: Upload CSV with errors → Verify preview shows validation errors → Verify only valid rows imported"
+
+output_artifacts:
+  - "API: POST /api/shipping/sales-orders/:id/clone"
+  - "API: POST /api/shipping/sales-orders/import"
+  - "SalesOrderService.cloneSalesOrder method"
+  - "SalesOrderService.importSalesOrdersFromCSV method"
+  - "CSV parsing utility (lib/utils/csv-parser.ts)"
+  - "CSV row validation utility"
+  - "CloneOrderDialog component"
+  - "ImportOrdersDialog component"
+  - "ImportPreviewTable component"
+  - "ImportResultSummary component"
+  - "'Clone Order' button on SO detail page"
+  - "'Import Orders' button on SO list page"
+  - "Unit tests for clone logic"
+  - "Unit tests for CSV validation"
+  - "Integration tests for clone API"
+  - "Integration tests for import API"
+  - "E2E test for clone workflow"
+  - "E2E test for import workflow"
+
+implementation_notes:
+  clone:
+    - "Fetch original SO + lines in single query with RLS"
+    - "Generate new order_number using existing generateOrderNumber method"
+    - "Create new SO with status='draft', order_date=today"
+    - "Clear customer_po, dates, confirmed_at, shipped_at"
+    - "Reset allergen_validated to false"
+    - "Clone lines with renumbered line_number (1, 2, 3...)"
+    - "Reset quantities: allocated, picked, packed, shipped = 0"
+    - "Preserve: customer_id, shipping_address_id, product_id, quantity_ordered, unit_price, notes"
+    - "Recalculate line_total and total_amount"
+
+  csv_import:
+    - "Use CSV parsing library (e.g., papaparse, csv-parse)"
+    - "Validate header row has required columns"
+    - "Validate each row: customer exists (org-scoped), product exists (org-scoped), quantity > 0"
+    - "Group valid rows by customer_code"
+    - "Create one SO per unique customer_code with status='draft'"
+    - "Create SO lines for each row in customer group"
+    - "Return created orders + row-level validation errors"
+    - "If customer has multiple addresses, use default shipping address"
+    - "If unit_price not provided, default to product.unit_price"
+
+  frontend:
+    - "Add 'Clone Order' button to SO detail page (top right, next to 'Edit' button)"
+    - "Add 'Import Orders' button to SO list page (top right, next to 'Create Order' button)"
+    - "CloneOrderDialog: Simple confirmation dialog with 'Clone Order' button"
+    - "ImportOrdersDialog: Multi-step dialog (1. upload file, 2. preview, 3. import, 4. results)"
+    - "ImportPreviewTable: DataTable with validation status column (green checkmark / red X + error message)"
+    - "ImportResultSummary: Success summary + error list + 'View Orders' link"
+    - "File upload: Use ShadCN dropzone or file input"
+    - "Toast notification on clone success: 'Cloned from SO-2025-00123'"
+
+  future_phases:
+    - "Story 07.5 does NOT implement SO templates (save as template)"
+    - "Story 07.5 does NOT implement recurring orders"
+    - "Epic 11 will implement EDI 850 inbound integration"
+    - "Phase 2 will add advanced CSV field mapping"

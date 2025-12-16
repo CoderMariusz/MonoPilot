@@ -1,0 +1,533 @@
+# Story 01.14 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/wizard-service.test.ts"
+    type: "unit"
+    description: "Unit tests for wizard service step handlers"
+  - path: "apps/frontend/components/settings/onboarding/__tests__/WizardStep2Warehouse.test.tsx"
+    type: "component"
+    description: "Component tests for Step 2 warehouse form"
+  - path: "apps/frontend/components/settings/onboarding/__tests__/WizardStep3Locations.test.tsx"
+    type: "component"
+    description: "Component tests for Step 3 location templates"
+  - path: "apps/frontend/components/settings/onboarding/__tests__/WizardStep4Product.test.tsx"
+    type: "component"
+    description: "Component tests for Step 4 product creation"
+  - path: "apps/frontend/components/settings/onboarding/__tests__/WizardStep6Complete.test.tsx"
+    type: "component"
+    description: "Component tests for Step 6 celebration"
+  - path: "apps/frontend/app/api/v1/settings/onboarding/__tests__/step-routes.test.ts"
+    type: "integration"
+    description: "Integration tests for wizard step API endpoints"
+  - path: "e2e/settings/onboarding-wizard-steps.spec.ts"
+    type: "e2e"
+    description: "E2E tests for complete wizard flow steps 2-6"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # Step 2: Warehouse
+  - id: "AC-W2-01"
+    given: "wizard step 1 is complete"
+    when: "wizard advances to step 2"
+    then: "warehouse code field shows pre-filled value 'WH-MAIN'"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-W2-02"
+    given: "wizard is on step 2"
+    when: "user enters warehouse name 'Main Warehouse' and clicks 'Next'"
+    then: "warehouse is created with is_default=true and wizard advances to step 3"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-W2-03"
+    given: "wizard is on step 2"
+    when: "user leaves warehouse name empty and clicks 'Next'"
+    then: "error 'Warehouse name is required' displays"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-W2-04"
+    given: "wizard is on step 2"
+    when: "user clicks 'Skip - Use Demo Warehouse'"
+    then: "demo warehouse DEMO-WH is created and info toast displays"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-W2-05"
+    given: "wizard is on step 2"
+    when: "user hovers over warehouse type dropdown option 'Quarantine'"
+    then: "tooltip displays 'Items on hold for quality inspection'"
+    test_type: "component"
+    priority: "P2"
+
+  # Step 3: Locations
+  - id: "AC-W3-01"
+    given: "wizard is on step 3"
+    when: "page loads"
+    then: "template selector displays 4 options: Simple (1), Basic (3), Full (9), Custom"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-W3-02"
+    given: "'Simple - 1 Zone' is selected"
+    when: "user clicks 'Next'"
+    then: "1 RECEIVING location is created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-W3-03"
+    given: "'Basic - 3 Zones' is selected"
+    when: "user clicks 'Next'"
+    then: "3 locations are created (RECEIVING, STORAGE, SHIPPING)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-W3-04"
+    given: "'Full - 9 Locations' is selected"
+    when: "user clicks 'Next'"
+    then: "9 locations are created with hierarchy (zone > aisle > rack)"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-W3-05"
+    given: "'Custom' is selected"
+    when: "user adds location 'SHELF-A1' and clicks 'Next'"
+    then: "custom location is created"
+    test_type: "integration"
+    priority: "P2"
+
+  # Step 4: Product
+  - id: "AC-W4-01"
+    given: "wizard is on step 4"
+    when: "page loads"
+    then: "industry selector displays 6 options with icons"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-W4-02"
+    given: "user selects 'Bakery' industry"
+    when: "industry selection made"
+    then: "product template dropdown shows Bread Loaf, Pastry, Cookie, Cake"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-W4-03"
+    given: "user selects 'Bread Loaf' template"
+    when: "template selected"
+    then: "form pre-fills: type=Finished Good, UOM=EA, shelf_life=7, storage=ambient"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-W4-04"
+    given: "user enters SKU 'WWB-001' and name 'Whole Wheat Bread'"
+    when: "'Create Product' clicked"
+    then: "product is created successfully"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-W4-05"
+    given: "product with SKU 'WWB-001' exists"
+    when: "user enters same SKU"
+    then: "error 'SKU already exists' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-W4-06"
+    given: "wizard is on step 4"
+    when: "user clicks 'Skip - Create Products Later'"
+    then: "no product is created and wizard advances to step 5"
+    test_type: "integration"
+    priority: "P1"
+
+  # Step 5: Work Order
+  - id: "AC-W5-01"
+    given: "product was created in step 4"
+    when: "wizard loads step 5"
+    then: "work order form is enabled with product pre-selected"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-W5-02"
+    given: "step 4 was skipped"
+    when: "wizard loads step 5"
+    then: "form is disabled with message 'Create a product first'"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-W5-03"
+    given: "product exists and wizard is on step 5"
+    when: "user enters quantity 50 and clicks 'Create Demo Work Order'"
+    then: "draft work order is created successfully"
+    test_type: "integration"
+    priority: "P1"
+
+  # Step 6: Completion
+  - id: "AC-W6-01"
+    given: "wizard reaches step 6"
+    when: "page loads"
+    then: "confetti animation plays for 3 seconds"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-W6-02"
+    given: "user created warehouse, 3 locations, and product"
+    when: "step 6 loads"
+    then: "summary displays all created items"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-W6-03"
+    given: "wizard started at 10:00:00 and completed at 10:12:34"
+    when: "step 6 loads"
+    then: "'Speed Setup Champion' badge displays"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-W6-04"
+    given: "wizard took 18 minutes"
+    when: "step 6 loads"
+    then: "no speed badge displays but completion is still celebratory"
+    test_type: "integration"
+    priority: "P2"
+
+  - id: "AC-W6-05"
+    given: "wizard completed"
+    when: "user clicks 'Go to Dashboard'"
+    then: "wizard closes and onboarding_completed_at is set"
+    test_type: "e2e"
+    priority: "P0"
+
+  # General Flow
+  - id: "AC-GEN-01"
+    given: "wizard on step N"
+    when: "Back button clicked"
+    then: "step N-1 loads with previously entered data"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-GEN-02"
+    given: "wizard on any step"
+    when: "progress is saved and user refreshes"
+    then: "wizard resumes from saved step with data intact"
+    test_type: "e2e"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  wizard_service:
+    - name: "saveStep2Warehouse creates warehouse with is_default=true"
+      setup: "Mock supabase client, org_id context"
+      expected: "Warehouse record created with is_default=true, wizard_progress updated"
+
+    - name: "saveStep2Warehouse with skip creates DEMO-WH"
+      setup: "Mock supabase client, skip=true"
+      expected: "Demo warehouse created with code DEMO-WH"
+
+    - name: "saveStep3Locations with 'simple' template creates 1 location"
+      setup: "Mock location service, template='simple'"
+      expected: "1 RECEIVING location created"
+
+    - name: "saveStep3Locations with 'basic' template creates 3 locations"
+      setup: "Mock location service, template='basic'"
+      expected: "3 locations created (RECEIVING, STORAGE, SHIPPING)"
+
+    - name: "saveStep3Locations with 'full' template creates 9 locations"
+      setup: "Mock location service, template='full'"
+      expected: "9 locations created with parent-child hierarchy"
+
+    - name: "saveStep4Product validates SKU format"
+      setup: "Mock product service, invalid SKU 'abc-123'"
+      expected: "Validation error: SKU must be uppercase"
+
+    - name: "saveStep4Product rejects duplicate SKU"
+      setup: "Mock product service, existing product with SKU"
+      expected: "Error: SKU already exists"
+
+    - name: "saveStep5WorkOrder requires product_id"
+      setup: "Mock work order service, product_id missing"
+      expected: "Validation error: product_id required"
+
+    - name: "completeWizard sets completed_at and wizard_completed"
+      setup: "Mock supabase client"
+      expected: "onboarding_completed_at and wizard_completed set"
+
+    - name: "checkSpeedChampion awards badge under 15 min"
+      setup: "Duration = 754 seconds (12:34)"
+      expected: "Returns true, badge awarded"
+
+    - name: "checkSpeedChampion no badge over 15 min"
+      setup: "Duration = 1080 seconds (18 min)"
+      expected: "Returns false, no badge"
+
+    - name: "calculateDuration returns correct seconds"
+      setup: "Started: 2024-12-15 10:00:00, Completed: 2024-12-15 10:12:34"
+      expected: "Returns 754 seconds"
+
+# Component Test Cases
+component_tests:
+  WizardStep2Warehouse:
+    - name: "Pre-fills WH-MAIN code on mount"
+      setup: "Render component"
+      expected: "Code field value is 'WH-MAIN'"
+
+    - name: "Validates required warehouse name"
+      setup: "Submit form with empty name"
+      expected: "Error message displays"
+
+    - name: "Skip button creates demo warehouse"
+      setup: "Click skip button"
+      expected: "Demo warehouse created, step advances"
+
+  WizardStep3Locations:
+    - name: "Shows 4 template options"
+      setup: "Render component"
+      expected: "4 template cards visible"
+
+    - name: "Custom mode shows add form"
+      setup: "Select custom template"
+      expected: "Location add form displays"
+
+  WizardStep4Product:
+    - name: "Industry selector renders 6 options"
+      setup: "Render component"
+      expected: "6 industry icons visible"
+
+    - name: "Template dropdown filters by industry"
+      setup: "Select 'Bakery' industry"
+      expected: "Only bakery templates in dropdown"
+
+    - name: "Template selection pre-fills fields"
+      setup: "Select 'Bread Loaf' template"
+      expected: "UOM='EA', shelf_life=7, storage='ambient'"
+
+  WizardStep5WorkOrder:
+    - name: "Disabled without product from step 4"
+      setup: "Render with product_id=null"
+      expected: "Form disabled, message shows"
+
+    - name: "Enabled with product pre-selected"
+      setup: "Render with product_id=uuid"
+      expected: "Form enabled, product selected"
+
+  WizardStep6Complete:
+    - name: "Confetti plays on mount"
+      setup: "Render component"
+      expected: "Confetti animation starts, runs 3 seconds"
+
+    - name: "Speed badge shows under 15 min"
+      setup: "Render with duration=754"
+      expected: "Badge visible with trophy icon"
+
+    - name: "Next steps contextual based on skips"
+      setup: "Render with product skipped"
+      expected: "'Create Your First Product' card prominent"
+
+# Integration Test Cases
+integration_tests:
+  step2_api:
+    - name: "POST /step/2 creates warehouse in DB"
+      setup: "Authenticated request with warehouse data"
+      action: "POST /api/v1/settings/onboarding/step/2"
+      expected: "Warehouse record exists, is_default=true"
+
+    - name: "POST /step/2 skip creates DEMO-WH"
+      setup: "Authenticated request with skip=true"
+      action: "POST /api/v1/settings/onboarding/step/2"
+      expected: "Warehouse with code DEMO-WH exists"
+
+  step3_api:
+    - name: "POST /step/3 template=simple creates 1 location"
+      setup: "Authenticated request, template='simple'"
+      action: "POST /api/v1/settings/onboarding/step/3"
+      expected: "1 location with code RECEIVING exists"
+
+    - name: "POST /step/3 template=basic creates 3 locations"
+      setup: "Authenticated request, template='basic'"
+      action: "POST /api/v1/settings/onboarding/step/3"
+      expected: "3 locations exist"
+
+    - name: "POST /step/3 template=full creates 9 locations with parents"
+      setup: "Authenticated request, template='full'"
+      action: "POST /api/v1/settings/onboarding/step/3"
+      expected: "9 locations with parent_id relationships"
+
+  step4_api:
+    - name: "POST /step/4 creates product in DB"
+      setup: "Authenticated request with product data"
+      action: "POST /api/v1/settings/onboarding/step/4"
+      expected: "Product record exists with correct SKU"
+
+    - name: "POST /step/4 duplicate SKU returns 400"
+      setup: "Existing product with SKU 'WWB-001'"
+      action: "POST /api/v1/settings/onboarding/step/4 with same SKU"
+      expected: "400 error, message: 'SKU already exists'"
+
+  step5_api:
+    - name: "POST /step/5 creates draft work order"
+      setup: "Authenticated request with product_id"
+      action: "POST /api/v1/settings/onboarding/step/5"
+      expected: "Work order with status='Draft' exists"
+
+    - name: "POST /step/5 without product_id returns 400"
+      setup: "Authenticated request, product_id missing"
+      action: "POST /api/v1/settings/onboarding/step/5"
+      expected: "400 error, validation failure"
+
+  step6_api:
+    - name: "POST /step/6 sets completed_at"
+      setup: "Authenticated request after steps 1-5"
+      action: "POST /api/v1/settings/onboarding/step/6"
+      expected: "onboarding_completed_at timestamp set"
+
+    - name: "POST /step/6 awards speed badge"
+      setup: "Duration < 900 seconds"
+      action: "POST /api/v1/settings/onboarding/step/6"
+      expected: "badges array contains speed_champion"
+
+  templates_api:
+    - name: "GET /templates/locations returns all templates"
+      setup: "Authenticated request"
+      action: "GET /api/v1/settings/onboarding/templates/locations"
+      expected: "4 templates returned (simple, basic, full, custom)"
+
+    - name: "GET /templates/products returns all industries"
+      setup: "Authenticated request"
+      action: "GET /api/v1/settings/onboarding/templates/products"
+      expected: "6 industries with product templates"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Complete wizard happy path (all steps)"
+    setup: "User completed step 1"
+    steps:
+      - "Navigate to step 2, fill warehouse, click Next"
+      - "Select 'Basic' template, click Next"
+      - "Select 'Bakery', choose 'Bread Loaf', fill SKU, click Next"
+      - "Fill work order quantity, click Next"
+      - "View celebration screen, click 'Go to Dashboard'"
+    expected: "User on dashboard, all entities created"
+
+  - name: "Skip all optional steps (4+5)"
+    setup: "User completed step 1"
+    steps:
+      - "Complete step 2 (warehouse)"
+      - "Complete step 3 (locations)"
+      - "Click 'Skip - Create Products Later' on step 4"
+      - "Click 'Skip - I'll Create Work Orders Later' on step 5"
+      - "View celebration screen"
+    expected: "Wizard completed, no product/work order created"
+
+  - name: "Back navigation preserves data"
+    setup: "User on step 3"
+    steps:
+      - "Click Back button"
+      - "Verify step 2 data preserved"
+      - "Click Next to return to step 3"
+    expected: "Data from step 2 still present"
+
+  - name: "Step 3 full template creates 9 locations"
+    setup: "User on step 3"
+    steps:
+      - "Select 'Full - 9 Locations' template"
+      - "Click Next"
+    expected: "9 locations created with hierarchy"
+
+  - name: "Step 4 bakery template pre-fills correctly"
+    setup: "User on step 4"
+    steps:
+      - "Select 'Bakery' industry"
+      - "Select 'Bread Loaf' template"
+    expected: "shelf_life=7, storage='ambient', uom='EA'"
+
+  - name: "Speed badge awarded under 15 min"
+    setup: "User completes wizard in 12 minutes"
+    steps:
+      - "Complete all steps rapidly"
+    expected: "Speed Champion badge visible on step 6"
+
+  - name: "Dashboard welcome banner displays after completion"
+    setup: "User just completed wizard"
+    steps:
+      - "Click 'Go to Dashboard'"
+    expected: "Welcome banner visible, dismissible"
+
+  - name: "Custom locations flow"
+    setup: "User on step 3"
+    steps:
+      - "Select 'Custom' template"
+      - "Add custom location 'SHELF-A1'"
+      - "Click Next"
+    expected: "Custom location created"
+
+  - name: "Confetti animation renders"
+    setup: "User completes step 5"
+    steps:
+      - "Step 6 loads"
+    expected: "Confetti visible for 3 seconds"
+
+# Definition of Done
+definition_of_done:
+  - "All unit tests pass (>80% coverage for wizard-service)"
+  - "All component tests pass"
+  - "All integration tests pass"
+  - "All E2E tests pass"
+  - "Step 2 warehouse creation works with skip"
+  - "Step 3 all templates create correct locations"
+  - "Step 4 product creation with templates works"
+  - "Step 4 SKU uniqueness validation works"
+  - "Step 5 conditional on product creation"
+  - "Step 6 celebration displays all created items"
+  - "Speed badge logic works correctly (<15 min)"
+  - "Back navigation preserves form state"
+  - "Progress saved to wizard_progress JSONB"
+  - "Confetti animation performs well"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Wizard business logic critical for onboarding"
+  component:
+    target: 75
+    reason: "Form components need interaction testing"
+  integration:
+    target: 85
+    reason: "Step APIs must work correctly"
+  files:
+    - "lib/services/wizard-service.ts: 80%"
+    - "components/settings/onboarding/WizardStep*.tsx: 75%"
+
+# Performance Requirements
+performance:
+  - endpoint: "POST /api/v1/settings/onboarding/step/2"
+    target: "< 500ms"
+  - endpoint: "POST /api/v1/settings/onboarding/step/3"
+    target: "< 1000ms (batch location creation)"
+  - endpoint: "POST /api/v1/settings/onboarding/step/6"
+    target: "< 300ms"
+  - component: "ConfettiAnimation"
+    target: "60fps for 3 seconds"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Template location creation fails partially"
+    mitigation: "Use transaction for batch location insert"
+    severity: "high"
+    test_coverage: "integration_tests.step3_api"
+
+  - id: "RISK-02"
+    description: "Confetti animation poor performance on low-end devices"
+    mitigation: "Limit particle count, use CSS fallback"
+    severity: "low"
+    test_coverage: "Manual testing on various devices"
+
+  - id: "RISK-03"
+    description: "Speed badge threshold too aggressive"
+    mitigation: "Monitor analytics, adjust threshold if needed"
+    severity: "low"
+    test_coverage: "integration_tests.step6_api"

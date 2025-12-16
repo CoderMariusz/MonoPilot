@@ -1,0 +1,532 @@
+# Story Context: 01.9 Locations CRUD (Hierarchical)
+# Generated: 2025-12-16
+# Purpose: AI agent context for implementing hierarchical location management
+
+story:
+  id: "01.9"
+  name: "Locations CRUD (Hierarchical)"
+  epic: "01-settings"
+  phase: "1B"
+  complexity: "L"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+
+dependencies:
+  required:
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides:
+        - "warehouses table"
+        - "warehouse-service.ts"
+        - "Warehouse detail page"
+        - "Warehouse modal component"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table with org_id"
+        - "RLS foundation"
+        - "auth context"
+    - story: "01.6"
+      name: "Role Permissions"
+      provides:
+        - "10-role permission system"
+        - "Admin+ role check for create/edit/delete"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/settings.md"
+  prd_sections:
+    - "FR-SET-042"  # Location hierarchy (zone/aisle/rack/bin)
+    - "FR-SET-043"  # Location capacity tracking
+    - "FR-SET-044"  # Location type (bulk/pallet/shelf/floor/staging)
+  architecture:
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  story: "docs/2-MANAGEMENT/epics/current/01-settings/01.9.locations-crud.md"
+  patterns:
+    - "apps/frontend/lib/services/warehouse-service.ts"  # Parent service pattern
+    - "apps/frontend/lib/validation/*.ts"  # Zod schema patterns
+    - "apps/frontend/components/ui/tree.tsx"  # Tree component if exists
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/055_create_locations_table.sql"
+      type: "migration"
+      description: "Create locations table with self-referencing parent_id, enums, triggers for path computation and hierarchy validation"
+  api:
+    - path: "apps/frontend/app/api/v1/settings/warehouses/[warehouseId]/locations/route.ts"
+      methods: ["GET", "POST"]
+      description: "List locations (tree/flat) and create location"
+    - path: "apps/frontend/app/api/v1/settings/warehouses/[warehouseId]/locations/[id]/route.ts"
+      methods: ["GET", "PUT", "DELETE"]
+      description: "Get, update, delete individual location"
+    - path: "apps/frontend/app/api/v1/settings/warehouses/[warehouseId]/locations/[id]/tree/route.ts"
+      methods: ["GET"]
+      description: "Get subtree under specific location"
+  services:
+    - path: "apps/frontend/lib/services/location-service.ts"
+      description: "Location CRUD with tree operations, hierarchy validation, capacity tracking"
+  validation:
+    - path: "apps/frontend/lib/validation/location.ts"
+      description: "Zod schemas for create/update/query location"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/settings/warehouses/[id]/locations/page.tsx"
+      description: "Location hierarchy page (tree view + detail panel)"
+  components:
+    - path: "apps/frontend/components/settings/locations/LocationTree.tsx"
+      description: "Hierarchical tree view with expand/collapse, selection, type/status badges"
+    - path: "apps/frontend/components/settings/locations/LocationModal.tsx"
+      description: "Create/edit modal with parent selection, level auto-set, capacity fields"
+    - path: "apps/frontend/components/settings/locations/CapacityIndicator.tsx"
+      description: "Visual capacity bar (green/yellow/red thresholds)"
+    - path: "apps/frontend/components/settings/locations/LocationBreadcrumb.tsx"
+      description: "Full path display with clickable segments"
+    - path: "apps/frontend/components/settings/locations/LocationTypeBadge.tsx"
+      description: "Badge component for location type display"
+    - path: "apps/frontend/components/settings/locations/LocationStatusBadge.tsx"
+      description: "Badge component for location status display"
+
+database:
+  enums:
+    - name: "location_type"
+      values: ["bulk", "pallet", "shelf", "floor", "staging"]
+      description: "Type of storage location"
+    - name: "location_level"
+      values: ["zone", "aisle", "rack", "bin"]
+      description: "Hierarchical level in location structure"
+
+  tables:
+    - name: "locations"
+      description: "Hierarchical storage locations with self-referencing parent"
+      columns:
+        - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "warehouse_id UUID NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE"
+        - "parent_id UUID REFERENCES locations(id) ON DELETE RESTRICT"
+        - "code VARCHAR(50) NOT NULL"
+        - "name VARCHAR(255) NOT NULL"
+        - "description TEXT"
+        - "level location_level NOT NULL"
+        - "full_path VARCHAR(500)"  # Computed by trigger
+        - "depth INT NOT NULL DEFAULT 1"  # Computed by trigger
+        - "location_type location_type NOT NULL DEFAULT 'shelf'"
+        - "max_pallets INT"
+        - "max_weight_kg DECIMAL(12,2)"
+        - "current_pallets INT DEFAULT 0"  # Denormalized for performance
+        - "current_weight_kg DECIMAL(12,2) DEFAULT 0"
+        - "is_active BOOLEAN DEFAULT true"
+        - "created_at TIMESTAMPTZ DEFAULT NOW()"
+        - "updated_at TIMESTAMPTZ DEFAULT NOW()"
+        - "created_by UUID REFERENCES users(id)"
+        - "updated_by UUID REFERENCES users(id)"
+      constraints:
+        - "UNIQUE(org_id, warehouse_id, code)"
+        - "CHECK(depth BETWEEN 1 AND 4)"
+        - "CHECK(max_pallets IS NULL OR max_pallets > 0)"
+        - "CHECK(max_weight_kg IS NULL OR max_weight_kg > 0)"
+        - "CHECK(current_pallets >= 0)"
+        - "CHECK(current_weight_kg >= 0)"
+      rls: true
+      rls_policy: "ADR-013 users lookup pattern"
+      indexes:
+        - "idx_locations_org ON locations(org_id)"
+        - "idx_locations_warehouse ON locations(warehouse_id)"
+        - "idx_locations_parent ON locations(parent_id)"
+        - "idx_locations_level ON locations(level)"
+        - "idx_locations_type ON locations(location_type)"
+        - "idx_locations_full_path ON locations(full_path)"
+
+  triggers:
+    - name: "trg_compute_location_path"
+      table: "locations"
+      timing: "BEFORE INSERT OR UPDATE"
+      description: "Computes full_path and depth from parent chain and warehouse code"
+      logic: |
+        IF NEW.parent_id IS NULL THEN
+          NEW.full_path := warehouse_code || '/' || NEW.code;
+          NEW.depth := 1;
+        ELSE
+          SELECT full_path, depth INTO parent_path, parent_depth FROM locations WHERE id = NEW.parent_id;
+          NEW.full_path := parent_path || '/' || NEW.code;
+          NEW.depth := parent_depth + 1;
+        END IF;
+
+    - name: "trg_validate_location_hierarchy"
+      table: "locations"
+      timing: "BEFORE INSERT OR UPDATE"
+      description: "Enforces zone > aisle > rack > bin hierarchy"
+      logic: |
+        IF NEW.parent_id IS NULL AND NEW.level != 'zone' THEN
+          RAISE EXCEPTION 'Root locations must be zones';
+        END IF;
+        -- zone -> aisle -> rack -> bin only
+
+  rls_policies:
+    locations:
+      - name: "locations_select"
+        operation: "SELECT"
+        role: "authenticated"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      - name: "locations_insert"
+        operation: "INSERT"
+        role: "authenticated"
+        with_check: |
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND warehouse_id IN (
+            SELECT id FROM warehouses
+            WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          )
+      - name: "locations_update"
+        operation: "UPDATE"
+        role: "authenticated"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      - name: "locations_delete"
+        operation: "DELETE"
+        role: "authenticated"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/warehouses/:warehouseId/locations"
+    description: "List locations for warehouse (tree or flat view)"
+    auth: true
+    roles: ["*"]
+    query_params:
+      - "view: 'tree' | 'flat' (default: 'tree')"
+      - "level: 'zone' | 'aisle' | 'rack' | 'bin'"
+      - "type: location_type enum"
+      - "parent_id: UUID | null (filter children)"
+      - "search: string (min 2 chars)"
+      - "include_capacity: boolean"
+    response:
+      locations: "LocationNode[]"
+      total_count: "number"
+
+  - method: "POST"
+    path: "/api/v1/settings/warehouses/:warehouseId/locations"
+    description: "Create new location"
+    auth: true
+    roles: ["super_admin", "admin", "warehouse_manager"]
+    request_body:
+      code: "string (required, 1-50 chars, uppercase)"
+      name: "string (required, 2-255 chars)"
+      description: "string (optional)"
+      parent_id: "UUID | null (null for zones)"
+      level: "location_level (required)"
+      location_type: "location_type (default: shelf)"
+      max_pallets: "number | null"
+      max_weight_kg: "number | null"
+      is_active: "boolean (default: true)"
+    response:
+      id: "UUID"
+      code: "string"
+      full_path: "string"
+
+  - method: "GET"
+    path: "/api/v1/settings/warehouses/:warehouseId/locations/:id"
+    description: "Get single location by ID"
+    auth: true
+    roles: ["*"]
+    response:
+      id: "UUID"
+      code: "string"
+      name: "string"
+      full_path: "string"
+      level: "location_level"
+      location_type: "location_type"
+      capacity_percent: "number | null"
+      children_count: "number"
+
+  - method: "PUT"
+    path: "/api/v1/settings/warehouses/:warehouseId/locations/:id"
+    description: "Update location (code, level, parent_id immutable)"
+    auth: true
+    roles: ["super_admin", "admin", "warehouse_manager"]
+    request_body:
+      name: "string (optional)"
+      description: "string (optional)"
+      location_type: "location_type (optional)"
+      max_pallets: "number | null (optional)"
+      max_weight_kg: "number | null (optional)"
+      is_active: "boolean (optional)"
+
+  - method: "DELETE"
+    path: "/api/v1/settings/warehouses/:warehouseId/locations/:id"
+    description: "Delete location (blocked if has children or inventory)"
+    auth: true
+    roles: ["super_admin", "admin", "warehouse_manager"]
+    errors:
+      - code: 400
+        message: "Delete child locations first"
+        condition: "Location has children"
+      - code: 400
+        message: "Location has inventory (N items). Relocate first."
+        condition: "Location has license plates"
+      - code: 404
+        message: "Location not found"
+        condition: "Invalid ID or cross-tenant"
+
+  - method: "GET"
+    path: "/api/v1/settings/warehouses/:warehouseId/locations/:id/tree"
+    description: "Get subtree under location"
+    auth: true
+    roles: ["*"]
+    response:
+      location: "LocationNode with nested children"
+
+ux:
+  wireframes:
+    - id: "SET-013"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-013-warehouse-create-edit-modal.md"
+      description: "Warehouse modal (context for location parent)"
+      components:
+        - "Warehouse code/name fields"
+        - "Warehouse type dropdown"
+        - "Address and contact fields"
+    - id: "SET-014"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-014-location-hierarchy-view.md"
+      description: "Location hierarchy tree view page"
+      components:
+        - "Tree view with expand/collapse controls"
+        - "Location row with code, type badge, status badge, LP count"
+        - "Search and type filter bar"
+        - "Expand All / Collapse All buttons"
+        - "Add Location button"
+        - "Actions menu (Edit, Add Child, Move, View Contents, Disable, Delete)"
+        - "Summary stats footer"
+  patterns:
+    tree: "Custom tree view with indentation, expand/collapse icons"
+    modal: "ShadCN Dialog for create/edit location"
+    breadcrumb: "Clickable path segments for navigation"
+    badges: "Type badges (Zone=blue, Aisle=green, Rack=yellow, Bin=purple)"
+    capacity_bar: "Progress bar with color thresholds (green < 70%, yellow 70-89%, red 90-100%)"
+    toast: "ShadCN Toast for success/error messages"
+  states:
+    - "loading: Skeleton rows (3) with 'Loading location hierarchy...' text"
+    - "empty: No locations icon with 'Add Your First Location' CTA"
+    - "error: Failed to load with Retry button"
+    - "success: Tree view with locations and controls"
+  layout:
+    description: "Split panel layout"
+    left_panel: "Location tree (40% width)"
+    right_panel: "Selected location details/form (60% width)"
+    toolbar: "Create button, Type filter, Search"
+
+hierarchy_rules:
+  structure:
+    - "zone > aisle > rack > bin (max depth 4)"
+    - "Root locations (parent_id = null) must be zones"
+    - "Zones can contain aisles"
+    - "Aisles can contain racks"
+    - "Racks can contain bins"
+    - "Bins are leaf nodes (no children)"
+  validation:
+    - "Bins directly under zones are invalid"
+    - "Racks directly under zones are invalid"
+    - "Aisles cannot be root level"
+    - "Bins cannot be root level"
+  path_format: "WH-001/ZONE-A/A01/R01/B001"
+
+location_types:
+  - type: "bulk"
+    description: "Bulk storage area"
+    icon: "warehouse"
+    badge_color: "gray"
+  - type: "pallet"
+    description: "Pallet racking"
+    icon: "grid-3x3"
+    badge_color: "blue"
+  - type: "shelf"
+    description: "Shelf storage"
+    icon: "layers"
+    badge_color: "green"
+  - type: "floor"
+    description: "Floor marking"
+    icon: "square"
+    badge_color: "yellow"
+  - type: "staging"
+    description: "Staging area"
+    icon: "clock"
+    badge_color: "orange"
+
+capacity_thresholds:
+  green: "0-69%"
+  yellow: "70-89%"
+  red: "90-100%"
+  unlimited: "max_pallets = null"
+
+validation_rules:
+  code:
+    - "Required, 1-50 characters"
+    - "Uppercase alphanumeric with hyphens only (regex: /^[A-Z0-9-]+$/)"
+    - "Unique per warehouse (org_id + warehouse_id + code)"
+    - "Immutable after creation"
+  name:
+    - "Required, 2-255 characters"
+  level:
+    - "Required, must match parent hierarchy"
+    - "Immutable after creation"
+  parent_id:
+    - "Null for zones, required UUID for other levels"
+    - "Must exist and be valid parent type"
+    - "Immutable after creation"
+  max_pallets:
+    - "Optional, positive integer if provided"
+  max_weight_kg:
+    - "Optional, positive decimal if provided"
+
+patterns:
+  rls: "ADR-013 - RLS Org Isolation Pattern (users lookup)"
+  api: "REST nested under warehouses: /warehouses/:id/locations"
+  service: "Class-based LocationService with static methods"
+  validation: "Zod schemas with custom refinements for hierarchy"
+  tree: "Recursive tree building from flat array using parent_id"
+
+permissions:
+  view_locations:
+    roles: ["super_admin", "admin", "production_manager", "quality_manager", "warehouse_manager", "production_operator", "quality_inspector", "warehouse_operator", "planner", "viewer"]
+    notes: "All roles can view location hierarchy"
+  create_locations:
+    roles: ["super_admin", "admin", "warehouse_manager"]
+    notes: "Admin+ and Warehouse Manager can create locations"
+  edit_locations:
+    roles: ["super_admin", "admin", "warehouse_manager"]
+    notes: "Admin+ and Warehouse Manager can edit locations"
+  delete_locations:
+    roles: ["super_admin", "admin", "warehouse_manager"]
+    notes: "Admin+ and Warehouse Manager can delete empty locations"
+
+acceptance_checklist:
+  hierarchy_management:
+    - "GIVEN warehouse 'WH-001' exists, WHEN admin creates location with level=zone and parent_id=null, THEN zone appears in tree under WH-001 with full_path 'WH-001/ZONE-A'"
+    - "GIVEN zone 'ZONE-A' exists, WHEN admin creates aisle under it, THEN full_path is 'WH-001/ZONE-A/A01' and depth=2"
+    - "GIVEN aisle 'A01' exists, WHEN admin creates rack under it, THEN full_path is 'WH-001/ZONE-A/A01/R01' and depth=3"
+    - "GIVEN rack 'R01' exists, WHEN admin creates bin under it, THEN full_path is 'WH-001/ZONE-A/A01/R01/B001' and depth=4"
+    - "GIVEN zone 'ZONE-A' exists, WHEN admin attempts to create bin directly under zone, THEN error 'Bins must be under racks, not zones' displays"
+
+  tree_view:
+    - "GIVEN zone has 5 aisles with racks and bins, WHEN admin clicks expand icon on zone, THEN children display within 200ms"
+    - "GIVEN tree expanded, WHEN admin clicks collapse icon, THEN children hide and state persists during session"
+    - "GIVEN location searched by code 'B001', THEN search result shows full path breadcrumb"
+
+  capacity_tracking:
+    - "GIVEN location has max_pallets=4 and current_pallets=3, THEN capacity indicator shows '3/4 pallets (75%)' with yellow color"
+    - "GIVEN location has max_pallets=4 and current_pallets=4, THEN capacity indicator shows '4/4 pallets (100%)' with red color"
+    - "GIVEN location created without max_pallets, THEN capacity shows 'Unlimited' or no indicator"
+
+  location_types:
+    - "GIVEN admin opens location create modal, WHEN clicking type dropdown, THEN 5 types display with descriptions"
+    - "GIVEN location created with type 'staging', THEN location displays with 'Staging' badge in tree"
+    - "GIVEN warehouse has 20 locations, WHEN admin filters by type 'pallet', THEN only pallet-type locations display"
+
+  crud_operations:
+    - "GIVEN admin opens create modal, WHEN submitting with empty code, THEN validation error 'Code is required' displays"
+    - "GIVEN location 'ZONE-A' exists in WH-001, WHEN creating another with same code, THEN error 'Location code must be unique within warehouse' displays"
+    - "GIVEN location exists with no inventory and no children, WHEN admin deletes, THEN location removed within 500ms with success toast"
+    - "GIVEN zone has 3 aisles underneath, WHEN admin attempts to delete zone, THEN error 'Delete child locations first' displays"
+    - "GIVEN location has 5 license plates assigned, WHEN admin attempts to delete, THEN error 'Location has inventory (5 items). Relocate first.' displays"
+
+  multi_tenancy:
+    - "GIVEN User A belongs to Org A with 10 locations, WHEN User A requests locations, THEN only Org A's 10 locations return"
+    - "GIVEN Location X belongs to Org B, WHEN User A from Org A requests Location X by ID, THEN 404 Not Found returns (not 403)"
+
+definition_of_done:
+  - "Database migration creates locations table with all columns and constraints"
+  - "location_type and location_level enums created"
+  - "Full path computation trigger works correctly"
+  - "Level hierarchy validation trigger enforces zone > aisle > rack > bin"
+  - "RLS policies enforce org isolation (ADR-013 pattern)"
+  - "All API endpoints functional at /api/v1/settings/warehouses/:warehouseId/locations"
+  - "Tree view displays hierarchical structure with expand/collapse"
+  - "Location modal handles create/edit with validation"
+  - "Capacity indicator shows correct colors (green/yellow/red)"
+  - "Breadcrumb displays full path with navigation"
+  - "Delete blocked for locations with children"
+  - "Delete blocked for locations with inventory (license plates)"
+  - "Code uniqueness enforced per warehouse"
+  - "Unit tests pass (>80% coverage)"
+  - "Integration tests pass"
+  - "E2E tests pass"
+  - "Loading states for tree expansion"
+  - "Error handling with user-friendly messages"
+  - "Toast notifications on success/error"
+
+tests:
+  unit:
+    - "LOC-U-001: Create location with valid data - location created, full_path computed"
+    - "LOC-U-002: Create location without code - validation error"
+    - "LOC-U-003: Create bin without parent - validation error (root must be zone)"
+    - "LOC-U-004: Create aisle under zone - success, depth = 2"
+    - "LOC-U-005: Create rack under bin - validation error (bins have no children)"
+    - "LOC-U-006: Duplicate code in same warehouse - validation error"
+    - "LOC-U-007: Same code in different warehouses - success"
+    - "LOC-U-008: Capacity validation negative pallets - validation error"
+    - "LOC-U-009: Full path computation 4 levels deep - correct path format"
+    - "LOC-U-010: Level hierarchy validation - correct parent-child levels"
+  integration:
+    - "LOC-I-001: List locations returns tree - nested structure with children"
+    - "LOC-I-002: Create via API with missing warehouse - 404 Not Found"
+    - "LOC-I-003: Update location name - name updated, updated_at refreshed"
+    - "LOC-I-004: Delete location with children - 400 error with message"
+    - "LOC-I-005: Delete empty location - success, location removed"
+    - "LOC-I-006: Cross-tenant access - 404 Not Found"
+    - "LOC-I-007: RLS filters by org - only org locations returned"
+    - "LOC-I-008: Create 4-level hierarchy - all levels created correctly"
+  e2e:
+    - "LOC-E-001: Create zone via UI - zone appears in tree"
+    - "LOC-E-002: Expand/collapse tree node - children show/hide"
+    - "LOC-E-003: Edit location name - name updates in tree"
+    - "LOC-E-004: Delete location flow - confirmation, removal"
+    - "LOC-E-005: Breadcrumb navigation - navigates to clicked segment"
+    - "LOC-E-006: Capacity indicator display - correct colors and percentages"
+    - "LOC-E-007: Filter by location type - only matching types shown"
+    - "LOC-E-008: Search locations - matching results with paths"
+
+output_artifacts:
+  database:
+    - "Migration: 055_create_locations_table.sql"
+    - "Enums: location_type, location_level"
+    - "Triggers: trg_compute_location_path, trg_validate_location_hierarchy"
+    - "RLS policies for locations table"
+    - "Indexes for org_id, warehouse_id, parent_id, level, type, full_path"
+  backend:
+    - "location-service.ts with CRUD + tree operations"
+    - "location.ts Zod validation schemas"
+    - "API routes under /warehouses/:warehouseId/locations"
+  frontend:
+    - "locations/page.tsx - Location hierarchy page"
+    - "LocationTree.tsx - Tree view component"
+    - "LocationModal.tsx - Create/edit modal"
+    - "CapacityIndicator.tsx - Visual capacity bar"
+    - "LocationBreadcrumb.tsx - Path display"
+    - "LocationTypeBadge.tsx - Type badge"
+    - "LocationStatusBadge.tsx - Status badge"
+  tests:
+    - "Unit tests for LocationService"
+    - "Integration tests for hierarchy scenarios"
+    - "E2E tests for tree view interactions"
+
+implementation_notes:
+  database:
+    - "Create enums before table creation"
+    - "Use ON DELETE RESTRICT for parent_id to prevent orphans"
+    - "Use ON DELETE CASCADE for warehouse_id"
+    - "Trigger computes full_path from warehouse.code + parent chain"
+    - "Hierarchy trigger validates zone > aisle > rack > bin only"
+    - "current_pallets/current_weight_kg are denormalized - updated by Warehouse module"
+  backend:
+    - "LocationService handles tree building from flat array"
+    - "canDelete() checks children count and license_plates count"
+    - "validateHierarchy() ensures parent level allows child level"
+    - "getAncestors() returns path from root to location"
+    - "getDescendants() returns all children recursively"
+  frontend:
+    - "Tree state stored in React state (expandedIds Set)"
+    - "Lazy load children on expand if warehouse has >100 locations"
+    - "Level auto-selected based on parent (zone selected = child must be aisle)"
+    - "Code field auto-uppercase on input"
+    - "Capacity indicator hidden when max_pallets is null"
+  performance:
+    - "full_path indexed for search"
+    - "Expand children: load on demand if subtree >50 nodes"
+    - "Tree render: virtualize if total >200 visible nodes"

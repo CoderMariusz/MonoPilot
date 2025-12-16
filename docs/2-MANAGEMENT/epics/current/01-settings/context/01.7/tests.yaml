@@ -1,0 +1,384 @@
+# Story 01.6-roles-viewer - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/role-service.test.ts"
+    type: "unit"
+    description: "Unit tests for role service"
+  - path: "apps/frontend/components/settings/roles/__tests__/RolesTable.test.tsx"
+    type: "unit"
+    description: "Unit tests for RolesTable component"
+  - path: "apps/frontend/components/settings/roles/__tests__/PermissionsMatrix.test.tsx"
+    type: "unit"
+    description: "Unit tests for PermissionsMatrix component"
+  - path: "apps/frontend/components/settings/roles/__tests__/PermissionBadge.test.tsx"
+    type: "unit"
+    description: "Unit tests for PermissionBadge component"
+  - path: "apps/frontend/app/(authenticated)/settings/roles/__tests__/page.test.tsx"
+    type: "integration"
+    description: "Integration tests for roles page"
+  - path: "tests/e2e/settings/roles-viewer.spec.ts"
+    type: "e2e"
+    description: "E2E tests for roles viewer"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    given: "an authenticated user"
+    when: "navigating to /settings/roles"
+    then: "page loads and displays 10 system roles"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "roles table displayed"
+    when: "page loads"
+    then: "roles are ordered by display_order (Super Admin first, External last)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "roles table"
+    when: "user clicks on a role row"
+    then: "role detail dialog opens showing permissions breakdown"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-04"
+    given: "permissions matrix view"
+    when: "user switches to matrix view"
+    then: "grid displays with modules as columns and roles as rows"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-05"
+    given: "permission badge for CRUD"
+    when: "displayed in matrix"
+    then: "badge shows green color with checkmark icon"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-06"
+    given: "permission badge for '-'"
+    when: "displayed in matrix"
+    then: "badge shows red color with X icon"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-07"
+    given: "user without admin role"
+    when: "viewing roles page"
+    then: "no edit or delete buttons visible (read-only)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-08"
+    given: "API returns error"
+    when: "fetching roles fails"
+    then: "error message displays with retry button"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-09"
+    given: "roles data cached"
+    when: "navigating away and back to roles page"
+    then: "data loads instantly from cache (< 100ms)"
+    test_type: "integration"
+    priority: "P2"
+
+  - id: "AC-10"
+    given: "permissions matrix"
+    when: "hovering over permission badge"
+    then: "tooltip displays full permission explanation"
+    test_type: "e2e"
+    priority: "P2"
+
+# Unit Test Cases
+unit_tests:
+  role_service:
+    - name: "getAllRoles returns array of 10 roles"
+      setup: "Mock successful API response with 10 roles"
+      expected: "Returns Role[] with length 10"
+
+    - name: "getAllRoles throws on API error"
+      setup: "Mock failed API response (500)"
+      expected: "Throws error with message 'Failed to fetch roles'"
+
+    - name: "getRoleByCode returns single role"
+      setup: "Mock successful API response for 'ADMIN'"
+      params: ["ADMIN"]
+      expected: "Returns Role object with code 'ADMIN'"
+
+    - name: "getRoleByCode returns null for invalid code"
+      setup: "Mock 404 API response"
+      params: ["INVALID"]
+      expected: "Returns null"
+
+    - name: "getPermissionsMatrix returns matrix structure"
+      setup: "Mock successful API response with matrix"
+      expected: "Returns PermissionsMatrix with modules array and roles array"
+
+  PermissionBadge:
+    - name: "renders green badge for CRUD"
+      props: { permission: "CRUD" }
+      expected: "Badge has green background and CheckCircle icon"
+
+    - name: "renders blue badge for CRU"
+      props: { permission: "CRU" }
+      expected: "Badge has blue background and Edit icon"
+
+    - name: "renders gray badge for R"
+      props: { permission: "R" }
+      expected: "Badge has gray background and Eye icon"
+
+    - name: "renders red badge for dash"
+      props: { permission: "-" }
+      expected: "Badge has red background and XCircle icon"
+
+    - name: "shows tooltip on hover"
+      props: { permission: "CRUD", module: "Settings" }
+      expected: "Tooltip displays 'Create, Read, Update, Delete'"
+
+  RolesTable:
+    - name: "renders 10 rows for 10 roles"
+      props: { roles: [10 mock roles] }
+      expected: "Table renders 10 rows"
+
+    - name: "sorts roles by name when column clicked"
+      props: { roles: [unsorted roles] }
+      action: "Click name column header"
+      expected: "Roles sorted alphabetically by name"
+
+    - name: "displays role name and description"
+      props: { roles: [{ name: "Admin", description: "Full access" }] }
+      expected: "Row shows 'Admin' and 'Full access'"
+
+    - name: "shows loading skeleton when loading"
+      props: { roles: undefined }
+      expected: "Skeleton rows displayed"
+
+# Integration Test Cases
+integration_tests:
+  roles_page:
+    - name: "Page fetches and displays roles on mount"
+      setup: |
+        - Mock GET /api/v1/settings/roles endpoint
+        - Return 10 system roles
+      action: "Render roles page"
+      expected: "10 roles displayed in table"
+
+    - name: "Error state displays when API fails"
+      setup: |
+        - Mock GET /api/v1/settings/roles to return 500
+      action: "Render roles page"
+      expected: "Error message with retry button displayed"
+
+    - name: "Retry button refetches data"
+      setup: |
+        - First request returns 500
+        - Second request returns success
+      action: "Click retry button"
+      expected: "Roles table displays after retry"
+
+    - name: "View toggle switches between list and matrix"
+      setup: "Render roles page with both views"
+      action: "Click 'Matrix' tab"
+      expected: "PermissionsMatrix component visible, RolesTable hidden"
+
+  permissions_matrix:
+    - name: "Matrix displays all modules and roles"
+      setup: |
+        - Mock GET /api/v1/settings/roles/permissions-matrix
+        - Return matrix with 8 modules and 10 roles
+      action: "Render PermissionsMatrix"
+      expected: "Grid shows 8 column headers and 10 row headers"
+
+    - name: "Matrix cells show correct permission badges"
+      setup: "Mock matrix with SUPER_ADMIN having all CRUD"
+      expected: "All cells for SUPER_ADMIN show green CRUD badges"
+
+  caching:
+    - name: "Roles cached for 5 minutes"
+      setup: |
+        - First request fetches from API
+        - Navigate away and back within 5 minutes
+      expected: "Second load uses cache (no API call)"
+
+    - name: "Cache expires after 5 minutes"
+      setup: |
+        - First request fetches from API
+        - Wait 6 minutes
+        - Navigate back to page
+      expected: "New API call made after expiry"
+
+# E2E Test Cases
+e2e_tests:
+  roles_viewer_page:
+    - name: "Full page load and interaction flow"
+      steps:
+        - "Navigate to /settings/roles"
+        - "Wait for roles table to load"
+        - "Verify 10 roles displayed"
+        - "Click on 'Admin' role row"
+        - "Verify role detail dialog opens"
+        - "Close dialog"
+        - "Switch to 'Matrix' view tab"
+        - "Verify permissions matrix visible"
+      expected: "All interactions work smoothly"
+
+    - name: "Read-only mode verification"
+      steps:
+        - "Login as VIEWER user"
+        - "Navigate to /settings/roles"
+        - "Verify no edit buttons present"
+        - "Verify no delete buttons present"
+        - "Verify info callout says 'Roles are system-defined and cannot be edited'"
+      expected: "Page is read-only for all users"
+
+    - name: "Permission badge tooltips"
+      steps:
+        - "Navigate to /settings/roles"
+        - "Switch to matrix view"
+        - "Hover over CRUD badge"
+        - "Verify tooltip shows 'Create, Read, Update, Delete'"
+        - "Hover over R badge"
+        - "Verify tooltip shows 'Read-only'"
+      expected: "All tooltips display correct information"
+
+    - name: "Responsive design on mobile"
+      steps:
+        - "Set viewport to mobile (375px)"
+        - "Navigate to /settings/roles"
+        - "Verify table is scrollable horizontally"
+        - "Switch to matrix view"
+        - "Verify matrix scrolls horizontally"
+      expected: "Page usable on mobile devices"
+
+# Definition of Done
+definition_of_done:
+  - "All 10 system roles display in roles table"
+  - "Roles ordered by display_order"
+  - "Permissions matrix view functional"
+  - "Permission badges color-coded correctly (CRUD=green, R=gray, etc.)"
+  - "Tooltips show on hover for permission badges"
+  - "No edit/delete buttons (read-only verification)"
+  - "Error handling with retry button"
+  - "Loading states (skeleton) display"
+  - "Caching works (5-minute stale time)"
+  - "Unit test coverage >= 85%"
+  - "Integration test coverage >= 80%"
+  - "E2E tests pass (4 scenarios)"
+  - "Responsive design verified (mobile + desktop)"
+  - "Accessibility: ARIA labels, keyboard navigation"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 85
+    reason: "Frontend components with clear behavior"
+  integration:
+    target: 80
+    reason: "API integration and React Query caching"
+  e2e:
+    target: 4
+    reason: "Core user flows verified"
+  files:
+    - "lib/services/role-service.ts: 90%"
+    - "components/settings/roles/RolesTable.tsx: 85%"
+    - "components/settings/roles/PermissionsMatrix.tsx: 80%"
+    - "components/settings/roles/PermissionBadge.tsx: 95%"
+
+# Test Data
+test_data:
+  mock_roles:
+    - code: "SUPER_ADMIN"
+      name: "Super Administrator"
+      description: "Full system access"
+      permissions:
+        settings: "CRUD"
+        users: "CRUD"
+        technical: "CRUD"
+        planning: "CRUD"
+        production: "CRUD"
+        warehouse: "CRUD"
+        quality: "CRUD"
+        shipping: "CRUD"
+      display_order: 1
+
+    - code: "VIEWER"
+      name: "Viewer"
+      description: "Read-only all modules"
+      permissions:
+        settings: "R"
+        users: "R"
+        technical: "R"
+        planning: "R"
+        production: "R"
+        warehouse: "R"
+        quality: "R"
+        shipping: "R"
+      display_order: 9
+
+    - code: "OPERATOR"
+      name: "Operator"
+      description: "CRU Production, read Quality"
+      permissions:
+        settings: "-"
+        users: "-"
+        technical: "R"
+        planning: "R"
+        production: "CRU"
+        warehouse: "CRU"
+        quality: "CRU"
+        shipping: "-"
+      display_order: 7
+
+  mock_matrix:
+    modules:
+      - "settings"
+      - "users"
+      - "technical"
+      - "planning"
+      - "production"
+      - "warehouse"
+      - "quality"
+      - "shipping"
+    roles:
+      - code: "SUPER_ADMIN"
+        name: "Super Administrator"
+        permissions:
+          settings: "CRUD"
+          users: "CRUD"
+          technical: "CRUD"
+          planning: "CRUD"
+          production: "CRUD"
+          warehouse: "CRUD"
+          quality: "CRUD"
+          shipping: "CRUD"
+
+# Performance Benchmarks
+performance:
+  page_load:
+    target: "< 1 second"
+    metric: "Time to interactive"
+  table_render:
+    target: "< 200ms"
+    metric: "Time to render 10 rows"
+  cache_load:
+    target: "< 100ms"
+    metric: "Load from React Query cache"
+  matrix_render:
+    target: "< 300ms"
+    metric: "Time to render 8x10 grid"
+
+# Accessibility Tests
+accessibility:
+  wcag_level: "AA"
+  tests:
+    - "Keyboard navigation: Tab through table rows"
+    - "Screen reader: Role names announced"
+    - "Color contrast: Badge colors meet 4.5:1 ratio"
+    - "Focus indicators: Visible on all interactive elements"
+    - "ARIA labels: Present on all icons and badges"

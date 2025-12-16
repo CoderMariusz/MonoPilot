@@ -1,0 +1,230 @@
+# Story 01.3 - API Specification
+# Purpose: Onboarding status and skip endpoints
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/onboarding/status"
+    file: "apps/frontend/app/api/v1/settings/onboarding/status/route.ts"
+    description: "Get current onboarding status for organization"
+    auth: true
+    roles: ["*"]  # All authenticated users
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      schema:
+        step: "number (0-7)"
+        started_at: "string | null (ISO timestamp)"
+        completed_at: "string | null (ISO timestamp)"
+        skipped: "boolean"
+        is_complete: "boolean (computed: step === 7 || completed_at !== null)"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "ORG_NOT_FOUND"
+        message: "Organization not found"
+
+    pattern: |
+      import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+      import { cookies } from 'next/headers';
+      import { NextResponse } from 'next/server';
+
+      export async function GET() {
+        const supabase = createRouteHandlerClient({ cookies });
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('org_id')
+          .eq('id', user.id)
+          .single();
+
+        if (userError || !userData) {
+          return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        const { data: org, error: orgError } = await supabase
+          .from('organizations')
+          .select('onboarding_step, onboarding_started_at, onboarding_completed_at, onboarding_skipped')
+          .eq('id', userData.org_id)
+          .single();
+
+        if (orgError || !org) {
+          return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
+
+        return NextResponse.json({
+          step: org.onboarding_step,
+          started_at: org.onboarding_started_at,
+          completed_at: org.onboarding_completed_at,
+          skipped: org.onboarding_skipped,
+          is_complete: org.onboarding_step === 7 || org.onboarding_completed_at !== null,
+        });
+      }
+
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/skip"
+    file: "apps/frontend/app/api/v1/settings/onboarding/skip/route.ts"
+    description: "Skip wizard and create demo data"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body: null  # No body required
+
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+        demo_data:
+          warehouse_id: "string (UUID)"
+          location_id: "string (UUID)"
+          product_id: "string (UUID)"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Only admin users can skip onboarding"
+
+    side_effects:
+      - "Creates warehouse: code=DEMO-WH, name=Main Warehouse, type=general, is_default=true"
+      - "Creates location: code=DEFAULT, name=Default Location, type=zone"
+      - "Creates product: code=SAMPLE-001, name=Sample Product, uom=EA, status=active"
+      - "Sets module toggles: technical=true, others=false"
+      - "Updates organizations: onboarding_skipped=true, onboarding_completed_at=now()"
+
+    pattern: |
+      import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+      import { cookies } from 'next/headers';
+      import { NextResponse } from 'next/server';
+      import { hasRole } from '@/lib/services/permission-service';
+      import { getOrgContext } from '@/lib/services/org-context-service';
+
+      export async function POST() {
+        const supabase = createRouteHandlerClient({ cookies });
+        const context = await getOrgContext();
+
+        if (!context) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        if (!hasRole(context, ['SUPER_ADMIN', 'ADMIN'])) {
+          return NextResponse.json({ error: 'Only admin users can skip onboarding' }, { status: 403 });
+        }
+
+        // Start transaction-like operations
+        // 1. Create demo warehouse
+        const { data: warehouse, error: whError } = await supabase
+          .from('warehouses')
+          .insert({
+            org_id: context.org_id,
+            code: 'DEMO-WH',
+            name: 'Main Warehouse',
+            type: 'general',
+            is_default: true,
+          })
+          .select()
+          .single();
+
+        if (whError) {
+          return NextResponse.json({ error: 'Failed to create warehouse' }, { status: 500 });
+        }
+
+        // 2. Create demo location
+        const { data: location, error: locError } = await supabase
+          .from('locations')
+          .insert({
+            org_id: context.org_id,
+            warehouse_id: warehouse.id,
+            code: 'DEFAULT',
+            name: 'Default Location',
+            type: 'zone',
+          })
+          .select()
+          .single();
+
+        // 3. Create demo product
+        const { data: product, error: prodError } = await supabase
+          .from('products')
+          .insert({
+            org_id: context.org_id,
+            code: 'SAMPLE-001',
+            name: 'Sample Product',
+            uom: 'EA',
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        // 4. Update organization
+        await supabase
+          .from('organizations')
+          .update({
+            onboarding_skipped: true,
+            onboarding_completed_at: new Date().toISOString(),
+          })
+          .eq('id', context.org_id);
+
+        // 5. Set module toggles
+        await supabase
+          .from('organization_modules')
+          .update({ enabled: true })
+          .eq('org_id', context.org_id)
+          .in('module_id', ['<technical_module_id>']); // Use actual module IDs
+
+        return NextResponse.json({
+          success: true,
+          demo_data: {
+            warehouse_id: warehouse.id,
+            location_id: location?.id,
+            product_id: product?.id,
+          },
+        });
+      }
+
+# Service
+services:
+  - path: "apps/frontend/lib/services/onboarding-service.ts"
+    description: "Onboarding wizard business logic"
+    exports:
+      - name: "getOnboardingStatus"
+        type: "async function"
+        returns: "Promise<OnboardingStatus>"
+
+      - name: "skipOnboarding"
+        type: "async function"
+        returns: "Promise<SkipResult>"
+
+      - name: "OnboardingStatus"
+        type: "interface"
+        fields:
+          - "step: number"
+          - "started_at: string | null"
+          - "completed_at: string | null"
+          - "skipped: boolean"
+          - "is_complete: boolean"
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/onboarding.ts"
+    schemas:
+      - name: "onboardingStatusSchema"
+        description: "Zod schema for status response"
+      - name: "skipResultSchema"
+        description: "Zod schema for skip result"

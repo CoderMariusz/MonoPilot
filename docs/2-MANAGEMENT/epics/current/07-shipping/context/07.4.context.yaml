@@ -1,0 +1,338 @@
+story:
+  id: "07.4"
+  name: "SO Line Pricing + Totals Calculation"
+  epic: "07-shipping"
+  phase: "1A"
+  complexity: "S"
+  estimate_days: 1-2
+  priority: "P0"
+  type: "backend + frontend"
+
+dependencies:
+  required:
+    - story: "01.1"
+      epic: "01-settings"
+      provides: ["organizations", "users", "roles", "RLS"]
+      status: "complete"
+    - story: "02.1"
+      epic: "02-technical"
+      provides: ["products table", "products.std_price field"]
+      status: "complete"
+    - story: "07.3"
+      epic: "07-shipping"
+      provides: ["sales_orders", "sales_order_lines tables"]
+      status: "required"
+
+  provides_to:
+    - story: "07.5"
+      what: "Validated pricing for SO confirmation"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/shipping.md"
+  prd_sections:
+    - "sales_order_lines schema (line 199-216)"
+    - "sales_orders schema (line 177-197)"
+  architecture:
+    - "docs/1-BASELINE/architecture/modules/shipping.md"
+    - "docs/1-BASELINE/architecture/modules/technical.md"
+  story: "docs/2-MANAGEMENT/epics/current/07-shipping/07.4.so-line-pricing.md"
+  patterns:
+    - "apps/frontend/lib/services/*-service.ts"
+    - "apps/frontend/lib/validation/*-schema.ts"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_add_discount_to_sales_order_lines.sql"
+      type: "migration"
+      content: "ADD COLUMN discount JSONB"
+
+  services:
+    - path: "apps/frontend/lib/services/pricing-service.ts"
+      exports:
+        - "PricingService.getProductPrice"
+        - "PricingService.calculateLineTotal"
+        - "PricingService.calculateOrderTotal"
+        - "PricingService.updateOrderTotal"
+
+  validation:
+    - path: "apps/frontend/lib/validation/sales-order-line-schema.ts"
+      updates: "Add discount field with type + value validation"
+
+  api:
+    - path: "apps/frontend/app/api/shipping/sales-orders/[id]/lines/route.ts"
+      methods: ["POST"]
+      changes: "Auto-populate unit_price, calculate line_total, update SO total"
+    - path: "apps/frontend/app/api/shipping/sales-orders/[id]/lines/[lineId]/route.ts"
+      methods: ["PUT", "DELETE"]
+      changes: "Recalculate line_total + SO total on edit/delete"
+    - path: "apps/frontend/app/api/shipping/products/[id]/price/route.ts"
+      methods: ["GET"]
+      optional: true
+      purpose: "Helper endpoint for price lookup"
+
+  components:
+    - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/components/SOLineForm.tsx"
+      updates:
+        - "Auto-populate unit_price from products.std_price"
+        - "Add discount input (type + value)"
+        - "Display calculated line_total"
+        - "Real-time recalculation"
+    - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/components/SOLineTable.tsx"
+      updates:
+        - "Display unit_price (editable in draft)"
+        - "Display discount column"
+        - "Display line_total"
+    - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/components/SOTotalDisplay.tsx"
+      purpose: "Display SO total_amount with real-time updates"
+    - path: "apps/frontend/app/(authenticated)/shipping/sales-orders/[id]/components/DiscountInput.tsx"
+      purpose: "Reusable discount input (type selector + value)"
+
+database:
+  tables:
+    - name: "sales_order_lines"
+      changes:
+        - column: "discount"
+          type: "JSONB"
+          nullable: true
+          default: "NULL"
+          comment: "Discount config: {type: 'percent'|'fixed', value: decimal}"
+      existing_columns:
+        - "unit_price DECIMAL(15,4) NOT NULL"
+        - "line_total DECIMAL(15,2) -- Calculated"
+        - "quantity_ordered DECIMAL(15,4) NOT NULL"
+      rls: true
+      indexes: []
+
+    - name: "sales_orders"
+      existing_columns:
+        - "total_amount DECIMAL(15,2) -- Calculated"
+      no_changes: true
+
+  lookup_tables:
+    - name: "products"
+      columns: ["std_price DECIMAL(15,4)"]
+      purpose: "Source of unit_price for SO lines"
+
+api_endpoints:
+  - method: "POST"
+    path: "/api/shipping/sales-orders/:id/lines"
+    auth: true
+    roles: ["sales", "manager", "admin"]
+    input:
+      - "product_id (uuid)"
+      - "quantity_ordered (decimal)"
+      - "unit_price (decimal, optional - auto-populated)"
+      - "discount (jsonb, optional)"
+      - "requested_lot (text, optional)"
+    logic:
+      - "Auto-populate unit_price from products.std_price if not provided"
+      - "Calculate line_total = quantity * unit_price - discount"
+      - "Insert sales_order_line"
+      - "Recalculate and update sales_orders.total_amount"
+    output:
+      - "created line with line_total"
+      - "updated SO total_amount"
+
+  - method: "PUT"
+    path: "/api/shipping/sales-orders/:id/lines/:lineId"
+    auth: true
+    roles: ["sales", "manager", "admin"]
+    validation:
+      - "unit_price > 0"
+      - "discount.value >= 0"
+      - "if discount.type = 'percent', discount.value <= 100"
+    logic:
+      - "Recalculate line_total"
+      - "Update sales_order_line"
+      - "Recalculate and update sales_orders.total_amount"
+    output:
+      - "updated line with line_total"
+      - "updated SO total_amount"
+
+  - method: "DELETE"
+    path: "/api/shipping/sales-orders/:id/lines/:lineId"
+    auth: true
+    roles: ["sales", "manager", "admin"]
+    logic:
+      - "Delete sales_order_line"
+      - "Recalculate and update sales_orders.total_amount"
+    output:
+      - "updated SO total_amount"
+
+  - method: "GET"
+    path: "/api/shipping/products/:id/price"
+    auth: true
+    optional: true
+    purpose: "Helper endpoint for price lookup without creating line"
+    output:
+      - "std_price from products table"
+
+validation_rules:
+  unit_price: "Must be > 0 (positive decimal)"
+  quantity_ordered: "Must be > 0 (positive decimal)"
+  discount:
+    type: "Must be 'percent' or 'fixed'"
+    value: "Must be >= 0 (non-negative)"
+    percent_constraint: "If type='percent', value must be <= 100"
+  line_total: "Calculated field, not user input"
+
+calculation_formulas:
+  line_total_no_discount: "quantity_ordered * unit_price"
+  line_total_percent_discount: "(quantity_ordered * unit_price) * (1 - discount.value / 100)"
+  line_total_fixed_discount: "MAX(0, (quantity_ordered * unit_price) - discount.value)"
+  order_total: "SUM(sales_order_lines.line_total) WHERE sales_order_id = :id"
+
+precision:
+  unit_price: "DECIMAL(15,4) - up to 4 decimals"
+  quantity_ordered: "DECIMAL(15,4) - fractional quantities allowed"
+  line_total: "DECIMAL(15,2) - currency precision (2 decimals)"
+  total_amount: "DECIMAL(15,2) - currency precision (2 decimals)"
+
+business_rules:
+  - rule: "Auto-populate unit_price from products.std_price when adding line"
+  - rule: "If products.std_price is NULL, default to 0.00 and warn user"
+  - rule: "Unit price can be manually overridden in 'draft' status only"
+  - rule: "Once SO is 'confirmed', prices are locked (read-only)"
+  - rule: "Discount is optional (can be NULL or {})"
+  - rule: "Fixed discount cannot make line_total negative (min = 0.00)"
+  - rule: "Line total recalculates on qty/price/discount change"
+  - rule: "SO total recalculates on line add/edit/delete"
+  - rule: "All calculations round to 2 decimal places for display"
+
+ux:
+  patterns:
+    form: "ShadCN Form pattern with real-time validation"
+    input: "Number inputs with step=0.01 for currency"
+    display: "Read-only calculated fields (line_total, total_amount)"
+    total_display: "Prominent card at bottom of line items table"
+
+  states:
+    loading: "Show skeleton loader while fetching product price"
+    empty: "No lines yet - display empty state with 'Add Line' CTA"
+    warning: "Product has no standard price - show warning toast"
+    error: "Validation errors displayed inline with red text"
+    success: "Line added/updated - show success toast + updated total"
+
+  real_time_updates:
+    - "Line total updates as user types quantity/price"
+    - "SO total updates immediately when line changes"
+    - "Discount preview shows calculated amount"
+    - "No page refresh needed"
+
+edge_cases:
+  - case: "Product with no std_price"
+    handling: "Default unit_price = 0.00, show warning, allow manual entry"
+
+  - case: "Discount > line subtotal (fixed type)"
+    handling: "Set line_total = 0.00 (minimum, cannot be negative)"
+
+  - case: "Product deleted after line created"
+    handling: "Keep existing unit_price in line (historical data)"
+
+  - case: "Zero quantity"
+    handling: "Validation error: 'Quantity must be greater than zero'"
+
+  - case: "Zero or negative unit_price"
+    handling: "Validation error: 'Unit price must be greater than zero'"
+
+  - case: "Negative discount"
+    handling: "Validation error: 'Discount cannot be negative'"
+
+  - case: "Percentage discount > 100%"
+    handling: "Validation error: 'Percentage discount cannot exceed 100%'"
+
+  - case: "SO in 'confirmed' status"
+    handling: "Unit price field is read-only, cannot edit"
+
+patterns:
+  rls: "ADR-013 - org_id filter on all queries"
+  api: "REST pattern: POST /lines, PUT /lines/:id, DELETE /lines/:id"
+  service: "Class-based service with static methods"
+  validation: "Zod schemas with custom refinements"
+  calculation: "Service layer methods, not database triggers (Phase 1)"
+  frontend_state: "React hooks (useState, useEffect) for real-time calc"
+
+acceptance_checklist:
+  - "AC-1: Auto-populate unit_price from products.std_price"
+  - "AC-2: Calculate line_total on quantity/price change"
+  - "AC-3: Apply percentage discount to line"
+  - "AC-4: Apply fixed discount to line"
+  - "AC-5: Calculate SO total_amount from all lines"
+  - "AC-6: Recalculate totals on line edit"
+  - "AC-7: Recalculate totals on line delete"
+  - "AC-8: Validate positive unit_price"
+  - "AC-9: Validate non-negative discount"
+  - "AC-10: Validate percentage discount <= 100%"
+  - "AC-11: Handle products without std_price"
+  - "AC-12: Real-time total display in SO form"
+
+output_artifacts:
+  database:
+    - "Migration: Add discount column to sales_order_lines"
+
+  backend:
+    - "PricingService with calculation methods"
+    - "Updated API routes with pricing logic"
+    - "Updated validation schemas"
+    - "Unit tests for pricing calculations"
+    - "Integration tests for API endpoints"
+
+  frontend:
+    - "SOLineForm component with auto-price + discount"
+    - "SOLineTable component with price/discount/total columns"
+    - "SOTotalDisplay component for order total"
+    - "DiscountInput reusable component"
+    - "E2E test for pricing workflow"
+
+  documentation:
+    - "Story document (07.4.so-line-pricing.md)"
+    - "Context YAML (07.4.context.yaml)"
+
+test_scenarios:
+  unit:
+    - "calculateLineTotal with no discount"
+    - "calculateLineTotal with 10% discount"
+    - "calculateLineTotal with $50 fixed discount"
+    - "calculateLineTotal with discount > subtotal (fixed)"
+    - "calculateOrderTotal with 3 lines"
+    - "getProductPrice returns std_price"
+    - "getProductPrice handles NULL std_price"
+
+  integration:
+    - "POST /lines auto-populates unit_price"
+    - "POST /lines calculates line_total"
+    - "POST /lines updates SO total_amount"
+    - "PUT /lines recalculates totals"
+    - "DELETE /lines recalculates SO total"
+    - "Validation rejects negative price"
+    - "Validation rejects discount > 100%"
+
+  e2e:
+    - "Create SO → Add line → Verify auto-price from product"
+    - "Edit quantity → Verify line + SO total update"
+    - "Add 10% discount → Verify calculation"
+    - "Delete line → Verify SO total update"
+    - "Select product with no price → See warning"
+
+out_of_scope:
+  phase_2:
+    - "Customer-specific pricing agreements (FR-7.8)"
+    - "Payment terms logic (FR-7.6)"
+    - "Credit limit validation (FR-7.4)"
+
+  phase_3:
+    - "Multi-currency pricing"
+    - "Bulk pricing tiers"
+    - "Historical price tracking"
+    - "Tax calculation (Epic 09 Finance)"
+    - "Price approval workflows"
+
+notes:
+  - "Phase 1 pricing is simple: products.std_price only"
+  - "Customer-specific pricing deferred to Phase 2"
+  - "Tax calculation is Epic 09 Finance (out of scope)"
+  - "Database triggers vs service layer: Service layer chosen for Phase 1 (simpler)"
+  - "Real-time updates handled by React state, not WebSockets"
+  - "Discount stored as JSONB for flexibility (future discount types)"
+  - "All currency values rounded to 2 decimals for display"
+  - "Price override only allowed in 'draft' status"

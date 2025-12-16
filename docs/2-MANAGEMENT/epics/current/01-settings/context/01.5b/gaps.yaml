@@ -1,0 +1,365 @@
+# Story 01.5b - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+
+gap_summary:
+  overall_readiness: "25%"
+  critical_blockers: 2
+  components_done: 1
+  components_partial: 1
+  components_missing: 5
+
+# =============================================================================
+# DEPENDENCY BLOCKERS (from Story 01.5a and 01.8)
+# =============================================================================
+dependency_blockers:
+  - blocker: "Story 01.5a (User Management CRUD) must be complete"
+    status: "PARTIAL"
+    description: |
+      Story 01.5a provides:
+      - users table with warehouse_access_ids column
+      - User CRUD API endpoints
+      - UserModal component
+      - user-service.ts
+
+      Without 01.5a merged to main, this story cannot proceed.
+    impact: "Blocks all implementation"
+    action: "Wait for 01.5a to be merged to main"
+
+  - blocker: "Story 01.8 (Warehouses CRUD) must be complete"
+    status: "UNKNOWN"
+    description: |
+      Story 01.8 provides:
+      - warehouses table
+      - GET /api/v1/settings/warehouses endpoint
+      - Warehouse entities for assignment
+
+      Without warehouses, there's nothing to assign.
+    impact: "Blocks warehouse fetching and assignment"
+    action: "Wait for 01.8 to be complete"
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "users.warehouse_access_ids column"
+    expected: "UUID[] column in users table"
+    found: "DEPENDS ON 01.5a"
+    status: "PENDING"
+    gap_description: |
+      This column is created in Story 01.5a.
+      If 01.5a is complete, this column exists.
+      If 01.5a is not complete, this is a blocker.
+    refactor_action: "Verify 01.5a completion status"
+    priority: "P0-BLOCKER"
+
+  - component: "user_warehouse_access_log table"
+    expected: "Optional audit log table"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Audit log table is optional but recommended.
+      Provides trail of who changed what warehouse access when.
+    refactor_action: "Create migration XXX_user_warehouse_access_log.sql"
+    priority: "P1"
+
+  - component: "RLS policies for warehouse-scoped tables"
+    expected: "Policies filtering by warehouse_access_ids"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      RLS policies must be added to:
+      - inventory_items
+      - license_plates
+      - Any other table with warehouse_id column
+
+      Policies should check:
+      1. warehouse_id IN (SELECT unnest(warehouse_access_ids) FROM users WHERE id = auth.uid())
+      2. OR (warehouse_access_ids IS NULL AND role IN ('SUPER_ADMIN', 'ADMIN'))
+    refactor_action: "Create migration XXX_rls_warehouse_access.sql"
+    priority: "P0"
+
+  - component: "Cascading delete trigger"
+    expected: "Trigger to clean up warehouse_access_ids when warehouse deleted"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      When a warehouse is deleted, it should be removed from all users'
+      warehouse_access_ids arrays automatically.
+    refactor_action: "Create trigger cleanup_warehouse_access()"
+    priority: "P1"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "GET /api/v1/settings/users/:id/warehouse-access"
+    expected: "New route returning WarehouseAccessResponse"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Endpoint to fetch user's warehouse access configuration."
+    refactor_action: "Create apps/frontend/app/api/v1/settings/users/[id]/warehouse-access/route.ts"
+    priority: "P0"
+
+  - component: "PUT /api/v1/settings/users/:id/warehouse-access"
+    expected: "New route accepting UpdateWarehouseAccessRequest"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Endpoint to update user's warehouse access."
+    refactor_action: "Create PUT handler in same route file"
+    priority: "P0"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "user-warehouse-service.ts"
+    expected: "apps/frontend/lib/services/user-warehouse-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Service extending UserService with warehouse access methods:
+      - getWarehouseAccess()
+      - updateWarehouseAccess()
+      - getAllWarehouses()
+      - getWarehousesByIds()
+      - logAccessChange()
+    refactor_action: "Create new service extending UserService"
+    priority: "P0"
+    depends_on: "UserService from 01.5a"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  - component: "WarehouseAccessSection"
+    expected: "apps/frontend/components/settings/users/WarehouseAccessSection.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Component for warehouse access UI in user modal.
+      Features:
+      - 'All Warehouses' checkbox
+      - Multi-select dropdown for specific warehouses
+      - Validation and warnings
+      - Disabled state handling
+    refactor_action: "Create new component"
+    priority: "P0"
+    depends_on: "UserModal from 01.5a"
+
+  - component: "WarehouseAccessBadge"
+    expected: "apps/frontend/components/settings/users/WarehouseAccessBadge.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Badge component showing warehouse access status in user list.
+      Variants: All, Specific (count), None
+    refactor_action: "Create new component"
+    priority: "P1"
+
+  - component: "UserModal (update)"
+    expected: "Extend existing UserModal with warehouse access section"
+    found: "DEPENDS ON 01.5a"
+    status: "PARTIAL"
+    gap_description: |
+      UserModal exists in 01.5a but needs extension:
+      - Add WarehouseAccessSection import
+      - Add warehouse_access_ids to form state
+      - Add all_warehouses to form state
+      - Fetch warehouses on mount
+      - Enable SET-009 lines 49-117
+    refactor_action: "Update UserModal component"
+    priority: "P0"
+    depends_on: "01.5a UserModal"
+
+  - component: "UsersDataTable (update)"
+    expected: "Add warehouse access column"
+    found: "DEPENDS ON 01.5a"
+    status: "PARTIAL"
+    gap_description: |
+      UsersDataTable exists in 01.5a but needs:
+      - New column 'Warehouse Access'
+      - Render WarehouseAccessBadge
+      - Fetch warehouse_access_ids in query
+    refactor_action: "Update UsersDataTable component"
+    priority: "P1"
+
+# =============================================================================
+# HOOK GAPS
+# =============================================================================
+hook_gaps:
+  - component: "useWarehouseAccess"
+    expected: "apps/frontend/lib/hooks/useWarehouseAccess.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Hook for managing warehouse access state in user form.
+      Uses React Query for fetching and mutations.
+    refactor_action: "Create new hook"
+    priority: "P1"
+
+# =============================================================================
+# TYPE GAPS
+# =============================================================================
+type_gaps:
+  - component: "WarehouseAccessResponse interface"
+    expected: "apps/frontend/lib/types/warehouse-access.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "TypeScript interface for API response."
+    refactor_action: "Create lib/types/warehouse-access.ts"
+    priority: "P1"
+
+  - component: "UpdateWarehouseAccessRequest interface"
+    expected: "Same file as above"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "TypeScript interface for API request."
+    refactor_action: "Add to lib/types/warehouse-access.ts"
+    priority: "P1"
+
+# =============================================================================
+# VALIDATION GAPS
+# =============================================================================
+validation_gaps:
+  - component: "updateWarehouseAccessSchema"
+    expected: "apps/frontend/lib/validation/warehouse-access.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Zod schema for warehouse access validation:
+      - all_warehouses: boolean
+      - warehouse_ids: UUID[] (required if all_warehouses = false)
+      - Refine: at least one warehouse if not all
+    refactor_action: "Create lib/validation/warehouse-access.ts"
+    priority: "P1"
+
+# =============================================================================
+# UX GAPS
+# =============================================================================
+ux_gaps:
+  - component: "SET-009 wireframe lines 49-117"
+    expected: "Warehouse access section in user modal"
+    found: "NOT IMPLEMENTED (Phase 2 in 01.5a)"
+    status: "DEFERRED"
+    gap_description: |
+      SET-009 wireframe includes warehouse access section but it was
+      deferred to Phase 1B (this story).
+      Must enable this section in UserModal.
+    refactor_action: "Enable SET-009 lines 49-117 in UserModal"
+    priority: "P0"
+
+# =============================================================================
+# ARCHITECTURAL NOTES
+# =============================================================================
+architectural_notes:
+  - note: "Service Extension Pattern"
+    description: |
+      UserWarehouseService extends UserService (composition pattern).
+      This keeps warehouse-specific logic separate from base user CRUD.
+
+      RECOMMENDATION: Use class inheritance or composition.
+
+  - note: "NULL vs Empty Array"
+    description: |
+      warehouse_access_ids has 3 states:
+      1. NULL = all warehouses (admin/super_admin only)
+      2. [] = no warehouses (explicit)
+      3. [id1, id2] = specific warehouses
+
+      IMPORTANT: NULL interpretation depends on user role.
+
+  - note: "RLS Policy Complexity"
+    description: |
+      RLS policies for warehouse access are more complex than standard
+      org isolation because they must check:
+      1. User's warehouse_access_ids array
+      2. User's role (for admin bypass)
+      3. NULL handling (admin bypass)
+
+      RECOMMENDATION: Test RLS policies thoroughly with multiple scenarios.
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  prerequisite: "Story 01.5a and 01.8 must be complete"
+
+  phase_1_database:
+    - "Verify users.warehouse_access_ids exists (from 01.5a)"
+    - "XXX_user_warehouse_access_log.sql (optional)"
+    - "XXX_rls_warehouse_access.sql (required)"
+    - "Cascading delete trigger (optional)"
+
+  phase_2_types:
+    - "lib/types/warehouse-access.ts"
+
+  phase_3_validation:
+    - "lib/validation/warehouse-access.ts"
+
+  phase_4_services:
+    - "lib/services/user-warehouse-service.ts"
+
+  phase_5_api:
+    - "app/api/v1/settings/users/[id]/warehouse-access/route.ts"
+
+  phase_6_hooks:
+    - "lib/hooks/useWarehouseAccess.ts"
+
+  phase_7_components:
+    - "components/settings/users/WarehouseAccessSection.tsx"
+    - "components/settings/users/WarehouseAccessBadge.tsx"
+
+  phase_8_updates:
+    - "Update UserModal with WarehouseAccessSection"
+    - "Update UsersDataTable with warehouse access column"
+
+  phase_9_tests:
+    - "Unit tests for components and service"
+    - "Integration tests for API and RLS"
+    - "E2E tests for user flows"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] users.warehouse_access_ids column exists"
+  - "[ ] RLS policies filter inventory by warehouse access"
+  - "[ ] Admin/Super Admin bypass works (NULL = all)"
+  - "[ ] GET /api/v1/settings/users/:id/warehouse-access returns correct data"
+  - "[ ] PUT /api/v1/settings/users/:id/warehouse-access updates correctly"
+  - "[ ] WarehouseAccessSection renders in user modal"
+  - "[ ] 'All Warehouses' checkbox toggles multi-select state"
+  - "[ ] Validation error shown when no warehouses selected"
+  - "[ ] Warehouse access badge appears in user list"
+  - "[ ] Cascading delete removes warehouse from access arrays"
+  - "[ ] Audit log captures access changes (if implemented)"
+  - "[ ] Unit tests >= 80% coverage"
+  - "[ ] Integration tests >= 80% coverage"
+  - "[ ] All acceptance criteria pass"
+
+# =============================================================================
+# RISKS
+# =============================================================================
+risks:
+  - id: "RISK-01"
+    description: "Story 01.5a not complete"
+    mitigation: "Check 01.5a status before starting, coordinate with team"
+    severity: "high"
+
+  - id: "RISK-02"
+    description: "Story 01.8 not complete"
+    mitigation: "Warehouses CRUD must be done first, check epic order"
+    severity: "high"
+
+  - id: "RISK-03"
+    description: "RLS policy misconfiguration could leak inventory data"
+    mitigation: "Comprehensive RLS tests with multiple user/warehouse combinations"
+    severity: "high"
+    test_coverage: "integration_tests.rls_enforcement"
+
+  - id: "RISK-04"
+    description: "NULL warehouse_access_ids interpreted incorrectly for non-admins"
+    mitigation: "Explicit role check in business logic and RLS policies"
+    severity: "medium"
+    test_coverage: "unit_tests.UserWarehouseService + integration_tests"

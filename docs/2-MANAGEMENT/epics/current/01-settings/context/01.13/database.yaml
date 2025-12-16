@@ -1,0 +1,114 @@
+# Story 01.13 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/061_create_tax_codes_table.sql"
+    type: "migration"
+    description: "Tax codes table with rate, jurisdiction, validity"
+  - path: "supabase/migrations/062_seed_polish_tax_codes.sql"
+    type: "seed"
+    description: "Seed common Polish tax codes (VAT 23%, 8%, 5%, 0%, Exempt)"
+
+tables:
+  - name: "tax_codes"
+    description: "Tax codes with rates, jurisdictions, and effective dates"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "code", type: "VARCHAR(20)", constraints: "NOT NULL" }
+      - { name: "name", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "rate", type: "DECIMAL(5,2)", constraints: "NOT NULL CHECK (rate >= 0 AND rate <= 100)" }
+      - { name: "country_code", type: "CHAR(2)", constraints: "NOT NULL CHECK (country_code ~ '^[A-Z]{2}$')" }
+      - { name: "valid_from", type: "DATE", constraints: "NOT NULL" }
+      - { name: "valid_to", type: "DATE", constraints: "CHECK (valid_to IS NULL OR valid_to > valid_from)" }
+      - { name: "is_default", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "is_deleted", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "deleted_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "deleted_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_tax_codes_org_id ON tax_codes(org_id)"
+      - "idx_tax_codes_org_country ON tax_codes(org_id, country_code)"
+      - "idx_tax_codes_org_active ON tax_codes(org_id, is_deleted) WHERE is_deleted = false"
+      - "idx_tax_codes_valid_dates ON tax_codes(org_id, valid_from, valid_to)"
+    constraints:
+      - "UNIQUE(org_id, code, country_code) WHERE is_deleted = false"
+      - "CHECK (code ~ '^[A-Z0-9-]{2,20}$')"
+
+# Trigger: Ensure only one default per org
+trigger:
+  name: "tr_tax_codes_single_default"
+  function: "ensure_single_default_tax_code"
+  timing: "BEFORE INSERT OR UPDATE OF is_default"
+  condition: "WHEN (NEW.is_default = true)"
+  logic: |
+    IF NEW.is_default = true AND NEW.is_deleted = false THEN
+      UPDATE tax_codes
+      SET is_default = false, updated_at = NOW()
+      WHERE org_id = NEW.org_id
+        AND id != NEW.id
+        AND is_default = true
+        AND is_deleted = false;
+    END IF;
+    RETURN NEW;
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "tax_codes"
+      name: "tax_codes_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND is_deleted = false"
+
+    - table: "tax_codes"
+      name: "tax_codes_insert"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('SUPER_ADMIN', 'ADMIN')
+        )
+
+    - table: "tax_codes"
+      name: "tax_codes_update"
+      operation: "UPDATE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('SUPER_ADMIN', 'ADMIN')
+        )
+
+    - table: "tax_codes"
+      name: "tax_codes_delete"
+      operation: "DELETE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('SUPER_ADMIN', 'ADMIN')
+        )
+
+# Seed Data (Polish Tax Codes)
+seed_data:
+  description: "Common Polish VAT rates"
+  data:
+    - { code: "VAT23", name: "VAT 23%", rate: 23.00, country_code: "PL", valid_from: "2011-01-01", is_default: true }
+    - { code: "VAT8", name: "VAT 8%", rate: 8.00, country_code: "PL", valid_from: "2011-01-01", is_default: false }
+    - { code: "VAT5", name: "VAT 5%", rate: 5.00, country_code: "PL", valid_from: "2011-01-01", is_default: false }
+    - { code: "VAT0", name: "VAT 0%", rate: 0.00, country_code: "PL", valid_from: "2011-01-01", is_default: false }
+    - { code: "ZW", name: "Zwolniony (Exempt)", rate: 0.00, country_code: "PL", valid_from: "2011-01-01", is_default: false }
+  notes:
+    - "Seed for all existing organizations"
+    - "Only seed if tax codes don't exist for org"
+    - "Set created_by to first SUPER_ADMIN user in org"

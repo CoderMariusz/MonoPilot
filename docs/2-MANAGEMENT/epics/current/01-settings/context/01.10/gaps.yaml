@@ -1,0 +1,160 @@
+# Story 01.10 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built
+
+gap_summary:
+  overall_readiness: "0%"
+  critical_blockers: 4
+  components_done: 0
+  components_partial: 0
+  components_missing: 18
+
+# Database Gaps
+database_gaps:
+  - component: "machine_type enum"
+    expected: "CREATE TYPE machine_type AS ENUM (...)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0-BLOCKER"
+
+  - component: "machine_status enum"
+    expected: "CREATE TYPE machine_status AS ENUM (...)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0-BLOCKER"
+
+  - component: "machines table"
+    expected: "supabase/migrations/054_create_machines_table.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0-BLOCKER"
+
+  - component: "machines RLS policies"
+    expected: "4 policies (SELECT, INSERT, UPDATE, DELETE)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0-BLOCKER"
+
+# API Gaps
+api_gaps:
+  - component: "GET /api/v1/settings/machines"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "POST /api/v1/settings/machines"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "GET /api/v1/settings/machines/:id"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "PUT /api/v1/settings/machines/:id"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "PATCH /api/v1/settings/machines/:id/status"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+  - component: "DELETE /api/v1/settings/machines/:id"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+# Service Gaps
+service_gaps:
+  - component: "machine-service.ts"
+    expected: "apps/frontend/lib/services/machine-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+# Validation Gaps
+validation_gaps:
+  - component: "machine-schema.ts"
+    expected: "apps/frontend/lib/validation/machine-schema.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+# Frontend Gaps
+frontend_gaps:
+  - component: "machines/page.tsx"
+    expected: "apps/frontend/app/(authenticated)/settings/machines/page.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "MachinesDataTable.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "MachineModal.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "MachineTypeBadge.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+  - component: "MachineStatusBadge.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+# Implementation Order
+implementation_order:
+  phase_1_database:
+    - "054_create_machines_table.sql (enums + table + indexes + RLS)"
+
+  phase_2_validation:
+    - "lib/validation/machine-schema.ts"
+
+  phase_3_services:
+    - "lib/services/machine-service.ts"
+
+  phase_4_api:
+    - "app/api/v1/settings/machines/route.ts (GET, POST)"
+    - "app/api/v1/settings/machines/[id]/route.ts (GET, PUT, DELETE)"
+    - "app/api/v1/settings/machines/[id]/status/route.ts (PATCH)"
+
+  phase_5_types:
+    - "lib/types/machine.ts"
+
+  phase_6_components:
+    - "MachinesDataTable.tsx"
+    - "MachineModal.tsx"
+    - "MachineTypeBadge.tsx"
+    - "MachineStatusBadge.tsx"
+    - "MachineLocationSelect.tsx"
+    - "DeleteMachineDialog.tsx"
+
+  phase_7_pages:
+    - "app/(authenticated)/settings/machines/page.tsx"
+
+  phase_8_tests:
+    - "Unit tests for machine-service"
+    - "Integration tests for API routes"
+    - "E2E tests for critical flows"
+
+# Validation Checklist
+validation_checklist:
+  - "[ ] Machines table created with correct schema"
+  - "[ ] RLS policies enforce org isolation"
+  - "[ ] Code uniqueness constraint works (org_id, code)"
+  - "[ ] Machine type enum has all 9 values"
+  - "[ ] Machine status enum has all 4 values"
+  - "[ ] API endpoints return correct status codes"
+  - "[ ] Soft delete works for machines with WO history"
+  - "[ ] Delete blocked for machines assigned to lines"
+  - "[ ] Location assignment works (nullable FK)"
+  - "[ ] Permission checks enforce PROD_MANAGER+ for write"

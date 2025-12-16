@@ -1,0 +1,190 @@
+# Story 01.10 - Frontend Specification
+# Purpose: Components, hooks, types, UX wireframes
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/machine.ts"
+    content: |
+      export type MachineType =
+        | 'MIXER'
+        | 'OVEN'
+        | 'FILLER'
+        | 'PACKAGING'
+        | 'CONVEYOR'
+        | 'BLENDER'
+        | 'CUTTER'
+        | 'LABELER'
+        | 'OTHER';
+
+      export type MachineStatus =
+        | 'ACTIVE'
+        | 'MAINTENANCE'
+        | 'OFFLINE'
+        | 'DECOMMISSIONED';
+
+      export interface Machine {
+        id: string;
+        org_id: string;
+        code: string;
+        name: string;
+        description: string | null;
+        type: MachineType;
+        status: MachineStatus;
+        units_per_hour: number | null;
+        setup_time_minutes: number | null;
+        max_batch_size: number | null;
+        location_id: string | null;
+        location?: Location;
+        is_deleted: boolean;
+        deleted_at: string | null;
+        created_at: string;
+        updated_at: string;
+        created_by: string | null;
+        updated_by: string | null;
+      }
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/machines/page.tsx"
+    description: "Machines list page"
+    wireframe: "SET-016"
+    components:
+      - "MachinesDataTable"
+      - "MachineFilters"
+
+# Components
+components:
+  - path: "apps/frontend/components/settings/machines/MachinesDataTable.tsx"
+    description: "Table with sorting, filtering, pagination"
+    pattern: "ShadCN DataTable"
+    columns:
+      - "Code"
+      - "Name"
+      - "Type (badge)"
+      - "Status (badge)"
+      - "Capacity"
+      - "Location"
+      - "Actions"
+
+  - path: "apps/frontend/components/settings/machines/MachineModal.tsx"
+    description: "Create/Edit form modal"
+    pattern: "ShadCN Dialog with Form"
+    wireframe: "SET-017"
+    sections:
+      - "Basic Info (code, name, description)"
+      - "Machine Type dropdown"
+      - "Capacity fields (units_per_hour, setup_time_minutes, max_batch_size)"
+      - "Location assignment dropdown"
+      - "Status toggle"
+
+  - path: "apps/frontend/components/settings/machines/MachineRow.tsx"
+    description: "Single machine row with actions"
+    actions:
+      - "Edit"
+      - "Change Status"
+      - "Delete"
+
+  - path: "apps/frontend/components/settings/machines/MachineTypeBadge.tsx"
+    description: "Type badge with icon (Mixer=blue, Oven=orange, etc.)"
+    variants:
+      MIXER: { color: "blue", icon: "MixerIcon" }
+      OVEN: { color: "orange", icon: "FlameIcon" }
+      FILLER: { color: "purple", icon: "FillIcon" }
+      PACKAGING: { color: "green", icon: "PackageIcon" }
+      CONVEYOR: { color: "gray", icon: "BeltIcon" }
+      BLENDER: { color: "cyan", icon: "BlenderIcon" }
+      CUTTER: { color: "red", icon: "ScissorsIcon" }
+      LABELER: { color: "yellow", icon: "TagIcon" }
+      OTHER: { color: "slate", icon: "SettingsIcon" }
+
+  - path: "apps/frontend/components/settings/machines/MachineStatusBadge.tsx"
+    description: "Status badge with color (Active=green, Maintenance=yellow, etc.)"
+    variants:
+      ACTIVE: { color: "green", label: "Active" }
+      MAINTENANCE: { color: "yellow", label: "Maintenance" }
+      OFFLINE: { color: "red", label: "Offline" }
+      DECOMMISSIONED: { color: "gray", label: "Decommissioned" }
+
+  - path: "apps/frontend/components/settings/machines/MachineCapacityDisplay.tsx"
+    description: "Capacity info display (units/hr, setup time)"
+    fields:
+      - "units_per_hour: '{value} u/hr'"
+      - "setup_time_minutes: '{value} min setup'"
+      - "max_batch_size: 'Max: {value}'"
+
+  - path: "apps/frontend/components/settings/machines/MachineLocationSelect.tsx"
+    description: "Hierarchical location dropdown with path display"
+    pattern: "ShadCN Select with combobox"
+    features:
+      - "Typeahead filtering"
+      - "Hierarchical path display: 'WH-001 > ZONE-A > RACK-01'"
+      - "Null option: '--' or 'Unassigned'"
+
+  - path: "apps/frontend/components/settings/machines/DeleteMachineDialog.tsx"
+    description: "Confirmation dialog with line assignment check"
+    validations:
+      - "Check production_line_machines for assignments"
+      - "Show error if assigned: 'Machine is assigned to line [LINE-001]'"
+
+  - path: "apps/frontend/components/settings/machines/MachineFilters.tsx"
+    description: "Filter controls (type, status, location dropdowns)"
+    filters:
+      - "Search (code/name)"
+      - "Type dropdown"
+      - "Status dropdown"
+      - "Location dropdown"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-machines.ts"
+    description: "React Query hook for machines list"
+    exports:
+      - name: "useMachines"
+        returns: "UseQueryResult<{ machines, total }>"
+
+  - path: "apps/frontend/lib/hooks/use-machine.ts"
+    description: "React Query hook for single machine"
+    exports:
+      - name: "useMachine"
+        params: ["id: string"]
+        returns: "UseQueryResult<Machine>"
+
+# UX Wireframes
+ux:
+  wireframes:
+    - id: "SET-016"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-016-machine-list.md"
+      description: "Machine List page with table, filters, and actions"
+      components:
+        - "Data table with columns: Code, Name, Type, Production Line, Status, Actions"
+        - "Search input (filters code and name)"
+        - "Type filter dropdown"
+        - "Status filter dropdown"
+        - "Sort dropdown"
+        - "Add Machine button (primary CTA)"
+
+    - id: "SET-017"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-017-machine-create-edit-modal.md"
+      description: "Create/Edit Machine modal"
+      components:
+        - "Code input (4-8 chars, auto-uppercase, unique)"
+        - "Name input (required)"
+        - "Type dropdown (9 options)"
+        - "Location dropdown (hierarchical)"
+        - "Capacity fields (units/hour, setup time, max batch)"
+        - "Description textarea"
+        - "Status toggle"
+
+  states:
+    loading: "Skeleton rows (6 items), 'Loading machines...' text"
+    empty: "'No Machines Found' icon, 'Add Your First Machine' CTA"
+    error: "'Failed to Load Machines' warning, Retry + Contact Support buttons"
+    success: "Table with machine rows, filters, pagination"
+
+  patterns:
+    table: "ShadCN DataTable with sortable columns"
+    modal: "ShadCN Dialog with form sections"
+    badge: "ShadCN Badge for type and status"
+    select: "ShadCN Select with combobox for location"
+    toast: "ShadCN Toast for success/error messages"

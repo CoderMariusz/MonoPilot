@@ -1,0 +1,330 @@
+# Story 01.4 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+# Refactoring Plan: ../REFACTORING-PLAN.md
+
+gap_summary:
+  overall_readiness: "40%"
+  critical_blockers: 1
+  components_done: 3
+  components_partial: 3
+  components_missing: 5
+
+# =============================================================================
+# DEPENDENCY STATUS
+# =============================================================================
+dependencies:
+  - story: "01.3"
+    status: "MUST_COMPLETE_FIRST"
+    provides: "WizardModal, wizard shell, progress tracking"
+
+  - story: "01.1"
+    status: "MUST_COMPLETE_FIRST"
+    provides: "organizations table with correct columns"
+
+# =============================================================================
+# DATABASE STATUS (mostly ready)
+# =============================================================================
+database_status:
+  - component: "organizations columns for Step 1"
+    expected: "name, timezone, locale, currency"
+    found: "company_name, timezone, default_language, default_currency"
+    status: "PARTIAL"
+    gap_description: |
+      Columns exist but names differ:
+      - company_name → name (Migration 054)
+      - default_language → locale (Migration 054)
+      - default_currency → currency (Migration 054)
+
+      After Migration 054, this will be DONE.
+    refactor_action: "Depends on Migration 054 from 01.1"
+    priority: "P0 (handled by 01.1)"
+
+  - component: "onboarding_step column"
+    expected: "INTEGER to track step progress"
+    found: "MISSING (wizard_progress JSONB instead)"
+    status: "PARTIAL"
+    gap_description: "Depends on Migration 059 from 01.3"
+    refactor_action: "Depends on Migration 059 from 01.3"
+    priority: "P0 (handled by 01.3)"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "POST /api/v1/settings/onboarding/step/1"
+    expected: "Step-specific endpoint with validation"
+    found: "NOT FOUND (generic /api/settings/wizard exists)"
+    status: "MISSING"
+    gap_description: |
+      Story expects: /api/v1/settings/onboarding/step/1
+      Existing: /api/settings/wizard with generic { step, data } format
+
+      Need step-specific route with dedicated Zod validation.
+    refactor_action: "Create new endpoint"
+    priority: "P0"
+
+  - component: "GET /api/v1/settings/organization"
+    expected: "Get org profile for pre-fill"
+    found: "/api/settings/organization/route.ts"
+    status: "DONE"
+    gap_description: |
+      Endpoint exists with GET and PUT methods.
+      Compatible with pre-fill requirements.
+      Only needs path update to v1 (optional).
+    refactor_action: "Optional - add v1 alias"
+    priority: "P2"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  - component: "OrganizationProfileStep"
+    expected: "apps/frontend/components/settings/onboarding/OrganizationProfileStep.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Main wizard step 1 component with form.
+      Fields: name, timezone, language, currency
+      Features: Browser detection defaults, validation, submit to API
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "TimezoneSelect"
+    expected: "apps/frontend/components/settings/onboarding/TimezoneSelect.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Searchable combobox for 300+ IANA timezones.
+      Uses Intl.supportedValuesOf('timeZone').
+      Groups by region (Europe, America, Asia, etc.)
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "Form patterns"
+    expected: "ShadCN Form with react-hook-form"
+    found: "OrganizationForm.tsx and other forms exist"
+    status: "DONE"
+    gap_description: |
+      Existing form components can serve as pattern reference.
+      apps/frontend/components/settings/ has 18 form components.
+    refactor_action: "Use as reference patterns"
+    priority: "N/A"
+
+# =============================================================================
+# VALIDATION GAPS
+# =============================================================================
+validation_gaps:
+  - component: "organization-profile-step.ts schema"
+    expected: "apps/frontend/lib/validation/organization-profile-step.ts"
+    found: "organization-schemas.ts (partial)"
+    status: "PARTIAL"
+    gap_description: |
+      organization-schemas.ts exists with:
+      - company_name: 2-100 chars ✓
+      - timezone: optional with default 'UTC' ✓
+      - default_language: enum ['PL', 'EN'] ← MISSING DE/FR
+      - default_currency: enum ['PLN', 'EUR', 'USD', 'GBP'] ✓
+
+      ISSUES:
+      - Field names don't match (company_name vs name)
+      - Language enum only has 2 values, needs 4
+      - Need step-specific schema separate from full org schema
+    refactor_action: "Create dedicated step 1 schema"
+    priority: "P0"
+
+  - component: "Timezone validation"
+    expected: "Validate against Intl.supportedValuesOf('timeZone')"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Need server-side timezone validation.
+      Client uses Intl API, server should validate same list.
+    refactor_action: "Add to step 1 schema"
+    priority: "P1"
+
+# =============================================================================
+# UTILITY GAPS
+# =============================================================================
+utility_gaps:
+  - component: "browser-detection.ts"
+    expected: "apps/frontend/lib/utils/browser-detection.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Browser timezone and language detection utilities.
+
+      Required functions:
+      - getBrowserTimezone(): string
+        Uses: Intl.DateTimeFormat().resolvedOptions().timeZone
+
+      - getBrowserLanguage(): string
+        Uses: navigator.language.slice(0, 2).toLowerCase()
+        Maps to supported: ['pl', 'en', 'de', 'fr']
+    refactor_action: "Create new utility file"
+    priority: "P1"
+
+# =============================================================================
+# SERVICE STATUS
+# =============================================================================
+service_status:
+  - component: "wizard-service.ts"
+    path: "apps/frontend/lib/services/wizard-service.ts"
+    status: "DONE"
+    gap_description: |
+      Service fully implemented with:
+      - saveWizardProgress() ✓
+      - getWizardProgress() ✓
+      - completeWizard() ✓
+
+      After 01.3 refactoring to onboarding-service.ts,
+      Step 1 can use updateOnboardingStep().
+    refactor_action: "Use after 01.3 refactoring"
+    priority: "N/A"
+
+# =============================================================================
+# COLUMN NAME MAPPING
+# =============================================================================
+column_name_mapping:
+  note: |
+    After Migration 054 (from 01.1), column names will match story spec.
+    Until then, code may need to handle both schemas.
+
+  mappings:
+    - story: "name"
+      current: "company_name"
+      after_054: "name"
+
+    - story: "language"
+      current: "default_language"
+      after_054: "locale"
+
+    - story: "currency"
+      current: "default_currency"
+      after_054: "currency"
+
+    - story: "timezone"
+      current: "timezone"
+      after_054: "timezone"  # No change needed
+
+# =============================================================================
+# EXISTING CODE (can reuse)
+# =============================================================================
+existing_code:
+  - path: "apps/frontend/lib/validation/organization-schemas.ts"
+    status: "EXTEND"
+    description: |
+      Good base schema. Need to:
+      1. Add DE/FR to language enum
+      2. Create step-specific subset schema
+
+  - path: "apps/frontend/components/settings/OrganizationForm.tsx"
+    status: "REFERENCE"
+    description: "Pattern reference for form structure."
+
+  - path: "apps/frontend/app/api/settings/organization/route.ts"
+    status: "KEEP"
+    description: "GET endpoint works for pre-fill."
+
+  - path: "apps/frontend/lib/services/wizard-service.ts"
+    status: "USE_AFTER_01.3"
+    description: "Use after 01.3 renames to onboarding-service."
+
+# =============================================================================
+# IMPLEMENTATION ORDER
+# =============================================================================
+implementation_order:
+  prerequisite: |
+    - Story 01.1 Migration 054 (column renames)
+    - Story 01.3 (wizard framework + onboarding-service)
+
+  phase_1_utilities:
+    - "lib/utils/browser-detection.ts"
+    description: "Simple, no dependencies"
+
+  phase_2_validation:
+    - "lib/validation/organization-profile-step.ts"
+    description: "Zod schema with 4 languages"
+
+  phase_3_components:
+    - "components/settings/onboarding/TimezoneSelect.tsx"
+    description: "Complex component, needed by step"
+
+    - "components/settings/onboarding/OrganizationProfileStep.tsx"
+    description: "Main step component using TimezoneSelect"
+
+  phase_4_api:
+    - "app/api/v1/settings/onboarding/step/1/route.ts"
+    description: "Step-specific endpoint with validation"
+
+  phase_5_integration:
+    - "Connect OrganizationProfileStep to WizardModal from 01.3"
+    description: "Wire up step 1 in wizard flow"
+
+# =============================================================================
+# VALIDATION RULES (for reference)
+# =============================================================================
+validation_rules:
+  name:
+    type: "string"
+    min: 2
+    max: 100
+    errors:
+      empty: "Organization name is required"
+      min: "Organization name must be at least 2 characters"
+      max: "Organization name must be at most 100 characters"
+
+  timezone:
+    type: "string"
+    validation: "Intl.supportedValuesOf('timeZone')"
+    default: "Browser detected"
+    error: "Invalid timezone"
+
+  language:
+    type: "enum"
+    values: ["pl", "en", "de", "fr"]
+    display:
+      pl: "Polski"
+      en: "English"
+      de: "Deutsch"
+      fr: "Français"
+    default: "Browser detected or 'en'"
+
+  currency:
+    type: "enum"
+    values: ["PLN", "EUR", "USD", "GBP"]
+    display:
+      PLN: "PLN - Polish Złoty"
+      EUR: "EUR - Euro"
+      USD: "USD - US Dollar"
+      GBP: "GBP - British Pound"
+    default: "EUR"
+
+# =============================================================================
+# TEST STATUS
+# =============================================================================
+test_status:
+  - component: "Generic wizard tests"
+    path: "apps/frontend/__tests__/api/settings/wizard.test.ts"
+    status: "EXISTS"
+    description: "Generic tests, need step-specific tests."
+
+  - component: "Step 1 specific tests"
+    path: "TBD"
+    status: "MISSING"
+    description: "Need unit + integration tests for step 1."
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] Organization name pre-fills from registration"
+  - "[ ] Timezone defaults to browser detected"
+  - "[ ] Language defaults to browser language if supported"
+  - "[ ] All 4 languages available (PL, EN, DE, FR)"
+  - "[ ] All 4 currencies available (PLN, EUR, USD, GBP)"
+  - "[ ] Timezone search filters correctly ('war' → 'Europe/Warsaw')"
+  - "[ ] Validation errors show inline"
+  - "[ ] Back button disabled on step 1"
+  - "[ ] Successful save advances to step 2"
+  - "[ ] onboarding_step updated to 2 in database"

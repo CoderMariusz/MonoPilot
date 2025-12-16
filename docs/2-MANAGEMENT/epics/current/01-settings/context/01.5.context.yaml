@@ -1,0 +1,455 @@
+# Story Context: 01.5 User Management CRUD (MVP)
+# Generated: 2025-12-16
+# Purpose: AI agent context for implementing user CRUD operations with role assignment
+
+story:
+  id: "01.5a"
+  name: "User Management CRUD (MVP)"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 4
+  type: "frontend + backend"
+  state: "ready"
+  priority: "P0"
+  story_file: "docs/2-MANAGEMENT/epics/current/01-settings/01.5a.user-management-crud-mvp.md"
+
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table schema"
+        - "org_id context"
+        - "RLS policies for tenant isolation"
+    - story: "01.2"
+      name: "Settings Shell"
+      provides:
+        - "Settings navigation"
+        - "Route guards"
+        - "Settings layout"
+    - story: "01.6"
+      name: "Role-Based Permissions"
+      provides:
+        - "roles table with 10 predefined roles"
+        - "permission matrix (module x CRUD)"
+        - "hasPermission() helper function"
+        - "usePermissions() React hook"
+        - "Permission middleware for API routes"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/settings.md"
+  prd_sections:
+    - "FR-SET-010"  # User CRUD operations
+    - "FR-SET-012"  # User invitations (deferred, but referenced)
+    - "FR-SET-017"  # User deactivation/archiving
+    - "FR-SET-011"  # 10-role permission system (for role dropdown)
+    - "FR-SET-020-029"  # Role definitions
+  architecture: "docs/1-BASELINE/architecture/modules/settings.md"
+  story: "docs/2-MANAGEMENT/epics/current/01-settings/01.5a.user-management-crud-mvp.md"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  patterns:
+    - "apps/frontend/lib/validation/*.ts"  # Existing Zod schema patterns
+    - "apps/frontend/components/ui/data-table.tsx"  # ShadCN DataTable
+    - "apps/frontend/components/ui/dialog.tsx"  # ShadCN Dialog for modal
+    - "apps/frontend/lib/services/*.ts"  # Existing service patterns
+
+files_to_create:
+  pages:
+    - path: "apps/frontend/app/(authenticated)/settings/users/page.tsx"
+      description: "Users list page with DataTable (SET-008)"
+  components:
+    - path: "apps/frontend/components/settings/users/UsersDataTable.tsx"
+      description: "DataTable with sorting, filtering, pagination"
+    - path: "apps/frontend/components/settings/users/UserModal.tsx"
+      description: "Create/Edit form modal (MVP fields only, no warehouse access)"
+    - path: "apps/frontend/components/settings/users/UserRow.tsx"
+      description: "Single user row component for table"
+    - path: "apps/frontend/components/settings/users/UserStatusBadge.tsx"
+      description: "Active/Inactive status indicator badge"
+    - path: "apps/frontend/components/settings/users/DeactivateConfirmDialog.tsx"
+      description: "Confirmation dialog for user deactivation"
+    - path: "apps/frontend/components/settings/users/UserRoleBadge.tsx"
+      description: "Role badge with color coding (10 roles)"
+  validation:
+    - path: "apps/frontend/lib/validation/user-schema.ts"
+      description: "Zod schemas for user create/update (MVP fields)"
+  api:
+    - path: "apps/frontend/app/api/v1/settings/users/route.ts"
+      methods: ["GET", "POST"]
+      description: "List users (with pagination/search/filter), Create user"
+    - path: "apps/frontend/app/api/v1/settings/users/[id]/route.ts"
+      methods: ["GET", "PUT", "DELETE"]
+      description: "Get user, Update user, Soft delete user"
+    - path: "apps/frontend/app/api/v1/settings/users/[id]/deactivate/route.ts"
+      methods: ["PATCH"]
+      description: "Deactivate user endpoint"
+    - path: "apps/frontend/app/api/v1/settings/users/[id]/activate/route.ts"
+      methods: ["PATCH"]
+      description: "Reactivate user endpoint"
+  services:
+    - path: "apps/frontend/lib/services/user-service.ts"
+      description: "User CRUD business logic with self-protection"
+
+database:
+  tables:
+    - name: "users"
+      columns:
+        - "id UUID PRIMARY KEY REFERENCES auth.users(id)"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "email TEXT NOT NULL"
+        - "first_name TEXT NOT NULL"
+        - "last_name TEXT NOT NULL"
+        - "role_id UUID NOT NULL REFERENCES roles(id)"
+        - "language TEXT DEFAULT 'en'"
+        - "is_active BOOLEAN DEFAULT true"
+        - "last_login_at TIMESTAMPTZ"
+        - "warehouse_access_ids UUID[]"  # Phase 1B - NULL for MVP users
+        - "created_at TIMESTAMPTZ DEFAULT NOW()"
+        - "updated_at TIMESTAMPTZ DEFAULT NOW()"
+      constraints:
+        - "UNIQUE(org_id, email)"
+      rls: true
+      rls_policies:
+        - name: "users_org_isolation"
+          operation: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "users_admin_write"
+          operation: "ALL"
+          using: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')
+      indexes:
+        - "org_id"
+        - "email"
+        - "role_id"
+        - "is_active"
+    - name: "roles"
+      notes: "Created in story 01.6 - 10 predefined roles with permission matrix"
+      columns:
+        - "id UUID PRIMARY KEY"
+        - "code VARCHAR(50) UNIQUE NOT NULL"
+        - "name VARCHAR(100) NOT NULL"
+        - "permissions JSONB NOT NULL"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/users"
+    description: "List users with pagination, search, and filtering"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "PROD_MANAGER", "QUAL_MANAGER", "WH_MANAGER", "VIEWER"]
+    query_params:
+      - "page: number (default 1)"
+      - "limit: number (default 25, max 100)"
+      - "search: string (searches name and email)"
+      - "role: string (role_id filter)"
+      - "status: 'active' | 'inactive' (is_active filter)"
+      - "sortBy: 'name' | 'email' | 'role' | 'last_login' | 'created'"
+      - "sortOrder: 'asc' | 'desc'"
+    response:
+      users: "User[]"
+      total: "number"
+      page: "number"
+      limit: "number"
+    performance: "< 500ms for 1000 users"
+
+  - method: "POST"
+    path: "/api/v1/settings/users"
+    description: "Create new user"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    request_body:
+      email: "string (required, valid email, unique per org)"
+      first_name: "string (required, 1-100 chars)"
+      last_name: "string (required, 1-100 chars)"
+      role_id: "UUID (required, references roles.id)"
+    response:
+      id: "UUID"
+      email: "string"
+      first_name: "string"
+      last_name: "string"
+      role_id: "UUID"
+      is_active: "boolean (default true)"
+      created_at: "timestamp"
+    errors:
+      409: "Email already exists in organization"
+      400: "Invalid role_id"
+
+  - method: "PUT"
+    path: "/api/v1/settings/users/:id"
+    description: "Update existing user"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    request_body:
+      first_name: "string (optional, 1-100 chars)"
+      last_name: "string (optional, 1-100 chars)"
+      role_id: "UUID (optional, references roles.id)"
+    response:
+      id: "UUID"
+      email: "string"
+      first_name: "string"
+      last_name: "string"
+      role_id: "UUID"
+      is_active: "boolean"
+      updated_at: "timestamp"
+    errors:
+      404: "User not found"
+      403: "Only Super Admin can assign Super Admin role"
+
+  - method: "PATCH"
+    path: "/api/v1/settings/users/:id/deactivate"
+    description: "Deactivate user account"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      success: true
+      message: "User deactivated"
+    errors:
+      400: "Cannot deactivate your own account"
+      400: "Cannot deactivate the only Super Admin"
+      404: "User not found"
+    side_effects:
+      - "Set is_active = false"
+      - "Terminate all user sessions immediately"
+
+  - method: "PATCH"
+    path: "/api/v1/settings/users/:id/activate"
+    description: "Reactivate deactivated user"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      success: true
+      message: "User activated"
+    errors:
+      404: "User not found"
+    side_effects:
+      - "Set is_active = true"
+
+ux:
+  wireframes:
+    - id: "SET-008"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-008-user-list.md"
+      description: "User List page with DataTable"
+      components:
+        - "DataTable with Name, Email, Role, Status, Last Login columns"
+        - "Search bar (name/email)"
+        - "Role filter dropdown (10 roles + All)"
+        - "Status filter dropdown (Active, Inactive, All)"
+        - "Sort dropdown"
+        - "Invite User button (primary CTA)"
+        - "Actions menu ([...]) per row: Edit, Deactivate, Activate"
+        - "Pagination (25 per page)"
+    - id: "SET-009"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-009-user-create-edit-modal.md"
+      description: "User Create/Edit Modal (MVP subset)"
+      components:
+        - "First Name input (required)"
+        - "Last Name input (required)"
+        - "Email input (required, validation)"
+        - "Role dropdown (10 roles)"
+        - "Active checkbox (for edit mode)"
+        - "HIDDEN: Warehouse Access multi-select (Phase 1B)"
+      mvp_notes: "Hide warehouse access section (lines 49-117 in wireframe)"
+  patterns:
+    table: "ShadCN DataTable with column sorting, filtering, pagination"
+    modal: "ShadCN Dialog with Form inside"
+    form: "react-hook-form with Zod resolver"
+    badge: "ShadCN Badge for status and role indicators"
+    search: "Debounced search input (300ms)"
+    confirmation: "ShadCN AlertDialog for destructive actions"
+  states:
+    loading: "Skeleton rows (3) with shimmer animation"
+    empty: "'No users found' illustration with 'Invite Your First User' CTA"
+    error: "'Failed to load users' warning with Retry button"
+    success: "Table populated with user data"
+  role_badges:
+    SUPER_ADMIN: "bg-red-100 text-red-800"
+    ADMIN: "bg-purple-100 text-purple-800"
+    PROD_MANAGER: "bg-blue-100 text-blue-800"
+    QUAL_MANAGER: "bg-green-100 text-green-800"
+    WH_MANAGER: "bg-orange-100 text-orange-800"
+    PROD_OPERATOR: "bg-blue-50 text-blue-700"
+    QUAL_INSPECTOR: "bg-green-50 text-green-700"
+    WH_OPERATOR: "bg-orange-50 text-orange-700"
+    PLANNER: "bg-cyan-100 text-cyan-800"
+    VIEWER: "bg-gray-100 text-gray-800"
+  status_badges:
+    active: "bg-green-100 text-green-800"
+    inactive: "bg-gray-100 text-gray-800"
+
+validation_rules:
+  email:
+    type: "string"
+    required: true
+    format: "email"
+    unique_per_org: true
+    error_empty: "Email is required"
+    error_format: "Invalid email format"
+    error_duplicate: "Email already exists"
+  first_name:
+    type: "string"
+    required: true
+    min: 1
+    max: 100
+    error_empty: "First name is required"
+    error_max: "First name must be at most 100 characters"
+  last_name:
+    type: "string"
+    required: true
+    min: 1
+    max: 100
+    error_empty: "Last name is required"
+    error_max: "Last name must be at most 100 characters"
+  role_id:
+    type: "uuid"
+    required: true
+    references: "roles.id"
+    error_empty: "Role is required"
+    error_invalid: "Invalid role"
+    restriction: "Only Super Admin can assign Super Admin role"
+
+patterns:
+  rls: "ADR-013 - RLS Org Isolation Pattern"
+  role_storage: "ADR-012 - Role Permission Storage (users.role_id FK to roles.id)"
+  api: "REST with org_id filter from auth context"
+  service: "Class-based UserService with static methods"
+  validation: "Zod schemas in lib/validation/user-schema.ts"
+  self_protection: |
+    // Self-protection logic in UserService
+    async canDeactivate(userId: string, currentUserId: string): Promise<{allowed: boolean; reason?: string}> {
+      if (userId === currentUserId) {
+        return { allowed: false, reason: "Cannot deactivate your own account" };
+      }
+
+      // Check if target is the only Super Admin
+      const user = await this.getUser(userId);
+      if (user.role.code === 'SUPER_ADMIN') {
+        const superAdminCount = await this.countSuperAdmins();
+        if (superAdminCount === 1) {
+          return { allowed: false, reason: "Cannot deactivate the only Super Admin" };
+        }
+      }
+
+      return { allowed: true };
+    }
+
+acceptance_checklist:
+  user_list_page:
+    - "GIVEN admin navigates to /settings/users, WHEN page loads, THEN user list displays within 500ms for up to 1000 users"
+    - "GIVEN user list has 500 users, WHEN admin applies search 'john', THEN filtered results display within 300ms"
+    - "GIVEN user list displayed, WHEN admin filters by role 'PROD_OPERATOR', THEN only Production Operators appear"
+    - "GIVEN user list displayed, WHEN admin filters by status 'inactive', THEN only deactivated users appear"
+    - "GIVEN user list with pagination, WHEN page 2 clicked, THEN next 25 users display"
+    - "GIVEN user list displayed, WHEN role column rendered, THEN role name (not code) displays (e.g., 'Production Manager' not 'PROD_MANAGER')"
+
+  create_user:
+    - "GIVEN admin clicks 'Add User', WHEN modal opens, THEN form displays: email, first name, last name, role fields (NO warehouse access in MVP)"
+    - "GIVEN valid user data (email: 'new@company.com', name: 'John Doe', role: 'VIEWER'), WHEN 'Create' clicked, THEN user created and appears in list within 1 second"
+    - "GIVEN duplicate email 'existing@company.com', WHEN save attempted, THEN error 'Email already exists' displays inline"
+    - "GIVEN invalid email format 'invalid@', WHEN save attempted, THEN error 'Invalid email format' displays inline"
+    - "GIVEN required field (email) empty, WHEN save attempted, THEN error 'Email is required' displays inline"
+
+  edit_user:
+    - "GIVEN admin clicks edit on existing user, WHEN modal opens, THEN current user data pre-populates form (NO warehouse access field in MVP)"
+    - "GIVEN admin updates user name from 'John' to 'Jonathan', WHEN save completes, THEN updated name displays immediately in list"
+    - "GIVEN admin changes user role from 'VIEWER' to 'ADMIN', WHEN save completes, THEN new role displays in list"
+
+  deactivation:
+    - "GIVEN admin clicks 'Deactivate' on active user, WHEN confirmation dialog accepted, THEN user status changes to 'inactive' within 500ms"
+    - "GIVEN user is deactivated, WHEN that user attempts login, THEN error 'Account is deactivated. Contact administrator.' displays"
+    - "GIVEN deactivated user has active sessions, WHEN deactivation completes, THEN all sessions terminated immediately"
+    - "GIVEN admin views deactivated user, WHEN 'Reactivate' clicked, THEN user status changes to 'active' and can login"
+
+  self_protection:
+    - "GIVEN admin attempts to delete/deactivate self, WHEN action attempted, THEN error 'Cannot delete your own account' displays"
+    - "GIVEN only 1 Super Admin exists, WHEN deactivation attempted on that user, THEN error 'Cannot deactivate the only Super Admin' displays"
+
+  permission_enforcement:
+    - "GIVEN user has no permission to manage users (e.g., PROD_OPERATOR), WHEN /settings/users accessed, THEN redirect to dashboard with 'Access Denied'"
+    - "GIVEN user with VIEWER role, WHEN users page loaded, THEN 'Add User' button hidden, edit/deactivate actions hidden"
+
+definition_of_done:
+  - "User list page loads within 500ms for 1000 users"
+  - "Create user with role assignment works end-to-end"
+  - "Edit user updates immediately in UI"
+  - "Deactivate blocks login, terminates sessions"
+  - "Self-deletion/deactivation prevented"
+  - "Last Super Admin deactivation prevented"
+  - "Role names (not codes) display in user list"
+  - "Permission checks hide unauthorized actions"
+  - "Search and filter work within 300ms"
+  - "Warehouse access field HIDDEN in modal (Phase 1B)"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover user-service (>80% coverage)"
+  - "SET-008 wireframe implemented (user list)"
+  - "SET-009 wireframe implemented (MVP subset - no warehouse access)"
+
+tests:
+  unit:
+    - "UserService.createUser validates email uniqueness"
+    - "UserService.canDeactivate returns false for self"
+    - "UserService.canDeactivate returns false for last Super Admin"
+    - "Zod schema rejects invalid email format"
+    - "Zod schema rejects empty required fields"
+    - "Zod schema rejects name > 100 characters"
+    - "Role dropdown displays 10 role options"
+    - "Status badge renders correct colors"
+  integration:
+    - "GET /api/v1/settings/users returns paginated results"
+    - "GET /api/v1/settings/users?search=john filters correctly"
+    - "GET /api/v1/settings/users?role={id} filters by role"
+    - "POST /api/v1/settings/users creates user in database"
+    - "POST /api/v1/settings/users returns 409 for duplicate email"
+    - "PUT /api/v1/settings/users/:id updates user"
+    - "PATCH /api/v1/settings/users/:id/deactivate sets is_active=false"
+    - "PATCH /api/v1/settings/users/:id/deactivate returns 400 for self"
+    - "PATCH /api/v1/settings/users/:id/activate sets is_active=true"
+    - "Permission middleware blocks unauthorized access"
+  e2e:
+    - "Full user creation flow from list to modal to confirmation"
+    - "Edit user and see immediate update in list"
+    - "Deactivate user and verify login blocked"
+    - "Search and filter user list"
+
+output_artifacts:
+  - "UsersDataTable.tsx component with sorting, filtering, pagination"
+  - "UserModal.tsx component for create/edit (MVP fields only)"
+  - "UserStatusBadge.tsx and UserRoleBadge.tsx components"
+  - "DeactivateConfirmDialog.tsx component"
+  - "user-schema.ts Zod validation schemas"
+  - "user-service.ts with CRUD operations and self-protection"
+  - "API routes: GET/POST /api/v1/settings/users"
+  - "API routes: GET/PUT /api/v1/settings/users/:id"
+  - "API routes: PATCH /api/v1/settings/users/:id/deactivate"
+  - "API routes: PATCH /api/v1/settings/users/:id/activate"
+  - "Unit tests for user-service"
+  - "Integration tests for API endpoints"
+
+implementation_notes:
+  frontend:
+    - "Use ShadCN DataTable for user list with server-side pagination"
+    - "Use ShadCN Dialog for create/edit modal"
+    - "Use react-hook-form with Zod resolver for form validation"
+    - "Debounce search input by 300ms to reduce API calls"
+    - "Show skeleton loaders while data is loading"
+    - "HIDE warehouse access section in modal (Phase 1B feature)"
+    - "Display role names from roles table, not hardcoded"
+    - "Use usePermissions() hook to conditionally render actions"
+  backend:
+    - "Validate role_id exists in roles table before insert/update"
+    - "Check email uniqueness within org before creating user"
+    - "Implement self-protection in UserService.canDeactivate()"
+    - "Terminate sessions on deactivation (invalidate tokens)"
+    - "Use ADR-013 RLS pattern for org isolation"
+    - "Enforce permission middleware on all user endpoints"
+  database:
+    - "Verify users table has role_id FK to roles.id (ADR-012)"
+    - "Verify RLS policies are active on users table"
+    - "Add index on users(org_id, is_active) for filtered queries"
+  phase_1b_preparation:
+    - "warehouse_access_ids column exists but is NULL for all MVP users"
+    - "Modal component has hidden section for warehouse access (to enable later)"
+    - "API schemas allow warehouse_access_ids but ignore it in MVP"

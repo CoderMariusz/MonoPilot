@@ -1,0 +1,85 @@
+# Story 01.6-roles-viewer - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.6-roles-viewer"
+  name: "Roles Viewer (Read-Only)"
+  slug: "roles-viewer-readonly"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "S"
+  estimate_days: 1
+  type: "frontend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables (reuses roles from 01.1)
+  - api.yaml         # Endpoints (GET roles, GET permissions matrix)
+  - frontend.yaml    # Components (RolesTable, PermissionsMatrix)
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Readiness assessment
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "roles table with JSONB permissions"
+        - "10 system roles seeded"
+        - "RLS foundation"
+        - "auth context"
+  blocked_by: []
+  blocks:
+    - story: "01.5"
+      name: "Users CRUD"
+      reason: "Role dropdown needs role list"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-011", "FR-SET-020", "FR-SET-021"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["Role-Based Access Control", "Permission Matrix"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.6.role-permissions.md"
+    sections: ["10 Role Definitions", "Permission Matrix"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
+      relevance: "PRIMARY - Roles table schema with JSONB permissions"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS pattern for roles table (public read)"
+  patterns:
+    - path: "apps/frontend/components/ui/table.tsx"
+      relevance: "ShadCN DataTable pattern"
+    - path: "apps/frontend/components/ui/badge.tsx"
+      relevance: "ShadCN Badge for permission indicators"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 2
+    description: "GET /api/v1/settings/roles, GET /api/v1/settings/roles/permissions-matrix"
+  - type: "component"
+    count: 3
+    description: "RolesTable, PermissionsMatrix, PermissionBadge"
+  - type: "page"
+    count: 1
+    description: "/settings/roles page"
+  - type: "test"
+    count: 2
+    description: "Unit + integration tests"
+
+# Technical notes
+technical_notes:
+  - "READ-ONLY viewer - no CRUD operations"
+  - "Roles are system-defined (seeded in 01.1)"
+  - "All authenticated users can view roles (for role assignment dropdown)"
+  - "RLS: is_system = true (public read for system roles)"
+  - "No org_id on roles table (global system data)"
+  - "Permission matrix is derived from JSONB permissions column"

@@ -1,0 +1,691 @@
+# Story Context: 07.16 RMA (Returns) Core CRUD + Approval
+# Generated: 2025-12-16
+# Purpose: AI agent context for implementing RMA system with approval workflows
+
+story:
+  id: "07.16"
+  name: "RMA (Returns) Core CRUD + Approval"
+  epic: "07-shipping"
+  phase: "2A"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P1"
+  story_file: "docs/2-MANAGEMENT/epics/current/07-shipping/07.16.rma-core-crud.md"
+
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table"
+        - "org_id context"
+        - "RLS policies for tenant isolation"
+    - story: "01.6"
+      name: "Role-Based Permissions"
+      provides:
+        - "roles table"
+        - "permission matrix"
+        - "Manager/Admin role checks"
+        - "Permission middleware"
+    - story: "02.1"
+      name: "Products CRUD"
+      provides:
+        - "products table for RMA lines reference"
+    - story: "07.1"
+      name: "Customers CRUD"
+      provides:
+        - "customers table (customer_id FK)"
+    - story: "07.2"
+      name: "Sales Orders Core"
+      provides:
+        - "sales_orders table (optional sales_order_id FK)"
+  optional:
+    - story: "07.17"
+      note: "RMA Receiving workflow (consumes rma_requests and rma_lines)"
+    - story: "07.18"
+      note: "RMA Disposition Processing (consumes approved RMAs)"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/shipping.md"
+  prd_sections:
+    - "FR-7.59"   # RMA Creation
+    - "FR-7.60"   # Return Receiving (Desktop)
+    - "FR-7.61"   # Return Receiving (Scanner)
+    - "FR-7.62"   # Return Disposition
+    - "FR-7.63"   # Quality Hold on Returns
+    - "FR-7.65"   # Return Reason Codes
+  architecture: "docs/1-BASELINE/architecture/modules/shipping.md"
+  architecture_sections:
+    - "lines 267-299"   # rma_requests and rma_lines schema
+    - "lines 474-490"   # RMA API endpoints
+    - "lines 613-621"   # RMA frontend components
+    - "lines 1024-1028" # RMA status workflow
+  story: "docs/2-MANAGEMENT/epics/current/07-shipping/07.16.rma-core-crud.md"
+  brief: "docs/2-MANAGEMENT/epics/current/07-shipping/STORY-WRITING-BRIEF.md"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  patterns:
+    - "apps/frontend/lib/validation/*.ts"  # Zod schema patterns
+    - "apps/frontend/components/ui/data-table.tsx"  # ShadCN DataTable
+    - "apps/frontend/components/ui/dialog.tsx"  # ShadCN Dialog
+    - "apps/frontend/lib/services/*.ts"  # Service layer patterns
+    - "docs/2-MANAGEMENT/epics/current/07-shipping/07.1.customers-crud.md"  # Reference CRUD story
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_rma_tables.sql"
+      type: "migration"
+      description: "Create rma_requests, rma_lines tables with RLS, auto-number function and triggers"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/shipping/rma/page.tsx"
+      description: "RMA list page with DataTable"
+    - path: "apps/frontend/app/(authenticated)/shipping/rma/[id]/page.tsx"
+      description: "RMA detail page with lines table and actions"
+  components:
+    - path: "apps/frontend/components/shipping/rma/RMATable.tsx"
+      description: "DataTable with search, filter by status/customer/date, sort, pagination"
+    - path: "apps/frontend/components/shipping/rma/RMAForm.tsx"
+      description: "Create/Edit RMA modal form"
+    - path: "apps/frontend/components/shipping/rma/RMALinesTable.tsx"
+      description: "Lines display table with actions"
+    - path: "apps/frontend/components/shipping/rma/RMALineForm.tsx"
+      description: "Add/Edit line modal"
+    - path: "apps/frontend/components/shipping/rma/RMAStatusBadge.tsx"
+      description: "Status badge (pending, approved, receiving, etc.)"
+    - path: "apps/frontend/components/shipping/rma/RMAReasonBadge.tsx"
+      description: "Reason code badge"
+    - path: "apps/frontend/components/shipping/rma/RMADispositionBadge.tsx"
+      description: "Disposition badge"
+    - path: "apps/frontend/components/shipping/rma/RMAApprovalInfo.tsx"
+      description: "Approval timestamp and user display"
+    - path: "apps/frontend/components/shipping/rma/RMAActionButtons.tsx"
+      description: "Approve, Close, Edit, Delete buttons with permission checks"
+  validation:
+    - path: "apps/frontend/lib/validation/rma-schema.ts"
+      description: "Zod schemas for RMA, RMA lines, enums (reason_code, disposition, status)"
+  api:
+    - path: "apps/frontend/app/api/shipping/rma/route.ts"
+      methods: ["GET", "POST"]
+      description: "List RMAs with filters, Create RMA"
+    - path: "apps/frontend/app/api/shipping/rma/[id]/route.ts"
+      methods: ["GET", "PUT", "DELETE"]
+      description: "Get RMA, Update RMA (pending only), Delete RMA (pending only)"
+    - path: "apps/frontend/app/api/shipping/rma/[id]/lines/route.ts"
+      methods: ["POST"]
+      description: "Add line to RMA"
+    - path: "apps/frontend/app/api/shipping/rma/[id]/lines/[lineId]/route.ts"
+      methods: ["PUT", "DELETE"]
+      description: "Update line, Delete line (pending RMA only)"
+    - path: "apps/frontend/app/api/shipping/rma/[id]/approve/route.ts"
+      methods: ["POST"]
+      description: "Approve RMA (Manager+ only)"
+    - path: "apps/frontend/app/api/shipping/rma/[id]/close/route.ts"
+      methods: ["POST"]
+      description: "Close RMA (Manager+ only)"
+  services:
+    - path: "apps/frontend/lib/services/rma-service.ts"
+      description: "RMA CRUD business logic, approval logic, validation"
+
+database:
+  tables:
+    - name: "rma_requests"
+      columns:
+        - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "rma_number TEXT NOT NULL"  # Auto: RMA-YYYY-NNNNN
+        - "customer_id UUID NOT NULL REFERENCES customers(id)"
+        - "sales_order_id UUID REFERENCES sales_orders(id)"  # Optional
+        - "reason_code TEXT NOT NULL"  # damaged, expired, wrong_product, quality_issue, customer_change, other
+        - "status TEXT NOT NULL DEFAULT 'pending'"  # pending, approved, receiving, received, processed, closed
+        - "total_value DECIMAL(15,2)"
+        - "disposition TEXT"  # restock, scrap, quality_hold, rework
+        - "notes TEXT"
+        - "created_at TIMESTAMPTZ DEFAULT now()"
+        - "created_by UUID REFERENCES users(id)"
+        - "updated_at TIMESTAMPTZ DEFAULT now()"
+        - "approved_at TIMESTAMPTZ"
+        - "approved_by UUID REFERENCES users(id)"
+      constraints:
+        - "UNIQUE(org_id, rma_number)"
+      rls: true
+      rls_policies:
+        - name: "rma_requests_org_isolation"
+          operation: "ALL"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      indexes:
+        - "org_id, status"
+        - "customer_id"
+        - "sales_order_id"
+        - "rma_number"
+        - "created_at"
+
+    - name: "rma_lines"
+      columns:
+        - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "rma_request_id UUID NOT NULL REFERENCES rma_requests(id) ON DELETE CASCADE"
+        - "product_id UUID NOT NULL REFERENCES products(id)"
+        - "quantity_expected DECIMAL(15,4) NOT NULL"
+        - "quantity_received DECIMAL(15,4) DEFAULT 0"
+        - "lot_number TEXT"
+        - "reason_notes TEXT"
+        - "disposition TEXT"  # Override RMA-level
+        - "created_at TIMESTAMPTZ DEFAULT now()"
+      rls: true
+      rls_policies:
+        - name: "rma_lines_org_isolation"
+          operation: "ALL"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      indexes:
+        - "rma_request_id"
+        - "product_id"
+      cascade_delete: true
+
+  functions:
+    - name: "generate_rma_number"
+      description: "Auto-generate RMA number in format RMA-YYYY-NNNNN"
+      params:
+        - "p_org_id UUID"
+      returns: "TEXT"
+      logic: |
+        1. Extract current year
+        2. Query max sequence for this org and year from rma_requests
+        3. Increment sequence (or start at 1 if none)
+        4. Format as RMA-YYYY-NNNNN with zero-padding
+        5. Return formatted number
+
+    - name: "set_rma_number"
+      description: "Trigger function to auto-set rma_number on insert"
+      trigger: "BEFORE INSERT ON rma_requests"
+      logic: |
+        IF NEW.rma_number IS NULL OR NEW.rma_number = '' THEN
+          NEW.rma_number := generate_rma_number(NEW.org_id);
+        END IF;
+        RETURN NEW;
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/shipping/rma"
+    description: "List RMAs with pagination, search, and filtering"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER", "SALES", "VIEWER"]
+    query_params:
+      - "page: number (default 1)"
+      - "limit: number (default 25, max 100)"
+      - "search: string (searches rma_number)"
+      - "status: 'pending' | 'approved' | 'receiving' | 'received' | 'processed' | 'closed' | 'all'"
+      - "customer_id: UUID (filter by customer)"
+      - "date_from: date (filter by created_at >= date_from)"
+      - "date_to: date (filter by created_at <= date_to)"
+      - "sortBy: 'rma_number' | 'created_at' | 'customer'"
+      - "sortOrder: 'asc' | 'desc'"
+    response:
+      rmas: "RMA[]"
+      total: "number"
+      page: "number"
+      limit: "number"
+    performance: "< 500ms for 50 RMAs"
+
+  - method: "POST"
+    path: "/api/shipping/rma"
+    description: "Create new RMA"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER", "SALES"]
+    request_body:
+      customer_id: "UUID (required)"
+      sales_order_id: "UUID (optional)"
+      reason_code: "enum: damaged | expired | wrong_product | quality_issue | customer_change | other"
+      disposition: "enum: restock | scrap | quality_hold | rework (optional)"
+      notes: "string (optional)"
+      lines: "RMALine[] (required, at least 1)"
+    response:
+      id: "UUID"
+      rma_number: "string (auto-generated)"
+      status: "pending"
+      created_at: "timestamp"
+    errors:
+      400: "At least one line item is required"
+      400: "Invalid reason_code or disposition"
+      404: "Customer not found"
+
+  - method: "GET"
+    path: "/api/shipping/rma/:id"
+    description: "Get RMA details with lines"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER", "SALES", "VIEWER"]
+    response:
+      rma: "RMA object with nested lines array"
+    errors:
+      404: "RMA not found"
+
+  - method: "PUT"
+    path: "/api/shipping/rma/:id"
+    description: "Update existing RMA (pending status only)"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER", "SALES"]
+    request_body:
+      reason_code: "enum (optional)"
+      disposition: "enum (optional)"
+      notes: "string (optional)"
+    response:
+      rma: "Updated RMA object"
+    errors:
+      404: "RMA not found"
+      400: "Cannot edit RMA with status other than pending"
+      400: "Cannot edit RMA with received quantities"
+
+  - method: "DELETE"
+    path: "/api/shipping/rma/:id"
+    description: "Delete RMA (pending status only, cascade deletes lines)"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"]
+    response:
+      success: true
+      message: "RMA deleted"
+    errors:
+      404: "RMA not found"
+      400: "Cannot delete RMA with status other than pending"
+
+  - method: "POST"
+    path: "/api/shipping/rma/:id/lines"
+    description: "Add line to RMA (pending status only)"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER", "SALES"]
+    request_body:
+      product_id: "UUID (required)"
+      quantity_expected: "decimal (required, positive)"
+      lot_number: "string (optional)"
+      reason_notes: "string (optional)"
+      disposition: "enum (optional, overrides RMA-level)"
+    response:
+      line: "RMALine object"
+    errors:
+      400: "Cannot add line to non-pending RMA"
+      404: "Product not found"
+
+  - method: "PUT"
+    path: "/api/shipping/rma/:id/lines/:lineId"
+    description: "Update line (pending RMA only)"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER", "SALES"]
+    request_body:
+      quantity_expected: "decimal (optional)"
+      lot_number: "string (optional)"
+      reason_notes: "string (optional)"
+      disposition: "enum (optional)"
+    response:
+      line: "Updated RMALine object"
+    errors:
+      400: "Cannot edit line in non-pending RMA"
+
+  - method: "DELETE"
+    path: "/api/shipping/rma/:id/lines/:lineId"
+    description: "Delete line (pending RMA only)"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER", "SALES"]
+    response:
+      success: true
+    errors:
+      400: "Cannot delete line from non-pending RMA"
+      400: "RMA must have at least one line"
+
+  - method: "POST"
+    path: "/api/shipping/rma/:id/approve"
+    description: "Approve RMA (Manager/Admin only)"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"]
+    response:
+      rma: "RMA object with status='approved', approved_at, approved_by set"
+    side_effects:
+      - "Set status to 'approved'"
+      - "Set approved_at to current timestamp"
+      - "Set approved_by to current user ID"
+    errors:
+      404: "RMA not found"
+      403: "Insufficient permissions (requires Manager or Admin)"
+      400: "RMA must be in pending status to approve"
+      400: "RMA must have at least one line"
+
+  - method: "POST"
+    path: "/api/shipping/rma/:id/close"
+    description: "Close RMA (Manager/Admin only, processed status required)"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"]
+    response:
+      rma: "RMA object with status='closed'"
+    side_effects:
+      - "Set status to 'closed'"
+    errors:
+      404: "RMA not found"
+      403: "Insufficient permissions"
+      400: "RMA must be in processed status to close"
+
+ux:
+  patterns:
+    table: "ShadCN DataTable with column sorting, filtering, pagination"
+    modal: "ShadCN Dialog for create/edit forms"
+    form: "react-hook-form with Zod resolver"
+    badge: "ShadCN Badge for status, reason, disposition indicators"
+    search: "Debounced search input (300ms)"
+    confirmation: "ShadCN AlertDialog for destructive actions (delete, approve)"
+
+  states:
+    loading: "Skeleton rows (3) with shimmer animation"
+    empty: "'No RMAs found' illustration with 'Create RMA' CTA"
+    error: "'Failed to load RMAs' warning with Retry button"
+    success: "Table populated with RMA data"
+
+  rma_list_features:
+    - "Search bar (RMA number)"
+    - "Status filter dropdown (Pending, Approved, Receiving, Received, Processed, Closed, All)"
+    - "Customer filter dropdown"
+    - "Date range filter (created_at)"
+    - "Sort dropdown (RMA Number, Created Date, Customer)"
+    - "Create RMA button (primary CTA)"
+    - "Row actions: View, Edit (pending only), Delete (pending only)"
+    - "Pagination (25 per page, configurable)"
+
+  rma_detail_sections:
+    - "Header: RMA number, customer, sales order link, status badge, reason badge"
+    - "Approval info: Approved by [user] on [date] (if approved)"
+    - "Details: Disposition, notes, created by, created at"
+    - "Lines table: Product, Qty Expected, Qty Received, Lot Number, Reason Notes, Disposition, Actions"
+    - "Action buttons: Approve (Manager+, pending only), Edit (pending only), Delete (pending only), Close (Manager+, processed only)"
+
+  badges:
+    status:
+      pending: "bg-yellow-100 text-yellow-800"
+      approved: "bg-blue-100 text-blue-800"
+      receiving: "bg-indigo-100 text-indigo-800"
+      received: "bg-purple-100 text-purple-800"
+      processed: "bg-green-100 text-green-800"
+      closed: "bg-gray-100 text-gray-800"
+    reason:
+      damaged: "bg-red-100 text-red-800"
+      expired: "bg-orange-100 text-orange-800"
+      wrong_product: "bg-blue-100 text-blue-800"
+      quality_issue: "bg-red-100 text-red-800"
+      customer_change: "bg-purple-100 text-purple-800"
+      other: "bg-gray-100 text-gray-800"
+    disposition:
+      restock: "bg-green-100 text-green-800"
+      scrap: "bg-red-100 text-red-800"
+      quality_hold: "bg-yellow-100 text-yellow-800"
+      rework: "bg-blue-100 text-blue-800"
+
+validation_rules:
+  customer_id:
+    type: "UUID"
+    required: true
+    error_empty: "Customer is required"
+    error_format: "Invalid customer ID"
+
+  sales_order_id:
+    type: "UUID"
+    optional: true
+    error_format: "Invalid sales order ID"
+
+  reason_code:
+    type: "enum"
+    values: ["damaged", "expired", "wrong_product", "quality_issue", "customer_change", "other"]
+    required: true
+    error_empty: "Reason code is required"
+
+  disposition:
+    type: "enum"
+    values: ["restock", "scrap", "quality_hold", "rework"]
+    optional: true
+
+  notes:
+    type: "string"
+    max: 1000
+    optional: true
+    error_max: "Notes must be at most 1000 characters"
+
+  product_id:
+    type: "UUID"
+    required: true
+    error_empty: "Product is required"
+    error_format: "Invalid product ID"
+
+  quantity_expected:
+    type: "decimal"
+    required: true
+    min: 0.0001
+    max: 999999.9999
+    error_empty: "Quantity is required"
+    error_min: "Quantity must be positive"
+    error_max: "Quantity too large"
+
+  lot_number:
+    type: "string"
+    max: 100
+    optional: true
+    error_max: "Lot number must be at most 100 characters"
+
+  reason_notes:
+    type: "string"
+    max: 500
+    optional: true
+    error_max: "Reason notes must be at most 500 characters"
+
+patterns:
+  rls: "ADR-013 - RLS Org Isolation Pattern"
+  api: "REST with org_id filter from auth context"
+  service: "Class-based RMAService with static methods"
+  validation: "Zod schemas in lib/validation/rma-schema.ts"
+  auto_number: "Database function with year-based sequential numbering"
+  status_workflow: "One-way state machine: pending → approved → receiving → received → processed → closed"
+  cascade_delete: "rma_lines have ON DELETE CASCADE"
+  approval_tracking: "Record approved_at timestamp and approved_by user ID"
+
+  disposition_defaults: |
+    // Suggest default disposition based on reason_code
+    function suggestDisposition(reasonCode: string): string {
+      const defaults = {
+        damaged: 'scrap',
+        expired: 'scrap',
+        wrong_product: 'restock',
+        quality_issue: 'quality_hold',
+        customer_change: 'restock',
+        other: null  // User must select
+      };
+      return defaults[reasonCode];
+    }
+
+  edit_restrictions: |
+    // Only allow edit/delete for pending status
+    function canEditRMA(rma: RMA): boolean {
+      if (rma.status !== 'pending') return false;
+
+      // Check if any lines have quantity_received > 0
+      const hasReceivedQty = rma.lines.some(line => line.quantity_received > 0);
+      if (hasReceivedQty) return false;
+
+      return true;
+    }
+
+  approval_logic: |
+    // Approve RMA (Manager/Admin only)
+    async function approveRMA(id: string, userId: string): Promise<RMA> {
+      const rma = await db.rma_requests.findUnique({ where: { id } });
+
+      if (rma.status !== 'pending') {
+        throw new Error('RMA must be in pending status to approve');
+      }
+
+      if (rma.lines.length === 0) {
+        throw new Error('RMA must have at least one line');
+      }
+
+      return db.rma_requests.update({
+        where: { id },
+        data: {
+          status: 'approved',
+          approved_at: new Date(),
+          approved_by: userId
+        }
+      });
+    }
+
+acceptance_checklist:
+  rma_list:
+    - "GIVEN clerk navigates to /shipping/rma, WHEN page loads, THEN RMA list displays within 500ms"
+    - "GIVEN RMA list has 50 RMAs, WHEN clerk searches 'RMA-2025-001', THEN filtered results display within 300ms"
+    - "GIVEN RMA list displayed, WHEN clerk filters by status 'pending', THEN only pending RMAs appear"
+    - "GIVEN RMA list displayed, WHEN clerk filters by customer, THEN only RMAs for that customer appear"
+    - "GIVEN RMA list with pagination, WHEN page 2 clicked, THEN next 25 RMAs display"
+
+  rma_creation:
+    - "GIVEN clerk clicks 'Create RMA', WHEN modal opens, THEN form displays customer, SO, reason_code, disposition, notes fields"
+    - "GIVEN valid RMA data entered with 1 line, WHEN 'Create' clicked, THEN RMA created with auto-generated number within 1 second"
+    - "GIVEN RMA created on 2025-03-15, WHEN saved, THEN RMA number is 'RMA-2025-NNNNN'"
+    - "GIVEN no lines added, WHEN form submitted, THEN error 'At least one line item is required' displays"
+    - "GIVEN reason_code 'damaged' selected, WHEN form loads, THEN disposition defaults to 'scrap'"
+
+  rma_lines:
+    - "GIVEN clerk creating RMA, WHEN 'Add Line' clicked, THEN line form displays product, qty, lot, reason_notes fields"
+    - "GIVEN valid line data entered, WHEN 'Add' clicked, THEN line added to lines table"
+    - "GIVEN RMA has 3 lines, WHEN clerk clicks 'Edit' on line, THEN line edit modal opens with pre-populated data"
+    - "GIVEN RMA status 'approved', WHEN clerk attempts to edit line, THEN edit button disabled with tooltip"
+
+  rma_detail:
+    - "GIVEN clerk clicks RMA row, WHEN detail page loads, THEN page displays RMA info and lines table"
+    - "GIVEN RMA status 'pending', WHEN detail page viewed, THEN 'Edit' and 'Delete' buttons visible"
+    - "GIVEN RMA status 'approved', WHEN detail page viewed, THEN 'Edit' and 'Delete' buttons hidden"
+
+  rma_approval:
+    - "GIVEN Manager views pending RMA, WHEN 'Approve' clicked, THEN confirmation dialog displays"
+    - "GIVEN Manager confirms approval, WHEN processed, THEN status changes to 'approved' with timestamp and user ID"
+    - "GIVEN RMA approved, WHEN detail page viewed, THEN approval info displays 'Approved by [user] on [date]'"
+    - "GIVEN Sales user views pending RMA, WHEN detail page loads, THEN 'Approve' button hidden"
+
+  rma_edit_delete:
+    - "GIVEN RMA status 'pending', WHEN clerk clicks 'Edit', THEN edit form opens with all fields editable"
+    - "GIVEN RMA status 'approved', WHEN clerk views RMA, THEN 'Edit' button hidden"
+    - "GIVEN RMA status 'pending', WHEN clerk clicks 'Delete' and confirms, THEN RMA and lines deleted"
+    - "GIVEN RMA status 'approved', WHEN clerk views RMA, THEN delete action disabled"
+
+  status_workflow:
+    - "GIVEN new RMA created, WHEN saved, THEN status is 'pending'"
+    - "GIVEN pending RMA approved, WHEN approval completed, THEN status changes to 'approved'"
+
+  security:
+    - "GIVEN user from Org A queries RMAs, WHEN results returned, THEN only Org A RMAs visible (RLS)"
+    - "GIVEN concurrent RMA creation, WHEN multiple users create RMAs, THEN each receives unique sequential number"
+
+definition_of_done:
+  - "Database tables created with RLS policies"
+  - "Auto-number generation function works correctly"
+  - "All API endpoints functional"
+  - "RMA list page loads < 500ms for 50 RMAs"
+  - "Search and filter work < 300ms"
+  - "Create/Edit RMA forms validate correctly"
+  - "RMA lines CRUD works end-to-end"
+  - "Approval workflow changes status and records user/timestamp"
+  - "Edit/delete disabled for non-pending RMAs"
+  - "Disposition defaults suggested"
+  - "RMA detail page displays correctly"
+  - "Status badges display correct colors"
+  - "Permission checks hide unauthorized actions"
+  - "Multi-tenant isolation verified (RLS tests)"
+  - "Cascade delete works"
+  - "Unit tests pass (>80% coverage)"
+  - "Integration tests pass for all endpoints"
+  - "E2E test passes for creation and approval"
+
+tests:
+  unit:
+    - "RMAService.createRMA generates RMA number correctly"
+    - "RMAService.canEditRMA returns false for non-pending status"
+    - "RMAService.canDeleteRMA returns false for non-pending status"
+    - "RMAService.suggestDisposition returns correct default per reason_code"
+    - "RMAService.approveRMA sets approved_at and approved_by"
+    - "Zod schema rejects invalid reason_code"
+    - "Zod schema rejects invalid disposition"
+    - "Zod schema rejects negative quantity_expected"
+    - "Status badge renders correct colors"
+
+  integration:
+    - "GET /api/shipping/rma returns paginated results"
+    - "GET /api/shipping/rma?status=pending filters correctly"
+    - "GET /api/shipping/rma?customer_id=uuid filters by customer"
+    - "POST /api/shipping/rma creates RMA with auto-generated number"
+    - "POST /api/shipping/rma returns 400 if no lines"
+    - "PUT /api/shipping/rma/:id updates pending RMA"
+    - "PUT /api/shipping/rma/:id returns 400 for non-pending RMA"
+    - "DELETE /api/shipping/rma/:id deletes pending RMA and cascades lines"
+    - "DELETE /api/shipping/rma/:id returns 400 for non-pending RMA"
+    - "POST /api/shipping/rma/:id/lines adds line to pending RMA"
+    - "POST /api/shipping/rma/:id/approve sets status to approved"
+    - "POST /api/shipping/rma/:id/approve returns 403 for non-Manager"
+    - "RLS policies block cross-org access"
+
+  e2e:
+    - "Full RMA creation flow from list to form to confirmation"
+    - "Add multiple lines to RMA and verify in lines table"
+    - "Edit RMA and see immediate update in list"
+    - "Manager approves RMA and sees approval info"
+    - "Sales user cannot see approve button"
+    - "Delete pending RMA and verify removal from list"
+    - "Attempt to edit approved RMA and verify disabled"
+    - "Search and filter RMA list"
+
+output_artifacts:
+  - "rma_requests, rma_lines migration with RLS, auto-number function/trigger"
+  - "RMATable.tsx with sorting, filtering, pagination"
+  - "RMAForm.tsx for create/edit"
+  - "RMALinesTable.tsx and RMALineForm.tsx"
+  - "RMAStatusBadge.tsx, RMAReasonBadge.tsx, RMADispositionBadge.tsx"
+  - "RMAApprovalInfo.tsx"
+  - "RMAActionButtons.tsx with permission checks"
+  - "rma-schema.ts Zod validation schemas"
+  - "rma-service.ts with CRUD and approval logic"
+  - "API routes: /api/shipping/rma (GET, POST)"
+  - "API routes: /api/shipping/rma/:id (GET, PUT, DELETE)"
+  - "API routes: /api/shipping/rma/:id/lines"
+  - "API routes: /api/shipping/rma/:id/approve"
+  - "API routes: /api/shipping/rma/:id/close"
+  - "Unit tests for rma-service"
+  - "Integration tests for all API endpoints"
+  - "E2E test for RMA creation and approval workflow"
+
+implementation_notes:
+  frontend:
+    - "Use ShadCN DataTable for RMA list with server-side pagination"
+    - "Use ShadCN Dialog for create/edit modals"
+    - "Use react-hook-form with Zod resolver for form validation"
+    - "Debounce search input by 300ms"
+    - "Show skeleton loaders while loading"
+    - "Use usePermissions() hook to conditionally render Approve button"
+    - "Display approval info (user, timestamp) when status is approved"
+    - "Disable Edit/Delete buttons for non-pending RMAs with tooltips"
+
+  backend:
+    - "Implement generate_rma_number() function in migration"
+    - "Add BEFORE INSERT trigger to auto-set rma_number"
+    - "Validate RMA status before allowing edit/delete (pending only)"
+    - "Enforce Manager/Admin role check for approval endpoint"
+    - "Calculate total_value from line items (product price × quantity_expected)"
+    - "Use ADR-013 RLS pattern for org isolation"
+    - "Enforce permission middleware on sensitive endpoints (approve, close)"
+    - "Cascade delete lines when RMA deleted"
+    - "Validate at least one line before approval"
+
+  database:
+    - "Create rma_requests with UNIQUE(org_id, rma_number)"
+    - "Create rma_lines with ON DELETE CASCADE"
+    - "Enable RLS on both tables"
+    - "Add indexes for performance: org_id+status, customer_id, rma_number, created_at"
+    - "Create generate_rma_number() function with year-based sequential logic"
+    - "Create set_rma_number() trigger function"
+    - "Add updated_at trigger for rma_requests"
+
+  future_considerations:
+    - "RMA receiving workflow in Story 07.17 (update quantity_received)"
+    - "Disposition processing in Story 07.18 (LP generation, putaway)"
+    - "Credit memo generation in Phase 3 (Epic 09 Finance)"
+    - "RMA analytics in Phase 2"

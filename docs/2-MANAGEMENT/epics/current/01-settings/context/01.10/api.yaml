@@ -1,0 +1,186 @@
+# Story 01.10 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/machines"
+    description: "List all machines with filtering, sorting, pagination"
+    file: "apps/frontend/app/api/v1/settings/machines/route.ts"
+    auth: true
+    roles: ["*"]
+    query_params:
+      - "page: number (default: 1)"
+      - "limit: number (default: 25)"
+      - "search: string (filters code and name)"
+      - "type: MachineType (enum filter)"
+      - "status: MachineStatus (enum filter)"
+      - "location_id: string (UUID filter)"
+      - "sortBy: 'code' | 'name' | 'type' | 'status' | 'created_at'"
+      - "sortOrder: 'asc' | 'desc'"
+    response:
+      status: 200
+      schema:
+        machines: "Machine[]"
+        total: "number"
+        page: "number"
+        limit: "number"
+    performance: "< 300ms for 100 machines"
+
+  - method: "POST"
+    path: "/api/v1/settings/machines"
+    description: "Create a new machine"
+    file: "apps/frontend/app/api/v1/settings/machines/route.ts"
+    auth: true
+    roles: ["super_admin", "admin", "prod_manager"]
+    request_body:
+      code: "string (required, uppercase alphanumeric with hyphens, max 50)"
+      name: "string (required, max 100)"
+      description: "string (optional, max 500)"
+      type: "MachineType (required)"
+      status: "MachineStatus (optional, default: ACTIVE)"
+      units_per_hour: "number (optional, integer, min 0)"
+      setup_time_minutes: "number (optional, integer, min 0)"
+      max_batch_size: "number (optional, integer, min 0)"
+      location_id: "string (optional, UUID)"
+    response:
+      status: 201
+      schema:
+        machine: "Machine"
+    errors:
+      - code: 400
+        message: "Validation error"
+        condition: "Invalid input data"
+      - code: 409
+        message: "Machine code must be unique"
+        condition: "Duplicate code in organization"
+      - code: 403
+        message: "Insufficient permissions"
+        condition: "User lacks PROD_MANAGER+ role"
+
+  - method: "GET"
+    path: "/api/v1/settings/machines/:id"
+    description: "Get single machine by ID"
+    file: "apps/frontend/app/api/v1/settings/machines/[id]/route.ts"
+    auth: true
+    roles: ["*"]
+    response:
+      status: 200
+      schema:
+        machine: "Machine with location details"
+
+  - method: "PUT"
+    path: "/api/v1/settings/machines/:id"
+    description: "Update machine"
+    file: "apps/frontend/app/api/v1/settings/machines/[id]/route.ts"
+    auth: true
+    roles: ["super_admin", "admin", "prod_manager"]
+    request_body:
+      code: "string (optional)"
+      name: "string (optional)"
+      description: "string (optional)"
+      type: "MachineType (optional)"
+      status: "MachineStatus (optional)"
+      units_per_hour: "number (optional)"
+      setup_time_minutes: "number (optional)"
+      max_batch_size: "number (optional)"
+      location_id: "string | null (optional, null to unassign)"
+    response:
+      status: 200
+      schema:
+        machine: "Machine"
+    errors:
+      - code: 404
+        message: "Machine not found"
+      - code: 409
+        message: "Machine code must be unique"
+
+  - method: "PATCH"
+    path: "/api/v1/settings/machines/:id/status"
+    description: "Update machine status only"
+    file: "apps/frontend/app/api/v1/settings/machines/[id]/status/route.ts"
+    auth: true
+    roles: ["super_admin", "admin", "prod_manager"]
+    request_body:
+      status: "MachineStatus (required)"
+    response:
+      status: 200
+      schema:
+        machine: "Machine"
+
+  - method: "DELETE"
+    path: "/api/v1/settings/machines/:id"
+    description: "Delete machine (soft delete if has historical references)"
+    file: "apps/frontend/app/api/v1/settings/machines/[id]/route.ts"
+    auth: true
+    roles: ["super_admin", "admin"]
+    response:
+      status: 204
+      schema:
+        success: "boolean"
+    errors:
+      - code: 409
+        message: "Machine is assigned to line [LINE-CODE]. Remove from line first."
+        condition: "Machine assigned to production line"
+      - code: 404
+        message: "Machine not found"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/machine-service.ts"
+    description: "Machine CRUD logic, validation helpers, location path building"
+    exports:
+      - name: "MachineService"
+        type: "class"
+        methods:
+          - "static async list(filters): Promise<{ machines, total }>"
+          - "static async getById(id): Promise<Machine>"
+          - "static async create(data): Promise<Machine>"
+          - "static async update(id, data): Promise<Machine>"
+          - "static async updateStatus(id, status): Promise<Machine>"
+          - "static async delete(id): Promise<void>"
+          - "static async isCodeUnique(code, excludeId?): Promise<boolean>"
+          - "static async canDelete(id): Promise<{ canDelete: boolean, reason?: string }>"
+          - "static getLocationPath(machine): string"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/machine-schema.ts"
+    description: "Zod schemas for machine create/update/status"
+    schemas:
+      - name: "machineCreateSchema"
+        fields:
+          code: "z.string().min(1).max(50).regex(/^[A-Z0-9-]+$/).transform(toUpperCase)"
+          name: "z.string().min(1).max(100)"
+          description: "z.string().max(500).optional()"
+          type: "z.enum(['MIXER', 'OVEN', 'FILLER', 'PACKAGING', 'CONVEYOR', 'BLENDER', 'CUTTER', 'LABELER', 'OTHER'])"
+          status: "z.enum(['ACTIVE', 'MAINTENANCE', 'OFFLINE', 'DECOMMISSIONED']).default('ACTIVE')"
+          units_per_hour: "z.number().int().min(0).optional()"
+          setup_time_minutes: "z.number().int().min(0).optional()"
+          max_batch_size: "z.number().int().min(0).optional()"
+          location_id: "z.string().uuid().nullable().optional()"
+
+      - name: "machineUpdateSchema"
+        description: "Partial of machineCreateSchema"
+
+      - name: "machineStatusSchema"
+        fields:
+          status: "z.enum(['ACTIVE', 'MAINTENANCE', 'OFFLINE', 'DECOMMISSIONED'])"
+
+# Permission Checks
+permissions:
+  view_machines:
+    roles: ["*"]
+    notes: "All authenticated users can view machines"
+  create_machines:
+    roles: ["super_admin", "admin", "prod_manager"]
+    notes: "Manager+ can create machines"
+  edit_machines:
+    roles: ["super_admin", "admin", "prod_manager"]
+    notes: "Manager+ can edit machines"
+  delete_machines:
+    roles: ["super_admin", "admin"]
+    notes: "Admin+ only can delete machines"
+  change_status:
+    roles: ["super_admin", "admin", "prod_manager"]
+    notes: "Manager+ can change machine status"

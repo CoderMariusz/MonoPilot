@@ -1,0 +1,91 @@
+# Story 01.5b - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.5b"
+  name: "User Warehouse Access Restrictions (Phase 1B)"
+  slug: "user-warehouse-access-phase1b"
+  epic: "01-settings"
+  phase: "1B"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "planned"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # No new tables, use existing column
+  - api.yaml         # GET/PUT warehouse-access endpoints
+  - frontend.yaml    # WarehouseAccessSection component
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Identified gaps, blockers
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.5a"
+      name: "User Management CRUD (Phase 1A)"
+      provides:
+        - "users table with warehouse_access_ids column"
+        - "User CRUD API endpoints"
+        - "UserModal component (base)"
+        - "user-service.ts"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides:
+        - "warehouses table"
+        - "GET /api/v1/settings/warehouses endpoint"
+        - "Warehouse entities for assignment"
+  blocks:
+    - story: "Epic 05"
+      name: "Warehouse Module"
+      reason: "Inventory operations need warehouse access enforcement"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-018"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["user_warehouse_access", "RLS Policies"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.5b.user-warehouse-access-phase1b.md"
+  ux_wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/SET-009-user-create-edit-modal.md"
+      lines: "49-117"
+      description: "Warehouse Access section in user modal"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS enforcement for warehouse-scoped operations"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 2
+    description: "GET/PUT /api/v1/settings/users/:id/warehouse-access"
+  - type: "component"
+    count: 2
+    description: "WarehouseAccessSection, WarehouseAccessBadge"
+  - type: "service"
+    count: 1
+    description: "user-warehouse-service.ts (extends user-service)"
+  - type: "rls"
+    count: 1
+    description: "Warehouse access RLS policy updates"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + RLS enforcement tests"
+
+# Technical notes
+technical_notes:
+  - "NO NEW TABLE - Uses existing users.warehouse_access_ids UUID[] column"
+  - "warehouse_access_ids NULL = all warehouses (admin/super_admin only)"
+  - "warehouse_access_ids [] = no warehouses (explicit empty)"
+  - "warehouse_access_ids [id1, id2] = specific warehouses"
+  - "Extend UserService with UserWarehouseService (composition pattern)"
+  - "Enable SET-009 wireframe lines 49-117 (previously Phase 2)"
+  - "RLS policies filter inventory by user's warehouse access"
+  - "Audit trail via user_warehouse_access_log table (optional)"

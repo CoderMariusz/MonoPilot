@@ -1,0 +1,1137 @@
+# Story Context: 01.14 Wizard Steps Complete (Steps 2-6)
+# Generated: 2025-12-16
+# Purpose: AI agent context for implementing wizard steps 2-6 (warehouse, locations, product, work order, completion)
+
+story:
+  id: "01.14"
+  name: "Wizard Steps Complete (Steps 2-6)"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "L"
+  estimate_days: 7
+  type: "full-stack"
+  state: "ready"
+  competitive_differentiator: "15-minute onboarding promise"
+  story_file: "docs/2-MANAGEMENT/epics/current/01-settings/01.14.wizard-steps-complete.md"
+
+dependencies:
+  required:
+    - story: "01.3"
+      name: "Onboarding Wizard Launcher"
+      provides:
+        - "WizardModal component with step shell"
+        - "Step navigation (Next/Back)"
+        - "Progress tracking framework"
+        - "Skip wizard functionality"
+        - "useOnboardingStatus hook"
+        - "onboarding_step column in organizations"
+    - story: "01.4"
+      name: "Organization Profile Step (Step 1)"
+      provides:
+        - "Step 1 form component"
+        - "Org profile API endpoint"
+        - "Browser detection utilities"
+        - "Step 1 completion advances to step 2"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides:
+        - "warehouses table"
+        - "warehouse-service.ts"
+        - "Warehouse types (GENERAL, RAW_MATERIALS, WIP, FINISHED_GOODS, QUARANTINE)"
+        - "Warehouse validation schemas"
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides:
+        - "locations table"
+        - "location-service.ts"
+        - "Location hierarchy (zone > aisle > rack > bin)"
+        - "Location types (bulk, pallet, shelf, floor, staging)"
+        - "Location validation schemas"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "org_id context"
+        - "RLS policies"
+        - "Multi-tenant isolation"
+  dependents:
+    - description: "Wizard completion is terminal - no dependent stories"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/settings.md"
+  prd_sections:
+    - "FR-SET-182"  # First warehouse creation step (Step 2)
+    - "FR-SET-183"  # First location setup step (Step 3)
+    - "FR-SET-184"  # First product creation step (Step 4)
+    - "FR-SET-185"  # First work order creation step (Step 5 - OPTIONAL)
+    - "FR-SET-188"  # Wizard completion celebration (Step 6)
+    - "FR-SET-186"  # Wizard progress tracking (framework in 01.3)
+    - "FR-SET-187"  # Skip wizard option (framework in 01.3)
+  architecture: "docs/1-BASELINE/architecture/modules/settings.md"
+  story: "docs/2-MANAGEMENT/epics/current/01-settings/01.14.wizard-steps-complete.md"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  patterns:
+    - "apps/frontend/lib/validation/*.ts"
+    - "apps/frontend/lib/services/warehouse-service.ts"
+    - "apps/frontend/lib/services/location-service.ts"
+    - "apps/frontend/components/settings/onboarding/"
+  related_contexts:
+    - "docs/2-MANAGEMENT/epics/current/01-settings/context/01.3.context.yaml"
+    - "docs/2-MANAGEMENT/epics/current/01-settings/context/01.4.context.yaml"
+    - "docs/2-MANAGEMENT/epics/current/01-settings/context/01.8.context.yaml"
+    - "docs/2-MANAGEMENT/epics/current/01-settings/context/01.9.context.yaml"
+
+files_to_create:
+  pages: []  # Steps are rendered within wizard modal, not as pages
+  components:
+    # Step Components
+    - path: "apps/frontend/components/settings/onboarding/WizardStep2Warehouse.tsx"
+      description: "Step 2: First warehouse creation form with type tooltips"
+    - path: "apps/frontend/components/settings/onboarding/WizardStep3Locations.tsx"
+      description: "Step 3: Location template selector (Simple/Basic/Full/Custom)"
+    - path: "apps/frontend/components/settings/onboarding/WizardStep4Product.tsx"
+      description: "Step 4: Industry selector + product template form"
+    - path: "apps/frontend/components/settings/onboarding/WizardStep5WorkOrder.tsx"
+      description: "Step 5: Demo work order creation (optional, requires product)"
+    - path: "apps/frontend/components/settings/onboarding/WizardStep6Complete.tsx"
+      description: "Step 6: Celebration screen with confetti, summary, next steps"
+    # Template Components
+    - path: "apps/frontend/components/settings/onboarding/templates/TemplateSelector.tsx"
+      description: "Reusable template card selector component"
+    - path: "apps/frontend/components/settings/onboarding/templates/LocationTemplateCard.tsx"
+      description: "Single location template option card with preview"
+    - path: "apps/frontend/components/settings/onboarding/templates/IndustrySelector.tsx"
+      description: "Industry icon grid (Bakery, Dairy, Meat, Beverages, Snacks, Other)"
+    - path: "apps/frontend/components/settings/onboarding/templates/ProductTemplateDropdown.tsx"
+      description: "Product templates dropdown filtered by selected industry"
+    # Celebration Components
+    - path: "apps/frontend/components/settings/onboarding/celebration/ConfettiAnimation.tsx"
+      description: "Canvas-based confetti particles (3 second duration)"
+    - path: "apps/frontend/components/settings/onboarding/celebration/SpeedBadge.tsx"
+      description: "Speed Setup Champion badge (if completed in <15 min)"
+    - path: "apps/frontend/components/settings/onboarding/celebration/CompletionSummary.tsx"
+      description: "Summary of all created entities"
+    - path: "apps/frontend/components/settings/onboarding/celebration/NextStepCard.tsx"
+      description: "Single next step action card component"
+    - path: "apps/frontend/components/settings/onboarding/celebration/NextStepsSection.tsx"
+      description: "Grid of contextual next step cards"
+    - path: "apps/frontend/components/settings/onboarding/celebration/WelcomeBanner.tsx"
+      description: "Dashboard welcome banner (dismissible, post-wizard)"
+    # Shared Components
+    - path: "apps/frontend/components/settings/onboarding/shared/WizardTooltip.tsx"
+      description: "Tooltip wrapper for field explanations"
+    - path: "apps/frontend/components/settings/onboarding/shared/SkipStepButton.tsx"
+      description: "Consistent skip button styling with confirmation"
+    - path: "apps/frontend/components/settings/onboarding/shared/StepTimer.tsx"
+      description: "Elapsed time display (optional, for speed tracking)"
+  validation:
+    - path: "apps/frontend/lib/validation/wizard-steps.ts"
+      description: "Zod schemas for steps 2-5 (step2, step3, step4, step5)"
+  api:
+    - path: "apps/frontend/app/api/v1/settings/onboarding/step/2/route.ts"
+      methods: ["POST"]
+      description: "Save warehouse (Step 2)"
+    - path: "apps/frontend/app/api/v1/settings/onboarding/step/3/route.ts"
+      methods: ["POST"]
+      description: "Save locations with template (Step 3)"
+    - path: "apps/frontend/app/api/v1/settings/onboarding/step/4/route.ts"
+      methods: ["POST"]
+      description: "Save product (Step 4)"
+    - path: "apps/frontend/app/api/v1/settings/onboarding/step/5/route.ts"
+      methods: ["POST"]
+      description: "Save demo work order (Step 5)"
+    - path: "apps/frontend/app/api/v1/settings/onboarding/step/6/route.ts"
+      methods: ["POST"]
+      description: "Complete wizard, calculate duration, award badge (Step 6)"
+    - path: "apps/frontend/app/api/v1/settings/onboarding/templates/locations/route.ts"
+      methods: ["GET"]
+      description: "Get location template definitions"
+    - path: "apps/frontend/app/api/v1/settings/onboarding/templates/products/route.ts"
+      methods: ["GET"]
+      description: "Get industry + product template definitions"
+  services:
+    - path: "apps/frontend/lib/services/wizard-service.ts"
+      description: "Wizard step handlers, progress management, badge award"
+  constants:
+    - path: "apps/frontend/lib/constants/wizard-templates.ts"
+      description: "Location templates (Simple/Basic/Full) and Product templates by industry"
+  database:
+    - path: "supabase/migrations/XXX_add_wizard_progress_badges.sql"
+      type: "migration"
+      description: "Add wizard_progress JSONB and badges JSONB columns to organizations"
+
+database:
+  tables:
+    - name: "organizations"
+      columns_to_add:
+        - name: "wizard_progress"
+          type: "JSONB"
+          default: "'{}'::jsonb"
+          description: |
+            Stores step completion data:
+            {
+              "step_1": { "completed_at": "timestamp", "org_name": "..." },
+              "step_2": { "completed_at": "timestamp", "warehouse_id": "uuid", "skipped": false },
+              "step_3": { "completed_at": "timestamp", "location_ids": ["uuid"], "template": "basic", "skipped": false },
+              "step_4": { "completed_at": "timestamp", "product_id": "uuid", "skipped": false },
+              "step_5": { "completed_at": "timestamp", "work_order_id": "uuid", "skipped": true },
+              "step_6": { "completed_at": "timestamp", "duration_seconds": 754, "badge": "speed_champion" }
+            }
+        - name: "badges"
+          type: "JSONB"
+          default: "'[]'::jsonb"
+          description: |
+            Array of earned badges:
+            [
+              { "code": "speed_champion", "name": "Speed Setup Champion", "earned_at": "timestamp" }
+            ]
+      rls: true
+      notes: "Extension of existing organizations table from 01.1"
+
+api_endpoints:
+  # Step 2: Warehouse
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/2"
+    description: "Save first warehouse (Step 2)"
+    auth: true
+    roles: ["super_admin", "admin"]
+    request_body:
+      code: "string (default 'WH-MAIN', 2-20 chars, uppercase alphanumeric + hyphens)"
+      name: "string (required, 2-100 chars)"
+      type: "string (default 'GENERAL', one of 5 warehouse types)"
+      skip: "boolean (optional, if true creates demo warehouse)"
+    response:
+      success: true
+      next_step: 3
+      warehouse:
+        id: "UUID"
+        code: "string"
+        name: "string"
+    on_success:
+      - "Create warehouse with is_default=true"
+      - "Update wizard_progress.step_2 with warehouse_id"
+      - "Set onboarding_step = 3"
+    on_skip:
+      - "Create demo warehouse: DEMO-WH / Demo Warehouse / GENERAL / is_default=true"
+      - "Show info toast: 'Demo warehouse created. You can edit it later in Settings.'"
+
+  # Step 3: Locations
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/3"
+    description: "Save locations with template (Step 3)"
+    auth: true
+    roles: ["super_admin", "admin"]
+    request_body:
+      template: "string (optional, one of 'simple', 'basic', 'full', 'custom')"
+      custom_locations: "array (only if template='custom')"
+      skip: "boolean (optional, if true creates default location)"
+    response:
+      success: true
+      next_step: 4
+      locations:
+        - id: "UUID"
+          code: "string"
+          name: "string"
+      count: "number"
+    templates:
+      simple:
+        description: "Single location for small operations"
+        creates: 1
+        locations:
+          - code: "RECEIVING"
+            name: "Receiving Area"
+            level: "zone"
+            location_type: "staging"
+      basic:
+        description: "Receiving, Storage, Shipping areas"
+        creates: 3
+        locations:
+          - code: "RECEIVING"
+            name: "Receiving Area"
+            level: "zone"
+            location_type: "staging"
+          - code: "STORAGE"
+            name: "Storage Area"
+            level: "zone"
+            location_type: "bulk"
+          - code: "SHIPPING"
+            name: "Shipping Area"
+            level: "zone"
+            location_type: "staging"
+      full:
+        description: "3 zones with aisle and rack structure"
+        creates: 9
+        locations:
+          - code: "RAW-ZONE"
+            name: "Raw Materials"
+            level: "zone"
+            location_type: "bulk"
+            children:
+              - code: "RAW-A1"
+                name: "Raw Aisle 1"
+                level: "aisle"
+                location_type: "pallet"
+                children:
+                  - code: "RAW-A1-R1"
+                    name: "Raw Rack 1"
+                    level: "rack"
+                    location_type: "pallet"
+          - code: "PROD-ZONE"
+            name: "Production"
+            level: "zone"
+            location_type: "floor"
+            children:
+              - code: "PROD-A1"
+                name: "Prod Aisle 1"
+                level: "aisle"
+                location_type: "floor"
+                children:
+                  - code: "PROD-A1-R1"
+                    name: "Prod Rack 1"
+                    level: "rack"
+                    location_type: "shelf"
+          - code: "FG-ZONE"
+            name: "Finished Goods"
+            level: "zone"
+            location_type: "bulk"
+            children:
+              - code: "FG-A1"
+                name: "FG Aisle 1"
+                level: "aisle"
+                location_type: "pallet"
+                children:
+                  - code: "FG-A1-R1"
+                    name: "FG Rack 1"
+                    level: "rack"
+                    location_type: "pallet"
+
+  # Step 4: Product
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/4"
+    description: "Save first product (Step 4)"
+    auth: true
+    roles: ["super_admin", "admin"]
+    request_body:
+      sku: "string (required, uppercase alphanumeric + hyphens)"
+      name: "string (required, 2-255 chars)"
+      product_type: "string (default 'finished_good')"
+      uom: "string (default 'EA')"
+      shelf_life_days: "number (optional, positive integer)"
+      storage_temp: "string (default 'ambient', one of ambient/chilled/frozen)"
+      skip: "boolean (optional, if true skips product creation)"
+    response:
+      success: true
+      next_step: 5
+      product:
+        id: "UUID"
+        sku: "string"
+        name: "string"
+      skipped: "boolean"
+    validations:
+      - "SKU format: uppercase alphanumeric with hyphens only"
+      - "SKU uniqueness check within org"
+      - "Name required, 2-255 chars"
+
+  # Step 5: Work Order
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/5"
+    description: "Save demo work order (Step 5 - optional)"
+    auth: true
+    roles: ["super_admin", "admin"]
+    request_body:
+      product_id: "UUID (required if not skipping)"
+      quantity: "number (default 100, positive integer)"
+      due_date: "string (default tomorrow, ISO date)"
+      skip: "boolean (optional)"
+    response:
+      success: true
+      next_step: 6
+      work_order:
+        id: "UUID"
+        code: "string"
+        status: "Draft"
+      skipped: "boolean"
+    notes:
+      - "If no product was created in step 4, work order form is disabled"
+      - "Work order created in Draft status"
+      - "Priority defaults to Normal"
+
+  # Step 6: Completion
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/6"
+    description: "Complete wizard, calculate duration, award badge"
+    auth: true
+    roles: ["super_admin", "admin"]
+    request_body: null
+    response:
+      success: true
+      completed: true
+      summary:
+        organization:
+          name: "string"
+        warehouse:
+          code: "string"
+          name: "string"
+        locations:
+          count: "number"
+          template: "string"
+        product:
+          sku: "string"
+          name: "string"
+        work_order:
+          code: "string"
+          status: "string"
+        duration_seconds: "number"
+        badge: "string | null ('speed_champion' if < 900 seconds)"
+    on_success:
+      - "Set organizations.onboarding_completed_at = NOW()"
+      - "Set organizations.wizard_completed = true"
+      - "Calculate duration_seconds from onboarding_started_at"
+      - "If duration < 900 (15 min), award 'speed_champion' badge"
+      - "Store badge in organizations.badges JSONB array"
+
+  # Template Endpoints
+  - method: "GET"
+    path: "/api/v1/settings/onboarding/templates/locations"
+    description: "Get location template definitions"
+    auth: true
+    roles: ["*"]
+    response:
+      templates:
+        - id: "simple"
+          name: "Simple - 1 Zone"
+          description: "Single location for small operations"
+          locations_created: 1
+        - id: "basic"
+          name: "Basic - 3 Zones"
+          description: "Receiving, Storage, Shipping"
+          locations_created: 3
+        - id: "full"
+          name: "Full - 9 Locations"
+          description: "3 zones with 3 locations each"
+          locations_created: 9
+        - id: "custom"
+          name: "Custom"
+          description: "Create your own structure"
+          locations_created: "user-defined"
+
+  - method: "GET"
+    path: "/api/v1/settings/onboarding/templates/products"
+    description: "Get industry and product template definitions"
+    auth: true
+    roles: ["*"]
+    response:
+      industries:
+        - id: "bakery"
+          name: "Bakery"
+          icon: "bread"
+          templates:
+            - id: "bread"
+              name: "Bread Loaf"
+              prefill:
+                product_type: "finished_good"
+                uom: "EA"
+                shelf_life_days: 7
+                storage_temp: "ambient"
+            - id: "pastry"
+              name: "Pastry"
+              prefill:
+                product_type: "finished_good"
+                uom: "EA"
+                shelf_life_days: 3
+                storage_temp: "chilled"
+            - id: "cookie"
+              name: "Cookie"
+              prefill:
+                product_type: "finished_good"
+                uom: "EA"
+                shelf_life_days: 14
+                storage_temp: "ambient"
+            - id: "cake"
+              name: "Cake"
+              prefill:
+                product_type: "finished_good"
+                uom: "EA"
+                shelf_life_days: 5
+                storage_temp: "chilled"
+        - id: "dairy"
+          name: "Dairy"
+          icon: "milk"
+          templates:
+            - id: "milk"
+              name: "Milk"
+              prefill:
+                product_type: "finished_good"
+                uom: "L"
+                shelf_life_days: 14
+                storage_temp: "chilled"
+            - id: "cheese"
+              name: "Cheese"
+              prefill:
+                product_type: "finished_good"
+                uom: "KG"
+                shelf_life_days: 90
+                storage_temp: "chilled"
+            - id: "yogurt"
+              name: "Yogurt"
+              prefill:
+                product_type: "finished_good"
+                uom: "EA"
+                shelf_life_days: 21
+                storage_temp: "chilled"
+            - id: "butter"
+              name: "Butter"
+              prefill:
+                product_type: "finished_good"
+                uom: "KG"
+                shelf_life_days: 60
+                storage_temp: "chilled"
+        - id: "meat"
+          name: "Meat Processing"
+          icon: "meat"
+          templates:
+            - id: "sausage"
+              name: "Sausage"
+              prefill:
+                product_type: "finished_good"
+                uom: "KG"
+                shelf_life_days: 14
+                storage_temp: "chilled"
+            - id: "ham"
+              name: "Ham"
+              prefill:
+                product_type: "finished_good"
+                uom: "KG"
+                shelf_life_days: 21
+                storage_temp: "chilled"
+            - id: "bacon"
+              name: "Bacon"
+              prefill:
+                product_type: "finished_good"
+                uom: "KG"
+                shelf_life_days: 28
+                storage_temp: "chilled"
+            - id: "deli"
+              name: "Deli Meat"
+              prefill:
+                product_type: "finished_good"
+                uom: "KG"
+                shelf_life_days: 7
+                storage_temp: "chilled"
+        - id: "beverages"
+          name: "Beverages"
+          icon: "drink"
+          templates:
+            - id: "juice"
+              name: "Juice"
+              prefill:
+                product_type: "finished_good"
+                uom: "L"
+                shelf_life_days: 30
+                storage_temp: "chilled"
+            - id: "softdrink"
+              name: "Soft Drink"
+              prefill:
+                product_type: "finished_good"
+                uom: "L"
+                shelf_life_days: 180
+                storage_temp: "ambient"
+            - id: "water"
+              name: "Water"
+              prefill:
+                product_type: "finished_good"
+                uom: "L"
+                shelf_life_days: 365
+                storage_temp: "ambient"
+            - id: "energy"
+              name: "Energy Drink"
+              prefill:
+                product_type: "finished_good"
+                uom: "L"
+                shelf_life_days: 365
+                storage_temp: "ambient"
+        - id: "snacks"
+          name: "Snacks"
+          icon: "cookie"
+          templates:
+            - id: "chips"
+              name: "Chips"
+              prefill:
+                product_type: "finished_good"
+                uom: "EA"
+                shelf_life_days: 90
+                storage_temp: "ambient"
+            - id: "crackers"
+              name: "Crackers"
+              prefill:
+                product_type: "finished_good"
+                uom: "EA"
+                shelf_life_days: 180
+                storage_temp: "ambient"
+            - id: "nuts"
+              name: "Nuts"
+              prefill:
+                product_type: "finished_good"
+                uom: "KG"
+                shelf_life_days: 365
+                storage_temp: "ambient"
+            - id: "candy"
+              name: "Candy"
+              prefill:
+                product_type: "finished_good"
+                uom: "EA"
+                shelf_life_days: 365
+                storage_temp: "ambient"
+        - id: "other"
+          name: "Other"
+          icon: "package"
+          templates:
+            - id: "readymeal"
+              name: "Ready Meal"
+              prefill:
+                product_type: "finished_good"
+                uom: "EA"
+                shelf_life_days: 5
+                storage_temp: "chilled"
+            - id: "sauce"
+              name: "Sauce"
+              prefill:
+                product_type: "finished_good"
+                uom: "L"
+                shelf_life_days: 180
+                storage_temp: "ambient"
+            - id: "soup"
+              name: "Soup"
+              prefill:
+                product_type: "finished_good"
+                uom: "L"
+                shelf_life_days: 14
+                storage_temp: "chilled"
+            - id: "salad"
+              name: "Salad"
+              prefill:
+                product_type: "finished_good"
+                uom: "EA"
+                shelf_life_days: 3
+                storage_temp: "chilled"
+
+ux:
+  wireframes:
+    - id: "SET-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-002-onboarding-organization.md"
+      description: "Reference for step layout and progress indicator"
+    - id: "SET-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-003-onboarding-warehouse.md"
+      description: "Step 2 warehouse creation form"
+    - id: "SET-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-004-onboarding-locations.md"
+      description: "Step 3 location template selection"
+    - id: "SET-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-005-onboarding-product.md"
+      description: "Step 4 product creation with industry templates"
+    - id: "SET-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-006-onboarding-complete.md"
+      description: "Step 6 celebration screen"
+  patterns:
+    wizard_modal: "Full-screen ShadCN Dialog, non-dismissible by backdrop click"
+    progress_indicator: "Step indicator: 'Step N of 6' with checkmarks for completed steps"
+    navigation: "Back (disabled on step 1, goes to previous step), Next (primary button)"
+    form: "ShadCN Form with react-hook-form + Zod resolver"
+    template_selector: "Card grid with visual preview and radio selection"
+    dropdown: "ShadCN Select with optional tooltips"
+    toast: "ShadCN Toast for success/info/error notifications"
+    confetti: "Canvas-based animation, 3 second duration, falls from top"
+    badge: "Animated glow effect, gold/yellow color scheme"
+  states:
+    loading: "Skeleton loaders for form sections"
+    submitting: "Disabled Next button with spinner"
+    success: "Toast notification, advance to next step"
+    error: "Inline validation errors, error banner at top"
+    skipped: "Info toast, advance to next step"
+  wizard_flow:
+    step_2:
+      title: "First Warehouse"
+      subtitle: "Create your first warehouse to start storing inventory"
+      fields:
+        - code: "Pre-filled WH-MAIN (editable)"
+        - name: "Required text input"
+        - type: "Dropdown with 5 options + tooltips"
+      actions:
+        - primary: "Next"
+        - secondary: "Skip - Use Demo Warehouse"
+        - back: "Back (returns to step 1)"
+    step_3:
+      title: "Storage Locations"
+      subtitle: "Set up storage areas in your warehouse"
+      template_options:
+        - simple: "1 location - Small operations"
+        - basic: "3 locations - Receiving/Storage/Shipping"
+        - full: "9 locations - Full hierarchy"
+        - custom: "Create your own"
+      actions:
+        - primary: "Next"
+        - secondary: "Skip - Create Locations Later"
+        - back: "Back"
+    step_4:
+      title: "First Product"
+      subtitle: "Add your first product to the catalog"
+      industry_icons:
+        - bakery: "bread icon"
+        - dairy: "milk icon"
+        - meat: "meat icon"
+        - beverages: "drink icon"
+        - snacks: "cookie icon"
+        - other: "package icon"
+      fields:
+        - industry: "Icon grid selector"
+        - template: "Dropdown filtered by industry"
+        - sku: "Required, uppercase, unique"
+        - name: "Required"
+        - product_type: "Pre-filled from template"
+        - uom: "Pre-filled from template"
+        - shelf_life_days: "Pre-filled from template"
+        - storage_temp: "Pre-filled from template"
+      actions:
+        - primary: "Create Product"
+        - secondary: "Skip - Create Products Later"
+        - alternative: "Start from Scratch"
+        - back: "Back"
+    step_5:
+      title: "Demo Work Order"
+      subtitle: "See how production planning works"
+      fields:
+        - product: "Read-only (from step 4)"
+        - quantity: "Editable (default 100)"
+        - due_date: "Editable (default tomorrow)"
+        - priority: "Dropdown (Normal/High/Urgent)"
+      states:
+        enabled: "Product created in step 4"
+        disabled: "Product skipped in step 4 - show message 'Create a product first'"
+      actions:
+        - primary: "Create Demo Work Order"
+        - secondary: "Skip - I'll Create Work Orders Later"
+        - alternative: "Skip to Finish (if no product)"
+        - back: "Back"
+    step_6:
+      title: "Congratulations!"
+      subtitle: "MonoPilot is ready for you"
+      sections:
+        - animation: "Confetti (3 seconds)"
+        - badge: "Speed Champion badge (if < 15 min)"
+        - summary: "List of created entities"
+        - duration: "Setup completed in: MM:SS"
+        - next_steps: "Contextual action cards"
+      actions:
+        - primary: "Go to Dashboard"
+      next_step_cards:
+        - add_team: "Add Team Members"
+        - more_products: "Create More Products"
+        - schedule: "Schedule Production"
+        - settings: "Explore Settings"
+  confetti_animation:
+    duration_ms: 3000
+    particle_count: 100
+    colors: ["#FFD700", "#0EA5E9", "#10B981", "#8B5CF6", "#F43F5E"]
+    fall_direction: "top to bottom"
+    performance: "requestAnimationFrame, auto-cleanup"
+  speed_badge:
+    threshold_seconds: 900  # 15 minutes
+    name: "Speed Setup Champion"
+    code: "speed_champion"
+    style: "Gold background, animated glow, trophy icon"
+    tooltip: "You completed setup in under 15 minutes!"
+
+validation_rules:
+  step_2_warehouse:
+    code:
+      type: "string"
+      required: false
+      default: "WH-MAIN"
+      min: 2
+      max: 20
+      pattern: "^[A-Z0-9-]+$"
+      transform: "toUpperCase()"
+      error_min: "Code must be at least 2 characters"
+      error_max: "Code must be at most 20 characters"
+      error_pattern: "Code must be uppercase alphanumeric with hyphens"
+    name:
+      type: "string"
+      required: true
+      min: 2
+      max: 100
+      error_empty: "Warehouse name is required"
+      error_min: "Warehouse name must be at least 2 characters"
+      error_max: "Warehouse name must be at most 100 characters"
+    type:
+      type: "enum"
+      required: false
+      default: "GENERAL"
+      values: ["GENERAL", "RAW_MATERIALS", "WIP", "FINISHED_GOODS", "QUARANTINE"]
+  step_3_locations:
+    template:
+      type: "enum"
+      values: ["simple", "basic", "full", "custom"]
+      default: "simple"
+    custom_locations:
+      type: "array"
+      required_if: "template === 'custom'"
+      min_items: 1
+      item:
+        code:
+          type: "string"
+          min: 1
+          max: 50
+          pattern: "^[A-Z0-9-]+$"
+        name:
+          type: "string"
+          min: 2
+          max: 255
+        location_type:
+          type: "enum"
+          values: ["bulk", "pallet", "shelf", "floor", "staging"]
+  step_4_product:
+    sku:
+      type: "string"
+      required: true
+      min: 1
+      max: 50
+      pattern: "^[A-Z0-9-]+$"
+      transform: "toUpperCase()"
+      unique_per_org: true
+      error_empty: "SKU is required"
+      error_pattern: "SKU must be uppercase alphanumeric with hyphens only"
+      error_duplicate: "SKU already exists"
+    name:
+      type: "string"
+      required: true
+      min: 2
+      max: 255
+      error_empty: "Product name is required"
+    product_type:
+      type: "enum"
+      values: ["finished_good", "raw_material", "wip"]
+      default: "finished_good"
+    uom:
+      type: "string"
+      min: 1
+      max: 10
+      default: "EA"
+    shelf_life_days:
+      type: "number"
+      required: false
+      positive: true
+      integer: true
+    storage_temp:
+      type: "enum"
+      values: ["ambient", "chilled", "frozen"]
+      default: "ambient"
+  step_5_work_order:
+    product_id:
+      type: "uuid"
+      required_if: "!skip"
+    quantity:
+      type: "number"
+      required: false
+      default: 100
+      positive: true
+      integer: true
+    due_date:
+      type: "datetime"
+      required: false
+      default: "tomorrow"
+
+patterns:
+  rls: "ADR-013 - RLS Org Isolation Pattern"
+  api: "REST with org_id filter from auth context"
+  service: "wizard-service.ts with step handlers"
+  validation: "Zod schemas in lib/validation/wizard-steps.ts"
+  state_machine: |
+    States: STEP_1 -> STEP_2 -> STEP_3 -> STEP_4 -> STEP_5 -> STEP_6 -> COMPLETED
+    Transitions:
+      - STEP_N + next -> STEP_(N+1)
+      - STEP_N + back -> STEP_(N-1)
+      - STEP_4 + skip -> STEP_5 (product_id = null)
+      - STEP_5 + skip -> STEP_6
+      - STEP_6 + complete -> COMPLETED
+  session_state: |
+    // Step data preserved in session during wizard
+    const [wizardState, setWizardState] = useState<WizardState>({
+      step2: { code: 'WH-MAIN', name: '', type: 'GENERAL' },
+      step3: { template: 'simple', customLocations: [] },
+      step4: { industry: null, template: null, sku: '', name: '' },
+      step5: { quantity: 100, dueDate: tomorrow() },
+    });
+
+acceptance_checklist:
+  step_2_warehouse:
+    - "GIVEN wizard step 1 is complete, WHEN wizard advances to step 2, THEN warehouse code field shows pre-filled value 'WH-MAIN'"
+    - "GIVEN wizard is on step 2, WHEN user enters warehouse name 'Main Warehouse' and clicks 'Next', THEN warehouse is created with is_default=true and wizard advances to step 3"
+    - "GIVEN wizard is on step 2, WHEN user leaves warehouse name empty and clicks 'Next', THEN error 'Warehouse name is required' displays"
+    - "GIVEN wizard is on step 2, WHEN user clicks 'Skip - Use Demo Warehouse', THEN demo warehouse DEMO-WH is created and info toast displays"
+    - "GIVEN wizard is on step 2, WHEN user hovers over warehouse type dropdown option 'Quarantine', THEN tooltip displays 'Items on hold for quality inspection'"
+    - "GIVEN wizard is on step 2, WHEN user clicks 'Back', THEN wizard returns to step 1 with data preserved"
+
+  step_3_locations:
+    - "GIVEN wizard is on step 3, THEN template selector displays 4 options: Simple (1), Basic (3), Full (9), Custom"
+    - "GIVEN 'Simple - 1 Zone' is selected, WHEN user clicks 'Next', THEN 1 RECEIVING location is created"
+    - "GIVEN 'Basic - 3 Zones' is selected, WHEN user clicks 'Next', THEN 3 locations are created (RECEIVING, STORAGE, SHIPPING)"
+    - "GIVEN 'Full - 9 Locations' is selected, WHEN user clicks 'Next', THEN 9 locations are created with hierarchy"
+    - "GIVEN 'Custom' is selected, WHEN user adds location 'SHELF-A1' and clicks 'Next', THEN custom location is created"
+    - "GIVEN wizard is on step 3, WHEN user clicks 'Skip - Create Locations Later', THEN DEFAULT location is created"
+
+  step_4_product:
+    - "GIVEN wizard is on step 4, THEN industry selector displays 6 options with icons"
+    - "GIVEN user selects 'Bakery' industry, THEN product template dropdown shows Bread Loaf, Pastry, Cookie, Cake"
+    - "GIVEN user selects 'Bread Loaf' template, THEN form pre-fills: type=Finished Good, UOM=EA, shelf_life=7, storage=ambient"
+    - "GIVEN user enters SKU 'WWB-001' and name 'Whole Wheat Bread', WHEN 'Create Product' clicked, THEN product is created"
+    - "GIVEN product with SKU 'WWB-001' exists, WHEN user enters same SKU, THEN error 'SKU already exists' displays"
+    - "GIVEN wizard is on step 4, WHEN user clicks 'Start from Scratch', THEN empty product form displays"
+    - "GIVEN wizard is on step 4, WHEN user clicks 'Skip - Create Products Later', THEN no product is created and wizard advances"
+
+  step_5_work_order:
+    - "GIVEN product was created in step 4, WHEN wizard loads step 5, THEN work order form is enabled with product pre-selected"
+    - "GIVEN step 4 was skipped, WHEN wizard loads step 5, THEN form is disabled with message 'Create a product first'"
+    - "GIVEN product exists, WHEN user enters quantity 50 and clicks 'Create Demo Work Order', THEN draft work order is created"
+    - "GIVEN wizard is on step 5, WHEN user clicks 'Skip - I'll Create Work Orders Later', THEN wizard advances to step 6"
+
+  step_6_completion:
+    - "GIVEN wizard reaches step 6, THEN confetti animation plays for 3 seconds"
+    - "GIVEN user created warehouse, 3 locations, and product, THEN summary displays all created items"
+    - "GIVEN wizard started at 10:00:00 and completed at 10:12:34, THEN 'Speed Setup Champion' badge displays"
+    - "GIVEN wizard took 18 minutes, THEN no speed badge displays but completion is still celebratory"
+    - "GIVEN user skipped product creation, THEN next steps prominently shows 'Create Your First Product'"
+    - "GIVEN wizard completed, WHEN user clicks 'Go to Dashboard', THEN wizard closes and onboarding_completed_at is set"
+    - "GIVEN wizard just completed, WHEN user lands on dashboard, THEN dismissible welcome banner displays"
+
+  general:
+    - "GIVEN wizard on any step, WHEN progress is saved and user refreshes, THEN wizard resumes from saved step with data intact"
+    - "GIVEN wizard on step N, WHEN Back button clicked, THEN step N-1 loads with previously entered data"
+    - "GIVEN wizard on step 1, THEN Back button is disabled or hidden"
+
+definition_of_done:
+  step_2:
+    - "Pre-filled code 'WH-MAIN' displayed and editable"
+    - "Required field validation for warehouse name"
+    - "Type dropdown with tooltips for each option"
+    - "Skip creates DEMO-WH with is_default=true"
+    - "Back navigation returns to step 1"
+    - "Next navigation advances to step 3"
+    - "wizard_progress.step_2 updated on completion"
+
+  step_3:
+    - "4 template options displayed (Simple, Basic, Full, Custom)"
+    - "Simple template creates 1 RECEIVING location"
+    - "Basic template creates 3 zones"
+    - "Full template creates 9 locations with hierarchy"
+    - "Custom mode allows adding multiple locations"
+    - "Skip creates DEFAULT location"
+    - "wizard_progress.step_3 updated on completion"
+
+  step_4:
+    - "6 industry options with icons"
+    - "Industry-specific templates in dropdown"
+    - "Template pre-fills form fields"
+    - "All pre-filled fields editable"
+    - "'Start from Scratch' shows empty form"
+    - "SKU format validation (uppercase alphanumeric)"
+    - "SKU uniqueness validation"
+    - "Skip advances without creating product"
+    - "wizard_progress.step_4 updated on completion"
+
+  step_5:
+    - "Disabled state when no product from step 4"
+    - "Product pre-selected from step 4"
+    - "Quantity defaults to 100"
+    - "Due date defaults to tomorrow"
+    - "Creates draft work order on submit"
+    - "Skip available regardless of product state"
+    - "wizard_progress.step_5 updated on completion"
+
+  step_6:
+    - "Confetti animation plays for 3 seconds"
+    - "Summary displays all created items"
+    - "Duration shows total setup time"
+    - "Speed Champion badge if < 15 minutes"
+    - "Badge stored in organizations.badges"
+    - "Next steps section displays contextually"
+    - "'Go to Dashboard' sets wizard_completed=true"
+    - "Dashboard shows dismissible welcome banner"
+
+  general:
+    - "All validation schemas implemented (Zod)"
+    - "All API endpoints functional and documented"
+    - "wizard-service.ts implements all methods"
+    - "Template constants defined (locations, products)"
+    - "Unit tests pass (>80% coverage)"
+    - "Integration tests pass for all endpoints"
+    - "E2E tests pass for complete flow"
+    - "Loading states for all async operations"
+    - "Error states with user-friendly messages"
+    - "Toast notifications on success/skip"
+    - "Accessibility: keyboard navigation, ARIA labels"
+    - "Mobile responsive (wizard works on tablet)"
+
+tests:
+  unit:
+    - "WIZ-U-001: saveStep2Warehouse creates warehouse with is_default=true"
+    - "WIZ-U-002: saveStep2Warehouse with skip creates demo DEMO-WH"
+    - "WIZ-U-003: saveStep3Locations with 'simple' template creates 1 RECEIVING location"
+    - "WIZ-U-004: saveStep3Locations with 'basic' template creates 3 locations"
+    - "WIZ-U-005: saveStep3Locations with 'full' template creates 9 locations with hierarchy"
+    - "WIZ-U-006: saveStep3Locations with custom creates user-defined locations"
+    - "WIZ-U-007: saveStep4Product validates SKU format (uppercase, alphanumeric)"
+    - "WIZ-U-008: saveStep4Product rejects duplicate SKU"
+    - "WIZ-U-009: saveStep5WorkOrder requires product_id"
+    - "WIZ-U-010: completeWizard sets completed_at"
+    - "WIZ-U-011: checkSpeedChampion under 15 min returns true, badge awarded"
+    - "WIZ-U-012: checkSpeedChampion over 15 min returns false, no badge"
+    - "WIZ-U-013: calculateDuration returns correct seconds"
+    - "WIZ-U-014: getSummary aggregates all created entities"
+  component:
+    - "WIZ-C-001: Step2 pre-fills WH-MAIN code"
+    - "WIZ-C-002: Step2 validates required name"
+    - "WIZ-C-003: Step3 shows 4 template options"
+    - "WIZ-C-004: Step3 custom mode shows add form"
+    - "WIZ-C-005: Step4 industry selector renders 6 options"
+    - "WIZ-C-006: Step4 template dropdown filters by industry"
+    - "WIZ-C-007: Step5 disabled without product"
+    - "WIZ-C-008: Step6 confetti plays on mount"
+    - "WIZ-C-009: Step6 speed badge shows under 15m"
+    - "WIZ-C-010: Step6 next steps contextual"
+  integration:
+    - "WIZ-I-001: POST /step/2 creates warehouse in DB"
+    - "WIZ-I-002: POST /step/2 skip creates DEMO-WH"
+    - "WIZ-I-003: POST /step/3 template=simple creates 1 location"
+    - "WIZ-I-004: POST /step/3 template=basic creates 3 locations"
+    - "WIZ-I-005: POST /step/3 template=full creates 9 locations with parents"
+    - "WIZ-I-006: POST /step/3 custom creates user locations"
+    - "WIZ-I-007: POST /step/4 creates product in DB"
+    - "WIZ-I-008: POST /step/4 duplicate SKU returns 400"
+    - "WIZ-I-009: POST /step/5 creates draft WO in DB"
+    - "WIZ-I-010: POST /step/5 without product_id returns 400"
+    - "WIZ-I-011: POST /step/6 sets completed_at"
+    - "WIZ-I-012: POST /step/6 awards speed badge"
+    - "WIZ-I-013: GET /templates/locations returns all templates"
+    - "WIZ-I-014: GET /templates/products returns all industries"
+  e2e:
+    - "WIZ-E-001: Complete wizard happy path (all steps)"
+    - "WIZ-E-002: Skip all optional steps (4+5)"
+    - "WIZ-E-003: Back navigation preserves data"
+    - "WIZ-E-004: Step 3 full template creates 9 locations"
+    - "WIZ-E-005: Step 4 bakery template pre-fills 7-day shelf life"
+    - "WIZ-E-006: Speed badge under 15 min"
+    - "WIZ-E-007: Dashboard welcome banner displays and is dismissible"
+    - "WIZ-E-008: Custom locations flow"
+    - "WIZ-E-009: Industry change resets template dropdown"
+    - "WIZ-E-010: Confetti animation renders"
+
+output_artifacts:
+  database:
+    - "Migration: XXX_add_wizard_progress_badges.sql"
+    - "JSONB columns: wizard_progress, badges on organizations"
+  backend:
+    - "wizard-service.ts with step handlers and badge logic"
+    - "wizard-steps.ts Zod validation schemas"
+    - "API routes: POST /api/v1/settings/onboarding/step/2-6"
+    - "API routes: GET /api/v1/settings/onboarding/templates/locations"
+    - "API routes: GET /api/v1/settings/onboarding/templates/products"
+  constants:
+    - "wizard-templates.ts with LOCATION_TEMPLATES and INDUSTRY_TEMPLATES"
+  frontend:
+    - "WizardStep2Warehouse.tsx"
+    - "WizardStep3Locations.tsx"
+    - "WizardStep4Product.tsx"
+    - "WizardStep5WorkOrder.tsx"
+    - "WizardStep6Complete.tsx"
+    - "TemplateSelector.tsx"
+    - "LocationTemplateCard.tsx"
+    - "IndustrySelector.tsx"
+    - "ProductTemplateDropdown.tsx"
+    - "ConfettiAnimation.tsx"
+    - "SpeedBadge.tsx"
+    - "CompletionSummary.tsx"
+    - "NextStepCard.tsx"
+    - "NextStepsSection.tsx"
+    - "WelcomeBanner.tsx"
+    - "WizardTooltip.tsx"
+    - "SkipStepButton.tsx"
+  tests:
+    - "Unit tests for wizard-service (>80% coverage)"
+    - "Component tests for step components"
+    - "Integration tests for API endpoints"
+    - "E2E tests for wizard flow"
+
+implementation_notes:
+  frontend:
+    - "Use ShadCN Form with react-hook-form for all step forms"
+    - "Use ShadCN Dialog for wizard modal (already from 01.3)"
+    - "Template selector uses ShadCN RadioGroup with card styling"
+    - "Industry selector uses grid of clickable icons (ShadCN Button variants)"
+    - "ConfettiAnimation uses canvas with requestAnimationFrame for performance"
+    - "SpeedBadge uses CSS animations for glow effect"
+    - "Preserve step data in React state during wizard session"
+    - "On Back, restore previous step data from state"
+    - "On refresh, reload progress from API and restore state"
+  backend:
+    - "Step handlers should be atomic - create entity and update progress together"
+    - "Skip handlers create demo/default data with clear naming"
+    - "Use warehouse-service.create() for step 2 (reuse existing service)"
+    - "Use location-service.createMany() for step 3 templates (batch insert)"
+    - "Check SKU uniqueness server-side before product creation"
+    - "Calculate duration_seconds from onboarding_started_at on step 6"
+    - "Award badge atomically with completion timestamp"
+  database:
+    - "wizard_progress JSONB allows flexible step data storage"
+    - "badges JSONB array supports future badge types"
+    - "No separate tables needed - extends organizations"
+  templates:
+    - "Location templates are hardcoded in constants (Simple/Basic/Full)"
+    - "Product templates organized by industry, stored in constants"
+    - "Templates return prefill data, user can edit before saving"
+  performance:
+    - "Confetti animation: limit to 100 particles, use RAF, auto-cleanup"
+    - "Template images: lazy load or use icons instead of images"
+    - "API calls: single call per step, not multiple"
+
+risks:
+  - risk: "Step dependencies complex"
+    probability: "Medium"
+    impact: "Medium"
+    mitigation: "Clear state machine, exhaustive tests"
+  - risk: "Product templates outdated for industries"
+    probability: "Low"
+    impact: "Low"
+    mitigation: "Review with PM, make templates configurable"
+  - risk: "Speed badge threshold too aggressive"
+    probability: "Low"
+    impact: "Medium"
+    mitigation: "A/B test threshold (15 vs 20 min)"
+  - risk: "Confetti performance on low-end devices"
+    probability: "Low"
+    impact: "Low"
+    mitigation: "Use CSS animations fallback"
+  - risk: "Custom location hierarchy validation"
+    probability: "Medium"
+    impact: "High"
+    mitigation: "Reuse location-service validation"
+
+out_of_scope:
+  - feature: "BOM creation in wizard"
+    reason: "Too complex for onboarding"
+    future_story: "Technical module"
+  - feature: "Recipe creation"
+    reason: "Too complex for onboarding"
+    future_story: "Technical module"
+  - feature: "Multi-warehouse wizard"
+    reason: "MVP focuses on single warehouse"
+    future_story: "Phase 2"
+  - feature: "Import from Excel in wizard"
+    reason: "Separate import feature"
+    future_story: "Story 01.x (Import/Export)"
+  - feature: "Wizard analytics/tracking"
+    reason: "Separate analytics feature"
+    future_story: "Phase 2"
+  - feature: "Re-run wizard after completion"
+    reason: "Edge case, manual setup available"
+    future_story: "Phase 2"

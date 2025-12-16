@@ -1,0 +1,355 @@
+# Story 01.5b - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/users/:id/warehouse-access"
+    description: "Get user's warehouse access configuration"
+    file: "apps/frontend/app/api/v1/settings/users/[id]/warehouse-access/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - User ID"
+
+    response:
+      status: 200
+      type: "WarehouseAccessResponse"
+      schema:
+        user_id: "UUID"
+        all_warehouses: "boolean"
+        warehouse_ids: "UUID[]"
+        warehouses: "Array<{ id: UUID, code: string, name: string }>"
+      example: |
+        {
+          "user_id": "user-uuid",
+          "all_warehouses": false,
+          "warehouse_ids": ["wh-uuid-1", "wh-uuid-2"],
+          "warehouses": [
+            { "id": "wh-uuid-1", "code": "WH-001", "name": "Main Warehouse" },
+            { "id": "wh-uuid-2", "code": "WH-002", "name": "Secondary Warehouse" }
+          ]
+        }
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "PERMISSION_DENIED"
+        message: "Permission denied"
+        when: "User doesn't have admin role"
+      - status: 404
+        code: "USER_NOT_FOUND"
+        message: "User not found"
+        when: "User ID doesn't exist or not in same org"
+
+  - method: "PUT"
+    path: "/api/v1/settings/users/:id/warehouse-access"
+    description: "Update user's warehouse access configuration"
+    file: "apps/frontend/app/api/v1/settings/users/[id]/warehouse-access/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      params:
+        id: "UUID - User ID"
+      body:
+        all_warehouses: "boolean"
+        warehouse_ids: "UUID[] (required if all_warehouses = false)"
+      example: |
+        {
+          "all_warehouses": false,
+          "warehouse_ids": ["wh-uuid-1", "wh-uuid-2"]
+        }
+
+    response:
+      status: 200
+      type: "WarehouseAccessResponse"
+      schema:
+        user_id: "UUID"
+        all_warehouses: "boolean"
+        warehouse_ids: "UUID[]"
+        warehouses: "Array<{ id: UUID, code: string, name: string }>"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "At least one warehouse must be selected when 'All Warehouses' is unchecked"
+        when: "all_warehouses = false and warehouse_ids is empty"
+      - status: 400
+        code: "WAREHOUSE_NOT_FOUND"
+        message: "One or more warehouse IDs do not exist"
+        when: "Invalid warehouse IDs in request"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "PERMISSION_DENIED"
+        message: "Permission denied"
+        when: "User doesn't have admin role"
+      - status: 404
+        code: "USER_NOT_FOUND"
+        message: "User not found"
+        when: "User ID doesn't exist or not in same org"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/user-warehouse-service.ts"
+    description: "Extends UserService with warehouse access management"
+    extends: "UserService"
+    exports:
+      - name: "getWarehouseAccess"
+        type: "async function"
+        params:
+          - "userId: string"
+        returns: "Promise<WarehouseAccessResponse>"
+        description: "Get user's warehouse access configuration"
+
+      - name: "updateWarehouseAccess"
+        type: "async function"
+        params:
+          - "userId: string"
+          - "data: UpdateWarehouseAccessRequest"
+        returns: "Promise<void>"
+        description: "Update user's warehouse access"
+
+      - name: "getAllWarehouses"
+        type: "async function"
+        params: []
+        returns: "Promise<Warehouse[]>"
+        description: "Get all warehouses for access assignment"
+
+      - name: "getWarehousesByIds"
+        type: "async function"
+        params:
+          - "warehouseIds: string[]"
+        returns: "Promise<Warehouse[]>"
+        description: "Get specific warehouses by IDs"
+
+      - name: "logAccessChange"
+        type: "async function (private)"
+        params:
+          - "userId: string"
+          - "oldAccess: WarehouseAccessResponse"
+          - "newAccess: UpdateWarehouseAccessRequest"
+        returns: "Promise<void>"
+        description: "Log warehouse access changes to audit table"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/warehouse-access.ts"
+    description: "Warehouse access TypeScript interfaces"
+    exports:
+      - name: "WarehouseAccessResponse"
+        interface: |
+          interface WarehouseAccessResponse {
+            user_id: string;
+            all_warehouses: boolean;
+            warehouse_ids: string[];
+            warehouses: Array<{
+              id: string;
+              code: string;
+              name: string;
+            }>;
+          }
+
+      - name: "UpdateWarehouseAccessRequest"
+        interface: |
+          interface UpdateWarehouseAccessRequest {
+            all_warehouses: boolean;
+            warehouse_ids?: string[];
+          }
+
+# Validation (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/warehouse-access.ts"
+    schema: |
+      import { z } from 'zod';
+
+      export const updateWarehouseAccessSchema = z.object({
+        all_warehouses: z.boolean(),
+        warehouse_ids: z.array(z.string().uuid()).optional()
+      }).refine(data => {
+        // If not all warehouses, must have at least one warehouse
+        if (!data.all_warehouses && (!data.warehouse_ids || data.warehouse_ids.length === 0)) {
+          return false;
+        }
+        return true;
+      }, {
+        message: "At least one warehouse must be selected when 'All Warehouses' is unchecked"
+      });
+
+      export type UpdateWarehouseAccessInput = z.infer<typeof updateWarehouseAccessSchema>;
+
+# Implementation patterns
+patterns:
+  api_route_get: |
+    // apps/frontend/app/api/v1/settings/users/[id]/warehouse-access/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { UserWarehouseService } from '@/lib/services/user-warehouse-service';
+
+    export async function GET(
+      req: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Check permissions (admin only)
+      const hasPermission = await checkPermission(user.id, 'users', 'U');
+      if (!hasPermission) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+      }
+
+      const service = new UserWarehouseService(supabase);
+      const access = await service.getWarehouseAccess(params.id);
+
+      if (!access) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      return NextResponse.json(access);
+    }
+
+  api_route_put: |
+    // PUT /api/v1/settings/users/[id]/warehouse-access/route.ts
+    export async function PUT(
+      req: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Check permissions (admin only)
+      const hasPermission = await checkPermission(user.id, 'users', 'U');
+      if (!hasPermission) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+      }
+
+      const body = await req.json();
+
+      // Validate request
+      const validation = updateWarehouseAccessSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: validation.error.errors[0].message },
+          { status: 400 }
+        );
+      }
+
+      const service = new UserWarehouseService(supabase);
+      await service.updateWarehouseAccess(params.id, validation.data);
+
+      const updatedAccess = await service.getWarehouseAccess(params.id);
+      return NextResponse.json(updatedAccess);
+    }
+
+  service_implementation: |
+    // lib/services/user-warehouse-service.ts
+    import { UserService } from './user-service';
+
+    export class UserWarehouseService extends UserService {
+      async getWarehouseAccess(userId: string): Promise<WarehouseAccessResponse | null> {
+        const { data: user, error } = await this.supabase
+          .from('users')
+          .select(`
+            id,
+            warehouse_access_ids,
+            role:roles(code)
+          `)
+          .eq('id', userId)
+          .single();
+
+        if (error || !user) return null;
+
+        // Determine if "all warehouses" mode
+        const isAdmin = ['SUPER_ADMIN', 'ADMIN'].includes(user.role.code);
+        const allWarehouses = user.warehouse_access_ids === null && isAdmin;
+
+        let warehouses = [];
+        if (allWarehouses) {
+          warehouses = await this.getAllWarehouses();
+        } else if (user.warehouse_access_ids && user.warehouse_access_ids.length > 0) {
+          warehouses = await this.getWarehousesByIds(user.warehouse_access_ids);
+        }
+
+        return {
+          user_id: userId,
+          all_warehouses: allWarehouses,
+          warehouse_ids: user.warehouse_access_ids || [],
+          warehouses
+        };
+      }
+
+      async updateWarehouseAccess(
+        userId: string,
+        data: UpdateWarehouseAccessRequest
+      ): Promise<void> {
+        const currentAccess = await this.getWarehouseAccess(userId);
+
+        if (data.all_warehouses) {
+          await this.supabase
+            .from('users')
+            .update({ warehouse_access_ids: null })
+            .eq('id', userId);
+        } else {
+          await this.supabase
+            .from('users')
+            .update({ warehouse_access_ids: data.warehouse_ids })
+            .eq('id', userId);
+        }
+
+        // Audit log (if table exists)
+        if (currentAccess) {
+          await this.logAccessChange(userId, currentAccess, data);
+        }
+      }
+
+      private async getAllWarehouses(): Promise<Warehouse[]> {
+        const { data } = await this.supabase
+          .from('warehouses')
+          .select('id, code, name')
+          .eq('is_active', true)
+          .order('code');
+        return data || [];
+      }
+
+      private async getWarehousesByIds(ids: string[]): Promise<Warehouse[]> {
+        const { data } = await this.supabase
+          .from('warehouses')
+          .select('id, code, name')
+          .in('id', ids)
+          .eq('is_active', true)
+          .order('code');
+        return data || [];
+      }
+
+      private async logAccessChange(
+        userId: string,
+        oldAccess: WarehouseAccessResponse,
+        newAccess: UpdateWarehouseAccessRequest
+      ): Promise<void> {
+        // Implementation for audit logging
+        // Insert records into user_warehouse_access_log table
+      }
+    }

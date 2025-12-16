@@ -1,0 +1,229 @@
+# Story 01.3 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/hooks/__tests__/use-onboarding-status.test.ts"
+    type: "unit"
+    description: "Unit tests for onboarding status hook"
+  - path: "apps/frontend/components/onboarding/__tests__/SkipConfirmationDialog.test.tsx"
+    type: "unit"
+    description: "Unit tests for skip dialog"
+  - path: "apps/frontend/e2e/onboarding-wizard.spec.ts"
+    type: "e2e"
+    description: "E2E tests for wizard flow"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    given: "new org with onboarding_step=0"
+    when: "admin logs in"
+    then: "wizard modal appears at step 1"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "org with onboarding_step=3"
+    when: "admin logs in"
+    then: "wizard resumes at step 3 with steps 1-2 showing checkmarks"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "org with onboarding_completed_at set"
+    when: "any user logs in"
+    then: "no wizard appears"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "non-admin user (Viewer, Operator)"
+    when: "org onboarding incomplete"
+    then: "user sees 'Setup in progress' message"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "admin clicks 'Skip Setup Wizard'"
+    when: "confirmed"
+    then: "demo data created (warehouse DEMO-WH, location DEFAULT, product SAMPLE-001)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "admin clicks 'Skip Setup Wizard'"
+    when: "cancelled"
+    then: "wizard remains open"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-07"
+    given: "wizard on any step 1-6"
+    then: "'Skip Setup Wizard' link is visible"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-08"
+    given: "progress saved after step"
+    when: "user refreshes or logs out/in"
+    then: "wizard resumes from saved step"
+    test_type: "e2e"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  useOnboardingStatus:
+    - name: "returns correct state for step=0 (not started)"
+      setup: "Mock API returns { step: 0, is_complete: false }"
+      expected: "{ step: 0, is_complete: false, skipped: false }"
+
+    - name: "returns correct state for step=3 (in progress)"
+      setup: "Mock API returns { step: 3, is_complete: false }"
+      expected: "{ step: 3, is_complete: false, skipped: false }"
+
+    - name: "returns correct state for completed org"
+      setup: "Mock API returns { step: 7, is_complete: true, completed_at: <date> }"
+      expected: "{ step: 7, is_complete: true, skipped: false }"
+
+    - name: "returns correct state for skipped org"
+      setup: "Mock API returns { skipped: true, is_complete: true }"
+      expected: "{ is_complete: true, skipped: true }"
+
+  SkipConfirmationDialog:
+    - name: "shows dialog when open=true"
+      setup: "Render with open=true"
+      expected: "Dialog visible with title and description"
+
+    - name: "hides dialog when open=false"
+      setup: "Render with open=false"
+      expected: "Dialog not visible"
+
+    - name: "calls onConfirm when confirm button clicked"
+      setup: "Render with open=true"
+      action: "Click 'Skip & Create Demo Data' button"
+      expected: "onConfirm called once"
+
+    - name: "calls onOpenChange(false) when cancel clicked"
+      setup: "Render with open=true"
+      action: "Click 'Cancel' button"
+      expected: "onOpenChange called with false"
+
+    - name: "disables buttons when isLoading=true"
+      setup: "Render with isLoading=true"
+      expected: "Both buttons disabled, spinner visible"
+
+  SetupInProgressMessage:
+    - name: "renders correct message"
+      expected: "Shows 'Setup in Progress' title and explanation text"
+
+  OnboardingGuard:
+    - name: "shows children when onboarding complete"
+      setup: "Mock status { is_complete: true }"
+      expected: "Children rendered"
+
+    - name: "shows SetupInProgressMessage for non-admin"
+      setup: "Mock status { is_complete: false }, context { role: 'VIEWER' }"
+      expected: "SetupInProgressMessage rendered"
+
+    - name: "shows skeleton while loading"
+      setup: "Mock isLoading: true"
+      expected: "Skeleton rendered"
+
+# Integration Test Cases
+integration_tests:
+  - name: "Wizard auto-launches for new org"
+    setup: "Create org with step=0, login as admin"
+    expected: "Wizard modal appears at step 1"
+
+  - name: "Wizard resumes at correct step"
+    setup: "Org with step=3, login as admin"
+    expected: "Wizard opens at step 3"
+
+  - name: "Skip creates demo data and closes wizard"
+    setup: "Admin in wizard"
+    action: "Click Skip, confirm"
+    expected: |
+      - Warehouse 'DEMO-WH' created
+      - Location 'DEFAULT' created
+      - Product 'SAMPLE-001' created
+      - Wizard closes
+      - Dashboard accessible
+
+  - name: "Completed orgs bypass wizard entirely"
+    setup: "Org with completed_at set, login as any user"
+    expected: "Dashboard loads directly, no wizard"
+
+  - name: "API returns 403 for non-admin skip attempts"
+    setup: "Login as VIEWER"
+    action: "POST /api/v1/settings/onboarding/skip"
+    expected: "403 Forbidden response"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Full wizard flow (new org to completion)"
+    steps:
+      - "Create new org"
+      - "Login as admin"
+      - "Verify wizard opens at step 1"
+      - "Complete step 1"
+      - "Verify step 2 loads"
+      - "Complete remaining steps"
+      - "Verify completion celebration"
+      - "Verify dashboard accessible"
+
+  - name: "Skip flow with demo data"
+    steps:
+      - "Create new org"
+      - "Login as admin"
+      - "Click 'Skip Setup Wizard'"
+      - "Confirm skip"
+      - "Verify demo warehouse in Settings > Warehouses"
+      - "Verify demo product exists"
+
+  - name: "Progress persistence across sessions"
+    steps:
+      - "Create new org"
+      - "Complete steps 1-3"
+      - "Logout"
+      - "Login again"
+      - "Verify wizard resumes at step 4"
+
+# Definition of Done
+definition_of_done:
+  - "Wizard launches for new orgs (step=0)"
+  - "Wizard resumes from saved step"
+  - "Completed orgs bypass wizard"
+  - "Non-admins see 'Setup in progress' message"
+  - "Skip creates demo data and closes wizard"
+  - "Progress persists across sessions"
+  - "All acceptance criteria have passing tests"
+  - "Unit test coverage >= 80%"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Frontend and hook coverage"
+  integration:
+    target: 70
+    reason: "API and state management"
+  files:
+    - "lib/hooks/use-onboarding-status.ts: 90%"
+    - "lib/services/onboarding-service.ts: 85%"
+    - "components/onboarding/OnboardingGuard.tsx: 80%"
+    - "components/onboarding/SkipConfirmationDialog.tsx: 90%"
+
+# Output Artifacts
+output_artifacts:
+  - "Migration file adding onboarding columns"
+  - "OnboardingWizardModal.tsx"
+  - "OnboardingGuard.tsx"
+  - "SkipConfirmationDialog.tsx"
+  - "SetupInProgressMessage.tsx"
+  - "useOnboardingStatus.ts hook"
+  - "onboarding-service.ts"
+  - "GET /api/v1/settings/onboarding/status endpoint"
+  - "POST /api/v1/settings/onboarding/skip endpoint"
+  - "Unit tests for all components and hooks"
+  - "Integration tests for wizard launch, resume, and skip flows"

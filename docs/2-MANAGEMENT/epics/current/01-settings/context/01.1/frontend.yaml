@@ -1,0 +1,139 @@
+# Story 01.1 - Frontend Specification
+# Purpose: Components, hooks, types (minimal for backend story)
+# Agent: FRONTEND-DEV (types/hooks focus)
+
+# Note: This is primarily a backend story. Frontend work is minimal.
+is_backend_focused: true
+
+# TypeScript Types to Create
+types:
+  - path: "apps/frontend/lib/types/organization.ts"
+    content: |
+      export interface Organization {
+        id: string;
+        name: string;
+        slug: string;
+        timezone: string;
+        locale: string;
+        currency: string;
+        logo_url: string | null;
+        onboarding_step: number;
+        onboarding_started_at: string | null;
+        onboarding_completed_at: string | null;
+        onboarding_skipped: boolean;
+        is_active: boolean;
+        created_at: string;
+        updated_at: string;
+      }
+
+      export interface OrgContext {
+        org_id: string;
+        user_id: string;
+        role_code: string;
+        role_name: string;
+        permissions: Record<string, string>;
+        organization: Pick<Organization, 'name' | 'timezone' | 'locale' | 'currency'>;
+      }
+
+  - path: "apps/frontend/lib/types/user.ts"
+    content: |
+      export interface User {
+        id: string;
+        org_id: string;
+        email: string;
+        first_name: string;
+        last_name: string;
+        role_id: string;
+        language: string;
+        is_active: boolean;
+        last_login_at: string | null;
+        created_at: string;
+        updated_at: string;
+      }
+
+      export interface Role {
+        id: string;
+        code: string;
+        name: string;
+        description: string | null;
+        permissions: Record<string, string>;
+        is_system: boolean;
+        display_order: number;
+        created_at: string;
+      }
+
+      export type RoleCode =
+        | 'SUPER_ADMIN'
+        | 'ADMIN'
+        | 'PRODUCTION_MANAGER'
+        | 'WAREHOUSE_MANAGER'
+        | 'QUALITY_MANAGER'
+        | 'PLANNER'
+        | 'OPERATOR'
+        | 'WAREHOUSE_OPERATOR'
+        | 'VIEWER'
+        | 'EXTERNAL';
+
+  - path: "apps/frontend/lib/types/module.ts"
+    content: |
+      export interface Module {
+        id: string;
+        code: string;
+        name: string;
+        dependencies: string[];
+        can_disable: boolean;
+        display_order: number;
+      }
+
+      export interface OrganizationModule {
+        id: string;
+        org_id: string;
+        module_id: string;
+        enabled: boolean;
+        enabled_at: string | null;
+        enabled_by: string | null;
+      }
+
+      export type ModuleCode =
+        | 'settings'
+        | 'technical'
+        | 'planning'
+        | 'production'
+        | 'warehouse'
+        | 'quality'
+        | 'shipping'
+        | 'npd'
+        | 'finance'
+        | 'oee'
+        | 'integrations';
+
+# Hooks (for consuming context)
+hooks:
+  - path: "apps/frontend/lib/hooks/use-org-context.ts"
+    description: "React Query hook for fetching org context"
+    exports:
+      - name: "useOrgContext"
+        returns: "UseQueryResult<OrgContext>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { getOrgContext, OrgContext } from '@/lib/services/org-context-service';
+
+      export function useOrgContext() {
+        return useQuery<OrgContext | null>({
+          queryKey: ['org-context'],
+          queryFn: getOrgContext,
+          staleTime: 5 * 60 * 1000, // 5 minutes
+          refetchOnWindowFocus: true,
+        });
+      }
+
+# UX Notes (minimal for backend story)
+ux:
+  wireframes: []  # No wireframes - backend story
+  notes:
+    - "This is a foundation/backend story with no UI components"
+    - "Org context will be consumed by all subsequent Settings UI stories"
+    - "Types and hooks defined here are used by frontend stories 01.2+"
+
+# No components for this story
+components: []

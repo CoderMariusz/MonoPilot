@@ -1,0 +1,340 @@
+# Story 01.6-roles-viewer - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/roles"
+    description: "List all system roles (read-only)"
+    file: "apps/frontend/app/api/v1/settings/roles/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params: []
+
+    response:
+      status: 200
+      type: "Role[]"
+      schema:
+        - id: "UUID"
+          code: "string"
+          name: "string"
+          description: "string | null"
+          permissions: "Record<string, string>"
+          display_order: "number"
+          created_at: "string"
+
+    example_response: |
+      [
+        {
+          "id": "uuid-1",
+          "code": "SUPER_ADMIN",
+          "name": "Super Administrator",
+          "description": "Full system access, can assign any role",
+          "permissions": {
+            "settings": "CRUD",
+            "users": "CRUD",
+            "technical": "CRUD",
+            "planning": "CRUD",
+            "production": "CRUD",
+            "warehouse": "CRUD",
+            "quality": "CRUD",
+            "shipping": "CRUD"
+          },
+          "display_order": 1,
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        {
+          "id": "uuid-2",
+          "code": "ADMIN",
+          "name": "Administrator",
+          "description": "Organization-wide access, cannot assign Super Admin",
+          "permissions": {
+            "settings": "CRUD",
+            "users": "CRUD",
+            "technical": "CRUD",
+            "planning": "CRUD",
+            "production": "CRUD",
+            "warehouse": "CRUD",
+            "quality": "CRUD",
+            "shipping": "CRUD"
+          },
+          "display_order": 2,
+          "created_at": "2025-01-01T00:00:00Z"
+        }
+      ]
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+  - method: "GET"
+    path: "/api/v1/settings/roles/permissions-matrix"
+    description: "Get permissions matrix for all roles (for visualization)"
+    file: "apps/frontend/app/api/v1/settings/roles/permissions-matrix/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "PermissionsMatrix"
+      schema:
+        modules: "string[]"
+        roles:
+          - code: "string"
+            name: "string"
+            permissions: "Record<string, string>"
+
+    example_response: |
+      {
+        "modules": [
+          "settings",
+          "users",
+          "technical",
+          "planning",
+          "production",
+          "warehouse",
+          "quality",
+          "shipping"
+        ],
+        "roles": [
+          {
+            "code": "SUPER_ADMIN",
+            "name": "Super Administrator",
+            "permissions": {
+              "settings": "CRUD",
+              "users": "CRUD",
+              "technical": "CRUD",
+              "planning": "CRUD",
+              "production": "CRUD",
+              "warehouse": "CRUD",
+              "quality": "CRUD",
+              "shipping": "CRUD"
+            }
+          },
+          {
+            "code": "VIEWER",
+            "name": "Viewer",
+            "permissions": {
+              "settings": "R",
+              "users": "R",
+              "technical": "R",
+              "planning": "R",
+              "production": "R",
+              "warehouse": "R",
+              "quality": "R",
+              "shipping": "R"
+            }
+          }
+        ]
+      }
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+  - method: "GET"
+    path: "/api/v1/settings/roles/:code"
+    description: "Get single role by code (for detail view)"
+    file: "apps/frontend/app/api/v1/settings/roles/[code]/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        code: "string (role code)"
+
+    response:
+      status: 200
+      type: "Role"
+      schema:
+        id: "UUID"
+        code: "string"
+        name: "string"
+        description: "string | null"
+        permissions: "Record<string, string>"
+        display_order: "number"
+        created_at: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "ROLE_NOT_FOUND"
+        message: "Role not found"
+        when: "Invalid role code provided"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/role-service.ts"
+    description: "Role data retrieval service"
+    exports:
+      - name: "getAllRoles"
+        type: "async function"
+        params: []
+        returns: "Promise<Role[]>"
+        description: "Fetch all system roles"
+
+      - name: "getRoleByCode"
+        type: "async function"
+        params:
+          - "code: string"
+        returns: "Promise<Role | null>"
+        description: "Fetch single role by code"
+
+      - name: "getPermissionsMatrix"
+        type: "async function"
+        params: []
+        returns: "Promise<PermissionsMatrix>"
+        description: "Fetch permissions matrix for visualization"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/role.ts"
+    description: "Role TypeScript interfaces"
+    exports:
+      - "Role"
+      - "PermissionsMatrix"
+      - "Permission"
+      - "PermissionSet"
+    content: |
+      export interface Role {
+        id: string;
+        code: string;
+        name: string;
+        description: string | null;
+        permissions: Record<string, string>;
+        display_order: number;
+        created_at: string;
+      }
+
+      export type Permission = 'C' | 'R' | 'U' | 'D' | '-';
+      export type PermissionSet = string; // e.g., "CRUD", "CRU", "R", "-"
+
+      export interface PermissionsMatrix {
+        modules: string[];
+        roles: {
+          code: string;
+          name: string;
+          permissions: Record<string, string>;
+        }[];
+      }
+
+      export type RoleCode =
+        | 'SUPER_ADMIN'
+        | 'ADMIN'
+        | 'PRODUCTION_MANAGER'
+        | 'WAREHOUSE_MANAGER'
+        | 'QUALITY_MANAGER'
+        | 'PLANNER'
+        | 'OPERATOR'
+        | 'WAREHOUSE_OPERATOR'
+        | 'VIEWER'
+        | 'EXTERNAL';
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/v1/settings/roles/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+
+    export async function GET() {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const { data: roles, error: rolesError } = await supabase
+        .from('roles')
+        .select('id, code, name, description, permissions, display_order, created_at')
+        .eq('is_system', true)
+        .order('display_order', { ascending: true });
+
+      if (rolesError) {
+        return NextResponse.json(
+          { error: 'Failed to fetch roles' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json(roles);
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/role-service.ts
+    import { Role, PermissionsMatrix } from '@/lib/types/role';
+
+    export async function getAllRoles(): Promise<Role[]> {
+      const response = await fetch('/api/v1/settings/roles', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch roles');
+      }
+
+      return response.json();
+    }
+
+    export async function getRoleByCode(code: string): Promise<Role | null> {
+      const response = await fetch(`/api/v1/settings/roles/${code}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error('Failed to fetch role');
+      }
+
+      return response.json();
+    }
+
+    export async function getPermissionsMatrix(): Promise<PermissionsMatrix> {
+      const response = await fetch('/api/v1/settings/roles/permissions-matrix', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch permissions matrix');
+      }
+
+      return response.json();
+    }
+
+# Caching Strategy
+caching:
+  strategy: "React Query"
+  cache_key: "['settings', 'roles']"
+  stale_time: "5 minutes"
+  reason: "Roles rarely change (system data), safe to cache"
+  invalidation: "Manual on role assignment"
+  pattern: |
+    // In useRoles hook
+    useQuery({
+      queryKey: ['settings', 'roles'],
+      queryFn: getAllRoles,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+    });

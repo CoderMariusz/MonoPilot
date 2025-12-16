@@ -1,0 +1,136 @@
+# Story 01.11 - Frontend Specification
+# Purpose: Components, hooks, types, UX wireframes
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/production-line.ts"
+    content: |
+      export type ProductionLineStatus = 'active' | 'maintenance' | 'inactive' | 'setup';
+
+      export interface ProductionLine {
+        id: string;
+        org_id: string;
+        code: string;
+        name: string;
+        description: string | null;
+        warehouse_id: string;
+        warehouse?: Warehouse;
+        default_output_location_id: string | null;
+        status: ProductionLineStatus;
+        calculated_capacity: number | null;
+        bottleneck_machine_id: string | null;
+        bottleneck_machine_code: string | null;
+        machines: LineMachine[];
+        compatible_products: Product[];
+        created_at: string;
+        updated_at: string;
+      }
+
+      export interface LineMachine {
+        id: string;
+        code: string;
+        name: string;
+        status: MachineStatus;
+        capacity_per_hour: number | null;
+        sequence_order: number;
+      }
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/production-lines/page.tsx"
+    description: "Production Line list page with DataTable"
+    wireframe: "SET-018"
+    components:
+      - "ProductionLineDataTable"
+
+# Components
+components:
+  - path: "apps/frontend/components/settings/production-lines/ProductionLineDataTable.tsx"
+    description: "DataTable with sorting, filtering, pagination, machine sequence preview"
+    pattern: "ShadCN DataTable"
+    columns:
+      - "Code"
+      - "Name"
+      - "Warehouse"
+      - "Machine Count"
+      - "Capacity"
+      - "Status"
+      - "Actions"
+
+  - path: "apps/frontend/components/settings/production-lines/ProductionLineModal.tsx"
+    description: "Create/Edit modal with machine assignment and product compatibility"
+    pattern: "ShadCN Dialog with Form"
+    wireframe: "SET-019"
+    sections:
+      - "Basic Info (code, name, description, warehouse)"
+      - "Machine Assignment (drag-drop sequencer)"
+      - "Product Compatibility (checkbox list with search)"
+      - "Status toggle"
+
+  - path: "apps/frontend/components/settings/production-lines/MachineSequenceEditor.tsx"
+    description: "Drag-drop machine list with sequence ordering using dnd-kit"
+    library: "dnd-kit"
+    features:
+      - "Drag handles"
+      - "Visual feedback during drag"
+      - "Auto-renumber on drop"
+      - "Keyboard accessibility (arrow keys + space)"
+
+  - path: "apps/frontend/components/settings/production-lines/ProductCompatibilityEditor.tsx"
+    description: "Checkbox list with search, Select All/Clear All"
+    features:
+      - "Search input (debounced 300ms)"
+      - "Select All / Clear All buttons"
+      - "Search respects filtering (Select All only selects visible)"
+
+  - path: "apps/frontend/components/settings/production-lines/CapacityCalculatorDisplay.tsx"
+    description: "Shows calculated capacity with bottleneck tooltip"
+    display: "'{capacity} u/hr' with info icon"
+    tooltip: "'Bottleneck: {MACHINE_CODE} ({capacity}/hr)'"
+
+  - path: "apps/frontend/components/settings/production-lines/ProductionLineStatusBadge.tsx"
+    description: "Status indicator"
+    variants:
+      active: { color: "bg-green-100 text-green-800", label: "Active" }
+      maintenance: { color: "bg-yellow-100 text-yellow-800", label: "Maintenance" }
+      inactive: { color: "bg-gray-100 text-gray-800", label: "Inactive" }
+      setup: { color: "bg-blue-100 text-blue-800", label: "Setup" }
+
+# UX Wireframes
+ux:
+  wireframes:
+    - id: "SET-018"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-018-production-line-list.md"
+      description: "Production Line List with machine flow preview"
+      components:
+        - "DataTable with Code, Name, Warehouse, Machine Count, Capacity, Status columns"
+        - "Machine flow preview row (Mixer -> Oven -> Cooler)"
+        - "Search bar (code/name)"
+        - "Warehouse filter dropdown"
+        - "Status filter dropdown"
+        - "Add Production Line button"
+
+    - id: "SET-019"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-019-production-line-create-edit-modal.md"
+      description: "Production Line Create/Edit Modal"
+      components:
+        - "Code input (auto-uppercase, unique)"
+        - "Name input (required)"
+        - "Warehouse dropdown (required)"
+        - "Machine assignment section with drag-drop reorder"
+        - "Product compatibility section with checkboxes and search"
+
+  states:
+    loading: "Skeleton rows (3) with shimmer animation"
+    empty: "'No production lines found' icon with 'Add Your First Production Line' CTA"
+    error: "'Failed to load production lines' warning with Retry button"
+    success: "Table populated with line data and machine flow preview"
+
+  patterns:
+    table: "ShadCN DataTable with server-side pagination, sorting, filtering"
+    modal: "ShadCN Dialog with Form inside"
+    form: "react-hook-form with Zod resolver"
+    badge: "ShadCN Badge for status indicators"
+    drag_drop: "dnd-kit for machine sequence reordering"
+    checkbox_list: "Custom checkbox list with search filter"

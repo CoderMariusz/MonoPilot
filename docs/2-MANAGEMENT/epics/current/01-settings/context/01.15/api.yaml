@@ -1,0 +1,159 @@
+# Story 01.15 - API Specification
+# Purpose: Session and password management endpoints
+# Agent: BACKEND-DEV (API focus)
+
+# Session Management Endpoints
+session_endpoints:
+  base_path: "/api/v1/settings/sessions"
+
+  - method: "GET"
+    path: "/api/v1/settings/sessions"
+    description: "List user's own active sessions"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      type: "Session[]"
+      schema:
+        - id: "uuid"
+        - device_type: "'browser' | 'mobile' | 'api'"
+        - device_name: "string"
+        - ip_address: "string"
+        - created_at: "ISO timestamp"
+        - last_activity_at: "ISO timestamp"
+        - is_current: "boolean"
+
+  - method: "GET"
+    path: "/api/v1/settings/sessions/current"
+    description: "Get current session details"
+    auth: "required"
+    response:
+      status: 200
+      type: "Session"
+
+  - method: "DELETE"
+    path: "/api/v1/settings/sessions/:id"
+    description: "Terminate specific session"
+    auth: "required"
+    response:
+      status: 204
+
+  - method: "DELETE"
+    path: "/api/v1/settings/sessions"
+    description: "Terminate all sessions except current"
+    auth: "required"
+    response:
+      status: 200
+      type: "{ terminated_count: number }"
+
+  - method: "POST"
+    path: "/api/v1/settings/sessions/terminate-all"
+    description: "Terminate all sessions (including current = logout)"
+    auth: "required"
+    response:
+      status: 200
+
+# Admin Session Endpoints
+  - method: "GET"
+    path: "/api/v1/settings/users/:userId/sessions"
+    description: "List user's sessions (admin only)"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      status: 200
+      type: "Session[]"
+
+  - method: "DELETE"
+    path: "/api/v1/settings/users/:userId/sessions"
+    description: "Terminate all user sessions (admin only)"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      status: 200
+      type: "{ terminated_count: number }"
+
+# Password Management Endpoints
+password_endpoints:
+  base_path: "/api/v1/settings/password"
+
+  - method: "POST"
+    path: "/api/v1/settings/password/change"
+    description: "Change own password"
+    auth: "required"
+    request:
+      type: "ChangePasswordRequest"
+      schema:
+        current_password: "string"
+        new_password: "string (min 8, uppercase, lowercase, number, special)"
+        confirm_password: "string"
+    response:
+      status: 200
+      notes: "Terminates all other sessions"
+
+  - method: "POST"
+    path: "/api/v1/settings/password/validate"
+    description: "Validate password strength (no auth)"
+    auth: "none"
+    request:
+      type: "{ password: string }"
+    response:
+      status: 200
+      type: "PasswordValidationResult"
+      schema:
+        valid: "boolean"
+        errors: "string[]"
+        requirements:
+          minLength: "{ met: boolean, message: string }"
+          uppercase: "{ met: boolean, message: string }"
+          lowercase: "{ met: boolean, message: string }"
+          number: "{ met: boolean, message: string }"
+          special: "{ met: boolean, message: string }"
+        strength: "'weak' | 'medium' | 'strong'"
+
+  - method: "GET"
+    path: "/api/v1/settings/password/policy"
+    description: "Get password policy config"
+    auth: "required"
+    response:
+      status: 200
+      type: "PasswordPolicy"
+      schema:
+        min_length: "number"
+        require_uppercase: "boolean"
+        require_lowercase: "boolean"
+        require_number: "boolean"
+        require_special: "boolean"
+        history_count: "number"
+        expiry_days: "number | null"
+
+# Admin Password Endpoints
+  - method: "POST"
+    path: "/api/v1/settings/users/:userId/password/reset"
+    description: "Force password reset (admin only)"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      status: 200
+      notes: "Terminates all user sessions"
+
+# Services
+services:
+  - path: "lib/services/session-service.ts"
+    exports:
+      - "createSession(userId, deviceInfo): Promise<Session>"
+      - "getSession(sessionToken): Promise<Session | null>"
+      - "getSessions(userId): Promise<Session[]>"
+      - "terminateSession(sessionId, reason): Promise<void>"
+      - "terminateAllSessions(userId, exceptCurrent?): Promise<number>"
+      - "validateSession(sessionToken): Promise<SessionValidation>"
+      - "updateLastActivity(sessionId): Promise<void>"
+      - "parseUserAgent(userAgent): DeviceInfo"
+
+  - path: "lib/services/password-service.ts"
+    exports:
+      - "changePassword(userId, currentPassword, newPassword): Promise<void>"
+      - "validatePassword(password): PasswordValidationResult"
+      - "checkPasswordHistory(userId, password): Promise<boolean>"
+      - "getPasswordPolicy(orgId): Promise<PasswordPolicy>"
+      - "hashPassword(password): Promise<string>"
+      - "verifyPassword(password, hash): Promise<boolean>"

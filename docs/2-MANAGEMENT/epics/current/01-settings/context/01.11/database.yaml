@@ -1,0 +1,166 @@
+# Story 01.11 - Database Schema
+# Purpose: Tables, RLS policies, indexes, junction tables
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/YYYYMMDDHHMMSS_create_production_lines.sql"
+    type: "migration"
+    description: "Create production_lines, production_line_machines, production_line_products tables with RLS"
+
+tables:
+  - name: "production_lines"
+    description: "Production line master data with warehouse and status"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "NOT NULL" }
+      - { name: "name", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "warehouse_id", type: "UUID", constraints: "NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT" }
+      - { name: "default_output_location_id", type: "UUID", constraints: "REFERENCES locations(id) ON DELETE SET NULL" }
+      - { name: "status", type: "VARCHAR(20)", constraints: "NOT NULL DEFAULT 'active'" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW() NOT NULL" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW() NOT NULL" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_production_lines_org ON production_lines(org_id)"
+      - "idx_production_lines_warehouse ON production_lines(warehouse_id)"
+      - "idx_production_lines_status ON production_lines(status)"
+      - "idx_production_lines_code ON production_lines(code)"
+      - "idx_production_lines_org_code_unique ON production_lines(org_id, code) UNIQUE"
+    constraints:
+      - "UNIQUE(org_id, code)"
+      - "CHECK (code ~ '^[A-Z0-9-]+$')"
+      - "CHECK (status IN ('active', 'maintenance', 'inactive', 'setup'))"
+
+  - name: "production_line_machines"
+    description: "Machine assignments to production lines with sequence order"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "line_id", type: "UUID", constraints: "NOT NULL REFERENCES production_lines(id) ON DELETE CASCADE" }
+      - { name: "machine_id", type: "UUID", constraints: "NOT NULL REFERENCES machines(id) ON DELETE CASCADE" }
+      - { name: "sequence_order", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW() NOT NULL" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_plm_line ON production_line_machines(line_id)"
+      - "idx_plm_machine ON production_line_machines(machine_id)"
+      - "idx_plm_sequence ON production_line_machines(line_id, sequence_order)"
+    constraints:
+      - "UNIQUE(line_id, machine_id)"
+      - "UNIQUE(line_id, sequence_order)"
+      - "CHECK (sequence_order > 0)"
+
+  - name: "production_line_products"
+    description: "Product compatibility for production lines"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "line_id", type: "UUID", constraints: "NOT NULL REFERENCES production_lines(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id) ON DELETE CASCADE" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW() NOT NULL" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_plp_line ON production_line_products(line_id)"
+      - "idx_plp_product ON production_line_products(product_id)"
+    constraints:
+      - "UNIQUE(line_id, product_id)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "production_lines"
+      name: "production_lines_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "production_lines"
+      name: "production_lines_admin_write"
+      operation: "ALL"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+            IN ('SUPER_ADMIN', 'ADMIN', 'PROD_MANAGER')
+
+    - table: "production_line_machines"
+      name: "plm_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "production_line_machines"
+      name: "plm_admin_write"
+      operation: "ALL"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+            IN ('SUPER_ADMIN', 'ADMIN', 'PROD_MANAGER')
+
+    - table: "production_line_products"
+      name: "plp_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "production_line_products"
+      name: "plp_admin_write"
+      operation: "ALL"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+            IN ('SUPER_ADMIN', 'ADMIN', 'PROD_MANAGER')
+
+# Capacity Calculation Logic
+capacity_calculation:
+  formula: "Line Capacity = MIN(machine.capacity_per_hour) for all machines in line"
+  algorithm: |
+    function calculateBottleneckCapacity(machines: LineMachine[]): CapacityResult {
+      const machinesWithCapacity = machines.filter(m =>
+        m.capacity_per_hour !== null && m.capacity_per_hour > 0
+      );
+
+      if (machinesWithCapacity.length === 0) {
+        return {
+          capacity: null,
+          bottleneck_machine_id: null,
+          bottleneck_machine_code: null,
+          machines_without_capacity: machines.map(m => m.code)
+        };
+      }
+
+      const bottleneck = machinesWithCapacity.reduce((min, m) =>
+        m.capacity_per_hour! < min.capacity_per_hour! ? m : min
+      );
+
+      return {
+        capacity: bottleneck.capacity_per_hour,
+        bottleneck_machine_id: bottleneck.id,
+        bottleneck_machine_code: bottleneck.code,
+        machines_without_capacity: machines
+          .filter(m => !m.capacity_per_hour)
+          .map(m => m.code)
+      };
+    }
+  edge_cases:
+    - "No machines assigned: capacity = null, display 'Not calculated' or '--'"
+    - "One machine has null capacity: exclude from calculation, use min of others"
+    - "All machines have null capacity: capacity = null, display 'Not calculated'"
+    - "Machine added/removed: recalculate immediately"
+
+# Sequence Renumbering
+sequence_renumber:
+  description: "On drag end, renumber all sequences starting from 1"
+  pattern: |
+    function renumberSequences(items: { id: string }[]): MachineOrder[] {
+      return items.map((item, index) => ({
+        machine_id: item.id,
+        sequence_order: index + 1
+      }));
+    }

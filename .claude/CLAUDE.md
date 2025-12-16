@@ -61,6 +61,92 @@ supabase/
 - **Service Layer**: lib/services/*-service.ts
 - **Validation**: Zod schemas in lib/validation/
 
+## Story Context Format (YAML)
+
+**IMPORTANT**: Every story MUST have a `.context.yaml` file for AI agent consumption.
+
+**Location**: `docs/2-MANAGEMENT/epics/current/{epic}/context/{story-id}.context.yaml`
+
+**Lookup order** (agent reads first available):
+1. `{story-id}.context.yaml` - Primary source
+2. `{story-id}.md` - Story markdown (fallback)
+3. Epic overview - General context
+4. PRD/Architecture docs - Reference material
+
+**Required YAML structure**:
+```yaml
+story:
+  id: "XX.Y"
+  name: "Story Name"
+  epic: "XX-module-name"
+  phase: "1A|1B|2|3"
+  complexity: "S|M|L|XL"
+  estimate_days: N
+
+dependencies:
+  required:
+    - story: "XX.Y"
+      provides: ["table_name", "service_name"]
+
+files_to_read:
+  prd: "path/to/prd.md"
+  prd_sections: ["FR-XXX-NNN"]
+  architecture: "path/to/arch.md"
+  story: "path/to/story.md"
+  patterns:
+    - "path/to/example/file.ts"
+
+files_to_create:
+  database: [{path, type}]
+  api: [{path, methods}]
+  services: [{path}]
+  validation: [{path}]
+  pages: [{path}]
+  components: [{path}]
+
+database:
+  tables:
+    - name: "table_name"
+      columns: ["col1", "col2"]
+      rls: true|false
+      indexes: ["col1"]
+
+api_endpoints:
+  - method: "GET|POST|PUT|DELETE|PATCH"
+    path: "/api/..."
+    auth: true|false
+    roles: ["role1", "role2"]
+
+ux:
+  wireframes:
+    - id: "SET-XXX"
+      path: "path/to/wireframe.md"
+      components: ["Component1", "Component2"]
+  patterns:
+    table: "ShadCN DataTable pattern"
+    modal: "ShadCN Dialog pattern"
+  states: ["loading", "empty", "error", "success"]
+
+validation_rules:
+  field_name: "validation description"
+
+patterns:
+  rls: "ADR-013"
+  api: "REST with org_id filter"
+  service: "class-based with static methods"
+  validation: "zod schemas"
+
+acceptance_checklist:
+  - "Checklist item 1"
+  - "Checklist item 2"
+
+output_artifacts:
+  - "Expected output 1"
+  - "Expected output 2"
+```
+
+**UX in context**: Include UX references in same YAML file (not separate). Reference wireframe paths, don't duplicate content.
+
 ## Key Files
 - `.claude/PROJECT-STATE.md` - Current project state after context clear
 - `.claude/PATTERNS.md` - Code patterns and conventions

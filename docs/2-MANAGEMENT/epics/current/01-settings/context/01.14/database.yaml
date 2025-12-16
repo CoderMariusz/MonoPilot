@@ -1,0 +1,83 @@
+# Story 01.14 - Database Schema
+# Purpose: wizard_progress, badges, templates (constants)
+# Agent: BACKEND-DEV
+
+migrations:
+  - path: "supabase/migrations/063_add_wizard_progress_to_organizations.sql"
+    type: "migration"
+    description: "Add wizard_progress JSONB and badges JSONB columns to organizations table"
+
+schema_changes:
+  - table: "organizations"
+    action: "ALTER TABLE"
+    columns:
+      - name: "wizard_progress"
+        type: "JSONB"
+        default: "'{}'::jsonb"
+        description: "Tracks wizard step completion and created entity IDs"
+
+      - name: "badges"
+        type: "JSONB"
+        default: "'[]'::jsonb"
+        description: "Achievement badges earned (e.g., speed_champion)"
+
+# wizard_progress JSONB Structure
+wizard_progress_schema:
+  description: "Tracks wizard completion state per step"
+  example: |
+    {
+      "step_1": {
+        "completed_at": "2025-12-16T10:00:00Z",
+        "org_name": "Bakery Fresh Ltd",
+        "skipped": false
+      },
+      "step_2": {
+        "completed_at": "2025-12-16T10:03:00Z",
+        "warehouse_id": "uuid-here",
+        "warehouse_code": "WH-MAIN",
+        "skipped": false
+      },
+      "step_3": {
+        "completed_at": "2025-12-16T10:06:00Z",
+        "location_ids": ["uuid1", "uuid2", "uuid3"],
+        "template": "basic",
+        "count": 3,
+        "skipped": false
+      },
+      "step_4": {
+        "completed_at": "2025-12-16T10:10:00Z",
+        "product_id": "uuid-here",
+        "product_sku": "WWB-001",
+        "skipped": false
+      },
+      "step_5": {
+        "completed_at": "2025-12-16T10:12:00Z",
+        "work_order_id": "uuid-here",
+        "work_order_code": "WO-0001",
+        "skipped": true
+      },
+      "step_6": {
+        "completed_at": "2025-12-16T10:12:34Z",
+        "duration_seconds": 754,
+        "badge": "speed_champion"
+      }
+    }
+
+# badges JSONB Structure
+badges_schema:
+  description: "Achievement badges"
+  example: |
+    [
+      {
+        "code": "speed_champion",
+        "name": "Speed Setup Champion",
+        "description": "Completed setup in under 15 minutes",
+        "earned_at": "2025-12-16T10:12:34Z"
+      }
+    ]
+
+# No new tables - uses existing tables
+# Step 2 creates warehouse in warehouses table
+# Step 3 creates locations in locations table
+# Step 4 creates product in products table (Technical module)
+# Step 5 creates work order in work_orders table (Planning module)

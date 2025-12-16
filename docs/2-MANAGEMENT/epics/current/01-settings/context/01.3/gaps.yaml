@@ -1,0 +1,330 @@
+# Story 01.3 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+# Refactoring Plan: ../REFACTORING-PLAN.md
+
+gap_summary:
+  overall_readiness: "17.6%"
+  critical_blockers: 2
+  components_done: 0
+  components_partial: 3
+  components_missing: 14
+
+# =============================================================================
+# CRITICAL SCHEMA CONFLICT
+# =============================================================================
+schema_conflict:
+  description: |
+    CRITICAL: Database schema mismatch between story spec and existing code.
+    This must be resolved before any implementation.
+
+  story_expects:
+    - "onboarding_step INTEGER DEFAULT 0"
+    - "onboarding_started_at TIMESTAMPTZ"
+    - "onboarding_completed_at TIMESTAMPTZ"
+    - "onboarding_skipped BOOLEAN DEFAULT false"
+
+  code_has:
+    - "wizard_completed BOOLEAN"
+    - "wizard_progress JSONB"
+
+  test_fixtures_expect: "Story column names (onboarding_*)"
+
+  resolution: "Migration 059_migrate_wizard_to_onboarding.sql"
+  priority: "P0-BLOCKER"
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "onboarding_step column"
+    expected: "organizations.onboarding_step INTEGER DEFAULT 0"
+    found: "NOT FOUND (uses wizard_progress JSONB instead)"
+    status: "MISSING"
+    gap_description: |
+      Migration 14 uses wizard_progress JSONB.
+      Test fixtures expect onboarding_step column.
+      Values: 0=not started, 1-6=in progress, 7=completed
+    refactor_action: "Migration 059_migrate_wizard_to_onboarding.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "onboarding_started_at column"
+    expected: "organizations.onboarding_started_at TIMESTAMPTZ"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Timestamp when wizard was first shown."
+    refactor_action: "Migration 059"
+    priority: "P0"
+
+  - component: "onboarding_completed_at column"
+    expected: "organizations.onboarding_completed_at TIMESTAMPTZ"
+    found: "NOT FOUND (only wizard_completed BOOLEAN exists)"
+    status: "MISSING"
+    gap_description: |
+      Code uses wizard_completed (boolean) not timestamp.
+      Need actual completion timestamp.
+    refactor_action: "Migration 059"
+    priority: "P0"
+
+  - component: "onboarding_skipped column"
+    expected: "organizations.onboarding_skipped BOOLEAN DEFAULT false"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Flag for when user skipped wizard (demo data created)."
+    refactor_action: "Migration 059"
+    priority: "P0"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "GET /api/v1/settings/onboarding/status"
+    expected: "Endpoint at /api/v1/settings/onboarding/status"
+    found: "/api/settings/wizard/route.ts (different path)"
+    status: "PARTIAL"
+    gap_description: |
+      PATH MISMATCH:
+      - Expected: /api/v1/settings/onboarding/status
+      - Found: /api/settings/wizard
+
+      Response schema also differs (JSONB vs columns).
+    refactor_action: "Create new endpoint at v1 path"
+    priority: "P0"
+
+  - component: "POST /api/v1/settings/onboarding/skip"
+    expected: "Skip endpoint creating demo data"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No skip endpoint exists.
+      Must create:
+      - warehouse (DEMO-WH)
+      - location (DEFAULT)
+      - product (SAMPLE-001)
+      - Set onboarding_skipped = true
+    refactor_action: "Create new endpoint"
+    priority: "P0"
+
+# =============================================================================
+# COMPONENT GAPS (ALL MISSING)
+# =============================================================================
+component_gaps:
+  - component: "OnboardingWizardModal"
+    expected: "apps/frontend/components/onboarding/OnboardingWizardModal.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Full-screen wizard modal with step navigation.
+      Features: Progress bar, Back/Next buttons, Skip link,
+      cannot dismiss by clicking outside.
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "OnboardingGuard"
+    expected: "apps/frontend/components/onboarding/OnboardingGuard.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Route wrapper that checks onboarding status.
+      Shows wizard for admins, 'Setup in progress' for non-admins.
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "SkipConfirmationDialog"
+    expected: "apps/frontend/components/onboarding/SkipConfirmationDialog.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      AlertDialog for skip confirmation.
+      Shows what demo data will be created.
+    refactor_action: "Create new component"
+    priority: "P1"
+
+  - component: "SetupInProgressMessage"
+    expected: "apps/frontend/components/onboarding/SetupInProgressMessage.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Message shown to non-admin users during onboarding."
+    refactor_action: "Create new component"
+    priority: "P1"
+
+# =============================================================================
+# HOOK GAPS
+# =============================================================================
+hook_gaps:
+  - component: "useOnboardingStatus"
+    expected: "apps/frontend/lib/hooks/use-onboarding-status.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      React Query hook for fetching onboarding status.
+      Returns: step, started_at, completed_at, skipped, is_complete
+    refactor_action: "Create new hook"
+    priority: "P0"
+
+  - component: "useSkipOnboarding"
+    expected: "apps/frontend/lib/hooks/use-skip-onboarding.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Mutation hook for skip action."
+    refactor_action: "Create new hook"
+    priority: "P1"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "onboarding-service.ts"
+    expected: "apps/frontend/lib/services/onboarding-service.ts"
+    found: "wizard-service.ts (wrong name, incomplete)"
+    status: "PARTIAL"
+    gap_description: |
+      wizard-service.ts exists with:
+      - getWizardProgress() ✓
+      - saveWizardProgress() ✓
+      - completeWizard() ✓
+
+      MISSING:
+      - skipOnboarding() function
+      - Uses wrong schema (JSONB vs columns)
+    refactor_action: "Rename and refactor to use new columns"
+    priority: "P0"
+
+# =============================================================================
+# PAGE GAPS
+# =============================================================================
+page_gaps:
+  - component: "Onboarding page"
+    expected: "apps/frontend/app/(authenticated)/onboarding/page.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Wizard launcher page (redirect target)."
+    refactor_action: "Create new page"
+    priority: "P1"
+
+# =============================================================================
+# VALIDATION GAPS
+# =============================================================================
+validation_gaps:
+  - component: "onboarding.ts schemas"
+    expected: "apps/frontend/lib/validation/onboarding.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Zod schemas for status and skip response."
+    refactor_action: "Create validation schemas"
+    priority: "P1"
+
+# =============================================================================
+# TEST STATUS
+# =============================================================================
+test_status:
+  - component: "01.3.onboarding-wizard-launcher.test.tsx"
+    path: "apps/frontend/__tests__/01-settings/01.3.onboarding-wizard-launcher.test.tsx"
+    status: "EXISTS_RED"
+    gap_description: |
+      Test file exists but uses mock components.
+      All tests will FAIL until components implemented.
+      Tests are TDD-style (RED phase complete).
+    priority: "P2"
+
+  - component: "Test fixtures"
+    path: "apps/frontend/__tests__/01-settings/fixtures/organizations.ts"
+    status: "DONE"
+    gap_description: |
+      Fixtures have correct fields:
+      onboarding_step, onboarding_started_at,
+      onboarding_completed_at, onboarding_skipped
+    priority: "N/A"
+
+# =============================================================================
+# EXISTING CODE (can partially reuse)
+# =============================================================================
+existing_code:
+  - path: "apps/frontend/lib/services/wizard-service.ts"
+    status: "REFACTOR"
+    description: |
+      Good structure but wrong schema.
+      Can refactor to use new onboarding_* columns.
+
+  - path: "apps/frontend/app/api/settings/wizard/route.ts"
+    status: "DEPRECATE"
+    description: |
+      Wrong path and schema.
+      Create new v1 endpoint, deprecate this one.
+
+# =============================================================================
+# IMPLEMENTATION ORDER
+# =============================================================================
+implementation_order:
+  prerequisite: "Migration 059 must be applied (onboarding columns)"
+
+  phase_1_database:
+    - "Migration 059_migrate_wizard_to_onboarding.sql"
+
+  phase_2_services:
+    - "Rename wizard-service.ts → onboarding-service.ts"
+    - "Refactor to use new column schema"
+    - "Add skipOnboarding() function"
+
+  phase_3_api:
+    - "app/api/v1/settings/onboarding/status/route.ts"
+    - "app/api/v1/settings/onboarding/skip/route.ts"
+
+  phase_4_validation:
+    - "lib/validation/onboarding.ts"
+
+  phase_5_hooks:
+    - "lib/hooks/use-onboarding-status.ts"
+    - "lib/hooks/use-skip-onboarding.ts"
+
+  phase_6_components:
+    - "components/onboarding/OnboardingWizardModal.tsx"
+    - "components/onboarding/OnboardingGuard.tsx"
+    - "components/onboarding/SkipConfirmationDialog.tsx"
+    - "components/onboarding/SetupInProgressMessage.tsx"
+
+  phase_7_pages:
+    - "app/(authenticated)/onboarding/page.tsx"
+
+# =============================================================================
+# DEMO DATA SPECIFICATION
+# =============================================================================
+demo_data_on_skip:
+  warehouse:
+    code: "DEMO-WH"
+    name: "Main Warehouse"
+    type: "general"
+    is_default: true
+
+  location:
+    code: "DEFAULT"
+    name: "Default Location"
+    type: "zone"
+    warehouse: "DEMO-WH"
+
+  product:
+    code: "SAMPLE-001"
+    name: "Sample Product"
+    uom: "EA"
+    status: "active"
+
+  module_toggles:
+    technical: true
+    planning: false
+    production: false
+    warehouse: false
+    quality: false
+    shipping: false
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] Migration 059 applied - onboarding columns exist"
+  - "[ ] Wizard auto-launches for new org (step=0)"
+  - "[ ] Wizard resumes at correct step"
+  - "[ ] Skip creates demo data (warehouse, location, product)"
+  - "[ ] Non-admin users see 'Setup in progress'"
+  - "[ ] Progress persists across sessions"
+  - "[ ] All RED tests now pass (GREEN phase)"
+  - "[ ] API returns 403 for non-admin skip attempts"

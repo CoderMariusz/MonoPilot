@@ -1,0 +1,259 @@
+# Story 01.1 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+# Refactoring Plan: ../REFACTORING-PLAN.md
+
+gap_summary:
+  overall_readiness: "17%"
+  critical_blockers: 3
+  components_done: 0
+  components_partial: 4
+  components_missing: 8
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "organizations table"
+    expected: "supabase/migrations/001_create_organizations_table.sql"
+    found: "apps/frontend/lib/supabase/migrations/000_create_organizations_table.sql"
+    status: "PARTIAL"
+    gap_description: |
+      Table exists but schema mismatch:
+      - company_name → should be `name`
+      - default_language → should be `locale`
+      - default_currency → should be `currency`
+      - Missing columns: slug, onboarding_step, onboarding_started_at,
+        onboarding_completed_at, onboarding_skipped, is_active
+    refactor_action: "Migration 054_rename_organization_columns.sql"
+    priority: "P0"
+
+  - component: "users table"
+    expected: "supabase/migrations/003_create_users_table.sql"
+    found: "apps/frontend/lib/supabase/migrations/001_create_users_table.sql"
+    status: "PARTIAL"
+    gap_description: |
+      Table exists but schema mismatch:
+      - uses `role VARCHAR(20)` enum → should be `role_id UUID FK`
+      - uses `status` → should be `is_active`
+      - Missing columns: language
+    refactor_action: "Migration 057_migrate_users_role_to_role_id.sql"
+    priority: "P0"
+
+  - component: "roles table"
+    expected: "supabase/migrations/002_create_roles_table.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      CRITICAL: No roles table exists.
+      Story requires: id, code (UNIQUE), name, description,
+      permissions (JSONB), is_system, display_order, created_at
+      Essential for ADR-012 permission system.
+    refactor_action: "Migration 055_create_roles_table.sql + 060_seed_system_data.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "modules table"
+    expected: "supabase/migrations/004_create_modules_tables.sql"
+    found: "NOT FOUND (hardcoded in apps/frontend/lib/config/modules.ts)"
+    status: "MISSING"
+    gap_description: |
+      No database table. Modules hardcoded in TypeScript config.
+      Story requires: id, code (UNIQUE), name, dependencies (TEXT[]),
+      can_disable, display_order
+    refactor_action: "Migration 056_create_modules_tables.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "organization_modules table"
+    expected: "Junction table with audit fields"
+    found: "PARTIAL - uses organizations.modules_enabled TEXT[] array"
+    status: "PARTIAL"
+    gap_description: |
+      Current implementation uses JSON array column `modules_enabled`
+      in organizations table. Story requires separate junction table with:
+      id, org_id, module_id, enabled, enabled_at, enabled_by
+    refactor_action: "Migration 056_create_modules_tables.sql + migrate data"
+    priority: "P1"
+
+  - component: "RLS policies"
+    expected: "ADR-013 pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+    found: "Uses auth.jwt() ->> 'org_id' (JWT claim)"
+    status: "WRONG_PATTERN"
+    gap_description: |
+      CRITICAL ARCHITECTURAL MISMATCH:
+      - Current: Uses JWT claim for org isolation
+      - Required: Users table lookup per ADR-013
+      This affects ALL tables with org_id column.
+    refactor_action: "Migration 058_update_rls_policies_adr013.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "seed data"
+    expected: "supabase/migrations/006_seed_system_data.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No seed migration for 10 system roles and 11 modules.
+      Modules exist only in TypeScript config.
+    refactor_action: "Migration 060_seed_system_data.sql"
+    priority: "P0"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "org-context-service.ts"
+    expected: "apps/frontend/lib/services/org-context-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No org context service. Current approach uses direct API calls
+      without service layer abstraction.
+      Required exports: getOrgContext(), getCurrentOrgId(), OrgContext interface
+    refactor_action: "Create new file per REFACTORING-PLAN.md Phase 2"
+    priority: "P0-BLOCKER"
+
+  - component: "permission-service.ts"
+    expected: "apps/frontend/lib/services/permission-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No permission service. Permission checks hardcoded in API routes
+      (checking userData.role !== 'admin' etc.)
+      Required exports: hasPermission(), requirePermission(), isAdmin()
+    refactor_action: "Create new file per REFACTORING-PLAN.md Phase 2"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# TYPE GAPS
+# =============================================================================
+type_gaps:
+  - component: "Organization interface"
+    expected: "apps/frontend/lib/types/organization.ts"
+    found: "NOT FOUND (validation schema exists but no TS interface)"
+    status: "MISSING"
+    gap_description: |
+      No TypeScript interface for Organization.
+      Validation exists in organization-schemas.ts but no proper types.
+    refactor_action: "Create lib/types/organization.ts"
+    priority: "P1"
+
+  - component: "User interface"
+    expected: "apps/frontend/lib/types/user.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No TypeScript interface for User entity."
+    refactor_action: "Create lib/types/user.ts"
+    priority: "P1"
+
+  - component: "Role interface"
+    expected: "apps/frontend/lib/types/user.ts (Role type)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No Role type definition."
+    refactor_action: "Create lib/types/role.ts"
+    priority: "P1"
+
+  - component: "OrgContext interface"
+    expected: "apps/frontend/lib/types/organization.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No OrgContext type for session resolution."
+    refactor_action: "Create in lib/types/organization.ts"
+    priority: "P1"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "GET /api/v1/settings/context"
+    expected: "New route returning OrgContext"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Story specifies /api/v1/settings/context endpoint.
+      Existing API structure uses /api/settings/* (no v1 prefix).
+      No unified context endpoint exists.
+    refactor_action: "Create apps/frontend/app/api/v1/settings/context/route.ts"
+    priority: "P0"
+
+  - component: "API response schema"
+    expected: "{ org_id, user_id, role_code, role_name, permissions, organization }"
+    found: "PARTIAL - scattered across multiple endpoints"
+    status: "PARTIAL"
+    gap_description: |
+      GET /api/settings/organization returns org data
+      GET /api/settings/modules returns module list
+      GET /api/settings/users returns user list
+      No unified context endpoint combining all.
+    refactor_action: "Create unified endpoint"
+    priority: "P0"
+
+# =============================================================================
+# HOOK GAPS
+# =============================================================================
+hook_gaps:
+  - component: "useOrgContext"
+    expected: "apps/frontend/lib/hooks/use-org-context.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No React Query hook for org context."
+    refactor_action: "Create hook after API endpoint exists"
+    priority: "P1"
+
+# =============================================================================
+# CRITICAL BLOCKERS (Must fix before story can be implemented)
+# =============================================================================
+critical_blockers:
+  - blocker: "RLS Pattern Mismatch"
+    description: "Current JWT claim pattern must be migrated to ADR-013 users lookup"
+    migration: "058_update_rls_policies_adr013.sql"
+    risk: "HIGH - data leak if misconfigured"
+
+  - blocker: "No Roles Table"
+    description: "Permission system cannot work without roles table"
+    migration: "055_create_roles_table.sql"
+    risk: "MEDIUM - blocks entire permission system"
+
+  - blocker: "No org-context-service"
+    description: "All Settings endpoints need this service"
+    file: "lib/services/org-context-service.ts"
+    risk: "MEDIUM - blocks API development"
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  phase_1_database:
+    - "054_rename_organization_columns.sql"
+    - "055_create_roles_table.sql"
+    - "056_create_modules_tables.sql"
+    - "057_migrate_users_role_to_role_id.sql"
+    - "058_update_rls_policies_adr013.sql"
+    - "060_seed_system_data.sql"
+
+  phase_2_services:
+    - "lib/services/org-context-service.ts"
+    - "lib/services/permission-service.ts"
+
+  phase_3_api:
+    - "app/api/v1/settings/context/route.ts"
+
+  phase_4_types:
+    - "lib/types/organization.ts"
+    - "lib/types/user.ts"
+    - "lib/types/role.ts"
+    - "lib/types/module.ts"
+
+  phase_5_hooks:
+    - "lib/hooks/use-org-context.ts"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] RLS blocks cross-tenant access (2-org test)"
+  - "[ ] All 10 roles seeded with correct JSONB permissions"
+  - "[ ] All 11 modules seeded with dependencies"
+  - "[ ] users.role_id FK works correctly"
+  - "[ ] GET /api/v1/settings/context returns full OrgContext"
+  - "[ ] organization_modules populated for existing orgs"
+  - "[ ] 404 (not 403) for cross-tenant resource access"

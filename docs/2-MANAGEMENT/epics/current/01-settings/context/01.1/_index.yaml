@@ -1,0 +1,78 @@
+# Story 01.1 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.1"
+  name: "Org Context + Base RLS"
+  slug: "org-context-base-rls"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 2
+  type: "backend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Types, services (minimal - backend story)
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required: []  # Root story - no dependencies
+  blocked_by: []
+  blocks:
+    - story: "01.2"
+      name: "Settings Shell Navigation"
+    - story: "01.6"
+      name: "Role Permissions"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+    - story: "01.12"
+      name: "Allergens Management"
+    - story: "01.13"
+      name: "Tax Codes CRUD"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-002"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections: ["Database Schema", "API Design", "Row Level Security (RLS) Policies"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.1.org-context-base-rls.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-011-module-toggle-storage.md"
+      relevance: "Module tables schema"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
+      relevance: "Roles table schema with JSONB permissions"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 6
+    description: "Database tables + RLS + seed data"
+  - type: "service"
+    count: 2
+    description: "org-context-service.ts, permission-service.ts"
+  - type: "api"
+    count: 1
+    description: "GET /api/v1/settings/context"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + RLS isolation tests"
+
+# Technical notes
+technical_notes:
+  - "Root story - ALL subsequent stories depend on this"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Return 404 (not 403) for cross-tenant access"
+  - "Seed data must be idempotent"

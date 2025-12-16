@@ -1,0 +1,68 @@
+# Story 01.4 - Database Schema
+# Purpose: Table columns used (no new tables/migrations)
+# Agent: BACKEND-DEV (database focus)
+
+# Note: This story uses existing columns from 01.1
+# No new migrations required
+no_new_migrations: true
+
+# Columns used from organizations table
+tables_used:
+  - name: "organizations"
+    columns_used:
+      - name: "name"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "Organization display name"
+        validation: "2-100 characters"
+
+      - name: "timezone"
+        type: "TEXT"
+        constraints: "NOT NULL DEFAULT 'UTC'"
+        description: "IANA timezone string"
+        validation: "Valid IANA timezone"
+        examples: ["Europe/Warsaw", "America/New_York", "UTC"]
+
+      - name: "locale"
+        type: "TEXT"
+        constraints: "NOT NULL DEFAULT 'en'"
+        description: "Language code"
+        validation: "One of: pl, en, de, fr"
+
+      - name: "currency"
+        type: "TEXT"
+        constraints: "NOT NULL DEFAULT 'PLN'"
+        description: "Currency code"
+        validation: "One of: PLN, EUR, USD, GBP"
+
+      - name: "onboarding_step"
+        type: "INTEGER"
+        constraints: "DEFAULT 0"
+        description: "Updated to 2 after step 1 completion"
+
+      - name: "onboarding_started_at"
+        type: "TIMESTAMPTZ"
+        description: "Set to NOW() on first step completion"
+
+    rls: true
+    note: "Uses RLS from 01.1 - only own org editable"
+
+# Query patterns
+query_patterns:
+  read_org_profile: |
+    SELECT name, timezone, locale, currency, onboarding_step
+    FROM organizations
+    WHERE id = (SELECT org_id FROM users WHERE id = auth.uid())
+
+  update_step_1: |
+    UPDATE organizations
+    SET
+      name = $1,
+      timezone = $2,
+      locale = $3,
+      currency = $4,
+      onboarding_step = 2,
+      onboarding_started_at = COALESCE(onboarding_started_at, NOW()),
+      updated_at = NOW()
+    WHERE id = (SELECT org_id FROM users WHERE id = auth.uid())
+    RETURNING *

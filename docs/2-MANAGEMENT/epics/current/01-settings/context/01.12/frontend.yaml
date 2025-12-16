@@ -1,0 +1,159 @@
+# Story 01.12 - Frontend Specification
+# Purpose: Components, hooks, types, icons, multi-language support
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/allergen.ts"
+    content: |
+      export interface Allergen {
+        id: string;
+        code: string;
+        name_en: string;
+        name_pl: string;
+        name_de: string | null;
+        name_fr: string | null;
+        icon_url: string | null;
+        icon_svg: string | null;
+        is_eu_mandatory: boolean;
+        is_custom: boolean;
+        is_active: boolean;
+        display_order: number;
+        created_at: string;
+        updated_at: string;
+      }
+
+      export interface AllergenSelectOption {
+        value: string;
+        label: string;
+        code: string;
+        icon_url: string | null;
+      }
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/allergens/page.tsx"
+    description: "Allergen list page with DataTable (read-only)"
+    components:
+      - "AllergensDataTable"
+      - "AllergenReadOnlyBanner"
+
+# Components
+components:
+  - path: "apps/frontend/components/settings/allergens/AllergensDataTable.tsx"
+    description: "DataTable with search (no sorting needed, only 14 items)"
+    pattern: "ShadCN DataTable (simple, no pagination)"
+    columns:
+      - "Code"
+      - "Icon"
+      - "Name (localized)"
+      - "Name EN"
+      - "Name PL"
+      - "Status"
+    features:
+      - "Search input (debounced 100ms)"
+      - "Multi-language tooltip on hover"
+      - "Read-only (no actions column)"
+
+  - path: "apps/frontend/components/settings/allergens/AllergenRow.tsx"
+    description: "Single allergen row with icon and multi-language names"
+    features:
+      - "Icon display (24x24)"
+      - "Multi-language tooltip on hover"
+      - "Click to view detail panel"
+
+  - path: "apps/frontend/components/settings/allergens/AllergenIcon.tsx"
+    description: "Icon component with fallback for missing icons"
+    sizes:
+      list: "24x24"
+      detail: "48x48"
+    fallback: "Warning triangle or generic allergen placeholder icon"
+
+  - path: "apps/frontend/components/settings/allergens/AllergenBadge.tsx"
+    description: "Code + name badge for use across modules (Technical, Shipping, Quality)"
+    usage: "Reusable component for displaying allergens in forms/lists"
+
+  - path: "apps/frontend/components/settings/allergens/AllergenDetailPanel.tsx"
+    description: "Detail view panel/modal showing all language translations"
+    pattern: "ShadCN Sheet or Dialog"
+    fields:
+      - "Code"
+      - "Icon (48x48)"
+      - "Name EN"
+      - "Name PL"
+      - "Name DE"
+      - "Name FR"
+      - "Status"
+
+  - path: "apps/frontend/components/settings/allergens/AllergenLanguageTooltip.tsx"
+    description: "Multi-language tooltip on row hover"
+    pattern: "ShadCN Tooltip"
+    content: "Shows all 4 translations: EN, PL, DE, FR"
+
+  - path: "apps/frontend/components/settings/allergens/AllergenReadOnlyBanner.tsx"
+    description: "Info banner about read-only system-managed allergens"
+    pattern: "ShadCN Alert"
+    message: "'EU-mandated allergens are system-managed. Contact support for custom allergen requests.'"
+
+# Assets
+assets:
+  - path: "public/icons/allergens/"
+    description: "14 SVG allergen icons (24x24 viewbox)"
+    files:
+      - "gluten.svg"
+      - "crustaceans.svg"
+      - "eggs.svg"
+      - "fish.svg"
+      - "peanuts.svg"
+      - "soybeans.svg"
+      - "milk.svg"
+      - "nuts.svg"
+      - "celery.svg"
+      - "mustard.svg"
+      - "sesame.svg"
+      - "sulphites.svg"
+      - "lupin.svg"
+      - "molluscs.svg"
+    specifications:
+      - "24x24 viewbox"
+      - "Use currentColor for theming"
+      - "Include <title> element for accessibility"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-allergens.ts"
+    description: "React Query hook for allergens list"
+    exports:
+      - name: "useAllergens"
+        returns: "UseQueryResult<Allergen[]>"
+
+# UX
+ux:
+  wireframes:
+    - id: "SET-TBD"
+      description: "Allergen List page (pending wireframe)"
+      components:
+        - "DataTable with Code, Icon, Name (localized), Name EN, Name PL columns"
+        - "Search input (searches code and all language name fields)"
+        - "Read-only info banner"
+        - "Allergen detail panel/modal on row click"
+
+  states:
+    loading: "Skeleton rows (3) with shimmer animation"
+    empty: "Never empty - 14 allergens always seeded"
+    error: "'Failed to load allergens' warning with Retry button"
+    success: "Table with 14 allergens"
+
+  patterns:
+    table: "ShadCN DataTable (simple, no pagination)"
+    panel: "ShadCN Sheet or Dialog for detail view"
+    search: "Debounced search input (100ms)"
+    tooltip: "ShadCN Tooltip for multi-language hover"
+    badge: "ShadCN Badge for allergen code"
+    banner: "ShadCN Alert for read-only info"
+
+# Multi-Language Support
+language_display:
+  primary: "Based on user language preference (default EN)"
+  hover: "Tooltip shows all 4 translations"
+  columns: "Always show Code, Name (localized), Name EN, Name PL"

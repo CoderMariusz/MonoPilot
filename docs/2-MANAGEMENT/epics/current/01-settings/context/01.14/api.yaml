@@ -1,0 +1,232 @@
+# Story 01.14 - API Specification
+# Purpose: Step endpoints, template endpoints
+# Agent: BACKEND-DEV (API focus)
+
+base_path: "/api/v1/settings/onboarding"
+
+# Step Endpoints
+endpoints:
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/2"
+    description: "Save warehouse (Step 2)"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      type: "Step2Request"
+      schema:
+        code: "string (default 'WH-MAIN')"
+        name: "string (required)"
+        type: "WarehouseType (default 'GENERAL')"
+        skip: "boolean (optional)"
+
+    response:
+      status: 200
+      type: "Step2Response"
+      schema:
+        success: true
+        next_step: 3
+        warehouse: { id: "uuid", code: "string", name: "string" }
+
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/3"
+    description: "Save locations (Step 3)"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      type: "Step3Request"
+      schema:
+        template: "'simple' | 'basic' | 'full' | 'custom'"
+        custom_locations: "CreateLocationInput[] (if custom)"
+        skip: "boolean"
+
+    response:
+      status: 200
+      type: "Step3Response"
+      schema:
+        success: true
+        next_step: 4
+        locations: "{ id, code, name }[]"
+        count: "number"
+
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/4"
+    description: "Save product (Step 4)"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      type: "Step4Request"
+      schema:
+        sku: "string"
+        name: "string"
+        product_type: "'finished_good' | 'raw_material' | 'wip'"
+        uom: "string"
+        shelf_life_days: "number | null"
+        storage_temp: "'ambient' | 'chilled' | 'frozen'"
+        skip: "boolean"
+
+    response:
+      status: 200
+      type: "Step4Response"
+      schema:
+        success: true
+        next_step: 5
+        product: "{ id, sku, name } | undefined"
+        skipped: "boolean"
+
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/5"
+    description: "Save work order (Step 5 - optional)"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      type: "Step5Request"
+      schema:
+        product_id: "string (uuid)"
+        quantity: "number (default 100)"
+        due_date: "string (ISO date)"
+        skip: "boolean"
+
+    response:
+      status: 200
+      type: "Step5Response"
+      schema:
+        success: true
+        next_step: 6
+        work_order: "{ id, code, status } | undefined"
+        skipped: "boolean"
+
+  - method: "POST"
+    path: "/api/v1/settings/onboarding/step/6"
+    description: "Complete wizard (Step 6)"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "Step6Response"
+      schema:
+        success: true
+        completed: true
+        summary:
+          organization: { name: "string" }
+          warehouse: "{ code, name } | null"
+          locations: "{ count, template } | null"
+          product: "{ sku, name } | null"
+          work_order: "{ code, status } | null"
+          duration_seconds: "number"
+          badge: "'speed_champion' | undefined"
+
+# Template Endpoints
+  - method: "GET"
+    path: "/api/v1/settings/onboarding/templates/locations"
+    description: "Get location templates"
+    auth: "required"
+
+    response:
+      status: 200
+      type: "LocationTemplate[]"
+      schema:
+        - id: "'simple' | 'basic' | 'full'"
+          name: "string"
+          description: "string"
+          locations: "TemplateLocation[]"
+
+  - method: "GET"
+    path: "/api/v1/settings/onboarding/templates/products"
+    description: "Get product templates by industry"
+    auth: "required"
+
+    response:
+      status: 200
+      type: "IndustryConfig[]"
+      schema:
+        - id: "'bakery' | 'dairy' | 'meat' | 'beverages' | 'snacks' | 'other'"
+          name: "string"
+          icon: "string"
+          templates: "ProductTemplate[]"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/wizard-service.ts"
+    description: "Wizard business logic"
+    exports:
+      - name: "saveStep2Warehouse"
+        params: ["data: Step2Request"]
+        returns: "Promise<Step2Response>"
+
+      - name: "saveStep3Locations"
+        params: ["data: Step3Request"]
+        returns: "Promise<Step3Response>"
+
+      - name: "saveStep4Product"
+        params: ["data: Step4Request"]
+        returns: "Promise<Step4Response>"
+
+      - name: "saveStep5WorkOrder"
+        params: ["data: Step5Request"]
+        returns: "Promise<Step5Response>"
+
+      - name: "completeWizard"
+        returns: "Promise<Step6Response>"
+
+      - name: "getProgress"
+        returns: "Promise<WizardProgress>"
+
+      - name: "updateProgress"
+        params: ["step: number", "data: Record<string, unknown>"]
+        returns: "Promise<void>"
+
+      - name: "getSummary"
+        returns: "Promise<WizardSummary>"
+
+      - name: "calculateDuration"
+        returns: "Promise<number>"
+        description: "Seconds since onboarding_started_at"
+
+      - name: "awardBadge"
+        params: ["badge: string"]
+        returns: "Promise<void>"
+
+      - name: "checkSpeedChampion"
+        returns: "Promise<boolean>"
+        description: "True if duration < 900 seconds (15 min)"
+
+# Validation Schemas
+validation:
+  - path: "lib/validation/wizard-steps.ts"
+    schemas:
+      - name: "wizardStep2Schema"
+        fields:
+          - "code: z.string().min(2).max(20).regex(/^[A-Z0-9-]+$/).default('WH-MAIN')"
+          - "name: z.string().min(2).max(100)"
+          - "type: z.enum(['GENERAL', 'RAW_MATERIALS', 'WIP', 'FINISHED_GOODS', 'QUARANTINE']).default('GENERAL')"
+          - "skip: z.boolean().optional()"
+
+      - name: "wizardStep3Schema"
+        fields:
+          - "template: z.enum(['simple', 'basic', 'full', 'custom']).optional()"
+          - "custom_locations: z.array(...).optional()"
+          - "skip: z.boolean().optional()"
+        refinements:
+          - "Custom template requires at least one location"
+
+      - name: "wizardStep4Schema"
+        fields:
+          - "sku: z.string().min(1).max(50).regex(/^[A-Z0-9-]+$/).transform(toUpperCase)"
+          - "name: z.string().min(2).max(255)"
+          - "product_type: z.enum(['finished_good', 'raw_material', 'wip']).default('finished_good')"
+          - "uom: z.string().min(1).max(10).default('EA')"
+          - "shelf_life_days: z.number().int().positive().nullable().optional()"
+          - "storage_temp: z.enum(['ambient', 'chilled', 'frozen']).default('ambient')"
+          - "skip: z.boolean().optional()"
+
+      - name: "wizardStep5Schema"
+        fields:
+          - "product_id: z.string().uuid().optional()"
+          - "quantity: z.number().int().positive().default(100)"
+          - "due_date: z.string().datetime().optional()"
+          - "skip: z.boolean().optional()"

@@ -1,0 +1,134 @@
+# Story 01.11 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built
+
+gap_summary:
+  overall_readiness: "0%"
+  critical_blockers: 3
+  components_done: 0
+  components_partial: 0
+  components_missing: 24
+
+# Database Gaps
+database_gaps:
+  - component: "production_lines table"
+    expected: "Table with code, warehouse_id, status"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0-BLOCKER"
+
+  - component: "production_line_machines junction table"
+    expected: "Table with sequence_order column"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0-BLOCKER"
+
+  - component: "production_line_products junction table"
+    expected: "Table for product compatibility"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0-BLOCKER"
+
+  - component: "RLS policies for production lines"
+    expected: "6 policies across 3 tables"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0-BLOCKER"
+
+# API Gaps
+api_gaps:
+  - component: "GET /api/v1/settings/production-lines"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "POST /api/v1/settings/production-lines"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "PATCH /api/v1/settings/production-lines/:id/machines/reorder"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "GET /api/v1/settings/production-lines/validate-code"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+# Service Gaps
+service_gaps:
+  - component: "production-line-service.ts"
+    expected: "Service with capacity calculation logic"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+# Frontend Gaps
+frontend_gaps:
+  - component: "ProductionLineDataTable.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "MachineSequenceEditor.tsx (drag-drop)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+    notes: "Requires dnd-kit library installation"
+
+  - component: "ProductCompatibilityEditor.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P0"
+
+  - component: "CapacityCalculatorDisplay.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    priority: "P1"
+
+# External Dependencies
+external_dependencies:
+  - library: "dnd-kit"
+    purpose: "Drag-and-drop machine sequencing"
+    version: "latest"
+    installation: "pnpm add @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities"
+    status: "NOT INSTALLED"
+    priority: "P0"
+
+# Implementation Order
+implementation_order:
+  phase_1_database:
+    - "Create migration for production_lines, production_line_machines, production_line_products"
+    - "Add RLS policies for all 3 tables"
+
+  phase_2_external_deps:
+    - "Install dnd-kit library"
+
+  phase_3_validation:
+    - "lib/validation/production-line-schema.ts"
+
+  phase_4_services:
+    - "lib/services/production-line-service.ts (with capacity calculation)"
+
+  phase_5_api:
+    - "app/api/v1/settings/production-lines/route.ts"
+    - "app/api/v1/settings/production-lines/[id]/route.ts"
+    - "app/api/v1/settings/production-lines/[id]/machines/reorder/route.ts"
+    - "app/api/v1/settings/production-lines/validate-code/route.ts"
+
+  phase_6_components:
+    - "MachineSequenceEditor.tsx (drag-drop)"
+    - "ProductCompatibilityEditor.tsx"
+    - "CapacityCalculatorDisplay.tsx"
+    - "ProductionLineModal.tsx"
+    - "ProductionLineDataTable.tsx"
+
+  phase_7_pages:
+    - "app/(authenticated)/settings/production-lines/page.tsx"
+
+  phase_8_tests:
+    - "Unit tests (capacity calculation, sequence renumber)"
+    - "Integration tests (API routes, RLS)"
+    - "E2E tests (drag-drop, product search)"

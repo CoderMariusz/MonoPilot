@@ -1,0 +1,266 @@
+# Story Context File: 01.2 Settings Shell: Navigation + Role Guards
+# Generated: 2025-12-16
+# Purpose: Provide AI agent with all context needed to implement this story
+
+story:
+  id: "01.2"
+  name: "Settings Shell: Navigation + Role Guards"
+  epic: "01-settings"
+  phase: "1A"
+  type: "frontend"
+  complexity: "S"
+  estimate_days: 2
+  state: "ready"
+
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table"
+        - "roles table"
+        - "organization_modules table"
+        - "getOrgContext() helper"
+        - "RLS policies for org isolation"
+        - "GET /api/v1/settings/context endpoint"
+  optional: []
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/settings.md"
+  prd_sections:
+    - "FR-SET-030"  # Module-level permissions
+    - "FR-SET-031"  # CRUD-level permissions
+  architecture: "docs/1-BASELINE/architecture/modules/settings.md"
+  architecture_sections:
+    - "Component Architecture"
+    - "API Design"
+    - "Security - Role Requirements"
+  story: "docs/2-MANAGEMENT/epics/current/01-settings/01.2.settings-shell-navigation.md"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
+    - "docs/1-BASELINE/architecture/decisions/ADR-011-module-toggle-storage.md"
+  patterns:
+    - "apps/frontend/app/(authenticated)/layout.tsx"  # Existing auth layout pattern
+    - "apps/frontend/lib/hooks/"  # Existing hooks pattern
+
+files_to_create:
+  pages:
+    - path: "apps/frontend/app/(authenticated)/settings/page.tsx"
+      description: "Settings landing/dashboard page"
+    - path: "apps/frontend/app/(authenticated)/settings/layout.tsx"
+      description: "Settings module layout with navigation sidebar"
+  components:
+    - path: "apps/frontend/components/settings/SettingsLayout.tsx"
+      description: "Settings shell layout component with consistent styling"
+    - path: "apps/frontend/components/settings/SettingsNav.tsx"
+      description: "Navigation sidebar with section groupings"
+    - path: "apps/frontend/components/settings/SettingsNavItem.tsx"
+      description: "Individual navigation item with role/permission handling"
+    - path: "apps/frontend/components/settings/SettingsEmptyState.tsx"
+      description: "Coming soon state for unimplemented routes"
+  hooks:
+    - path: "apps/frontend/lib/hooks/useSettingsGuard.ts"
+      description: "Reusable guard hook for role checks"
+    - path: "apps/frontend/lib/hooks/useSettingsPermissions.ts"
+      description: "Hook to get user's settings permissions"
+  services:
+    - path: "apps/frontend/lib/services/settings-navigation-service.ts"
+      description: "Service to build navigation based on permissions/modules"
+
+api_endpoints:
+  consumed:
+    - method: "GET"
+      path: "/api/v1/settings/context"
+      description: "Get org context, user role, and permissions"
+      auth: true
+      response:
+        org_id: "uuid"
+        user_id: "uuid"
+        role: "string"
+        permissions: "object"
+    - method: "GET"
+      path: "/api/settings/modules"
+      description: "Get enabled modules for navigation filtering"
+      auth: true
+
+ux:
+  wireframes: []  # No specific wireframe for shell, it hosts other wireframes
+  navigation_sections:
+    - section: "Organization"
+      items:
+        - name: "Organization Profile"
+          path: "/settings/organization"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: "SET-007"
+        - name: "Localization"
+          path: "/settings/localization"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: null  # Future
+    - section: "Users & Roles"
+      items:
+        - name: "Users"
+          path: "/settings/users"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: "SET-008"
+        - name: "Roles & Permissions"
+          path: "/settings/roles"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: "SET-011"
+        - name: "Invitations"
+          path: "/settings/invitations"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: "SET-010"
+    - section: "Infrastructure"
+      items:
+        - name: "Warehouses"
+          path: "/settings/warehouses"
+          roles: ["SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER"]
+          wireframe: "SET-012"
+        - name: "Machines"
+          path: "/settings/machines"
+          roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+          wireframe: "SET-016"
+        - name: "Production Lines"
+          path: "/settings/production-lines"
+          roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+          wireframe: "SET-018"
+    - section: "Master Data"
+      items:
+        - name: "Allergens"
+          path: "/settings/allergens"
+          roles: ["SUPER_ADMIN", "ADMIN", "QUALITY_MANAGER"]
+          wireframe: "SET-020"
+        - name: "Tax Codes"
+          path: "/settings/tax-codes"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: "SET-021"
+    - section: "Integrations"
+      items:
+        - name: "API Keys"
+          path: "/settings/api-keys"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: "SET-023"
+        - name: "Webhooks"
+          path: "/settings/webhooks"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: "SET-024"
+    - section: "System"
+      items:
+        - name: "Modules"
+          path: "/settings/modules"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: "SET-022"
+        - name: "Security"
+          path: "/settings/security"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: "SET-026"
+        - name: "Audit Logs"
+          path: "/settings/audit-logs"
+          roles: ["SUPER_ADMIN", "ADMIN"]
+          wireframe: "SET-025"
+  patterns:
+    layout: "ShadCN sidebar layout with collapsible sections"
+    navigation: "Vertical sidebar with icons and section headers"
+    guard: "Client-side redirect with loading state, server-side API protection"
+  states:
+    - name: "loading"
+      description: "Skeleton loader while permissions load"
+    - name: "error"
+      description: "Error state with retry button"
+    - name: "empty"
+      description: "'Coming soon' for unimplemented routes"
+    - name: "success"
+      description: "Normal content display"
+  behavior:
+    - "Navigation items hidden for users without permission"
+    - "Disabled modules hide their related navigation items"
+    - "Clicking unimplemented route shows 'Coming Soon' state"
+    - "Role change reflects immediately on navigation"
+
+validation_rules:
+  route_access: "User must have role with module permission"
+  admin_routes: "SUPER_ADMIN or ADMIN role required for org/user management"
+  redirect_on_denied: "Redirect to dashboard with toast message"
+
+patterns:
+  route_guard: |
+    // useSettingsGuard hook pattern
+    export function useSettingsGuard(requiredRole?: Role | Role[]) {
+      const { data: context, isLoading } = useSettingsContext();
+
+      const allowed = useMemo(() => {
+        if (!context) return false;
+        if (!requiredRole) return true;
+        const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+        return roles.includes(context.role);
+      }, [context, requiredRole]);
+
+      return { allowed, loading: isLoading, role: context?.role };
+    }
+  layout_pattern: |
+    // Settings layout pattern
+    export default function SettingsLayout({ children }: { children: React.ReactNode }) {
+      return (
+        <div className="flex h-full">
+          <SettingsNav />
+          <main className="flex-1 overflow-auto">
+            {children}
+          </main>
+        </div>
+      );
+    }
+  navigation_item: |
+    // Navigation item with permission check
+    interface NavItem {
+      name: string;
+      path: string;
+      icon: LucideIcon;
+      roles: Role[];
+      implemented: boolean;
+    }
+
+acceptance_checklist:
+  - "GIVEN user navigates to /settings, WHEN user has Admin role, THEN all settings sections are visible in navigation"
+  - "GIVEN user has Viewer role, WHEN accessing /settings/users, THEN redirect to dashboard with 'insufficient permissions' toast"
+  - "GIVEN an authenticated user, WHEN they open Settings, THEN a Settings landing page loads with navigation items for implemented pages"
+  - "GIVEN a non-admin user, WHEN they navigate to an admin-only Settings route, THEN they are blocked (redirect or 'no access' message)"
+  - "GIVEN a navigation item points to an unimplemented route, WHEN clicked, THEN a clear 'coming soon' state is shown (or link is visually disabled)"
+  - "GIVEN module toggles exist (later), WHEN toggles are disabled, THEN navigation can hide/disable related sections without breaking routing"
+
+definition_of_done:
+  - "Settings shell exists and can host later pages without refactor"
+  - "Protected routes are enforced in UI and backed by server-side checks"
+  - "Navigation renders correctly for different role types"
+  - "Loading, error, and empty states are implemented"
+  - "Tests pass for guard logic and redirect behavior"
+  - "Unit test coverage >= 80%"
+  - "Settings page loads within 300ms (performance target)"
+
+output_artifacts:
+  - "Settings layout component (SettingsLayout.tsx)"
+  - "Settings navigation sidebar component (SettingsNav.tsx)"
+  - "Reusable guard utility for Settings pages (useSettingsGuard hook)"
+  - "Minimal tests for navigation + access enforcement"
+
+testing:
+  unit:
+    - "useSettingsGuard hook - returns allowed:true for admin roles"
+    - "useSettingsGuard hook - returns allowed:false for viewer role"
+    - "SettingsNav - renders correct sections for admin"
+    - "SettingsNav - hides restricted sections for non-admin"
+    - "Navigation item - shows disabled state for unimplemented routes"
+  integration:
+    - "Protected route redirect behavior for unauthorized users"
+    - "Navigation updates when role changes"
+    - "Module toggle hides related navigation items"
+  e2e:
+    - "Admin can access all settings sections"
+    - "Viewer redirected from /settings/users"
+
+technical_notes:
+  - "Use React Query for permissions caching"
+  - "Implement as Next.js route group: app/(authenticated)/settings/"
+  - "Navigation should support future module toggle integration"
+  - "Consider mobile responsiveness (collapsible sidebar)"
+  - "Use ShadCN Sheet component for mobile navigation"

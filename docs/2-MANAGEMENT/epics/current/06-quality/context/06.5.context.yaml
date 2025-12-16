@@ -1,0 +1,299 @@
+story:
+  id: "06.5"
+  name: "Sampling Plans (AQL-Based Configuration)"
+  epic: "06-quality"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3
+  priority: "P0"
+  prd_reference: "FR-QA-008"
+
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "users", "RLS foundation"]
+    - story: "02.1"
+      provides: ["products", "product_id FK"]
+  optional: []
+  deferred: []
+
+files_to_read:
+  prd: "/docs/1-BASELINE/product/modules/quality.md"
+  prd_sections:
+    - "Section 12: Sampling Plans (AQL-Based)"
+    - "Section 12.1: Sampling Methods"
+    - "Section 12.2: Sample Size Table"
+  architecture: "/docs/1-BASELINE/architecture/modules/quality.md"
+  architecture_sections:
+    - "Sampling Tables"
+    - "Database Schema"
+  story: "/docs/2-MANAGEMENT/epics/current/06-quality/SAMPLING-PLANS-ANALYZER.md"
+  patterns:
+    - "/docs/1-BASELINE/architecture/PATTERNS.md"
+    - "/docs/.claude/PATTERNS.md"
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/XXXXXXX_create_sampling_plans.sql"
+      type: "migration"
+      description: "Create sampling_plans + sampling_records tables"
+    - path: "supabase/migrations/XXXXXXX_create_sampling_indices.sql"
+      type: "migration"
+      description: "Create performance indices for sampling queries"
+  api:
+    - path: "apps/frontend/app/api/quality/sampling-plans/route.ts"
+      methods: ["GET", "POST"]
+      auth: true
+      roles: ["QA Manager"]
+    - path: "apps/frontend/app/api/quality/sampling-plans/[id]/route.ts"
+      methods: ["GET", "PUT", "DELETE"]
+      auth: true
+      roles: ["QA Manager"]
+    - path: "apps/frontend/app/api/quality/sampling-plans/bulk-load/route.ts"
+      methods: ["POST"]
+      auth: true
+      roles: ["QA Manager"]
+      description: "Load ISO 2859 standard tables"
+    - path: "apps/frontend/app/api/quality/sampling-records/route.ts"
+      methods: ["GET", "POST"]
+      auth: true
+      roles: ["QA Inspector", "QA Manager"]
+  services:
+    - path: "apps/frontend/lib/services/sampling-service.ts"
+      description: "CRUD + selection algorithm"
+  validation:
+    - path: "apps/frontend/lib/validation/sampling.ts"
+      description: "Zod schemas for plans and records"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/page.tsx"
+      description: "Sampling plans list"
+    - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/new/page.tsx"
+      description: "Create sampling plan"
+    - path: "apps/frontend/app/(authenticated)/quality/sampling-plans/[id]/edit/page.tsx"
+      description: "Edit sampling plan"
+  components:
+    - path: "apps/frontend/components/quality/SamplingPlanForm.tsx"
+    - path: "apps/frontend/components/quality/SamplingPlanTable.tsx"
+    - path: "apps/frontend/components/quality/SamplingPlanBulkLoader.tsx"
+    - path: "apps/frontend/components/quality/SamplingRecordModal.tsx"
+
+database:
+  tables:
+    - name: "sampling_plans"
+      columns:
+        - "id (UUID, PK)"
+        - "org_id (UUID, FK → organizations, NOT NULL)"
+        - "name (TEXT, NOT NULL)"
+        - "inspection_type (TEXT, NOT NULL: 'incoming'|'in_process'|'final')"
+        - "product_id (UUID, FK → products, NULLABLE - optional filter)"
+        - "aql_level (TEXT, NULLABLE: '0.65'|'1.0'|'1.5'|'2.5'|'4.0')"
+        - "inspection_level (TEXT, NOT NULL: 'I'|'II'|'III')"
+        - "special_level (TEXT, NULLABLE: 'S-1'|'S-2'|'S-3'|'S-4')"
+        - "lot_size_min (INTEGER, NOT NULL)"
+        - "lot_size_max (INTEGER, NOT NULL, > lot_size_min)"
+        - "sample_size (INTEGER, NOT NULL, ≤ lot_size_max)"
+        - "acceptance_number (INTEGER, NOT NULL, ≥ 0)"
+        - "rejection_number (INTEGER, NOT NULL, > acceptance_number)"
+        - "is_active (BOOLEAN, DEFAULT true)"
+        - "created_at (TIMESTAMPTZ, DEFAULT now())"
+        - "created_by (UUID, FK → users, NULLABLE)"
+      rls: true
+      indexes:
+        - "idx_sampling_plans_org_type: (org_id, inspection_type)"
+        - "idx_sampling_plans_lot_size: (lot_size_min, lot_size_max, org_id)"
+        - "idx_sampling_plans_product: (product_id) WHERE is_active = true"
+      constraints:
+        - "UNIQUE(org_id, inspection_type, lot_size_min, lot_size_max)"
+        - "CHECK(lot_size_max >= lot_size_min)"
+        - "CHECK(sample_size <= lot_size_max)"
+        - "CHECK(rejection_number > acceptance_number)"
+
+    - name: "sampling_records"
+      columns:
+        - "id (UUID, PK)"
+        - "org_id (UUID, FK → organizations, NOT NULL)"
+        - "plan_id (UUID, FK → sampling_plans, NOT NULL)"
+        - "inspection_id (UUID, FK → quality_inspections, NULLABLE)"
+        - "sample_identifier (TEXT, NOT NULL)"
+        - "location_description (TEXT)"
+        - "sampled_by (UUID, FK → users, NOT NULL)"
+        - "sampled_at (TIMESTAMPTZ, DEFAULT now())"
+        - "notes (TEXT, NULLABLE)"
+        - "created_at (TIMESTAMPTZ, DEFAULT now())"
+      rls: true
+      indexes:
+        - "idx_sampling_records_org: (org_id)"
+        - "idx_sampling_records_plan: (plan_id)"
+        - "idx_sampling_records_inspection: (inspection_id)"
+        - "idx_sampling_records_sampler: (sampled_by)"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/quality/sampling-plans"
+    auth: true
+    roles: ["QA Inspector", "QA Manager"]
+    description: "List sampling plans (filtered by org_id, optional type/product filters)"
+    query_params:
+      - "inspection_type: optional ('incoming'|'in_process'|'final')"
+      - "product_id: optional (UUID)"
+      - "is_active: optional (boolean)"
+      - "page: integer, default 1"
+      - "limit: integer, default 20"
+
+  - method: "POST"
+    path: "/api/quality/sampling-plans"
+    auth: true
+    roles: ["QA Manager"]
+    description: "Create sampling plan"
+    request_body:
+      - "name: string (required)"
+      - "inspection_type: enum (required)"
+      - "product_id: UUID (optional)"
+      - "aql_level: enum (optional)"
+      - "inspection_level: enum (required)"
+      - "special_level: enum (optional)"
+      - "lot_size_min: number (required)"
+      - "lot_size_max: number (required)"
+      - "sample_size: number (required)"
+      - "acceptance_number: number (required)"
+      - "rejection_number: number (required)"
+
+  - method: "GET"
+    path: "/api/quality/sampling-plans/:id"
+    auth: true
+    roles: ["QA Inspector", "QA Manager"]
+    description: "Get sampling plan detail"
+
+  - method: "PUT"
+    path: "/api/quality/sampling-plans/:id"
+    auth: true
+    roles: ["QA Manager"]
+    description: "Update sampling plan"
+
+  - method: "POST"
+    path: "/api/quality/sampling-plans/bulk-load"
+    auth: true
+    roles: ["QA Manager"]
+    description: "Load ISO 2859 standard tables (14+ plan ranges)"
+    request_body:
+      - "inspection_type: enum (required)"
+      - "aql_level: enum (required)"
+      - "inspection_level: enum (required)"
+
+  - method: "POST"
+    path: "/api/quality/sampling-records"
+    auth: true
+    roles: ["QA Inspector", "QA Manager"]
+    description: "Create sampling record (track sampled unit)"
+    request_body:
+      - "plan_id: UUID (required)"
+      - "inspection_id: UUID (required)"
+      - "sample_identifier: string (required)"
+      - "location_description: string (required)"
+      - "sampled_by: UUID (required)"
+      - "notes: string (optional)"
+
+  - method: "GET"
+    path: "/api/quality/sampling-records/:id"
+    auth: true
+    roles: ["QA Inspector", "QA Manager"]
+    description: "Get sampling record"
+
+ux:
+  wireframes:
+    - id: "SAMP-001"
+      path: "/docs/2-MANAGEMENT/epics/current/06-quality/SAMPLING-PLANS-ANALYZER.md#section-68-wireframes"
+      name: "Create Sampling Plan Form"
+      components:
+        - "SamplingPlanForm"
+        - "AQL Level Selector"
+        - "Inspection Level Selector"
+        - "Lot Size Range Input"
+    - id: "SAMP-002"
+      path: "/docs/2-MANAGEMENT/epics/current/06-quality/SAMPLING-PLANS-ANALYZER.md#section-68-wireframes"
+      name: "Sampling Plans List"
+      components:
+        - "SamplingPlanTable"
+        - "Filter Controls"
+        - "Edit/Delete Actions"
+    - id: "SAMP-003"
+      path: "/docs/2-MANAGEMENT/epics/current/06-quality/SAMPLING-PLANS-ANALYZER.md#section-68-wireframes"
+      name: "Bulk Load ISO 2859 Dialog"
+      components:
+        - "SamplingPlanBulkLoader"
+        - "Configuration Selectors"
+        - "Preview of Ranges"
+  patterns:
+    table: "ShadCN DataTable with sorting, filtering"
+    form: "React Hook Form + Zod validation"
+    modal: "ShadCN Dialog for bulk load"
+    dropdown: "ShadCN Select for AQL/levels"
+  states:
+    - "empty: No sampling plans configured"
+    - "loading: Fetching plans or records"
+    - "error: API error or validation error"
+    - "success: Plan created/updated"
+    - "bulk_loading: Batch loading ISO 2859 tables"
+
+validation_rules:
+  lot_size_min: "Positive integer, minimum 2"
+  lot_size_max: "Positive integer, > lot_size_min"
+  sample_size: "Positive integer, ≤ lot_size_max"
+  acceptance_number: "Non-negative integer"
+  rejection_number: "Positive integer, > acceptance_number"
+  aql_level: "Enum: '0.65', '1.0', '1.5', '2.5', '4.0'"
+  inspection_level: "Enum: 'I', 'II', 'III'"
+  special_level: "Enum: 'S-1', 'S-2', 'S-3', 'S-4' (optional)"
+  sample_identifier: "Non-empty string, unique per org/day"
+  location_description: "Required, describe physical location"
+
+patterns:
+  rls: "ADR-001 (all tables filtered by org_id)"
+  api: "REST with org_id implicit filter"
+  service: "Static methods, Supabase client injected"
+  validation: "Zod schemas with custom error messages"
+  caching: "Redis key: org:{orgId}:sampling-plans:{inspectionType}, TTL 24h"
+
+acceptance_checklist:
+  - "sampling_plans table created with all required fields"
+  - "sampling_records table created for audit trail"
+  - "RLS policies enforce org_id isolation"
+  - "All API endpoints working (GET/POST/PUT)"
+  - "Bulk load endpoint creates 14 ISO 2859 plan ranges in <5s"
+  - "Sample size selection algorithm works for 15+ lot sizes"
+  - "Unit tests: 80%+ coverage for service layer"
+  - "Integration tests: Create plan → Select by lot size → Verify Ac/Re"
+  - "E2E test: QA Manager creates plan → View in UI → List shows plan"
+  - "Mobile responsive: All forms work on tablet/mobile"
+  - "Form validation: All fields validated client-side"
+  - "Error handling: Graceful fallbacks (5% sample if no plan)"
+  - "Audit trail: Plan creation/updates logged in quality_audit_log"
+  - "Documentation: Sampling method comparison, ISO 2859 reference"
+
+output_artifacts:
+  - "sampling_plans table migration"
+  - "sampling_records table migration"
+  - "RLS policies migration"
+  - "API endpoints (4 routes)"
+  - "Service layer: sampling-service.ts"
+  - "Validation schemas: sampling.ts"
+  - "UI components: Form, Table, BulkLoader, RecordModal"
+  - "Pages: List, Create, Edit"
+  - "Unit tests (50%+ coverage)"
+  - "Integration tests (API + Service)"
+  - "E2E tests (user workflows)"
+  - "README: Sampling plan configuration guide"
+  - "Sampling Methods comparison document"
+
+notes:
+  - "Sampling plans are INDEPENDENT of inspections - Phase 1A feature"
+  - "NO blocking dependencies - only requires Epic 01.1 + 02.1"
+  - "AQL tables pre-built as constants for quick setup"
+  - "Sampling records link to inspections in Phase 1B"
+  - "Support for Product-specific plans (priority) vs Global plans (fallback)"
+  - "Inspection level switching logic (normal→tightened) deferred to Phase 2"
+  - "Query performance critical: Index on lot_size ranges, cache results"
+  - "Multi-method support: AQL (required), Random (optional), Systematic (optional)"
+
+git_branch: "feature/quality-sampling-plans-06-5"
+git_commit_message: "feat(quality): Story 06.5 - Sampling Plans AQL Configuration"

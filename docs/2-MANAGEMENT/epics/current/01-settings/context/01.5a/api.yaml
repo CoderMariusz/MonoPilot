@@ -1,0 +1,454 @@
+# Story 01.5a - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/users"
+    description: "Get paginated list of users with search/filter"
+    file: "apps/frontend/app/api/v1/settings/users/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "VIEWER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        page: "number (default: 1)"
+        limit: "number (default: 25, max: 100)"
+        search: "string (search by name or email)"
+        role: "string (filter by role_code)"
+        status: "string (active/inactive)"
+        sortBy: "string (default: created_at)"
+        sortOrder: "string (asc/desc, default: desc)"
+
+    response:
+      status: 200
+      type: "UsersListResponse"
+      schema:
+        users: "User[]"
+        total: "number"
+        page: "number"
+        limit: "number"
+      example: |
+        {
+          "users": [
+            {
+              "id": "uuid",
+              "org_id": "uuid",
+              "email": "john@company.com",
+              "first_name": "John",
+              "last_name": "Doe",
+              "role_id": "uuid",
+              "role": {
+                "id": "uuid",
+                "code": "ADMIN",
+                "name": "Administrator"
+              },
+              "language": "en",
+              "is_active": true,
+              "last_login_at": "2025-12-16T10:00:00Z",
+              "created_at": "2025-12-01T10:00:00Z",
+              "updated_at": "2025-12-16T10:00:00Z"
+            }
+          ],
+          "total": 42,
+          "page": 1,
+          "limit": 25
+        }
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks permission to view users"
+
+  - method: "POST"
+    path: "/api/v1/settings/users"
+    description: "Create new user with role assignment"
+    file: "apps/frontend/app/api/v1/settings/users/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        email: "string (required, email format)"
+        first_name: "string (required, 1-100 chars)"
+        last_name: "string (required, 1-100 chars)"
+        role_id: "UUID (required, must be valid system role)"
+        language: "string (optional, pl/en/de/fr, default: en)"
+      example: |
+        {
+          "email": "new@company.com",
+          "first_name": "Jane",
+          "last_name": "Smith",
+          "role_id": "uuid-of-viewer-role",
+          "language": "en"
+        }
+
+    response:
+      status: 201
+      type: "User"
+      schema:
+        id: "UUID"
+        org_id: "UUID"
+        email: "string"
+        first_name: "string"
+        last_name: "string"
+        role_id: "UUID"
+        role: "Role object"
+        language: "string"
+        is_active: "boolean"
+        created_at: "string"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid email format"
+        when: "Email validation fails"
+      - status: 409
+        code: "DUPLICATE_EMAIL"
+        message: "Email already exists"
+        when: "Email already exists in organization"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks ADMIN role"
+
+  - method: "PUT"
+    path: "/api/v1/settings/users/:id"
+    description: "Update existing user"
+    file: "apps/frontend/app/api/v1/settings/users/[id]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      params:
+        id: "UUID (user id to update)"
+      body:
+        first_name: "string (optional, 1-100 chars)"
+        last_name: "string (optional, 1-100 chars)"
+        role_id: "UUID (optional, must be valid system role)"
+        language: "string (optional, pl/en/de/fr)"
+      example: |
+        {
+          "first_name": "Jonathan",
+          "role_id": "uuid-of-admin-role"
+        }
+
+    response:
+      status: 200
+      type: "User"
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "User not found"
+        when: "User ID doesn't exist or belongs to different org (per ADR-013)"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks ADMIN role"
+
+  - method: "PATCH"
+    path: "/api/v1/settings/users/:id/deactivate"
+    description: "Deactivate user (set is_active = false)"
+    file: "apps/frontend/app/api/v1/settings/users/[id]/deactivate/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID (user id to deactivate)"
+
+    response:
+      status: 200
+      type: "object"
+      schema:
+        success: "boolean"
+        message: "string"
+      example: |
+        {
+          "success": true,
+          "message": "User deactivated successfully"
+        }
+
+    errors:
+      - status: 400
+        code: "SELF_DEACTIVATION"
+        message: "Cannot delete your own account"
+        when: "User attempts to deactivate themselves"
+      - status: 400
+        code: "LAST_SUPER_ADMIN"
+        message: "Cannot deactivate the only Super Admin"
+        when: "Attempting to deactivate last active Super Admin"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "User not found"
+        when: "User ID doesn't exist or belongs to different org"
+
+  - method: "PATCH"
+    path: "/api/v1/settings/users/:id/activate"
+    description: "Reactivate user (set is_active = true)"
+    file: "apps/frontend/app/api/v1/settings/users/[id]/activate/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID (user id to activate)"
+
+    response:
+      status: 200
+      type: "object"
+      schema:
+        success: "boolean"
+        message: "string"
+
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "User not found"
+        when: "User ID doesn't exist or belongs to different org"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/user-service.ts"
+    description: "User CRUD operations with self-protection logic"
+    exports:
+      - name: "UserService"
+        type: "class"
+        methods:
+          - name: "getUsers"
+            params:
+              - "params: UsersListParams"
+            returns: "Promise<UsersListResponse>"
+            description: "Get paginated list with search/filter"
+
+          - name: "createUser"
+            params:
+              - "data: CreateUserRequest"
+            returns: "Promise<User>"
+            description: "Create new user with validation"
+
+          - name: "updateUser"
+            params:
+              - "id: string"
+              - "data: UpdateUserRequest"
+            returns: "Promise<User>"
+            description: "Update existing user"
+
+          - name: "deactivateUser"
+            params:
+              - "id: string"
+            returns: "Promise<void>"
+            description: "Deactivate user with self-protection checks"
+
+          - name: "activateUser"
+            params:
+              - "id: string"
+            returns: "Promise<void>"
+            description: "Reactivate user"
+
+          - name: "canDeactivate"
+            params:
+              - "userId: string"
+              - "currentUserId: string"
+            returns: "Promise<{ allowed: boolean; reason?: string }>"
+            description: "Check if user can be deactivated (self-protection logic)"
+
+# Validation Schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/user-schemas.ts"
+    description: "Zod validation schemas for user operations"
+    schemas:
+      - name: "createUserSchema"
+        type: "z.object"
+        fields:
+          email: "z.string().email('Invalid email format')"
+          first_name: "z.string().min(1, 'First name is required').max(100)"
+          last_name: "z.string().min(1, 'Last name is required').max(100)"
+          role_id: "z.string().uuid('Invalid role')"
+          language: "z.enum(['pl', 'en', 'de', 'fr']).optional().default('en')"
+
+      - name: "updateUserSchema"
+        type: "z.object"
+        fields:
+          first_name: "z.string().min(1).max(100).optional()"
+          last_name: "z.string().min(1).max(100).optional()"
+          role_id: "z.string().uuid().optional()"
+          language: "z.enum(['pl', 'en', 'de', 'fr']).optional()"
+
+# Implementation Patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/v1/settings/users/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { createUserSchema } from '@/lib/validation/user-schemas';
+
+    export async function GET(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const { searchParams } = new URL(request.url);
+
+      const page = parseInt(searchParams.get('page') || '1');
+      const limit = parseInt(searchParams.get('limit') || '25');
+      const search = searchParams.get('search') || '';
+      const role = searchParams.get('role') || '';
+      const status = searchParams.get('status') || '';
+
+      let query = supabase
+        .from('users')
+        .select(`
+          id,
+          org_id,
+          email,
+          first_name,
+          last_name,
+          role_id,
+          role:roles(id, code, name),
+          language,
+          is_active,
+          last_login_at,
+          created_at,
+          updated_at
+        `, { count: 'exact' });
+
+      if (search) {
+        query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+
+      if (role) {
+        query = query.eq('role.code', role);
+      }
+
+      if (status) {
+        query = query.eq('is_active', status === 'active');
+      }
+
+      const { data: users, count, error } = await query
+        .range((page - 1) * limit, page * limit - 1)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        users,
+        total: count || 0,
+        page,
+        limit,
+      });
+    }
+
+    export async function POST(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const body = await request.json();
+
+      // Validate request
+      const validationResult = createUserSchema.safeParse(body);
+      if (!validationResult.success) {
+        return NextResponse.json(
+          { error: validationResult.error.errors },
+          { status: 400 }
+        );
+      }
+
+      // Get org context
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id')
+        .eq('id', user.id)
+        .single();
+
+      // Create user
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          ...validationResult.data,
+          org_id: userData.org_id,
+          is_active: true,
+        })
+        .select(`
+          id,
+          org_id,
+          email,
+          first_name,
+          last_name,
+          role_id,
+          role:roles(id, code, name),
+          language,
+          is_active,
+          created_at
+        `)
+        .single();
+
+      if (createError) {
+        if (createError.code === '23505') {
+          return NextResponse.json(
+            { error: 'Email already exists' },
+            { status: 409 }
+          );
+        }
+        return NextResponse.json({ error: createError.message }, { status: 500 });
+      }
+
+      return NextResponse.json(newUser, { status: 201 });
+    }
+
+  self_protection: |
+    // Self-protection logic in deactivate endpoint
+    export async function canDeactivate(
+      userId: string,
+      currentUserId: string
+    ): Promise<{ allowed: boolean; reason?: string }> {
+      // Check 1: Cannot deactivate self
+      if (userId === currentUserId) {
+        return { allowed: false, reason: 'Cannot delete your own account' };
+      }
+
+      // Check 2: Cannot deactivate last Super Admin
+      const { data: user } = await supabase
+        .from('users')
+        .select('role:roles(code)')
+        .eq('id', userId)
+        .single();
+
+      if (user?.role?.code === 'SUPER_ADMIN') {
+        const { count } = await supabase
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .eq('role.code', 'SUPER_ADMIN')
+          .eq('is_active', true);
+
+        if (count === 1) {
+          return {
+            allowed: false,
+            reason: 'Cannot deactivate the only Super Admin',
+          };
+        }
+      }
+
+      return { allowed: true };
+    }

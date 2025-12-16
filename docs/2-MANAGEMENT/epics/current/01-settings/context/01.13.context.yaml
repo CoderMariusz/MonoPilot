@@ -1,0 +1,726 @@
+# Story Context: 01.13 Tax Codes CRUD
+# Generated: 2025-12-16
+# Purpose: AI agent context for implementing tax code management with rates, jurisdictions, and effective dates
+
+story:
+  id: "01.13"
+  name: "Tax Codes CRUD"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "S"
+  estimate_days: 2
+  type: "frontend + backend"
+  state: "ready"
+  priority: "P1"
+  story_file: "docs/2-MANAGEMENT/epics/current/01-settings/01.13.tax-codes-crud.md"
+
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table with org_id"
+        - "RLS foundation"
+        - "auth context"
+    - story: "01.2"
+      name: "Settings Shell + Navigation"
+      provides:
+        - "Settings layout"
+        - "Navigation guards"
+        - "Sidebar navigation structure"
+    - story: "01.6"
+      name: "Role Permissions"
+      provides:
+        - "10-role permission system"
+        - "roles table with predefined roles"
+        - "Permission enforcement (ADMIN allowed)"
+        - "hasPermission() helper function"
+        - "usePermissions() React hook"
+  dependents:
+    - epic: "03"
+      name: "Planning Module"
+      requires: "Suppliers use default tax codes"
+    - epic: "09"
+      name: "Finance Module"
+      requires: "All financial calculations reference tax codes"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/settings.md"
+  prd_sections:
+    - "FR-SET-080"  # Tax code CRUD (create, read, update, delete)
+    - "FR-SET-081"  # Tax rate configuration (percentage 0-100%)
+    - "FR-SET-082"  # Tax jurisdiction (country/region - ISO 3166-1 alpha-2)
+    - "FR-SET-083"  # Effective date ranges (valid_from, valid_to)
+    - "FR-SET-084"  # Default tax code assignment
+  architecture: "docs/1-BASELINE/architecture/modules/settings.md"
+  story: "docs/2-MANAGEMENT/epics/current/01-settings/01.13.tax-codes-crud.md"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  patterns:
+    - "apps/frontend/lib/validation/*.ts"  # Existing Zod schema patterns
+    - "apps/frontend/components/ui/data-table.tsx"  # ShadCN DataTable
+    - "apps/frontend/components/ui/dialog.tsx"  # ShadCN Dialog for modal
+    - "apps/frontend/lib/services/*.ts"  # Existing service patterns
+  wireframes:
+    - "TBD: Tax Code List wireframe"
+    - "TBD: Tax Code Modal wireframe"
+
+files_to_create:
+  pages:
+    - path: "apps/frontend/app/(authenticated)/settings/tax-codes/page.tsx"
+      description: "Tax code list page with DataTable"
+  components:
+    - path: "apps/frontend/components/settings/tax-codes/TaxCodesDataTable.tsx"
+      description: "DataTable with sorting, filtering, pagination"
+    - path: "apps/frontend/components/settings/tax-codes/TaxCodeModal.tsx"
+      description: "Create/Edit form modal"
+    - path: "apps/frontend/components/settings/tax-codes/TaxCodeRow.tsx"
+      description: "Single tax code row"
+    - path: "apps/frontend/components/settings/tax-codes/TaxCodeRateBadge.tsx"
+      description: "Rate badge with percentage display and color coding"
+    - path: "apps/frontend/components/settings/tax-codes/TaxCodeStatusBadge.tsx"
+      description: "Active/Expired/Scheduled status indicator badge"
+    - path: "apps/frontend/components/settings/tax-codes/TaxCodeCountryBadge.tsx"
+      description: "Country code display (ISO 2-letter code)"
+    - path: "apps/frontend/components/settings/tax-codes/TaxCodeActionsMenu.tsx"
+      description: "Row actions dropdown (edit, set default, delete)"
+    - path: "apps/frontend/components/settings/tax-codes/TaxCodeFilters.tsx"
+      description: "Search + country/status filter bar"
+    - path: "apps/frontend/components/settings/tax-codes/SetDefaultConfirmDialog.tsx"
+      description: "Confirmation dialog for default change"
+    - path: "apps/frontend/components/settings/tax-codes/DeleteConfirmDialog.tsx"
+      description: "Confirmation with reference check warning"
+    - path: "apps/frontend/components/settings/tax-codes/TaxCodeCountrySelect.tsx"
+      description: "Country dropdown with ISO codes"
+    - path: "apps/frontend/components/settings/tax-codes/TaxCodeDateRangePicker.tsx"
+      description: "Valid from/to date inputs"
+  validation:
+    - path: "apps/frontend/lib/validation/tax-code-schema.ts"
+      description: "Zod schemas for tax code create/update"
+  api:
+    - path: "apps/frontend/app/api/v1/settings/tax-codes/route.ts"
+      methods: ["GET", "POST"]
+      description: "List tax codes (with pagination/search/filter), Create tax code"
+    - path: "apps/frontend/app/api/v1/settings/tax-codes/[id]/route.ts"
+      methods: ["GET", "PUT", "DELETE"]
+      description: "Get tax code, Update tax code, Soft delete tax code"
+    - path: "apps/frontend/app/api/v1/settings/tax-codes/[id]/set-default/route.ts"
+      methods: ["PATCH"]
+      description: "Set as default tax code (atomic unset previous)"
+    - path: "apps/frontend/app/api/v1/settings/tax-codes/validate-code/route.ts"
+      methods: ["GET"]
+      description: "Check code uniqueness per country (debounce 500ms)"
+    - path: "apps/frontend/app/api/v1/settings/tax-codes/default/route.ts"
+      methods: ["GET"]
+      description: "Get default tax code for org"
+  services:
+    - path: "apps/frontend/lib/services/tax-code-service.ts"
+      description: "Tax code CRUD business logic with reference check"
+  database:
+    - path: "supabase/migrations/058_create_tax_codes_table.sql"
+      type: "migration"
+      description: "Create tax_codes table with RLS policies and seed Polish tax codes"
+
+database:
+  tables:
+    - name: "tax_codes"
+      description: "Tax code master data with rates, jurisdictions, and effective dates"
+      columns:
+        - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        - "org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE"
+        - "code VARCHAR(20) NOT NULL"
+        - "name VARCHAR(100) NOT NULL"
+        - "rate DECIMAL(5,2) NOT NULL"  # 0.00 to 100.00
+        - "country_code CHAR(2) NOT NULL"  # ISO 3166-1 alpha-2 (PL, DE, GB, US)
+        - "valid_from DATE NOT NULL"
+        - "valid_to DATE"  # NULL = no expiration
+        - "is_default BOOLEAN DEFAULT false"
+        - "is_deleted BOOLEAN DEFAULT false"
+        - "deleted_at TIMESTAMPTZ"
+        - "deleted_by UUID REFERENCES users(id)"
+        - "created_at TIMESTAMPTZ DEFAULT NOW()"
+        - "updated_at TIMESTAMPTZ DEFAULT NOW()"
+        - "created_by UUID REFERENCES users(id)"
+        - "updated_by UUID REFERENCES users(id)"
+      constraints:
+        - "UNIQUE(org_id, code, country_code) WHERE (is_deleted = false)"
+        - "CHECK (code ~ '^[A-Z0-9-]{2,20}$')"
+        - "CHECK (rate >= 0 AND rate <= 100)"
+        - "CHECK (country_code ~ '^[A-Z]{2}$')"
+        - "CHECK (valid_to IS NULL OR valid_to > valid_from)"
+      rls: true
+      rls_policies:
+        - name: "tax_codes_select"
+          operation: "SELECT"
+          using: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND is_deleted = false
+        - name: "tax_codes_insert"
+          operation: "INSERT"
+          with_check: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+            IN ('SUPER_ADMIN', 'ADMIN')
+        - name: "tax_codes_update"
+          operation: "UPDATE"
+          using: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+            IN ('SUPER_ADMIN', 'ADMIN')
+        - name: "tax_codes_delete"
+          operation: "DELETE"
+          using: |
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+            IN ('SUPER_ADMIN', 'ADMIN')
+      indexes:
+        - "org_id"
+        - "(org_id, country_code)"
+        - "(org_id, is_deleted) WHERE is_deleted = false"
+        - "(org_id, valid_from, valid_to)"
+      triggers:
+        - name: "tr_tax_codes_single_default"
+          timing: "BEFORE INSERT OR UPDATE OF is_default"
+          condition: "NEW.is_default = true AND NEW.is_deleted = false"
+          action: |
+            UPDATE tax_codes
+            SET is_default = false, updated_at = NOW()
+            WHERE org_id = NEW.org_id
+              AND id != NEW.id
+              AND is_default = true
+              AND is_deleted = false;
+
+  seed_data:
+    description: "Polish tax codes seeded for all organizations"
+    codes:
+      - code: "VAT23"
+        name: "VAT 23%"
+        rate: 23.00
+        country_code: "PL"
+        valid_from: "2011-01-01"
+        is_default: true
+      - code: "VAT8"
+        name: "VAT 8%"
+        rate: 8.00
+        country_code: "PL"
+        valid_from: "2011-01-01"
+        is_default: false
+      - code: "VAT5"
+        name: "VAT 5%"
+        rate: 5.00
+        country_code: "PL"
+        valid_from: "2011-01-01"
+        is_default: false
+      - code: "VAT0"
+        name: "VAT 0%"
+        rate: 0.00
+        country_code: "PL"
+        valid_from: "2011-01-01"
+        is_default: false
+      - code: "ZW"
+        name: "Zwolniony (Exempt)"
+        rate: 0.00
+        country_code: "PL"
+        valid_from: "2011-01-01"
+        is_default: false
+    seed_sql: |
+      INSERT INTO tax_codes (org_id, code, name, rate, country_code, valid_from, is_default, created_by)
+      SELECT
+        o.id AS org_id,
+        t.code,
+        t.name,
+        t.rate,
+        t.country_code,
+        t.valid_from,
+        t.is_default,
+        (SELECT id FROM users WHERE org_id = o.id AND role_id IN (SELECT id FROM roles WHERE code = 'SUPER_ADMIN') LIMIT 1)
+      FROM organizations o
+      CROSS JOIN (
+        VALUES
+          ('VAT23', 'VAT 23%', 23.00, 'PL', '2011-01-01'::DATE, true),
+          ('VAT8', 'VAT 8%', 8.00, 'PL', '2011-01-01'::DATE, false),
+          ('VAT5', 'VAT 5%', 5.00, 'PL', '2011-01-01'::DATE, false),
+          ('VAT0', 'VAT 0%', 0.00, 'PL', '2011-01-01'::DATE, false),
+          ('ZW', 'Zwolniony (Exempt)', 0.00, 'PL', '2011-01-01'::DATE, false)
+      ) AS t(code, name, rate, country_code, valid_from, is_default)
+      WHERE NOT EXISTS (
+        SELECT 1 FROM tax_codes tc WHERE tc.org_id = o.id AND tc.code = t.code AND tc.country_code = t.country_code
+      );
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/tax-codes"
+    description: "List tax codes with pagination, search, and filtering"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "PROD_MANAGER", "QUAL_MANAGER", "WH_MANAGER", "PLANNER", "VIEWER"]
+    query_params:
+      - "page: number (default 1)"
+      - "limit: number (default 20, max 100)"
+      - "search: string (min 2 chars, searches code and name)"
+      - "country_code: string (ISO 2-letter code, e.g., 'PL', 'DE')"
+      - "status: 'active' | 'expired' | 'scheduled' | 'all'"
+      - "sort: 'code' | 'name' | 'rate' | 'country_code' | 'valid_from' | 'created_at'"
+      - "order: 'asc' | 'desc'"
+    response:
+      tax_codes: "TaxCode[]"
+      total: "number"
+      page: "number"
+      limit: "number"
+    performance: "< 300ms for 100 tax codes"
+
+  - method: "POST"
+    path: "/api/v1/settings/tax-codes"
+    description: "Create new tax code"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    request_body:
+      code: "string (required, 2-20 chars, uppercase alphanumeric + hyphens)"
+      name: "string (required, 2-100 chars)"
+      rate: "number (required, 0.00 to 100.00, 2 decimal places)"
+      country_code: "string (required, ISO 3166-1 alpha-2, e.g., 'PL')"
+      valid_from: "string (required, YYYY-MM-DD format)"
+      valid_to: "string (optional, YYYY-MM-DD format, must be > valid_from)"
+      is_default: "boolean (optional, default false)"
+    response:
+      id: "UUID"
+      code: "string"
+      name: "string"
+      rate: "number"
+      country_code: "string"
+      valid_from: "string"
+      valid_to: "string | null"
+      is_default: "boolean"
+      created_at: "timestamp"
+    errors:
+      409: "Tax code must be unique within jurisdiction"
+      400: "Invalid code format"
+      400: "Rate must be between 0 and 100"
+      400: "Valid to must be after valid from"
+
+  - method: "GET"
+    path: "/api/v1/settings/tax-codes/:id"
+    description: "Get tax code by ID"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "PROD_MANAGER", "QUAL_MANAGER", "WH_MANAGER", "PLANNER", "VIEWER"]
+    response:
+      id: "UUID"
+      code: "string"
+      name: "string"
+      rate: "number"
+      country_code: "string"
+      valid_from: "string"
+      valid_to: "string | null"
+      is_default: "boolean"
+      is_deleted: "boolean"
+      created_at: "timestamp"
+      updated_at: "timestamp"
+    errors:
+      404: "Tax code not found"
+
+  - method: "PUT"
+    path: "/api/v1/settings/tax-codes/:id"
+    description: "Update tax code"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    request_body:
+      code: "string (optional, only if no supplier references)"
+      name: "string (optional, 2-100 chars)"
+      rate: "number (optional, 0.00 to 100.00)"
+      country_code: "string (optional, only if no supplier references)"
+      valid_from: "string (optional, YYYY-MM-DD format)"
+      valid_to: "string (optional, YYYY-MM-DD format)"
+    response:
+      id: "UUID"
+      code: "string"
+      name: "string"
+      rate: "number"
+      country_code: "string"
+      valid_from: "string"
+      valid_to: "string | null"
+      updated_at: "timestamp"
+    errors:
+      404: "Tax code not found"
+      400: "Cannot change code for referenced tax code"
+      400: "Valid to must be after valid from"
+      409: "Tax code must be unique within jurisdiction"
+
+  - method: "DELETE"
+    path: "/api/v1/settings/tax-codes/:id"
+    description: "Soft delete tax code"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      success: true
+      message: "Tax code deleted"
+    errors:
+      404: "Tax code not found"
+      400: "Cannot delete tax code referenced by N suppliers"
+
+  - method: "PATCH"
+    path: "/api/v1/settings/tax-codes/:id/set-default"
+    description: "Set tax code as default (atomic unset previous)"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      success: true
+      message: "Tax code set as default"
+      previous_default: "string | null (previous default tax code)"
+    errors:
+      404: "Tax code not found"
+      400: "Cannot set expired tax code as default"
+
+  - method: "GET"
+    path: "/api/v1/settings/tax-codes/validate-code"
+    description: "Check code uniqueness per country for real-time validation"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    query_params:
+      - "code: string (required)"
+      - "country_code: string (required, ISO 2-letter code)"
+      - "excludeId: UUID (optional, for edit mode)"
+    response:
+      available: "boolean"
+    notes: "Debounce 500ms on client side"
+
+  - method: "GET"
+    path: "/api/v1/settings/tax-codes/default"
+    description: "Get default tax code for organization"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "PROD_MANAGER", "QUAL_MANAGER", "WH_MANAGER", "PLANNER", "VIEWER"]
+    response:
+      id: "UUID"
+      code: "string"
+      name: "string"
+      rate: "number"
+      country_code: "string"
+    errors:
+      404: "No default tax code configured"
+
+ux:
+  wireframes:
+    - id: "TBD"
+      path: "TBD"
+      description: "Tax Code List page with DataTable"
+      components:
+        - "DataTable with Code, Name, Rate, Jurisdiction, Valid From, Valid To, Default, Status columns"
+        - "Search bar (code/name)"
+        - "Country filter dropdown"
+        - "Status filter dropdown (Active, Expired, Scheduled, All)"
+        - "Sort dropdown"
+        - "Add Tax Code button (primary CTA)"
+        - "Actions menu per row: Edit, Set as Default, Delete"
+        - "Pagination (20 per page)"
+        - "Gold star icon for default tax code"
+    - id: "TBD"
+      path: "TBD"
+      description: "Tax Code Create/Edit Modal"
+      components:
+        - "Code input (required, 2-20 chars, auto-uppercase)"
+        - "Name input (required, 2-100 chars)"
+        - "Rate input (required, 0-100%, 2 decimal places)"
+        - "Country dropdown (ISO codes with names)"
+        - "Valid From date picker (required)"
+        - "Valid To date picker (optional)"
+        - "Is Default checkbox"
+  patterns:
+    table: "ShadCN DataTable with column sorting, filtering, pagination"
+    modal: "ShadCN Dialog with Form inside"
+    form: "react-hook-form with Zod resolver"
+    badge: "ShadCN Badge for rate, status, and country indicators"
+    search: "Debounced search input (200ms)"
+    confirmation: "ShadCN AlertDialog for destructive actions"
+    select: "ShadCN Select for country dropdown"
+    datepicker: "ShadCN DatePicker for date inputs"
+  states:
+    loading: "Skeleton rows (3) with shimmer animation"
+    empty: "'No tax codes found' icon with 'Add Your First Tax Code' CTA"
+    error: "'Failed to load tax codes' warning with Retry button"
+    success: "Table populated with tax code data"
+  rate_badges:
+    zero: "bg-gray-100 text-gray-800"  # 0% (exempt)
+    reduced_low: "bg-green-100 text-green-800"  # 1-10%
+    reduced_high: "bg-blue-100 text-blue-800"  # 11-20%
+    standard: "bg-purple-100 text-purple-800"  # 21-100%
+  status_badges:
+    active: "bg-green-100 text-green-800"
+    expired: "bg-red-100 text-red-800"
+    scheduled: "bg-yellow-100 text-yellow-800"
+
+validation_rules:
+  code:
+    type: "string"
+    required: true
+    min: 2
+    max: 20
+    pattern: "^[A-Z0-9-]+$"
+    transform: "toUpperCase()"
+    unique_per_org_and_country: true
+    immutable_with_references: true
+    error_empty: "Code is required"
+    error_min: "Code must be at least 2 characters"
+    error_max: "Code must be at most 20 characters"
+    error_pattern: "Code must be uppercase alphanumeric with hyphens only"
+    error_duplicate: "Tax code must be unique within jurisdiction"
+    error_immutable: "Cannot change code for referenced tax code"
+  name:
+    type: "string"
+    required: true
+    min: 2
+    max: 100
+    error_empty: "Name is required"
+    error_min: "Name must be at least 2 characters"
+    error_max: "Name must be at most 100 characters"
+  rate:
+    type: "number"
+    required: true
+    min: 0
+    max: 100
+    precision: 2
+    error_empty: "Rate is required"
+    error_min: "Rate must be between 0 and 100"
+    error_max: "Rate must be between 0 and 100"
+    error_precision: "Rate must have at most 2 decimal places"
+  country_code:
+    type: "string"
+    required: true
+    length: 2
+    pattern: "^[A-Z]{2}$"
+    transform: "toUpperCase()"
+    error_empty: "Country is required"
+    error_format: "Country code must be 2 uppercase letters"
+  valid_from:
+    type: "string"
+    required: true
+    format: "YYYY-MM-DD"
+    error_empty: "Valid from date is required"
+    error_format: "Valid from must be YYYY-MM-DD format"
+  valid_to:
+    type: "string"
+    required: false
+    format: "YYYY-MM-DD"
+    error_format: "Valid to must be YYYY-MM-DD format"
+    error_range: "Valid to must be after valid from"
+
+patterns:
+  rls: "ADR-013 - RLS Org Isolation Pattern (users lookup)"
+  api: "REST with org_id filter from auth context"
+  service: "Class-based TaxCodeService with static methods"
+  validation: "Zod schemas in lib/validation/tax-code-schema.ts"
+  default_atomicity: |
+    // Database trigger ensures only one default per org
+    // When setting new default, trigger auto-unsets previous default
+    // Service method returns previous_default for UI feedback
+  reference_check: |
+    // Check for supplier references before delete or code change
+    async hasReferences(taxCodeId: string): Promise<{ count: number; entities: string[] }> {
+      const { count } = await supabase
+        .from('suppliers')
+        .select('*', { count: 'exact', head: true })
+        .eq('tax_code_id', taxCodeId);
+      return { count: count || 0, entities: count > 0 ? ['suppliers'] : [] };
+    }
+  status_calculation: |
+    // Computed status based on dates
+    function getTaxCodeStatus(taxCode: TaxCode): 'active' | 'expired' | 'scheduled' {
+      const today = new Date().toISOString().split('T')[0];
+      if (taxCode.valid_from > today) return 'scheduled';
+      if (taxCode.valid_to && taxCode.valid_to < today) return 'expired';
+      return 'active';
+    }
+
+acceptance_checklist:
+  tax_code_list_page:
+    - "GIVEN admin navigates to /settings/tax-codes, WHEN page loads, THEN tax code list displays within 300ms"
+    - "GIVEN tax code list displayed, WHEN table renders, THEN columns show: Code, Name, Rate, Jurisdiction, Valid From, Valid To, Default, Status"
+    - "GIVEN tax code list with 10+ tax codes, WHEN admin enters search 'VAT', THEN only matching tax codes display within 200ms"
+    - "GIVEN tax code list displayed, WHEN admin selects filter country 'PL', THEN only Polish tax codes appear"
+    - "GIVEN tax code list displayed, WHEN admin filters by status 'active', THEN only currently active tax codes appear"
+    - "GIVEN tax code list displayed, WHEN admin clicks 'Rate' column header, THEN list sorts by rate (toggle asc/desc)"
+    - "GIVEN 30 tax codes exist, WHEN admin views tax code list, THEN 20 tax codes display per page with pagination controls"
+
+  create_tax_code:
+    - "GIVEN admin clicks '+ Add Tax Code', WHEN modal opens, THEN form displays: code, name, rate, country dropdown, valid_from, valid_to, is_default checkbox"
+    - "GIVEN admin enters code 'VAT23', name 'VAT 23%', rate '23.00', country 'PL', WHEN 'Create' clicked, THEN tax code created and appears in list within 1 second"
+    - "GIVEN tax code 'VAT23' exists for country 'PL', WHEN admin creates another with code 'VAT23' for 'PL', THEN error 'Tax code must be unique within jurisdiction' displays inline"
+    - "GIVEN admin enters code 'invalid code!', WHEN save attempted, THEN error 'Code must be 2-20 uppercase alphanumeric characters' displays"
+    - "GIVEN admin leaves code field empty, WHEN save attempted, THEN error 'Code is required' displays inline"
+
+  tax_rate_configuration:
+    - "GIVEN tax code create/edit modal open, WHEN admin enters rate field, THEN input accepts decimal values with 2 decimal places"
+    - "GIVEN admin enters rate '-5', WHEN save attempted, THEN error 'Rate must be between 0 and 100' displays"
+    - "GIVEN admin enters rate '150', WHEN save attempted, THEN error 'Rate must be between 0 and 100' displays"
+    - "GIVEN tax codes with different rates exist, WHEN viewing tax code list, THEN rate displays as percentage with % symbol"
+    - "GIVEN admin enters rate '0.00' for tax-exempt code, WHEN save completed, THEN tax code created with 0% rate"
+
+  tax_jurisdiction:
+    - "GIVEN tax code create/edit modal open, WHEN admin opens country dropdown, THEN options display with country code and name (PL, DE, GB, US, etc.)"
+    - "GIVEN tax codes with different countries exist, WHEN viewing tax code list, THEN jurisdiction column shows country code"
+    - "GIVEN multiple tax codes for different countries, WHEN admin opens jurisdiction filter, THEN only countries with existing tax codes appear as options"
+
+  effective_date_ranges:
+    - "GIVEN tax code create/edit modal open, WHEN form loads, THEN 'Valid From' and 'Valid To' date pickers display"
+    - "GIVEN admin leaves valid_from empty, WHEN save attempted, THEN error 'Valid from date is required' displays"
+    - "GIVEN admin leaves valid_to empty, WHEN save completed, THEN tax code created with no expiration"
+    - "GIVEN admin enters valid_from '2025-12-01' and valid_to '2025-06-01', WHEN save attempted, THEN error 'Valid to must be after valid from' displays"
+    - "GIVEN tax code with valid_to '2024-01-01' exists, WHEN viewing tax code list, THEN status shows 'Expired' badge in red"
+    - "GIVEN tax code with valid_from '2026-01-01' exists, WHEN viewing tax code list, THEN status shows 'Scheduled' badge in yellow"
+
+  default_tax_code:
+    - "GIVEN one tax code is marked as default, WHEN viewing tax code list, THEN default tax code shows gold star icon in Default column"
+    - "GIVEN tax code 'VAT23' exists (not default), WHEN admin clicks actions menu > 'Set as Default', THEN confirmation dialog displays"
+    - "GIVEN 'VAT8' is current default, WHEN admin sets 'VAT23' as default, THEN 'VAT23' becomes default AND 'VAT8' loses default status (atomic operation)"
+    - "GIVEN admin sets 'VAT23' as default, WHEN checking database, THEN exactly one tax code has is_default=true for org"
+    - "GIVEN 'VAT23' is default tax code, WHEN creating new supplier without specifying tax, THEN supplier auto-assigned 'VAT23' as default tax code"
+
+  edit_tax_code:
+    - "GIVEN admin clicks edit on tax code 'VAT23', WHEN modal opens, THEN current tax code data pre-populates form"
+    - "GIVEN tax code 'VAT23' is referenced by suppliers, WHEN edit modal opens, THEN code field is disabled with tooltip 'Cannot change code for referenced tax code'"
+    - "GIVEN tax code 'TEST' has no supplier references, WHEN edit modal opens, THEN code field is editable"
+    - "GIVEN admin changes rate from '23.00' to '22.00', WHEN save completed, THEN updated rate displays in list immediately"
+
+  delete_tax_code:
+    - "GIVEN tax code 'TEST' has no references, WHEN admin clicks 'Delete Tax Code', THEN confirmation displays and tax code removed within 500ms"
+    - "GIVEN tax code 'VAT23' is referenced by suppliers, WHEN admin clicks 'Delete Tax Code', THEN error 'Cannot delete tax code referenced by N suppliers' displays"
+    - "GIVEN tax code 'OLD-VAT' has historical references, WHEN admin confirms delete, THEN tax code soft-deleted (is_deleted=true)"
+
+  permission_enforcement:
+    - "GIVEN user has ADMIN role, WHEN accessing /settings/tax-codes, THEN all CRUD actions available"
+    - "GIVEN user has PROD_MANAGER role, WHEN accessing /settings/tax-codes, THEN can view list but 'Add Tax Code' button hidden"
+    - "GIVEN user has VIEWER role, WHEN accessing /settings/tax-codes, THEN table displays but all actions hidden"
+
+  multi_tenancy:
+    - "GIVEN User A from Org A, WHEN requesting /api/settings/tax-codes, THEN only Org A tax codes returned"
+    - "GIVEN User A from Org A, WHEN requesting tax code ID from Org B, THEN 404 Not Found returned (not 403)"
+
+definition_of_done:
+  - "Database migration creates tax_codes table with all constraints"
+  - "Seed migration creates common Polish tax codes (VAT23, VAT8, VAT5, VAT0, ZW)"
+  - "RLS policies enforce org isolation and role permissions"
+  - "Single default tax code trigger works atomically"
+  - "All 8 API endpoints implemented and documented"
+  - "Zod schemas validate all inputs (rate range, date range, code format)"
+  - "tax-code-service.ts implements all methods"
+  - "Tax code list page renders with DataTable"
+  - "Create/Edit modal with all fields"
+  - "Rate badge displays with percentage and color coding"
+  - "Status badge shows Active/Expired/Scheduled"
+  - "Country badge/code displays correctly"
+  - "Date range picker validates from < to"
+  - "Default tax code star icon and 'Set as Default' action"
+  - "Delete blocked for referenced tax codes"
+  - "Code immutability enforced when referenced"
+  - "Search, filter, sort, pagination work correctly"
+  - "Permission matrix implemented (admin, viewer)"
+  - "Multi-tenancy: cross-org returns 404"
+  - "Unit tests >= 80% coverage"
+  - "Integration tests for all endpoints"
+  - "E2E tests for critical flows"
+  - "Loading, empty, error states implemented"
+  - "Toast notifications on success/error"
+  - "Accessibility: keyboard nav, ARIA labels, screen reader support"
+
+tests:
+  unit:
+    - "TaxCodeService.list() returns org-scoped tax codes"
+    - "TaxCodeService.list() filters by country_code"
+    - "TaxCodeService.list() filters by status (active/expired/scheduled)"
+    - "TaxCodeService.create() validates code uniqueness per country"
+    - "TaxCodeService.create() auto-uppercases code and country"
+    - "TaxCodeService.create() validates rate range (0-100)"
+    - "TaxCodeService.create() validates date range (valid_to > valid_from)"
+    - "TaxCodeService.update() prevents code change with references"
+    - "TaxCodeService.setDefault() unsets previous default"
+    - "TaxCodeService.delete() blocks with references"
+    - "getTaxCodeStatus() returns correct status based on dates"
+    - "TaxCodeService.validateCode() returns availability"
+    - "Zod schema rejects invalid code format"
+    - "Zod schema rejects rate outside 0-100 range"
+    - "Zod schema rejects invalid date format"
+    - "Rate badge renders correct colors for each rate tier"
+    - "Status badge renders correct colors for each status"
+  integration:
+    - "GET /api/v1/settings/tax-codes returns paginated list"
+    - "GET /api/v1/settings/tax-codes?country_code=PL filters correctly"
+    - "GET /api/v1/settings/tax-codes?status=active filters correctly"
+    - "POST /api/v1/settings/tax-codes creates with validation"
+    - "POST /api/v1/settings/tax-codes duplicate code+country returns 409"
+    - "POST /api/v1/settings/tax-codes invalid rate returns 400"
+    - "POST /api/v1/settings/tax-codes invalid date range returns 400"
+    - "PUT /api/v1/settings/tax-codes/:id updates mutable fields"
+    - "PUT /api/v1/settings/tax-codes/:id code immutable with refs returns 400"
+    - "PATCH /api/v1/settings/tax-codes/:id/set-default atomicity verified"
+    - "DELETE /api/v1/settings/tax-codes/:id with references returns 400"
+    - "GET /api/v1/settings/tax-codes/default returns default tax code"
+    - "Cross-org access returns 404"
+    - "Permission denied returns 403"
+  e2e:
+    - "Full tax code creation flow: list > add button > modal > form > save > list updated"
+    - "Edit tax code flow: actions menu > edit > modify > save"
+    - "Set default tax code: actions menu > set default > confirm > star icon appears"
+    - "Delete tax code: actions menu > delete > confirm > removed from list"
+    - "Search and filter tax code list"
+    - "Date range validation: invalid dates show error"
+    - "Rate input validation: out of range shows error"
+    - "Permission-based UI: Viewer sees no actions"
+
+output_artifacts:
+  database:
+    - "Migration: 058_create_tax_codes_table.sql"
+    - "RLS policies for tax_codes table"
+    - "Trigger for single default tax code per org"
+    - "Seed data for Polish tax codes (VAT23, VAT8, VAT5, VAT0, ZW)"
+  backend:
+    - "tax-code-service.ts with CRUD operations and reference check"
+    - "tax-code-schema.ts Zod validation schemas"
+    - "API routes: GET/POST /api/v1/settings/tax-codes"
+    - "API routes: GET/PUT/DELETE /api/v1/settings/tax-codes/:id"
+    - "API routes: PATCH /api/v1/settings/tax-codes/:id/set-default"
+    - "API routes: GET /api/v1/settings/tax-codes/validate-code"
+    - "API routes: GET /api/v1/settings/tax-codes/default"
+  frontend:
+    - "TaxCodesDataTable.tsx component with sorting, filtering, pagination"
+    - "TaxCodeModal.tsx component for create/edit"
+    - "TaxCodeRateBadge.tsx component with color coding"
+    - "TaxCodeStatusBadge.tsx component (Active/Expired/Scheduled)"
+    - "TaxCodeCountryBadge.tsx component"
+    - "TaxCodeActionsMenu.tsx component"
+    - "TaxCodeFilters.tsx component"
+    - "SetDefaultConfirmDialog.tsx component"
+    - "DeleteConfirmDialog.tsx component"
+    - "TaxCodeCountrySelect.tsx component"
+    - "TaxCodeDateRangePicker.tsx component"
+  tests:
+    - "Unit tests for tax-code-service (>80% coverage)"
+    - "Integration tests for API endpoints"
+    - "E2E tests for tax code CRUD flows"
+
+implementation_notes:
+  frontend:
+    - "Use ShadCN DataTable for tax code list with server-side pagination"
+    - "Use ShadCN Dialog for create/edit modal"
+    - "Use react-hook-form with Zod resolver for form validation"
+    - "Debounce search input by 200ms to reduce API calls"
+    - "Debounce code validation by 500ms on blur"
+    - "Show skeleton loaders while data is loading"
+    - "Auto-uppercase code input on blur"
+    - "Use usePermissions() hook to conditionally render actions"
+    - "Gold star icon for default tax code in list"
+    - "Rate badge color based on rate tier (0%, 1-10%, 11-20%, 21-100%)"
+    - "Status badge color based on computed status"
+    - "Date pickers with proper validation (valid_to > valid_from)"
+  backend:
+    - "Validate code uniqueness within org AND country before create/update"
+    - "Check hasReferences() before code change or delete"
+    - "Use database trigger for atomic default tax code switch"
+    - "Implement soft delete (is_deleted = true) for historical references"
+    - "Use ADR-013 RLS pattern for org isolation"
+    - "Return previous_default on set-default for UI feedback"
+    - "Compute status (active/expired/scheduled) based on dates in service"
+  database:
+    - "Create migration with tax_codes table and all constraints"
+    - "Add trigger for single default per org"
+    - "Seed Polish tax codes for all organizations"
+    - "Verify RLS policies are active"
+    - "Add indexes for query performance"
+    - "Partial unique index: UNIQUE(org_id, code, country_code) WHERE is_deleted = false"

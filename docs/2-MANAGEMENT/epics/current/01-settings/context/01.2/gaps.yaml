@@ -1,0 +1,257 @@
+# Story 01.2 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+# Refactoring Plan: ../REFACTORING-PLAN.md
+
+gap_summary:
+  overall_readiness: "18%"
+  critical_blockers: 2
+  components_done: 3
+  components_partial: 1
+  components_missing: 8
+
+# =============================================================================
+# DEPENDENCY BLOCKERS (from Story 01.1)
+# =============================================================================
+dependency_blockers:
+  - blocker: "GET /api/v1/settings/context endpoint"
+    source_story: "01.1"
+    status: "MISSING"
+    description: |
+      This story's components (SettingsNav, useSettingsGuard) require
+      org context from 01.1. Cannot implement until 01.1 is complete.
+    impact: "Blocks all permission-based UI filtering"
+
+  - blocker: "useOrgContext hook"
+    source_story: "01.1"
+    status: "MISSING"
+    description: |
+      SettingsNav component needs useOrgContext to get permissions.
+      Must wait for 01.1 to create this hook.
+    impact: "Blocks SettingsNav implementation"
+
+# =============================================================================
+# PAGE GAPS
+# =============================================================================
+page_gaps:
+  - component: "Settings page"
+    expected: "apps/frontend/app/(authenticated)/settings/page.tsx"
+    found: "apps/frontend/app/(authenticated)/settings/page.tsx"
+    status: "DONE"
+    gap_description: |
+      Page EXISTS but uses different pattern:
+      - Current: Card grid layout (dashboard-style)
+      - Expected: Shell layout with sidebar navigation
+      Could keep as-is or refactor to match story spec.
+    refactor_action: "Optional - can keep existing pattern or refactor"
+    priority: "P2"
+
+  - component: "Settings layout"
+    expected: "apps/frontend/app/(authenticated)/settings/layout.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No layout file with sidebar navigation.
+      Story specifies: SettingsLayout wrapper with SettingsNav sidebar.
+    refactor_action: "Create layout.tsx with SettingsNav component"
+    priority: "P0"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  - component: "SettingsLayout"
+    expected: "apps/frontend/components/settings/SettingsLayout.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Shell layout component for consistent Settings styling."
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "SettingsNav"
+    expected: "apps/frontend/components/settings/SettingsNav.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Sidebar navigation with role-based filtering not implemented.
+      Requires: Section groupings, permission filtering, module toggle filtering.
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "SettingsNavItem"
+    expected: "apps/frontend/components/settings/SettingsNavItem.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Individual navigation item with active state and role handling."
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "SettingsEmptyState"
+    expected: "apps/frontend/components/settings/SettingsEmptyState.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "'Coming soon' state for unimplemented routes."
+    refactor_action: "Create new component"
+    priority: "P1"
+
+  - component: "SettingsHeader"
+    expected: "N/A (not in story)"
+    found: "apps/frontend/components/settings/SettingsHeader.tsx"
+    status: "EXISTS_ALTERNATIVE"
+    gap_description: |
+      Horizontal tab navigation exists (alternative pattern).
+      Could be kept alongside sidebar or replaced.
+    refactor_action: "Keep as alternative or deprecate"
+    priority: "P2"
+
+  - component: "SettingsStatsCards"
+    expected: "N/A (not in story)"
+    found: "apps/frontend/components/settings/SettingsStatsCards.tsx"
+    status: "DONE"
+    gap_description: "Dashboard stats component - works, can keep."
+    refactor_action: "None needed"
+    priority: "N/A"
+
+# =============================================================================
+# HOOK GAPS
+# =============================================================================
+hook_gaps:
+  - component: "useSettingsGuard"
+    expected: "apps/frontend/lib/hooks/useSettingsGuard.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Role-based guard hook not implemented.
+      Hooks directory exists at /hooks/ but only has utility hooks.
+      Required: Check role permissions, return allowed/loading/role.
+    refactor_action: "Create new hook"
+    priority: "P0"
+    depends_on: "useOrgContext from 01.1"
+
+  - component: "useSettingsPermissions"
+    expected: "apps/frontend/lib/hooks/useSettingsPermissions.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Permission checking hook not implemented.
+      Required: canRead, canWrite, canDelete for settings module.
+    refactor_action: "Create new hook"
+    priority: "P0"
+    depends_on: "useOrgContext from 01.1"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "settings-navigation-service"
+    expected: "apps/frontend/lib/services/settings-navigation-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Core service to build navigation based on permissions and modules.
+      Required exports: buildSettingsNavigation(), NavigationSection, NavigationItem
+    refactor_action: "Create new service"
+    priority: "P0"
+
+# =============================================================================
+# TYPE GAPS
+# =============================================================================
+type_gaps:
+  - component: "NavigationItem interface"
+    expected: "Defined in api.yaml"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      Interface: name, path, icon, roles, implemented, moduleCode
+    refactor_action: "Define in settings-navigation-service.ts"
+    priority: "P1"
+
+  - component: "NavigationSection interface"
+    expected: "Defined in api.yaml"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Interface: section, items[]"
+    refactor_action: "Define in settings-navigation-service.ts"
+    priority: "P1"
+
+# =============================================================================
+# EXISTING COMPONENTS (can reuse)
+# =============================================================================
+existing_components:
+  - path: "apps/frontend/components/settings/SettingsHeader.tsx"
+    usage: "Alternative navigation pattern (horizontal tabs)"
+    keep: true
+
+  - path: "apps/frontend/components/settings/SettingsStatsCards.tsx"
+    usage: "Dashboard stats - works with current API"
+    keep: true
+
+  - path: "apps/frontend/components/settings/OrganizationForm.tsx"
+    usage: "Org profile form - can be used in settings pages"
+    keep: true
+
+  - path: "apps/frontend/components/settings/UserForm.tsx"
+    usage: "User management form"
+    keep: true
+
+# =============================================================================
+# ARCHITECTURAL NOTES
+# =============================================================================
+architectural_notes:
+  - note: "Pattern Choice"
+    description: |
+      Current implementation uses horizontal tabs (SettingsHeader).
+      Story specifies vertical sidebar (SettingsNav).
+
+      OPTIONS:
+      A) Replace tabs with sidebar (story spec)
+      B) Keep both patterns (tabs for mobile, sidebar for desktop)
+      C) Keep tabs only (simpler, less refactoring)
+
+      RECOMMENDATION: Option A or B based on UX preference.
+
+  - note: "Hook Location"
+    description: |
+      Hooks directory exists at /apps/frontend/hooks/ (utility hooks)
+      Story expects /apps/frontend/lib/hooks/ (business hooks)
+
+      RECOMMENDATION: Create lib/hooks/ for business logic hooks,
+      keep /hooks/ for utility hooks.
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  prerequisite: "Story 01.1 must be complete (org-context-service, useOrgContext)"
+
+  phase_1_types:
+    - "Define NavigationItem, NavigationSection interfaces"
+
+  phase_2_services:
+    - "lib/services/settings-navigation-service.ts"
+
+  phase_3_hooks:
+    - "lib/hooks/useSettingsGuard.ts"
+    - "lib/hooks/useSettingsPermissions.ts"
+
+  phase_4_components:
+    - "components/settings/SettingsNav.tsx"
+    - "components/settings/SettingsNavItem.tsx"
+    - "components/settings/SettingsEmptyState.tsx"
+    - "components/settings/SettingsLayout.tsx"
+
+  phase_5_pages:
+    - "app/(authenticated)/settings/layout.tsx"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] Settings shell layout renders correctly"
+  - "[ ] Navigation shows correct sections for ADMIN role"
+  - "[ ] Navigation hides sections for VIEWER role"
+  - "[ ] useSettingsGuard returns correct allowed state"
+  - "[ ] Unimplemented routes show 'Coming Soon' state"
+  - "[ ] Active navigation item highlighted"
+  - "[ ] Mobile responsive (Sheet component for small screens)"
+  - "[ ] Settings page loads within 300ms"

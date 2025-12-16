@@ -1,0 +1,453 @@
+# Story 01.15 - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built/refactored
+# Story: Session & Password Management
+
+gap_summary:
+  overall_readiness: "5%"
+  critical_blockers: 4
+  components_done: 0
+  components_partial: 1
+  components_missing: 18
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "user_sessions table"
+    expected: "supabase/migrations/XXX_user_sessions.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No user_sessions table exists.
+      Required columns: id, user_id, org_id, session_token, refresh_token,
+      device_type, device_name, ip_address, user_agent, created_at,
+      last_activity_at, expires_at, revoked_at, revoked_by, revocation_reason
+    refactor_action: "Create migration XXX_user_sessions.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "password_history table"
+    expected: "supabase/migrations/XXX_password_history.sql"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No password_history table exists.
+      Required columns: id, user_id, password_hash, created_at
+      Required trigger: maintain_password_history() to keep only last 5
+    refactor_action: "Create migration XXX_password_history.sql"
+    priority: "P0-BLOCKER"
+
+  - component: "organizations.session_timeout_hours"
+    expected: "Column with default 24, range 1-720"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No session timeout configuration per org"
+    refactor_action: "Migration XXX_org_session_settings.sql"
+    priority: "P1"
+
+  - component: "organizations.password_expiry_days"
+    expected: "Column with default NULL, range >=30 or NULL"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No password expiry configuration per org"
+    refactor_action: "Migration XXX_org_session_settings.sql"
+    priority: "P2"
+
+  - component: "organizations.enforce_password_history"
+    expected: "Boolean column, default true"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No password history enforcement toggle"
+    refactor_action: "Migration XXX_org_session_settings.sql"
+    priority: "P2"
+
+  - component: "users.password_changed_at"
+    expected: "Timestamp column, default NOW()"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Cannot track when password was last changed"
+    refactor_action: "Migration XXX_user_password_fields.sql"
+    priority: "P1"
+
+  - component: "users.password_expires_at"
+    expected: "Timestamp column, nullable"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Cannot enforce password expiry"
+    refactor_action: "Migration XXX_user_password_fields.sql"
+    priority: "P2"
+
+  - component: "users.force_password_change"
+    expected: "Boolean column, default false"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Cannot force user to change password on next login"
+    refactor_action: "Migration XXX_user_password_fields.sql"
+    priority: "P2"
+
+  - component: "RLS policies for user_sessions"
+    expected: "Users can read/delete own sessions, admins can manage all in org"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No RLS policies for user_sessions table"
+    refactor_action: "Include in XXX_user_sessions.sql migration"
+    priority: "P0-BLOCKER"
+
+  - component: "RLS policies for password_history"
+    expected: "No direct user access (service role only)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Password history must not be user-accessible"
+    refactor_action: "Include in XXX_password_history.sql migration"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "session-service.ts"
+    expected: "apps/frontend/lib/services/session-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No session service exists.
+      Required methods:
+      - createSession(userId, deviceInfo, ipAddress)
+      - getSessions(userId)
+      - terminateSession(sessionId, reason)
+      - terminateAllSessions(userId, exceptCurrent)
+      - parseUserAgent(userAgent)
+      - validateSession(sessionToken)
+    refactor_action: "Create new service"
+    priority: "P0-BLOCKER"
+
+  - component: "password-service.ts"
+    expected: "apps/frontend/lib/services/password-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No password service exists.
+      Required methods:
+      - validatePassword(password)
+      - checkPasswordHistory(userId, password)
+      - changePassword(userId, currentPassword, newPassword)
+      - hashPassword(password)
+      - verifyPassword(password, hash)
+    refactor_action: "Create new service"
+    priority: "P0-BLOCKER"
+
+  - component: "Supabase Auth integration"
+    expected: "Session management integrated with Supabase Auth"
+    found: "PARTIAL - basic auth exists, not session tracking"
+    status: "PARTIAL"
+    gap_description: "Need to sync Supabase Auth sessions with user_sessions table"
+    refactor_action: "Enhance auth flow to create user_sessions records"
+    priority: "P0"
+
+# =============================================================================
+# VALIDATION GAPS
+# =============================================================================
+validation_gaps:
+  - component: "session-schemas.ts"
+    expected: "apps/frontend/lib/validation/session-schemas.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No Zod schemas for session operations"
+    refactor_action: "Create validation schemas"
+    priority: "P1"
+
+  - component: "password-schemas.ts"
+    expected: "apps/frontend/lib/validation/password-schemas.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No Zod schemas for password validation.
+      Required: passwordSchema, changePasswordSchema
+    refactor_action: "Create validation schemas"
+    priority: "P0"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  - component: "ActiveSessionsList.tsx"
+    expected: "apps/frontend/components/settings/security/ActiveSessionsList.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "List of active sessions with termination actions"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  - component: "SessionCard.tsx"
+    expected: "apps/frontend/components/settings/security/SessionCard.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Individual session display card"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "TerminateSessionDialog.tsx"
+    expected: "apps/frontend/components/settings/security/TerminateSessionDialog.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Confirmation dialog for single session termination"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "TerminateAllSessionsDialog.tsx"
+    expected: "apps/frontend/components/settings/security/TerminateAllSessionsDialog.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Confirmation dialog for bulk session termination"
+    refactor_action: "Create component"
+    priority: "P2"
+
+  - component: "ChangePasswordForm.tsx"
+    expected: "apps/frontend/components/settings/security/ChangePasswordForm.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Password change form with validation"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  - component: "PasswordRequirements.tsx"
+    expected: "apps/frontend/components/settings/security/PasswordRequirements.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Real-time password requirements checklist"
+    refactor_action: "Create component"
+    priority: "P0"
+
+  - component: "PasswordStrengthIndicator.tsx"
+    expected: "apps/frontend/components/settings/security/PasswordStrengthIndicator.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Visual password strength meter"
+    refactor_action: "Create component"
+    priority: "P1"
+
+  - component: "ForcePasswordChangeModal.tsx"
+    expected: "apps/frontend/components/settings/security/ForcePasswordChangeModal.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Modal for expired password forced change"
+    refactor_action: "Create component"
+    priority: "P2"
+
+# =============================================================================
+# PAGE GAPS
+# =============================================================================
+page_gaps:
+  - component: "Security settings page"
+    expected: "apps/frontend/app/(authenticated)/settings/security/page.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "Combined security page for sessions + password"
+    refactor_action: "Create page"
+    priority: "P0"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "GET /api/v1/settings/sessions"
+    expected: "List user's own active sessions"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No session list endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "GET /api/v1/settings/sessions/current"
+    expected: "Get current session details"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No current session endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P1"
+
+  - component: "DELETE /api/v1/settings/sessions/:id"
+    expected: "Terminate specific session"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No session termination endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "DELETE /api/v1/settings/sessions"
+    expected: "Terminate all sessions except current"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No bulk termination endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P1"
+
+  - component: "POST /api/v1/settings/sessions/terminate-all"
+    expected: "Terminate all sessions including current (logout all)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No logout all devices endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P2"
+
+  - component: "GET /api/v1/settings/users/:userId/sessions"
+    expected: "Admin: list user's sessions"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No admin session list endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P1"
+
+  - component: "DELETE /api/v1/settings/users/:userId/sessions"
+    expected: "Admin: terminate all user sessions"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No admin session termination endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P1"
+
+  - component: "POST /api/v1/settings/password/change"
+    expected: "Change own password"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No password change endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P0"
+
+  - component: "POST /api/v1/settings/password/validate"
+    expected: "Validate password strength (no auth required)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No password validation endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P1"
+
+  - component: "GET /api/v1/settings/password/policy"
+    expected: "Get password policy configuration"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No password policy endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P2"
+
+  - component: "POST /api/v1/settings/users/:userId/password/reset"
+    expected: "Admin: force password reset for user"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No admin password reset endpoint"
+    refactor_action: "Create route.ts"
+    priority: "P2"
+
+# =============================================================================
+# CRITICAL BLOCKERS (Must fix before story can be implemented)
+# =============================================================================
+critical_blockers:
+  - blocker: "No user_sessions table"
+    description: "Cannot track sessions without database table"
+    migration: "XXX_user_sessions.sql"
+    risk: "HIGH - blocks all session management features"
+
+  - blocker: "No password_history table"
+    description: "Cannot enforce password history without table and trigger"
+    migration: "XXX_password_history.sql"
+    risk: "HIGH - blocks password reuse prevention"
+
+  - blocker: "No session-service.ts"
+    description: "All session endpoints need this service"
+    file: "lib/services/session-service.ts"
+    risk: "HIGH - blocks API development"
+
+  - blocker: "No password-service.ts"
+    description: "All password endpoints need this service"
+    file: "lib/services/password-service.ts"
+    risk: "HIGH - blocks API development"
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  phase_1_database:
+    - "XXX_user_sessions.sql"
+    - "XXX_password_history.sql"
+    - "XXX_org_session_settings.sql"
+    - "XXX_user_password_fields.sql"
+
+  phase_2_validation:
+    - "lib/validation/session-schemas.ts"
+    - "lib/validation/password-schemas.ts"
+
+  phase_3_services:
+    - "lib/services/session-service.ts"
+    - "lib/services/password-service.ts"
+
+  phase_4_api:
+    - "app/api/v1/settings/sessions/route.ts"
+    - "app/api/v1/settings/sessions/current/route.ts"
+    - "app/api/v1/settings/sessions/[id]/route.ts"
+    - "app/api/v1/settings/sessions/terminate-all/route.ts"
+    - "app/api/v1/settings/password/change/route.ts"
+    - "app/api/v1/settings/password/validate/route.ts"
+    - "app/api/v1/settings/password/policy/route.ts"
+
+  phase_5_components:
+    - "components/settings/security/PasswordRequirements.tsx"
+    - "components/settings/security/PasswordStrengthIndicator.tsx"
+    - "components/settings/security/ChangePasswordForm.tsx"
+    - "components/settings/security/SessionCard.tsx"
+    - "components/settings/security/TerminateSessionDialog.tsx"
+    - "components/settings/security/ActiveSessionsList.tsx"
+
+  phase_6_pages:
+    - "app/(authenticated)/settings/security/page.tsx"
+
+  phase_7_admin_features:
+    - "app/api/v1/settings/users/[userId]/sessions/route.ts"
+    - "app/api/v1/settings/users/[userId]/password/reset/route.ts"
+
+  phase_8_tests:
+    - "All test files per tests.yaml"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] user_sessions table created with indexes and RLS"
+  - "[ ] password_history table created with cleanup trigger"
+  - "[ ] Organizations table extended with session/password settings"
+  - "[ ] Users table extended with password fields"
+  - "[ ] Sessions created on login with device info and expiry"
+  - "[ ] Session timeout configurable per org (default 24h)"
+  - "[ ] Active sessions list displays all user sessions"
+  - "[ ] Current session correctly identified and badged"
+  - "[ ] Single session termination works with confirmation"
+  - "[ ] 'Terminate All' terminates all sessions except current"
+  - "[ ] Terminated sessions return 401 on next request"
+  - "[ ] Password change terminates all other sessions"
+  - "[ ] Password validation enforces all complexity requirements"
+  - "[ ] Real-time password requirements checklist works"
+  - "[ ] Password strength indicator displays correctly"
+  - "[ ] Password history prevents reuse of last 5 passwords"
+  - "[ ] Admins can view and terminate user sessions"
+  - "[ ] Non-admins cannot view other users' sessions"
+  - "[ ] Cross-tenant session access returns 404 (not 403)"
+  - "[ ] All tests passing (unit >= 90%, integration >= 85%)"
+
+# =============================================================================
+# DEPENDENCY GAPS (Story Dependencies)
+# =============================================================================
+dependency_gaps:
+  - component: "Story 01.1 - Org Context + Base RLS"
+    expected: "Organizations table, users table, auth.uid() pattern"
+    found: "COMPLETED (assumed)"
+    status: "OK"
+    gap_description: "Required for RLS policies and org_id context"
+    refactor_action: "Verify 01.1 completed"
+    priority: "P0"
+
+  - component: "Story 01.6 - Role-Based Permissions"
+    expected: "Roles table, hasPermission() helper, admin role checks"
+    found: "UNKNOWN - depends on 01.6 completion"
+    status: "DEPENDENCY"
+    gap_description: "Admin session termination requires role checks"
+    refactor_action: "Verify 01.6 completed"
+    priority: "P1"

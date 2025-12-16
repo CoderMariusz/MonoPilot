@@ -1,0 +1,747 @@
+# Story Context: 07.1 Customers CRUD + Contacts + Addresses
+# Generated: 2025-12-16
+# Purpose: AI agent context for implementing customer management system with contacts and addresses
+
+story:
+  id: "07.1"
+  name: "Customers CRUD + Contacts + Addresses"
+  epic: "07-shipping"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P0"
+  story_file: "docs/2-MANAGEMENT/epics/current/07-shipping/07.1.customers-crud.md"
+
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table"
+        - "org_id context"
+        - "RLS policies for tenant isolation"
+    - story: "01.6"
+      name: "Role-Based Permissions"
+      provides:
+        - "roles table"
+        - "permission matrix"
+        - "hasPermission() helper"
+        - "Permission middleware"
+    - story: "02.3"
+      name: "Allergens Management"
+      provides:
+        - "allergens table for customer restrictions reference"
+  optional:
+    - epic: "02"
+      note: "Allergens reference for allergen_restrictions field validation"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/shipping.md"
+  prd_sections:
+    - "FR-7.1"   # Customer CRUD operations
+    - "FR-7.2"   # Customer contacts management
+    - "FR-7.3"   # Multiple shipping addresses
+    - "FR-7.7"   # Customer allergen restrictions
+  architecture: "docs/1-BASELINE/architecture/modules/shipping.md"
+  architecture_sections:
+    - "lines 32-83"   # Database schema for customers, contacts, addresses
+    - "lines 318-380" # API endpoints and indexes
+    - "lines 556-565" # Frontend component structure
+  story: "docs/2-MANAGEMENT/epics/current/07-shipping/07.1.customers-crud.md"
+  brief: "docs/2-MANAGEMENT/epics/current/07-shipping/STORY-WRITING-BRIEF.md"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  patterns:
+    - "apps/frontend/lib/validation/*.ts"  # Zod schema patterns
+    - "apps/frontend/components/ui/data-table.tsx"  # ShadCN DataTable
+    - "apps/frontend/components/ui/dialog.tsx"  # ShadCN Dialog
+    - "apps/frontend/lib/services/*.ts"  # Service layer patterns
+    - "docs/2-MANAGEMENT/epics/current/01-settings/01.5a.user-management-crud-mvp.md"  # Reference CRUD story
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/YYYYMMDDHHMMSS_create_customers_tables.sql"
+      type: "migration"
+      description: "Create customers, customer_contacts, customer_addresses tables with RLS"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/shipping/customers/page.tsx"
+      description: "Customer list page with DataTable"
+    - path: "apps/frontend/app/(authenticated)/shipping/customers/[id]/page.tsx"
+      description: "Customer detail page with tabs"
+  components:
+    - path: "apps/frontend/components/shipping/customers/CustomerTable.tsx"
+      description: "DataTable with search, filter, sort, pagination"
+    - path: "apps/frontend/components/shipping/customers/CustomerForm.tsx"
+      description: "Create/Edit customer modal form"
+    - path: "apps/frontend/components/shipping/customers/ContactsTab.tsx"
+      description: "Contacts list with CRUD operations"
+    - path: "apps/frontend/components/shipping/customers/ContactForm.tsx"
+      description: "Add/Edit contact modal"
+    - path: "apps/frontend/components/shipping/customers/AddressesTab.tsx"
+      description: "Addresses list with CRUD operations"
+    - path: "apps/frontend/components/shipping/customers/AddressForm.tsx"
+      description: "Add/Edit address modal"
+    - path: "apps/frontend/components/shipping/customers/CustomerDetailsTab.tsx"
+      description: "Customer info display"
+    - path: "apps/frontend/components/shipping/customers/CustomerStatusBadge.tsx"
+      description: "Active/Inactive status badge"
+    - path: "apps/frontend/components/shipping/customers/CustomerCategoryBadge.tsx"
+      description: "Category badge (retail/wholesale/distributor)"
+    - path: "apps/frontend/components/shipping/customers/AllergenBadge.tsx"
+      description: "Individual allergen badge"
+    - path: "apps/frontend/components/shipping/customers/CustomerOrderHistory.tsx"
+      description: "Placeholder component for Story 07.3"
+  validation:
+    - path: "apps/frontend/lib/validation/customer-schema.ts"
+      description: "Zod schemas for customer, contact, address"
+  api:
+    - path: "apps/frontend/app/api/shipping/customers/route.ts"
+      methods: ["GET", "POST"]
+      description: "List customers with filters, Create customer"
+    - path: "apps/frontend/app/api/shipping/customers/[id]/route.ts"
+      methods: ["GET", "PUT", "DELETE"]
+      description: "Get customer, Update customer, Archive customer"
+    - path: "apps/frontend/app/api/shipping/customers/[id]/contacts/route.ts"
+      methods: ["GET", "POST"]
+      description: "List contacts, Create contact"
+    - path: "apps/frontend/app/api/shipping/customers/[id]/contacts/[contactId]/route.ts"
+      methods: ["PUT", "DELETE"]
+      description: "Update contact, Delete contact"
+    - path: "apps/frontend/app/api/shipping/customers/[id]/addresses/route.ts"
+      methods: ["GET", "POST"]
+      description: "List addresses, Create address"
+    - path: "apps/frontend/app/api/shipping/customers/[id]/addresses/[addressId]/route.ts"
+      methods: ["PUT", "DELETE"]
+      description: "Update address, Delete address"
+    - path: "apps/frontend/app/api/shipping/customers/[id]/addresses/[addressId]/set-default/route.ts"
+      methods: ["PUT"]
+      description: "Set address as default for its type"
+  services:
+    - path: "apps/frontend/lib/services/customer-service.ts"
+      description: "Customer CRUD business logic with validation"
+
+database:
+  tables:
+    - name: "customers"
+      columns:
+        - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "customer_code TEXT NOT NULL"
+        - "name TEXT NOT NULL"
+        - "email TEXT"
+        - "phone TEXT"
+        - "tax_id TEXT"  # Encrypted via Supabase Vault
+        - "credit_limit DECIMAL(15,2)"
+        - "payment_terms_days INTEGER DEFAULT 30"
+        - "category TEXT"  # retail, wholesale, distributor
+        - "allergen_restrictions JSONB"  # Array of allergen IDs
+        - "is_active BOOLEAN DEFAULT true"
+        - "notes TEXT"
+        - "created_at TIMESTAMPTZ DEFAULT now()"
+        - "created_by UUID REFERENCES users(id)"
+        - "updated_at TIMESTAMPTZ DEFAULT now()"
+      constraints:
+        - "UNIQUE(org_id, customer_code)"
+      rls: true
+      rls_policies:
+        - name: "customers_org_isolation"
+          operation: "ALL"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      indexes:
+        - "org_id, customer_code"
+        - "org_id, is_active"
+        - "name"
+        - "email"
+
+    - name: "customer_contacts"
+      columns:
+        - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE"
+        - "name TEXT NOT NULL"
+        - "title TEXT"
+        - "email TEXT"
+        - "phone TEXT"
+        - "is_primary BOOLEAN DEFAULT false"
+        - "created_at TIMESTAMPTZ DEFAULT now()"
+      rls: true
+      rls_policies:
+        - name: "customer_contacts_org_isolation"
+          operation: "ALL"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      indexes:
+        - "customer_id"
+
+    - name: "customer_addresses"
+      columns:
+        - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE"
+        - "address_type TEXT NOT NULL"  # billing, shipping
+        - "is_default BOOLEAN DEFAULT false"
+        - "address_line1 TEXT NOT NULL"
+        - "address_line2 TEXT"
+        - "city TEXT NOT NULL"
+        - "state TEXT"
+        - "postal_code TEXT NOT NULL"
+        - "country TEXT NOT NULL"
+        - "dock_hours JSONB"  # {mon: "8-17", ...}
+        - "notes TEXT"
+        - "created_at TIMESTAMPTZ DEFAULT now()"
+      rls: true
+      rls_policies:
+        - name: "customer_addresses_org_isolation"
+          operation: "ALL"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      indexes:
+        - "customer_id"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/shipping/customers"
+    description: "List customers with pagination, search, and filtering"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES", "VIEWER"]
+    query_params:
+      - "page: number (default 1)"
+      - "limit: number (default 25, max 100)"
+      - "search: string (searches name, customer_code, email)"
+      - "status: 'active' | 'inactive' | 'all' (default 'active')"
+      - "category: 'retail' | 'wholesale' | 'distributor' | 'other'"
+      - "sortBy: 'name' | 'customer_code' | 'email' | 'created_at'"
+      - "sortOrder: 'asc' | 'desc'"
+    response:
+      customers: "Customer[]"
+      total: "number"
+      page: "number"
+      limit: "number"
+    performance: "< 500ms for 200 customers"
+
+  - method: "POST"
+    path: "/api/shipping/customers"
+    description: "Create new customer"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES"]
+    request_body:
+      customer_code: "string (required, unique per org)"
+      name: "string (required)"
+      email: "string (optional, valid email)"
+      phone: "string (optional)"
+      tax_id: "string (optional, will be encrypted)"
+      credit_limit: "decimal (optional)"
+      payment_terms_days: "integer (default 30)"
+      category: "enum: retail | wholesale | distributor | other"
+      allergen_restrictions: "string[] (array of allergen IDs)"
+      notes: "string (optional)"
+    response:
+      id: "UUID"
+      customer_code: "string"
+      name: "string"
+      created_at: "timestamp"
+    errors:
+      409: "Customer code already exists"
+      400: "Invalid email format"
+      400: "Invalid allergen ID"
+
+  - method: "GET"
+    path: "/api/shipping/customers/:id"
+    description: "Get customer details with contacts and addresses"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES", "VIEWER"]
+    response:
+      customer: "Customer object with nested contacts and addresses arrays"
+    errors:
+      404: "Customer not found"
+
+  - method: "PUT"
+    path: "/api/shipping/customers/:id"
+    description: "Update existing customer"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES"]
+    request_body:
+      name: "string (optional)"
+      email: "string (optional)"
+      phone: "string (optional)"
+      tax_id: "string (optional, will be encrypted)"
+      credit_limit: "decimal (optional)"
+      category: "enum (optional)"
+      allergen_restrictions: "string[] (optional)"
+      notes: "string (optional)"
+      is_active: "boolean (optional)"
+    response:
+      customer: "Updated Customer object"
+    errors:
+      404: "Customer not found"
+
+  - method: "DELETE"
+    path: "/api/shipping/customers/:id"
+    description: "Archive customer (soft delete, sets is_active=false)"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      success: true
+      message: "Customer archived"
+    errors:
+      404: "Customer not found"
+    warnings:
+      - "Warn if customer has open orders before archiving"
+
+  - method: "GET"
+    path: "/api/shipping/customers/:id/contacts"
+    description: "List all contacts for a customer"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES", "VIEWER"]
+    response:
+      contacts: "CustomerContact[]"
+
+  - method: "POST"
+    path: "/api/shipping/customers/:id/contacts"
+    description: "Create new contact for customer"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES"]
+    request_body:
+      name: "string (required)"
+      title: "string (optional)"
+      email: "string (optional)"
+      phone: "string (optional)"
+      is_primary: "boolean (default false)"
+    response:
+      contact: "CustomerContact object"
+    side_effects:
+      - "If is_primary=true, unmark existing primary contact"
+
+  - method: "PUT"
+    path: "/api/shipping/customers/:id/contacts/:contactId"
+    description: "Update existing contact"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES"]
+    request_body:
+      name: "string (optional)"
+      title: "string (optional)"
+      email: "string (optional)"
+      phone: "string (optional)"
+      is_primary: "boolean (optional)"
+    response:
+      contact: "Updated CustomerContact object"
+
+  - method: "DELETE"
+    path: "/api/shipping/customers/:id/contacts/:contactId"
+    description: "Delete contact"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES"]
+    response:
+      success: true
+
+  - method: "GET"
+    path: "/api/shipping/customers/:id/addresses"
+    description: "List all addresses for a customer"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES", "VIEWER"]
+    response:
+      addresses: "CustomerAddress[]"
+
+  - method: "POST"
+    path: "/api/shipping/customers/:id/addresses"
+    description: "Create new address for customer"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES"]
+    request_body:
+      address_type: "enum: billing | shipping (required)"
+      is_default: "boolean (default false)"
+      address_line1: "string (required)"
+      address_line2: "string (optional)"
+      city: "string (required)"
+      state: "string (optional)"
+      postal_code: "string (required)"
+      country: "string (required)"
+      dock_hours: "object (optional, e.g., {mon: '8-17'})"
+      notes: "string (optional)"
+    response:
+      address: "CustomerAddress object"
+    side_effects:
+      - "If is_default=true, unmark existing default for same address_type"
+
+  - method: "PUT"
+    path: "/api/shipping/customers/:id/addresses/:addressId"
+    description: "Update existing address"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES"]
+    request_body:
+      address_line1: "string (optional)"
+      address_line2: "string (optional)"
+      city: "string (optional)"
+      state: "string (optional)"
+      postal_code: "string (optional)"
+      country: "string (optional)"
+      dock_hours: "object (optional)"
+      notes: "string (optional)"
+      is_default: "boolean (optional)"
+    response:
+      address: "Updated CustomerAddress object"
+
+  - method: "DELETE"
+    path: "/api/shipping/customers/:id/addresses/:addressId"
+    description: "Delete address"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES"]
+    response:
+      success: true
+    errors:
+      400: "Cannot delete the only address for a customer"
+
+  - method: "PUT"
+    path: "/api/shipping/customers/:id/addresses/:addressId/set-default"
+    description: "Set address as default for its type"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN", "SALES"]
+    response:
+      success: true
+    side_effects:
+      - "Unmark existing default for same address_type"
+
+ux:
+  patterns:
+    table: "ShadCN DataTable with column sorting, filtering, pagination"
+    modal: "ShadCN Dialog for create/edit forms"
+    form: "react-hook-form with Zod resolver"
+    badge: "ShadCN Badge for status, category, allergen indicators"
+    search: "Debounced search input (300ms)"
+    tabs: "ShadCN Tabs for customer detail sections"
+    confirmation: "ShadCN AlertDialog for destructive actions"
+
+  states:
+    loading: "Skeleton rows (3) with shimmer animation"
+    empty: "'No customers found' illustration with 'Add Your First Customer' CTA"
+    error: "'Failed to load customers' warning with Retry button"
+    success: "Table populated with customer data"
+
+  customer_list_features:
+    - "Search bar (name, customer_code, email)"
+    - "Status filter dropdown (Active, Inactive, All)"
+    - "Category filter dropdown (Retail, Wholesale, Distributor, Other, All)"
+    - "Sort dropdown (Name, Customer Code, Email, Created Date)"
+    - "Add Customer button (primary CTA)"
+    - "Row actions: View, Edit, Archive/Reactivate"
+    - "Pagination (25 per page, configurable)"
+
+  customer_detail_tabs:
+    - "Details: Customer info, allergen restrictions, notes"
+    - "Contacts: List of contacts with CRUD actions"
+    - "Addresses: List of addresses with CRUD actions"
+    - "Order History: Placeholder (Story 07.3)"
+
+  badges:
+    status:
+      active: "bg-green-100 text-green-800"
+      inactive: "bg-gray-100 text-gray-800"
+    category:
+      retail: "bg-blue-100 text-blue-800"
+      wholesale: "bg-purple-100 text-purple-800"
+      distributor: "bg-orange-100 text-orange-800"
+      other: "bg-gray-100 text-gray-800"
+    allergen: "bg-red-100 text-red-800"
+
+validation_rules:
+  customer_code:
+    type: "string"
+    required: true
+    min: 1
+    max: 50
+    pattern: "^[A-Z0-9-]+$"
+    unique_per_org: true
+    error_empty: "Customer code is required"
+    error_pattern: "Customer code must contain only uppercase letters, numbers, and hyphens"
+    error_duplicate: "Customer code already exists"
+
+  name:
+    type: "string"
+    required: true
+    min: 1
+    max: 200
+    error_empty: "Customer name is required"
+    error_max: "Customer name must be at most 200 characters"
+
+  email:
+    type: "string"
+    format: "email"
+    optional: true
+    error_format: "Invalid email format"
+
+  phone:
+    type: "string"
+    max: 50
+    optional: true
+    error_max: "Phone must be at most 50 characters"
+
+  tax_id:
+    type: "string"
+    max: 50
+    optional: true
+    encrypted: true
+    display: "masked (last 4 digits only)"
+    error_max: "Tax ID must be at most 50 characters"
+
+  credit_limit:
+    type: "decimal"
+    min: 0
+    optional: true
+    error_min: "Credit limit must be non-negative"
+
+  payment_terms_days:
+    type: "integer"
+    min: 0
+    default: 30
+    error_min: "Payment terms must be non-negative"
+
+  category:
+    type: "enum"
+    values: ["retail", "wholesale", "distributor", "other"]
+    optional: true
+
+  allergen_restrictions:
+    type: "array"
+    items: "UUID (references allergens.id)"
+    optional: true
+    default: []
+    error_invalid: "Invalid allergen ID"
+
+  contact_name:
+    type: "string"
+    required: true
+    min: 1
+    max: 100
+    error_empty: "Contact name is required"
+
+  address_type:
+    type: "enum"
+    values: ["billing", "shipping"]
+    required: true
+
+  address_line1:
+    type: "string"
+    required: true
+    min: 1
+    max: 200
+    error_empty: "Address line 1 is required"
+
+  city:
+    type: "string"
+    required: true
+    min: 1
+    max: 100
+    error_empty: "City is required"
+
+  postal_code:
+    type: "string"
+    required: true
+    min: 1
+    max: 20
+    error_empty: "Postal code is required"
+
+  country:
+    type: "string"
+    required: true
+    min: 1
+    max: 100
+    error_empty: "Country is required"
+
+patterns:
+  rls: "ADR-013 - RLS Org Isolation Pattern"
+  api: "REST with org_id filter from auth context"
+  service: "Class-based CustomerService with static methods"
+  validation: "Zod schemas in lib/validation/customer-schema.ts"
+  encryption: "Supabase Vault for tax_id field"
+  cascade_delete: "customer_contacts and customer_addresses have ON DELETE CASCADE"
+  soft_delete: "Archive customers by setting is_active=false"
+  primary_contact_logic: |
+    // When marking a contact as primary
+    async setPrimaryContact(customerId: string, contactId: string): Promise<void> {
+      // 1. Unmark existing primary contact
+      await db.update(customer_contacts)
+        .set({ is_primary: false })
+        .where(eq(customer_contacts.customer_id, customerId));
+
+      // 2. Mark new contact as primary
+      await db.update(customer_contacts)
+        .set({ is_primary: true })
+        .where(eq(customer_contacts.id, contactId));
+    }
+
+  default_address_logic: |
+    // When marking an address as default
+    async setDefaultAddress(customerId: string, addressId: string, addressType: string): Promise<void> {
+      // 1. Unmark existing default for this address_type
+      await db.update(customer_addresses)
+        .set({ is_default: false })
+        .where(
+          and(
+            eq(customer_addresses.customer_id, customerId),
+            eq(customer_addresses.address_type, addressType)
+          )
+        );
+
+      // 2. Mark new address as default
+      await db.update(customer_addresses)
+        .set({ is_default: true })
+        .where(eq(customer_addresses.id, addressId));
+    }
+
+acceptance_checklist:
+  customer_list:
+    - "GIVEN admin navigates to /shipping/customers, WHEN page loads, THEN customer list displays within 500ms"
+    - "GIVEN customer list has 200 customers, WHEN admin searches 'Acme', THEN filtered results display within 300ms"
+    - "GIVEN customer list displayed, WHEN admin filters by status 'inactive', THEN only archived customers appear"
+    - "GIVEN customer list displayed, WHEN admin filters by category 'wholesale', THEN only wholesale customers appear"
+    - "GIVEN customer list with pagination, WHEN page 2 clicked, THEN next 25 customers display"
+
+  customer_creation:
+    - "GIVEN admin clicks 'Add Customer', WHEN modal opens, THEN form displays all required fields"
+    - "GIVEN valid customer data entered, WHEN 'Create' clicked, THEN customer created and appears in list within 1 second"
+    - "GIVEN duplicate customer_code entered, WHEN save attempted, THEN error 'Customer code already exists' displays"
+    - "GIVEN invalid email format entered, WHEN save attempted, THEN error 'Invalid email format' displays"
+    - "GIVEN required field empty, WHEN save attempted, THEN error displays inline"
+
+  customer_details:
+    - "GIVEN admin clicks customer row, WHEN detail page loads, THEN tabs display: Details, Contacts, Addresses, Order History (disabled)"
+    - "GIVEN customer has allergen restrictions, WHEN Details tab viewed, THEN allergen badges display"
+    - "GIVEN customer has encrypted tax_id, WHEN Details tab viewed, THEN tax_id displays masked (last 4 digits)"
+
+  contacts_management:
+    - "GIVEN admin on Contacts tab, WHEN 'Add Contact' clicked, THEN contact form modal opens"
+    - "GIVEN valid contact data entered, WHEN 'Save' clicked, THEN contact added to list"
+    - "GIVEN customer has 3 contacts with 1 primary, WHEN another contact marked primary, THEN old primary unmarked"
+    - "GIVEN admin clicks delete on contact, WHEN confirmed, THEN contact removed from list"
+
+  addresses_management:
+    - "GIVEN admin on Addresses tab, WHEN 'Add Address' clicked, THEN address form modal opens"
+    - "GIVEN valid shipping address entered, WHEN 'Save' clicked, THEN address added to list"
+    - "GIVEN customer has 2 shipping addresses with 1 default, WHEN another marked default, THEN old default unmarked"
+    - "GIVEN address has dock_hours, WHEN address viewed, THEN dock hours display in readable format"
+
+  customer_edit:
+    - "GIVEN admin clicks 'Edit', WHEN modal opens, THEN form pre-populates with current data"
+    - "GIVEN admin updates customer name, WHEN 'Save' clicked, THEN updated name displays immediately"
+
+  customer_archive:
+    - "GIVEN admin clicks 'Archive' on active customer, WHEN confirmed, THEN customer status changes to inactive"
+    - "GIVEN customer archived, WHEN list viewed without filters, THEN archived customer not visible"
+    - "GIVEN inactive customer viewed, WHEN 'Reactivate' clicked, THEN customer status changes to active"
+
+  security:
+    - "GIVEN user from Org A queries customers, WHEN results returned, THEN only Org A customers visible (RLS)"
+    - "GIVEN user with VIEWER role, WHEN customer list loaded, THEN 'Add Customer' button hidden"
+    - "GIVEN user with PROD_OPERATOR role, WHEN /shipping/customers accessed, THEN access denied"
+
+definition_of_done:
+  - "Database tables created with RLS policies"
+  - "All API endpoints functional"
+  - "Customer list page loads < 500ms for 200 customers"
+  - "Search and filter work < 300ms"
+  - "Create/Edit customer forms validate correctly"
+  - "Customer detail tabs display correctly"
+  - "Contact CRUD works end-to-end"
+  - "Address CRUD works end-to-end"
+  - "Only one primary contact per customer enforced"
+  - "Only one default address per type enforced"
+  - "Tax ID encrypted and masked in UI"
+  - "Allergen restrictions display as badges"
+  - "Multi-tenant isolation verified (RLS tests)"
+  - "Permission checks hide unauthorized actions"
+  - "Unit tests pass (>80% coverage)"
+  - "Integration tests pass for all endpoints"
+  - "E2E test passes for customer creation"
+
+tests:
+  unit:
+    - "CustomerService.createCustomer validates customer_code uniqueness"
+    - "CustomerService.validateCustomerCode checks uniqueness per org"
+    - "CustomerService.setPrimaryContact unmarks old primary"
+    - "CustomerService.setDefaultAddress unmarks old default for same type"
+    - "Zod schema rejects invalid email format"
+    - "Zod schema rejects empty required fields"
+    - "Zod schema rejects customer_code with lowercase letters"
+    - "Status badge renders correct colors"
+    - "Category badge renders correct colors"
+
+  integration:
+    - "GET /api/shipping/customers returns paginated results"
+    - "GET /api/shipping/customers?search=acme filters correctly"
+    - "GET /api/shipping/customers?status=inactive filters by status"
+    - "GET /api/shipping/customers?category=wholesale filters by category"
+    - "POST /api/shipping/customers creates customer in database"
+    - "POST /api/shipping/customers returns 409 for duplicate customer_code"
+    - "PUT /api/shipping/customers/:id updates customer"
+    - "DELETE /api/shipping/customers/:id sets is_active=false"
+    - "POST /api/shipping/customers/:id/contacts creates contact"
+    - "POST /api/shipping/customers/:id/addresses creates address"
+    - "PUT /api/shipping/customers/:id/addresses/:addressId/set-default unmarks old default"
+    - "RLS policies block cross-org access"
+    - "Permission middleware blocks unauthorized access"
+
+  e2e:
+    - "Full customer creation flow from list to modal to confirmation"
+    - "Edit customer and see immediate update in list"
+    - "Add contact to customer and verify in contacts tab"
+    - "Add address to customer and verify in addresses tab"
+    - "Mark contact as primary and verify old primary unmarked"
+    - "Mark address as default and verify old default unmarked"
+    - "Archive customer and verify status change"
+    - "Search and filter customer list"
+
+output_artifacts:
+  - "customers, customer_contacts, customer_addresses migration with RLS"
+  - "CustomerTable.tsx with sorting, filtering, pagination"
+  - "CustomerForm.tsx for create/edit"
+  - "ContactsTab.tsx and ContactForm.tsx"
+  - "AddressesTab.tsx and AddressForm.tsx"
+  - "CustomerDetailsTab.tsx"
+  - "CustomerStatusBadge.tsx, CustomerCategoryBadge.tsx, AllergenBadge.tsx"
+  - "customer-schema.ts Zod validation schemas"
+  - "customer-service.ts with CRUD operations"
+  - "API routes: /api/shipping/customers (GET, POST)"
+  - "API routes: /api/shipping/customers/:id (GET, PUT, DELETE)"
+  - "API routes: /api/shipping/customers/:id/contacts"
+  - "API routes: /api/shipping/customers/:id/addresses"
+  - "Unit tests for customer-service"
+  - "Integration tests for all API endpoints"
+  - "E2E test for customer creation workflow"
+
+implementation_notes:
+  frontend:
+    - "Use ShadCN DataTable for customer list with server-side pagination"
+    - "Use ShadCN Dialog for create/edit modals"
+    - "Use ShadCN Tabs for customer detail sections"
+    - "Use react-hook-form with Zod resolver for form validation"
+    - "Debounce search input by 300ms to reduce API calls"
+    - "Show skeleton loaders while data is loading"
+    - "Display allergen names from allergens table, not hardcoded"
+    - "Mask tax_id display (show last 4 digits only)"
+    - "Use usePermissions() hook to conditionally render actions"
+
+  backend:
+    - "Validate customer_code uniqueness within org before insert"
+    - "Validate allergen IDs exist in allergens table before saving"
+    - "Encrypt tax_id using Supabase Vault before storing"
+    - "Implement primary contact logic (unmark old, mark new)"
+    - "Implement default address logic (unmark old for same type, mark new)"
+    - "Use ADR-013 RLS pattern for org isolation"
+    - "Enforce permission middleware on all customer endpoints"
+    - "Cascade delete contacts and addresses when customer deleted"
+
+  database:
+    - "Create customers table with UNIQUE(org_id, customer_code)"
+    - "Create customer_contacts with ON DELETE CASCADE"
+    - "Create customer_addresses with ON DELETE CASCADE"
+    - "Enable RLS on all 3 tables"
+    - "Add indexes for performance: org_id, is_active, customer_id"
+    - "Use JSONB for allergen_restrictions array"
+    - "Use JSONB for dock_hours object"
+
+  future_considerations:
+    - "Order history tab will be populated in Story 07.3"
+    - "Allergen validation against products in Story 07.3"
+    - "Customer credit limit enforcement in Phase 1B"
+    - "Customer pricing agreements in Phase 2"

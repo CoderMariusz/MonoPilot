@@ -1,0 +1,168 @@
+# Story 01.1 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/001_create_organizations_table.sql"
+    type: "migration"
+    description: "Core tenant table with onboarding state"
+  - path: "supabase/migrations/002_create_roles_table.sql"
+    type: "migration"
+    description: "10 system roles with JSONB permissions (ADR-012)"
+  - path: "supabase/migrations/003_create_users_table.sql"
+    type: "migration"
+    description: "Users table with role_id FK"
+  - path: "supabase/migrations/004_create_modules_tables.sql"
+    type: "migration"
+    description: "modules + organization_modules tables (ADR-011)"
+  - path: "supabase/migrations/005_rls_policies.sql"
+    type: "migration"
+    description: "RLS policies following ADR-013 pattern"
+  - path: "supabase/migrations/006_seed_system_data.sql"
+    type: "seed"
+    description: "Seed 10 system roles and 11 modules"
+
+tables:
+  - name: "organizations"
+    description: "Core tenant table"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "slug", type: "TEXT", constraints: "UNIQUE NOT NULL" }
+      - { name: "timezone", type: "TEXT", constraints: "DEFAULT 'UTC'" }
+      - { name: "locale", type: "TEXT", constraints: "DEFAULT 'en'" }
+      - { name: "currency", type: "TEXT", constraints: "DEFAULT 'PLN'" }
+      - { name: "logo_url", type: "TEXT", constraints: "" }
+      - { name: "onboarding_step", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "onboarding_started_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "onboarding_completed_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "onboarding_skipped", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_organizations_slug ON organizations(slug)"
+
+  - name: "roles"
+    description: "System roles with JSONB permissions (ADR-012)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "UNIQUE NOT NULL" }
+      - { name: "name", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "permissions", type: "JSONB", constraints: "NOT NULL" }
+      - { name: "is_system", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "display_order", type: "INT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "is_system = true (public read for system roles)"
+    indexes:
+      - "idx_roles_code ON roles(code)"
+      - "idx_roles_system ON roles(is_system)"
+
+  - name: "users"
+    description: "User accounts with org_id and role_id"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY REFERENCES auth.users(id)" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "email", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "first_name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "last_name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "role_id", type: "UUID", constraints: "NOT NULL REFERENCES roles(id)" }
+      - { name: "language", type: "TEXT", constraints: "DEFAULT 'en'" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "last_login_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_users_org_email ON users(org_id, email)"
+      - "idx_users_org_active ON users(org_id, is_active)"
+      - "idx_users_role ON users(role_id)"
+    constraints:
+      - "UNIQUE(org_id, email)"
+
+  - name: "modules"
+    description: "Module definitions - seeded, immutable (ADR-011)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "UNIQUE NOT NULL" }
+      - { name: "name", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "dependencies", type: "TEXT[]", constraints: "" }
+      - { name: "can_disable", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "display_order", type: "INT", constraints: "" }
+    rls: true
+    rls_pattern: "true (public read for all authenticated)"
+    indexes:
+      - "idx_modules_code ON modules(code)"
+
+  - name: "organization_modules"
+    description: "Org-specific module state (ADR-011)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "module_id", type: "UUID", constraints: "NOT NULL REFERENCES modules(id)" }
+      - { name: "enabled", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "enabled_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "enabled_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_organization_modules_org ON organization_modules(org_id)"
+      - "idx_organization_modules_module ON organization_modules(module_id)"
+      - "idx_organization_modules_enabled ON organization_modules(org_id, enabled)"
+    constraints:
+      - "UNIQUE(org_id, module_id)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Single source of truth (users table)"
+    - "User org reassignment takes effect immediately"
+    - "No custom JWT claim configuration required"
+    - "Performance overhead <1ms per query"
+
+  policies:
+    - { table: "organizations", name: "org_select_own", operation: "SELECT", using: "id = (SELECT org_id FROM users WHERE id = auth.uid())" }
+    - { table: "users", name: "users_org_isolation", operation: "SELECT", using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())" }
+    - { table: "users", name: "users_admin_write", operation: "ALL", using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')" }
+    - { table: "roles", name: "roles_select_system", operation: "SELECT", using: "is_system = true" }
+    - { table: "modules", name: "modules_select_all", operation: "SELECT", using: "true" }
+    - { table: "organization_modules", name: "org_modules_isolation", operation: "SELECT", using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())" }
+    - { table: "organization_modules", name: "org_modules_admin_write", operation: "ALL", using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')" }
+
+# Seed Data
+seed_data:
+  roles:
+    description: "10 system roles per ADR-012"
+    data:
+      - { code: "SUPER_ADMIN", name: "Super Administrator", permissions: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","warehouse":"CRUD","quality":"CRUD","shipping":"CRUD"}' }
+      - { code: "ADMIN", name: "Administrator", permissions: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","warehouse":"CRUD","quality":"CRUD","shipping":"CRUD"}' }
+      - { code: "PRODUCTION_MANAGER", name: "Production Manager", permissions: '{"settings":"R","users":"R","technical":"R","planning":"CRU","production":"CRUD","warehouse":"R","quality":"CRU","shipping":"R"}' }
+      - { code: "WAREHOUSE_MANAGER", name: "Warehouse Manager", permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","warehouse":"CRUD","quality":"R","shipping":"CRU"}' }
+      - { code: "QUALITY_MANAGER", name: "Quality Manager", permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","warehouse":"R","quality":"CRUD","shipping":"R"}' }
+      - { code: "PLANNER", name: "Planner", permissions: '{"settings":"R","users":"R","technical":"R","planning":"CRUD","production":"R","warehouse":"R","quality":"R","shipping":"R"}' }
+      - { code: "OPERATOR", name: "Operator", permissions: '{"settings":"-","users":"-","technical":"R","planning":"R","production":"CRU","warehouse":"CRU","quality":"CRU","shipping":"-"}' }
+      - { code: "WAREHOUSE_OPERATOR", name: "Warehouse Operator", permissions: '{"settings":"-","users":"-","technical":"R","planning":"R","production":"R","warehouse":"CRU","quality":"R","shipping":"CRU"}' }
+      - { code: "VIEWER", name: "Viewer", permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","warehouse":"R","quality":"R","shipping":"R"}' }
+      - { code: "EXTERNAL", name: "External User", permissions: '{"settings":"-","users":"-","technical":"R","planning":"R","production":"R","warehouse":"R","quality":"R","shipping":"R"}' }
+
+  modules:
+    description: "11 modules per ADR-011"
+    data:
+      - { code: "settings", name: "Settings", can_disable: false, display_order: 1 }
+      - { code: "technical", name: "Technical", can_disable: false, display_order: 2 }
+      - { code: "planning", name: "Planning", dependencies: ["technical"], can_disable: true, display_order: 3 }
+      - { code: "production", name: "Production", dependencies: ["planning"], can_disable: true, display_order: 4 }
+      - { code: "warehouse", name: "Warehouse", dependencies: ["technical"], can_disable: true, display_order: 5 }
+      - { code: "quality", name: "Quality", dependencies: ["production"], can_disable: true, display_order: 6 }
+      - { code: "shipping", name: "Shipping", dependencies: ["warehouse"], can_disable: true, display_order: 7 }
+      - { code: "npd", name: "New Product Development", dependencies: ["technical"], can_disable: true, display_order: 8 }
+      - { code: "finance", name: "Finance", dependencies: ["planning", "shipping"], can_disable: true, display_order: 9 }
+      - { code: "oee", name: "OEE", dependencies: ["production"], can_disable: true, display_order: 10 }
+      - { code: "integrations", name: "Integrations", dependencies: [], can_disable: true, display_order: 11 }

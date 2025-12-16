@@ -1,0 +1,562 @@
+# Story 01.16 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/invitation-service.test.ts"
+    type: "unit"
+    description: "Unit tests for invitation CRUD and acceptance"
+  - path: "apps/frontend/lib/services/__tests__/email-service.test.ts"
+    type: "unit"
+    description: "Unit tests for email sending"
+  - path: "apps/frontend/components/settings/users/__tests__/InviteUserModal.test.tsx"
+    type: "component"
+    description: "Component tests for invitation modal"
+  - path: "apps/frontend/components/settings/users/__tests__/PendingInvitationsTable.test.tsx"
+    type: "component"
+    description: "Component tests for invitations table"
+  - path: "apps/frontend/components/auth/__tests__/AcceptInvitationForm.test.tsx"
+    type: "component"
+    description: "Component tests for accept invitation form"
+  - path: "apps/frontend/app/api/v1/settings/users/__tests__/invite.test.ts"
+    type: "integration"
+    description: "Integration tests for invitation API"
+  - path: "apps/frontend/app/api/auth/__tests__/accept-invitation.test.ts"
+    type: "integration"
+    description: "Integration tests for accept invitation API (public)"
+  - path: "e2e/settings/user-invitations.spec.ts"
+    type: "e2e"
+    description: "E2E tests for full invitation flow"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # Send Invitation
+  - id: "AC-I-01"
+    given: "admin is on the Users page"
+    when: "admin clicks 'Invite User'"
+    then: "an invitation modal displays with email and role fields"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-I-02"
+    given: "admin enters email 'new@company.com' and selects role 'PROD_OPERATOR'"
+    when: "'Send Invitation' is clicked"
+    then: "invitation email is sent within 5 seconds"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-I-03"
+    given: "invitation sent successfully"
+    when: "action completes"
+    then: "success toast displays 'Invitation sent to new@company.com'"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Email Content
+  - id: "AC-E-01"
+    given: "invitation is sent to 'john@company.com'"
+    when: "email is delivered"
+    then: "subject is 'You're invited to join [Organization Name] on MonoPilot'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-E-02"
+    given: "invitation email"
+    when: "rendered"
+    then: "body contains organization name, inviter name, role name, activation link, and expiry notice"
+    test_type: "unit"
+    priority: "P0"
+
+  # Accept Invitation
+  - id: "AC-A-01"
+    given: "recipient receives invitation email"
+    when: "recipient clicks the activation link"
+    then: "password setup page displays with org name, role, and pre-filled email"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-A-02"
+    given: "recipient submits valid password"
+    when: "form is submitted"
+    then: "account is activated, user logged in, and redirected to dashboard"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-A-03"
+    given: "account activated successfully"
+    when: "redirect completes"
+    then: "welcome toast displays 'Welcome to [Organization Name]!'"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Invitation Expiry
+  - id: "AC-X-01"
+    given: "invitation link is older than 7 days"
+    when: "recipient clicks the link"
+    then: "error page displays 'This invitation has expired'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-X-02"
+    given: "invitation is 6 days old"
+    when: "recipient clicks the link"
+    then: "warning banner shows 'This invitation expires in 1 day'"
+    test_type: "unit"
+    priority: "P2"
+
+  # Pending Invitations
+  - id: "AC-P-01"
+    given: "admin navigates to Users page"
+    when: "'Pending Invitations' tab is clicked"
+    then: "pending invitations list displays with email, role, sent date, expires date"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-P-02"
+    given: "invitation list"
+    when: "sorted"
+    then: "invitations ordered by sent date (newest first)"
+    test_type: "unit"
+    priority: "P2"
+
+  # Resend Invitation
+  - id: "AC-R-01"
+    given: "pending invitation exists for 'test@company.com'"
+    when: "admin clicks 'Resend' and confirms"
+    then: "new invitation email is sent and expiry reset to 7 days"
+    test_type: "integration"
+    priority: "P0"
+
+  # Cancel Invitation
+  - id: "AC-C-01"
+    given: "pending invitation exists for 'cancel@company.com'"
+    when: "admin clicks 'Cancel' and confirms"
+    then: "invitation is invalidated and removed from pending list"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-C-02"
+    given: "cancelled invitation token"
+    when: "recipient clicks old link"
+    then: "error page displays 'This invitation is no longer valid'"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Duplicate Handling
+  - id: "AC-D-01"
+    given: "user 'existing@company.com' already has an active account"
+    when: "admin attempts to invite 'existing@company.com'"
+    then: "error displays 'User with this email already exists'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-D-02"
+    given: "pending invitation exists for 'pending@company.com'"
+    when: "admin attempts to invite 'pending@company.com' again"
+    then: "error displays 'An invitation is already pending for this email'"
+    test_type: "integration"
+    priority: "P0"
+
+  # Permission Enforcement
+  - id: "AC-PER-01"
+    given: "user with VIEWER role"
+    when: "accessing invite functionality"
+    then: "'Invite User' button is hidden"
+    test_type: "unit"
+    priority: "P0"
+    security: true
+
+  - id: "AC-PER-02"
+    given: "user with ADMIN role"
+    when: "inviting user with SUPER_ADMIN role"
+    then: "error displays 'Only Super Admin can invite Super Admin'"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  invitation_service:
+    - name: "createInvitation generates unique 64-char token"
+      setup: "Mock crypto.randomBytes"
+      expected: "Token is 64 characters hex string"
+
+    - name: "createInvitation sets expiry to 7 days from now"
+      setup: "Mock current date"
+      expected: "expires_at = now + 7 days"
+
+    - name: "createInvitation rejects duplicate pending invitation"
+      setup: "Existing pending invitation for email"
+      expected: "Throws error: 'An invitation is already pending for this email'"
+
+    - name: "createInvitation rejects invitation for existing user email"
+      setup: "User with email exists in users table"
+      expected: "Throws error: 'User with this email already exists'"
+
+    - name: "createInvitation rejects Super Admin role for non-Super Admin inviter"
+      setup: "Inviter has ADMIN role, role_id is SUPER_ADMIN"
+      expected: "Throws error: 'Only Super Admin can invite Super Admin'"
+
+    - name: "acceptInvitation creates user with correct role"
+      setup: "Valid token, role_id in invitation"
+      expected: "User created with role_id from invitation"
+
+    - name: "acceptInvitation marks invitation as accepted"
+      setup: "Valid token"
+      expected: "Invitation status='accepted', accepted_at set"
+
+    - name: "acceptInvitation returns valid access token"
+      setup: "Valid token, password"
+      expected: "Returns JWT access token"
+
+    - name: "acceptInvitation rejects expired invitation"
+      setup: "Token with expires_at in past"
+      expected: "Throws error: 'Invitation has expired'"
+
+    - name: "acceptInvitation rejects cancelled invitation"
+      setup: "Token with status='cancelled'"
+      expected: "Throws error: 'Invitation no longer valid'"
+
+    - name: "acceptInvitation rejects invalid token"
+      setup: "Non-existent token"
+      expected: "Throws error: 'Invalid invitation token'"
+
+    - name: "resendInvitation generates new token"
+      setup: "Existing pending invitation"
+      expected: "New token generated, old token invalid"
+
+    - name: "resendInvitation resets expiry to 7 days"
+      setup: "Existing invitation expires in 2 days"
+      expected: "expires_at = now + 7 days"
+
+    - name: "resendInvitation rejects non-pending invitation"
+      setup: "Invitation with status='accepted'"
+      expected: "Throws error: 'Cannot resend non-pending invitation'"
+
+    - name: "cancelInvitation sets status to cancelled"
+      setup: "Pending invitation"
+      expected: "status='cancelled', cancelled_at set"
+
+  email_service:
+    - name: "sendInvitationEmail calls Resend API correctly"
+      setup: "Mock Resend client"
+      expected: "resend.emails.send called with correct params"
+
+    - name: "sendInvitationEmail renders template with all fields"
+      setup: "Mock params with orgName, inviterName, roleName"
+      expected: "Email HTML contains all fields"
+
+    - name: "sendInvitationEmail handles API errors gracefully"
+      setup: "Mock Resend to throw error"
+      expected: "Returns { success: false, error: message }"
+
+# Component Test Cases
+component_tests:
+  InviteUserModal:
+    - name: "Renders email and role fields"
+      setup: "Open modal"
+      expected: "Email input and role dropdown visible"
+
+    - name: "Validates email format"
+      setup: "Enter invalid email 'notanemail'"
+      expected: "Error message: 'Invalid email format'"
+
+    - name: "Validates required role"
+      setup: "Submit without selecting role"
+      expected: "Error message: 'Role is required'"
+
+    - name: "Submits invitation successfully"
+      setup: "Valid email and role"
+      expected: "Success callback called, modal closes"
+
+    - name: "Shows loading state during submission"
+      setup: "Submit form"
+      expected: "Button shows spinner, form disabled"
+
+    - name: "Filters out Super Admin role for non-Super Admin"
+      setup: "User with ADMIN role"
+      expected: "Super Admin not in role dropdown"
+
+  PendingInvitationsTable:
+    - name: "Renders all pending invitations"
+      setup: "Mock 3 pending invitations"
+      expected: "3 rows visible with email, role, dates"
+
+    - name: "Shows empty state when no invitations"
+      setup: "Empty invitations array"
+      expected: "'No pending invitations' message displays"
+
+    - name: "Opens resend confirmation dialog"
+      setup: "Click 'Resend' on row"
+      expected: "Confirmation dialog displays"
+
+    - name: "Opens cancel confirmation dialog"
+      setup: "Click 'Cancel' on row"
+      expected: "Confirmation dialog displays"
+
+    - name: "Shows loading state during action"
+      setup: "Click 'Resend', action in progress"
+      expected: "Row shows loading state"
+
+  AcceptInvitationForm:
+    - name: "Pre-fills email from invitation"
+      setup: "Render with invitation.email='test@company.com'"
+      expected: "Email field shows 'test@company.com', readonly"
+
+    - name: "Displays organization and role"
+      setup: "Render with org='Acme', role='Admin'"
+      expected: "Shows 'Join Acme as Admin'"
+
+    - name: "Validates password requirements"
+      setup: "Submit with weak password 'abc'"
+      expected: "Error messages display"
+
+    - name: "Shows real-time password requirements"
+      setup: "Type password"
+      expected: "Requirements checklist updates"
+
+    - name: "Validates password confirmation match"
+      setup: "password='Abc123!', confirm='Abc124!'"
+      expected: "Error: 'Passwords do not match'"
+
+    - name: "Submits successfully with valid data"
+      setup: "Valid password, confirmation matches"
+      expected: "Success callback called"
+
+# Integration Test Cases
+integration_tests:
+  invitation_api:
+    - name: "POST /invite creates and sends invitation"
+      setup: "Admin user, valid email and role"
+      action: "POST /api/v1/settings/users/invite"
+      expected: "Invitation created in DB, email sent, 200 response"
+
+    - name: "POST /invite returns 400 for invalid email"
+      setup: "Admin user, email='notanemail'"
+      action: "POST /api/v1/settings/users/invite"
+      expected: "400 error: 'Invalid email format'"
+
+    - name: "POST /invite returns 409 for duplicate email"
+      setup: "Existing user with email"
+      action: "POST /api/v1/settings/users/invite"
+      expected: "409 error: 'User with this email already exists'"
+
+    - name: "POST /invite returns 403 for non-admin"
+      setup: "Viewer user"
+      action: "POST /api/v1/settings/users/invite"
+      expected: "403 Forbidden"
+
+    - name: "POST /invite returns 403 for non-Super Admin inviting Super Admin"
+      setup: "Admin user, role_id=SUPER_ADMIN"
+      action: "POST /api/v1/settings/users/invite"
+      expected: "403 error: 'Only Super Admin can invite Super Admin'"
+
+    - name: "GET /invitations returns org invitations only"
+      setup: "Org A has 2 invitations, Org B has 1"
+      action: "Org A admin calls GET /invitations"
+      expected: "Returns 2 invitations, not Org B's"
+
+    - name: "GET /invitations excludes other org invitations"
+      setup: "User A from Org A"
+      action: "GET /invitations"
+      expected: "Only Org A invitations returned"
+
+    - name: "POST /invitations/:id/resend resets invitation"
+      setup: "Pending invitation exists"
+      action: "POST /invitations/:id/resend"
+      expected: "New token, expires_at reset, email sent"
+
+    - name: "POST /invitations/:id/resend returns 404 for invalid id"
+      setup: "Non-existent invitation id"
+      action: "POST /invitations/:id/resend"
+      expected: "404 Not Found"
+
+    - name: "DELETE /invitations/:id cancels invitation"
+      setup: "Pending invitation exists"
+      action: "DELETE /invitations/:id"
+      expected: "status='cancelled', 204 response"
+
+    - name: "DELETE /invitations/:id returns 404 for invalid id"
+      setup: "Non-existent invitation id"
+      action: "DELETE /invitations/:id"
+      expected: "404 Not Found"
+
+  accept_api:
+    - name: "POST /auth/accept-invitation creates user with correct role"
+      setup: "Valid token, role_id=PROD_OPERATOR"
+      action: "POST /auth/accept-invitation"
+      expected: "User created with role_id=PROD_OPERATOR"
+
+    - name: "POST /auth/accept-invitation returns 400 for expired token"
+      setup: "Token with expires_at in past"
+      action: "POST /auth/accept-invitation"
+      expected: "400 error: 'Invitation has expired'"
+
+    - name: "POST /auth/accept-invitation returns 400 for invalid token"
+      setup: "Non-existent token"
+      action: "POST /auth/accept-invitation"
+      expected: "400 error: 'Invalid token'"
+
+    - name: "POST /auth/accept-invitation returns 400 for weak password"
+      setup: "Valid token, password='abc'"
+      action: "POST /auth/accept-invitation"
+      expected: "400 error with validation failures"
+
+    - name: "GET /auth/invitation/:token returns invitation details"
+      setup: "Valid pending token"
+      action: "GET /auth/invitation/:token"
+      expected: "Returns email, org_name, role_name, expires_at"
+
+    - name: "GET /auth/invitation/:token returns 404 for invalid token"
+      setup: "Non-existent token"
+      action: "GET /auth/invitation/:token"
+      expected: "404 Not Found"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Admin can invite user and user receives email"
+    steps:
+      - "Login as admin"
+      - "Navigate to Users page"
+      - "Click 'Invite User'"
+      - "Enter email 'new@company.com', select 'Production Operator'"
+      - "Click 'Send Invitation'"
+    expected: "Success toast displays, invitation in pending list, email sent"
+
+  - name: "User can accept invitation and is logged in"
+    steps:
+      - "Admin sends invitation to 'test@company.com'"
+      - "Recipient clicks invitation link"
+      - "Enter password 'NewPass123!'"
+      - "Confirm password 'NewPass123!'"
+      - "Click 'Create Account'"
+    expected: "Account created, user logged in, redirected to dashboard"
+
+  - name: "Expired invitation shows error page"
+    steps:
+      - "Create invitation with expires_at in past"
+      - "Click invitation link"
+    expected: "Error page: 'This invitation has expired'"
+
+  - name: "Admin can resend invitation from pending list"
+    steps:
+      - "Login as admin"
+      - "Navigate to Users > Pending Invitations"
+      - "Click 'Resend' on invitation"
+      - "Confirm dialog"
+    expected: "New email sent, expiry reset, success toast"
+
+  - name: "Admin can cancel invitation from pending list"
+    steps:
+      - "Login as admin"
+      - "Navigate to Users > Pending Invitations"
+      - "Click 'Cancel' on invitation"
+      - "Confirm dialog"
+    expected: "Invitation removed from list, status='cancelled'"
+
+  - name: "Cancelled invitation shows invalid page to recipient"
+    steps:
+      - "Admin cancels invitation"
+      - "Recipient clicks old link"
+    expected: "Error page: 'This invitation is no longer valid'"
+
+  - name: "Duplicate email shows error in modal"
+    steps:
+      - "Login as admin"
+      - "Click 'Invite User'"
+      - "Enter email of existing user"
+      - "Click 'Send Invitation'"
+    expected: "Error message: 'User with this email already exists'"
+
+# Definition of Done
+definition_of_done:
+  - "user_invitations table created with correct indexes and RLS"
+  - "Email service integrated with Resend"
+  - "POST /api/v1/settings/users/invite sends email end-to-end"
+  - "GET /api/v1/settings/users/invitations returns org invitations"
+  - "POST /api/v1/settings/users/invitations/:id/resend resets expiry and sends email"
+  - "DELETE /api/v1/settings/users/invitations/:id cancels invitation"
+  - "POST /api/auth/accept-invitation creates user and logs in"
+  - "GET /api/auth/invitation/:token returns invitation details"
+  - "InviteUserModal implemented with role selection"
+  - "PendingInvitationsTable implemented with resend/cancel actions"
+  - "AcceptInvitationPage implemented (public route)"
+  - "Email template sends correctly with all required fields"
+  - "Duplicate email validation works for both users and pending invitations"
+  - "Expiry handling works (7 days)"
+  - "Super Admin invitation restricted to Super Admins"
+  - "Cron job or trigger to expire old invitations"
+  - "Unit test coverage >= 80%"
+  - "Integration tests pass"
+  - "E2E test for full invitation flow passes"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Invitation logic critical for user onboarding"
+  component:
+    target: 75
+    reason: "Form components need interaction testing"
+  integration:
+    target: 85
+    reason: "Invitation APIs must work end-to-end with email"
+  files:
+    - "lib/services/invitation-service.ts: 80%"
+    - "lib/services/email-service.ts: 75%"
+    - "components/settings/users/InviteUserModal.tsx: 75%"
+    - "components/auth/AcceptInvitationForm.tsx: 80%"
+
+# Security Test Requirements
+security_tests:
+  - name: "Invitation tokens are cryptographically secure"
+    description: "Tokens must be 64 chars (32 bytes hex)"
+    test: "Verify token generation uses crypto.randomBytes(32)"
+
+  - name: "Invitation tokens are single-use"
+    description: "Token invalidated after acceptance"
+    test: "Integration test: accept invitation, try to use token again"
+
+  - name: "Cross-tenant invitation access blocked"
+    description: "User A cannot access Org B invitations"
+    test: "Integration test: returns 404 (not 403)"
+
+  - name: "Super Admin invitation restricted"
+    description: "Only Super Admin can invite Super Admin role"
+    test: "Integration test: Admin inviting Super Admin returns 403"
+
+  - name: "Rate limiting on accept endpoint"
+    description: "Prevent brute force token guessing"
+    test: "Integration test: 10 failed attempts, verify rate limit"
+
+# Performance Requirements
+performance:
+  - endpoint: "POST /api/v1/settings/users/invite"
+    target: "< 5s (includes email send)"
+  - endpoint: "POST /api/v1/settings/users/invitations/:id/resend"
+    target: "< 5s (includes email send)"
+  - endpoint: "POST /api/auth/accept-invitation"
+    target: "< 3s (includes user creation + login)"
+  - endpoint: "GET /api/v1/settings/users/invitations"
+    target: "< 300ms"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Email deliverability issues (spam folder)"
+    mitigation: "Use Resend with proper SPF/DKIM setup, add retry logic"
+    severity: "medium"
+    test_coverage: "Integration tests with email mock"
+
+  - id: "RISK-02"
+    description: "Token exposure in email"
+    mitigation: "Tokens are single-use, expire after 7 days, invalidate on use"
+    severity: "low"
+    test_coverage: "security_tests"
+
+  - id: "RISK-03"
+    description: "Race condition on invitation acceptance"
+    mitigation: "Database unique constraint on token, transaction on accept"
+    severity: "low"
+    test_coverage: "integration_tests.accept_api"

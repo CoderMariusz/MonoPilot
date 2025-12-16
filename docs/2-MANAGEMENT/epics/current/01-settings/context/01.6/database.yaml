@@ -1,0 +1,216 @@
+# Story 01.6 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+# Primary Table (per ADR-012)
+tables:
+  - name: "roles"
+    description: "System roles with JSONB permissions (ADR-012)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "UNIQUE NOT NULL" }
+      - { name: "name", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "permissions", type: "JSONB", constraints: "NOT NULL" }
+      - { name: "is_system", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "display_order", type: "INT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "is_system = true (public read for system roles)"
+    indexes:
+      - "idx_roles_code ON roles(code)"
+      - "idx_roles_system ON roles(is_system)"
+    constraints:
+      - "code must be uppercase snake_case"
+      - "permissions JSONB must contain all 8 module keys"
+
+# Permissions JSONB Structure (ADR-012)
+permissions_jsonb_structure:
+  description: "Module-level permissions with CRUD strings"
+  schema: |
+    {
+      "settings": "CRUD",
+      "users": "CRUD",
+      "technical": "CRUD",
+      "planning": "CRUD",
+      "production": "CRUD",
+      "quality": "CRUD",
+      "warehouse": "CRUD",
+      "shipping": "CRUD"
+    }
+  values:
+    - "CRUD - Full access (Create, Read, Update, Delete)"
+    - "CRU - Create, Read, Update (no Delete)"
+    - "R - Read only"
+    - "- - No access"
+  examples:
+    super_admin: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD"}'
+    admin: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD"}'
+    viewer: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"R","warehouse":"R","shipping":"R"}'
+
+# Seed Data (10 System Roles)
+seed_data:
+  roles:
+    description: "10 system roles per ADR-012 and story requirements"
+    data:
+      - code: "SUPER_ADMIN"
+        name: "Super Administrator"
+        description: "Full system access, can assign any role"
+        permissions: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD"}'
+        is_system: true
+        display_order: 1
+
+      - code: "ADMIN"
+        name: "Administrator"
+        description: "Organization-wide access, cannot assign Super Admin"
+        permissions: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD"}'
+        is_system: true
+        display_order: 2
+
+      - code: "PROD_MANAGER"
+        name: "Production Manager"
+        description: "Full Production, Planning, Quality access"
+        permissions: '{"settings":"R","users":"R","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"R","shipping":"R"}'
+        is_system: true
+        display_order: 3
+
+      - code: "QUAL_MANAGER"
+        name: "Quality Manager"
+        description: "Full Quality, read Production"
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"CRUD","warehouse":"R","shipping":"R"}'
+        is_system: true
+        display_order: 4
+
+      - code: "WH_MANAGER"
+        name: "Warehouse Manager"
+        description: "Full Warehouse and Shipping access"
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"R","warehouse":"CRUD","shipping":"CRUD"}'
+        is_system: true
+        display_order: 5
+
+      - code: "PROD_OPERATOR"
+        name: "Production Operator"
+        description: "CRU Production, read Quality"
+        permissions: '{"settings":"-","users":"-","technical":"R","planning":"R","production":"CRU","quality":"R","warehouse":"-","shipping":"-"}'
+        is_system: true
+        display_order: 6
+
+      - code: "QUAL_INSPECTOR"
+        name: "Quality Inspector"
+        description: "CRU Quality only"
+        permissions: '{"settings":"-","users":"-","technical":"R","planning":"-","production":"R","quality":"CRU","warehouse":"-","shipping":"-"}'
+        is_system: true
+        display_order: 7
+
+      - code: "WH_OPERATOR"
+        name: "Warehouse Operator"
+        description: "CRU Warehouse and Shipping"
+        permissions: '{"settings":"-","users":"-","technical":"-","planning":"-","production":"-","quality":"-","warehouse":"CRU","shipping":"CRU"}'
+        is_system: true
+        display_order: 8
+
+      - code: "PLANNER"
+        name: "Planner"
+        description: "Full Planning, read Production"
+        permissions: '{"settings":"R","users":"-","technical":"R","planning":"CRUD","production":"R","quality":"R","warehouse":"R","shipping":"R"}'
+        is_system: true
+        display_order: 9
+
+      - code: "VIEWER"
+        name: "Viewer"
+        description: "Read-only all modules"
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"R","warehouse":"R","shipping":"R"}'
+        is_system: true
+        display_order: 10
+
+# RLS Policies (ADR-013 pattern)
+rls_policies:
+  - table: "roles"
+    policy_name: "roles_select_system"
+    operation: "SELECT"
+    using: "is_system = true"
+    description: "System roles visible to all authenticated users"
+
+  - table: "roles"
+    policy_name: "roles_select_custom"
+    operation: "SELECT"
+    using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    description: "Custom roles (future) org-scoped"
+
+  - table: "roles"
+    policy_name: "roles_insert_custom"
+    operation: "INSERT"
+    with_check: |
+      org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      AND is_system = false
+    description: "Only custom roles can be created (future feature)"
+
+  - table: "roles"
+    policy_name: "roles_update_custom"
+    operation: "UPDATE"
+    using: |
+      org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      AND is_system = false
+    description: "System roles are immutable"
+
+  - table: "roles"
+    policy_name: "roles_delete_never"
+    operation: "DELETE"
+    using: "false"
+    description: "No role deletion allowed (soft delete if needed)"
+
+# Migrations
+migrations:
+  - path: "supabase/migrations/XXX_create_roles_table.sql"
+    type: "migration"
+    description: "Create roles table with JSONB permissions (ADR-012)"
+    content: |
+      CREATE TABLE roles (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        code VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        permissions JSONB NOT NULL,
+        is_system BOOLEAN DEFAULT true,
+        display_order INT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE INDEX idx_roles_code ON roles(code);
+      CREATE INDEX idx_roles_system ON roles(is_system);
+
+      -- Enable RLS
+      ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
+
+      -- RLS policies
+      CREATE POLICY "roles_select_system" ON roles
+      FOR SELECT TO authenticated
+      USING (is_system = true);
+
+  - path: "supabase/migrations/XXX_seed_system_roles.sql"
+    type: "seed"
+    description: "Seed 10 system roles"
+    idempotent: true
+    content: |
+      INSERT INTO roles (code, name, description, permissions, is_system, display_order)
+      VALUES
+        ('SUPER_ADMIN', 'Super Administrator', 'Full system access, can assign any role',
+         '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD"}'::jsonb,
+         true, 1),
+        -- ... (repeat for all 10 roles)
+      ON CONFLICT (code) DO NOTHING;
+
+# Indexes
+indexes:
+  - "idx_roles_code ON roles(code) -- Fast code lookup"
+  - "idx_roles_system ON roles(is_system) -- Filter system vs custom"
+
+# Future: Custom Roles (out of scope for this story)
+future_enhancements:
+  - feature: "Custom role creation"
+    description: "Allow orgs to create custom roles with specific permissions"
+    columns_needed:
+      - "org_id UUID REFERENCES organizations(id) -- NULL for system roles"
+    rls_changes:
+      - "Add org_id filter for custom roles"
+      - "Prevent modification of is_system = true roles"

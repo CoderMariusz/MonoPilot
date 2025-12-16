@@ -1,0 +1,313 @@
+# Story 01.5a - Frontend Specification
+# Purpose: Components, hooks, types, pages
+# Agent: FRONTEND-DEV
+
+is_fullstack: true  # Both frontend and backend work
+
+# Pages to Create
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/users/page.tsx"
+    description: "Users list page with DataTable, search, filters"
+    wireframe: "SET-008"
+    layout: "Uses SettingsLayout from 01.2"
+    performance: "Load within 500ms for 1000 users"
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/settings/users/UsersDataTable.tsx"
+    description: "DataTable with sorting, filtering, pagination"
+    wireframe: "SET-008"
+    props:
+      users: "User[]"
+      total: "number"
+      page: "number"
+      limit: "number"
+      onPageChange: "(page: number) => void"
+      onSearch: "(search: string) => void"
+      onFilter: "(filters: UserFilters) => void"
+    features:
+      - "Search by name/email (debounced)"
+      - "Filter by role, status"
+      - "Sort by name, email, created_at"
+      - "Pagination (25 per page)"
+      - "Row actions: Edit, Deactivate/Activate"
+    ui_states:
+      - "loading: Skeleton rows"
+      - "error: Error message with retry"
+      - "empty: 'No users found' with Add User CTA"
+      - "success: User rows with actions"
+
+  - path: "apps/frontend/components/settings/users/UserModal.tsx"
+    description: "Create/Edit user modal with form validation"
+    wireframe: "SET-009 (MVP subset - hide warehouse access lines 49-117)"
+    props:
+      mode: "'create' | 'edit'"
+      user: "User | null (null for create mode)"
+      open: "boolean"
+      onClose: "() => void"
+      onSuccess: "(user: User) => void"
+    fields:
+      - name: "email"
+        type: "text"
+        required: true
+        validation: "Email format"
+        disabled_on_edit: true
+      - name: "first_name"
+        type: "text"
+        required: true
+        validation: "1-100 chars"
+      - name: "last_name"
+        type: "text"
+        required: true
+        validation: "1-100 chars"
+      - name: "role_id"
+        type: "select"
+        required: true
+        options: "10 system roles from roles table"
+        display: "Role name (not code)"
+      - name: "language"
+        type: "select"
+        required: false
+        options: ["Polski (pl)", "English (en)", "Deutsch (de)", "Francais (fr)"]
+        default: "en"
+    mvp_note: "Warehouse access multi-select HIDDEN (Phase 1B)"
+
+  - path: "apps/frontend/components/settings/users/UserRow.tsx"
+    description: "Single user row in DataTable"
+    wireframe: "SET-008"
+    props:
+      user: "User"
+      onEdit: "(user: User) => void"
+      onDeactivate: "(user: User) => void"
+      onActivate: "(user: User) => void"
+    columns:
+      - "Name (first_name + last_name)"
+      - "Email"
+      - "Role (role.name not role.code)"
+      - "Status (active/inactive badge)"
+      - "Last Login"
+      - "Actions (dropdown: Edit, Deactivate/Activate)"
+
+  - path: "apps/frontend/components/settings/users/UserStatusBadge.tsx"
+    description: "Active/Inactive status indicator"
+    props:
+      is_active: "boolean"
+    variants:
+      active: "Green badge with 'Active' text"
+      inactive: "Red badge with 'Inactive' text"
+
+  - path: "apps/frontend/components/settings/users/DeactivateConfirmDialog.tsx"
+    description: "Confirmation dialog for user deactivation"
+    props:
+      user: "User"
+      open: "boolean"
+      onClose: "() => void"
+      onConfirm: "() => void"
+    content: |
+      Title: "Deactivate User?"
+      Message: "Are you sure you want to deactivate {user.name}? They will no longer be able to log in."
+      Warning: "This will also terminate all active sessions immediately."
+      Actions: [Cancel, Deactivate (destructive)]
+
+# Hooks to Create
+hooks:
+  - path: "apps/frontend/lib/hooks/use-users.ts"
+    description: "React Query hook for user list with pagination/search"
+    exports:
+      - name: "useUsers"
+        params:
+          - "params: UsersListParams"
+        returns: "UseQueryResult<UsersListResponse>"
+        features:
+          - "Auto-refetch on window focus"
+          - "Cache for 5 minutes"
+          - "Debounced search"
+        pattern: |
+          import { useQuery } from '@tanstack/react-query';
+          import { UserService } from '@/lib/services/user-service';
+
+          export function useUsers(params: UsersListParams) {
+            return useQuery({
+              queryKey: ['users', params],
+              queryFn: () => UserService.getUsers(params),
+              staleTime: 5 * 60 * 1000,
+              refetchOnWindowFocus: true,
+            });
+          }
+
+  - path: "apps/frontend/lib/hooks/use-create-user.ts"
+    description: "Mutation hook for creating user"
+    exports:
+      - name: "useCreateUser"
+        returns: "UseMutationResult<User, Error, CreateUserRequest>"
+        features:
+          - "Invalidates users query on success"
+          - "Shows success toast"
+          - "Handles duplicate email error"
+
+  - path: "apps/frontend/lib/hooks/use-update-user.ts"
+    description: "Mutation hook for updating user"
+    exports:
+      - name: "useUpdateUser"
+        returns: "UseMutationResult<User, Error, UpdateUserRequest>"
+
+  - path: "apps/frontend/lib/hooks/use-deactivate-user.ts"
+    description: "Mutation hook for deactivating user"
+    exports:
+      - name: "useDeactivateUser"
+        returns: "UseMutationResult<void, Error, string>"
+        features:
+          - "Self-protection: blocks self-deactivation"
+          - "Self-protection: blocks last Super Admin"
+          - "Invalidates users query"
+
+# Types to Create
+types:
+  - path: "apps/frontend/lib/types/user.ts"
+    description: "User TypeScript interfaces (extends 01.1 types)"
+    exports:
+      - name: "User"
+        fields:
+          - "id: string"
+          - "org_id: string"
+          - "email: string"
+          - "first_name: string"
+          - "last_name: string"
+          - "role_id: string"
+          - "role?: Role  // Populated via join"
+          - "language: string"
+          - "is_active: boolean"
+          - "last_login_at: string | null"
+          - "warehouse_access_ids: string[] | null  // NULL in MVP"
+          - "created_at: string"
+          - "updated_at: string"
+
+      - name: "CreateUserRequest"
+        fields:
+          - "email: string"
+          - "first_name: string"
+          - "last_name: string"
+          - "role_id: string"
+          - "language?: string"
+
+      - name: "UpdateUserRequest"
+        fields:
+          - "first_name?: string"
+          - "last_name?: string"
+          - "role_id?: string"
+          - "language?: string"
+
+      - name: "UsersListParams"
+        fields:
+          - "page?: number"
+          - "limit?: number"
+          - "search?: string"
+          - "role?: string"
+          - "status?: 'active' | 'inactive'"
+          - "sortBy?: string"
+          - "sortOrder?: 'asc' | 'desc'"
+
+      - name: "UsersListResponse"
+        fields:
+          - "users: User[]"
+          - "total: number"
+          - "page: number"
+          - "limit: number"
+
+# UX Implementation
+ux:
+  wireframes:
+    - id: "SET-008"
+      path: "docs/2-MANAGEMENT/epics/current/01-settings/context/wireframes/SET-008-user-list.md"
+      components:
+        - "UsersDataTable"
+        - "UserRow"
+        - "UserStatusBadge"
+      states:
+        - "Loading: Skeleton table with 5 rows"
+        - "Empty: 'No users found' message with 'Add User' button"
+        - "Error: Error message with 'Retry' button"
+        - "Success: User rows with pagination"
+
+    - id: "SET-009"
+      path: "docs/2-MANAGEMENT/epics/current/01-settings/context/wireframes/SET-009-user-modal.md"
+      components:
+        - "UserModal"
+      mvp_scope: "Hide warehouse access section (lines 49-117)"
+      fields:
+        - "Email (disabled on edit)"
+        - "First Name"
+        - "Last Name"
+        - "Role (dropdown)"
+        - "Language (dropdown)"
+      actions:
+        - "Cancel"
+        - "Create User / Save Changes"
+
+  patterns:
+    table: "ShadCN DataTable pattern with TanStack Table"
+    modal: "ShadCN Dialog with Form"
+    form: "React Hook Form + Zod validation"
+    toast: "ShadCN Toast for success/error messages"
+
+  accessibility:
+    - "All form inputs have labels"
+    - "Error messages announced to screen readers"
+    - "Modal traps focus"
+    - "Keyboard navigation for table and actions"
+
+  responsive:
+    - "Mobile: Stack table columns vertically"
+    - "Tablet: Show 3 columns minimum"
+    - "Desktop: Full table with all columns"
+
+# Permission Enforcement
+permissions:
+  view_users:
+    roles: ["SUPER_ADMIN", "ADMIN", "VIEWER"]
+    action: "Can view users list page"
+    ui_effect: "Show users page in navigation"
+
+  create_user:
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    action: "Can create new users"
+    ui_effect: "Show 'Add User' button"
+
+  edit_user:
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    action: "Can edit user details"
+    ui_effect: "Show 'Edit' action in row dropdown"
+
+  deactivate_user:
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    action: "Can deactivate users"
+    ui_effect: "Show 'Deactivate' action in row dropdown"
+    restrictions:
+      - "Cannot deactivate self"
+      - "Cannot deactivate last Super Admin"
+
+# Performance Targets
+performance:
+  page_load: "500ms for 1000 users"
+  search: "300ms response time"
+  pagination: "200ms navigation"
+  modal_open: "100ms animation"
+
+# Error Handling
+error_messages:
+  duplicate_email: "Email already exists in your organization"
+  invalid_role: "Invalid role selected"
+  self_deactivation: "You cannot deactivate your own account"
+  last_super_admin: "Cannot deactivate the only Super Admin"
+  network_error: "Failed to load users. Please try again."
+
+# Testing Focus
+testing_focus:
+  - "Search debouncing works correctly"
+  - "Filter combinations work (role + status)"
+  - "Pagination maintains filter state"
+  - "Self-protection prevents self-deactivation"
+  - "Last Super Admin protection works"
+  - "Duplicate email shows inline error"
+  - "Role dropdown shows names not codes"
+  - "Warehouse access field hidden in modal"

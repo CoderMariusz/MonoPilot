@@ -1,0 +1,439 @@
+# Story 01.6-roles-viewer - GAP Analysis vs Codebase
+# Generated: 2025-12-16
+# Purpose: What exists vs what needs to be built
+# Refactoring Plan: ../REFACTORING-PLAN.md
+
+gap_summary:
+  overall_readiness: "25%"
+  critical_blockers: 2
+  components_done: 1
+  components_partial: 2
+  components_missing: 7
+
+# =============================================================================
+# DATABASE GAPS
+# =============================================================================
+database_gaps:
+  - component: "roles table"
+    expected: "supabase/migrations/002_create_roles_table.sql (from 01.1)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      CRITICAL: No roles table exists.
+      Story depends on 01.1 which should create this table with:
+      - id, code (UNIQUE), name, description
+      - permissions (JSONB)
+      - is_system, display_order, created_at
+    refactor_action: "BLOCKED by 01.1 - implement 01.1 first"
+    priority: "P0-BLOCKER"
+
+  - component: "RLS policies for roles"
+    expected: "is_system = true (public read)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No RLS policy for roles table.
+      Expected: SELECT policy allowing all authenticated users to read system roles.
+    refactor_action: "BLOCKED by 01.1 - implement 01.1 first"
+    priority: "P0-BLOCKER"
+
+  - component: "seed data for 10 roles"
+    expected: "supabase/migrations/006_seed_system_data.sql (from 01.1)"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No seed migration for 10 system roles.
+      Roles must be seeded before this story can display them.
+    refactor_action: "BLOCKED by 01.1 - implement 01.1 first"
+    priority: "P0-BLOCKER"
+
+# =============================================================================
+# API GAPS
+# =============================================================================
+api_gaps:
+  - component: "GET /api/v1/settings/roles"
+    expected: "New route returning Role[]"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No API endpoint to fetch all roles.
+      Needs to query roles table and return ordered by display_order.
+    refactor_action: "Create apps/frontend/app/api/v1/settings/roles/route.ts"
+    priority: "P0"
+
+  - component: "GET /api/v1/settings/roles/permissions-matrix"
+    expected: "New route returning PermissionsMatrix"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No API endpoint for permissions matrix view.
+      Needs to transform roles.permissions JSONB into matrix structure.
+    refactor_action: "Create apps/frontend/app/api/v1/settings/roles/permissions-matrix/route.ts"
+    priority: "P1"
+
+  - component: "GET /api/v1/settings/roles/:code"
+    expected: "New route returning single Role"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: "No API endpoint to fetch single role by code."
+    refactor_action: "Create apps/frontend/app/api/v1/settings/roles/[code]/route.ts"
+    priority: "P2"
+
+# =============================================================================
+# SERVICE GAPS
+# =============================================================================
+service_gaps:
+  - component: "role-service.ts"
+    expected: "apps/frontend/lib/services/role-service.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No role service for data fetching.
+      Required exports: getAllRoles(), getRoleByCode(), getPermissionsMatrix()
+    refactor_action: "Create new file"
+    priority: "P0"
+
+# =============================================================================
+# TYPE GAPS
+# =============================================================================
+type_gaps:
+  - component: "Role interface"
+    expected: "apps/frontend/lib/types/role.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No TypeScript interface for Role entity.
+      Needs: id, code, name, description, permissions, display_order, created_at
+    refactor_action: "Create lib/types/role.ts"
+    priority: "P0"
+
+  - component: "PermissionsMatrix interface"
+    expected: "apps/frontend/lib/types/role.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No TypeScript interface for permissions matrix structure.
+    refactor_action: "Create in lib/types/role.ts"
+    priority: "P1"
+
+  - component: "RoleCode type"
+    expected: "Union type of 10 role codes"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No type-safe enum for role codes.
+      Should be: 'SUPER_ADMIN' | 'ADMIN' | ... | 'EXTERNAL'
+    refactor_action: "Create in lib/types/role.ts"
+    priority: "P1"
+
+# =============================================================================
+# COMPONENT GAPS
+# =============================================================================
+component_gaps:
+  - component: "RolesTable.tsx"
+    expected: "apps/frontend/components/settings/roles/RolesTable.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No roles table component.
+      Needs ShadCN DataTable with columns: name, description, permissions summary
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "PermissionsMatrix.tsx"
+    expected: "apps/frontend/components/settings/roles/PermissionsMatrix.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No permissions matrix component.
+      Needs grid layout with roles x modules.
+    refactor_action: "Create new component"
+    priority: "P1"
+
+  - component: "PermissionBadge.tsx"
+    expected: "apps/frontend/components/settings/roles/PermissionBadge.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No reusable permission badge component.
+      Needs color-coded badges: CRUD=green, R=gray, etc.
+    refactor_action: "Create new component"
+    priority: "P0"
+
+  - component: "RoleDetailDialog.tsx"
+    expected: "apps/frontend/components/settings/roles/RoleDetailDialog.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No role detail modal component.
+      Shows expanded role info when clicking table row.
+    refactor_action: "Create new component"
+    priority: "P2"
+
+# =============================================================================
+# PAGE GAPS
+# =============================================================================
+page_gaps:
+  - component: "roles page"
+    expected: "apps/frontend/app/(authenticated)/settings/roles/page.tsx"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No roles viewer page.
+      Needs to render RolesTable and PermissionsMatrix with view toggle.
+    refactor_action: "Create new page"
+    priority: "P0"
+
+# =============================================================================
+# HOOK GAPS
+# =============================================================================
+hook_gaps:
+  - component: "useRoles"
+    expected: "apps/frontend/lib/hooks/use-roles.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No React Query hook for roles data.
+      Needs to wrap getAllRoles() with caching.
+    refactor_action: "Create hook"
+    priority: "P0"
+
+  - component: "usePermissionsMatrix"
+    expected: "apps/frontend/lib/hooks/use-roles.ts"
+    found: "NOT FOUND"
+    status: "MISSING"
+    gap_description: |
+      No React Query hook for permissions matrix.
+      Needs to wrap getPermissionsMatrix() with caching.
+    refactor_action: "Create hook in same file"
+    priority: "P1"
+
+# =============================================================================
+# SHADCN UI COMPONENTS (Dependencies)
+# =============================================================================
+shadcn_dependencies:
+  - component: "DataTable"
+    expected: "apps/frontend/components/ui/data-table.tsx"
+    found: "UNKNOWN"
+    status: "CHECK_REQUIRED"
+    gap_description: "ShadCN DataTable pattern needed for RolesTable"
+    refactor_action: "Install if missing: npx shadcn-ui@latest add table"
+    priority: "P0"
+
+  - component: "Badge"
+    expected: "apps/frontend/components/ui/badge.tsx"
+    found: "UNKNOWN"
+    status: "CHECK_REQUIRED"
+    gap_description: "ShadCN Badge needed for PermissionBadge"
+    refactor_action: "Install if missing: npx shadcn-ui@latest add badge"
+    priority: "P0"
+
+  - component: "Dialog"
+    expected: "apps/frontend/components/ui/dialog.tsx"
+    found: "UNKNOWN"
+    status: "CHECK_REQUIRED"
+    gap_description: "ShadCN Dialog needed for RoleDetailDialog"
+    refactor_action: "Install if missing: npx shadcn-ui@latest add dialog"
+    priority: "P1"
+
+  - component: "Tooltip"
+    expected: "apps/frontend/components/ui/tooltip.tsx"
+    found: "UNKNOWN"
+    status: "CHECK_REQUIRED"
+    gap_description: "ShadCN Tooltip needed for permission badge hover"
+    refactor_action: "Install if missing: npx shadcn-ui@latest add tooltip"
+    priority: "P1"
+
+  - component: "Tabs"
+    expected: "apps/frontend/components/ui/tabs.tsx"
+    found: "UNKNOWN"
+    status: "CHECK_REQUIRED"
+    gap_description: "ShadCN Tabs needed for List/Matrix view toggle"
+    refactor_action: "Install if missing: npx shadcn-ui@latest add tabs"
+    priority: "P1"
+
+# =============================================================================
+# NAVIGATION GAPS
+# =============================================================================
+navigation_gaps:
+  - component: "Settings sidebar navigation"
+    expected: "Roles & Permissions menu item"
+    found: "UNKNOWN"
+    status: "CHECK_REQUIRED"
+    gap_description: |
+      Need to add "Roles & Permissions" to settings navigation.
+      Path: /settings/roles
+      Icon: Shield
+      Order: 3 (after Organization, Users)
+    refactor_action: "Update settings navigation config"
+    priority: "P1"
+
+# =============================================================================
+# CRITICAL BLOCKERS (Must fix before story can be implemented)
+# =============================================================================
+critical_blockers:
+  - blocker: "Story 01.1 Not Implemented"
+    description: "This story depends on 01.1 (Org Context + Base RLS) which creates roles table"
+    migration: "002_create_roles_table.sql + 006_seed_system_data.sql"
+    risk: "HIGH - cannot proceed without roles table"
+    resolution: "IMPLEMENT 01.1 FIRST"
+
+  - blocker: "No roles table"
+    description: "Database has no roles table to query"
+    migration: "BLOCKED by 01.1"
+    risk: "HIGH - entire story blocked"
+    resolution: "BLOCKED - wait for 01.1"
+
+# =============================================================================
+# IMPLEMENTATION ORDER (for this story)
+# =============================================================================
+implementation_order:
+  phase_0_prerequisites:
+    - "WAIT FOR 01.1 to complete (roles table + seed data)"
+    - "Verify roles table exists with 10 seeded roles"
+    - "Verify RLS policy allows public read (is_system = true)"
+
+  phase_1_types_and_services:
+    - "lib/types/role.ts"
+    - "lib/services/role-service.ts"
+
+  phase_2_api:
+    - "app/api/v1/settings/roles/route.ts"
+    - "app/api/v1/settings/roles/permissions-matrix/route.ts"
+    - "app/api/v1/settings/roles/[code]/route.ts"
+
+  phase_3_hooks:
+    - "lib/hooks/use-roles.ts"
+
+  phase_4_components:
+    - "components/settings/roles/PermissionBadge.tsx"
+    - "components/settings/roles/RolesTable.tsx"
+    - "components/settings/roles/PermissionsMatrix.tsx"
+    - "components/settings/roles/RoleDetailDialog.tsx"
+
+  phase_5_pages:
+    - "app/(authenticated)/settings/roles/page.tsx"
+
+  phase_6_navigation:
+    - "Update settings navigation config"
+
+  phase_7_tests:
+    - "Unit tests for all components and services"
+    - "Integration tests for API endpoints"
+    - "E2E tests for roles page"
+
+# =============================================================================
+# VALIDATION AFTER IMPLEMENTATION
+# =============================================================================
+validation_checklist:
+  - "[ ] Story 01.1 completed (roles table exists)"
+  - "[ ] 10 roles seeded in database"
+  - "[ ] GET /api/v1/settings/roles returns all 10 roles"
+  - "[ ] GET /api/v1/settings/roles/permissions-matrix returns matrix structure"
+  - "[ ] RolesTable component renders 10 rows"
+  - "[ ] PermissionsMatrix component renders 8x10 grid"
+  - "[ ] PermissionBadge component color-codes correctly"
+  - "[ ] Roles page accessible at /settings/roles"
+  - "[ ] Navigation includes 'Roles & Permissions' link"
+  - "[ ] Tooltips display on permission badge hover"
+  - "[ ] No edit/delete buttons (read-only verified)"
+  - "[ ] Unit test coverage >= 85%"
+  - "[ ] Integration test coverage >= 80%"
+  - "[ ] E2E tests pass (4 scenarios)"
+  - "[ ] Responsive design works on mobile"
+  - "[ ] Accessibility: WCAG AA compliance"
+
+# =============================================================================
+# READINESS SCORE CALCULATION
+# =============================================================================
+readiness_breakdown:
+  database: "0% (blocked by 01.1)"
+  api: "0% (3 endpoints missing)"
+  services: "0% (1 service missing)"
+  types: "0% (3 types missing)"
+  components: "0% (4 components missing)"
+  pages: "0% (1 page missing)"
+  hooks: "0% (2 hooks missing)"
+  navigation: "0% (not integrated)"
+  tests: "0% (6 test files missing)"
+  shadcn_ui: "50% (assuming some components exist)"
+
+  overall: "25% (can start after 01.1 completes)"
+
+# =============================================================================
+# RISK ASSESSMENT
+# =============================================================================
+risks:
+  - id: "RISK-01"
+    description: "Story 01.1 not implemented"
+    impact: "HIGH - entire story blocked"
+    mitigation: "Coordinate with team to prioritize 01.1"
+    status: "OPEN"
+
+  - id: "RISK-02"
+    description: "Roles table schema mismatch"
+    impact: "MEDIUM - API responses may not match expected types"
+    mitigation: "Verify 01.1 schema matches this story's expectations"
+    status: "OPEN"
+
+  - id: "RISK-03"
+    description: "Permission badge color accessibility"
+    impact: "LOW - color-only indicators may not meet WCAG AA"
+    mitigation: "Include icons in addition to colors"
+    status: "MITIGATED"
+
+  - id: "RISK-04"
+    description: "Permissions matrix responsive layout"
+    impact: "MEDIUM - large grid may not fit mobile screens"
+    mitigation: "Implement horizontal scroll on mobile"
+    status: "PLANNED"
+
+# =============================================================================
+# EFFORT ESTIMATE AFTER GAPS RESOLVED
+# =============================================================================
+effort_estimate:
+  types_and_services: "2 hours"
+  api_endpoints: "3 hours"
+  hooks: "1 hour"
+  components: "6 hours"
+  pages: "2 hours"
+  navigation: "1 hour"
+  tests: "4 hours"
+  total: "19 hours (1 day)"
+
+  assumptions:
+    - "Story 01.1 is complete"
+    - "ShadCN UI components already installed"
+    - "No major bugs or blockers"
+
+# =============================================================================
+# NEXT STEPS
+# =============================================================================
+next_steps:
+  - step: "WAIT for story 01.1 to complete"
+    assignee: "TBD"
+    status: "BLOCKED"
+
+  - step: "Verify roles table exists with correct schema"
+    assignee: "Backend Dev"
+    status: "PENDING"
+
+  - step: "Implement types and services (Phase 1)"
+    assignee: "Backend Dev"
+    status: "READY_AFTER_01.1"
+
+  - step: "Implement API endpoints (Phase 2)"
+    assignee: "Backend Dev"
+    status: "READY_AFTER_01.1"
+
+  - step: "Implement frontend components (Phase 4)"
+    assignee: "Frontend Dev"
+    status: "READY_AFTER_PHASE_2"
+
+  - step: "Implement roles page (Phase 5)"
+    assignee: "Frontend Dev"
+    status: "READY_AFTER_PHASE_4"
+
+  - step: "Write and run tests (Phase 7)"
+    assignee: "QA / Dev"
+    status: "READY_AFTER_PHASE_5"

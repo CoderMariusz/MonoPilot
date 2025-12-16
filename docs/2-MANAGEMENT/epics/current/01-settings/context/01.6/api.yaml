@@ -1,0 +1,245 @@
+# Story 01.6 - API Specification
+# Purpose: Endpoints, request/response schemas, permission enforcement
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/roles"
+    description: "List all roles (system + custom)"
+    file: "apps/frontend/app/api/v1/settings/roles/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "Role[]"
+      schema:
+        - id: "UUID"
+          code: "string"
+          name: "string"
+          description: "string"
+          permissions: "Record<string, string>"
+          is_system: "boolean"
+          display_order: "number"
+      example: |
+        [
+          {
+            "id": "uuid-1",
+            "code": "SUPER_ADMIN",
+            "name": "Super Administrator",
+            "description": "Full system access",
+            "permissions": {
+              "settings": "CRUD",
+              "users": "CRUD",
+              ...
+            },
+            "is_system": true,
+            "display_order": 1
+          },
+          ...
+        ]
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/permission-service.ts"
+    description: "Permission checking service"
+    exports:
+      - name: "hasPermission"
+        type: "function"
+        signature: "(user: User, module: string, action: 'C' | 'R' | 'U' | 'D') => boolean"
+        description: "Check if user has permission for module action"
+        implementation: |
+          export function hasPermission(
+            user: User,
+            module: string,
+            action: 'C' | 'R' | 'U' | 'D'
+          ): boolean {
+            const role = user.role;
+            if (!role || !role.permissions) return false;
+
+            const modulePerms = role.permissions[module];
+            if (!modulePerms || modulePerms === '-') return false;
+
+            return modulePerms.includes(action);
+          }
+
+      - name: "hasRole"
+        type: "function"
+        signature: "(user: User, roles: string[]) => boolean"
+        description: "Check if user has any of the specified roles"
+        implementation: |
+          export function hasRole(user: User, roles: string[]): boolean {
+            return roles.includes(user.role.code);
+          }
+
+      - name: "requirePermission"
+        type: "function (middleware)"
+        signature: "(module: string, action: 'C' | 'R' | 'U' | 'D') => Middleware"
+        description: "Middleware to enforce permission on API routes"
+        implementation: |
+          export function requirePermission(
+            module: string,
+            action: 'C' | 'R' | 'U' | 'D'
+          ) {
+            return async (req: Request, context: any) => {
+              const user = await getAuthUser(req);
+              if (!user) {
+                return Response.json({ error: 'Unauthorized' }, { status: 401 });
+              }
+
+              if (!hasPermission(user, module, action)) {
+                return Response.json(
+                  { error: "You don't have permission to perform this action" },
+                  { status: 403 }
+                );
+              }
+
+              return context.next();
+            };
+          }
+
+      - name: "canAssignRole"
+        type: "function"
+        signature: "(currentUserRole: string, targetRoleCode: string) => boolean"
+        description: "Check if current user can assign target role (Super Admin restriction)"
+        implementation: |
+          export function canAssignRole(
+            currentUserRole: string,
+            targetRoleCode: string
+          ): boolean {
+            // Only Super Admin can assign Super Admin
+            if (targetRoleCode === 'SUPER_ADMIN') {
+              return currentUserRole === 'SUPER_ADMIN';
+            }
+            // Admin and Super Admin can assign all other roles
+            return ['SUPER_ADMIN', 'ADMIN'].includes(currentUserRole);
+          }
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/role.ts"
+    description: "Role TypeScript interfaces"
+    exports:
+      - name: "Role"
+        interface: |
+          export interface Role {
+            id: string;
+            code: string;
+            name: string;
+            description: string | null;
+            permissions: Record<string, string>;
+            is_system: boolean;
+            display_order: number;
+            created_at: string;
+          }
+
+      - name: "RoleCode"
+        type: "string literal union"
+        definition: |
+          export type RoleCode =
+            | 'SUPER_ADMIN'
+            | 'ADMIN'
+            | 'PROD_MANAGER'
+            | 'QUAL_MANAGER'
+            | 'WH_MANAGER'
+            | 'PROD_OPERATOR'
+            | 'QUAL_INSPECTOR'
+            | 'WH_OPERATOR'
+            | 'PLANNER'
+            | 'VIEWER';
+
+      - name: "PermissionAction"
+        type: "string literal union"
+        definition: |
+          export type PermissionAction = 'C' | 'R' | 'U' | 'D';
+
+      - name: "ModuleCode"
+        type: "string literal union"
+        definition: |
+          export type ModuleCode =
+            | 'settings'
+            | 'users'
+            | 'technical'
+            | 'planning'
+            | 'production'
+            | 'quality'
+            | 'warehouse'
+            | 'shipping';
+
+# Implementation patterns
+patterns:
+  api_route_with_permission: |
+    // apps/frontend/app/api/v1/settings/users/route.ts
+    import { requirePermission } from '@/lib/services/permission-service';
+
+    export async function POST(req: Request) {
+      const user = await getAuthUser(req);
+      if (!user) {
+        return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Check permission
+      if (!hasPermission(user, 'users', 'C')) {
+        return Response.json(
+          { error: "You don't have permission to create users" },
+          { status: 403 }
+        );
+      }
+
+      // ... proceed with creation
+    }
+
+  role_assignment_validation: |
+    // In user creation/update endpoint
+    const currentUser = await getAuthUser(req);
+    const targetRoleCode = req.body.role_code;
+
+    if (!canAssignRole(currentUser.role.code, targetRoleCode)) {
+      return Response.json(
+        { error: "Only Super Admin can assign Super Admin role" },
+        { status: 403 }
+      );
+    }
+
+  caching_permissions: |
+    // Cache user permissions in Redis
+    const cacheKey = `user:${userId}:permissions`;
+
+    // Get from cache
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
+    // Fetch from DB
+    const permissions = await fetchUserPermissions(userId);
+
+    // Cache for 1 minute
+    await redis.setex(cacheKey, 60, JSON.stringify(permissions));
+
+    return permissions;
+
+# Permission Matrix (for reference)
+permission_matrix:
+  modules: ["settings", "users", "technical", "planning", "production", "quality", "warehouse", "shipping"]
+  roles:
+    SUPER_ADMIN: ["CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
+    ADMIN: ["CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
+    PROD_MANAGER: ["R", "R", "CRUD", "CRUD", "CRUD", "CRUD", "R", "R"]
+    QUAL_MANAGER: ["R", "R", "R", "R", "R", "CRUD", "R", "R"]
+    WH_MANAGER: ["R", "R", "R", "R", "R", "R", "CRUD", "CRUD"]
+    PROD_OPERATOR: ["-", "-", "R", "R", "CRU", "R", "-", "-"]
+    QUAL_INSPECTOR: ["-", "-", "R", "-", "R", "CRU", "-", "-"]
+    WH_OPERATOR: ["-", "-", "-", "-", "-", "-", "CRU", "CRU"]
+    PLANNER: ["R", "-", "R", "CRUD", "R", "R", "R", "R"]
+    VIEWER: ["R", "R", "R", "R", "R", "R", "R", "R"]

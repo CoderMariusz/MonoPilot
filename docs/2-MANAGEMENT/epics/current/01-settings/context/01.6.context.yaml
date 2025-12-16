@@ -1,0 +1,864 @@
+# Story 01.6 Context File
+# Generated: 2025-12-16
+# Purpose: Provides complete context for DEV agents implementing Role-Based Permissions
+
+story:
+  id: "01.6"
+  name: "Role-Based Permissions (10 Roles)"
+  slug: "role-permissions"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+
+# -----------------------------------------------------------------------------
+# DEPENDENCIES
+# -----------------------------------------------------------------------------
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table with role_id FK"
+        - "roles table with JSONB permissions"
+        - "RLS policies (ADR-013 pattern)"
+        - "getOrgContext() helper"
+  blocked_by: []
+  blocks:
+    - story: "01.5"
+      name: "Users CRUD"
+      reason: "Needs role dropdown and permission checks"
+    - story: "01.7"
+      name: "Module Toggles"
+      reason: "Needs admin permission enforcement"
+
+# -----------------------------------------------------------------------------
+# FILES TO READ (Context for Implementation)
+# -----------------------------------------------------------------------------
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections:
+      - "FR-SET-011"   # 10-role permission system (lines 330-351)
+      - "FR-SET-020"   # Super Admin role
+      - "FR-SET-021"   # Admin role
+      - "FR-SET-022"   # Production Manager role
+      - "FR-SET-023"   # Quality Manager role
+      - "FR-SET-024"   # Warehouse Manager role
+      - "FR-SET-025"   # Production Operator role
+      - "FR-SET-026"   # Quality Inspector role
+      - "FR-SET-027"   # Warehouse Operator role
+      - "FR-SET-028"   # Planner role
+      - "FR-SET-029"   # Viewer role
+      - "FR-SET-030"   # Module-level permissions
+      - "FR-SET-031"   # CRUD-level permissions
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+    sections:
+      - "Role-Based Access Control"
+      - "Permission Enforcement"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.6.role-permissions.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
+      relevance: "PRIMARY - Roles table schema, JSONB permissions, seed data"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for permission checks"
+  ux_wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/SET-011-roles-permissions-view.md"
+      relevance: "Permission matrix view wireframe"
+
+# -----------------------------------------------------------------------------
+# FILES TO CREATE
+# -----------------------------------------------------------------------------
+files_to_create:
+  database:
+    migrations:
+      - path: "supabase/migrations/010_permission_check_function.sql"
+        type: "migration"
+        description: "check_permission() PostgreSQL function for DB-level enforcement"
+
+  services:
+    - path: "apps/frontend/lib/services/permission-service.ts"
+      description: "hasPermission(), requirePermission() helpers"
+    - path: "apps/frontend/lib/services/role-service.ts"
+      description: "getRoles(), getRoleById(), getRoleByCode()"
+
+  hooks:
+    - path: "apps/frontend/lib/hooks/use-permissions.ts"
+      description: "usePermissions() React hook for UI conditional rendering"
+
+  middleware:
+    - path: "apps/frontend/lib/middleware/require-permission.ts"
+      description: "API middleware for permission enforcement"
+
+  constants:
+    - path: "apps/frontend/lib/constants/roles.ts"
+      description: "ROLE_CODES, PERMISSION_LEVELS, ROLE_PERMISSIONS matrix"
+    - path: "apps/frontend/lib/constants/modules.ts"
+      description: "MODULE_CODES enum for permission checks"
+
+  types:
+    - path: "apps/frontend/lib/types/permission.ts"
+      description: "Permission, PermissionSet, RolePermissions interfaces"
+
+  validation:
+    - path: "apps/frontend/lib/validation/permission-schemas.ts"
+      description: "Zod schemas for permission validation"
+
+  components:
+    - path: "apps/frontend/components/settings/role-dropdown.tsx"
+      description: "Role dropdown for user forms (displays name, not code)"
+    - path: "apps/frontend/components/settings/permission-matrix.tsx"
+      description: "Read-only permission matrix table (SET-011 wireframe)"
+    - path: "apps/frontend/components/shared/permission-gate.tsx"
+      description: "Wrapper component to hide/show based on permissions"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/settings/roles/page.tsx"
+      description: "Roles & Permissions view page"
+
+  api:
+    - path: "apps/frontend/app/api/v1/settings/roles/route.ts"
+      methods: ["GET"]
+      description: "List all 10 system roles"
+    - path: "apps/frontend/app/api/v1/settings/roles/[id]/route.ts"
+      methods: ["GET"]
+      description: "Get single role by ID"
+
+  tests:
+    - path: "apps/frontend/lib/services/__tests__/permission-service.test.ts"
+      description: "Unit tests for permission helpers"
+    - path: "apps/frontend/lib/hooks/__tests__/use-permissions.test.ts"
+      description: "Unit tests for usePermissions hook"
+    - path: "apps/frontend/lib/middleware/__tests__/require-permission.test.ts"
+      description: "Unit tests for permission middleware"
+    - path: "apps/frontend/app/api/v1/settings/roles/__tests__/route.test.ts"
+      description: "Integration tests for roles API"
+    - path: "supabase/tests/permission-enforcement.test.sql"
+      description: "DB-level permission check tests"
+
+# -----------------------------------------------------------------------------
+# DATABASE SCHEMA
+# -----------------------------------------------------------------------------
+database:
+  tables:
+    - name: "roles"
+      description: "10 system roles with JSONB permissions (created in 01.1, referenced here)"
+      note: "Table created in 01.1, this story implements service layer"
+      columns:
+        - name: "id"
+          type: "UUID"
+          constraints: "PRIMARY KEY DEFAULT gen_random_uuid()"
+        - name: "code"
+          type: "VARCHAR(50)"
+          constraints: "UNIQUE NOT NULL"
+        - name: "name"
+          type: "VARCHAR(100)"
+          constraints: "NOT NULL"
+        - name: "description"
+          type: "TEXT"
+          constraints: ""
+        - name: "permissions"
+          type: "JSONB"
+          constraints: "NOT NULL"
+        - name: "is_system"
+          type: "BOOLEAN"
+          constraints: "DEFAULT true"
+        - name: "org_id"
+          type: "UUID"
+          constraints: "REFERENCES organizations(id) -- NULL for system roles"
+        - name: "display_order"
+          type: "INT"
+          constraints: ""
+        - name: "created_at"
+          type: "TIMESTAMPTZ"
+          constraints: "DEFAULT NOW()"
+        - name: "updated_at"
+          type: "TIMESTAMPTZ"
+          constraints: "DEFAULT NOW()"
+      rls: true
+      rls_pattern: "is_system = true (public read for system roles)"
+      indexes:
+        - "idx_roles_code ON roles(code)"
+        - "idx_roles_system ON roles(is_system)"
+        - "idx_roles_display_order ON roles(display_order)"
+
+  functions:
+    - name: "check_permission"
+      description: "DB function to check user permission for module + action"
+      signature: "check_permission(p_user_id UUID, p_module TEXT, p_action CHAR(1)) RETURNS BOOLEAN"
+      implementation: |
+        CREATE OR REPLACE FUNCTION check_permission(
+          p_user_id UUID,
+          p_module TEXT,
+          p_action CHAR(1)
+        ) RETURNS BOOLEAN AS $$
+        DECLARE
+          v_permissions JSONB;
+          v_module_perms TEXT;
+        BEGIN
+          SELECT r.permissions INTO v_permissions
+          FROM users u
+          JOIN roles r ON u.role_id = r.id
+          WHERE u.id = p_user_id;
+
+          v_module_perms := v_permissions ->> p_module;
+
+          IF v_module_perms IS NULL OR v_module_perms = '-' THEN
+            RETURN false;
+          END IF;
+
+          RETURN v_module_perms LIKE '%' || p_action || '%';
+        END;
+        $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+  seed_data:
+    description: "10 system roles per ADR-012 (seeded in 01.1, referenced here)"
+    roles:
+      - code: "SUPER_ADMIN"
+        name: "Super Administrator"
+        description: "Full system access, can assign any role"
+        display_order: 1
+        permissions:
+          settings: "CRUD"
+          users: "CRUD"
+          technical: "CRUD"
+          planning: "CRUD"
+          production: "CRUD"
+          quality: "CRUD"
+          warehouse: "CRUD"
+          shipping: "CRUD"
+          npd: "CRUD"
+          finance: "CRUD"
+          oee: "CRUD"
+          integrations: "CRUD"
+
+      - code: "ADMIN"
+        name: "Administrator"
+        description: "Organization-wide access, cannot assign Super Admin"
+        display_order: 2
+        permissions:
+          settings: "CRUD"
+          users: "CRUD"
+          technical: "CRUD"
+          planning: "CRUD"
+          production: "CRUD"
+          quality: "CRUD"
+          warehouse: "CRUD"
+          shipping: "CRUD"
+          npd: "CRUD"
+          finance: "CRUD"
+          oee: "CRUD"
+          integrations: "CRUD"
+
+      - code: "PROD_MANAGER"
+        name: "Production Manager"
+        description: "Full Production, Planning, Quality access"
+        display_order: 3
+        permissions:
+          settings: "R"
+          users: "R"
+          technical: "CRUD"
+          planning: "CRUD"
+          production: "CRUD"
+          quality: "CRUD"
+          warehouse: "R"
+          shipping: "R"
+          npd: "R"
+          finance: "R"
+          oee: "CRUD"
+          integrations: "R"
+
+      - code: "QUAL_MANAGER"
+        name: "Quality Manager"
+        description: "Full Quality, read Production"
+        display_order: 4
+        permissions:
+          settings: "R"
+          users: "R"
+          technical: "R"
+          planning: "R"
+          production: "R"
+          quality: "CRUD"
+          warehouse: "R"
+          shipping: "R"
+          npd: "RU"
+          finance: "-"
+          oee: "R"
+          integrations: "-"
+
+      - code: "WH_MANAGER"
+        name: "Warehouse Manager"
+        description: "Full Warehouse and Shipping access"
+        display_order: 5
+        permissions:
+          settings: "R"
+          users: "R"
+          technical: "R"
+          planning: "R"
+          production: "R"
+          quality: "R"
+          warehouse: "CRUD"
+          shipping: "CRUD"
+          npd: "-"
+          finance: "-"
+          oee: "-"
+          integrations: "-"
+
+      - code: "PROD_OPERATOR"
+        name: "Production Operator"
+        description: "CRU Production, read Quality"
+        display_order: 6
+        permissions:
+          settings: "-"
+          users: "-"
+          technical: "R"
+          planning: "R"
+          production: "CRU"
+          quality: "R"
+          warehouse: "-"
+          shipping: "-"
+          npd: "-"
+          finance: "-"
+          oee: "R"
+          integrations: "-"
+
+      - code: "QUAL_INSPECTOR"
+        name: "Quality Inspector"
+        description: "CRU Quality only"
+        display_order: 7
+        permissions:
+          settings: "-"
+          users: "-"
+          technical: "R"
+          planning: "-"
+          production: "R"
+          quality: "CRU"
+          warehouse: "-"
+          shipping: "-"
+          npd: "-"
+          finance: "-"
+          oee: "-"
+          integrations: "-"
+
+      - code: "WH_OPERATOR"
+        name: "Warehouse Operator"
+        description: "CRU Warehouse and Shipping"
+        display_order: 8
+        permissions:
+          settings: "-"
+          users: "-"
+          technical: "-"
+          planning: "-"
+          production: "-"
+          quality: "-"
+          warehouse: "CRU"
+          shipping: "CRU"
+          npd: "-"
+          finance: "-"
+          oee: "-"
+          integrations: "-"
+
+      - code: "PLANNER"
+        name: "Planner"
+        description: "Full Planning, read Production"
+        display_order: 9
+        permissions:
+          settings: "R"
+          users: "-"
+          technical: "R"
+          planning: "CRUD"
+          production: "R"
+          quality: "R"
+          warehouse: "R"
+          shipping: "R"
+          npd: "R"
+          finance: "R"
+          oee: "R"
+          integrations: "-"
+
+      - code: "VIEWER"
+        name: "Viewer"
+        description: "Read-only all modules"
+        display_order: 10
+        permissions:
+          settings: "R"
+          users: "R"
+          technical: "R"
+          planning: "R"
+          production: "R"
+          quality: "R"
+          warehouse: "R"
+          shipping: "R"
+          npd: "R"
+          finance: "R"
+          oee: "R"
+          integrations: "R"
+
+# -----------------------------------------------------------------------------
+# PERMISSION MATRIX (Complete Reference)
+# -----------------------------------------------------------------------------
+permission_matrix:
+  legend:
+    "CRUD": "Create, Read, Update, Delete - Full access"
+    "CRU": "Create, Read, Update - No delete"
+    "RU": "Read, Update only"
+    "R": "Read only"
+    "-": "No access"
+
+  modules:
+    - settings
+    - users
+    - technical
+    - planning
+    - production
+    - quality
+    - warehouse
+    - shipping
+    - npd
+    - finance
+    - oee
+    - integrations
+
+  matrix:
+    # Format: [settings, users, technical, planning, production, quality, warehouse, shipping, npd, finance, oee, integrations]
+    SUPER_ADMIN:  ["CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
+    ADMIN:        ["CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
+    PROD_MANAGER: ["R",    "R",    "CRUD", "CRUD", "CRUD", "CRUD", "R",    "R",    "R",    "R",    "CRUD", "R"]
+    QUAL_MANAGER: ["R",    "R",    "R",    "R",    "R",    "CRUD", "R",    "R",    "RU",   "-",    "R",    "-"]
+    WH_MANAGER:   ["R",    "R",    "R",    "R",    "R",    "R",    "CRUD", "CRUD", "-",    "-",    "-",    "-"]
+    PROD_OPERATOR:  ["-",  "-",    "R",    "R",    "CRU",  "R",    "-",    "-",    "-",    "-",    "R",    "-"]
+    QUAL_INSPECTOR: ["-",  "-",    "R",    "-",    "R",    "CRU",  "-",    "-",    "-",    "-",    "-",    "-"]
+    WH_OPERATOR:    ["-",  "-",    "-",    "-",    "-",    "-",    "CRU",  "CRU",  "-",    "-",    "-",    "-"]
+    PLANNER:      ["R",    "-",    "R",    "CRUD", "R",    "R",    "R",    "R",    "R",    "R",    "R",    "-"]
+    VIEWER:       ["R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R"]
+
+# -----------------------------------------------------------------------------
+# API ENDPOINTS
+# -----------------------------------------------------------------------------
+api:
+  endpoints:
+    - method: "GET"
+      path: "/api/v1/settings/roles"
+      description: "List all 10 system roles"
+      auth: "required"
+      roles: ["all"]  # Any authenticated user can view roles
+      response:
+        type: "Role[]"
+        fields:
+          - "id: UUID"
+          - "code: string"
+          - "name: string"
+          - "description: string"
+          - "permissions: Record<string, string>"
+          - "display_order: number"
+      errors:
+        - code: 401
+          message: "Unauthorized"
+
+    - method: "GET"
+      path: "/api/v1/settings/roles/:id"
+      description: "Get single role by ID"
+      auth: "required"
+      roles: ["all"]
+      response:
+        type: "Role"
+      errors:
+        - code: 401
+          message: "Unauthorized"
+        - code: 404
+          message: "Role not found"
+
+# -----------------------------------------------------------------------------
+# UX SECTION
+# -----------------------------------------------------------------------------
+ux:
+  wireframes:
+    - id: "SET-011"
+      name: "Roles & Permissions View"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-011-roles-permissions-view.md"
+      description: "Read-only permission matrix showing all 10 roles and their access levels"
+      components:
+        - "PermissionMatrixTable"
+        - "RoleLegend"
+        - "ExportPDFButton"
+        - "PrintButton"
+
+  components:
+    - name: "RoleDropdown"
+      description: "Dropdown showing 10 roles by display name (not code)"
+      props:
+        - "value: string (role_id)"
+        - "onChange: (roleId: string) => void"
+        - "disabled?: boolean"
+        - "excludeSuperAdmin?: boolean (for non-super-admin users)"
+      states:
+        - "default: Shows 10 roles sorted by display_order"
+        - "disabled: Grayed out, no interaction"
+        - "error: Red border if required and empty"
+
+    - name: "PermissionMatrix"
+      description: "Table showing all roles x modules x CRUD permissions"
+      props:
+        - "onExport: () => void"
+        - "onPrint: () => void"
+      layout: |
+        +---------------+------------+-------+----------+--------+--------+------+------+------+
+        | Module        | Super Admin| Admin | Prod Mgr | ... (10 columns) ...                |
+        +---------------+------------+-------+----------+--------+--------+------+------+------+
+        | Settings      | CRUD       | CRUD  | R        | ...                                 |
+        | Users         | CRUD       | CRUD  | R        | ...                                 |
+        | Technical     | CRUD       | CRUD  | CRUD     | ...                                 |
+        | Planning      | CRUD       | CRUD  | CRUD     | ...                                 |
+        | Production    | CRUD       | CRUD  | CRUD     | ...                                 |
+        | Quality       | CRUD       | CRUD  | CRUD     | ...                                 |
+        | Warehouse     | CRUD       | CRUD  | R        | ...                                 |
+        | Shipping      | CRUD       | CRUD  | R        | ...                                 |
+        +---------------+------------+-------+----------+---------------------------------+
+
+    - name: "PermissionGate"
+      description: "Wrapper component to conditionally render children based on permissions"
+      props:
+        - "module: ModuleCode"
+        - "action: 'C' | 'R' | 'U' | 'D'"
+        - "fallback?: ReactNode"
+        - "children: ReactNode"
+      usage: |
+        <PermissionGate module="production" action="C">
+          <CreateButton />
+        </PermissionGate>
+
+  states:
+    - "loading: Skeleton table while fetching roles"
+    - "empty: Error state if roles not seeded (should never happen)"
+    - "error: Failed to load permissions message with retry"
+    - "success: Full matrix displayed with legend"
+
+  patterns:
+    table: "ShadCN DataTable with sticky headers for horizontal scroll"
+    dropdown: "ShadCN Select with search for role selection"
+    tooltip: "Show full permission description on hover"
+
+# -----------------------------------------------------------------------------
+# VALIDATION RULES
+# -----------------------------------------------------------------------------
+validation_rules:
+  role_assignment:
+    - "Only SUPER_ADMIN can assign SUPER_ADMIN role to another user"
+    - "ADMIN cannot assign SUPER_ADMIN role"
+    - "Cannot change role of last SUPER_ADMIN in organization"
+    - "Role must be one of 10 valid system roles"
+
+  permission_check:
+    - "Module must be a valid module code"
+    - "Action must be one of: C, R, U, D"
+    - "Permission string must contain the action character"
+    - "'-' means no access at all"
+
+# -----------------------------------------------------------------------------
+# PATTERNS
+# -----------------------------------------------------------------------------
+patterns:
+  permission_service:
+    description: "Backend permission checking"
+    code: |
+      // permission-service.ts
+      export function hasPermission(
+        userPermissions: Record<string, string>,
+        module: string,
+        action: 'C' | 'R' | 'U' | 'D'
+      ): boolean {
+        const modulePerms = userPermissions[module];
+        if (!modulePerms || modulePerms === '-') return false;
+        return modulePerms.includes(action);
+      }
+
+      export function requirePermission(
+        module: string,
+        action: 'C' | 'R' | 'U' | 'D'
+      ) {
+        return async (context: OrgContext) => {
+          if (!hasPermission(context.permissions, module, action)) {
+            throw new ForbiddenError("You don't have permission to perform this action");
+          }
+        };
+      }
+
+  use_permissions_hook:
+    description: "Frontend permission checking hook"
+    code: |
+      // use-permissions.ts
+      export function usePermissions() {
+        const { user } = useAuth();
+        const permissions = user?.role?.permissions ?? {};
+
+        return {
+          can: (module: string, action: 'C' | 'R' | 'U' | 'D') => {
+            return hasPermission(permissions, module, action);
+          },
+          canAny: (module: string) => {
+            const perms = permissions[module];
+            return perms && perms !== '-';
+          },
+          role: user?.role?.code ?? '',
+          roleName: user?.role?.name ?? '',
+        };
+      }
+
+  api_middleware:
+    description: "Permission middleware for API routes"
+    code: |
+      // In API route
+      export async function POST(req: Request) {
+        const context = await getOrgContext(req);
+
+        if (!hasPermission(context.permissions, 'production', 'C')) {
+          return Response.json(
+            { error: "You don't have permission to perform this action" },
+            { status: 403 }
+          );
+        }
+
+        // ... proceed with creation
+      }
+
+  ui_conditional:
+    description: "UI conditional rendering"
+    code: |
+      // In component
+      function UserActionsCell({ user }: { user: User }) {
+        const { can } = usePermissions();
+
+        return (
+          <div className="flex gap-2">
+            {can('users', 'U') && <EditButton user={user} />}
+            {can('users', 'D') && <DeleteButton user={user} />}
+          </div>
+        );
+      }
+
+# -----------------------------------------------------------------------------
+# ACCEPTANCE CRITERIA
+# -----------------------------------------------------------------------------
+acceptance_criteria:
+  role_assignment:
+    - id: "AC-01"
+      given: "role dropdown in user modal"
+      when: "opened"
+      then: "exactly 10 roles display with display names (not codes)"
+      test_type: "integration"
+
+    - id: "AC-02"
+      given: "Super Admin assigning role to user"
+      when: "any of 10 roles selected"
+      then: "role assignment succeeds"
+      test_type: "integration"
+
+    - id: "AC-03"
+      given: "non-Super Admin (e.g., ADMIN)"
+      when: "attempting to assign SUPER_ADMIN role"
+      then: "error 'Only Super Admin can assign Super Admin role' displays"
+      test_type: "integration"
+
+    - id: "AC-04"
+      given: "role changed from VIEWER to ADMIN"
+      when: "user's next request made"
+      then: "new permissions active immediately (no stale cache)"
+      test_type: "integration"
+
+  module_permission_enforcement:
+    - id: "AC-05"
+      given: "user with SUPER_ADMIN role"
+      when: "accessing any module"
+      then: "full CRUD access granted"
+      test_type: "integration"
+
+    - id: "AC-06"
+      given: "user with VIEWER role"
+      when: "attempting to create anything"
+      then: "action blocked, create button hidden"
+      test_type: "integration"
+
+    - id: "AC-07"
+      given: "user with PROD_OPERATOR role"
+      when: "accessing Quality module"
+      then: "read-only access (no create/update/delete)"
+      test_type: "integration"
+
+    - id: "AC-08"
+      given: "user with QUAL_INSPECTOR role"
+      when: "accessing Warehouse module"
+      then: "access denied (redirect)"
+      test_type: "integration"
+
+    - id: "AC-09"
+      given: "user with WH_OPERATOR role"
+      when: "accessing Settings module"
+      then: "access denied (redirect)"
+      test_type: "integration"
+
+  api_permission_enforcement:
+    - id: "AC-10"
+      given: "API request to /api/v1/production/work-orders by VIEWER"
+      when: "POST attempted"
+      then: "403 Forbidden returns"
+      test_type: "integration"
+
+    - id: "AC-11"
+      given: "API request to /api/v1/quality/inspections by PROD_OPERATOR"
+      when: "DELETE attempted"
+      then: "403 Forbidden returns"
+      test_type: "integration"
+
+    - id: "AC-12"
+      given: "API request to /api/v1/warehouse/locations by QUAL_INSPECTOR"
+      when: "GET attempted"
+      then: "403 Forbidden returns (no module access)"
+      test_type: "integration"
+
+  ui_permission_rendering:
+    - id: "AC-13"
+      given: "user with CRU permission (no Delete)"
+      when: "delete button rendered"
+      then: "button hidden or disabled"
+      test_type: "unit"
+
+    - id: "AC-14"
+      given: "user with R permission only"
+      when: "page loads"
+      then: "'Create' and 'Edit' buttons hidden"
+      test_type: "unit"
+
+    - id: "AC-15"
+      given: "user with CRUD permission"
+      when: "page loads"
+      then: "all action buttons visible"
+      test_type: "unit"
+
+  permission_caching:
+    - id: "AC-16"
+      given: "user permissions cached"
+      when: "admin updates user's role"
+      then: "user's next request uses updated permissions (no stale cache beyond 1 minute)"
+      test_type: "integration"
+
+# -----------------------------------------------------------------------------
+# DEFINITION OF DONE
+# -----------------------------------------------------------------------------
+definition_of_done:
+  - "10 roles seeded in database with correct permissions"
+  - "hasPermission() correctly checks module + action"
+  - "API middleware enforces permissions, returns 403"
+  - "usePermissions() hook works for UI conditional rendering"
+  - "Role dropdown displays names (not codes) in user modal"
+  - "Super Admin role assignment restricted to Super Admins"
+  - "Role changes take effect within 1 minute"
+  - "PermissionGate component hides/shows children correctly"
+  - "Integration tests cover all role x module x action combinations"
+  - "Unit tests for permission-service (>80% coverage)"
+  - "Roles & Permissions page displays full matrix (SET-011)"
+
+# -----------------------------------------------------------------------------
+# DELIVERABLES
+# -----------------------------------------------------------------------------
+deliverables:
+  - type: "service"
+    path: "apps/frontend/lib/services/permission-service.ts"
+    description: "hasPermission(), requirePermission() helpers"
+
+  - type: "service"
+    path: "apps/frontend/lib/services/role-service.ts"
+    description: "getRoles(), getRoleById() service functions"
+
+  - type: "hook"
+    path: "apps/frontend/lib/hooks/use-permissions.ts"
+    description: "usePermissions() React hook"
+
+  - type: "middleware"
+    path: "apps/frontend/lib/middleware/require-permission.ts"
+    description: "API permission middleware"
+
+  - type: "constants"
+    path: "apps/frontend/lib/constants/roles.ts"
+    description: "Role codes, permission levels, static matrix"
+
+  - type: "component"
+    path: "apps/frontend/components/settings/role-dropdown.tsx"
+    description: "Role selection dropdown"
+
+  - type: "component"
+    path: "apps/frontend/components/settings/permission-matrix.tsx"
+    description: "Permission matrix table (SET-011)"
+
+  - type: "component"
+    path: "apps/frontend/components/shared/permission-gate.tsx"
+    description: "Permission-based render wrapper"
+
+  - type: "page"
+    path: "apps/frontend/app/(authenticated)/settings/roles/page.tsx"
+    description: "Roles & Permissions view"
+
+  - type: "api"
+    path: "apps/frontend/app/api/v1/settings/roles/route.ts"
+    description: "GET /api/v1/settings/roles"
+
+  - type: "test"
+    path: "apps/frontend/lib/services/__tests__/permission-service.test.ts"
+    description: "Permission service unit tests"
+
+  - type: "test"
+    path: "apps/frontend/lib/hooks/__tests__/use-permissions.test.ts"
+    description: "usePermissions hook tests"
+
+# -----------------------------------------------------------------------------
+# RISKS
+# -----------------------------------------------------------------------------
+risks:
+  - id: "RISK-01"
+    description: "Permission bypass if hasPermission() not called on all endpoints"
+    mitigation: "Create comprehensive integration tests for all API routes"
+    severity: "high"
+
+  - id: "RISK-02"
+    description: "Stale permissions if role changed but cached"
+    mitigation: "Implement cache invalidation on role change, max 1 minute TTL"
+    severity: "medium"
+
+  - id: "RISK-03"
+    description: "UI shows actions user cannot perform (API returns 403)"
+    mitigation: "Use PermissionGate consistently, add client-side permission checks"
+    severity: "low"
+
+# -----------------------------------------------------------------------------
+# TECHNICAL NOTES
+# -----------------------------------------------------------------------------
+technical_notes:
+  - "Roles table seeded in 01.1, this story adds service layer"
+  - "Permission matrix is static (hardcoded in constants for performance)"
+  - "API endpoints also read from DB for source of truth"
+  - "Use ADR-012 JSONB structure for permissions"
+  - "Super Admin restriction: Only Super Admin can assign Super Admin role"
+  - "Cannot delete or modify the last Super Admin in an organization"
+  - "Role dropdown shows display_name, stores role_id"
+  - "Permission check is O(1) - single object lookup"
+  - "Consider Redis cache for permissions in production (future optimization)"
+
+# -----------------------------------------------------------------------------
+# HANDOFF TO DEV AGENTS
+# -----------------------------------------------------------------------------
+handoff:
+  story: "01.6.role-permissions"
+  story_file: "docs/2-MANAGEMENT/epics/current/01-settings/01.6.role-permissions.md"
+  epic_folder: "docs/2-MANAGEMENT/epics/current/01-settings/"
+  adrs:
+    - "ADR-012: Role Permission Storage (PRIMARY)"
+    - "ADR-013: RLS Org Isolation Pattern"
+  technical_notes: "10 predefined roles with JSONB permissions. Implement hasPermission(), usePermissions(), and API middleware."
+  dependencies:
+    - "01.1: Org Context + Base RLS (provides roles table, users table)"
+  priority: "high"
+  estimated_effort: "3 days"

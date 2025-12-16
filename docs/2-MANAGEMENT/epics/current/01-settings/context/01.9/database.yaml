@@ -1,0 +1,170 @@
+# Story 01.9 - Database Schema
+# Purpose: Tables, RLS policies, indexes, hierarchical functions
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/061_create_locations_table.sql"
+    type: "migration"
+    description: "Hierarchical locations table with enums and triggers"
+  - path: "supabase/migrations/062_locations_rls_policies.sql"
+    type: "migration"
+    description: "RLS policies following ADR-013 pattern"
+
+# Enums
+enums:
+  - name: "location_type"
+    values: ["bulk", "pallet", "shelf", "floor", "staging"]
+    description: "Storage type classification"
+
+  - name: "location_level"
+    values: ["zone", "aisle", "rack", "bin"]
+    description: "Hierarchical level (4 levels)"
+
+tables:
+  - name: "locations"
+    description: "Hierarchical storage locations within warehouses"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "warehouse_id", type: "UUID", constraints: "NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE" }
+      - { name: "parent_id", type: "UUID", constraints: "REFERENCES locations(id) ON DELETE RESTRICT" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "NOT NULL" }
+      - { name: "name", type: "VARCHAR(255)", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "level", type: "location_level", constraints: "NOT NULL" }
+      - { name: "full_path", type: "VARCHAR(500)", constraints: "-- Computed: WH-001/ZONE-A/A01/R01/B001" }
+      - { name: "depth", type: "INT", constraints: "NOT NULL DEFAULT 1" }
+      - { name: "location_type", type: "location_type", constraints: "NOT NULL DEFAULT 'shelf'" }
+      - { name: "max_pallets", type: "INT", constraints: "" }
+      - { name: "max_weight_kg", type: "DECIMAL(12,2)", constraints: "" }
+      - { name: "current_pallets", type: "INT", constraints: "DEFAULT 0" }
+      - { name: "current_weight_kg", type: "DECIMAL(12,2)", constraints: "DEFAULT 0" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_locations_org ON locations(org_id)"
+      - "idx_locations_warehouse ON locations(warehouse_id)"
+      - "idx_locations_parent ON locations(parent_id)"
+      - "idx_locations_level ON locations(level)"
+      - "idx_locations_type ON locations(location_type)"
+      - "idx_locations_full_path ON locations(full_path)"
+    constraints:
+      - "UNIQUE(org_id, warehouse_id, code)"
+      - "CHECK(depth BETWEEN 1 AND 4)"
+      - "CHECK(max_pallets IS NULL OR max_pallets > 0)"
+      - "CHECK(max_weight_kg IS NULL OR max_weight_kg > 0)"
+      - "CHECK(current_pallets >= 0)"
+      - "CHECK(current_weight_kg >= 0)"
+
+# Database Functions
+functions:
+  - name: "compute_location_full_path()"
+    type: "TRIGGER FUNCTION"
+    description: "Automatically computes full_path and depth on INSERT/UPDATE"
+    returns: "TRIGGER"
+    logic: |
+      - If parent_id IS NULL: full_path = warehouse_code || '/' || code, depth = 1
+      - Else: full_path = parent.full_path || '/' || code, depth = parent.depth + 1
+      - Updates automatically on location move or code change
+
+  - name: "validate_location_hierarchy()"
+    type: "TRIGGER FUNCTION"
+    description: "Enforces level hierarchy: zone > aisle > rack > bin"
+    returns: "TRIGGER"
+    validation_rules:
+      - "Root locations (parent_id IS NULL) must be level = 'zone'"
+      - "Zone children must be level = 'aisle'"
+      - "Aisle children must be level = 'rack'"
+      - "Rack children must be level = 'bin'"
+      - "Bins cannot have children"
+    errors:
+      - "Root locations must be zones"
+      - "Locations under zones must be aisles"
+      - "Locations under aisles must be racks"
+      - "Locations under racks must be bins"
+      - "Bins cannot have child locations"
+
+# Triggers
+triggers:
+  - name: "trg_compute_location_path"
+    event: "BEFORE INSERT OR UPDATE"
+    table: "locations"
+    function: "compute_location_full_path()"
+
+  - name: "trg_validate_location_hierarchy"
+    event: "BEFORE INSERT OR UPDATE"
+    table: "locations"
+    function: "validate_location_hierarchy()"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Org isolation using users table lookup per ADR-013"
+    - "Warehouse ownership check on insert"
+    - "Parent location must belong to same org"
+
+  policies:
+    - table: "locations"
+      name: "locations_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "locations"
+      name: "locations_insert"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND warehouse_id IN (
+          SELECT id FROM warehouses
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+        AND (parent_id IS NULL OR parent_id IN (
+          SELECT id FROM locations
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        ))
+
+    - table: "locations"
+      name: "locations_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "locations"
+      name: "locations_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Seed Data
+seed_data: []  # No seed data - locations are user-created
+
+# Example Location Hierarchy
+example_data:
+  warehouse_code: "WH-001"
+  locations:
+    - code: "ZONE-A"
+      level: "zone"
+      parent: null
+      full_path: "WH-001/ZONE-A"
+      depth: 1
+      children:
+        - code: "A01"
+          level: "aisle"
+          full_path: "WH-001/ZONE-A/A01"
+          depth: 2
+          children:
+            - code: "R01"
+              level: "rack"
+              full_path: "WH-001/ZONE-A/A01/R01"
+              depth: 3
+              children:
+                - code: "B001"
+                  level: "bin"
+                  full_path: "WH-001/ZONE-A/A01/R01/B001"
+                  depth: 4
+                  children: []  # Bins have no children

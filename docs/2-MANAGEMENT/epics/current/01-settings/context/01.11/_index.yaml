@@ -1,0 +1,107 @@
+# Story 01.11 - Index File (Entry Point)
+# Generated: 2025-12-16
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "01.11"
+  name: "Production Lines CRUD"
+  slug: "production-lines-crud"
+  epic: "01-settings"
+  phase: "1B"
+  complexity: "L"
+  estimate_days: 5
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, junction tables
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, hooks, drag-drop
+  - tests.yaml       # Acceptance criteria, test specifications
+  - gaps.yaml        # Readiness assessment
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "org_id context"
+        - "RLS policies for tenant isolation"
+    - story: "01.6"
+      name: "Role-Based Permissions"
+      provides:
+        - "roles table with 10 predefined roles"
+        - "permission matrix (module x CRUD)"
+        - "hasPermission() helper function"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides:
+        - "warehouses table"
+        - "warehouse dropdown data"
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides:
+        - "locations table"
+        - "default_output_location_id reference"
+    - story: "01.10"
+      name: "Machines CRUD"
+      provides:
+        - "machines table"
+        - "machine data for assignment"
+        - "capacity_per_hour field for bottleneck calculation"
+  external:
+    - name: "Products table"
+      provides:
+        - "products table for line-product compatibility"
+      notes: "Part of Technical module (Epic 02)"
+  blocked_by: []
+  blocks:
+    - story: "04.x"
+      name: "Work Order Creation"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/settings.md"
+    sections: ["FR-SET-060", "FR-SET-061", "FR-SET-062", "FR-SET-063", "FR-SET-064", "FR-SET-065"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/settings.md"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.11.production-lines-crud.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "PRIMARY - RLS policy pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "3 tables: production_lines, production_line_machines, production_line_products"
+  - type: "service"
+    count: 1
+    description: "production-line-service.ts"
+  - type: "api"
+    count: 7
+    description: "CRUD + machine reorder + product compatibility endpoints"
+  - type: "component"
+    count: 10
+    description: "List, modal, drag-drop machine sequencer, product selector"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Machine sequence: drag-drop reorder with dnd-kit library"
+  - "Capacity calculation: MIN(machine.capacity_per_hour) = bottleneck"
+  - "Product compatibility: empty = ANY product, populated = restricted list"
+  - "Status: active, maintenance, inactive, setup"
+  - "Code immutability: cannot change if work orders exist"
+  - "Delete blocked if active work orders exist"
+  - "Sequence auto-renumber (1, 2, 3... no gaps)"
+  - "Keyboard accessibility for drag-drop"

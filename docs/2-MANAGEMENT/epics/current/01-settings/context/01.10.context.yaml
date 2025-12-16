@@ -1,0 +1,629 @@
+# Story Context: 01.10 Machines CRUD
+# Generated: 2025-12-16
+# Purpose: AI agent context for implementing machine management with types, statuses, capacities, and location assignment
+
+story:
+  id: "01.10"
+  name: "Machines CRUD"
+  epic: "01-settings"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3
+  type: "frontend + backend"
+  state: "ready"
+
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "organizations table"
+        - "users table with org_id"
+        - "RLS foundation"
+        - "auth context"
+    - story: "01.6"
+      name: "Role Permissions"
+      provides:
+        - "10-role permission system"
+        - "Role-based access control"
+        - "PROD_MANAGER+ role check"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides:
+        - "warehouses table"
+        - "Warehouse context for locations"
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides:
+        - "locations table"
+        - "Location hierarchy (zone/aisle/rack/bin)"
+        - "location_id FK for machine assignment"
+
+  critical_path: "01.1 -> 01.6 -> 01.8 -> 01.9 -> 01.10"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/settings.md"
+  prd_sections:
+    - "FR-SET-050"  # Machine CRUD
+    - "FR-SET-051"  # Machine type (mixer/oven/filler/packaging/conveyor)
+    - "FR-SET-052"  # Machine status (active/maintenance/offline/decommissioned)
+    - "FR-SET-053"  # Machine capacity (units/hour)
+    - "FR-SET-054"  # Maintenance schedule configuration (Phase 2 - OUT OF SCOPE)
+    - "FR-SET-055"  # Machine location assignment
+    - "FR-SET-056"  # Machine-specific parameters (Phase 2 - OUT OF SCOPE)
+  architecture:
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  story: "docs/2-MANAGEMENT/epics/current/01-settings/01.10.machines-crud.md"
+  patterns:
+    - "apps/frontend/lib/services/*-service.ts"  # Service pattern
+    - "apps/frontend/lib/validation/*.ts"  # Zod schema patterns
+    - "apps/frontend/components/ui/badge.tsx"  # ShadCN Badge component
+    - "apps/frontend/components/ui/dialog.tsx"  # ShadCN Dialog for modal
+
+files_to_create:
+  database:
+    - path: "supabase/migrations/054_create_machines_table.sql"
+      type: "migration"
+      description: "Create machine_type enum, machine_status enum, and machines table"
+  api:
+    - path: "apps/frontend/app/api/v1/settings/machines/route.ts"
+      methods: ["GET", "POST"]
+      description: "List machines with filters; Create new machine"
+    - path: "apps/frontend/app/api/v1/settings/machines/[id]/route.ts"
+      methods: ["GET", "PUT", "DELETE"]
+      description: "Get, Update, Delete single machine"
+    - path: "apps/frontend/app/api/v1/settings/machines/[id]/status/route.ts"
+      methods: ["PATCH"]
+      description: "Update machine status only"
+  services:
+    - path: "apps/frontend/lib/services/machine-service.ts"
+      description: "Machine CRUD logic, validation helpers, location path building"
+  validation:
+    - path: "apps/frontend/lib/validation/machine-schema.ts"
+      description: "Zod schemas for machine create/update/status"
+  pages:
+    - path: "apps/frontend/app/(authenticated)/settings/machines/page.tsx"
+      description: "Machines list page"
+  components:
+    - path: "apps/frontend/components/settings/machines/MachinesDataTable.tsx"
+      description: "Table with sorting, filtering, pagination"
+    - path: "apps/frontend/components/settings/machines/MachineModal.tsx"
+      description: "Create/Edit form modal"
+    - path: "apps/frontend/components/settings/machines/MachineRow.tsx"
+      description: "Single machine row with actions"
+    - path: "apps/frontend/components/settings/machines/MachineTypeBadge.tsx"
+      description: "Type badge with icon (Mixer=blue, Oven=orange, etc.)"
+    - path: "apps/frontend/components/settings/machines/MachineStatusBadge.tsx"
+      description: "Status badge with color (Active=green, Maintenance=yellow, etc.)"
+    - path: "apps/frontend/components/settings/machines/MachineCapacityDisplay.tsx"
+      description: "Capacity info display (units/hr, setup time)"
+    - path: "apps/frontend/components/settings/machines/MachineLocationSelect.tsx"
+      description: "Hierarchical location dropdown with path display"
+    - path: "apps/frontend/components/settings/machines/DeleteMachineDialog.tsx"
+      description: "Confirmation dialog with line assignment check"
+    - path: "apps/frontend/components/settings/machines/MachineFilters.tsx"
+      description: "Filter controls (type, status, location dropdowns)"
+
+database:
+  enums:
+    - name: "machine_type"
+      values:
+        - "MIXER"
+        - "OVEN"
+        - "FILLER"
+        - "PACKAGING"
+        - "CONVEYOR"
+        - "BLENDER"
+        - "CUTTER"
+        - "LABELER"
+        - "OTHER"
+    - name: "machine_status"
+      values:
+        - "ACTIVE"
+        - "MAINTENANCE"
+        - "OFFLINE"
+        - "DECOMMISSIONED"
+
+  tables:
+    - name: "machines"
+      description: "Production machine master data with type, status, capacity, and location"
+      columns:
+        - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "code VARCHAR(50) NOT NULL"
+        - "name VARCHAR(100) NOT NULL"
+        - "description TEXT"
+        - "type machine_type NOT NULL DEFAULT 'OTHER'"
+        - "status machine_status NOT NULL DEFAULT 'ACTIVE'"
+        - "units_per_hour INTEGER"
+        - "setup_time_minutes INTEGER"
+        - "max_batch_size INTEGER"
+        - "location_id UUID REFERENCES locations(id) ON DELETE SET NULL"
+        - "is_deleted BOOLEAN DEFAULT false"
+        - "deleted_at TIMESTAMPTZ"
+        - "created_at TIMESTAMPTZ DEFAULT NOW()"
+        - "updated_at TIMESTAMPTZ DEFAULT NOW()"
+        - "created_by UUID REFERENCES users(id)"
+        - "updated_by UUID REFERENCES users(id)"
+        - "UNIQUE(org_id, code)"
+      rls: true
+      rls_policy: "ADR-013 users lookup pattern"
+      indexes:
+        - "org_id"
+        - "type"
+        - "status"
+        - "location_id"
+        - "(org_id, code) UNIQUE"
+
+  rls_policies:
+    machines:
+      - name: "machines_select"
+        operation: "SELECT"
+        role: "authenticated"
+        using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND is_deleted = false"
+      - name: "machines_insert"
+        operation: "INSERT"
+        role: "authenticated"
+        with_check: |
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+              IN ('SUPER_ADMIN', 'ADMIN', 'PROD_MANAGER')
+      - name: "machines_update"
+        operation: "UPDATE"
+        role: "authenticated"
+        using: |
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+              IN ('SUPER_ADMIN', 'ADMIN', 'PROD_MANAGER')
+      - name: "machines_delete"
+        operation: "DELETE"
+        role: "authenticated"
+        using: |
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+              IN ('SUPER_ADMIN', 'ADMIN')
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/machines"
+    description: "List all machines with filtering, sorting, pagination"
+    auth: true
+    roles: ["*"]
+    query_params:
+      - "page: number (default: 1)"
+      - "limit: number (default: 25)"
+      - "search: string (filters code and name)"
+      - "type: MachineType (enum filter)"
+      - "status: MachineStatus (enum filter)"
+      - "location_id: string (UUID filter)"
+      - "sortBy: 'code' | 'name' | 'type' | 'status' | 'created_at'"
+      - "sortOrder: 'asc' | 'desc'"
+    response:
+      machines: "Machine[]"
+      total: "number"
+      page: "number"
+      limit: "number"
+
+  - method: "POST"
+    path: "/api/v1/settings/machines"
+    description: "Create a new machine"
+    auth: true
+    roles: ["super_admin", "admin", "prod_manager"]
+    request_body:
+      code: "string (required, uppercase alphanumeric with hyphens, max 50)"
+      name: "string (required, max 100)"
+      description: "string (optional, max 500)"
+      type: "MachineType (required)"
+      status: "MachineStatus (optional, default: ACTIVE)"
+      units_per_hour: "number (optional, integer, min 0)"
+      setup_time_minutes: "number (optional, integer, min 0)"
+      max_batch_size: "number (optional, integer, min 0)"
+      location_id: "string (optional, UUID)"
+    response:
+      machine: "Machine"
+    errors:
+      - code: 400
+        message: "Validation error"
+        condition: "Invalid input data"
+      - code: 409
+        message: "Machine code must be unique"
+        condition: "Duplicate code in organization"
+      - code: 403
+        message: "Insufficient permissions"
+        condition: "User lacks PROD_MANAGER+ role"
+
+  - method: "GET"
+    path: "/api/v1/settings/machines/:id"
+    description: "Get single machine by ID"
+    auth: true
+    roles: ["*"]
+    response:
+      machine: "Machine with location details"
+
+  - method: "PUT"
+    path: "/api/v1/settings/machines/:id"
+    description: "Update machine"
+    auth: true
+    roles: ["super_admin", "admin", "prod_manager"]
+    request_body:
+      code: "string (optional)"
+      name: "string (optional)"
+      description: "string (optional)"
+      type: "MachineType (optional)"
+      status: "MachineStatus (optional)"
+      units_per_hour: "number (optional)"
+      setup_time_minutes: "number (optional)"
+      max_batch_size: "number (optional)"
+      location_id: "string | null (optional, null to unassign)"
+    response:
+      machine: "Machine"
+    errors:
+      - code: 404
+        message: "Machine not found"
+      - code: 409
+        message: "Machine code must be unique"
+
+  - method: "PATCH"
+    path: "/api/v1/settings/machines/:id/status"
+    description: "Update machine status only"
+    auth: true
+    roles: ["super_admin", "admin", "prod_manager"]
+    request_body:
+      status: "MachineStatus (required)"
+    response:
+      machine: "Machine"
+
+  - method: "DELETE"
+    path: "/api/v1/settings/machines/:id"
+    description: "Delete machine (soft delete if has historical references)"
+    auth: true
+    roles: ["super_admin", "admin"]
+    response:
+      success: "boolean"
+    errors:
+      - code: 409
+        message: "Machine is assigned to line [LINE-CODE]. Remove from line first."
+        condition: "Machine assigned to production line"
+      - code: 404
+        message: "Machine not found"
+
+ux:
+  wireframes:
+    - id: "SET-016"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-016-machine-list.md"
+      description: "Machine List page with table, filters, and actions"
+      components:
+        - "Data table with columns: Code, Name, Type, Production Line, Status, Actions"
+        - "Search input (filters code and name)"
+        - "Type filter dropdown"
+        - "Status filter dropdown"
+        - "Sort dropdown"
+        - "Add Machine button (primary CTA)"
+        - "Actions menu (Edit, Assign to Line, Set Maintenance, Disable)"
+        - "Type badges: Mixer (blue), Oven (red), Packaging (green), etc."
+        - "Status badges: Active (green), Maintenance (yellow), Disabled (gray)"
+    - id: "SET-017"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-017-machine-create-edit-modal.md"
+      description: "Create/Edit Machine modal"
+      components:
+        - "Code input (4-8 chars, auto-uppercase, unique)"
+        - "Name input (required)"
+        - "Type dropdown (6 options)"
+        - "Production Line dropdown (optional)"
+        - "Capacity input (units/hour)"
+        - "Specifications textarea"
+        - "Active checkbox"
+
+  type_badges:
+    MIXER:
+      label: "Mixer"
+      color: "blue"
+      icon: "MixerIcon"
+    OVEN:
+      label: "Oven"
+      color: "orange"
+      icon: "FlameIcon"
+    FILLER:
+      label: "Filler"
+      color: "purple"
+      icon: "FillIcon"
+    PACKAGING:
+      label: "Packaging"
+      color: "green"
+      icon: "PackageIcon"
+    CONVEYOR:
+      label: "Conveyor"
+      color: "gray"
+      icon: "BeltIcon"
+    BLENDER:
+      label: "Blender"
+      color: "cyan"
+      icon: "BlenderIcon"
+    CUTTER:
+      label: "Cutter"
+      color: "red"
+      icon: "ScissorsIcon"
+    LABELER:
+      label: "Labeler"
+      color: "yellow"
+      icon: "TagIcon"
+    OTHER:
+      label: "Other"
+      color: "slate"
+      icon: "SettingsIcon"
+
+  status_badges:
+    ACTIVE:
+      label: "Active"
+      color: "green"
+    MAINTENANCE:
+      label: "Maintenance"
+      color: "yellow"
+    OFFLINE:
+      label: "Offline"
+      color: "red"
+    DECOMMISSIONED:
+      label: "Decommissioned"
+      color: "gray"
+
+  patterns:
+    table: "ShadCN DataTable with sortable columns"
+    modal: "ShadCN Dialog with form sections"
+    badge: "ShadCN Badge for type and status"
+    select: "ShadCN Select with combobox for location"
+    toast: "ShadCN Toast for success/error messages"
+
+  states:
+    - "loading: Skeleton rows (6 items), 'Loading machines...' text"
+    - "empty: 'No Machines Found' icon, 'Add Your First Machine' CTA"
+    - "error: 'Failed to Load Machines' warning, Retry + Contact Support buttons"
+    - "success: Table with machine rows, filters, pagination"
+
+validation_rules:
+  code:
+    required: true
+    format: "^[A-Z0-9-]+$"
+    min_length: 1
+    max_length: 50
+    unique: "per organization"
+    message: "Code must be uppercase alphanumeric with hyphens"
+  name:
+    required: true
+    min_length: 1
+    max_length: 100
+    message: "Machine name is required"
+  description:
+    required: false
+    max_length: 500
+  type:
+    required: true
+    values: ["MIXER", "OVEN", "FILLER", "PACKAGING", "CONVEYOR", "BLENDER", "CUTTER", "LABELER", "OTHER"]
+  status:
+    required: false
+    default: "ACTIVE"
+    values: ["ACTIVE", "MAINTENANCE", "OFFLINE", "DECOMMISSIONED"]
+  units_per_hour:
+    required: false
+    type: "integer"
+    min: 0
+  setup_time_minutes:
+    required: false
+    type: "integer"
+    min: 0
+  max_batch_size:
+    required: false
+    type: "integer"
+    min: 0
+  location_id:
+    required: false
+    type: "uuid"
+    nullable: true
+
+patterns:
+  rls: "ADR-013 - RLS Org Isolation Pattern (users lookup)"
+  api: "REST with org_id from auth context"
+  service: "Class-based MachineService with static methods"
+  validation: "Zod schemas in lib/validation/machine-schema.ts"
+  soft_delete: "is_deleted flag for machines with historical WO references"
+
+location_assignment:
+  description: "Machines can be assigned to a location for physical tracking"
+  implementation:
+    - "location_id is nullable FK to locations table"
+    - "Location dropdown shows hierarchical path: 'WH-001 > ZONE-A > RACK-01'"
+    - "Dropdown supports typeahead filtering"
+    - "Null location displays as '--' or 'Unassigned' in list"
+    - "ON DELETE SET NULL preserves machine if location deleted"
+  display_format: "{warehouse_code}/{zone_code}/{rack_code}"
+
+delete_validation:
+  description: "Validate before deleting machine"
+  rules:
+    - "Check if machine is assigned to any production line (production_line_machines table)"
+    - "If assigned, return 409 with line codes"
+    - "Check if machine has historical work order references (work_order_operations table)"
+    - "If has history, perform soft delete (is_deleted=true, deleted_at=NOW())"
+    - "If no history and no line assignment, perform hard delete"
+
+permissions:
+  view_machines:
+    roles: ["*"]
+    notes: "All authenticated users can view machines"
+  create_machines:
+    roles: ["super_admin", "admin", "prod_manager"]
+    notes: "Manager+ can create machines"
+  edit_machines:
+    roles: ["super_admin", "admin", "prod_manager"]
+    notes: "Manager+ can edit machines"
+  delete_machines:
+    roles: ["super_admin", "admin"]
+    notes: "Admin+ only can delete machines"
+  change_status:
+    roles: ["super_admin", "admin", "prod_manager"]
+    notes: "Manager+ can change machine status"
+
+acceptance_checklist:
+  machine_list_page:
+    - "GIVEN admin navigates to /settings/machines, WHEN page loads, THEN machine list displays within 300ms"
+    - "GIVEN machine list has 50 items, WHEN admin filters by type 'Mixer', THEN only mixer machines display within 200ms"
+    - "GIVEN machine list displayed, WHEN admin filters by status 'Maintenance', THEN only machines in maintenance status appear"
+    - "GIVEN machine list displayed, WHEN admin filters by location 'WH-001/ZONE-A', THEN only machines in that location appear"
+    - "GIVEN machine list displayed, WHEN admin searches 'MIX', THEN machines with code or name matching 'MIX' display within 200ms"
+    - "GIVEN machine list with pagination, WHEN page 2 clicked, THEN next 25 machines display"
+    - "GIVEN machine list displayed, WHEN columns rendered, THEN columns show: Code, Name, Type (badge), Status (badge), Capacity, Location, Actions"
+
+  create_machine:
+    - "GIVEN admin clicks 'Add Machine', WHEN modal opens, THEN form displays: code, name, type, status, capacity fields, location dropdown"
+    - "GIVEN admin enters machine code 'MIX-001', WHEN save clicked with valid data, THEN machine created with default status 'Active' within 500ms"
+    - "GIVEN machine code 'MIX-001' exists in organization, WHEN duplicate code entered, THEN error 'Machine code must be unique' displays inline"
+    - "GIVEN required field (code or name) empty, WHEN save attempted, THEN validation error 'Field is required' displays inline"
+    - "GIVEN admin selects type 'Mixer', WHEN form submitted, THEN machine created with type 'MIXER'"
+    - "GIVEN admin sets capacity fields (units_per_hour: 500, setup_time: 30, max_batch_size: 1000), WHEN form submitted, THEN machine created with all capacity values stored"
+    - "GIVEN admin selects location 'WH-001/ZONE-A/RACK-01', WHEN form submitted, THEN machine created with location_id reference"
+    - "GIVEN admin leaves location unselected, WHEN form submitted, THEN machine created with location_id NULL"
+
+  edit_machine:
+    - "GIVEN admin clicks edit on existing machine 'MIX-001', WHEN modal opens, THEN current machine data pre-populates all form fields"
+    - "GIVEN admin updates machine name from 'Primary Mixer' to 'Main Mixer', WHEN save completes, THEN updated name displays immediately in list"
+    - "GIVEN admin changes machine type from 'MIXER' to 'BLENDER', WHEN save completes, THEN new type badge displays in list"
+    - "GIVEN admin changes location assignment, WHEN save completes, THEN new location displays in list"
+
+  machine_status_management:
+    - "GIVEN machine status is 'Active', WHEN admin changes to 'Maintenance', THEN status updates immediately with yellow 'Maintenance' badge"
+    - "GIVEN machine status is 'Maintenance', WHEN admin changes to 'Offline', THEN status updates immediately with red 'Offline' badge"
+    - "GIVEN machine status is 'Offline', WHEN admin changes to 'Active', THEN status updates immediately with green 'Active' badge"
+    - "GIVEN machine status is 'Active', WHEN admin changes to 'Decommissioned', THEN status updates with gray 'Decommissioned' badge and machine excluded from active lists"
+
+  machine_type_badges:
+    - "GIVEN machine list displayed, WHEN type column rendered, THEN each type shows distinct badge: Mixer (blue), Oven (orange), Filler (purple), Packaging (green), Conveyor (gray)"
+
+  capacity_display:
+    - "GIVEN machine has capacity values set, WHEN list viewed, THEN capacity displays as '{units_per_hour} u/hr'"
+    - "GIVEN machine form open, WHEN capacity section displayed, THEN fields show: Units per hour, Setup time in minutes, Max batch size"
+    - "GIVEN capacity field left empty, WHEN form submitted, THEN field saved as NULL (optional field)"
+
+  location_assignment:
+    - "GIVEN admin opens machine form, WHEN location dropdown loaded, THEN locations display as hierarchical path (e.g., 'WH-001 > ZONE-A > RACK-01')"
+    - "GIVEN location dropdown open, WHEN typing to filter, THEN locations filter by name/code within 200ms"
+    - "GIVEN machine assigned to location 'RACK-01', WHEN machine list viewed, THEN location column shows full path 'WH-001/ZONE-A/RACK-01'"
+    - "GIVEN machine has no location assigned, WHEN machine list viewed, THEN location column shows '--' or 'Unassigned'"
+
+  delete_machine:
+    - "GIVEN machine has no assignments (not on any production line), WHEN delete confirmed, THEN machine removed within 500ms"
+    - "GIVEN machine is assigned to production line 'LINE-001', WHEN delete attempted, THEN error 'Machine is assigned to line [LINE-001]. Remove from line first.' displays"
+    - "GIVEN machine has historical work order references, WHEN delete attempted, THEN soft-delete performed (is_deleted=true) instead of hard delete"
+
+  permission_enforcement:
+    - "GIVEN user has PROD_MANAGER role or higher, WHEN /settings/machines accessed, THEN full CRUD access available"
+    - "GIVEN user has VIEWER role, WHEN /settings/machines accessed, THEN 'Add Machine' button hidden, edit/delete actions hidden (read-only)"
+    - "GIVEN user has PROD_OPERATOR role, WHEN /settings/machines accessed, THEN read-only access (can view but not modify)"
+
+definition_of_done:
+  - "Database migration creates machines table with enums (machine_type, machine_status)"
+  - "RLS policies enforce org isolation (ADR-013 pattern)"
+  - "API endpoints for CRUD operations implemented (GET, POST, PUT, DELETE, PATCH status)"
+  - "machine-service.ts with all service methods"
+  - "Zod validation schemas for all inputs"
+  - "Machine list page loads within 300ms for 100 machines"
+  - "Create/Edit modal with all form fields working"
+  - "Machine type badges display with correct colors/icons"
+  - "Machine status badges display with correct colors"
+  - "Status updates reflect immediately in UI"
+  - "Capacity fields save and display correctly"
+  - "Location assignment works with hierarchical dropdown"
+  - "Soft delete for machines with historical references"
+  - "Delete blocked for machines assigned to production lines"
+  - "Search and filter work within 200ms"
+  - "Permission enforcement hides unauthorized actions"
+  - "Unit tests for machine-service (>80% coverage)"
+  - "Integration tests for all API endpoints"
+  - "E2E tests for critical flows"
+
+tests:
+  unit:
+    - "UT-01: Create machine with valid data - Machine created with all fields"
+    - "UT-02: Create machine with duplicate code - Throws 'Code already exists' error"
+    - "UT-03: Update machine status from ACTIVE to MAINTENANCE - Status updated successfully"
+    - "UT-04: Delete machine with no line assignments - Machine soft-deleted"
+    - "UT-05: Delete machine with line assignments - Throws 'Machine assigned to line' error"
+    - "UT-06: Get machines with type filter - Only matching type returned"
+    - "UT-07: Get machines with status filter - Only matching status returned"
+    - "UT-08: Get machines with location filter - Only machines in location returned"
+    - "UT-09: Search machines by code - Matching machines returned"
+    - "UT-10: Validate code format (uppercase, alphanumeric, hyphens) - Invalid codes rejected"
+  integration:
+    - "IT-01: GET /machines returns org-scoped list - Only org machines returned"
+    - "IT-02: POST /machines creates with valid data - 201 with machine object"
+    - "IT-03: POST /machines with duplicate code - 409 conflict error"
+    - "IT-04: PUT /machines/:id updates machine - 200 with updated machine"
+    - "IT-05: PATCH /machines/:id/status updates status - 200 with new status"
+    - "IT-06: DELETE /machines/:id with no assignments - 204 no content"
+    - "IT-07: DELETE /machines/:id with assignments - 409 conflict error"
+    - "IT-08: GET /machines with VIEWER role - 200 read-only access"
+    - "IT-09: POST /machines with VIEWER role - 403 forbidden"
+    - "IT-10: RLS prevents cross-org access - Empty results for other org"
+  e2e:
+    - "E2E-01: Create new machine end-to-end - Machine appears in list"
+    - "E2E-02: Edit existing machine - Changes reflected immediately"
+    - "E2E-03: Change machine status - Status badge updates"
+    - "E2E-04: Filter by type - Only filtered machines shown"
+    - "E2E-05: Filter by status - Only filtered machines shown"
+    - "E2E-06: Search by code - Matching machines displayed"
+    - "E2E-07: Assign location to machine - Location displayed in list"
+    - "E2E-08: Delete machine (no assignments) - Machine removed from list"
+    - "E2E-09: Delete machine (with assignments) - Error dialog shown"
+    - "E2E-10: Permission: VIEWER sees read-only - Add/Edit/Delete hidden"
+
+output_artifacts:
+  database:
+    - "Migration: 054_create_machines_table.sql (enums + table + indexes + RLS)"
+  backend:
+    - "machine-service.ts with CRUD methods and validation helpers"
+    - "machine-schema.ts Zod validation schemas"
+    - "API routes: GET/POST /machines, GET/PUT/DELETE /machines/:id, PATCH /machines/:id/status"
+  frontend:
+    - "machines/page.tsx - Machines list page"
+    - "MachinesDataTable.tsx - Table with filters, sorting, pagination"
+    - "MachineModal.tsx - Create/Edit form modal"
+    - "MachineTypeBadge.tsx - Type badge with icon"
+    - "MachineStatusBadge.tsx - Status badge with color"
+    - "MachineLocationSelect.tsx - Hierarchical location dropdown"
+    - "MachineFilters.tsx - Filter controls"
+    - "DeleteMachineDialog.tsx - Confirmation with assignment check"
+  tests:
+    - "Unit tests for MachineService"
+    - "Integration tests for API endpoints"
+    - "E2E tests for list, create, edit, delete flows"
+
+implementation_notes:
+  database:
+    - "Create migration 054 with machine_type and machine_status enums"
+    - "machines table with all fields including soft delete support"
+    - "location_id FK with ON DELETE SET NULL"
+    - "Unique constraint on (org_id, code)"
+    - "Indexes on org_id, type, status, location_id"
+  backend:
+    - "MachineService handles all CRUD logic"
+    - "isCodeUnique checks within organization scope"
+    - "canDelete checks production_line_machines join table"
+    - "getLocationPath builds hierarchical path string"
+    - "Soft delete sets is_deleted=true, deleted_at=NOW()"
+  frontend:
+    - "Use ShadCN DataTable for machine list"
+    - "Use ShadCN Dialog for create/edit modal"
+    - "Use ShadCN Badge for type and status"
+    - "Use ShadCN Select with combobox for location"
+    - "Location dropdown shows hierarchical path format"
+    - "Optimistic UI update after status change"
+    - "Toast notifications for success/error"
+  performance:
+    - "List page loads within 300ms for 100 machines"
+    - "Search/filter response within 200ms"
+    - "Create/Update/Delete within 500ms"
+
+out_of_scope:
+  - "FR-SET-054: Maintenance schedule configuration (Phase 2)"
+  - "FR-SET-056: Machine-specific parameters (Phase 2)"
+  - "Machine OEE tracking (Epic 10)"
+  - "Machine downtime logging (requires maintenance module)"
+  - "Machine documentation/manuals (Phase 3)"
