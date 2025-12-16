@@ -4,8 +4,8 @@
 
 endpoints:
   - method: "GET"
-    path: "/api/v1/settings/onboarding/status"
-    file: "apps/frontend/app/api/v1/settings/onboarding/status/route.ts"
+    path: "/api/settings/onboarding/status"
+    file: "apps/frontend/app/api/settings/onboarding/status/route.ts"
     description: "Get current onboarding status for organization"
     auth: true
     roles: ["*"]  # All authenticated users
@@ -74,11 +74,11 @@ endpoints:
       }
 
   - method: "POST"
-    path: "/api/v1/settings/onboarding/skip"
-    file: "apps/frontend/app/api/v1/settings/onboarding/skip/route.ts"
+    path: "/api/settings/onboarding/skip"
+    file: "apps/frontend/app/api/settings/onboarding/skip/route.ts"
     description: "Skip wizard and create demo data"
     auth: true
-    roles: ["SUPER_ADMIN", "ADMIN"]
+    roles: ["owner", "admin"]
 
     request:
       headers:
@@ -124,7 +124,7 @@ endpoints:
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        if (!hasRole(context, ['SUPER_ADMIN', 'ADMIN'])) {
+        if (!hasRole(context, ['owner', 'admin'])) {
           return NextResponse.json({ error: 'Only admin users can skip onboarding' }, { status: 403 });
         }
 

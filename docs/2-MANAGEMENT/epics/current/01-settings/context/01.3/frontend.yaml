@@ -159,7 +159,7 @@ components:
         }
 
         // Non-admin user - show setup in progress
-        const isAdmin = ['SUPER_ADMIN', 'ADMIN'].includes(context?.role_code || '');
+        const isAdmin = ['owner', 'admin'].includes(context?.role_code || '');
         if (!isAdmin) {
           return <SetupInProgressMessage />;
         }

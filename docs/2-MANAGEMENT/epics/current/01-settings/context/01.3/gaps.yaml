@@ -78,20 +78,20 @@ database_gaps:
 # API GAPS
 # =============================================================================
 api_gaps:
-  - component: "GET /api/v1/settings/onboarding/status"
-    expected: "Endpoint at /api/v1/settings/onboarding/status"
+  - component: "GET /api/settings/onboarding/status"
+    expected: "Endpoint at /api/settings/onboarding/status"
     found: "/api/settings/wizard/route.ts (different path)"
     status: "PARTIAL"
     gap_description: |
       PATH MISMATCH:
-      - Expected: /api/v1/settings/onboarding/status
+      - Expected: /api/settings/onboarding/status
       - Found: /api/settings/wizard
 
       Response schema also differs (JSONB vs columns).
-    refactor_action: "Create new endpoint at v1 path"
+    refactor_action: "Create new endpoint at correct path"
     priority: "P0"
 
-  - component: "POST /api/v1/settings/onboarding/skip"
+  - component: "POST /api/settings/onboarding/skip"
     expected: "Skip endpoint creating demo data"
     found: "NOT FOUND"
     status: "MISSING"
@@ -267,8 +267,8 @@ implementation_order:
     - "Add skipOnboarding() function"
 
   phase_3_api:
-    - "app/api/v1/settings/onboarding/status/route.ts"
-    - "app/api/v1/settings/onboarding/skip/route.ts"
+    - "app/api/settings/onboarding/status/route.ts"
+    - "app/api/settings/onboarding/skip/route.ts"
 
   phase_4_validation:
     - "lib/validation/onboarding.ts"

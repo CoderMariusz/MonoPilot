@@ -156,7 +156,7 @@ integration_tests:
 
   - name: "API returns 403 for non-admin skip attempts"
     setup: "Login as VIEWER"
-    action: "POST /api/v1/settings/onboarding/skip"
+    action: "POST /api/settings/onboarding/skip"
     expected: "403 Forbidden response"
 
 # E2E Test Cases
@@ -223,7 +223,7 @@ output_artifacts:
   - "SetupInProgressMessage.tsx"
   - "useOnboardingStatus.ts hook"
   - "onboarding-service.ts"
-  - "GET /api/v1/settings/onboarding/status endpoint"
-  - "POST /api/v1/settings/onboarding/skip endpoint"
+  - "GET /api/settings/onboarding/status endpoint"
+  - "POST /api/settings/onboarding/skip endpoint"
   - "Unit tests for all components and hooks"
   - "Integration tests for wizard launch, resume, and skip flows"
