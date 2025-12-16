@@ -4,9 +4,9 @@
 
 endpoints:
   - method: "GET"
-    path: "/api/v1/settings/context"
+    path: "/api/settings/context"
     description: "Returns org_id, user_id, role, permissions for authenticated user"
-    file: "apps/frontend/app/api/v1/settings/context/route.ts"
+    file: "apps/frontend/app/api/settings/context/route.ts"
     auth: "required"
     roles: ["*"]  # All authenticated users
 
@@ -101,7 +101,7 @@ types:
 # Implementation patterns
 patterns:
   api_route: |
-    // apps/frontend/app/api/v1/settings/context/route.ts
+    // apps/frontend/app/api/settings/context/route.ts
     import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
     import { cookies } from 'next/headers';
     import { NextResponse } from 'next/server';
@@ -158,7 +158,7 @@ patterns:
     }
 
     export async function getOrgContext(): Promise<OrgContext | null> {
-      const response = await fetch('/api/v1/settings/context');
+      const response = await fetch('/api/settings/context');
       if (!response.ok) return null;
       return response.json();
     }

@@ -1,287 +1,213 @@
-# Story 01.6-roles-viewer - Frontend Specification
-# Purpose: Components, hooks, pages (read-only viewer focus)
+# Story 01.7 - Frontend Specification
+# Purpose: Components, hooks, pages (module toggles UI)
 # Agent: FRONTEND-DEV
 
 is_backend_focused: false
 
-# Pages to Create
 pages:
-  - path: "apps/frontend/app/(authenticated)/settings/roles/page.tsx"
-    description: "Roles viewer page (list + permissions matrix)"
+  - path: "apps/frontend/app/(authenticated)/settings/modules/page.tsx"
+    description: "Module toggles management page"
     layout: "Settings layout with sidebar"
     sections:
       - "Page header with title and description"
-      - "RolesTable component (list view)"
-      - "PermissionsMatrix component (matrix view)"
-      - "Toggle between list/matrix view"
+      - "Module cards grouped by type (Core, Premium, New)"
+      - "Dependency indicators and status"
+      - "Toggle switches for enable/disable"
 
-# Components to Create
 components:
-  - path: "apps/frontend/components/settings/roles/RolesTable.tsx"
-    description: "ShadCN DataTable showing all roles"
+  - path: "apps/frontend/components/settings/modules/ModuleCard.tsx"
+    description: "Individual module card with toggle switch"
     props:
-      roles: "Role[]"
-    columns:
-      - { key: "name", label: "Role Name", sortable: true }
-      - { key: "description", label: "Description", sortable: false }
-      - { key: "permissions_summary", label: "Access Level", sortable: false }
-      - { key: "display_order", label: "Order", sortable: true, hidden: true }
+      module: "Module"
+      onToggle: "(enabled: boolean) => Promise<void>"
     features:
-      - "Sort by name or display_order"
-      - "No pagination (only 10 roles)"
-      - "Click row to expand permissions detail"
-      - "No edit/delete buttons (read-only)"
+      - "Module name, description, icon"
+      - "Toggle switch (ON/OFF)"
+      - "Dependency list (requires X, required by Y)"
+      - "Premium badge for NPD/Finance/OEE/Integrations"
+      - "Can_disable indicator (Settings cannot be disabled)"
     states:
-      - "loading: Skeleton table rows"
-      - "success: Populated table"
-      - "error: Error message with retry"
-      - "empty: Should never happen (roles always seeded)"
+      - "loading: switch disabled, spinner shown"
+      - "success: switch enabled, toast shown"
+      - "error: switch re-enabled, error toast shown"
+      - "disabled: non-admin role, switch disabled"
 
-  - path: "apps/frontend/components/settings/roles/PermissionsMatrix.tsx"
-    description: "Grid showing roles x modules permissions"
+  - path: "apps/frontend/components/settings/modules/ModuleToggleList.tsx"
+    description: "List of module cards grouped by type"
     props:
-      matrix: "PermissionsMatrix"
+      modules: "Module[]"
+      onToggle: "(moduleId: string, enabled: boolean) => Promise<void>"
     layout:
-      - "Header row: Module names (Settings, Technical, Planning, etc.)"
-      - "Left column: Role names (Super Admin, Admin, etc.)"
-      - "Cells: Permission badges (CRUD, CRU, R, -)"
+      - "Section: Core Modules (Settings, Technical, Planning, Production, Quality, Warehouse, Shipping)"
+      - "Section: Premium Modules (NPD, Finance, OEE, Integrations)"
+      - "Collapse/Expand groups"
     features:
-      - "Responsive grid (horizontal scroll on mobile)"
-      - "Color-coded badges: CRUD=green, CRU=blue, R=gray, -=red"
-      - "Hover tooltip showing full permission explanation"
-      - "Export as CSV/PDF button (optional)"
-    states:
-      - "loading: Skeleton grid"
-      - "success: Populated matrix"
-      - "error: Error message"
+      - "Filter/search modules"
+      - "Show enabled count (X enabled, Y disabled)"
+      - "Cascade warning banner if needed"
 
-  - path: "apps/frontend/components/settings/roles/PermissionBadge.tsx"
-    description: "Reusable badge for permission display"
+  - path: "apps/frontend/components/settings/modules/DependencyWarningModal.tsx"
+    description: "Modal for dependency confirmation"
     props:
-      permission: "PermissionSet"
-      module: "string (optional)"
-    variants:
-      - "CRUD: green with checkmark icon"
-      - "CRU: blue with edit icon"
-      - "R: gray with eye icon"
-      - "-: red with X icon"
-    tooltip: "Hover shows: 'Create, Read, Update, Delete'"
-
-  - path: "apps/frontend/components/settings/roles/RoleDetailDialog.tsx"
-    description: "Modal showing detailed role permissions"
-    props:
-      role: "Role | null"
       open: "boolean"
-      onClose: "() => void"
+      module: "Module"
+      action: "'enable' | 'disable'"
+      affected: "string[]"
+      onConfirm: "(cascade: boolean) => Promise<void>"
+      onCancel: "() => void"
     content:
-      - "Role name and description"
-      - "List of modules with permission badges"
-      - "No edit button (read-only)"
-      - "Close button only"
+      - "Warning message about dependencies"
+      - "List of modules that will be affected"
+      - "Cascade toggle (enable both, disable both)"
+      - "Confirm and Cancel buttons"
+    example:
+      - "Enable Technical requires: Nothing"
+      - "Enable Planning requires: Technical. Enable both?"
+      - "Disable Planning impacts: Production, Finance. Disable both?"
 
-# Hooks to Create
 hooks:
-  - path: "apps/frontend/lib/hooks/use-roles.ts"
-    description: "React Query hook for roles data"
+  - path: "apps/frontend/lib/hooks/use-modules.ts"
+    description: "React hook for module state and toggles"
     exports:
-      - name: "useRoles"
-        returns: "UseQueryResult<Role[]>"
-        description: "Fetch all system roles"
+      - name: "useModules"
+        returns: "UseQueryResult<Module[]>"
+        description: "Fetch all modules with org-specific status"
         pattern: |
-          import { useQuery } from '@tanstack/react-query';
-          import { getAllRoles } from '@/lib/services/role-service';
-
-          export function useRoles() {
+          export function useModules() {
             return useQuery({
-              queryKey: ['settings', 'roles'],
-              queryFn: getAllRoles,
-              staleTime: 5 * 60 * 1000, // 5 minutes
+              queryKey: ['settings', 'modules'],
+              queryFn: getAllModules,
+              staleTime: 1 * 60 * 1000, // 1 minute
             });
           }
 
-      - name: "usePermissionsMatrix"
-        returns: "UseQueryResult<PermissionsMatrix>"
-        description: "Fetch permissions matrix"
+      - name: "useToggleModule"
+        returns: "UseMutationResult<ToggleResponse>"
+        description: "Mutation to toggle module enabled/disabled"
         pattern: |
-          import { useQuery } from '@tanstack/react-query';
-          import { getPermissionsMatrix } from '@/lib/services/role-service';
-
-          export function usePermissionsMatrix() {
-            return useQuery({
-              queryKey: ['settings', 'permissions-matrix'],
-              queryFn: getPermissionsMatrix,
-              staleTime: 5 * 60 * 1000, // 5 minutes
+          export function useToggleModule() {
+            const queryClient = useQueryClient();
+            return useMutation({
+              mutationFn: ({ moduleId, enabled, cascade }: TogglePayload) =>
+                toggleModule(moduleId, enabled, cascade),
+              onSuccess: () => {
+                queryClient.invalidateQueries(['settings', 'modules']);
+              },
             });
           }
 
-# UX Wireframe References
 ux:
   wireframes:
-    - id: "SET-011"
-      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-011-roles-viewer.md"
-      description: "Roles viewer page layout"
+    - id: "SET-022"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-022-module-toggles.md"
+      description: "Module Toggles management page"
       components:
-        - "Page header: 'Roles & Permissions'"
-        - "View toggle: List / Matrix"
-        - "RolesTable (default view)"
-        - "PermissionsMatrix (alternate view)"
-        - "Info callout: 'Roles are system-defined and cannot be edited'"
+        - "Page header with description"
+        - "Module cards grouped by type (Core, Premium, New)"
+        - "Toggle switches (ON/OFF visual state)"
+        - "Dependency indicators (Requires: X, Required for: Y)"
+        - "Premium badge with upgrade button"
+        - "Status summary footer (X enabled, Y disabled)"
+        - "Expand/Collapse group sections"
 
   patterns:
-    table: "ShadCN DataTable with sorting"
-    badge: "ShadCN Badge for permission indicators"
-    dialog: "ShadCN Dialog for role details"
-    tooltip: "ShadCN Tooltip for permission explanations"
-    toggle: "ShadCN Tabs for List/Matrix view switch"
+    card: "ShadCN Card with icon, name, description, toggle"
+    toggle: "ShadCN Switch component for ON/OFF"
+    modal: "ShadCN Dialog for dependency warnings"
+    toast: "ShadCN Toast for success/error messages"
+    grouping: "Collapsible sections for Core/Premium/New"
 
   states:
-    - "loading: Skeleton table or grid (6 rows)"
-    - "success: Populated roles table or matrix"
-    - "error: Error message with retry button"
-    - "empty: N/A (roles always seeded)"
+    - "loading: Skeleton cards (11 items)"
+    - "success: Module cards with current status"
+    - "empty: All modules disabled message with CTA"
+    - "error: Failed to load with retry button"
+    - "toggling: Switch disabled during API call"
 
   accessibility:
-    - "ARIA labels for permission badges"
-    - "Keyboard navigation in table"
-    - "Screen reader announcements for expanded rows"
+    - "ARIA labels for toggle switches"
+    - "Keyboard navigation in card list"
+    - "Screen reader announcements for dependency warnings"
     - "High contrast mode support"
+    - "Focus indicators on all interactive elements"
 
-# Color Coding
 color_scheme:
-  permissions:
-    CRUD:
-      color: "green"
-      bg: "bg-green-100"
-      text: "text-green-800"
-      border: "border-green-300"
+  module_status:
+    enabled:
+      bg: "bg-green-50"
+      border: "border-green-200"
+      text: "text-green-900"
       icon: "CheckCircle"
-    CRU:
-      color: "blue"
-      bg: "bg-blue-100"
-      text: "text-blue-800"
-      border: "border-blue-300"
-      icon: "Edit"
-    R:
-      color: "gray"
-      bg: "bg-gray-100"
-      text: "text-gray-800"
-      border: "border-gray-300"
-      icon: "Eye"
-    DASH:
-      color: "red"
-      bg: "bg-red-100"
-      text: "text-red-800"
-      border: "border-red-300"
-      icon: "XCircle"
+    disabled:
+      bg: "bg-gray-50"
+      border: "border-gray-200"
+      text: "text-gray-600"
+      icon: "CircleOff"
 
-# Sample Component Code
-sample_code:
-  RolesTable: |
-    'use client';
+  module_type:
+    core:
+      badge: "bg-blue-100 text-blue-800"
+      description: "Free, always available"
+    premium:
+      badge: "bg-purple-100 text-purple-800"
+      description: "$50/user/month"
 
-    import { Role } from '@/lib/types/role';
-    import { DataTable } from '@/components/ui/data-table';
-    import { ColumnDef } from '@tanstack/react-table';
-    import { PermissionBadge } from './PermissionBadge';
-
-    interface RolesTableProps {
-      roles: Role[];
-    }
-
-    export function RolesTable({ roles }: RolesTableProps) {
-      const columns: ColumnDef<Role>[] = [
-        {
-          accessorKey: 'name',
-          header: 'Role Name',
-          cell: ({ row }) => (
-            <div>
-              <div className="font-medium">{row.original.name}</div>
-              <div className="text-sm text-muted-foreground">
-                {row.original.description}
-              </div>
-            </div>
-          ),
-        },
-        {
-          id: 'permissions_summary',
-          header: 'Access Level',
-          cell: ({ row }) => {
-            const perms = Object.values(row.original.permissions);
-            const hasCRUD = perms.includes('CRUD');
-            const hasWrite = perms.some(p => p.includes('C') || p.includes('U'));
-            const level = hasCRUD ? 'Full Access' : hasWrite ? 'Moderate' : 'Read-Only';
-            return <span className="text-sm">{level}</span>;
-          },
-        },
-      ];
-
-      return <DataTable columns={columns} data={roles} />;
-    }
-
-  PermissionBadge: |
-    import { Badge } from '@/components/ui/badge';
-    import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-    import { CheckCircle, Edit, Eye, XCircle } from 'lucide-react';
-
-    interface PermissionBadgeProps {
-      permission: string;
-      module?: string;
-    }
-
-    export function PermissionBadge({ permission, module }: PermissionBadgeProps) {
-      const config = {
-        CRUD: { label: 'Full', color: 'green', icon: CheckCircle, tooltip: 'Create, Read, Update, Delete' },
-        CRU: { label: 'Edit', color: 'blue', icon: Edit, tooltip: 'Create, Read, Update' },
-        R: { label: 'View', color: 'gray', icon: Eye, tooltip: 'Read-only' },
-        '-': { label: 'None', color: 'red', icon: XCircle, tooltip: 'No Access' },
-      }[permission] || { label: permission, color: 'gray', icon: Eye, tooltip: permission };
-
-      const Icon = config.icon;
-
-      return (
-        <Tooltip>
-          <TooltipTrigger>
-            <Badge variant={config.color as any} className="gap-1">
-              <Icon className="h-3 w-3" />
-              {config.label}
-            </Badge>
-          </TooltipTrigger>
-          <TooltipContent>
-            {module && <div className="font-semibold">{module}</div>}
-            <div>{config.tooltip}</div>
-          </TooltipContent>
-        </Tooltip>
-      );
-    }
-
-# Integration Points
-integration:
-  user_management:
-    description: "Role dropdown in Users CRUD (story 01.5)"
-    usage: "useRoles() hook provides role list for dropdown"
-    component: "apps/frontend/components/settings/users/UserForm.tsx"
-    pattern: |
-      const { data: roles } = useRoles();
-      <Select>
-        {roles?.map(role => (
-          <SelectItem key={role.id} value={role.id}>
-            {role.name}
-          </SelectItem>
-        ))}
-      </Select>
-
-  permission_checks:
-    description: "Permission enforcement in UI (story 01.6)"
-    usage: "PermissionBadge component used in permission checks"
-    pattern: "Reusable across all modules for permission display"
-
-# Navigation
 navigation:
-  path: "/settings/roles"
-  sidebar_label: "Roles & Permissions"
-  icon: "Shield"
-  order: 3
+  path: "/settings/modules"
+  sidebar_label: "Module Toggles"
+  icon: "Puzzle"
+  order: 4
   parent: "Settings"
   breadcrumbs:
     - { label: "Settings", href: "/settings" }
-    - { label: "Roles & Permissions", href: "/settings/roles" }
+    - { label: "Module Toggles", href: "/settings/modules" }
+
+integration:
+  sidebar_navigation:
+    description: "Hide disabled modules from sidebar nav"
+    implementation: |
+      // In layout/sidebar component
+      const { data: modules } = useModules();
+      const enabledModules = modules?.filter(m => m.enabled).map(m => m.code);
+      const navItems = ALL_NAV_ITEMS.filter(item =>
+        item.module === 'settings' || enabledModules?.includes(item.module)
+      );
+
+  route_guards:
+    description: "Redirect disabled module routes"
+    implementation: |
+      // In app/(authenticated)/[module]/layout.tsx
+      export async function ModuleLayout({ params }: ModuleLayoutProps) {
+        const enabled = await isModuleEnabled(params.module);
+        if (!enabled) {
+          redirect('/dashboard?error=module_disabled');
+        }
+        return <>{children}</>;
+      }
+
+  api_guards:
+    description: "Return 403 for disabled module APIs"
+    implementation: |
+      // In route handlers
+      export function requireModule(moduleCode: string) {
+        return async (req: Request) => {
+          const enabled = await isModuleEnabled(moduleCode);
+          if (!enabled) {
+            return Response.json(
+              { error: 'Module not enabled' },
+              { status: 403 }
+            );
+          }
+        };
+      }
+
+permissions:
+  view_modules:
+    roles: ["super_admin", "admin", "manager", "supervisor", "quality_lead", "warehouse_lead", "production_lead", "operator", "viewer"]
+    notes: "All roles can view (read-only for non-admin)"
+  toggle_modules:
+    roles: ["super_admin", "admin"]
+    notes: "Only Admin+ can enable/disable modules"
+  upgrade_premium:
+    roles: ["super_admin", "admin"]
+    notes: "Only Admin+ can initiate subscription upgrade"

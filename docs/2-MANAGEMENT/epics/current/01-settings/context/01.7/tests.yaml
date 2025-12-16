@@ -1,384 +1,370 @@
-# Story 01.6-roles-viewer - Test Specification
+# Story 01.7 - Test Specification
 # Purpose: Acceptance criteria, test cases, coverage requirements
 # Agent: QA-AGENT / TEST-WRITER
 
-# Test files to create
 test_files:
-  - path: "apps/frontend/lib/services/__tests__/role-service.test.ts"
+  - path: "apps/frontend/lib/services/__tests__/module-settings-service.test.ts"
     type: "unit"
-    description: "Unit tests for role service"
-  - path: "apps/frontend/components/settings/roles/__tests__/RolesTable.test.tsx"
+    description: "Unit tests for module toggle logic"
+  - path: "apps/frontend/components/settings/modules/__tests__/ModuleCard.test.tsx"
     type: "unit"
-    description: "Unit tests for RolesTable component"
-  - path: "apps/frontend/components/settings/roles/__tests__/PermissionsMatrix.test.tsx"
+    description: "Unit tests for ModuleCard component"
+  - path: "apps/frontend/components/settings/modules/__tests__/ModuleToggleList.test.tsx"
     type: "unit"
-    description: "Unit tests for PermissionsMatrix component"
-  - path: "apps/frontend/components/settings/roles/__tests__/PermissionBadge.test.tsx"
+    description: "Unit tests for ModuleToggleList component"
+  - path: "apps/frontend/components/settings/modules/__tests__/DependencyWarningModal.test.tsx"
     type: "unit"
-    description: "Unit tests for PermissionBadge component"
-  - path: "apps/frontend/app/(authenticated)/settings/roles/__tests__/page.test.tsx"
+    description: "Unit tests for DependencyWarningModal"
+  - path: "apps/frontend/app/(authenticated)/settings/modules/__tests__/page.test.tsx"
     type: "integration"
-    description: "Integration tests for roles page"
-  - path: "tests/e2e/settings/roles-viewer.spec.ts"
+    description: "Integration tests for modules page"
+  - path: "tests/e2e/settings/module-toggles.spec.ts"
     type: "e2e"
-    description: "E2E tests for roles viewer"
+    description: "E2E tests for module toggle workflows"
 
-# Acceptance Criteria
 acceptance_criteria:
   - id: "AC-01"
-    given: "an authenticated user"
-    when: "navigating to /settings/roles"
-    then: "page loads and displays 10 system roles"
+    given: "admin navigates to /settings/modules"
+    when: "page loads"
+    then: "11 modules display with current status"
     test_type: "e2e"
     priority: "P0"
 
   - id: "AC-02"
-    given: "roles table displayed"
+    given: "Settings module displayed"
     when: "page loads"
-    then: "roles are ordered by display_order (Super Admin first, External last)"
+    then: "Settings has no toggle switch (always enabled)"
     test_type: "integration"
     priority: "P0"
 
   - id: "AC-03"
-    given: "roles table"
-    when: "user clicks on a role row"
-    then: "role detail dialog opens showing permissions breakdown"
-    test_type: "e2e"
-    priority: "P1"
+    given: "module list displayed"
+    when: "toggle switch shown"
+    then: "enabled modules show ON (green), disabled show OFF (gray)"
+    test_type: "integration"
+    priority: "P0"
 
   - id: "AC-04"
-    given: "permissions matrix view"
-    when: "user switches to matrix view"
-    then: "grid displays with modules as columns and roles as rows"
+    given: "admin enables Warehouse module"
+    when: "toggle switched ON"
+    then: "Warehouse appears in navigation within 1 second"
     test_type: "e2e"
-    priority: "P1"
+    priority: "P0"
 
   - id: "AC-05"
-    given: "permission badge for CRUD"
-    when: "displayed in matrix"
-    then: "badge shows green color with checkmark icon"
-    test_type: "unit"
+    given: "Production requires Technical and Planning"
+    when: "enabling Production while both ON"
+    then: "Production enables successfully"
+    test_type: "integration"
     priority: "P1"
 
   - id: "AC-06"
-    given: "permission badge for '-'"
-    when: "displayed in matrix"
-    then: "badge shows red color with X icon"
-    test_type: "unit"
-    priority: "P1"
+    given: "Technical is OFF"
+    when: "admin tries to enable Planning"
+    then: "warning displays: 'Planning requires Technical'"
+    test_type: "e2e"
+    priority: "P0"
 
   - id: "AC-07"
-    given: "user without admin role"
-    when: "viewing roles page"
-    then: "no edit or delete buttons visible (read-only)"
+    given: "warning shown with Enable Both button"
+    when: "clicked"
+    then: "both Technical and Planning enabled"
     test_type: "e2e"
     priority: "P0"
 
   - id: "AC-08"
-    given: "API returns error"
-    when: "fetching roles fails"
-    then: "error message displays with retry button"
-    test_type: "integration"
+    given: "warning shown"
+    when: "Cancel clicked"
+    then: "no changes made"
+    test_type: "e2e"
     priority: "P1"
 
   - id: "AC-09"
-    given: "roles data cached"
-    when: "navigating away and back to roles page"
-    then: "data loads instantly from cache (< 100ms)"
-    test_type: "integration"
-    priority: "P2"
+    given: "Production module is ON"
+    when: "admin toggles OFF"
+    then: "Production hidden from navigation within 1 second"
+    test_type: "e2e"
+    priority: "P0"
 
   - id: "AC-10"
-    given: "permissions matrix"
-    when: "hovering over permission badge"
-    then: "tooltip displays full permission explanation"
+    given: "admin disables Planning with active work orders"
+    when: "toggle switched OFF"
+    then: "warning displays but allows disable"
     test_type: "e2e"
-    priority: "P2"
+    priority: "P1"
 
-# Unit Test Cases
+  - id: "AC-11"
+    given: "Quality depends on Production"
+    when: "admin disables Production while Quality is ON"
+    then: "warning displays: 'Quality depends on Production'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-12"
+    given: "cascade warning shown with Disable Both"
+    when: "clicked"
+    then: "both Production and Quality disabled"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-13"
+    given: "Production module disabled"
+    when: "user views navigation sidebar"
+    then: "Production menu item hidden"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-14"
+    given: "Production module disabled"
+    when: "user navigates to /production/dashboard directly"
+    then: "redirect to dashboard with error toast"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-15"
+    given: "Quality module disabled"
+    when: "API call to /api/v1/quality/inspections made"
+    then: "403 'Module not enabled' returns"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-16"
+    given: "user with VIEWER role"
+    when: "accessing /settings/modules"
+    then: "page loads read-only (toggles disabled)"
+    test_type: "e2e"
+    priority: "P0"
+
 unit_tests:
-  role_service:
-    - name: "getAllRoles returns array of 10 roles"
-      setup: "Mock successful API response with 10 roles"
-      expected: "Returns Role[] with length 10"
+  module_service:
+    - name: "getAllModules returns 11 modules"
+      setup: "Mock API response with 11 modules"
+      expected: "Returns Module[] with length 11"
 
-    - name: "getAllRoles throws on API error"
-      setup: "Mock failed API response (500)"
-      expected: "Throws error with message 'Failed to fetch roles'"
+    - name: "toggleModule validates dependencies on enable"
+      setup: "Planning module, enable=true, technical disabled"
+      expected: "Throws error or returns warning"
 
-    - name: "getRoleByCode returns single role"
-      setup: "Mock successful API response for 'ADMIN'"
-      params: ["ADMIN"]
-      expected: "Returns Role object with code 'ADMIN'"
+    - name: "toggleModule auto-enables deps with cascade=true"
+      setup: "Planning module, enable=true, cascade=true"
+      expected: "Technical also enabled"
 
-    - name: "getRoleByCode returns null for invalid code"
-      setup: "Mock 404 API response"
-      params: ["INVALID"]
-      expected: "Returns null"
+    - name: "toggleModule validates dependents on disable"
+      setup: "Technical module, enable=false, planning enabled"
+      expected: "Throws error or returns warning"
 
-    - name: "getPermissionsMatrix returns matrix structure"
-      setup: "Mock successful API response with matrix"
-      expected: "Returns PermissionsMatrix with modules array and roles array"
+    - name: "toggleModule auto-disables dependents with cascade=true"
+      setup: "Technical module, enable=false, cascade=true"
+      expected: "Planning also disabled"
 
-  PermissionBadge:
-    - name: "renders green badge for CRUD"
-      props: { permission: "CRUD" }
-      expected: "Badge has green background and CheckCircle icon"
+    - name: "Settings module cannot be disabled"
+      setup: "Settings module, enable=false"
+      expected: "Error thrown or blocked"
 
-    - name: "renders blue badge for CRU"
-      props: { permission: "CRU" }
-      expected: "Badge has blue background and Edit icon"
+  ModuleCard:
+    - name: "renders module name and description"
+      props: { module: { name: "Technical", description: "Products..." } }
+      expected: "Displays name and description"
 
-    - name: "renders gray badge for R"
-      props: { permission: "R" }
-      expected: "Badge has gray background and Eye icon"
+    - name: "toggle switch disabled for Settings module"
+      props: { module: { code: "settings", can_disable: false } }
+      expected: "Switch is disabled and shows 'Always Enabled'"
 
-    - name: "renders red badge for dash"
-      props: { permission: "-" }
-      expected: "Badge has red background and XCircle icon"
+    - name: "shows dependencies list"
+      props: { module: { code: "planning", dependencies: ["technical"] } }
+      expected: "Displays 'Requires: Technical'"
 
-    - name: "shows tooltip on hover"
-      props: { permission: "CRUD", module: "Settings" }
-      expected: "Tooltip displays 'Create, Read, Update, Delete'"
+    - name: "shows dependents list"
+      props: { module: { code: "technical", dependents: ["planning", "warehouse"] } }
+      expected: "Displays 'Required by: Planning, Warehouse'"
 
-  RolesTable:
-    - name: "renders 10 rows for 10 roles"
-      props: { roles: [10 mock roles] }
-      expected: "Table renders 10 rows"
+    - name: "premium badge shows for NPD/Finance/OEE"
+      props: { module: { code: "npd" } }
+      expected: "Badge shows '$50/user/month'"
 
-    - name: "sorts roles by name when column clicked"
-      props: { roles: [unsorted roles] }
-      action: "Click name column header"
-      expected: "Roles sorted alphabetically by name"
+  ModuleToggleList:
+    - name: "groups modules by type (Core, Premium)"
+      props: { modules: [core modules...premium modules] }
+      expected: "Two sections visible"
 
-    - name: "displays role name and description"
-      props: { roles: [{ name: "Admin", description: "Full access" }] }
-      expected: "Row shows 'Admin' and 'Full access'"
+    - name: "collapse/expand Core section"
+      setup: "Core section expanded"
+      action: "Click header"
+      expected: "Core section collapses"
 
-    - name: "shows loading skeleton when loading"
-      props: { roles: undefined }
-      expected: "Skeleton rows displayed"
+    - name: "shows enabled count"
+      props: { modules: [6 enabled, 5 disabled] }
+      expected: "Footer shows '6 enabled, 5 disabled'"
 
-# Integration Test Cases
+  DependencyWarningModal:
+    - name: "shows enable warning for missing dependencies"
+      props: { action: "enable", module: "planning", affected: ["technical"] }
+      expected: "Modal shows 'Planning requires Technical. Enable both?'"
+
+    - name: "shows disable warning for active dependents"
+      props: { action: "disable", module: "technical", affected: ["planning"] }
+      expected: "Modal shows 'Planning requires Technical. Disable both?'"
+
+    - name: "cascade toggle changes button text"
+      setup: "Modal open, cascade=false"
+      action: "Click cascade toggle"
+      expected: "Button text changes to 'Enable All' or 'Disable All'"
+
 integration_tests:
-  roles_page:
-    - name: "Page fetches and displays roles on mount"
-      setup: |
-        - Mock GET /api/v1/settings/roles endpoint
-        - Return 10 system roles
-      action: "Render roles page"
-      expected: "10 roles displayed in table"
+  modules_page:
+    - name: "Page loads and displays all modules"
+      setup: "Mock GET /api/v1/settings/modules with 11 modules"
+      action: "Render modules page"
+      expected: "11 ModuleCard components visible"
 
-    - name: "Error state displays when API fails"
-      setup: |
-        - Mock GET /api/v1/settings/roles to return 500
-      action: "Render roles page"
-      expected: "Error message with retry button displayed"
+    - name: "Clicking toggle calls API"
+      setup: "Mock PATCH /api/v1/settings/modules/:id/toggle"
+      action: "Click toggle switch"
+      expected: "API called with enabled=true/false"
 
-    - name: "Retry button refetches data"
-      setup: |
-        - First request returns 500
-        - Second request returns success
-      action: "Click retry button"
-      expected: "Roles table displays after retry"
+    - name: "Toggle with unmet dependencies shows warning"
+      setup: "Technical disabled, try to enable Planning"
+      action: "Click Planning toggle"
+      expected: "DependencyWarningModal opens"
 
-    - name: "View toggle switches between list and matrix"
-      setup: "Render roles page with both views"
-      action: "Click 'Matrix' tab"
-      expected: "PermissionsMatrix component visible, RolesTable hidden"
+    - name: "Cascade toggle enables dependencies"
+      setup: "Technical disabled, cascade=true"
+      action: "Confirm enable Planning"
+      expected: "Both Technical and Planning enabled"
 
-  permissions_matrix:
-    - name: "Matrix displays all modules and roles"
-      setup: |
-        - Mock GET /api/v1/settings/roles/permissions-matrix
-        - Return matrix with 8 modules and 10 roles
-      action: "Render PermissionsMatrix"
-      expected: "Grid shows 8 column headers and 10 row headers"
+    - name: "Toggle with active dependents shows warning"
+      setup: "Production enabled, Quality enabled, try to disable Production"
+      action: "Click Production toggle"
+      expected: "DependencyWarningModal opens"
 
-    - name: "Matrix cells show correct permission badges"
-      setup: "Mock matrix with SUPER_ADMIN having all CRUD"
-      expected: "All cells for SUPER_ADMIN show green CRUD badges"
+    - name: "Cascade toggle disables dependents"
+      setup: "cascade=true"
+      action: "Confirm disable Production"
+      expected: "Both Production and Quality disabled"
 
-  caching:
-    - name: "Roles cached for 5 minutes"
-      setup: |
-        - First request fetches from API
-        - Navigate away and back within 5 minutes
-      expected: "Second load uses cache (no API call)"
+    - name: "Toast shows on successful toggle"
+      setup: "Toggle switch clicked"
+      action: "API returns success"
+      expected: "Toast shows 'Module enabled' or 'Module disabled'"
 
-    - name: "Cache expires after 5 minutes"
-      setup: |
-        - First request fetches from API
-        - Wait 6 minutes
-        - Navigate back to page
-      expected: "New API call made after expiry"
+    - name: "Error toast on toggle failure"
+      setup: "Toggle API returns 400"
+      action: "Click toggle"
+      expected: "Error toast shows with message"
 
-# E2E Test Cases
+    - name: "Settings module toggle switch disabled"
+      setup: "Render modules page"
+      expected: "Settings ModuleCard has disabled toggle"
+
+    - name: "Navigation updates after toggle"
+      setup: "Warehouse disabled, then enabled"
+      action: "Check sidebar nav"
+      expected: "Warehouse appears in nav within 1 second"
+
 e2e_tests:
-  roles_viewer_page:
-    - name: "Full page load and interaction flow"
+  module_toggle_workflow:
+    - name: "Enable module without dependencies"
       steps:
-        - "Navigate to /settings/roles"
-        - "Wait for roles table to load"
-        - "Verify 10 roles displayed"
-        - "Click on 'Admin' role row"
-        - "Verify role detail dialog opens"
-        - "Close dialog"
-        - "Switch to 'Matrix' view tab"
-        - "Verify permissions matrix visible"
-      expected: "All interactions work smoothly"
+        - "Login as admin"
+        - "Navigate to /settings/modules"
+        - "Click Warehouse toggle ON"
+        - "Confirm in modal"
+      expected: "Warehouse enabled, appears in nav"
 
-    - name: "Read-only mode verification"
+    - name: "Enable module with unmet dependencies"
       steps:
-        - "Login as VIEWER user"
-        - "Navigate to /settings/roles"
-        - "Verify no edit buttons present"
-        - "Verify no delete buttons present"
-        - "Verify info callout says 'Roles are system-defined and cannot be edited'"
-      expected: "Page is read-only for all users"
+        - "Disable Technical"
+        - "Try to enable Planning"
+        - "Modal warns about dependency"
+        - "Click Cancel"
+      expected: "Planning remains disabled"
 
-    - name: "Permission badge tooltips"
+    - name: "Enable module with cascade"
       steps:
-        - "Navigate to /settings/roles"
-        - "Switch to matrix view"
-        - "Hover over CRUD badge"
-        - "Verify tooltip shows 'Create, Read, Update, Delete'"
-        - "Hover over R badge"
-        - "Verify tooltip shows 'Read-only'"
-      expected: "All tooltips display correct information"
+        - "Disable Technical"
+        - "Try to enable Planning"
+        - "Modal shows 'Enable Both' option"
+        - "Click 'Enable Both'"
+      expected: "Both Technical and Planning enabled"
 
-    - name: "Responsive design on mobile"
+    - name: "Disable module with active dependents"
       steps:
-        - "Set viewport to mobile (375px)"
-        - "Navigate to /settings/roles"
-        - "Verify table is scrollable horizontally"
-        - "Switch to matrix view"
-        - "Verify matrix scrolls horizontally"
-      expected: "Page usable on mobile devices"
+        - "Enable Technical and Planning"
+        - "Try to disable Technical"
+        - "Modal warns about dependents"
+      expected: "Warning displayed, option to cascade"
 
-# Definition of Done
+    - name: "Navigation enforcement after toggle"
+      steps:
+        - "Disable Production"
+        - "Check sidebar nav"
+        - "Try to access /production directly"
+      expected: "Redirects to /dashboard with error"
+
+    - name: "API enforcement for disabled modules"
+      steps:
+        - "Disable Quality"
+        - "Call GET /api/v1/quality/inspections"
+      expected: "403 'Module not enabled' response"
+
+    - name: "Read-only for non-admin users"
+      steps:
+        - "Login as VIEWER"
+        - "Navigate to /settings/modules"
+        - "Try to click toggle"
+      expected: "Toggle disabled, shows 'Admin only'"
+
+    - name: "Module grouping and organization"
+      steps:
+        - "Load modules page"
+        - "Check Core modules section"
+        - "Check Premium modules section"
+        - "Collapse Core section"
+      expected: "Sections properly grouped and collapsible"
+
 definition_of_done:
-  - "All 10 system roles display in roles table"
-  - "Roles ordered by display_order"
-  - "Permissions matrix view functional"
-  - "Permission badges color-coded correctly (CRUD=green, R=gray, etc.)"
-  - "Tooltips show on hover for permission badges"
-  - "No edit/delete buttons (read-only verification)"
-  - "Error handling with retry button"
-  - "Loading states (skeleton) display"
-  - "Caching works (5-minute stale time)"
-  - "Unit test coverage >= 85%"
-  - "Integration test coverage >= 80%"
-  - "E2E tests pass (4 scenarios)"
-  - "Responsive design verified (mobile + desktop)"
-  - "Accessibility: ARIA labels, keyboard navigation"
+  - "modules table created with 11 modules seeded (7 core + 4 premium)"
+  - "organization_modules table created with RLS policies"
+  - "GET /api/v1/settings/modules returns all modules with org-specific status"
+  - "PATCH /api/v1/settings/modules/:id/toggle works with dependency validation"
+  - "Module toggles page displays 11 modules with correct status"
+  - "Settings module always enabled, no toggle switch displayed"
+  - "Enable/disable updates navigation within 1 second (no page reload)"
+  - "Dependency validation shows warning before cascade"
+  - "Direct URL to disabled module redirects with message"
+  - "API returns 403 for disabled module endpoints"
+  - "Admin+ required to toggle modules (VIEWER sees read-only)"
+  - "Unit tests for module-settings-service (>85% coverage)"
+  - "Integration tests for dependency scenarios"
+  - "E2E tests for navigation and API enforcement"
 
-# Coverage Requirements
 coverage:
   unit:
     target: 85
-    reason: "Frontend components with clear behavior"
+    reason: "Service functions with complex dependency logic"
   integration:
     target: 80
-    reason: "API integration and React Query caching"
+    reason: "API integration and React Query mutations"
   e2e:
-    target: 4
-    reason: "Core user flows verified"
-  files:
-    - "lib/services/role-service.ts: 90%"
-    - "components/settings/roles/RolesTable.tsx: 85%"
-    - "components/settings/roles/PermissionsMatrix.tsx: 80%"
-    - "components/settings/roles/PermissionBadge.tsx: 95%"
+    target: 8
+    reason: "Critical user workflows verified"
 
-# Test Data
-test_data:
-  mock_roles:
-    - code: "SUPER_ADMIN"
-      name: "Super Administrator"
-      description: "Full system access"
-      permissions:
-        settings: "CRUD"
-        users: "CRUD"
-        technical: "CRUD"
-        planning: "CRUD"
-        production: "CRUD"
-        warehouse: "CRUD"
-        quality: "CRUD"
-        shipping: "CRUD"
-      display_order: 1
-
-    - code: "VIEWER"
-      name: "Viewer"
-      description: "Read-only all modules"
-      permissions:
-        settings: "R"
-        users: "R"
-        technical: "R"
-        planning: "R"
-        production: "R"
-        warehouse: "R"
-        quality: "R"
-        shipping: "R"
-      display_order: 9
-
-    - code: "OPERATOR"
-      name: "Operator"
-      description: "CRU Production, read Quality"
-      permissions:
-        settings: "-"
-        users: "-"
-        technical: "R"
-        planning: "R"
-        production: "CRU"
-        warehouse: "CRU"
-        quality: "CRU"
-        shipping: "-"
-      display_order: 7
-
-  mock_matrix:
-    modules:
-      - "settings"
-      - "users"
-      - "technical"
-      - "planning"
-      - "production"
-      - "warehouse"
-      - "quality"
-      - "shipping"
-    roles:
-      - code: "SUPER_ADMIN"
-        name: "Super Administrator"
-        permissions:
-          settings: "CRUD"
-          users: "CRUD"
-          technical: "CRUD"
-          planning: "CRUD"
-          production: "CRUD"
-          warehouse: "CRUD"
-          quality: "CRUD"
-          shipping: "CRUD"
-
-# Performance Benchmarks
 performance:
   page_load:
     target: "< 1 second"
     metric: "Time to interactive"
-  table_render:
-    target: "< 200ms"
-    metric: "Time to render 10 rows"
-  cache_load:
-    target: "< 100ms"
-    metric: "Load from React Query cache"
-  matrix_render:
-    target: "< 300ms"
-    metric: "Time to render 8x10 grid"
+  toggle_response:
+    target: "< 500ms"
+    metric: "API response time"
+  nav_update:
+    target: "< 1 second"
+    metric: "Navigation refresh after toggle"
 
-# Accessibility Tests
 accessibility:
   wcag_level: "AA"
   tests:
-    - "Keyboard navigation: Tab through table rows"
-    - "Screen reader: Role names announced"
-    - "Color contrast: Badge colors meet 4.5:1 ratio"
+    - "Keyboard navigation: Tab through toggle switches"
+    - "Screen reader: Module names and dependencies announced"
+    - "Color contrast: Status colors meet 4.5:1 ratio"
     - "Focus indicators: Visible on all interactive elements"
-    - "ARIA labels: Present on all icons and badges"
+    - "ARIA labels: Present on toggles and buttons"

@@ -47,16 +47,16 @@ acceptance_criteria:
     priority: "P0"
 
   - id: "AC-1.3"
-    title: "Super Admin Assignment Restriction"
-    given: "non-Super Admin (e.g., ADMIN)"
-    when: "attempting to assign SUPER_ADMIN role"
-    then: "error 'Only Super Admin can assign Super Admin role' displays"
+    title: "Owner Role Assignment Restriction"
+    given: "non-owner (e.g., admin)"
+    when: "attempting to assign owner role"
+    then: "error 'Only owner can assign owner role' displays"
     test_type: "integration"
     priority: "P0"
 
   - id: "AC-1.4"
     title: "Role Change Takes Effect"
-    given: "role changed from VIEWER to ADMIN"
+    given: "role changed from viewer to admin"
     when: "user's next request made"
     then: "new permissions active immediately"
     test_type: "integration"
@@ -64,39 +64,39 @@ acceptance_criteria:
 
   - id: "AC-2"
     title: "Permission Enforcement - Module Level"
-    given: "user with SUPER_ADMIN role"
+    given: "user with owner role"
     when: "accessing any module"
     then: "full CRUD access granted"
     test_type: "unit"
     priority: "P0"
 
   - id: "AC-2.1"
-    title: "VIEWER Cannot Create"
-    given: "user with VIEWER role"
+    title: "Viewer Cannot Create"
+    given: "user with viewer role"
     when: "attempting to create anything"
     then: "action blocked, create button hidden"
     test_type: "e2e"
     priority: "P0"
 
   - id: "AC-2.2"
-    title: "Operator Read-Only Quality"
-    given: "user with PROD_OPERATOR role"
+    title: "Operator Read-Create Quality"
+    given: "user with production_operator role"
     when: "accessing Quality module"
-    then: "read-only access (no create/update/delete)"
+    then: "read and create access (CR - no update/delete)"
     test_type: "unit"
     priority: "P0"
 
   - id: "AC-2.3"
-    title: "Inspector No Warehouse Access"
-    given: "user with QUAL_INSPECTOR role"
-    when: "accessing Warehouse module"
+    title: "Inspector No Integrations Access"
+    given: "user with quality_inspector role"
+    when: "accessing Integrations module"
     then: "access denied (redirect)"
     test_type: "e2e"
     priority: "P0"
 
   - id: "AC-3"
     title: "API Permission Enforcement - POST Denied"
-    given: "API request to /api/v1/production/work-orders by VIEWER"
+    given: "API request to /api/production/work-orders by viewer"
     when: "POST attempted"
     then: "403 Forbidden returns"
     test_type: "integration"
@@ -104,7 +104,7 @@ acceptance_criteria:
 
   - id: "AC-3.1"
     title: "API Permission Enforcement - DELETE Denied"
-    given: "API request to /api/v1/quality/inspections by PROD_OPERATOR"
+    given: "API request to /api/quality/inspections by production_operator"
     when: "DELETE attempted"
     then: "403 Forbidden returns"
     test_type: "integration"
@@ -112,7 +112,7 @@ acceptance_criteria:
 
   - id: "AC-3.2"
     title: "API Permission Enforcement - No Module Access"
-    given: "API request to /api/v1/warehouse/locations by QUAL_INSPECTOR"
+    given: "API request to /api/integrations/connections by quality_inspector"
     when: "GET attempted"
     then: "403 Forbidden returns (no module access)"
     test_type: "integration"
@@ -158,16 +158,16 @@ unit_tests:
       expected: "10 options displayed"
 
     - name: "displays role names not codes"
-      setup: "Mount with PROD_MANAGER role"
-      expected: "'Production Manager' displayed, not 'PROD_MANAGER'"
+      setup: "Mount with production_manager role"
+      expected: "'Production Manager' displayed, not 'production_manager'"
 
-    - name: "disables Super Admin for non-Super Admin users"
-      setup: "currentUserRole = 'ADMIN'"
-      expected: "Super Admin option disabled with tooltip"
+    - name: "disables owner role for non-owner users"
+      setup: "currentUserRole = 'admin'"
+      expected: "owner option disabled with tooltip"
 
-    - name: "enables Super Admin for Super Admin users"
-      setup: "currentUserRole = 'SUPER_ADMIN'"
-      expected: "Super Admin option enabled"
+    - name: "enables owner role for owner users"
+      setup: "currentUserRole = 'owner'"
+      expected: "owner option enabled"
 
     - name: "onChange callback fires on selection"
       setup: "Mock onChange, select role"
@@ -200,37 +200,37 @@ unit_tests:
       expected: "Returns false"
 
     - name: "hasRole() returns true when user has role"
-      setup: "Context with role_code: 'ADMIN'"
-      params: ["['ADMIN', 'SUPER_ADMIN']"]
+      setup: "Context with role_code: 'admin'"
+      params: ["['admin', 'owner']"]
       expected: "Returns true"
 
     - name: "isAdmin returns true for admin roles"
-      setup: "Context with role_code: 'ADMIN'"
+      setup: "Context with role_code: 'admin'"
       expected: "isAdmin = true"
 
-    - name: "isSuperAdmin returns true only for Super Admin"
-      setup: "Context with role_code: 'SUPER_ADMIN'"
-      expected: "isSuperAdmin = true"
+    - name: "isOwner returns true only for owner"
+      setup: "Context with role_code: 'owner'"
+      expected: "isOwner = true"
 
   permission_service:
     - name: "hasPermission() checks CRUD correctly"
-      setup: "User with PROD_MANAGER role"
+      setup: "User with production_manager role"
       params: ["user", "'production'", "'C'"]
       expected: "Returns true"
 
     - name: "hasPermission() denies operator delete"
-      setup: "User with PROD_OPERATOR role (CRU)"
+      setup: "User with production_operator role (RU)"
       params: ["user", "'production'", "'D'"]
       expected: "Returns false"
 
-    - name: "canAssignRole() blocks Super Admin assignment"
-      setup: "currentUserRole = 'ADMIN'"
-      params: ["'ADMIN'", "'SUPER_ADMIN'"]
+    - name: "canAssignRole() blocks owner assignment"
+      setup: "currentUserRole = 'admin'"
+      params: ["'admin'", "'owner'"]
       expected: "Returns false"
 
-    - name: "canAssignRole() allows Super Admin to assign Super Admin"
-      setup: "currentUserRole = 'SUPER_ADMIN'"
-      params: ["'SUPER_ADMIN'", "'SUPER_ADMIN'"]
+    - name: "canAssignRole() allows owner to assign owner"
+      setup: "currentUserRole = 'owner'"
+      params: ["'owner'", "'owner'"]
       expected: "Returns true"
 
 # Integration Test Cases
@@ -238,58 +238,58 @@ integration_tests:
   api_endpoints:
     - name: "GET /roles returns all system roles"
       setup: "Seed 10 system roles"
-      action: "GET /api/v1/settings/roles"
+      action: "GET /api/settings/roles"
       expected: "200 response with 10 roles array"
 
     - name: "GET /roles returns roles sorted by display_order"
       setup: "Seed roles"
-      action: "GET /api/v1/settings/roles"
-      expected: "Roles sorted: SUPER_ADMIN first, VIEWER last"
+      action: "GET /api/settings/roles"
+      expected: "Roles sorted: owner first, viewer last"
 
     - name: "GET /roles accessible to all authenticated users"
-      setup: "Authenticated as VIEWER"
-      action: "GET /api/v1/settings/roles"
+      setup: "Authenticated as viewer"
+      action: "GET /api/settings/roles"
       expected: "200 response"
 
   rls_enforcement:
     - name: "All users can read system roles"
-      setup: "Create User A with VIEWER role"
+      setup: "Create User A with viewer role"
       action: "User A queries roles table"
       expected: "All system roles returned"
 
     - name: "System roles are immutable"
-      setup: "User attempts to update ADMIN role permissions"
+      setup: "User attempts to update admin role permissions"
       action: "UPDATE roles SET permissions = ..."
       expected: "RLS blocks update"
 
   permission_enforcement:
-    - name: "VIEWER blocked from creating users"
-      setup: "Authenticated as VIEWER"
-      action: "POST /api/v1/settings/users"
+    - name: "viewer blocked from creating users"
+      setup: "Authenticated as viewer"
+      action: "POST /api/settings/users"
       expected: "403 Forbidden"
 
-    - name: "ADMIN can create users"
-      setup: "Authenticated as ADMIN"
-      action: "POST /api/v1/settings/users"
+    - name: "admin can create users"
+      setup: "Authenticated as admin"
+      action: "POST /api/settings/users"
       expected: "200 OK, user created"
 
-    - name: "PROD_OPERATOR cannot delete work orders"
-      setup: "Authenticated as PROD_OPERATOR"
-      action: "DELETE /api/v1/production/work-orders/:id"
+    - name: "production_operator cannot delete work orders"
+      setup: "Authenticated as production_operator"
+      action: "DELETE /api/production/work-orders/:id"
       expected: "403 Forbidden"
 
-    - name: "QUAL_INSPECTOR cannot access warehouse"
-      setup: "Authenticated as QUAL_INSPECTOR"
-      action: "GET /api/v1/warehouse/locations"
+    - name: "quality_inspector cannot access integrations"
+      setup: "Authenticated as quality_inspector"
+      action: "GET /api/integrations/connections"
       expected: "403 Forbidden"
 
     - name: "Role change invalidates permission cache"
       setup: |
-        - Create User C as VIEWER
-        - User C makes request (VIEWER permissions)
-        - Admin changes User C to ADMIN
+        - Create User C as viewer
+        - User C makes request (viewer permissions)
+        - admin changes User C to admin
       action: "User C makes request after <1 min"
-      expected: "ADMIN permissions active"
+      expected: "admin permissions active"
 
 # E2E Test Cases
 e2e_tests:
@@ -300,26 +300,26 @@ e2e_tests:
       - "Fill in email, name"
       - "Select 'Production Manager' role"
       - "Click 'Create'"
-    expected: "User created with PROD_MANAGER role"
+    expected: "User created with production_manager role"
 
-  - name: "Admin cannot assign Super Admin"
+  - name: "Admin cannot assign owner"
     steps:
       - "Admin opens user modal"
-      - "Attempt to select 'Super Administrator'"
+      - "Attempt to select 'Owner'"
     expected: "Option is disabled with tooltip"
 
-  - name: "VIEWER sees no create buttons"
+  - name: "Viewer sees no create buttons"
     steps:
-      - "Login as VIEWER"
+      - "Login as viewer"
       - "Navigate to /settings/users"
     expected: "'Add User' button is hidden"
 
   - name: "Permission-based UI rendering"
     steps:
-      - "Login as PROD_OPERATOR"
+      - "Login as production_operator"
       - "Navigate to /production/work-orders"
       - "Open work order details"
-    expected: "No delete button visible"
+    expected: "No delete button visible (operator has RU not D)"
 
 # Definition of Done
 definition_of_done:
@@ -355,16 +355,16 @@ security_tests:
     expected: "RLS blocks update"
 
   - id: "SEC-2"
-    description: "Non-Super Admin cannot assign Super Admin"
-    test: "ADMIN attempts to assign SUPER_ADMIN role"
+    description: "Non-owner cannot assign owner role"
+    test: "admin attempts to assign owner role"
     expected: "403 Forbidden"
 
   - id: "SEC-3"
     description: "Permission checks cannot be bypassed"
-    test: "VIEWER sends POST request with forged permissions"
+    test: "viewer sends POST request with forged permissions"
     expected: "403 Forbidden (server-side check)"
 
   - id: "SEC-4"
     description: "Cross-tenant role assignment blocked"
-    test: "Admin from Org A tries to assign role from Org B"
+    test: "admin from Org A tries to assign role from Org B"
     expected: "404 (role not found for org)"

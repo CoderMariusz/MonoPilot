@@ -65,7 +65,7 @@ deliverables:
     description: "org-context-service.ts, permission-service.ts"
   - type: "api"
     count: 1
-    description: "GET /api/v1/settings/context"
+    description: "GET /api/settings/context"
   - type: "test"
     count: 3
     description: "Unit + integration + RLS isolation tests"

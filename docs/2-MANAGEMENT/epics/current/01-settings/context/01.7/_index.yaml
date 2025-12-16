@@ -1,24 +1,24 @@
-# Story 01.6-roles-viewer - Index File (Entry Point)
+# Story 01.7 - Index File (Entry Point)
 # Generated: 2025-12-16
 # Purpose: Story metadata and dependencies - read this first
 
 story:
-  id: "01.6-roles-viewer"
-  name: "Roles Viewer (Read-Only)"
-  slug: "roles-viewer-readonly"
+  id: "01.7"
+  name: "Module Toggles"
+  slug: "module-toggles"
   epic: "01-settings"
   phase: "1A"
-  complexity: "S"
-  estimate_days: 1
-  type: "frontend"
+  complexity: "M"
+  estimate_days: 3
+  type: "frontend + backend"
   state: "ready"
 
 # Files in this context folder
 context_files:
   - _index.yaml      # This file - metadata, dependencies
-  - database.yaml    # Tables (reuses roles from 01.1)
-  - api.yaml         # Endpoints (GET roles, GET permissions matrix)
-  - frontend.yaml    # Components (RolesTable, PermissionsMatrix)
+  - database.yaml    # Tables (modules, organization_modules)
+  - api.yaml         # Endpoints (GET /modules, PATCH /modules/:id/toggle)
+  - frontend.yaml    # Components (ModuleCard, ModuleToggleList, DependencyWarningModal)
   - tests.yaml       # Acceptance criteria, test specifications
   - gaps.yaml        # Readiness assessment
 
@@ -28,58 +28,74 @@ dependencies:
     - story: "01.1"
       name: "Org Context + Base RLS"
       provides:
-        - "roles table with JSONB permissions"
-        - "10 system roles seeded"
+        - "organizations table"
+        - "users table with org_id"
         - "RLS foundation"
         - "auth context"
+    - story: "01.2"
+      name: "Settings Shell + Navigation"
+      provides:
+        - "Settings layout"
+        - "Navigation guards"
+        - "Sidebar navigation structure"
+    - story: "01.6"
+      name: "Role Permissions"
+      provides:
+        - "10-role permission system"
+        - "Role-based access control"
+        - "Admin+ role check"
   blocked_by: []
   blocks:
-    - story: "01.5"
-      name: "Users CRUD"
-      reason: "Role dropdown needs role list"
+    - story: "02.1"
+      name: "Technical Module"
+      reason: "Module toggles control which modules are visible"
 
 # Reference Documents
 files_to_read:
   prd:
     path: "docs/1-BASELINE/product/modules/settings.md"
-    sections: ["FR-SET-011", "FR-SET-020", "FR-SET-021"]
+    sections: ["FR-SET-090", "FR-SET-091", "FR-SET-092", "FR-SET-093", "FR-SET-094", "FR-SET-095", "FR-SET-096", "FR-SET-097"]
   architecture:
-    path: "docs/1-BASELINE/architecture/modules/settings.md"
-    sections: ["Role-Based Access Control", "Permission Matrix"]
-  story:
-    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.6.role-permissions.md"
-    sections: ["10 Role Definitions", "Permission Matrix"]
-  adrs:
-    - path: "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
-      relevance: "PRIMARY - Roles table schema with JSONB permissions"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-011-module-toggle-storage.md"
+      relevance: "PRIMARY - Module toggle storage in junction table"
     - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
-      relevance: "RLS pattern for roles table (public read)"
+      relevance: "RLS pattern for organization_modules table"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/01-settings/01.7.module-toggles.md"
+    sections: ["Module Definitions", "Dependency Graph", "Implementation"]
   patterns:
-    - path: "apps/frontend/components/ui/table.tsx"
-      relevance: "ShadCN DataTable pattern"
-    - path: "apps/frontend/components/ui/badge.tsx"
-      relevance: "ShadCN Badge for permission indicators"
+    - path: "apps/frontend/components/ui/switch.tsx"
+      relevance: "ShadCN Switch component for toggles"
+    - path: "apps/frontend/lib/services/*-service.ts"
+      relevance: "Service pattern for business logic"
 
 # High-level deliverables
 deliverables:
+  - type: "database"
+    count: 2
+    description: "modules table (system-defined), organization_modules table (org-specific)"
   - type: "api"
     count: 2
-    description: "GET /api/v1/settings/roles, GET /api/v1/settings/roles/permissions-matrix"
+    description: "GET /api/v1/settings/modules, PATCH /api/v1/settings/modules/:id/toggle"
   - type: "component"
     count: 3
-    description: "RolesTable, PermissionsMatrix, PermissionBadge"
+    description: "ModuleCard, ModuleToggleList, DependencyWarningModal"
   - type: "page"
     count: 1
-    description: "/settings/roles page"
+    description: "/settings/modules page"
+  - type: "service"
+    count: 1
+    description: "module-settings-service.ts with dependency validation"
   - type: "test"
-    count: 2
-    description: "Unit + integration tests"
+    count: 3
+    description: "Unit + integration + e2e tests"
 
 # Technical notes
-technical_notes:
-  - "READ-ONLY viewer - no CRUD operations"
-  - "Roles are system-defined (seeded in 01.1)"
-  - "All authenticated users can view roles (for role assignment dropdown)"
-  - "RLS: is_system = true (public read for system roles)"
-  - "No org_id on roles table (global system data)"
-  - "Permission matrix is derived from JSONB permissions column"
+  - "11 modules total (7 core + 4 premium)"
+  - "Dependencies: Planning requires Technical, Production requires Technical+Planning, etc."
+  - "Settings module cannot be disabled (can_disable=false)"
+  - "Module toggles cascade: enable all deps, disable all dependents"
+  - "RLS: organization_modules filtered by org_id"
+  - "API guard: disabled modules return 403"
+  - "Navigation integration: filter nav items by enabled modules"
+  - "Direct URL guard: redirect /production -> /dashboard if disabled"

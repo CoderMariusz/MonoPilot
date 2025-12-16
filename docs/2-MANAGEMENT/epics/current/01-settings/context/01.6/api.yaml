@@ -4,9 +4,9 @@
 
 endpoints:
   - method: "GET"
-    path: "/api/v1/settings/roles"
+    path: "/api/settings/roles"
     description: "List all roles (system + custom)"
-    file: "apps/frontend/app/api/v1/settings/roles/route.ts"
+    file: "apps/frontend/app/api/settings/roles/route.ts"
     auth: "required"
     roles: ["*"]  # All authenticated users
 
@@ -29,12 +29,14 @@ endpoints:
         [
           {
             "id": "uuid-1",
-            "code": "SUPER_ADMIN",
-            "name": "Super Administrator",
-            "description": "Full system access",
+            "code": "owner",
+            "name": "Owner",
+            "description": "Full system access, billing control",
             "permissions": {
               "settings": "CRUD",
               "users": "CRUD",
+              "npd": "CRUD",
+              "finance": "CRUD",
               ...
             },
             "is_system": true,
@@ -111,18 +113,18 @@ services:
       - name: "canAssignRole"
         type: "function"
         signature: "(currentUserRole: string, targetRoleCode: string) => boolean"
-        description: "Check if current user can assign target role (Super Admin restriction)"
+        description: "Check if current user can assign target role (owner restriction)"
         implementation: |
           export function canAssignRole(
             currentUserRole: string,
             targetRoleCode: string
           ): boolean {
-            // Only Super Admin can assign Super Admin
-            if (targetRoleCode === 'SUPER_ADMIN') {
-              return currentUserRole === 'SUPER_ADMIN';
+            // Only owner can assign owner role
+            if (targetRoleCode === 'owner') {
+              return currentUserRole === 'owner';
             }
-            // Admin and Super Admin can assign all other roles
-            return ['SUPER_ADMIN', 'ADMIN'].includes(currentUserRole);
+            // admin and owner can assign all other roles
+            return ['owner', 'admin'].includes(currentUserRole);
           }
 
 # Types
@@ -147,16 +149,16 @@ types:
         type: "string literal union"
         definition: |
           export type RoleCode =
-            | 'SUPER_ADMIN'
-            | 'ADMIN'
-            | 'PROD_MANAGER'
-            | 'QUAL_MANAGER'
-            | 'WH_MANAGER'
-            | 'PROD_OPERATOR'
-            | 'QUAL_INSPECTOR'
-            | 'WH_OPERATOR'
-            | 'PLANNER'
-            | 'VIEWER';
+            | 'owner'
+            | 'admin'
+            | 'production_manager'
+            | 'quality_manager'
+            | 'warehouse_manager'
+            | 'production_operator'
+            | 'quality_inspector'
+            | 'warehouse_operator'
+            | 'planner'
+            | 'viewer';
 
       - name: "PermissionAction"
         type: "string literal union"
@@ -174,7 +176,11 @@ types:
             | 'production'
             | 'quality'
             | 'warehouse'
-            | 'shipping';
+            | 'shipping'
+            | 'npd'
+            | 'finance'
+            | 'oee'
+            | 'integrations';
 
 # Implementation patterns
 patterns:
@@ -231,15 +237,15 @@ patterns:
 
 # Permission Matrix (for reference)
 permission_matrix:
-  modules: ["settings", "users", "technical", "planning", "production", "quality", "warehouse", "shipping"]
+  modules: ["settings", "users", "technical", "planning", "production", "quality", "warehouse", "shipping", "npd", "finance", "oee", "integrations"]
   roles:
-    SUPER_ADMIN: ["CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
-    ADMIN: ["CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
-    PROD_MANAGER: ["R", "R", "CRUD", "CRUD", "CRUD", "CRUD", "R", "R"]
-    QUAL_MANAGER: ["R", "R", "R", "R", "R", "CRUD", "R", "R"]
-    WH_MANAGER: ["R", "R", "R", "R", "R", "R", "CRUD", "CRUD"]
-    PROD_OPERATOR: ["-", "-", "R", "R", "CRU", "R", "-", "-"]
-    QUAL_INSPECTOR: ["-", "-", "R", "-", "R", "CRU", "-", "-"]
-    WH_OPERATOR: ["-", "-", "-", "-", "-", "-", "CRU", "CRU"]
-    PLANNER: ["R", "-", "R", "CRUD", "R", "R", "R", "R"]
-    VIEWER: ["R", "R", "R", "R", "R", "R", "R", "R"]
+    owner:              ["CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
+    admin:              ["CRU",  "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
+    production_manager: ["R",    "R",    "RU",   "CRUD", "CRUD", "CRUD", "RU",   "R",    "R",    "R",    "CRUD", "R"]
+    quality_manager:    ["R",    "R",    "R",    "R",    "RU",   "CRUD", "R",    "R",    "RU",   "-",    "R",    "-"]
+    warehouse_manager:  ["R",    "R",    "R",    "R",    "R",    "R",    "CRUD", "CRUD", "-",    "-",    "-",    "-"]
+    production_operator: ["-",   "-",    "R",    "R",    "RU",   "CR",   "R",    "-",    "-",    "-",    "R",    "-"]
+    quality_inspector:  ["-",    "-",    "R",    "-",    "R",    "CRU",  "R",    "R",    "-",    "-",    "-",    "-"]
+    warehouse_operator: ["-",    "-",    "R",    "-",    "-",    "R",    "CRU",  "RU",   "-",    "-",    "-",    "-"]
+    planner:            ["R",    "R",    "R",    "CRUD", "R",    "R",    "R",    "R",    "R",    "R",    "R",    "-"]
+    viewer:             ["R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R"]

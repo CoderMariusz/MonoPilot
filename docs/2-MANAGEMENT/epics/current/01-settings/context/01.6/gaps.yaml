@@ -46,9 +46,10 @@ database_gaps:
     found: "NOT FOUND"
     status: "MISSING"
     gap_description: |
-      10 system roles must be seeded:
-      SUPER_ADMIN, ADMIN, PROD_MANAGER, QUAL_MANAGER, WH_MANAGER,
-      PROD_OPERATOR, QUAL_INSPECTOR, WH_OPERATOR, PLANNER, VIEWER
+      10 system roles must be seeded with lowercase snake_case codes:
+      owner, admin, production_manager, quality_manager, warehouse_manager,
+      production_operator, quality_inspector, warehouse_operator, planner, viewer
+      All with 12 module permissions (8 core + 4 premium)
     refactor_action: "Create migration XXX_seed_system_roles.sql"
     priority: "P0-BLOCKER"
 
@@ -230,13 +231,13 @@ architectural_notes:
 
       DECISION: JSONB is better for our use case (10 system roles, rarely changed).
 
-  - note: "Super Admin Restriction"
+  - note: "Owner Role Restriction"
     description: |
-      Only Super Admin can assign Super Admin role.
+      Only owner can assign owner role.
       This prevents privilege escalation.
 
       IMPLEMENTATION:
-      - Frontend: Disable Super Admin option in dropdown
+      - Frontend: Disable owner option in dropdown
       - Backend: canAssignRole() validation in API
       - Both checks required (frontend for UX, backend for security)
 
@@ -322,7 +323,7 @@ risks:
     severity: "medium"
 
   - id: "RISK-04"
-    description: "Super Admin privilege escalation"
-    mitigation: "canAssignRole() validation in API, test non-Super Admin assignment blocked"
+    description: "Owner privilege escalation"
+    mitigation: "canAssignRole() validation in API, test non-owner assignment blocked"
     severity: "high"
     test_coverage: "security_tests.SEC-2"

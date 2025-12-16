@@ -43,7 +43,7 @@ files_to_read:
     path: "docs/1-BASELINE/product/modules/settings.md"
     sections:
       - "FR-SET-011"   # 10-role permission system (lines 330-351)
-      - "FR-SET-020"   # Super Admin role
+      - "FR-SET-020"   # Owner role
       - "FR-SET-021"   # Admin role
       - "FR-SET-022"   # Production Manager role
       - "FR-SET-023"   # Quality Manager role
@@ -122,10 +122,10 @@ files_to_create:
       description: "Roles & Permissions view page"
 
   api:
-    - path: "apps/frontend/app/api/v1/settings/roles/route.ts"
+    - path: "apps/frontend/app/api/settings/roles/route.ts"
       methods: ["GET"]
       description: "List all 10 system roles"
-    - path: "apps/frontend/app/api/v1/settings/roles/[id]/route.ts"
+    - path: "apps/frontend/app/api/settings/roles/[id]/route.ts"
       methods: ["GET"]
       description: "Get single role by ID"
 
@@ -136,7 +136,7 @@ files_to_create:
       description: "Unit tests for usePermissions hook"
     - path: "apps/frontend/lib/middleware/__tests__/require-permission.test.ts"
       description: "Unit tests for permission middleware"
-    - path: "apps/frontend/app/api/v1/settings/roles/__tests__/route.test.ts"
+    - path: "apps/frontend/app/api/settings/roles/__tests__/route.test.ts"
       description: "Integration tests for roles API"
     - path: "supabase/tests/permission-enforcement.test.sql"
       description: "DB-level permission check tests"
@@ -219,9 +219,9 @@ database:
   seed_data:
     description: "10 system roles per ADR-012 (seeded in 01.1, referenced here)"
     roles:
-      - code: "SUPER_ADMIN"
-        name: "Super Administrator"
-        description: "Full system access, can assign any role"
+      - code: "owner"
+        name: "Owner"
+        description: "Full system access, billing control"
         display_order: 1
         permissions:
           settings: "CRUD"
@@ -237,12 +237,12 @@ database:
           oee: "CRUD"
           integrations: "CRUD"
 
-      - code: "ADMIN"
+      - code: "admin"
         name: "Administrator"
-        description: "Organization-wide access, cannot assign Super Admin"
+        description: "Full access except billing, cannot delete org settings"
         display_order: 2
         permissions:
-          settings: "CRUD"
+          settings: "CRU"
           users: "CRUD"
           technical: "CRUD"
           planning: "CRUD"
@@ -255,25 +255,25 @@ database:
           oee: "CRUD"
           integrations: "CRUD"
 
-      - code: "PROD_MANAGER"
+      - code: "production_manager"
         name: "Production Manager"
         description: "Full Production, Planning, Quality access"
         display_order: 3
         permissions:
           settings: "R"
           users: "R"
-          technical: "CRUD"
+          technical: "RU"
           planning: "CRUD"
           production: "CRUD"
           quality: "CRUD"
-          warehouse: "R"
+          warehouse: "RU"
           shipping: "R"
           npd: "R"
           finance: "R"
           oee: "CRUD"
           integrations: "R"
 
-      - code: "QUAL_MANAGER"
+      - code: "quality_manager"
         name: "Quality Manager"
         description: "Full Quality, read Production"
         display_order: 4
@@ -282,7 +282,7 @@ database:
           users: "R"
           technical: "R"
           planning: "R"
-          production: "R"
+          production: "RU"
           quality: "CRUD"
           warehouse: "R"
           shipping: "R"
@@ -291,7 +291,7 @@ database:
           oee: "R"
           integrations: "-"
 
-      - code: "WH_MANAGER"
+      - code: "warehouse_manager"
         name: "Warehouse Manager"
         description: "Full Warehouse and Shipping access"
         display_order: 5
@@ -309,27 +309,27 @@ database:
           oee: "-"
           integrations: "-"
 
-      - code: "PROD_OPERATOR"
+      - code: "production_operator"
         name: "Production Operator"
-        description: "CRU Production, read Quality"
+        description: "Execute work orders, create quality checks"
         display_order: 6
         permissions:
           settings: "-"
           users: "-"
           technical: "R"
           planning: "R"
-          production: "CRU"
-          quality: "R"
-          warehouse: "-"
+          production: "RU"
+          quality: "CR"
+          warehouse: "R"
           shipping: "-"
           npd: "-"
           finance: "-"
           oee: "R"
           integrations: "-"
 
-      - code: "QUAL_INSPECTOR"
+      - code: "quality_inspector"
         name: "Quality Inspector"
-        description: "CRU Quality only"
+        description: "Perform QC inspections, view production and warehouse"
         display_order: 7
         permissions:
           settings: "-"
@@ -338,38 +338,38 @@ database:
           planning: "-"
           production: "R"
           quality: "CRU"
-          warehouse: "-"
-          shipping: "-"
+          warehouse: "R"
+          shipping: "R"
           npd: "-"
           finance: "-"
           oee: "-"
           integrations: "-"
 
-      - code: "WH_OPERATOR"
+      - code: "warehouse_operator"
         name: "Warehouse Operator"
-        description: "CRU Warehouse and Shipping"
+        description: "Execute inventory and shipping tasks"
         display_order: 8
         permissions:
           settings: "-"
           users: "-"
-          technical: "-"
+          technical: "R"
           planning: "-"
           production: "-"
-          quality: "-"
+          quality: "R"
           warehouse: "CRU"
-          shipping: "CRU"
+          shipping: "RU"
           npd: "-"
           finance: "-"
           oee: "-"
           integrations: "-"
 
-      - code: "PLANNER"
+      - code: "planner"
         name: "Planner"
-        description: "Full Planning, read Production"
+        description: "Manage schedules and work orders"
         display_order: 9
         permissions:
           settings: "R"
-          users: "-"
+          users: "R"
           technical: "R"
           planning: "CRUD"
           production: "R"
@@ -381,9 +381,9 @@ database:
           oee: "R"
           integrations: "-"
 
-      - code: "VIEWER"
+      - code: "viewer"
         name: "Viewer"
-        description: "Read-only all modules"
+        description: "Read-only access to all modules"
         display_order: 10
         permissions:
           settings: "R"
@@ -426,16 +426,16 @@ permission_matrix:
 
   matrix:
     # Format: [settings, users, technical, planning, production, quality, warehouse, shipping, npd, finance, oee, integrations]
-    SUPER_ADMIN:  ["CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
-    ADMIN:        ["CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
-    PROD_MANAGER: ["R",    "R",    "CRUD", "CRUD", "CRUD", "CRUD", "R",    "R",    "R",    "R",    "CRUD", "R"]
-    QUAL_MANAGER: ["R",    "R",    "R",    "R",    "R",    "CRUD", "R",    "R",    "RU",   "-",    "R",    "-"]
-    WH_MANAGER:   ["R",    "R",    "R",    "R",    "R",    "R",    "CRUD", "CRUD", "-",    "-",    "-",    "-"]
-    PROD_OPERATOR:  ["-",  "-",    "R",    "R",    "CRU",  "R",    "-",    "-",    "-",    "-",    "R",    "-"]
-    QUAL_INSPECTOR: ["-",  "-",    "R",    "-",    "R",    "CRU",  "-",    "-",    "-",    "-",    "-",    "-"]
-    WH_OPERATOR:    ["-",  "-",    "-",    "-",    "-",    "-",    "CRU",  "CRU",  "-",    "-",    "-",    "-"]
-    PLANNER:      ["R",    "-",    "R",    "CRUD", "R",    "R",    "R",    "R",    "R",    "R",    "R",    "-"]
-    VIEWER:       ["R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R"]
+    owner:              ["CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
+    admin:              ["CRU",  "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD", "CRUD"]
+    production_manager: ["R",    "R",    "RU",   "CRUD", "CRUD", "CRUD", "RU",   "R",    "R",    "R",    "CRUD", "R"]
+    quality_manager:    ["R",    "R",    "R",    "R",    "RU",   "CRUD", "R",    "R",    "RU",   "-",    "R",    "-"]
+    warehouse_manager:  ["R",    "R",    "R",    "R",    "R",    "R",    "CRUD", "CRUD", "-",    "-",    "-",    "-"]
+    production_operator: ["-",   "-",    "R",    "R",    "RU",   "CR",   "R",    "-",    "-",    "-",    "R",    "-"]
+    quality_inspector:  ["-",    "-",    "R",    "-",    "R",    "CRU",  "R",    "R",    "-",    "-",    "-",    "-"]
+    warehouse_operator: ["-",    "-",    "R",    "-",    "-",    "R",    "CRU",  "RU",   "-",    "-",    "-",    "-"]
+    planner:            ["R",    "R",    "R",    "CRUD", "R",    "R",    "R",    "R",    "R",    "R",    "R",    "-"]
+    viewer:             ["R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R",    "R"]
 
 # -----------------------------------------------------------------------------
 # API ENDPOINTS
@@ -443,7 +443,7 @@ permission_matrix:
 api:
   endpoints:
     - method: "GET"
-      path: "/api/v1/settings/roles"
+      path: "/api/settings/roles"
       description: "List all 10 system roles"
       auth: "required"
       roles: ["all"]  # Any authenticated user can view roles
@@ -461,7 +461,7 @@ api:
           message: "Unauthorized"
 
     - method: "GET"
-      path: "/api/v1/settings/roles/:id"
+      path: "/api/settings/roles/:id"
       description: "Get single role by ID"
       auth: "required"
       roles: ["all"]
@@ -548,9 +548,9 @@ ux:
 # -----------------------------------------------------------------------------
 validation_rules:
   role_assignment:
-    - "Only SUPER_ADMIN can assign SUPER_ADMIN role to another user"
-    - "ADMIN cannot assign SUPER_ADMIN role"
-    - "Cannot change role of last SUPER_ADMIN in organization"
+    - "Only owner can assign owner role to another user"
+    - "admin cannot assign owner role"
+    - "Cannot change role of last owner in organization"
     - "Role must be one of 10 valid system roles"
 
   permission_check:
@@ -653,71 +653,71 @@ acceptance_criteria:
       test_type: "integration"
 
     - id: "AC-02"
-      given: "Super Admin assigning role to user"
+      given: "owner assigning role to user"
       when: "any of 10 roles selected"
       then: "role assignment succeeds"
       test_type: "integration"
 
     - id: "AC-03"
-      given: "non-Super Admin (e.g., ADMIN)"
-      when: "attempting to assign SUPER_ADMIN role"
-      then: "error 'Only Super Admin can assign Super Admin role' displays"
+      given: "non-owner (e.g., admin)"
+      when: "attempting to assign owner role"
+      then: "error 'Only owner can assign owner role' displays"
       test_type: "integration"
 
     - id: "AC-04"
-      given: "role changed from VIEWER to ADMIN"
+      given: "role changed from viewer to admin"
       when: "user's next request made"
       then: "new permissions active immediately (no stale cache)"
       test_type: "integration"
 
   module_permission_enforcement:
     - id: "AC-05"
-      given: "user with SUPER_ADMIN role"
+      given: "user with owner role"
       when: "accessing any module"
       then: "full CRUD access granted"
       test_type: "integration"
 
     - id: "AC-06"
-      given: "user with VIEWER role"
+      given: "user with viewer role"
       when: "attempting to create anything"
       then: "action blocked, create button hidden"
       test_type: "integration"
 
     - id: "AC-07"
-      given: "user with PROD_OPERATOR role"
+      given: "user with production_operator role"
       when: "accessing Quality module"
-      then: "read-only access (no create/update/delete)"
+      then: "read only access (CR - create and read)"
       test_type: "integration"
 
     - id: "AC-08"
-      given: "user with QUAL_INSPECTOR role"
+      given: "user with quality_inspector role"
       when: "accessing Warehouse module"
-      then: "access denied (redirect)"
+      then: "read-only access granted (QI can see warehouse)"
       test_type: "integration"
 
     - id: "AC-09"
-      given: "user with WH_OPERATOR role"
+      given: "user with warehouse_operator role"
       when: "accessing Settings module"
       then: "access denied (redirect)"
       test_type: "integration"
 
   api_permission_enforcement:
     - id: "AC-10"
-      given: "API request to /api/v1/production/work-orders by VIEWER"
+      given: "API request to /api/production/work-orders by viewer"
       when: "POST attempted"
       then: "403 Forbidden returns"
       test_type: "integration"
 
     - id: "AC-11"
-      given: "API request to /api/v1/quality/inspections by PROD_OPERATOR"
+      given: "API request to /api/quality/inspections by production_operator"
       when: "DELETE attempted"
       then: "403 Forbidden returns"
       test_type: "integration"
 
     - id: "AC-12"
-      given: "API request to /api/v1/warehouse/locations by QUAL_INSPECTOR"
+      given: "API request to /api/warehouse/locations by quality_inspector"
       when: "GET attempted"
-      then: "403 Forbidden returns (no module access)"
+      then: "200 OK returns (QI has read access to warehouse)"
       test_type: "integration"
 
   ui_permission_rendering:
@@ -840,10 +840,12 @@ technical_notes:
   - "Roles table seeded in 01.1, this story adds service layer"
   - "Permission matrix is static (hardcoded in constants for performance)"
   - "API endpoints also read from DB for source of truth"
-  - "Use ADR-012 JSONB structure for permissions"
-  - "Super Admin restriction: Only Super Admin can assign Super Admin role"
-  - "Cannot delete or modify the last Super Admin in an organization"
+  - "Use ADR-012 JSONB structure for permissions (source of truth for seed data)"
+  - "Owner restriction: Only owner can assign owner role"
+  - "Cannot delete or modify the last owner in an organization"
   - "Role dropdown shows display_name, stores role_id"
+  - "Role codes use lowercase_snake_case per ADR-012 (PostgreSQL convention)"
+  - "All 12 modules present in permission matrix (8 core + 4 premium/future)"
   - "Permission check is O(1) - single object lookup"
   - "Consider Redis cache for permissions in production (future optimization)"
 

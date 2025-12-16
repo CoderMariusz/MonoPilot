@@ -15,15 +15,15 @@ components:
         description: "Callback when role changes"
       - name: "currentUserRole"
         type: "string"
-        description: "Current user's role (for Super Admin restriction)"
+        description: "Current user's role code (for owner restriction)"
       - name: "disabled"
         type: "boolean"
         description: "Whether the field is disabled"
     ux_reference: "SET-011"
     implementation_notes:
-      - "Display role NAME (not code): 'Production Manager' not 'PROD_MANAGER'"
-      - "Super Admin option disabled if current user is not Super Admin"
-      - "Tooltip on Super Admin: 'Only Super Admin can assign this role'"
+      - "Display role NAME (not code): 'Production Manager' not 'production_manager'"
+      - "Owner option disabled if current user is not owner"
+      - "Tooltip on owner role: 'Only owner can assign this role'"
       - "Use ShadCN Select component"
       - "Roles sorted by display_order"
 
@@ -98,8 +98,8 @@ hooks:
           canAny,
           hasRole,
           role: context?.role_code,
-          isAdmin: hasRole(['SUPER_ADMIN', 'ADMIN']),
-          isSuperAdmin: hasRole(['SUPER_ADMIN'])
+          isAdmin: hasRole(['owner', 'admin']),
+          isOwner: hasRole(['owner'])
         };
       }
 
@@ -137,16 +137,16 @@ types:
       }
 
       export type RoleCode =
-        | 'SUPER_ADMIN'
-        | 'ADMIN'
-        | 'PROD_MANAGER'
-        | 'QUAL_MANAGER'
-        | 'WH_MANAGER'
-        | 'PROD_OPERATOR'
-        | 'QUAL_INSPECTOR'
-        | 'WH_OPERATOR'
-        | 'PLANNER'
-        | 'VIEWER';
+        | 'owner'
+        | 'admin'
+        | 'production_manager'
+        | 'quality_manager'
+        | 'warehouse_manager'
+        | 'production_operator'
+        | 'quality_inspector'
+        | 'warehouse_operator'
+        | 'planner'
+        | 'viewer';
 
       export type PermissionAction = 'C' | 'R' | 'U' | 'D';
 
@@ -158,7 +158,11 @@ types:
         | 'production'
         | 'quality'
         | 'warehouse'
-        | 'shipping';
+        | 'shipping'
+        | 'npd'
+        | 'finance'
+        | 'oee'
+        | 'integrations';
 
       export interface UsePermissionsResult {
         can: (module: ModuleCode, action: PermissionAction) => boolean;
@@ -166,7 +170,7 @@ types:
         hasRole: (roles: RoleCode[]) => boolean;
         role: string | undefined;
         isAdmin: boolean;
-        isSuperAdmin: boolean;
+        isOwner: boolean;
       }
 
 # UX Wireframe Implementation
@@ -190,7 +194,7 @@ ux:
 
 # Usage Examples
 usage_examples:
-  - scenario: "Hide create button for VIEWER"
+  - scenario: "Hide create button for viewer role"
     code: |
       function UserListPage() {
         const { can } = usePermissions();
@@ -212,7 +216,7 @@ usage_examples:
   - scenario: "Role selector in user modal"
     code: |
       function UserModal() {
-        const { role: currentUserRole } = usePermissions();
+        const { role: currentUserRole, isOwner } = usePermissions();
         const { data: roles } = useRoles();
 
         return (
@@ -246,14 +250,14 @@ error_handling:
     ui: "Hide button or show 'No permission' message"
   - scenario: "Role fetch fails"
     ui: "Disable role selector, show error toast"
-  - scenario: "Super Admin assignment attempted by non-Super Admin"
-    ui: "Show error toast: 'Only Super Admin can assign Super Admin role'"
+  - scenario: "Owner role assignment attempted by non-owner"
+    ui: "Show error toast: 'Only owner can assign owner role'"
 
 # Accessibility
 accessibility:
   - "Role selector has label 'Role'"
   - "Keyboard navigation works for role dropdown"
-  - "Screen reader announces disabled Super Admin option"
+  - "Screen reader announces disabled owner role option"
   - "Tooltip on disabled option accessible via keyboard"
   - "PermissionGuard does not render hidden elements in DOM"
 

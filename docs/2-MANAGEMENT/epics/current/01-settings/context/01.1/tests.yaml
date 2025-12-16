@@ -100,13 +100,13 @@ unit_tests:
       expected: "Returns false"
 
     - name: "hasRole returns true when user has role"
-      setup: "Context with role_code: 'ADMIN'"
-      params: ["context", "['ADMIN', 'SUPER_ADMIN']"]
+      setup: "Context with role_code: 'admin'"
+      params: ["context", "['admin', 'owner']"]
       expected: "Returns true"
 
     - name: "hasRole returns false when user lacks role"
-      setup: "Context with role_code: 'VIEWER'"
-      params: ["context", "['ADMIN', 'SUPER_ADMIN']"]
+      setup: "Context with role_code: 'viewer'"
+      params: ["context", "['admin', 'owner']"]
       expected: "Returns false"
 
 # Integration Test Cases (RLS)

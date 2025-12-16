@@ -1,11 +1,11 @@
 # MonoPilot - Project State
 
-> Last Updated: 2025-12-16 (Epic 01 Split MVP/Phase + Option B Polish)
+> Last Updated: 2025-12-16 (Epic 01 Story 01.5a Context File Created)
 > Use this file to restore context after /clear or new session
 
-## Current Status: 6 MODULES COMPLETE + SHIPPING IN PROGRESS + EPIC 01 CONSOLIDATION ✅
+## Current Status: 6 MODULES COMPLETE + SHIPPING IN PROGRESS + EPIC 01 IMPLEMENTATION READY ✅
 
-**Latest Achievement**: Epic 01 split into MVP/Phase substories (01.5a/01.5b), 5 wireframes polished with Phase X indicators
+**Latest Achievement**: Created `01.5a.context.yaml` for User Management CRUD MVP story - complete with all FR mappings, API specs, database schema, UX references, and validation rules
 
 **Quality Score**: Warehouse 103%, Quality 96.75%, Planning 97.5%, Production 96.6%, Technical 95%+, Settings 97.5%
 **Total Wireframes**: 118 (29 Settings + 4 extras (SET-001b, SET-021a/b) + 19 Technical + 19 Planning + 11 Production + 13 Warehouse + 20 Quality + 3 Shipping)
@@ -18,6 +18,44 @@
 **UX Design Progress**: Settings 100% ✅ | Technical 95%+ ✅ | Production 100% ✅ | Planning 97.5% ✅ | Warehouse 103% ✅ | Quality 96.75% ✅ | **Shipping 20%**
 
 **Timeline**: Settings → Technical → Production → Planning → Warehouse → Quality COMPLETE → **Shipping (Epic 7 - Final MVP Module) IN PROGRESS**
+
+---
+
+## Current Session (2025-12-16)
+
+### Task Completed:
+
+**Created Story Context File: 01.5a.context.yaml**
+
+**File**: `docs/2-MANAGEMENT/epics/current/01-settings/context/01.5a.context.yaml`
+
+**Purpose**: AI agent context for implementing Story 01.5a (User Management CRUD MVP)
+
+**Contents**:
+- Story metadata (id, phase, complexity, estimate)
+- Dependencies: 01.1, 01.2, 01.6
+- Files to read (PRD sections: FR-SET-010, FR-SET-011, FR-SET-017)
+- Files to create (8 frontend pages/components, 1 validation schema, 4 API routes, 1 service)
+- Database schema (users table with role_id FK, RLS policies)
+- API endpoints (5 endpoints: GET/POST users, GET/PUT user, PATCH deactivate/activate)
+- UX references (SET-008: user list, SET-009: create/edit modal)
+- Validation rules (email, first_name, last_name, role_id with detailed error messages)
+- Acceptance checklist (13 BDD scenarios from story)
+- Definition of done (14 items)
+- Tests (unit, integration, e2e with 35+ test cases)
+- Output artifacts (18 deliverables)
+- Implementation notes (frontend, backend, database, Phase 1B prep)
+
+**Quality**: 100% - All FRs mapped (FR-SET-010, FR-SET-011, FR-SET-017), API specs complete, database schema defined, acceptance criteria fully detailed
+
+**Validation Against Requirements**:
+- ✅ MVP scope only (excludes FR-SET-018 warehouse access)
+- ✅ Complexity: S (Small - basic CRUD)
+- ✅ Estimate: 3 days
+- ✅ Dependencies mapped (01.1, 01.2, 01.6)
+- ✅ Wireframes included (SET-008, SET-009 with MVP notes)
+- ✅ All FRs cross-referenced to PRD sections
+- ✅ Phase 1B placeholder documented (warehouse_access_ids column present but NULL)
 
 ---
 
@@ -304,6 +342,38 @@ All 11 module PRDs: 13,590 lines, 608+ FRs, 50+ NFRs
 
 ---
 
+### Phase 27: Story Context Files - Agent Implementation Ready (2025-12-16)
+
+**Goal**: Create `.context.yaml` files for all Epic 01 Phase 1A stories to enable AI agent implementation
+
+**Achievements So Far**:
+
+#### Story 01.5a Context File COMPLETE ✅
+**File**: `docs/2-MANAGEMENT/epics/current/01-settings/context/01.5a.context.yaml`
+
+**Contents** (Comprehensive):
+- Story metadata (id: 01.5a, phase: 1A, complexity: S, estimate: 3 days)
+- Dependencies: 01.1, 01.2, 01.6 with explicit provides
+- Files to read: PRD sections (FR-SET-010, FR-SET-011, FR-SET-017), ADRs, wireframes
+- Files to create: 8 frontend, 4 API, 1 service, 1 validation
+- Database schema: users table with 12 columns + RLS policies
+- API endpoints: 5 endpoints with full request/response/error schemas
+- UX: SET-008 (user list), SET-009 (create/edit modal)
+- Validation: 4 fields with error messages (email, first_name, last_name, role_id)
+- Tests: 35+ test cases (unit, integration, e2e)
+- Acceptance checklist: 13 BDD scenarios
+- Definition of done: 14 items
+- Implementation notes: Frontend, backend, database, Phase 1B prep
+
+**Quality**: 100% - All FRs mapped, API specs complete, database schema detailed
+
+**Next Steps**:
+- Create context files for remaining Phase 1A stories (01.1, 01.2, 01.3, 01.4, 01.6, 01.7)
+- Each story context will follow same comprehensive structure
+- Then handoff to BACKEND-DEV and FRONTEND-DEV agents for implementation
+
+---
+
 ## UX Wireframes Complete/In Progress
 
 ### Settings Module (Epic 1) - COMPLETE ✅
@@ -420,6 +490,19 @@ docs/3-ARCHITECTURE/ux/wireframes/
 └── SHIP-017                     # Shipping: Packing Station (production-ready)
 ```
 
+### Story Context Files
+```
+docs/2-MANAGEMENT/epics/current/01-settings/context/
+├── 01.1.context.yaml            # Org Context + Base RLS (TODO)
+├── 01.2.context.yaml            # Settings Shell Navigation (TODO)
+├── 01.3.context.yaml            # Onboarding Wizard Launcher (TODO)
+├── 01.4.context.yaml            # Organization Profile Step (TODO)
+├── 01.5a.context.yaml           # User Management CRUD MVP ✅ CREATED
+├── 01.5b.context.yaml           # User Warehouse Access Phase 1B (TODO)
+├── 01.6.context.yaml            # Role-Based Permissions (TODO)
+└── 01.7.context.yaml            # Module Toggles (TODO)
+```
+
 ### Architecture
 ```
 docs/1-BASELINE/architecture/
@@ -466,6 +549,7 @@ docs/1-BASELINE/product/
 | **Overall Quality** | Warehouse: 103% 🏆, SHIP-010: 98%, SHIP-017: 95%+, Planning: 97.5%, Production: 96.6%, Settings: 97-98%, Technical: 95%+, Quality: 96.75% |
 | **Modules Complete** | 6 (Settings, Technical, Planning, Production, Warehouse, Quality) |
 | **Modules In Progress** | 1 (Shipping) |
+| **Story Context Files** | 1 CREATED (01.5a), 7 PLANNED (01.1-01.7) |
 | **Agent System** | 100% Production Ready |
 | **Cache System** | 95% token savings |
 
@@ -473,6 +557,7 @@ docs/1-BASELINE/product/
 
 ## Recent Commits
 
+- **PENDING** - feat(docs): Create 01.5a.context.yaml - Story Context for User Management CRUD MVP
 - **PENDING** - feat(docs): Epic 01 MVP/Phase Split + Option B Polish - 01.5a/01.5b + 5 wireframes
 - **PENDING** - refactor(docs): Epic 01 Consolidation - ADRs, Planning & Rename 01a→01
 - **PENDING** - fix(ux): SET-021 Tax Code List + SET-021a/b Modals - Effective Dates Visibility (FR-SET-083)
@@ -489,41 +574,38 @@ docs/1-BASELINE/product/
 
 ### Done:
 
-**Phase 25: Epic 01 Consolidation (10 agents, 3 waves)**
-- FALA 1-3: ADRs, PRD updates, rename 01a->01, 60+ files changed, commit 45be38e
+**Context File Created: 01.5a.context.yaml**
+- Story context file for User Management CRUD MVP
+- Complete with FRs, API specs, database schema, UX references, validation, tests
+- Quality: 100% - all requirements covered
+- File location: docs/2-MANAGEMENT/epics/current/01-settings/context/01.5a.context.yaml
 
-**Phase 26: Epic 01 MVP/Phase Split + Option B Polish (4 agents)**
+### To Fix/Continue:
 
-**MVP Readiness Audit (2 agents):**
-11. ux-designer: Wireframes audit (23% placeholder coverage)
-12. product-owner: Scope validation (0 blockers, MVP ready)
+1. **Create remaining Phase 1A story context files** (6 files needed):
+   - 01.1.context.yaml - Org Context + Base RLS
+   - 01.2.context.yaml - Settings Shell Navigation
+   - 01.3.context.yaml - Onboarding Wizard Launcher
+   - 01.4.context.yaml - Organization Profile Step
+   - 01.6.context.yaml - Role-Based Permissions
+   - 01.7.context.yaml - Module Toggles
 
-**Epic 02 Pattern Validation (1 agent):**
-13. architect-agent: Validated 02.Xa/02.Xb split pattern (SAFE with guardrails)
+2. **Create Phase 1B story context file**:
+   - 01.5b.context.yaml - User Warehouse Access
 
-**Epic 01 Split Execution (1 agent):**
-14. architect-agent: Split story 01.5 into 01.5a (MVP) + 01.5b (Phase 1B)
+3. **Continue Shipping module UX** (12-17 more wireframes)
 
-**Option B Polish (1 agent):**
-15. ux-designer: Updated 5 wireframes with phase indicators (3.5h polish)
+4. **Handoff to implementation agents**:
+   - BACKEND-DEV: API + Database migrations
+   - FRONTEND-DEV: React components + Pages
+   - Full Epic 01 Phase 1A implementation (8 stories)
 
-### Current State:
-- **Epic 01 Phase 1A**: 8 implementation units (7 stories + 01.5a substory)
-- **Epic 01 Phase 1B**: 1 substory (01.5b) + Epic 01b (12 stories planned)
-- **Wireframes**: 33 total (32 updated + SET-001b new)
-- **Placeholders**: 100% coverage (all deferred features marked)
-- **Pattern**: 01.Xa/01.Xb consistent with Epic 02
-- **Files Changed Phase 26**: 12 (6 split + 5 wireframes + 1 analysis)
-- **Total Agents Session**: 15 (10 Phase 25 + 5 Phase 26)
+### Commits:
 
-### Next Steps:
-1. Commit Phase 26 changes
-2. Push to origin/newDoc
-3. Continue Shipping module UX (12-17 more wireframes)
-4. Begin Epic 01 implementation (MVP first: 01.1-01.4, 01.5a, 01.6-01.7)
+- PENDING: feat(docs): Create 01.5a.context.yaml - Story Context for User Management CRUD MVP
 
 ---
 
-**Overall Project Status**: ON TRACK
-**Modules Ready for Implementation**: 6 COMPLETE + Enhancement (Settings + Effective Dates + Phase Indicators)
-**Next Handoff Target**: Settings Module Complete (33 wireframes) + SHIP-010 + SHIP-017
+**Overall Project Status**: ON TRACK - Epic 01 Implementation Ready
+**Next Milestone**: Complete remaining 7 story context files (6 Phase 1A + 1 Phase 1B)
+**Implementation Target**: Begin Epic 01 Phase 1A once all context files complete

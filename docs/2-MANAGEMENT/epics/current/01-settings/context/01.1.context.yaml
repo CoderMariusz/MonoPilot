@@ -61,22 +61,22 @@ files_to_read:
 files_to_create:
   database:
     migrations:
-      - path: "supabase/migrations/001_create_organizations_table.sql"
+      - path: "supabase/migrations/043_create_organizations_table.sql"
         type: "migration"
         description: "Core tenant table with onboarding state"
-      - path: "supabase/migrations/002_create_roles_table.sql"
+      - path: "supabase/migrations/044_create_roles_table.sql"
         type: "migration"
         description: "10 system roles with JSONB permissions (ADR-012)"
-      - path: "supabase/migrations/003_create_users_table.sql"
+      - path: "supabase/migrations/045_create_users_table.sql"
         type: "migration"
         description: "Users table with role_id FK"
-      - path: "supabase/migrations/004_create_modules_tables.sql"
+      - path: "supabase/migrations/046_create_modules_tables.sql"
         type: "migration"
         description: "modules + organization_modules tables (ADR-011)"
-      - path: "supabase/migrations/005_rls_policies.sql"
+      - path: "supabase/migrations/047_rls_policies.sql"
         type: "migration"
         description: "RLS policies following ADR-013 pattern"
-      - path: "supabase/migrations/006_seed_system_data.sql"
+      - path: "supabase/migrations/048_seed_system_data.sql"
         type: "seed"
         description: "Seed 10 system roles and 11 modules"
 
@@ -323,7 +323,7 @@ rls_policies:
       operation: "ALL"
       using: |
         org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
 
     - table: "roles"
       name: "roles_select_system"
@@ -345,7 +345,7 @@ rls_policies:
       operation: "ALL"
       using: |
         org_id = (SELECT org_id FROM users WHERE id = auth.uid())
-        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('SUPER_ADMIN', 'ADMIN')
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
 
 # -----------------------------------------------------------------------------
 # API ENDPOINTS
@@ -378,36 +378,36 @@ seed_data:
   roles:
     description: "10 system roles per ADR-012"
     data:
-      - code: "SUPER_ADMIN"
-        name: "Super Administrator"
-        permissions: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","warehouse":"CRUD","quality":"CRUD","shipping":"CRUD"}'
-      - code: "ADMIN"
+      - code: "owner"
+        name: "Owner"
+        permissions: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","warehouse":"CRUD","quality":"CRUD","shipping":"CRUD","npd":"CRUD","finance":"CRUD","oee":"CRUD","integrations":"CRUD"}'
+      - code: "admin"
         name: "Administrator"
-        permissions: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","warehouse":"CRUD","quality":"CRUD","shipping":"CRUD"}'
-      - code: "PRODUCTION_MANAGER"
+        permissions: '{"settings":"CRU","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","warehouse":"CRUD","quality":"CRUD","shipping":"CRUD","npd":"CRUD","finance":"CRUD","oee":"CRUD","integrations":"CRUD"}'
+      - code: "production_manager"
         name: "Production Manager"
-        permissions: '{"settings":"R","users":"R","technical":"R","planning":"CRU","production":"CRUD","warehouse":"R","quality":"CRU","shipping":"R"}'
-      - code: "WAREHOUSE_MANAGER"
-        name: "Warehouse Manager"
-        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","warehouse":"CRUD","quality":"R","shipping":"CRU"}'
-      - code: "QUALITY_MANAGER"
+        permissions: '{"settings":"R","users":"R","technical":"RU","planning":"CRUD","production":"CRUD","warehouse":"RU","quality":"CRUD","shipping":"R","npd":"R","finance":"R","oee":"CRUD","integrations":"R"}'
+      - code: "quality_manager"
         name: "Quality Manager"
-        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","warehouse":"R","quality":"CRUD","shipping":"R"}'
-      - code: "PLANNER"
-        name: "Planner"
-        permissions: '{"settings":"R","users":"R","technical":"R","planning":"CRUD","production":"R","warehouse":"R","quality":"R","shipping":"R"}'
-      - code: "OPERATOR"
-        name: "Operator"
-        permissions: '{"settings":"-","users":"-","technical":"R","planning":"R","production":"CRU","warehouse":"CRU","quality":"CRU","shipping":"-"}'
-      - code: "WAREHOUSE_OPERATOR"
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"RU","warehouse":"R","quality":"CRUD","shipping":"R","npd":"RU","finance":"-","oee":"R","integrations":"-"}'
+      - code: "warehouse_manager"
+        name: "Warehouse Manager"
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","warehouse":"CRUD","quality":"R","shipping":"CRUD","npd":"-","finance":"-","oee":"-","integrations":"-"}'
+      - code: "production_operator"
+        name: "Production Operator"
+        permissions: '{"settings":"-","users":"-","technical":"R","planning":"R","production":"RU","warehouse":"R","quality":"CR","shipping":"-","npd":"-","finance":"-","oee":"R","integrations":"-"}'
+      - code: "warehouse_operator"
         name: "Warehouse Operator"
-        permissions: '{"settings":"-","users":"-","technical":"R","planning":"R","production":"R","warehouse":"CRU","quality":"R","shipping":"CRU"}'
-      - code: "VIEWER"
+        permissions: '{"settings":"-","users":"-","technical":"R","planning":"-","production":"-","warehouse":"CRU","quality":"R","shipping":"RU","npd":"-","finance":"-","oee":"-","integrations":"-"}'
+      - code: "quality_inspector"
+        name: "Quality Inspector"
+        permissions: '{"settings":"-","users":"-","technical":"R","planning":"-","production":"R","warehouse":"R","quality":"CRU","shipping":"R","npd":"-","finance":"-","oee":"-","integrations":"-"}'
+      - code: "planner"
+        name: "Planner"
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"CRUD","production":"R","warehouse":"R","quality":"R","shipping":"R","npd":"R","finance":"R","oee":"R","integrations":"-"}'
+      - code: "viewer"
         name: "Viewer"
-        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","warehouse":"R","quality":"R","shipping":"R"}'
-      - code: "EXTERNAL"
-        name: "External User"
-        permissions: '{"settings":"-","users":"-","technical":"R","planning":"R","production":"R","warehouse":"R","quality":"R","shipping":"R"}'
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","warehouse":"R","quality":"R","shipping":"R","npd":"R","finance":"R","oee":"R","integrations":"R"}'
 
   modules:
     description: "11 modules per ADR-011"
@@ -533,7 +533,7 @@ deliverables:
     description: "Shared auth/org context helper(s) used by Settings endpoints (getOrgContext())"
 
   - type: "migration"
-    path: "supabase/migrations/005_rls_policies.sql"
+    path: "supabase/migrations/047_rls_policies.sql"
     description: "Baseline RLS policies for organizations, users, roles, organization_modules"
 
   - type: "test"
@@ -541,8 +541,8 @@ deliverables:
     description: "Tests proving isolation + 404 behavior"
 
   - type: "api"
-    path: "apps/frontend/app/api/v1/settings/context/route.ts"
-    description: "GET /api/v1/settings/context - returns org_id, user_id, role, permissions"
+    path: "apps/frontend/app/api/settings/context/route.ts"
+    description: "GET /api/settings/context - returns org_id, user_id, role, permissions"
 
 # -----------------------------------------------------------------------------
 # UX SECTION

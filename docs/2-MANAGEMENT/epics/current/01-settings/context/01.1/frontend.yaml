@@ -63,16 +63,16 @@ types:
       }
 
       export type RoleCode =
-        | 'SUPER_ADMIN'
-        | 'ADMIN'
-        | 'PRODUCTION_MANAGER'
-        | 'WAREHOUSE_MANAGER'
-        | 'QUALITY_MANAGER'
-        | 'PLANNER'
-        | 'OPERATOR'
-        | 'WAREHOUSE_OPERATOR'
-        | 'VIEWER'
-        | 'EXTERNAL';
+        | 'owner'
+        | 'admin'
+        | 'production_manager'
+        | 'quality_manager'
+        | 'warehouse_manager'
+        | 'production_operator'
+        | 'warehouse_operator'
+        | 'quality_inspector'
+        | 'planner'
+        | 'viewer';
 
   - path: "apps/frontend/lib/types/module.ts"
     content: |

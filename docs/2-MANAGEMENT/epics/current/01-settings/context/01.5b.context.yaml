@@ -1,0 +1,401 @@
+# Story Context: 01.5b User Warehouse Access (Phase 1B)
+# Generated: 2025-12-16
+# Purpose: AI agent context for implementing user warehouse access restrictions (FR-SET-018)
+
+story:
+  id: "01.5b"
+  name: "User Warehouse Access Restrictions (Phase 1B)"
+  epic: "01-settings"
+  phase: "1B"
+  complexity: "S"
+  estimate_days: 2
+  type: "frontend + backend"
+  state: "planned"
+  priority: "P1"
+  story_file: "docs/2-MANAGEMENT/epics/current/01-settings/01.5b.user-warehouse-access-phase1b.md"
+
+dependencies:
+  required:
+    - story: "01.5a"
+      name: "User Management CRUD (MVP)"
+      provides:
+        - "users table with role_id FK"
+        - "UserService base class"
+        - "user-schema.ts Zod schemas"
+        - "UserModal.tsx component"
+        - "users list page"
+        - "All user CRUD endpoints"
+      reason: "01.5b extends 01.5a functionality - must be merged to main first"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides:
+        - "warehouses table with proper schema"
+        - "warehouse list for dropdown population"
+        - "warehouse existence validation"
+      reason: "Cannot assign users to non-existent warehouses"
+    - story: "01.6"
+      name: "Role-Based Permissions"
+      provides:
+        - "roles table with 10 predefined roles"
+        - "permission enforcement middleware"
+        - "usePermissions() React hook"
+        - "hasPermission() helper function"
+      reason: "RLS policies check user role for admin bypass logic"
+
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/settings.md"
+  prd_sections:
+    - "FR-SET-018"  # User warehouse access restrictions (lines 465+)
+    - "FR-SET-017"  # User deactivation (referenced for access removal)
+    - "FR-SET-040"  # Warehouse CRUD (context for warehouse list)
+  architecture: "docs/1-BASELINE/architecture/modules/settings.md"
+  story: "docs/2-MANAGEMENT/epics/current/01-settings/01.5b.user-warehouse-access-phase1b.md"
+  story_base: "docs/2-MANAGEMENT/epics/current/01-settings/01.5a.user-management-crud-mvp.md"
+  warehouse_story: "docs/2-MANAGEMENT/epics/current/01-settings/01.8.warehouses-crud.md"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  patterns:
+    - "apps/frontend/lib/validation/*.ts"  # Zod schema patterns
+    - "apps/frontend/lib/services/user-service.ts"  # UserService base (extend this)
+    - "apps/frontend/components/ui/multi-select.tsx"  # ShadCN multi-select component
+    - "apps/frontend/components/ui/checkbox.tsx"  # ShadCN checkbox
+    - "apps/frontend/components/ui/dialog.tsx"  # ShadCN dialog (modal)
+
+files_to_create:
+  services:
+    - path: "apps/frontend/lib/services/user-warehouse-service.ts"
+      description: "UserWarehouseService extending UserService with warehouse access methods"
+  components:
+    - path: "apps/frontend/components/settings/users/WarehouseAccessSection.tsx"
+      description: "Multi-select warehouse section with 'All Warehouses' checkbox"
+    - path: "apps/frontend/components/settings/users/WarehouseAccessBadge.tsx"
+      description: "Badge showing warehouse access status in user list"
+  validation:
+    - path: "apps/frontend/lib/validation/warehouse-access-schema.ts"
+      description: "Zod schema for warehouse access validation"
+  api:
+    - path: "apps/frontend/app/api/v1/settings/users/[id]/warehouse-access/route.ts"
+      methods: ["GET", "PUT"]
+      description: "Get/Update warehouse access for user"
+  database:
+    - path: "supabase/migrations/XXX_create_user_warehouse_access_log_table.sql"
+      type: "migration"
+      description: "Optional audit log table for warehouse access changes"
+
+database:
+  tables:
+    - name: "users"
+      notes: "Existing table from 01.5a - warehouse_access_ids column already present (nullable)"
+      columns:
+        - "id UUID PRIMARY KEY REFERENCES auth.users(id)"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "email TEXT NOT NULL"
+        - "first_name TEXT NOT NULL"
+        - "last_name TEXT NOT NULL"
+        - "role_id UUID NOT NULL REFERENCES roles(id)"
+        - "warehouse_access_ids UUID[] DEFAULT NULL"  # NULL = all warehouses (for admin/super_admin)
+        - "is_active BOOLEAN DEFAULT true"
+        - "created_at TIMESTAMPTZ DEFAULT NOW()"
+        - "updated_at TIMESTAMPTZ DEFAULT NOW()"
+      rls: true
+      rls_policies:
+        - name: "users_org_isolation"
+          operation: "SELECT"
+          using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+        - name: "users_warehouse_access_enforcement"
+          operation: "SELECT"
+          using: |
+            -- User can see other users in same org
+            org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      indexes:
+        - "org_id"
+        - "warehouse_access_ids"  # For filtering queries
+
+    - name: "warehouses"
+      notes: "Created in story 01.8 - referenced by user warehouse access"
+      columns:
+        - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "code VARCHAR(10) NOT NULL"
+        - "name VARCHAR(100) NOT NULL"
+        - "type TEXT NOT NULL"
+        - "is_active BOOLEAN DEFAULT true"
+        - "created_at TIMESTAMPTZ DEFAULT NOW()"
+
+    - name: "user_warehouse_access_log"
+      notes: "OPTIONAL - For detailed audit trail of warehouse access changes"
+      columns:
+        - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        - "org_id UUID NOT NULL REFERENCES organizations(id)"
+        - "user_id UUID NOT NULL REFERENCES users(id)"
+        - "warehouse_id UUID REFERENCES warehouses(id)"  # NULL for all_warehouses changes
+        - "action TEXT NOT NULL"  # 'granted', 'revoked', 'all_warehouses_enabled', 'all_warehouses_disabled'
+        - "changed_by UUID NOT NULL REFERENCES users(id)"
+        - "changed_at TIMESTAMPTZ DEFAULT NOW()"
+      indexes:
+        - "org_id"
+        - "user_id"
+        - "warehouse_id"
+
+api_endpoints:
+  - method: "GET"
+    path: "/api/v1/settings/users/:id/warehouse-access"
+    description: "Get warehouse access configuration for a user"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    response:
+      user_id: "UUID"
+      all_warehouses: "boolean"
+      warehouse_ids: "UUID[]"
+      warehouses: "Array<{id: UUID, code: string, name: string}>"
+    example_response: |
+      {
+        "user_id": "uuid-123",
+        "all_warehouses": false,
+        "warehouse_ids": ["uuid-wh1", "uuid-wh2"],
+        "warehouses": [
+          {"id": "uuid-wh1", "code": "WH-001", "name": "Main Warehouse"},
+          {"id": "uuid-wh2", "code": "WH-002", "name": "Cold Storage"}
+        ]
+      }
+    performance: "< 200ms"
+
+  - method: "PUT"
+    path: "/api/v1/settings/users/:id/warehouse-access"
+    description: "Update warehouse access for a user"
+    auth: true
+    roles: ["SUPER_ADMIN", "ADMIN"]
+    request_body:
+      all_warehouses: "boolean (required)"
+      warehouse_ids: "UUID[] (required if all_warehouses=false)"
+    validation:
+      - "If all_warehouses=true, warehouse_ids is ignored"
+      - "If all_warehouses=false, warehouse_ids must contain at least 1 warehouse"
+      - "All warehouse_ids must exist in warehouses table"
+      - "User must be active"
+    response:
+      success: "boolean"
+      message: "string"
+    errors:
+      400: "At least one warehouse required when all_warehouses=false"
+      400: "Invalid warehouse IDs"
+      404: "User not found"
+      403: "Insufficient permissions"
+    side_effects:
+      - "Update users.warehouse_access_ids"
+      - "Create audit log entry (if audit table used)"
+      - "Invalidate user permission cache"
+
+ux:
+  wireframes:
+    - id: "SET-009"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-009-user-create-edit-modal.md"
+      description: "User Create/Edit Modal (Phase 1B - warehouse access section)"
+      components:
+        - "First Name input (from 01.5a)"
+        - "Last Name input (from 01.5a)"
+        - "Email input (from 01.5a)"
+        - "Role dropdown (from 01.5a)"
+        - "Active checkbox (from 01.5a)"
+        - "WAREHOUSE ACCESS SECTION (NEW - 01.5b):"
+        - "  - 'All Warehouses' checkbox (default ON for admin/super_admin)"
+        - "  - Multi-select dropdown for specific warehouses (disabled if 'All Warehouses' checked)"
+      lines_enabled: "49-117 (warehouse access section, previously hidden)"
+  patterns:
+    modal_field: "ShadCN Dialog with form inputs"
+    multi_select: "ShadCN Multi-select component for warehouse selection"
+    checkbox: "ShadCN Checkbox with label"
+    badge: "ShadCN Badge for warehouse list display"
+    conditional: "Show/hide warehouse dropdown based on checkbox state"
+  states:
+    loading: "Skeleton for warehouse dropdown while fetching"
+    empty: "'No warehouses available' message if org has no warehouses"
+    error: "'Failed to load warehouses' with retry option"
+    success: "Multi-select populated with available warehouses"
+    disabled: "Multi-select disabled when 'All Warehouses' is checked"
+
+validation_rules:
+  all_warehouses:
+    type: "boolean"
+    required: true
+    default: true
+    description: "Whether user can access all warehouses or specific ones only"
+    error: "All Warehouses setting is required"
+
+  warehouse_ids:
+    type: "UUID[]"
+    required_if: "all_warehouses === false"
+    min_items: 1
+    max_items: 1000
+    items_must_exist_in: "warehouses table"
+    error_empty: "At least one warehouse must be selected"
+    error_invalid_uuid: "Invalid warehouse ID format"
+    error_not_found: "One or more warehouses do not exist"
+    error_not_in_org: "Cannot assign warehouses from different organizations"
+
+patterns:
+  rls: "ADR-013 - RLS Org Isolation Pattern extended with warehouse filtering"
+  role_storage: "ADR-012 - Roles stored with UUID FK"
+  api: "REST with org_id filter from auth context"
+  service: "Extend UserService - do not modify base UserService"
+  validation: "Zod schemas in lib/validation/warehouse-access-schema.ts"
+  extension_pattern: |
+    // Do NOT modify UserService - extend it
+    export class UserWarehouseService extends UserService {
+      async getWarehouseAccess(userId: string): Promise<WarehouseAccessResponse> {
+        // Extend without modifying base class
+      }
+
+      async updateWarehouseAccess(
+        userId: string,
+        data: UpdateWarehouseAccessRequest
+      ): Promise<void> {
+        // Extend without modifying base class
+      }
+    }
+
+acceptance_checklist:
+  warehouse_access_ui:
+    - "GIVEN admin opens user create/edit modal, WHEN modal loads, THEN warehouse access section displays (SET-009 lines 49-117)"
+    - "GIVEN 'All Warehouses' checkbox displayed, WHEN page loads, THEN checkbox is checked by default for NEW users"
+    - "GIVEN 'All Warehouses' is checked, WHEN admin views warehouse multi-select, THEN multi-select is disabled (visually grayed out)"
+    - "GIVEN 'All Warehouses' is unchecked, WHEN admin clicks warehouse dropdown, THEN all available warehouses appear"
+    - "GIVEN admin unchecks 'All Warehouses' and selects 'WH-001, WH-002', WHEN save clicked, THEN user's warehouse_access_ids = ['uuid-wh1', 'uuid-wh2']"
+
+  rls_enforcement:
+    - "GIVEN user has warehouse_access_ids = ['uuid-wh1'] only, WHEN viewing inventory module, THEN only WH-001 inventory displays (RLS filtered)"
+    - "GIVEN user has warehouse_access_ids = NULL and role IN (SUPER_ADMIN, ADMIN), WHEN accessing any module, THEN all warehouses are accessible"
+    - "GIVEN user has warehouse_access_ids = NULL and role NOT IN (SUPER_ADMIN, ADMIN), WHEN accessing warehouse-dependent module, THEN error 'No warehouse access configured' displays"
+    - "GIVEN user's warehouse access is changed by admin, WHEN user refreshes page, THEN new access permissions apply immediately (within 1 second)"
+
+  warehouse_dropdown_filtering:
+    - "GIVEN admin assigns warehouses to user in modal, WHEN user logs in, THEN warehouse dropdown filter shows ONLY assigned warehouses"
+    - "GIVEN user has access to WH-001 and WH-003 only, WHEN viewing inventory filter dropdown, THEN only WH-001 and WH-003 appear (no WH-002)"
+    - "GIVEN 'All Warehouses' is checked for admin, WHEN warehouse dropdown opens, THEN ALL warehouses appear in list"
+
+  default_behavior:
+    - "GIVEN new user created (01.5a) with warehouse_access_ids = NULL, WHEN user is admin/super_admin, THEN system interprets as 'all warehouses'"
+    - "GIVEN new user created with warehouse_access_ids = NULL, WHEN user is NOT admin/super_admin, THEN system interprets as 'no warehouses' (warning shown)"
+    - "GIVEN existing user with NULL warehouse_access_ids, WHEN admin opens edit modal, THEN 'All Warehouses' checkbox is checked for admin/super_admin roles"
+    - "GIVEN existing user with NULL warehouse_access_ids, WHEN admin opens edit modal, THEN 'All Warehouses' checkbox is unchecked for other roles (warning: 'No warehouses assigned')"
+
+  api_endpoints:
+    - "GIVEN GET /api/v1/settings/users/:id/warehouse-access called, WHEN user has specific warehouses assigned, THEN response includes {warehouse_ids: ['id1', 'id2'], all_warehouses: false}"
+    - "GIVEN GET /api/v1/settings/users/:id/warehouse-access called, WHEN user has all_warehouses=true, THEN response includes {warehouse_ids: [], all_warehouses: true, warehouses: [all warehouses]}"
+    - "GIVEN PUT /api/v1/settings/users/:id/warehouse-access with {all_warehouses: true}, WHEN request processed, THEN users.warehouse_access_ids set to NULL"
+    - "GIVEN PUT /api/v1/settings/users/:id/warehouse-access with {all_warehouses: false, warehouse_ids: ['id1']}, WHEN request processed, THEN users.warehouse_access_ids updated correctly"
+
+  audit_trail:
+    - "GIVEN admin changes user's warehouse access from [WH-001] to [WH-001, WH-002], WHEN change is saved, THEN audit log entry created with old/new warehouse lists"
+    - "GIVEN audit log entry created, THEN log captures: who (admin user_id), what (old->new warehouses), when (timestamp)"
+
+  cascading_delete:
+    - "GIVEN warehouse WH-001 is deleted (in 01.8), WHEN user had WH-001 in warehouse_access_ids, THEN WH-001 is removed from warehouse_access_ids automatically"
+    - "GIVEN user has ONLY 1 warehouse assigned and that warehouse is deleted, WHEN cascade completes, THEN warehouse_access_ids becomes empty array [] (not NULL)"
+
+definition_of_done:
+  - "Warehouse access multi-select displays in user modal (SET-009 lines 49-117)"
+  - "'All Warehouses' checkbox enables/disables multi-select dropdown based on state"
+  - "API GET /api/v1/settings/users/:id/warehouse-access returns correct format"
+  - "API PUT /api/v1/settings/users/:id/warehouse-access updates database correctly"
+  - "RLS enforcement filters inventory by user warehouse access"
+  - "Admin/Super Admin bypass works (all_warehouses=true ignores warehouse_ids)"
+  - "Audit log captures warehouse access changes"
+  - "Cascading delete removes user from deleted warehouse"
+  - "SET-009 wireframe fully implemented (warehouse section enabled)"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover UserWarehouseService (>80% coverage)"
+  - "Warehouse dropdown in modules filters based on user access"
+  - "Permission middleware enforces admin-only warehouse access assignment"
+
+tests:
+  unit:
+    - "UserWarehouseService.getWarehouseAccess returns all_warehouses=true for admin with NULL"
+    - "UserWarehouseService.getWarehouseAccess returns all_warehouses=false for non-admin with NULL"
+    - "UserWarehouseService.updateWarehouseAccess sets warehouse_access_ids to NULL when all_warehouses=true"
+    - "UserWarehouseService.updateWarehouseAccess validates warehouse_ids are not empty when all_warehouses=false"
+    - "Zod schema warehouseAccessSchema rejects empty warehouse_ids when all_warehouses=false"
+    - "Zod schema accepts all_warehouses=true regardless of warehouse_ids"
+    - "WarehouseAccessSection component disables dropdown when 'All Warehouses' checked"
+    - "WarehouseAccessSection component enables dropdown when 'All Warehouses' unchecked"
+
+  integration:
+    - "GET /api/v1/settings/users/:id/warehouse-access returns correct response format"
+    - "GET /api/v1/settings/users/:id/warehouse-access includes warehouses array with code/name"
+    - "PUT /api/v1/settings/users/:id/warehouse-access with all_warehouses=true sets column to NULL"
+    - "PUT /api/v1/settings/users/:id/warehouse-access with all_warehouses=false updates UUID array"
+    - "PUT endpoint rejects invalid warehouse UUIDs (400)"
+    - "PUT endpoint rejects empty warehouse_ids when all_warehouses=false (400)"
+    - "PUT endpoint requires SUPER_ADMIN or ADMIN role (403)"
+    - "Audit log entry created after successful PUT"
+    - "User warehouse access filters inventory in subsequent RLS queries"
+
+  rls:
+    - "SELECT inventory_items filtered by user.warehouse_access_ids"
+    - "SELECT inventory_items returns all rows for admin with NULL warehouse_access_ids"
+    - "SELECT inventory_items returns no rows for user with empty warehouse_access_ids"
+
+  e2e:
+    - "Admin opens user modal and enables 'All Warehouses' for user - user can access all warehouses"
+    - "Admin opens user modal and unchecks 'All Warehouses', selects WH-001 only - user can ONLY access WH-001"
+    - "Admin changes user warehouse access from [WH-001] to [WH-001, WH-002] - user's UI updates within 1 second"
+    - "Delete warehouse WH-001 - user's warehouse_access_ids removes WH-001 automatically"
+
+output_artifacts:
+  - "UserWarehouseService extending UserService with getWarehouseAccess() and updateWarehouseAccess()"
+  - "WarehouseAccessSection.tsx component with checkbox + multi-select"
+  - "WarehouseAccessBadge.tsx showing access status in user list"
+  - "warehouse-access-schema.ts with Zod validation"
+  - "API route: GET /api/v1/settings/users/:id/warehouse-access"
+  - "API route: PUT /api/v1/settings/users/:id/warehouse-access"
+  - "RLS policy updates for warehouse-scoped inventory tables"
+  - "User warehouse access audit log (optional migration)"
+  - "Unit tests for UserWarehouseService"
+  - "Integration tests for API endpoints"
+  - "RLS test validating inventory filtering by warehouse access"
+
+implementation_notes:
+  frontend:
+    - "WarehouseAccessSection imported into UserModal.tsx (replace hidden placeholder)"
+    - "Pass warehouses array from parent to WarehouseAccessSection"
+    - "Handle 'all_warehouses' checkbox state to disable/enable multi-select"
+    - "Validate warehouse_ids not empty when all_warehouses=false before submit"
+    - "Show loading skeleton while fetching warehouses for modal"
+    - "Display warehouse code + name in multi-select options (e.g., 'WH-001: Main Warehouse')"
+    - "Use usePermissions() hook to restrict warehouse access UI to admin/super_admin only"
+
+  backend:
+    - "Create UserWarehouseService extending (not replacing) UserService base class"
+    - "getWarehouseAccess: Check user role for admin bypass logic"
+    - "getWarehouseAccess: Return all warehouses if all_warehouses=true"
+    - "updateWarehouseAccess: Validate warehouse_ids exist before update"
+    - "updateWarehouseAccess: Set warehouse_access_ids to NULL if all_warehouses=true"
+    - "updateWarehouseAccess: Create audit log entry for changes"
+    - "RLS policies: Extend to filter inventory_items, locations, stock tables by warehouse_access_ids"
+    - "Cache invalidation: Clear user permissions cache after warehouse access change"
+
+  database:
+    - "Ensure users.warehouse_access_ids column exists from 01.5a (nullable array)"
+    - "Ensure warehouses table exists from 01.8 with id, org_id, code, name, type"
+    - "Optional: Create user_warehouse_access_log table for audit trail"
+    - "Add index on users(warehouse_access_ids) for filtered queries"
+    - "Test cascading delete: warehouse deletion removes warehouse from user access arrays"
+
+  rls_extension:
+    - "Inventory RLS: Add policy to check warehouse_id IN user.warehouse_access_ids"
+    - "Inventory RLS: Allow all warehouses if user.warehouse_access_ids IS NULL AND user role IN (SUPER_ADMIN, ADMIN)"
+    - "Apply similar policies to: locations, stock, stock_movements, transfers"
+
+  phase_1b_completion:
+    - "01.5b completes warehouse access restriction feature from Phase 1B"
+    - "01.5a must be merged FIRST, then 01.5b depends on it"
+    - "01.8 (Warehouses CRUD) can be parallel but must complete before 01.5b implementation"
+    - "After 01.5b, warehouse module (Epic 05) can begin with proper RLS enforcement"
+
+  dependency_notes:
+    - "HARD dependency: 01.5a must be in main branch before starting 01.5b implementation"
+    - "HARD dependency: 01.8 (Warehouses CRUD) must be complete to have warehouses for dropdown"
+    - "SOFT dependency: Can code 01.5b in parallel with 01.8 if mock warehouses used for testing"
+    - "BLOCKERS for: Epic 05 (Warehouse module) - needs RLS warehouse filtering"
+    - "BLOCKERS for: Epic 03 (Planning) - may need warehouse access checks"

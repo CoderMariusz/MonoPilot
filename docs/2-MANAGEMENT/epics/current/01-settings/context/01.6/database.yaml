@@ -21,8 +21,8 @@ tables:
       - "idx_roles_code ON roles(code)"
       - "idx_roles_system ON roles(is_system)"
     constraints:
-      - "code must be uppercase snake_case"
-      - "permissions JSONB must contain all 8 module keys"
+      - "code must be lowercase snake_case (per ADR-012)"
+      - "permissions JSONB must contain all 12 module keys"
 
 # Permissions JSONB Structure (ADR-012)
 permissions_jsonb_structure:
@@ -36,7 +36,11 @@ permissions_jsonb_structure:
       "production": "CRUD",
       "quality": "CRUD",
       "warehouse": "CRUD",
-      "shipping": "CRUD"
+      "shipping": "CRUD",
+      "npd": "CRUD",
+      "finance": "CRUD",
+      "oee": "CRUD",
+      "integrations": "CRUD"
     }
   values:
     - "CRUD - Full access (Create, Read, Update, Delete)"
@@ -44,82 +48,82 @@ permissions_jsonb_structure:
     - "R - Read only"
     - "- - No access"
   examples:
-    super_admin: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD"}'
-    admin: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD"}'
-    viewer: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"R","warehouse":"R","shipping":"R"}'
+    owner: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD","npd":"CRUD","finance":"CRUD","oee":"CRUD","integrations":"CRUD"}'
+    admin: '{"settings":"CRU","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD","npd":"CRUD","finance":"CRUD","oee":"CRUD","integrations":"CRUD"}'
+    viewer: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"R","warehouse":"R","shipping":"R","npd":"R","finance":"R","oee":"R","integrations":"R"}'
 
 # Seed Data (10 System Roles)
 seed_data:
   roles:
     description: "10 system roles per ADR-012 and story requirements"
     data:
-      - code: "SUPER_ADMIN"
-        name: "Super Administrator"
-        description: "Full system access, can assign any role"
-        permissions: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD"}'
+      - code: "owner"
+        name: "Owner"
+        description: "Full system access, billing control"
+        permissions: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD","npd":"CRUD","finance":"CRUD","oee":"CRUD","integrations":"CRUD"}'
         is_system: true
         display_order: 1
 
-      - code: "ADMIN"
+      - code: "admin"
         name: "Administrator"
-        description: "Organization-wide access, cannot assign Super Admin"
-        permissions: '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD"}'
+        description: "Full access except billing, cannot delete org settings"
+        permissions: '{"settings":"CRU","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD","npd":"CRUD","finance":"CRUD","oee":"CRUD","integrations":"CRUD"}'
         is_system: true
         display_order: 2
 
-      - code: "PROD_MANAGER"
+      - code: "production_manager"
         name: "Production Manager"
         description: "Full Production, Planning, Quality access"
-        permissions: '{"settings":"R","users":"R","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"R","shipping":"R"}'
+        permissions: '{"settings":"R","users":"R","technical":"RU","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"RU","shipping":"R","npd":"R","finance":"R","oee":"CRUD","integrations":"R"}'
         is_system: true
         display_order: 3
 
-      - code: "QUAL_MANAGER"
+      - code: "quality_manager"
         name: "Quality Manager"
         description: "Full Quality, read Production"
-        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"CRUD","warehouse":"R","shipping":"R"}'
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"RU","quality":"CRUD","warehouse":"R","shipping":"R","npd":"RU","finance":"-","oee":"R","integrations":"-"}'
         is_system: true
         display_order: 4
 
-      - code: "WH_MANAGER"
+      - code: "warehouse_manager"
         name: "Warehouse Manager"
         description: "Full Warehouse and Shipping access"
-        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"R","warehouse":"CRUD","shipping":"CRUD"}'
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"R","warehouse":"CRUD","shipping":"CRUD","npd":"-","finance":"-","oee":"-","integrations":"-"}'
         is_system: true
         display_order: 5
 
-      - code: "PROD_OPERATOR"
+      - code: "production_operator"
         name: "Production Operator"
-        description: "CRU Production, read Quality"
-        permissions: '{"settings":"-","users":"-","technical":"R","planning":"R","production":"CRU","quality":"R","warehouse":"-","shipping":"-"}'
+        description: "Execute work orders, create quality checks"
+        permissions: '{"settings":"-","users":"-","technical":"R","planning":"R","production":"RU","quality":"CR","warehouse":"R","shipping":"-","npd":"-","finance":"-","oee":"R","integrations":"-"}'
         is_system: true
         display_order: 6
 
-      - code: "QUAL_INSPECTOR"
+      - code: "quality_inspector"
         name: "Quality Inspector"
-        description: "CRU Quality only"
-        permissions: '{"settings":"-","users":"-","technical":"R","planning":"-","production":"R","quality":"CRU","warehouse":"-","shipping":"-"}'
+        description: "Perform QC inspections, view production and warehouse"
+        permissions: '{"settings":"-","users":"-","technical":"R","planning":"-","production":"R","quality":"CRU","warehouse":"R","shipping":"R","npd":"-","finance":"-","oee":"-","integrations":"-"}'
         is_system: true
         display_order: 7
 
-      - code: "WH_OPERATOR"
+      - code: "warehouse_operator"
         name: "Warehouse Operator"
-        description: "CRU Warehouse and Shipping"
-        permissions: '{"settings":"-","users":"-","technical":"-","planning":"-","production":"-","quality":"-","warehouse":"CRU","shipping":"CRU"}'
+        description: "Execute inventory and shipping tasks"
+        permissions: '{"settings":"-","users":"-","technical":"R","planning":"-","production":"-","quality":"R","warehouse":"CRU","shipping":"RU","npd":"-","finance":"-","oee":"-","integrations":"-"}'
         is_system: true
         display_order: 8
 
-      - code: "PLANNER"
+      - code: "planner"
         name: "Planner"
-        description: "Full Planning, read Production"
-        permissions: '{"settings":"R","users":"-","technical":"R","planning":"CRUD","production":"R","quality":"R","warehouse":"R","shipping":"R"}'
+        description: "Manage schedules and work orders"
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"CRUD","production":"R","quality":"R","warehouse":"R","shipping":"R","npd":"R","finance":"R","oee":"R","integrations":"-"}'
         is_system: true
         display_order: 9
 
-      - code: "VIEWER"
+      - code: "viewer"
         name: "Viewer"
-        description: "Read-only all modules"
-        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"R","warehouse":"R","shipping":"R"}'
+        description: "Read-only access to all modules"
+        permissions: '{"settings":"R","users":"R","technical":"R","planning":"R","production":"R","quality":"R","warehouse":"R","shipping":"R","npd":"R","finance":"R","oee":"R","integrations":"R"}'
         is_system: true
         display_order: 10
 
@@ -194,9 +198,12 @@ migrations:
     content: |
       INSERT INTO roles (code, name, description, permissions, is_system, display_order)
       VALUES
-        ('SUPER_ADMIN', 'Super Administrator', 'Full system access, can assign any role',
-         '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD"}'::jsonb,
+        ('owner', 'Owner', 'Full system access, billing control',
+         '{"settings":"CRUD","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD","npd":"CRUD","finance":"CRUD","oee":"CRUD","integrations":"CRUD"}'::jsonb,
          true, 1),
+        ('admin', 'Administrator', 'Full access except billing, cannot delete org settings',
+         '{"settings":"CRU","users":"CRUD","technical":"CRUD","planning":"CRUD","production":"CRUD","quality":"CRUD","warehouse":"CRUD","shipping":"CRUD","npd":"CRUD","finance":"CRUD","oee":"CRUD","integrations":"CRUD"}'::jsonb,
+         true, 2),
         -- ... (repeat for all 10 roles)
       ON CONFLICT (code) DO NOTHING;
 
