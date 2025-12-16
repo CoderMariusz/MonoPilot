@@ -23,7 +23,7 @@ tables_used:
         validation: "Valid IANA timezone"
         examples: ["Europe/Warsaw", "America/New_York", "UTC"]
 
-      - name: "locale"
+      - name: "language"
         type: "TEXT"
         constraints: "NOT NULL DEFAULT 'en'"
         description: "Language code"
@@ -50,7 +50,7 @@ tables_used:
 # Query patterns
 query_patterns:
   read_org_profile: |
-    SELECT name, timezone, locale, currency, onboarding_step
+    SELECT name, timezone, language, currency, onboarding_step
     FROM organizations
     WHERE id = (SELECT org_id FROM users WHERE id = auth.uid())
 
@@ -59,7 +59,7 @@ query_patterns:
     SET
       name = $1,
       timezone = $2,
-      locale = $3,
+      language = $3,
       currency = $4,
       onboarding_step = 2,
       onboarding_started_at = COALESCE(onboarding_started_at, NOW()),

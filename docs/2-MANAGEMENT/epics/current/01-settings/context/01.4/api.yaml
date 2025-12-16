@@ -8,7 +8,7 @@ endpoints:
     file: "apps/frontend/app/api/v1/settings/onboarding/step/1/route.ts"
     description: "Save organization profile (wizard step 1)"
     auth: true
-    roles: ["SUPER_ADMIN", "ADMIN"]
+    roles: ["super_admin", "admin"]
 
     request:
       headers:
@@ -87,7 +87,7 @@ endpoints:
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        if (!hasRole(context, ['SUPER_ADMIN', 'ADMIN'])) {
+        if (!hasRole(context, ['super_admin', 'admin'])) {
           return NextResponse.json({ error: 'Only admin users can update organization' }, { status: 403 });
         }
 
@@ -108,7 +108,7 @@ endpoints:
           .update({
             name,
             timezone,
-            locale: language,
+            language,
             currency,
             onboarding_step: 2,
             onboarding_started_at: new Date().toISOString(),
@@ -129,7 +129,7 @@ endpoints:
             id: org.id,
             name: org.name,
             timezone: org.timezone,
-            language: org.locale,
+            language: org.language,
             currency: org.currency,
           },
         });
