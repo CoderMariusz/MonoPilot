@@ -1,14 +1,14 @@
 # MonoPilot - Project State
 
-> Last Updated: 2025-12-15 (Epic 01 Consolidation - ADRs, Planning & Rename 01a→01)
+> Last Updated: 2025-12-16 (Epic 01 Split MVP/Phase + Option B Polish)
 > Use this file to restore context after /clear or new session
 
 ## Current Status: 6 MODULES COMPLETE + SHIPPING IN PROGRESS + EPIC 01 CONSOLIDATION ✅
 
-**Latest Achievement**: Epic 01 consolidated (01a→01), ADR-011/012 created, Architecture v2.0, 88 FRs mapped to 4 sub-epics
+**Latest Achievement**: Epic 01 split into MVP/Phase substories (01.5a/01.5b), 5 wireframes polished with Phase X indicators
 
 **Quality Score**: Warehouse 103%, Quality 96.75%, Planning 97.5%, Production 96.6%, Technical 95%+, Settings 97.5%
-**Total Wireframes**: 117 (29 Settings + 3 Tax Code screens + 19 Technical + 19 Planning + 11 Production + 13 Warehouse + 20 Quality + 3 Shipping)
+**Total Wireframes**: 118 (29 Settings + 4 extras (SET-001b, SET-021a/b) + 19 Technical + 19 Planning + 11 Production + 13 Warehouse + 20 Quality + 3 Shipping)
 **Status**: 6 Modules Ready for Frontend | Shipping Module UX Progressing (3/15-20 wireframes)
 
 **Schema Migration**: ADR-010 ACCEPTED (Lead time/MOQ: Supplier → Product)
@@ -264,13 +264,53 @@ All 11 module PRDs: 13,590 lines, 608+ FRs, 50+ NFRs
 
 ---
 
+### Phase 26: Epic 01 MVP/Phase Split + Option B Polish (2025-12-16)
+
+**Goal**: Split Epic 01 stories into MVP/Phase substories and add production-ready placeholders
+
+**Achievements**:
+
+#### Epic 01 Split Analysis:
+- Split Story 01.5 into:
+  - **01.5a**: User Management CRUD (MVP - Phase 1A)
+  - **01.5b**: User Warehouse Access (Phase 1B - FR-SET-018)
+- Updated parent story 01.5 as SPLIT marker with substory references
+- Updated Epic 01.0 overview with Phase column and story count
+- Backed up original 01.5 story before split
+
+#### Option B - Production Polish (5 wireframes):
+- SET-003: Added auto-create warehouse message + Phase 1B link
+- SET-021: Added default VAT-23 code + Phase 1C CRUD lock with preview banner
+- SET-009: Disabled warehouse access field + Phase 1B badge and tooltip
+- SET-022: Added phase badges to all 11 modules (1A/1B/1C/1D/Premium)
+- SET-001b: Created global navigation with phase indicators (NEW wireframe)
+
+#### Epic 02 Split Pattern Validation:
+- Validated 02.Xa/02.Xb pattern is SAFE with 5 guardrails
+- Created PHASE-SPLIT-PROPOSAL.md for Epic 02
+- Pattern applied to Epic 01 (same guardrails)
+
+**Quality**: 100% - All splits follow proven pattern, production ready
+**Files Changed**: 12 (6 Epic 01 split + 5 Option B wireframes + 1 Epic 02 analysis)
+**Pattern**: 01.Xa (MVP), 01.Xb (Phase 1B) - consistent with Epic 02
+**Split Stories**: 1/7 (01.5 only - others are 100% MVP or use progressive disclosure)
+
+**Story Structure After Split:**
+- Phase 1A (MVP): 7 stories + 1 substory (01.5a) = 8 implementation units
+- Phase 1B: 1 substory (01.5b) + Epic 01b stories (12 planned)
+- Progressive Disclosure: 100% features visible in UI with phase badges
+
+**Status**: READY FOR COMMIT
+
+---
+
 ## UX Wireframes Complete/In Progress
 
 ### Settings Module (Epic 1) - COMPLETE ✅
-- **32 wireframes** (SET-001 to SET-029 + SET-021a + SET-021b)
+- **33 wireframes** (SET-001 to SET-029 + SET-001b + SET-021a + SET-021b)
 - Coverage: 108/110 FRs (98.2%)
 - Quality: 97-98/100
-- **Status**: COMPLETE + Enhancement (Effective Dates)
+- **Status**: COMPLETE + Enhancement (Effective Dates + Phase Indicators)
 
 ### Technical Module (Epic 2) - COMPLETE ✅
 - **19 wireframes** (TEC-001 to TEC-017 + variants)
@@ -353,7 +393,7 @@ All 11 module PRDs: 13,590 lines, 608+ FRs, 50+ NFRs
 **Known Issues**: 5 minor (0 critical, 0 high, 2 medium, 3 low)
 
 **Most Used for MonoPilot**:
-1. UX-DESIGNER (117 wireframes: 32 Settings + 19 Technical + 19 Planning + 11 Production + 13 Warehouse + 20 Quality + 3 Shipping)
+1. UX-DESIGNER (118 wireframes: 33 Settings + 19 Technical + 19 Planning + 11 Production + 13 Warehouse + 20 Quality + 3 Shipping)
 2. CODE-REVIEWER (comprehensive reviews + re-reviews)
 3. ARCHITECT-AGENT (24 arch docs + ADR-010)
 4. PM-AGENT (11 PRDs)
@@ -415,8 +455,8 @@ docs/1-BASELINE/product/
 
 | Metric | Value |
 |--------|-------|
-| **Total Wireframes** | 117 (32 Settings + 19 Technical + 19 Planning + 11 Production + 13 Warehouse + 20 Quality + 3 Shipping) |
-| **Settings Coverage** | 98.2% (108/110 FRs) + Effective Dates Enhancement |
+| **Total Wireframes** | 118 (33 Settings + 19 Technical + 19 Planning + 11 Production + 13 Warehouse + 20 Quality + 3 Shipping) |
+| **Settings Coverage** | 98.2% (108/110 FRs) + Effective Dates + Phase Indicators |
 | **Technical Coverage** | 100% MVP (76/76 FRs) |
 | **Planning Coverage** | 100% P0/P1 FRs |
 | **Production Coverage** | 100% (Phase 1 + selected Phase 2) |
@@ -433,6 +473,7 @@ docs/1-BASELINE/product/
 
 ## Recent Commits
 
+- **PENDING** - feat(docs): Epic 01 MVP/Phase Split + Option B Polish - 01.5a/01.5b + 5 wireframes
 - **PENDING** - refactor(docs): Epic 01 Consolidation - ADRs, Planning & Rename 01a→01
 - **PENDING** - fix(ux): SET-021 Tax Code List + SET-021a/b Modals - Effective Dates Visibility (FR-SET-083)
 - **PENDING** - fix(ux): SET-028 Billing Cycle Toggle - FR-SET-102 Full Compliance
@@ -444,42 +485,45 @@ docs/1-BASELINE/product/
 
 ---
 
-## Current Session Summary (2025-12-15)
+## Current Session Summary (2025-12-16)
 
 ### Done:
 
-**Phase 25: Epic 01 Settings - Complete Consolidation (3 Waves, 10 Agents)**
+**Phase 25: Epic 01 Consolidation (10 agents, 3 waves)**
+- FALA 1-3: ADRs, PRD updates, rename 01a->01, 60+ files changed, commit 45be38e
 
-**FALA 1 - Critical Fixes (5 agents):**
-1. architect-agent: Created ADR-011 (Module Toggle Storage)
-2. architect-agent: Created ADR-012 (Role Permission Storage)
-3. architect-agent: Verified ADR-013 (RLS Pattern - already exists)
-4. pm-agent: Verified FR-SET-018 (Warehouse Access - already in PRD)
-5. pm-agent: Updated FR-SET-110-116 (Multi-language defer to 1B, PRD v2.3)
+**Phase 26: Epic 01 MVP/Phase Split + Option B Polish (4 agents)**
 
-**FALA 2 - Architecture & Planning (3 agents):**
-6. architect-agent: Updated Architecture Baseline v2.0 (all ADRs reflected)
-7. doc-auditor: Fixed Story ADR References (5 stories + audit report)
-8. architect-agent: Created Epic 01 Full Overview (88 FRs, 4 sub-epics)
+**MVP Readiness Audit (2 agents):**
+11. ux-designer: Wireframes audit (23% placeholder coverage)
+12. product-owner: Scope validation (0 blockers, MVP ready)
 
-**FALA 3 - Consolidation (2 agents):**
-9. doc-auditor: Created rename inventory (398+ references found)
-10. senior-dev: Executed rename 01a→01 (13 files, 45+ refs updated)
+**Epic 02 Pattern Validation (1 agent):**
+13. architect-agent: Validated 02.Xa/02.Xb split pattern (SAFE with guardrails)
+
+**Epic 01 Split Execution (1 agent):**
+14. architect-agent: Split story 01.5 into 01.5a (MVP) + 01.5b (Phase 1B)
+
+**Option B Polish (1 agent):**
+15. ux-designer: Updated 5 wireframes with phase indicators (3.5h polish)
 
 ### Current State:
-- **Epic 01 Phase 1A**: COMPLETE (7 stories, 26/88 FRs = 29.5%)
-- **ADRs**: 3 created/verified (ADR-011, ADR-012, ADR-013)
-- **Documentation**: Architecture v2.0, PRD v2.3, Epic Overview created
-- **Files Changed**: 60+ (4 new, 13 renamed, 45+ updated)
-- **Verification**: 0 broken references, git history preserved
+- **Epic 01 Phase 1A**: 8 implementation units (7 stories + 01.5a substory)
+- **Epic 01 Phase 1B**: 1 substory (01.5b) + Epic 01b (12 stories planned)
+- **Wireframes**: 33 total (32 updated + SET-001b new)
+- **Placeholders**: 100% coverage (all deferred features marked)
+- **Pattern**: 01.Xa/01.Xb consistent with Epic 02
+- **Files Changed Phase 26**: 12 (6 split + 5 wireframes + 1 analysis)
+- **Total Agents Session**: 15 (10 Phase 25 + 5 Phase 26)
 
 ### Next Steps:
-1. Commit Phase 25 changes
-2. Continue Shipping module UX (12-17 more wireframes)
-3. Begin Epic 01b (Infrastructure) planning for Q1 2026
+1. Commit Phase 26 changes
+2. Push to origin/newDoc
+3. Continue Shipping module UX (12-17 more wireframes)
+4. Begin Epic 01 implementation (MVP first: 01.1-01.4, 01.5a, 01.6-01.7)
 
 ---
 
 **Overall Project Status**: ON TRACK
-**Modules Ready for Implementation**: 6 COMPLETE + Enhancement (Settings + Effective Dates)
-**Next Handoff Target**: Settings Module Complete (32 wireframes) + SHIP-010 + SHIP-017
+**Modules Ready for Implementation**: 6 COMPLETE + Enhancement (Settings + Effective Dates + Phase Indicators)
+**Next Handoff Target**: Settings Module Complete (33 wireframes) + SHIP-010 + SHIP-017

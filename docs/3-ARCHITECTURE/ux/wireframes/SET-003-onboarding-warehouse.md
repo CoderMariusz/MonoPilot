@@ -4,13 +4,15 @@
 **Feature**: Onboarding Wizard (Story 1.12)
 **Step**: 2 of 6
 **Status**: Ready for Review
-**Last Updated**: 2025-12-15
+**Last Updated**: 2025-12-16
 
 ---
 
 ## Overview
 
 Second step of onboarding wizard. Creates organization's first warehouse. Offers "Quick Setup" (auto-generate defaults) or "Custom" (manual entry). Most users choose Quick Setup for speed. Warehouse code auto-generated as "WH-001" if quick setup selected. Default warehouse type is "General" for multi-purpose use.
+
+**Note (Phase 1A)**: Basic warehouse is auto-created to enable core workflows. Full warehouse configuration (locations, capacity, machines, production lines) is available in Phase 1B (Q1 2026).
 
 ---
 
@@ -23,9 +25,10 @@ Second step of onboarding wizard. Creates organization's first warehouse. Offers
 │  MonoPilot Onboarding Wizard                    [2/6]  33%  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
-│  Step 2: First Warehouse                                     │
+│  Step 2: Warehouse Configuration                             │
 │                                                               │
-│  Create your primary warehouse location                      │
+│  Note: Basic warehouse auto-created. Full configuration      │
+│  available in Phase 1B (Q1 2026).                            │
 │                                                               │
 │  ┌─────────────────────────────────────────────────────────┐ │
 │  │  Setup Type                                             │ │
@@ -57,6 +60,27 @@ Second step of onboarding wizard. Creates organization's first warehouse. Offers
 │  │                                                         │ │
 │  └─────────────────────────────────────────────────────────┘ │
 │                                                               │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │  ✓ Auto-Created Warehouse (Phase 1A)                   │ │
+│  │                                                         │ │
+│  │  Default Setup:                                         │ │
+│  │  • Name: "Main Warehouse"                               │ │
+│  │  • Type: General                                        │ │
+│  │  • Status: Active                                       │ │
+│  │  • Location: "DEFAULT" (auto-created)                   │ │
+│  │                                                         │ │
+│  │  Your warehouse is ready! You can configure locations,  │ │
+│  │  capacity, and machines in Settings > Infrastructure    │ │
+│  │  (available Phase 1B - Q1 2026).                        │ │
+│  │                                                         │ │
+│  │  🔒 Coming in Phase 1B (Q1 2026):                       │ │
+│  │  • Location management (zones, racks, bins)             │ │
+│  │  • Capacity planning and limits                         │ │
+│  │  • Machine configuration                                │ │
+│  │  • Production line setup                                │ │
+│  │                                                         │ │
+│  └─────────────────────────────────────────────────────────┘ │
+│                                                               │
 │  * Required fields                                            │
 │                                                               │
 ├─────────────────────────────────────────────────────────────┤
@@ -79,7 +103,7 @@ Second step of onboarding wizard. Creates organization's first warehouse. Offers
 │                                                               │
 │  ┌─────────────────────────────────────────────────────────┐ │
 │  │  [Skeleton: Radio buttons]                              │ │
-│  │  [Skeleton: Form fields]                                │ │
+│  │  │  [Skeleton: Form fields]                                │ │
 │  └─────────────────────────────────────────────────────────┘ │
 │                                                               │
 └─────────────────────────────────────────────────────────────┘
@@ -137,14 +161,21 @@ Second step of onboarding wizard. Creates organization's first warehouse. Offers
 - **Purpose**: Show wizard progress
 - **Color**: Blue (in progress)
 
-### 2. Setup Type Selector
+### 2. Phase 1B Notice (NEW)
+- **Type**: Informational banner
+- **Position**: After step header, before setup type selector
+- **Content**: "Basic warehouse auto-created. Full configuration available in Phase 1B (Q1 2026)."
+- **Purpose**: Set expectations that advanced features are deferred
+- **Color**: Blue info banner (not warning/error)
+
+### 3. Setup Type Selector
 - **Type**: Radio button group
 - **Options**:
   - Quick Setup (default, recommended)
   - Custom Setup
 - **Behavior**: Toggle between pre-filled vs manual entry
 
-### 3. Warehouse Details Form
+### 4. Warehouse Details Form
 - **Fields** (Quick Setup):
   - Code: "WH-001" (auto-filled, editable)
   - Name: "Main Warehouse" (auto-filled, editable)
@@ -156,7 +187,18 @@ Second step of onboarding wizard. Creates organization's first warehouse. Offers
   - Type: "General" default (user selects, required)
   - Address: Individual fields (city, postal, etc.)
 
-### 4. Warehouse Type Dropdown
+### 5. Auto-Created Warehouse Message (NEW - Phase 1A)
+- **Type**: Success/info panel
+- **Position**: After warehouse details form
+- **Content**:
+  - Default Setup: Name, Type, Status, Location
+  - Success message: "Your warehouse is ready!"
+  - Phase 1B link: "Configure in Settings > Infrastructure (available Phase 1B - Q1 2026)"
+  - Feature preview: List of Phase 1B features (locations, capacity, machines, production lines)
+- **Visual**: Green checkmark icon, green border
+- **Interaction**: Link to Settings > Infrastructure is disabled with tooltip "Coming in Phase 1B (Q1 2026)"
+
+### 6. Warehouse Type Dropdown
 - **Options** (PRD FR-SET-041):
   - Raw Materials - Store incoming raw ingredients and packaging
   - Work in Progress (WIP) - For items currently in production
@@ -164,14 +206,14 @@ Second step of onboarding wizard. Creates organization's first warehouse. Offers
   - Quarantine - Items on hold for quality inspection
   - General - Multi-purpose warehouse (default, recommended for small operations)
 
-### 5. Warehouse Type Tooltips (PRD FR-SET-182)
+### 7. Warehouse Type Tooltips (PRD FR-SET-182)
 Each warehouse type displays tooltip on hover:
 
 | Type | Tooltip |
 |------|---------|
 | Raw Materials | Store incoming ingredients and packaging. Raw material LPs automatically assigned here during receiving. |
 | Work in Progress | For items currently in production. WIP is tracked separately from raw materials and finished goods. |
-| Finished Goods | Completed products ready for shipping. System warns if raw materials moved here. |
+| Finished Goods | Completed products ready for shipping. System warns if raw materials moved here (product type mismatch). |
 | Quarantine | Items on hold for quality inspection. LPs automatically marked as "QA Hold" status. |
 | General | Multi-purpose warehouse for small operations. Handles all inventory types. (Recommended for startups) |
 
@@ -204,12 +246,13 @@ Step 1 (Organization)
   ↓ [Next]
 LOADING (Load warehouse defaults)
   ↓ Success
-SUCCESS (Show Quick Setup form with WH-001, General type)
+SUCCESS (Show Quick Setup form with WH-001, General type, Phase 1B notice)
   ↓ Select "Custom Setup"
 SUCCESS (Show empty Custom form, type defaults to General)
   ↓ [Next]
   ↓ Validate code uniqueness
   ↓ Success
+  ↓ Show auto-created warehouse message
 Step 3 (Locations)
 
 OR
@@ -263,6 +306,11 @@ WHERE org_id = :org_id AND code = :code;
 -- 'RAW_MATERIALS', 'WIP', 'FINISHED_GOODS', 'QUARANTINE', 'GENERAL'
 ```
 
+### Auto-Creation (Phase 1A)
+- Auto-creation: System creates DEMO-WH warehouse if user skips wizard
+- Default location: System creates DEFAULT location in warehouse
+- Phase 1B features disabled: Capacity, Layout, Machines, Production Lines (deferred to Q1 2026)
+
 ---
 
 ## Data Saved
@@ -277,7 +325,8 @@ Step 2 saves to `organizations.wizard_progress`:
     "warehouse_name": "Main Warehouse",
     "warehouse_type": "GENERAL",
     "address_same_as_org": true,
-    "address": null
+    "address": null,
+    "auto_created_location": "DEFAULT"
   }
 }
 ```
@@ -293,7 +342,8 @@ If user selects "Skip - Use Demo Warehouse":
     "warehouse_type": "GENERAL",
     "address_same_as_org": true,
     "address": null,
-    "is_demo": true
+    "is_demo": true,
+    "auto_created_location": "DEFAULT"
   }
 }
 ```
@@ -307,6 +357,7 @@ If user selects "Skip - Use Demo Warehouse":
 - Name: "Main Warehouse"
 - Type: "GENERAL" (default per PRD FR-SET-182)
 - Address: Copy from `organizations.address`
+- Location: "DEFAULT" (auto-created in Phase 1A)
 
 ### Custom Setup
 - All fields empty initially except Type which defaults to "GENERAL"
@@ -327,6 +378,13 @@ If user selects "Skip - Use Demo Warehouse":
 - Marked with `is_demo = true` for future identification
 - Can be edited/renamed later in Settings
 
+### Phase 1B Features (Deferred to Q1 2026)
+- **Location Management**: Zones, racks, bins, capacity planning
+- **Capacity Planning**: Set limits, track utilization
+- **Machine Configuration**: Link machines to warehouse
+- **Production Line Setup**: Configure lines within warehouse
+- **Note**: Link to Settings > Infrastructure is disabled until Phase 1B
+
 ---
 
 ## Accessibility
@@ -339,6 +397,7 @@ If user selects "Skip - Use Demo Warehouse":
 - **Error messages**: Announced to screen readers with `role="alert"`
 - **Focus**: First radio button auto-focused on load
 - **Color contrast**: All text meets 4.5:1 minimum
+- **Phase 1B notice**: Announced as "Informational: Basic warehouse auto-created. Full configuration available in Phase 1B, Q1 2026."
 
 ---
 
@@ -346,6 +405,15 @@ If user selects "Skip - Use Demo Warehouse":
 
 - **Previous**: [SET-002-onboarding-organization.md] (Step 1)
 - **Next**: [SET-004-onboarding-location.md] (Step 3)
+
+---
+
+## Related Documentation
+
+- **Epic 01 Roadmap**: [01.0.epic-overview.md](../../2-MANAGEMENT/epics/current/01-settings/01.0.epic-overview.md)
+- **Phase 1B Stories**: Epic 01b (Infrastructure - Warehouses, Locations, Machines, Production Lines)
+- **FR-SET-041**: Warehouse Types
+- **FR-SET-182**: First Warehouse Creation (Onboarding)
 
 ---
 
@@ -361,6 +429,9 @@ If user selects "Skip - Use Demo Warehouse":
 7. On duplicate: show suggestions, let user edit
 8. Save to `wizard_progress.step2` via `PATCH /api/settings/wizard/progress`
 9. Support "Skip - Use Demo Warehouse" to auto-create DEMO-WH and advance
+10. **Phase 1A**: Auto-create DEFAULT location with warehouse
+11. **Phase 1B**: Show informational banner about deferred features
+12. **Phase 1B**: Disable link to Settings > Infrastructure with tooltip "Coming in Phase 1B (Q1 2026)"
 
 ### API Endpoints:
 ```
@@ -373,7 +444,7 @@ Response: { success: true }
 
 POST /api/warehouses/demo (if skip selected)
 Body: { }
-Response: { warehouse: { code: "DEMO-WH", type: "GENERAL", ... } }
+Response: { warehouse: { code: "DEMO-WH", type: "GENERAL", ... }, location: { code: "DEFAULT", ... } }
 ```
 
 ### Database Enum Values
@@ -384,7 +455,14 @@ type warehouse_type = 'RAW_MATERIALS' | 'WIP' | 'FINISHED_GOODS' | 'QUARANTINE' 
 
 ---
 
+## Version History
+
+- **v1.0** (2025-12-15): Initial wireframe
+- **v1.1** (2025-12-16): Added Phase 1B placeholders (Option B polish), auto-create message, deferred features notice
+
+---
+
 **Status**: Ready for Implementation
-**Approval Mode**: Auto-Approve (Critical Fix Applied)
-**Iterations**: 1 of 3 (Critical warehouse type mismatch fixed)
+**Approval Mode**: Auto-Approve (Critical Fix Applied + Phase 1B Polish)
+**Iterations**: 2 of 3 (Critical warehouse type mismatch fixed + Phase 1B indicators added)
 **PRD Compliance**: FR-SET-041 (warehouse types) ✓, FR-SET-182 (first warehouse creation) ✓
