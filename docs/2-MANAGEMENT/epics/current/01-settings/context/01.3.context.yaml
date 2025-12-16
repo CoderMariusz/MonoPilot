@@ -43,10 +43,10 @@ files_to_create:
       type: "migration"
       description: "Add onboarding columns to organizations table"
   api:
-    - path: "apps/frontend/app/api/v1/settings/onboarding/status/route.ts"
+    - path: "apps/frontend/app/api/settings/onboarding/status/route.ts"
       methods: ["GET"]
       description: "Get current onboarding status for organization"
-    - path: "apps/frontend/app/api/v1/settings/onboarding/skip/route.ts"
+    - path: "apps/frontend/app/api/settings/onboarding/skip/route.ts"
       methods: ["POST"]
       description: "Skip wizard and create demo data"
   services:
@@ -95,7 +95,7 @@ database:
 
 api_endpoints:
   - method: "GET"
-    path: "/api/v1/settings/onboarding/status"
+    path: "/api/settings/onboarding/status"
     auth: true
     roles: ["*"]  # All authenticated users
     request: null
@@ -106,9 +106,9 @@ api_endpoints:
       skipped: "boolean"
     description: "Returns current onboarding status for user's organization"
   - method: "POST"
-    path: "/api/v1/settings/onboarding/skip"
+    path: "/api/settings/onboarding/skip"
     auth: true
-    roles: ["admin", "super_admin"]
+    roles: ["admin", "owner"]
     request: null
     response:
       success: "boolean"
@@ -152,7 +152,7 @@ ux:
 
 validation_rules:
   onboarding_step: "Integer 0-7, where 0=not started, 1-6=current step, 7=completed"
-  skip_permission: "Only admin or super_admin roles can skip wizard"
+  skip_permission: "Only admin or owner roles can skip wizard"
   wizard_visibility: "Show wizard if onboarding_completed_at is null"
 
 patterns:
@@ -184,8 +184,8 @@ output_artifacts:
   - "OnboardingWizardModal.tsx with step navigation framework"
   - "useOnboardingStatus.ts hook"
   - "OnboardingGuard.tsx wrapper component"
-  - "GET /api/v1/settings/onboarding/status endpoint"
-  - "POST /api/v1/settings/onboarding/skip endpoint"
+  - "GET /api/settings/onboarding/status endpoint"
+  - "POST /api/settings/onboarding/skip endpoint"
   - "SkipConfirmationDialog.tsx component"
   - "SetupInProgressMessage.tsx for non-admin users"
   - "Unit tests for hook and skip dialog"
