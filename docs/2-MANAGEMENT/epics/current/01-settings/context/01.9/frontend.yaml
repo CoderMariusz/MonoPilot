@@ -193,7 +193,22 @@ hooks:
 
 # UX Notes
 ux:
-  wireframes: []  # No wireframes specified in story
+  wireframes:
+    - id: "SET-014"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-014-location-hierarchy-view.md"
+      description: "Location tree/hierarchy view with capacity indicators"
+      components:
+        - "LocationTree"
+        - "LocationNode"
+        - "CapacityIndicator"
+        - "LocationBreadcrumbs"
+    - id: "SET-015"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/SET-015-location-create-edit-modal.md"
+      description: "Location create/edit modal with parent selection"
+      components:
+        - "LocationModal"
+        - "LocationForm"
+        - "ParentLocationSelect"
   patterns:
     tree: "Expandable tree with nested indentation"
     modal: "ShadCN Dialog pattern for create/edit"
