@@ -1,0 +1,554 @@
+# Story 05.11 - Frontend Specification
+# Purpose: Pages, components, wizard flow, state management
+# Agent: FRONTEND-DEV
+# Wireframe: docs/3-ARCHITECTURE/ux/wireframes/WH-004-grn-from-po-modal.md
+
+# ============================================================================
+# UX Reference
+# ============================================================================
+ux:
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/WH-004-grn-from-po-modal.md"
+    id: "WH-004"
+    name: "GRN from PO Modal"
+    fr_coverage:
+      - "WH-FR-003"  # GRN from PO
+      - "WH-FR-001"  # LP Creation
+      - "WH-FR-009"  # Batch Tracking
+      - "WH-FR-010"  # Expiry Tracking
+
+  states:
+    - id: "loading_po_list"
+      description: "Loading available POs for receiving"
+    - id: "success_po_selection"
+      description: "PO list displayed, user selects one"
+    - id: "empty_no_available_pos"
+      description: "No POs eligible for receiving"
+    - id: "success_form"
+      description: "PO selected, user fills receipt details"
+    - id: "loading_creation"
+      description: "Submitting receipt, creating GRN + LPs"
+    - id: "error_validation"
+      description: "Form validation errors inline + banner"
+    - id: "success_completed"
+      description: "GRN created, success modal with next actions"
+
+  accessibility:
+    touch_targets: "48dp minimum"
+    contrast: "4.5:1 minimum"
+    wcag_level: "AA"
+    keyboard_navigation: "full support"
+    screen_reader: "comprehensive announcements"
+
+  breakpoints:
+    mobile: "<768px"
+    tablet: "768-1024px"
+    desktop: ">1024px"
+
+# ============================================================================
+# Pages
+# ============================================================================
+pages:
+  - path: "apps/frontend/app/(authenticated)/warehouse/receiving/page.tsx"
+    name: "ReceivingPage"
+    description: "Pending POs list with receive action"
+    route: "/warehouse/receiving"
+    components:
+      - "PageHeader"
+      - "PendingPOsTable"
+      - "ReceiveFromPOModal"
+    data_fetching:
+      - hook: "useReceivablePOs"
+        endpoint: "GET /api/warehouse/receiving/pending-pos"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/receiving/[poId]/page.tsx"
+    name: "ReceivePOPage"
+    description: "Receive specific PO (full page wizard)"
+    route: "/warehouse/receiving/:poId"
+    components:
+      - "PageHeader"
+      - "ReceivingWizard"
+    data_fetching:
+      - hook: "usePOForReceiving"
+        endpoint: "GET /api/warehouse/receiving/po/:poId/lines"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/grns/page.tsx"
+    name: "GRNListPage"
+    description: "GRN list with filters and search"
+    route: "/warehouse/grns"
+    components:
+      - "PageHeader"
+      - "GRNDataTable"
+      - "GRNFilters"
+    data_fetching:
+      - hook: "useGRNList"
+        endpoint: "GET /api/warehouse/grns"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/grns/[id]/page.tsx"
+    name: "GRNDetailPage"
+    description: "GRN detail with items and LP links"
+    route: "/warehouse/grns/:id"
+    components:
+      - "PageHeader"
+      - "GRNDetail"
+      - "GRNItemsTable"
+    data_fetching:
+      - hook: "useGRNDetail"
+        endpoint: "GET /api/warehouse/grns/:id"
+
+# ============================================================================
+# Components - Receiving Wizard
+# ============================================================================
+components:
+  wizard:
+    - path: "apps/frontend/components/warehouse/receiving/ReceivingWizard.tsx"
+      name: "ReceivingWizard"
+      description: "Multi-step wizard container (5 steps)"
+      props:
+        - name: "poId"
+          type: "string"
+          required: true
+        - name: "onComplete"
+          type: "(grn: GRN) => void"
+        - name: "onCancel"
+          type: "() => void"
+      state:
+        currentStep: "1 | 2 | 3 | 4 | 5"
+        formData: "ReceiveFormData"
+        isSubmitting: "boolean"
+        validationErrors: "ValidationError[]"
+      pattern: |
+        // Use Zustand or React state for complex multi-step form
+        const [state, dispatch] = useReducer(receivingWizardReducer, initialState);
+
+        const steps = [
+          { id: 1, component: ReceivingStep1SelectPO },
+          { id: 2, component: ReceivingStep2ReviewLines },
+          { id: 3, component: ReceivingStep3EnterDetails },
+          { id: 4, component: ReceivingStep4Confirm },
+          { id: 5, component: ReceivingStep5Success },
+        ];
+
+    - path: "apps/frontend/components/warehouse/receiving/ReceivingStep1SelectPO.tsx"
+      name: "ReceivingStep1SelectPO"
+      description: "Step 1: Select PO from pending list"
+      props:
+        - name: "onSelectPO"
+          type: "(po: ReceivablePO) => void"
+      features:
+        - "PO search by number"
+        - "Filter by supplier, warehouse, due date"
+        - "Show receive progress (% received)"
+
+    - path: "apps/frontend/components/warehouse/receiving/ReceivingStep2ReviewLines.tsx"
+      name: "ReceivingStep2ReviewLines"
+      description: "Step 2: Review PO lines with quantities"
+      props:
+        - name: "po"
+          type: "POWithLines"
+        - name: "onNext"
+          type: "() => void"
+        - name: "onBack"
+          type: "() => void"
+      features:
+        - "Show ordered vs received vs remaining"
+        - "Indicate fully received lines (disabled)"
+        - "Receive All button to auto-fill"
+
+    - path: "apps/frontend/components/warehouse/receiving/ReceivingStep3EnterDetails.tsx"
+      name: "ReceivingStep3EnterDetails"
+      description: "Step 3: Enter receipt details per line"
+      props:
+        - name: "lines"
+          type: "POLineForReceipt[]"
+        - name: "settings"
+          type: "WarehouseSettings"
+        - name: "formData"
+          type: "ReceiptLineFormData[]"
+        - name: "onFormChange"
+          type: "(data: ReceiptLineFormData[]) => void"
+        - name: "validationErrors"
+          type: "ValidationError[]"
+      features:
+        - "Expandable form per line"
+        - "Required field indicators based on settings"
+        - "Real-time validation"
+        - "Over-receipt warning inline"
+        - "LP preview before creation"
+
+    - path: "apps/frontend/components/warehouse/receiving/ReceivingStep4Confirm.tsx"
+      name: "ReceivingStep4Confirm"
+      description: "Step 4: Review and confirm before submit"
+      props:
+        - name: "po"
+          type: "POWithLines"
+        - name: "formData"
+          type: "ReceiptLineFormData[]"
+        - name: "onConfirm"
+          type: "() => void"
+        - name: "onBack"
+          type: "() => void"
+      features:
+        - "Summary of items being received"
+        - "Total quantities"
+        - "Over-receipt warnings (if any)"
+        - "LP numbers preview (if auto-generate)"
+        - "Confirm button"
+
+    - path: "apps/frontend/components/warehouse/receiving/ReceivingStep5Success.tsx"
+      name: "ReceivingStep5Success"
+      description: "Step 5: Success with GRN and LP details"
+      props:
+        - name: "result"
+          type: "CreateGRNFromPOResult"
+        - name: "onViewGRN"
+          type: "() => void"
+        - name: "onReceiveMore"
+          type: "() => void"
+        - name: "onViewLPs"
+          type: "() => void"
+        - name: "onPrintLabels"
+          type: "() => void"
+        - name: "onClose"
+          type: "() => void"
+      features:
+        - "GRN number display"
+        - "Created LP list with numbers"
+        - "PO status update notification"
+        - "Action buttons for next steps"
+
+  # Form Components
+  forms:
+    - path: "apps/frontend/components/warehouse/receiving/ReceiveLineForm.tsx"
+      name: "ReceiveLineForm"
+      description: "Single line receipt form (expandable)"
+      props:
+        - name: "line"
+          type: "POLineForReceipt"
+        - name: "settings"
+          type: "WarehouseSettings"
+        - name: "data"
+          type: "ReceiptLineFormData"
+        - name: "onChange"
+          type: "(data: ReceiptLineFormData) => void"
+        - name: "errors"
+          type: "FieldError[]"
+        - name: "expanded"
+          type: "boolean"
+        - name: "onToggle"
+          type: "() => void"
+      fields:
+        - name: "received_qty"
+          type: "number"
+          required: true
+        - name: "batch_number"
+          type: "string"
+          required: "conditional"
+        - name: "supplier_batch_number"
+          type: "string"
+          required: false
+        - name: "expiry_date"
+          type: "date"
+          required: "conditional"
+        - name: "manufacture_date"
+          type: "date"
+          required: false
+        - name: "location_id"
+          type: "select"
+          required: true
+        - name: "qa_status"
+          type: "radio"
+          required: true
+        - name: "notes"
+          type: "textarea"
+          required: false
+
+    - path: "apps/frontend/components/warehouse/receiving/BatchExpiryInputs.tsx"
+      name: "BatchExpiryInputs"
+      description: "Batch and expiry date input group"
+      props:
+        - name: "batchNumber"
+          type: "string"
+        - name: "supplierBatchNumber"
+          type: "string"
+        - name: "expiryDate"
+          type: "string"
+        - name: "manufactureDate"
+          type: "string"
+        - name: "shelfLifeDays"
+          type: "number | null"
+        - name: "requireBatch"
+          type: "boolean"
+        - name: "requireExpiry"
+          type: "boolean"
+        - name: "onChange"
+          type: "(field, value) => void"
+        - name: "errors"
+          type: "FieldError[]"
+      features:
+        - "Auto-calculate expiry from manufacture_date + shelf_life"
+        - "Required field indicators"
+        - "Date picker for dates"
+
+    - path: "apps/frontend/components/warehouse/receiving/OverReceiptWarning.tsx"
+      name: "OverReceiptWarning"
+      description: "Inline warning for over-receipt"
+      props:
+        - name: "orderedQty"
+          type: "number"
+        - name: "alreadyReceived"
+          type: "number"
+        - name: "attemptingQty"
+          type: "number"
+        - name: "tolerance"
+          type: "number"
+        - name: "allowed"
+          type: "boolean"
+      display:
+        - type: "error"
+          condition: "Over-receipt not allowed and exceeds ordered"
+          message: "Over-receipt not allowed. Max: {remaining}"
+        - type: "error"
+          condition: "Over-receipt allowed but exceeds tolerance"
+          message: "Exceeds tolerance ({tolerance}%). Max: {maxAllowed}"
+        - type: "warning"
+          condition: "Over-receipt within tolerance"
+          message: "Over-receipt of {pct}% (within tolerance)"
+
+    - path: "apps/frontend/components/warehouse/receiving/LPPreview.tsx"
+      name: "LPPreview"
+      description: "Preview of LP to be created"
+      props:
+        - name: "lpNumber"
+          type: "string (preview)"
+        - name: "product"
+          type: "Product"
+        - name: "quantity"
+          type: "number"
+        - name: "uom"
+          type: "string"
+        - name: "batchNumber"
+          type: "string | null"
+        - name: "expiryDate"
+          type: "string | null"
+        - name: "location"
+          type: "Location"
+        - name: "qaStatus"
+          type: "string"
+
+  # Table Components
+  tables:
+    - path: "apps/frontend/components/warehouse/receiving/PendingPOsTable.tsx"
+      name: "PendingPOsTable"
+      description: "DataTable for receivable POs"
+      columns:
+        - "PO Number (link)"
+        - "Supplier"
+        - "Expected Date"
+        - "Lines"
+        - "% Received (progress bar)"
+        - "Status (badge)"
+        - "Actions (Receive button)"
+      features:
+        - "Search by PO number"
+        - "Filter by supplier, warehouse"
+        - "Sort by date, status"
+        - "Pagination"
+
+    - path: "apps/frontend/components/warehouse/receiving/POLinesTable.tsx"
+      name: "POLinesTable"
+      description: "Table of PO lines for receiving"
+      columns:
+        - "Line #"
+        - "Product (code + name)"
+        - "Ordered Qty"
+        - "Received Qty"
+        - "Remaining Qty"
+        - "UoM"
+        - "Status (badge: Fully Received / Partial / Pending)"
+        - "Actions (Receive This Line)"
+      features:
+        - "Expandable row for receipt form"
+        - "Disable fully received lines"
+        - "Receive All button in header"
+
+    - path: "apps/frontend/components/warehouse/grns/GRNDataTable.tsx"
+      name: "GRNDataTable"
+      description: "DataTable for GRN list"
+      columns:
+        - "GRN Number (link)"
+        - "Source (PO/TO icon + number)"
+        - "Supplier"
+        - "Receipt Date"
+        - "Items Count"
+        - "Status (badge)"
+        - "Actions (View)"
+      features:
+        - "Search by GRN number"
+        - "Filter by status, source type, date range"
+        - "Pagination"
+
+    - path: "apps/frontend/components/warehouse/grns/GRNItemsTable.tsx"
+      name: "GRNItemsTable"
+      description: "Table of GRN items with LP links"
+      columns:
+        - "Product"
+        - "Ordered Qty"
+        - "Received Qty"
+        - "Batch"
+        - "Expiry"
+        - "Location"
+        - "QA Status (badge)"
+        - "LP Number (link to LP detail)"
+
+  # Shared Components
+  shared:
+    - path: "apps/frontend/components/warehouse/grns/GRNStatusBadge.tsx"
+      name: "GRNStatusBadge"
+      description: "Status badge for GRN"
+      variants:
+        - status: "draft"
+          color: "gray"
+        - status: "completed"
+          color: "green"
+        - status: "cancelled"
+          color: "red"
+
+    - path: "apps/frontend/components/warehouse/grns/GRNFilters.tsx"
+      name: "GRNFilters"
+      description: "Filter panel for GRN list"
+      filters:
+        - name: "status"
+          type: "select"
+          options: ["draft", "completed", "cancelled"]
+        - name: "source_type"
+          type: "select"
+          options: ["po", "to", "return", "adjustment"]
+        - name: "date_range"
+          type: "date-range"
+        - name: "supplier"
+          type: "async-select"
+        - name: "warehouse"
+          type: "select"
+
+    - path: "apps/frontend/components/warehouse/grns/GRNDetail.tsx"
+      name: "GRNDetail"
+      description: "GRN detail view (header + metadata)"
+      sections:
+        - "Header: GRN number, status, receipt date"
+        - "Source: PO link, supplier info"
+        - "Location: Warehouse, default location"
+        - "Received by: User info"
+        - "Notes"
+
+# ============================================================================
+# Hooks
+# ============================================================================
+hooks:
+  - path: "apps/frontend/lib/hooks/use-receivable-pos.ts"
+    name: "useReceivablePOs"
+    description: "Fetch POs available for receiving"
+    returns: "UseQueryResult<ReceivablePO[]>"
+    params:
+      - "filters?: { warehouseId?: string; supplierId?: string }"
+
+  - path: "apps/frontend/lib/hooks/use-po-for-receiving.ts"
+    name: "usePOForReceiving"
+    description: "Fetch PO with lines for receive wizard"
+    returns: "UseQueryResult<POLinesForReceipt>"
+    params:
+      - "poId: string"
+
+  - path: "apps/frontend/lib/hooks/use-grn-list.ts"
+    name: "useGRNList"
+    description: "Fetch GRN list with filters"
+    returns: "UseQueryResult<PaginatedResult<GRN>>"
+    params:
+      - "params: GRNListParams"
+
+  - path: "apps/frontend/lib/hooks/use-grn-detail.ts"
+    name: "useGRNDetail"
+    description: "Fetch GRN detail by ID"
+    returns: "UseQueryResult<GRNWithItems>"
+    params:
+      - "id: string"
+
+  - path: "apps/frontend/lib/hooks/use-create-grn-from-po.ts"
+    name: "useCreateGRNFromPO"
+    description: "Mutation hook for creating GRN from PO"
+    returns: "UseMutationResult<CreateGRNFromPOResult>"
+    params:
+      - "poId: string"
+      - "data: CreateGRNFromPOInput"
+
+  - path: "apps/frontend/lib/hooks/use-validate-grn.ts"
+    name: "useValidateGRN"
+    description: "Pre-flight validation before submit"
+    returns: "UseMutationResult<GRNValidationResult>"
+
+# ============================================================================
+# State Management
+# ============================================================================
+state:
+  approach: "React useReducer or Zustand for wizard state"
+  store:
+    name: "receivingWizardStore"
+    state:
+      currentStep: "number"
+      selectedPO: "ReceivablePO | null"
+      poLines: "POLineForReceipt[]"
+      formData: "Record<string, ReceiptLineFormData>"  # keyed by po_line_id
+      validationErrors: "ValidationError[]"
+      isSubmitting: "boolean"
+      result: "CreateGRNFromPOResult | null"
+    actions:
+      - "selectPO(po: ReceivablePO)"
+      - "setFormData(lineId: string, data: ReceiptLineFormData)"
+      - "nextStep()"
+      - "prevStep()"
+      - "setValidationErrors(errors: ValidationError[])"
+      - "setSubmitting(isSubmitting: boolean)"
+      - "setResult(result: CreateGRNFromPOResult)"
+      - "reset()"
+
+# ============================================================================
+# Types
+# ============================================================================
+types:
+  path: "apps/frontend/lib/types/receiving.ts"
+  exports:
+    - name: "ReceivablePO"
+      fields:
+        - "id: string"
+        - "po_number: string"
+        - "supplier: { id: string; code: string; name: string }"
+        - "warehouse_id: string"
+        - "expected_delivery_date: string | null"
+        - "status: 'approved' | 'confirmed' | 'partial'"
+        - "lines_count: number"
+        - "receive_percent: number"
+    - name: "POLineForReceipt"
+      fields:
+        - "id: string"
+        - "line_number: number"
+        - "product: { id: string; code: string; name: string; shelf_life_days: number | null }"
+        - "quantity: number"
+        - "received_qty: number"
+        - "remaining_qty: number"
+        - "uom: string"
+    - name: "ReceiptLineFormData"
+      fields:
+        - "po_line_id: string"
+        - "received_qty: number"
+        - "batch_number: string"
+        - "supplier_batch_number: string"
+        - "expiry_date: string"
+        - "manufacture_date: string"
+        - "location_id: string"
+        - "qa_status: 'pending' | 'passed' | 'hold'"
+        - "notes: string"
+    - name: "ValidationError"
+      fields:
+        - "field: string"
+        - "message: string"
+        - "po_line_id?: string"

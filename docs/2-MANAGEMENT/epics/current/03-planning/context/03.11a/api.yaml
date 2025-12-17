@@ -1,0 +1,434 @@
+# Story 03.11a - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET WO Materials (Read-only snapshot)
+  - method: "GET"
+    path: "/api/planning/work-orders/:id/materials"
+    description: "Returns all wo_materials for a Work Order (BOM snapshot)"
+    file: "apps/frontend/app/api/planning/work-orders/[id]/materials/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users can read
+
+    params:
+      path:
+        - name: "id"
+          type: "UUID"
+          required: true
+          description: "Work Order ID"
+
+    response:
+      status: 200
+      type: "WOMaterialsListResponse"
+      schema:
+        materials:
+          type: "array"
+          items: "WOMaterial"
+        total:
+          type: "number"
+        bom_version:
+          type: "number | null"
+        snapshot_at:
+          type: "string | null"
+          description: "ISO timestamp when snapshot was created"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+        when: "WO does not exist or belongs to different org"
+
+  # POST Create/Refresh BOM Snapshot
+  - method: "POST"
+    path: "/api/planning/work-orders/:id/snapshot"
+    description: "Creates or refreshes BOM snapshot (wo_materials). Only allowed for draft/planned WOs."
+    file: "apps/frontend/app/api/planning/work-orders/[id]/snapshot/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+
+    params:
+      path:
+        - name: "id"
+          type: "UUID"
+          required: true
+          description: "Work Order ID"
+
+    request:
+      body: null  # No body required - uses WO's existing bom_id
+
+    response:
+      status: 200
+      type: "CreateSnapshotResponse"
+      schema:
+        success:
+          type: "boolean"
+        materials_count:
+          type: "number"
+        message:
+          type: "string"
+
+    errors:
+      - status: 400
+        code: "NO_BOM_SELECTED"
+        message: "Work order has no BOM selected"
+        when: "WO.bom_id is null and wo_require_bom = true"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Permission denied"
+        when: "User role cannot create snapshots"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+        when: "WO does not exist or belongs to different org"
+      - status: 409
+        code: "WO_RELEASED"
+        message: "Cannot modify materials after WO is released"
+        when: "WO status in (released, in_progress, completed, closed)"
+
+# Response Schemas
+schemas:
+  WOMaterial:
+    description: "Single WO material item from BOM snapshot"
+    fields:
+      - { name: "id", type: "string", description: "UUID" }
+      - { name: "wo_id", type: "string", description: "Work Order UUID" }
+      - { name: "product_id", type: "string", description: "Component product UUID" }
+      - { name: "material_name", type: "string", description: "Denormalized product name" }
+      - { name: "required_qty", type: "number", description: "Scaled quantity from BOM" }
+      - { name: "consumed_qty", type: "number", description: "Quantity consumed (Epic 04)" }
+      - { name: "reserved_qty", type: "number", description: "Reserved quantity (03.11b)" }
+      - { name: "uom", type: "string", description: "Unit of measure" }
+      - { name: "sequence", type: "number", description: "Display order" }
+      - { name: "consume_whole_lp", type: "boolean", description: "LP consumption flag" }
+      - { name: "is_by_product", type: "boolean", description: "By-product indicator" }
+      - { name: "yield_percent", type: "number | null", description: "By-product yield %" }
+      - { name: "scrap_percent", type: "number", description: "Scrap percentage" }
+      - { name: "condition_flags", type: "object | null", description: "Conditional item flags" }
+      - { name: "bom_item_id", type: "string | null", description: "Source bom_item for audit" }
+      - { name: "bom_version", type: "number | null", description: "BOM version at snapshot" }
+      - { name: "notes", type: "string | null", description: "Item notes" }
+      - { name: "created_at", type: "string", description: "ISO timestamp" }
+      - { name: "product", type: "ProductSummary | null", description: "Joined product data" }
+
+  ProductSummary:
+    description: "Minimal product info for display"
+    fields:
+      - { name: "id", type: "string" }
+      - { name: "code", type: "string" }
+      - { name: "name", type: "string" }
+      - { name: "product_type", type: "string", description: "RM, ING, PKG, WIP, FG" }
+
+  WOMaterialsListResponse:
+    description: "Response for GET /materials endpoint"
+    fields:
+      - { name: "materials", type: "WOMaterial[]" }
+      - { name: "total", type: "number" }
+      - { name: "bom_version", type: "number | null" }
+      - { name: "snapshot_at", type: "string | null" }
+
+  CreateSnapshotResponse:
+    description: "Response for POST /snapshot endpoint"
+    fields:
+      - { name: "success", type: "boolean" }
+      - { name: "materials_count", type: "number" }
+      - { name: "message", type: "string" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/wo-snapshot-service.ts"
+    description: "BOM snapshot creation and management"
+    exports:
+      - name: "createBOMSnapshot"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "bomId: string"
+          - "woPlannedQty: number"
+        returns: "Promise<WOMaterial[]>"
+        description: "Creates BOM snapshot - copies bom_items to wo_materials with scaling"
+
+      - name: "refreshSnapshot"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<WOMaterial[]>"
+        description: "Deletes existing wo_materials and recreates from current BOM"
+
+      - name: "getWOMaterials"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<WOMaterial[]>"
+        description: "Gets all wo_materials for a WO, ordered by sequence"
+
+      - name: "scaleQuantity"
+        type: "function"
+        params:
+          - "itemQty: number"
+          - "woQty: number"
+          - "bomOutputQty: number"
+          - "scrapPercent?: number"
+        returns: "number"
+        description: "Calculates scaled quantity with scrap percentage"
+
+      - name: "canModifySnapshot"
+        type: "function"
+        params:
+          - "woStatus: string"
+        returns: "boolean"
+        description: "Checks if WO snapshot can be modified (draft/planned only)"
+
+# Implementation patterns
+patterns:
+  scale_quantity: |
+    /**
+     * Scales BOM item quantity for WO.
+     * Formula: (wo_qty / bom_output_qty) * item_qty * (1 + scrap_percent/100)
+     */
+    export function scaleQuantity(
+      itemQty: number,
+      woQty: number,
+      bomOutputQty: number,
+      scrapPercent: number = 0
+    ): number {
+      const scaleFactor = woQty / bomOutputQty;
+      const scrapMultiplier = 1 + (scrapPercent / 100);
+      const result = itemQty * scaleFactor * scrapMultiplier;
+      // Round to 6 decimal places
+      return Math.round(result * 1000000) / 1000000;
+    }
+
+  can_modify_snapshot: |
+    /**
+     * Checks if WO snapshot can be modified.
+     * Only draft and planned WOs allow snapshot modification.
+     */
+    export function canModifySnapshot(woStatus: string): boolean {
+      return ['draft', 'planned'].includes(woStatus);
+    }
+
+  create_snapshot: |
+    /**
+     * Creates BOM snapshot for a Work Order.
+     */
+    export async function createBOMSnapshot(
+      woId: string,
+      bomId: string,
+      woPlannedQty: number
+    ): Promise<WOMaterial[]> {
+      const supabase = createServerClient();
+
+      // Get BOM with items
+      const { data: bom } = await supabase
+        .from('boms')
+        .select(`
+          id,
+          version,
+          output_qty,
+          bom_items (
+            id,
+            product_id,
+            quantity,
+            uom,
+            sequence,
+            scrap_percent,
+            consume_whole_lp,
+            is_by_product,
+            yield_percent,
+            condition_flags,
+            notes,
+            product:products(id, name, code, product_type)
+          )
+        `)
+        .eq('id', bomId)
+        .single();
+
+      if (!bom) throw new Error('BOM not found');
+
+      // Map and scale items
+      const woMaterials = bom.bom_items.map(item => ({
+        wo_id: woId,
+        organization_id: getOrgId(),
+        product_id: item.product_id,
+        material_name: item.product?.name || 'Unknown',
+        required_qty: item.is_by_product
+          ? 0  // By-products have no required qty
+          : scaleQuantity(item.quantity, woPlannedQty, bom.output_qty, item.scrap_percent),
+        consumed_qty: 0,
+        reserved_qty: 0,
+        uom: item.uom,
+        sequence: item.sequence,
+        consume_whole_lp: item.consume_whole_lp,
+        is_by_product: item.is_by_product,
+        yield_percent: item.yield_percent,
+        scrap_percent: item.scrap_percent,
+        condition_flags: item.condition_flags,
+        bom_item_id: item.id,
+        bom_version: bom.version,
+        notes: item.notes,
+      }));
+
+      // Bulk insert
+      const { data, error } = await supabase
+        .from('wo_materials')
+        .insert(woMaterials)
+        .select();
+
+      if (error) throw error;
+      return data;
+    }
+
+  api_route_get: |
+    // apps/frontend/app/api/planning/work-orders/[id]/materials/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Verify WO exists and belongs to user's org (RLS handles this)
+      const { data: wo, error: woError } = await supabase
+        .from('work_orders')
+        .select('id, bom_id')
+        .eq('id', params.id)
+        .single();
+
+      if (woError || !wo) {
+        return NextResponse.json(
+          { error: 'Work order not found' },
+          { status: 404 }
+        );
+      }
+
+      // Get materials with product details
+      const { data: materials, error } = await supabase
+        .from('wo_materials')
+        .select(`
+          *,
+          product:products(id, code, name, product_type)
+        `)
+        .eq('wo_id', params.id)
+        .order('sequence', { ascending: true });
+
+      if (error) {
+        return NextResponse.json(
+          { error: 'Failed to fetch materials' },
+          { status: 500 }
+        );
+      }
+
+      // Get BOM version from first material (all have same version)
+      const bomVersion = materials?.[0]?.bom_version || null;
+      const snapshotAt = materials?.[0]?.created_at || null;
+
+      return NextResponse.json({
+        materials: materials || [],
+        total: materials?.length || 0,
+        bom_version: bomVersion,
+        snapshot_at: snapshotAt,
+      });
+    }
+
+  api_route_post: |
+    // apps/frontend/app/api/planning/work-orders/[id]/snapshot/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { createBOMSnapshot, canModifySnapshot } from '@/lib/services/wo-snapshot-service';
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Get WO with status
+      const { data: wo, error: woError } = await supabase
+        .from('work_orders')
+        .select('id, status, bom_id, planned_quantity')
+        .eq('id', params.id)
+        .single();
+
+      if (woError || !wo) {
+        return NextResponse.json(
+          { error: 'Work order not found' },
+          { status: 404 }
+        );
+      }
+
+      // Check if snapshot can be modified
+      if (!canModifySnapshot(wo.status)) {
+        return NextResponse.json(
+          { error: 'Cannot modify materials after WO is released' },
+          { status: 409 }
+        );
+      }
+
+      // Check BOM exists
+      if (!wo.bom_id) {
+        return NextResponse.json(
+          { error: 'Work order has no BOM selected' },
+          { status: 400 }
+        );
+      }
+
+      // Delete existing materials
+      await supabase
+        .from('wo_materials')
+        .delete()
+        .eq('wo_id', params.id);
+
+      // Create new snapshot
+      const materials = await createBOMSnapshot(
+        params.id,
+        wo.bom_id,
+        wo.planned_quantity
+      );
+
+      return NextResponse.json({
+        success: true,
+        materials_count: materials.length,
+        message: `Snapshot created with ${materials.length} materials`,
+      });
+    }
+
+# Error Codes Reference
+error_codes:
+  NO_BOM_SELECTED:
+    http_status: 400
+    description: "WO has no BOM assigned"
+    resolution: "Select a BOM for the work order first"
+  WO_NOT_FOUND:
+    http_status: 404
+    description: "Work order not found or access denied"
+    resolution: "Verify WO ID and org access"
+  WO_RELEASED:
+    http_status: 409
+    description: "WO is released - materials are immutable"
+    resolution: "Cannot modify materials after release"
+  FORBIDDEN:
+    http_status: 403
+    description: "User role cannot perform this action"
+    resolution: "Contact admin for permission"
+
+# Performance Requirements
+performance:
+  - endpoint: "GET /work-orders/:id/materials"
+    target: "< 500ms for up to 200 materials"
+    strategy: "Single query with JOIN, indexed on wo_id"
+  - endpoint: "POST /work-orders/:id/snapshot"
+    target: "< 2s for 100-item BOM"
+    strategy: "Bulk insert in single transaction"

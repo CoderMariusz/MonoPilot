@@ -1,0 +1,444 @@
+# Story 02.2 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/product-history-service.test.ts"
+    type: "unit"
+    description: "Unit tests for product history service and diff detection"
+  - path: "apps/frontend/components/technical/__tests__/version-badge.test.tsx"
+    type: "unit"
+    description: "Unit tests for VersionBadge component"
+  - path: "apps/frontend/components/technical/__tests__/version-history-panel.test.tsx"
+    type: "integration"
+    description: "Integration tests for VersionHistoryPanel with mock API"
+  - path: "apps/frontend/app/api/v1/technical/products/[id]/versions/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for versions endpoint"
+  - path: "apps/frontend/app/api/v1/technical/products/[id]/history/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for history endpoint"
+  - path: "supabase/tests/product_version_history_rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for product_version_history table"
+
+# Acceptance Criteria (from Story 02.2)
+acceptance_criteria:
+  # Version Auto-Increment
+  - id: "AC-01"
+    given: "product 'SKU-001' exists with version 1"
+    when: "admin updates product name from 'Bread' to 'White Bread'"
+    then: "version increments to 2 and history record is created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "product 'SKU-002' has version 5"
+    when: "any field is edited (name, description, shelf_life_days, etc.)"
+    then: "version becomes 6"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "product is being created"
+    when: "product is saved successfully"
+    then: "version is set to 1 (initial version)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "product version is 10"
+    when: "user attempts to set version to 5 manually"
+    then: "operation is rejected (version is system-managed, never decreases)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Version History Records
+  - id: "AC-05"
+    given: "product edit saves successfully"
+    when: "history record is created"
+    then: "it contains: product_id, version, changed_fields (JSONB), changed_by (user_id), changed_at (timestamp)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "admin changes name 'Bread' to 'White Bread' and shelf_life_days from 5 to 7"
+    when: "history record is created"
+    then: "changed_fields contains: {\"name\": {\"old\": \"Bread\", \"new\": \"White Bread\"}, \"shelf_life_days\": {\"old\": 5, \"new\": 7}}"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "no fields actually changed (user opens edit, makes no changes, clicks save)"
+    when: "save is attempted"
+    then: "no version increment occurs and no history record is created"
+    test_type: "integration"
+    priority: "P0"
+
+  # Version List API
+  - id: "AC-08"
+    given: "product 'SKU-001' with 5 versions"
+    when: "GET /api/technical/products/:id/versions is called"
+    then: "returns list of versions in descending order"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "product has 100 versions"
+    when: "versions endpoint is called with pagination (page=1, limit=20)"
+    then: "returns first 20 versions with total count"
+    test_type: "integration"
+    priority: "P1"
+
+  # History Detail API
+  - id: "AC-10"
+    given: "product 'SKU-001' with history records"
+    when: "GET /api/technical/products/:id/history is called"
+    then: "returns detailed change log with version, changed_fields, changed_by (user name), changed_at"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "history request with filters (from_date, to_date)"
+    when: "endpoint is called"
+    then: "returns only history records within date range"
+    test_type: "integration"
+    priority: "P1"
+
+  # Version Badge Display (TEC-001)
+  - id: "AC-12"
+    given: "product list is displayed"
+    when: "version column renders"
+    then: "shows 'v{N}' format (e.g., 'v1', 'v5', 'v12')"
+    test_type: "unit"
+    priority: "P1"
+
+  # Version Indicator in Edit Modal (TEC-002)
+  - id: "AC-13"
+    given: "admin opens product edit modal for product with version 4"
+    when: "modal header renders"
+    then: "shows 'Edit Product - SKU-001 (Product Name) Version: v4'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-14"
+    given: "admin is editing product (version 4)"
+    when: "save button is rendered"
+    then: "shows 'Save Changes (v4 -> v5)' to indicate version will increment"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-15"
+    given: "product has been edited"
+    when: "warning banner renders"
+    then: "displays warning about version increment and BOM impact"
+    test_type: "unit"
+    priority: "P1"
+
+  # Version History Panel (PANEL-version-history)
+  - id: "AC-16"
+    given: "admin clicks 'View Version History' link in edit modal"
+    when: "panel opens"
+    then: "slides in from right (400px width) showing version timeline"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-17"
+    given: "version history panel is open"
+    when: "panel content renders"
+    then: "shows list of versions with: version number, timestamp, user name, summary of changed fields"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-18"
+    given: "version 1 (initial creation)"
+    when: "displayed in history panel"
+    then: "shows 'Initial creation' instead of field changes"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-19"
+    given: "user clicks 'View Details' on a version"
+    when: "expanded"
+    then: "shows full JSONB diff with all field changes"
+    test_type: "integration"
+    priority: "P1"
+
+  # Permission Enforcement
+  - id: "AC-20"
+    given: "user with VIEWER role"
+    when: "attempting to access version history"
+    then: "read-only access is allowed (can view, cannot edit)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Data Integrity
+  - id: "AC-21"
+    given: "history record is created"
+    when: "attempting to modify or delete it"
+    then: "operation is blocked (history is immutable)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-22"
+    given: "concurrent edits to same product"
+    when: "both saves complete"
+    then: "each creates separate history record with correct version sequence"
+    test_type: "integration"
+    priority: "P1"
+
+  # RLS Enforcement
+  - id: "AC-23"
+    given: "user from Org B"
+    when: "requesting version history for product in Org A"
+    then: "returns 404 Not Found (org isolation enforced)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Performance
+  - id: "AC-24"
+    given: "product with 100 versions"
+    when: "history query is executed"
+    then: "response time is < 500ms"
+    test_type: "performance"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  product_history_service:
+    - name: "detectChangedFields returns correct diff for single field change"
+      setup: "Old product with name 'Bread', new with name 'White Bread'"
+      expected: "Returns {name: {old: 'Bread', new: 'White Bread'}}"
+
+    - name: "detectChangedFields returns correct diff for multiple field changes"
+      setup: "Change name and shelf_life_days"
+      expected: "Returns both fields in changed_fields"
+
+    - name: "detectChangedFields returns empty object when no changes"
+      setup: "Same old and new product values"
+      expected: "Returns {}"
+
+    - name: "detectChangedFields handles null to value change"
+      setup: "Old description is null, new is 'New description'"
+      expected: "Returns {description: {old: null, new: 'New description'}}"
+
+    - name: "detectChangedFields handles value to null change"
+      setup: "Old description is 'Description', new is null"
+      expected: "Returns {description: {old: 'Description', new: null}}"
+
+    - name: "formatChangeSummary returns 'Initial creation' for initial flag"
+      setup: "Changed fields with _initial: true"
+      expected: "Returns 'Initial creation'"
+
+    - name: "formatChangeSummary formats multiple changes correctly"
+      setup: "Changed fields with name and shelf_life_days"
+      expected: "Returns 'name: Bread -> White Bread, shelf_life_days: 5 -> 7'"
+
+  version_badge:
+    - name: "renders correct version format"
+      setup: "version=5"
+      expected: "Displays 'v5'"
+
+    - name: "applies correct size class for sm"
+      setup: "size='sm'"
+      expected: "Has small text class"
+
+    - name: "applies correct size class for lg"
+      setup: "size='lg'"
+      expected: "Has large text class"
+
+    - name: "applies custom className"
+      setup: "className='custom-class'"
+      expected: "Has custom-class applied"
+
+  version_warning_banner:
+    - name: "displays correct next version number"
+      setup: "currentVersion=4"
+      expected: "Shows 'will create version v5'"
+
+    - name: "calls onViewHistory when link clicked"
+      setup: "Mock onViewHistory function"
+      expected: "Function called once on click"
+
+    - name: "hides View History link when onViewHistory not provided"
+      setup: "No onViewHistory prop"
+      expected: "Link not rendered"
+
+  version_diff:
+    - name: "renders field changes with old and new values"
+      setup: "changedFields with name change"
+      expected: "Shows old value struck through and new value highlighted"
+
+    - name: "formats null values as '(empty)'"
+      setup: "changedFields with null old value"
+      expected: "Shows '(empty)' for null"
+
+    - name: "formats boolean values as 'Yes'/'No'"
+      setup: "changedFields with boolean change"
+      expected: "Shows 'Yes' or 'No' instead of true/false"
+
+# Integration Test Cases
+integration_tests:
+  versions_endpoint:
+    - name: "returns versions in descending order"
+      setup: "Product with versions 1, 2, 3"
+      action: "GET /api/v1/technical/products/:id/versions"
+      expected: "Returns [v3, v2, v1]"
+
+    - name: "returns 404 for non-existent product"
+      setup: "Invalid product ID"
+      action: "GET /api/v1/technical/products/:id/versions"
+      expected: "404 Not Found"
+
+    - name: "returns 401 for unauthenticated request"
+      setup: "No auth token"
+      action: "GET /api/v1/technical/products/:id/versions"
+      expected: "401 Unauthorized"
+
+    - name: "paginates correctly"
+      setup: "Product with 30 versions"
+      action: "GET with page=2, limit=10"
+      expected: "Returns versions 20-11, has_more=true"
+
+  history_endpoint:
+    - name: "returns detailed history with user info"
+      setup: "Product with history records"
+      action: "GET /api/v1/technical/products/:id/history"
+      expected: "Returns history with changed_by name and email"
+
+    - name: "filters by date range"
+      setup: "History records from different dates"
+      action: "GET with from_date and to_date"
+      expected: "Only returns records in range"
+
+    - name: "validates date range (from < to)"
+      setup: "from_date after to_date"
+      action: "GET with invalid date range"
+      expected: "400 Bad Request with error message"
+
+    - name: "marks initial version correctly"
+      setup: "Product with initial and subsequent versions"
+      action: "GET history"
+      expected: "is_initial=true for version 1"
+
+  version_increment:
+    - name: "increments version on field change"
+      setup: "Product with version 1"
+      action: "PUT update name"
+      expected: "Version becomes 2, history record created"
+
+    - name: "does not increment version when no changes"
+      setup: "Product with version 1"
+      action: "PUT with same values"
+      expected: "Version stays 1, no history record"
+
+    - name: "creates history record with correct changed_fields"
+      setup: "Product with version 1"
+      action: "PUT update multiple fields"
+      expected: "History record has all changed fields"
+
+  rls_isolation:
+    - name: "user can only see history for own org products"
+      setup: "Org A product, Org B user"
+      action: "User B tries to GET history"
+      expected: "404 Not Found"
+
+    - name: "history records cannot be updated"
+      setup: "Existing history record"
+      action: "Direct UPDATE attempt"
+      expected: "RLS blocks update"
+
+    - name: "history records cannot be deleted"
+      setup: "Existing history record"
+      action: "Direct DELETE attempt"
+      expected: "RLS blocks delete"
+
+# E2E Test Cases (Playwright)
+e2e_tests:
+  - name: "product edit shows version badge and warning banner"
+    steps:
+      - "Navigate to product list"
+      - "Click edit on product with version 3"
+      - "Verify modal header shows 'v3'"
+      - "Verify warning banner visible"
+      - "Verify save button shows 'v3 -> v4'"
+
+  - name: "version history panel opens and displays timeline"
+    steps:
+      - "Navigate to product edit modal"
+      - "Click 'View Version History' link"
+      - "Verify panel slides in from right"
+      - "Verify version entries displayed"
+      - "Verify timestamps and user names shown"
+
+  - name: "version history detail expansion works"
+    steps:
+      - "Open version history panel"
+      - "Click 'View Details' on version 2"
+      - "Verify changed fields displayed"
+      - "Verify old/new values shown correctly"
+
+# Definition of Done
+definition_of_done:
+  - "Product version auto-increments on any field change"
+  - "Version never decreases (system-managed)"
+  - "No version increment if no fields actually changed"
+  - "History record captures all changed fields as JSONB"
+  - "changed_fields format: {field: {old, new}}"
+  - "History records are immutable (no update/delete)"
+  - "Versions list endpoint returns descending order"
+  - "History endpoint supports date range filters"
+  - "Version badge shows 'v{N}' format in product list"
+  - "Edit modal header shows current version"
+  - "Save button shows 'v{N} -> v{N+1}' text"
+  - "Version history panel slides in from right"
+  - "Panel shows timeline with user, timestamp, changes"
+  - "'View Details' expands to show full diff"
+  - "Initial creation (v1) shows 'Initial creation' text"
+  - "RLS policy enforces org_id filtering on history"
+  - "Integration tests cover version increment scenarios"
+  - "Unit tests cover detectChangedFields function"
+  - "Performance: History query < 500ms for 100 versions"
+  - "Phase 1+ features (comparison, restore, export) hidden"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "High coverage for diff detection logic"
+  integration:
+    target: 85
+    reason: "API endpoints must be thoroughly tested"
+  files:
+    - "lib/services/product-history-service.ts: 90%"
+    - "components/technical/version-badge.tsx: 90%"
+    - "components/technical/version-history-panel.tsx: 85%"
+    - "components/technical/version-diff.tsx: 90%"
+    - "app/api/v1/technical/products/[id]/versions/route.ts: 85%"
+    - "app/api/v1/technical/products/[id]/history/route.ts: 85%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Concurrent edits could cause version conflicts"
+    mitigation: "Database trigger ensures atomic version increment with unique constraint"
+    severity: "medium"
+    test_coverage: "integration_tests.version_increment"
+
+  - id: "RISK-02"
+    description: "Large history could slow down queries"
+    mitigation: "Pagination enforced, indexes on product_id + version DESC"
+    severity: "low"
+    test_coverage: "AC-24 performance test"
+
+  - id: "RISK-03"
+    description: "History immutability bypass"
+    mitigation: "RLS policies explicitly block UPDATE/DELETE, tested"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"

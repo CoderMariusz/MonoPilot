@@ -1,0 +1,253 @@
+# Story 05.1 - Database Schema
+# Purpose: Tables, RLS policies, indexes, functions, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_license_plates_table.sql"
+    type: "migration"
+    description: "Core license_plates table with all Phase 0-3 columns"
+  - path: "supabase/migrations/XXX_create_lp_number_sequences.sql"
+    type: "migration"
+    description: "LP number sequence tracking per org + generate_lp_number() function"
+  - path: "supabase/migrations/XXX_license_plates_rls.sql"
+    type: "migration"
+    description: "RLS policies following ADR-013 pattern"
+
+tables:
+  - name: "license_plates"
+    description: "Core inventory unit table - atomic tracking with full traceability"
+    columns:
+      # Identity (Phase 0)
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "lp_number", type: "TEXT", constraints: "NOT NULL" }
+
+      # Product Reference (Phase 0)
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "quantity", type: "DECIMAL(15,4)", constraints: "NOT NULL CHECK (quantity >= 0)" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+
+      # Location (Phase 0)
+      - { name: "location_id", type: "UUID", constraints: "NOT NULL REFERENCES locations(id)" }
+      - { name: "warehouse_id", type: "UUID", constraints: "NOT NULL REFERENCES warehouses(id)" }
+
+      # Status (Phase 0)
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'reserved', 'consumed', 'blocked'))" }
+      - { name: "qa_status", type: "TEXT", constraints: "NOT NULL DEFAULT 'pending' CHECK (qa_status IN ('pending', 'passed', 'failed', 'quarantine'))" }
+
+      # Tracking (Phase 0)
+      - { name: "batch_number", type: "TEXT", constraints: "" }
+      - { name: "supplier_batch_number", type: "TEXT", constraints: "" }
+      - { name: "expiry_date", type: "DATE", constraints: "" }
+      - { name: "manufacture_date", type: "DATE", constraints: "" }
+
+      # Source Reference (Phase 0)
+      - { name: "source", type: "TEXT", constraints: "NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'receipt', 'production', 'return', 'adjustment', 'split'))" }
+      - { name: "po_number", type: "TEXT", constraints: "" }
+
+      # Phase 1 Fields (GRN Integration)
+      - { name: "grn_id", type: "UUID", constraints: "-- FK to grns table (Phase 1)" }
+      - { name: "asn_id", type: "UUID", constraints: "-- FK to asns table (Phase 1)" }
+
+      # Production References (Phase 0 - Epic 04)
+      - { name: "wo_id", type: "UUID", constraints: "-- WO that created this LP (output)" }
+      - { name: "consumed_by_wo_id", type: "UUID", constraints: "-- WO that consumed this LP" }
+      - { name: "parent_lp_id", type: "UUID", constraints: "REFERENCES license_plates(id)" }
+
+      # Phase 2 Fields (Catch Weight)
+      - { name: "catch_weight_kg", type: "DECIMAL(10,3)", constraints: "" }
+
+      # Phase 3 Fields (GS1)
+      - { name: "gtin", type: "TEXT", constraints: "-- GS1 GTIN-14" }
+      - { name: "sscc", type: "TEXT", constraints: "-- GS1 SSCC-18 (if on pallet)" }
+
+      # Phase 3 Fields (Pallets)
+      - { name: "pallet_id", type: "UUID", constraints: "-- FK to pallets table (Phase 3)" }
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    constraints:
+      - "UNIQUE(org_id, lp_number)"
+    indexes:
+      # Primary query patterns
+      - "idx_lp_org_status ON license_plates(org_id, status)"
+      - "idx_lp_org_product ON license_plates(org_id, product_id)"
+      - "idx_lp_org_location ON license_plates(org_id, location_id)"
+      - "idx_lp_org_warehouse ON license_plates(org_id, warehouse_id)"
+      - "idx_lp_org_qa ON license_plates(org_id, qa_status)"
+      # FIFO/FEFO queries
+      - "idx_lp_expiry ON license_plates(expiry_date) WHERE expiry_date IS NOT NULL"
+      - "idx_lp_created ON license_plates(created_at)"
+      # Search patterns
+      - "idx_lp_batch ON license_plates(batch_number) WHERE batch_number IS NOT NULL"
+      - "idx_lp_number_search ON license_plates(org_id, lp_number text_pattern_ops)"
+      # Production references
+      - "idx_lp_wo ON license_plates(wo_id) WHERE wo_id IS NOT NULL"
+      - "idx_lp_consumed_by ON license_plates(consumed_by_wo_id) WHERE consumed_by_wo_id IS NOT NULL"
+      # Parent reference (split/merge)
+      - "idx_lp_parent ON license_plates(parent_lp_id) WHERE parent_lp_id IS NOT NULL"
+
+  - name: "lp_number_sequences"
+    description: "LP number sequence tracking per organization"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE UNIQUE" }
+      - { name: "current_value", type: "BIGINT", constraints: "NOT NULL DEFAULT 0" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_lp_seq_org ON lp_number_sequences(org_id)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Single source of truth (users table)"
+    - "User org reassignment takes effect immediately"
+    - "No custom JWT claim configuration required"
+    - "Performance overhead <1ms per query"
+
+  policies:
+    # license_plates table
+    - table: "license_plates"
+      name: "lp_select_org"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "license_plates"
+      name: "lp_insert_org"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND warehouse_id IN (
+          SELECT id FROM warehouses
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+        AND location_id IN (
+          SELECT id FROM locations
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+        AND product_id IN (
+          SELECT id FROM products
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+    - table: "license_plates"
+      name: "lp_update_org"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "license_plates"
+      name: "lp_delete_org"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    # lp_number_sequences table
+    - table: "lp_number_sequences"
+      name: "lp_seq_org"
+      operation: "ALL"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Database Functions
+functions:
+  - name: "generate_lp_number"
+    description: "Generate next LP number for organization"
+    params: "p_org_id UUID"
+    returns: "TEXT"
+    language: "plpgsql"
+    body: |
+      DECLARE
+        v_prefix TEXT;
+        v_length INT;
+        v_next_val BIGINT;
+        v_lp_number TEXT;
+      BEGIN
+        -- Get settings (with defaults if not exists)
+        SELECT
+          COALESCE(lp_number_prefix, 'LP'),
+          COALESCE(lp_number_sequence_length, 8)
+        INTO v_prefix, v_length
+        FROM warehouse_settings
+        WHERE org_id = p_org_id;
+
+        -- Use defaults if no settings
+        IF v_prefix IS NULL THEN
+          v_prefix := 'LP';
+          v_length := 8;
+        END IF;
+
+        -- Upsert sequence and get next value (atomic)
+        INSERT INTO lp_number_sequences (org_id, current_value)
+        VALUES (p_org_id, 1)
+        ON CONFLICT (org_id)
+        DO UPDATE SET
+          current_value = lp_number_sequences.current_value + 1,
+          updated_at = NOW()
+        RETURNING current_value INTO v_next_val;
+
+        -- Format LP number
+        v_lp_number := v_prefix || LPAD(v_next_val::TEXT, v_length, '0');
+
+        RETURN v_lp_number;
+      END;
+
+# Database Triggers
+triggers:
+  - name: "tr_lp_updated_at"
+    table: "license_plates"
+    event: "BEFORE UPDATE"
+    description: "Auto-update updated_at timestamp"
+    function: |
+      CREATE OR REPLACE FUNCTION update_lp_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+# Status Enums (for reference)
+enums:
+  lp_status:
+    values: ["available", "reserved", "consumed", "blocked"]
+    description: "LP lifecycle status"
+    transitions:
+      available: ["reserved", "consumed", "blocked"]
+      reserved: ["available", "consumed"]
+      consumed: []  # Terminal state
+      blocked: ["available"]
+
+  qa_status:
+    values: ["pending", "passed", "failed", "quarantine"]
+    description: "QA inspection status"
+    transitions:
+      pending: ["passed", "failed", "quarantine"]
+      passed: ["failed", "quarantine"]
+      failed: ["quarantine"]
+      quarantine: ["passed"]  # After reinspection
+
+  lp_source:
+    values: ["manual", "receipt", "production", "return", "adjustment", "split"]
+    description: "How the LP was created"
+
+# Performance Targets
+performance:
+  - query: "LP lookup by ID"
+    target: "<100ms"
+    index: "PRIMARY KEY"
+  - query: "LP list with filters"
+    target: "<500ms"
+    index: "idx_lp_org_status, idx_lp_org_warehouse"
+  - query: "LP search by number prefix"
+    target: "<300ms"
+    index: "idx_lp_number_search (text_pattern_ops)"
+  - query: "Available LPs for product (FIFO/FEFO)"
+    target: "<200ms"
+    index: "idx_lp_org_product, idx_lp_expiry, idx_lp_created"
+  - query: "LP creation"
+    target: "<200ms"
+    notes: "Includes LP number generation"

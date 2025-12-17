@@ -1,0 +1,299 @@
+# Story 03.5a - Frontend Specification
+# Purpose: Components, hooks, types, validation
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/planning-settings.ts"
+    content: |
+      export interface PlanningSettings {
+        id: string;
+        org_id: string;
+        po_require_approval: boolean;
+        po_approval_threshold: number | null;
+        po_approval_roles: string[];
+        created_at: string;
+        updated_at: string;
+      }
+
+      export interface PlanningSettingsUpdate {
+        po_require_approval?: boolean;
+        po_approval_threshold?: number | null;
+        po_approval_roles?: string[];
+      }
+
+      export interface POApprovalSettingsFormValues {
+        po_require_approval: boolean;
+        po_approval_threshold: string;  // String for form input, converted to number
+        po_approval_roles: string[];
+      }
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/planning-settings-schema.ts"
+    content: |
+      import { z } from 'zod';
+
+      // PO Approval settings section
+      export const poApprovalSettingsSchema = z.object({
+        po_require_approval: z.boolean(),
+        po_approval_threshold: z
+          .number()
+          .positive('Threshold must be a positive number')
+          .gt(0, 'Threshold must be greater than zero')
+          .refine(
+            (val) => {
+              const str = val.toString();
+              const decimalIndex = str.indexOf('.');
+              if (decimalIndex === -1) return true;
+              return str.length - decimalIndex - 1 <= 4;
+            },
+            'Threshold can have at most 4 decimal places'
+          )
+          .nullable()
+          .optional(),
+        po_approval_roles: z
+          .array(z.string().min(1))
+          .min(1, 'At least one approval role must be selected'),
+      });
+
+      // Full planning settings update schema
+      export const planningSettingsUpdateSchema = z.object({
+        po_require_approval: z.boolean().optional(),
+        po_approval_threshold: z
+          .number()
+          .positive('Threshold must be a positive number')
+          .gt(0, 'Threshold must be greater than zero')
+          .nullable()
+          .optional(),
+        po_approval_roles: z
+          .array(z.string())
+          .min(1, 'At least one approval role must be selected')
+          .optional(),
+      });
+
+      export type POApprovalSettings = z.infer<typeof poApprovalSettingsSchema>;
+      export type PlanningSettingsUpdate = z.infer<typeof planningSettingsUpdateSchema>;
+
+# Components
+components:
+  - path: "apps/frontend/components/settings/POApprovalSettings.tsx"
+    description: "PO Approval settings section component"
+    props:
+      - name: "settings"
+        type: "PlanningSettings"
+        required: true
+      - name: "onSave"
+        type: "(updates: PlanningSettingsUpdate) => Promise<void>"
+        required: true
+      - name: "isLoading"
+        type: "boolean"
+        required: false
+    features:
+      - "Toggle switch for po_require_approval"
+      - "Currency input for po_approval_threshold (disabled when toggle off)"
+      - "Multi-select dropdown for po_approval_roles"
+      - "Tooltips on hover for each field"
+      - "Validation error messages"
+      - "Save button with loading state"
+
+  - path: "apps/frontend/components/settings/PlanningSettingsForm.tsx"
+    description: "Main planning settings form container"
+    props:
+      - name: "settings"
+        type: "PlanningSettings"
+        required: true
+      - name: "onSave"
+        type: "(updates: PlanningSettingsUpdate) => Promise<void>"
+        required: true
+    features:
+      - "Section layout with cards"
+      - "Contains POApprovalSettings component"
+      - "Future: TOSettings, WOSettings sections"
+
+  - path: "apps/frontend/app/(authenticated)/settings/planning/page.tsx"
+    description: "Planning Settings page"
+    features:
+      - "Page title and breadcrumb"
+      - "Loading skeleton state"
+      - "Error state with retry"
+      - "Success toast on save"
+      - "Permission guard (admin only)"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-planning-settings.ts"
+    description: "React Query hook for planning settings"
+    content: |
+      import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+      import {
+        getPlanningSettings,
+        updatePlanningSettings,
+      } from '@/lib/services/planning-settings-service';
+      import type { PlanningSettings, PlanningSettingsUpdate } from '@/lib/types/planning-settings';
+      import { toast } from 'sonner';
+
+      export function usePlanningSettings() {
+        return useQuery<PlanningSettings>({
+          queryKey: ['planning-settings'],
+          queryFn: getPlanningSettings,
+          staleTime: 5 * 60 * 1000, // 5 minutes
+        });
+      }
+
+      export function useUpdatePlanningSettings() {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: (updates: PlanningSettingsUpdate) => updatePlanningSettings(updates),
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['planning-settings'] });
+            toast.success('Planning settings updated successfully');
+          },
+          onError: (error: Error) => {
+            toast.error(error.message || 'Failed to update settings');
+          },
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-roles.ts"
+    description: "Hook to fetch roles for dropdown"
+    content: |
+      import { useQuery } from '@tanstack/react-query';
+      import type { Role } from '@/lib/types/user';
+
+      export function useRoles() {
+        return useQuery<Role[]>({
+          queryKey: ['roles'],
+          queryFn: async () => {
+            const response = await fetch('/api/settings/roles');
+            if (!response.ok) throw new Error('Failed to fetch roles');
+            const result = await response.json();
+            return result.data || result;
+          },
+          staleTime: 10 * 60 * 1000, // 10 minutes (roles rarely change)
+        });
+      }
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "PLAN-008"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-008-po-approval-modal.md"
+      relevance: "Reference for approval workflow UX (used in Story 03.5b)"
+      components: ["Dialog", "Form", "Button"]
+
+  layout:
+    page_structure: |
+      /settings/planning
+      +------------------------------------------+
+      | Settings > Planning                      |
+      +------------------------------------------+
+      |                                          |
+      | [Card] Purchase Order Approval           |
+      | +--------------------------------------+ |
+      | |                                      | |
+      | | Require Approval    [Toggle OFF]     | |
+      | |   (i) tooltip                        | |
+      | |                                      | |
+      | | Approval Threshold  [_________] PLN  | |
+      | |   (i) tooltip       (disabled)       | |
+      | |                                      | |
+      | | Approval Roles      [v Admin     ]   | |
+      | |   (i) tooltip       [v Manager   ]   | |
+      | |                     [  Planner   ]   | |
+      | |                                      | |
+      | | [Save Settings]                      | |
+      | +--------------------------------------+ |
+      |                                          |
+      | [Card] Transfer Order Settings (future)  |
+      | [Card] Work Order Settings (future)      |
+      |                                          |
+      +------------------------------------------+
+
+  states:
+    - name: "loading"
+      description: "Settings are being fetched"
+      ui: "Skeleton loaders for form fields"
+
+    - name: "loaded"
+      description: "Settings loaded successfully"
+      ui: "Form with current values"
+
+    - name: "error"
+      description: "Failed to load settings"
+      ui: "Error message with retry button"
+
+    - name: "saving"
+      description: "Settings being saved"
+      ui: "Save button disabled with spinner"
+
+    - name: "saved"
+      description: "Settings saved successfully"
+      ui: "Success toast notification"
+
+  interactions:
+    toggle_approval:
+      trigger: "Click toggle switch"
+      effect: |
+        - If toggled ON: Threshold field becomes enabled
+        - If toggled OFF: Threshold field becomes disabled (grayed out)
+        - Roles dropdown always enabled
+
+    threshold_input:
+      trigger: "Enter value in threshold field"
+      validation: "Real-time validation on blur"
+      format: "Currency format based on org settings"
+
+    roles_multiselect:
+      trigger: "Click dropdown"
+      effect: "Show all roles as checkboxes"
+      validation: "At least one must be selected"
+
+    save_button:
+      trigger: "Click Save Settings"
+      validation: "Validate all fields before submit"
+      success: "Toast: 'Planning settings updated successfully'"
+      error: "Toast with error message"
+
+  tooltips:
+    po_require_approval: "When enabled, POs must be approved before confirmation"
+    po_approval_threshold: "If set, only POs above this amount require approval. Leave empty to require approval for all POs."
+    po_approval_roles: "Users with these roles can approve purchase orders"
+
+  accessibility:
+    - "Toggle: aria-checked, aria-label"
+    - "Threshold input: aria-describedby for tooltip"
+    - "Roles dropdown: aria-multiselectable='true'"
+    - "Error messages: aria-live='polite'"
+    - "Keyboard navigation for all interactive elements"
+
+  patterns:
+    form: "ShadCN Form with react-hook-form + zod"
+    toggle: "ShadCN Switch component"
+    input: "ShadCN Input with currency formatting"
+    multiselect: "ShadCN Popover + Checkbox group"
+    toast: "Sonner toast notifications"
+    card: "ShadCN Card component"
+
+# Component implementation hints
+implementation_hints:
+  POApprovalSettings: |
+    - Use react-hook-form with zod resolver
+    - Currency input should format on blur
+    - Threshold input should be disabled when toggle is off
+    - Use Controller for controlled inputs
+    - Multi-select uses Popover with checkboxes
+    - Each role shows as chip when selected
+
+  PlanningSettingsForm: |
+    - Wrap sections in Card components
+    - Use Separator between sections
+    - Future sections can be added as new cards
+    - Loading state shows skeleton for entire form
+
+  page: |
+    - Use Suspense with loading fallback
+    - Permission check: redirect non-admins
+    - Breadcrumb: Settings > Planning
+    - Page title: "Planning Settings"

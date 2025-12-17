@@ -1,0 +1,346 @@
+# Story 02.14 - Database Specification
+# Purpose: Database queries, recursive CTEs, no new tables required
+# Agent: BACKEND-DEV (database focus)
+
+# Note: No new tables required - uses existing boms, bom_items, products tables
+new_tables: []
+
+# Existing tables used
+existing_tables:
+  - name: "boms"
+    description: "BOM header with version, effective dates, output qty"
+    relevant_columns:
+      - "id"
+      - "org_id"
+      - "product_id"
+      - "version"
+      - "effective_from"
+      - "effective_to"
+      - "status"
+      - "output_qty"
+      - "output_uom"
+      - "yield_percent"    # Used for yield calculation
+      - "routing_id"
+    indexes_used:
+      - "idx_boms_product (product_id)"
+      - "idx_boms_effective (product_id, effective_from, effective_to)"
+
+  - name: "bom_items"
+    description: "BOM line items with components and quantities"
+    relevant_columns:
+      - "id"
+      - "bom_id"
+      - "component_id"     # FK to products - key for comparison matching
+      - "quantity"
+      - "uom"
+      - "sequence"
+      - "operation_seq"
+      - "scrap_percent"
+      - "is_output"
+      - "is_by_product"
+    indexes_used:
+      - "idx_bom_items_bom (bom_id)"
+      - "idx_bom_items_product (component_id)"
+
+  - name: "products"
+    description: "Product master data"
+    relevant_columns:
+      - "id"
+      - "org_id"
+      - "code"
+      - "name"
+      - "uom"
+      - "product_type_id"  # For identifying if component has sub-BOM
+      - "cost_per_unit"
+
+# Recursive CTE for Multi-Level BOM Explosion
+queries:
+  multi_level_explosion:
+    description: "Recursive CTE to explode BOM through all levels (max 10)"
+    purpose: "FR-2.29 - Multi-level BOM explosion"
+    max_depth: 10
+    sql: |
+      WITH RECURSIVE bom_explosion AS (
+        -- Base case: direct items from the top-level BOM
+        SELECT
+          bi.id as item_id,
+          bi.bom_id,
+          bi.component_id,
+          p.code as component_code,
+          p.name as component_name,
+          p.uom as component_uom,
+          pt.code as component_type,
+          bi.quantity,
+          bi.uom,
+          bi.sequence,
+          bi.scrap_percent,
+          bi.is_output,
+          1 as level,
+          ARRAY[bi.component_id] as path,
+          bi.quantity as cumulative_qty,
+          :parent_output_qty as parent_output_qty
+        FROM bom_items bi
+        JOIN products p ON bi.component_id = p.id
+        LEFT JOIN product_types pt ON p.product_type_id = pt.id
+        WHERE bi.bom_id = :bom_id
+          AND bi.is_output = false
+
+        UNION ALL
+
+        -- Recursive case: items from sub-BOMs
+        SELECT
+          bi.id as item_id,
+          bi.bom_id,
+          bi.component_id,
+          p.code as component_code,
+          p.name as component_name,
+          p.uom as component_uom,
+          pt.code as component_type,
+          bi.quantity,
+          bi.uom,
+          bi.sequence,
+          bi.scrap_percent,
+          bi.is_output,
+          be.level + 1 as level,
+          be.path || bi.component_id as path,
+          -- Calculate cumulative qty: parent qty * child qty / parent BOM output
+          (be.cumulative_qty * bi.quantity / COALESCE(sub_bom.output_qty, 1)) as cumulative_qty,
+          sub_bom.output_qty as parent_output_qty
+        FROM bom_explosion be
+        -- Find active BOM for the component
+        JOIN boms sub_bom ON sub_bom.product_id = be.component_id
+          AND sub_bom.org_id = :org_id
+          AND sub_bom.status = 'Active'
+          AND sub_bom.effective_from <= CURRENT_DATE
+          AND (sub_bom.effective_to IS NULL OR sub_bom.effective_to >= CURRENT_DATE)
+        JOIN bom_items bi ON bi.bom_id = sub_bom.id
+          AND bi.is_output = false
+        JOIN products p ON bi.component_id = p.id
+        LEFT JOIN product_types pt ON p.product_type_id = pt.id
+        WHERE be.level < 10  -- Max depth limit
+          AND NOT (bi.component_id = ANY(be.path))  -- Prevent circular references
+          AND be.component_type IN ('wip', 'semi_finished')  -- Only explode WIP/Semi-finished
+      )
+      SELECT
+        item_id,
+        bom_id,
+        component_id,
+        component_code,
+        component_name,
+        component_uom,
+        component_type,
+        quantity,
+        uom,
+        sequence,
+        scrap_percent,
+        is_output,
+        level,
+        path,
+        cumulative_qty,
+        parent_output_qty
+      FROM bom_explosion
+      ORDER BY level, sequence;
+
+    parameters:
+      - name: "bom_id"
+        type: "UUID"
+        description: "Root BOM ID to explode"
+      - name: "org_id"
+        type: "UUID"
+        description: "Organization ID for RLS"
+      - name: "parent_output_qty"
+        type: "DECIMAL"
+        description: "Output quantity of root BOM"
+
+  version_comparison:
+    description: "Query to get two BOMs with items for comparison"
+    purpose: "FR-2.25 - BOM version comparison"
+    sql: |
+      -- Get BOM 1 with items
+      SELECT
+        b.id,
+        b.product_id,
+        b.version,
+        b.effective_from,
+        b.effective_to,
+        b.output_qty,
+        b.output_uom,
+        b.status,
+        json_agg(json_build_object(
+          'id', bi.id,
+          'component_id', bi.component_id,
+          'component_code', p.code,
+          'component_name', p.name,
+          'quantity', bi.quantity,
+          'uom', bi.uom,
+          'sequence', bi.sequence,
+          'operation_seq', bi.operation_seq,
+          'scrap_percent', bi.scrap_percent,
+          'is_output', bi.is_output
+        ) ORDER BY bi.sequence) as items
+      FROM boms b
+      LEFT JOIN bom_items bi ON bi.bom_id = b.id
+      LEFT JOIN products p ON bi.component_id = p.id
+      WHERE b.id = :bom_id
+        AND b.org_id = :org_id
+      GROUP BY b.id;
+
+    notes:
+      - "Run twice for bom_id_1 and bom_id_2"
+      - "Compare items by component_id as the matching key"
+      - "Detect added (in bom_2, not bom_1), removed (in bom_1, not bom_2), modified"
+
+  yield_calculation:
+    description: "Get data needed for yield calculation"
+    purpose: "FR-2.34 - BOM yield calculation"
+    sql: |
+      SELECT
+        b.id,
+        b.output_qty,
+        b.output_uom,
+        b.yield_percent,
+        COALESCE(SUM(
+          CASE WHEN bi.is_output = false THEN
+            bi.quantity * (1 + COALESCE(bi.scrap_percent, 0) / 100)
+          ELSE 0 END
+        ), 0) as total_input_qty,
+        COALESCE(SUM(
+          CASE WHEN bi.is_output = true OR bi.is_by_product = true THEN
+            bi.quantity
+          ELSE 0 END
+        ), 0) as total_byproduct_qty
+      FROM boms b
+      LEFT JOIN bom_items bi ON bi.bom_id = b.id
+      WHERE b.id = :bom_id
+        AND b.org_id = :org_id
+      GROUP BY b.id, b.output_qty, b.output_uom, b.yield_percent;
+
+    calculated_fields:
+      - name: "theoretical_yield_percent"
+        formula: "(output_qty / total_input_qty) * 100"
+        note: "Output / Input as percentage"
+      - name: "expected_actual_qty"
+        formula: "output_qty * (yield_percent / 100)"
+        note: "Expected output accounting for yield loss"
+
+  scaling_preview:
+    description: "Get BOM items for scaling preview"
+    purpose: "FR-2.35 - BOM scaling"
+    sql: |
+      SELECT
+        b.id as bom_id,
+        b.output_qty,
+        b.output_uom,
+        bi.id as item_id,
+        bi.component_id,
+        p.code as component_code,
+        p.name as component_name,
+        bi.quantity as original_qty,
+        bi.uom,
+        bi.scrap_percent
+      FROM boms b
+      JOIN bom_items bi ON bi.bom_id = b.id
+      JOIN products p ON bi.component_id = p.id
+      WHERE b.id = :bom_id
+        AND b.org_id = :org_id
+        AND bi.is_output = false
+      ORDER BY bi.sequence;
+
+    scaling_logic: |
+      -- Scaling is calculated in application code:
+      -- scale_factor = target_batch_size / original_output_qty
+      -- new_quantity = original_qty * scale_factor
+      -- Optionally round to N decimal places
+
+  update_scaled_quantities:
+    description: "Update BOM items with scaled quantities (when apply=true)"
+    purpose: "FR-2.35 - Apply scaling changes"
+    sql: |
+      -- Transaction: update all items and BOM output_qty
+      BEGIN;
+
+      UPDATE bom_items
+      SET quantity = :new_quantity
+      WHERE id = :item_id
+        AND bom_id = :bom_id;
+
+      -- Update BOM output_qty
+      UPDATE boms
+      SET
+        output_qty = :new_output_qty,
+        updated_at = NOW(),
+        updated_by = :user_id
+      WHERE id = :bom_id
+        AND org_id = :org_id;
+
+      COMMIT;
+
+    notes:
+      - "Execute in transaction"
+      - "Validate user has write permission"
+      - "Audit trail via updated_at, updated_by"
+
+# Validation queries
+validation_queries:
+  same_product_check:
+    description: "Verify both BOMs are for same product (comparison)"
+    sql: |
+      SELECT
+        b1.product_id as product_id_1,
+        b2.product_id as product_id_2,
+        (b1.product_id = b2.product_id) as same_product
+      FROM boms b1, boms b2
+      WHERE b1.id = :bom_id_1
+        AND b2.id = :bom_id_2
+        AND b1.org_id = :org_id
+        AND b2.org_id = :org_id;
+    error_if_false: "Versions must be from same product"
+
+  not_same_version_check:
+    description: "Verify not comparing same BOM to itself"
+    sql: |
+      SELECT (:bom_id_1 != :bom_id_2) as different_boms;
+    error_if_false: "Cannot compare version to itself"
+
+  positive_batch_size:
+    description: "Verify scaling target is positive"
+    validation: "target_batch_size > 0"
+    error_message: "Batch size must be positive"
+
+# Performance indexes (already exist)
+indexes_used:
+  - name: "idx_boms_product"
+    table: "boms"
+    columns: ["product_id"]
+    purpose: "Fast lookup for comparison and explosion"
+
+  - name: "idx_boms_effective"
+    table: "boms"
+    columns: ["product_id", "effective_from", "effective_to"]
+    purpose: "Find active BOM for sub-BOM explosion"
+
+  - name: "idx_bom_items_bom"
+    table: "bom_items"
+    columns: ["bom_id"]
+    purpose: "Fast item lookup for any BOM"
+
+  - name: "idx_bom_items_product"
+    table: "bom_items"
+    columns: ["component_id"]
+    purpose: "Fast lookup for where-used queries"
+
+# Performance considerations
+performance:
+  explosion:
+    max_depth: 10
+    max_nodes: 1000
+    cache_ttl_seconds: 300  # 5 minutes
+    note: "Limit results to prevent runaway queries"
+
+  comparison:
+    cache_ttl_seconds: 60   # 1 minute (versions rarely change)
+    note: "Cache by (bom_id_1, bom_id_2) pair"
+
+  scaling:
+    preview_only_default: true
+    note: "No caching needed - preview is real-time"

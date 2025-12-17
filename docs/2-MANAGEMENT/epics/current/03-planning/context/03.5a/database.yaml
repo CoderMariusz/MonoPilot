@@ -1,0 +1,144 @@
+# Story 03.5a - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_add_po_approval_settings.sql"
+    type: "migration"
+    description: "Add PO approval columns to planning_settings table"
+    sql: |
+      -- Add PO approval columns to planning_settings
+      -- If table doesn't exist, create it
+      CREATE TABLE IF NOT EXISTS planning_settings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT planning_settings_org_unique UNIQUE(org_id)
+      );
+
+      -- Add PO approval columns (idempotent)
+      ALTER TABLE planning_settings
+        ADD COLUMN IF NOT EXISTS po_require_approval BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS po_approval_threshold DECIMAL(15,4),
+        ADD COLUMN IF NOT EXISTS po_approval_roles TEXT[] DEFAULT ARRAY['admin', 'manager'];
+
+      -- Enable RLS
+      ALTER TABLE planning_settings ENABLE ROW LEVEL SECURITY;
+
+      -- RLS Policies (drop and recreate for idempotency)
+      DROP POLICY IF EXISTS planning_settings_select ON planning_settings;
+      DROP POLICY IF EXISTS planning_settings_insert ON planning_settings;
+      DROP POLICY IF EXISTS planning_settings_update ON planning_settings;
+
+      -- SELECT: Users can read their org's settings
+      CREATE POLICY planning_settings_select ON planning_settings
+        FOR SELECT TO authenticated
+        USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+      -- INSERT: Admin/Owner only
+      CREATE POLICY planning_settings_insert ON planning_settings
+        FOR INSERT TO authenticated
+        WITH CHECK (
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (
+            SELECT r.code FROM roles r
+            JOIN users u ON u.role_id = r.id
+            WHERE u.id = auth.uid()
+          ) IN ('owner', 'admin')
+        );
+
+      -- UPDATE: Admin/Owner only
+      CREATE POLICY planning_settings_update ON planning_settings
+        FOR UPDATE TO authenticated
+        USING (
+          org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND (
+            SELECT r.code FROM roles r
+            JOIN users u ON u.role_id = r.id
+            WHERE u.id = auth.uid()
+          ) IN ('owner', 'admin')
+        );
+
+      -- Index
+      CREATE INDEX IF NOT EXISTS idx_planning_settings_org ON planning_settings(org_id);
+
+      -- Function: Auto-update updated_at
+      CREATE OR REPLACE FUNCTION update_planning_settings_timestamp()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      -- Trigger for updated_at
+      DROP TRIGGER IF EXISTS tr_planning_settings_updated_at ON planning_settings;
+      CREATE TRIGGER tr_planning_settings_updated_at
+        BEFORE UPDATE ON planning_settings
+        FOR EACH ROW
+        EXECUTE FUNCTION update_planning_settings_timestamp();
+
+tables:
+  - name: "planning_settings"
+    description: "Organization-level planning module settings (singleton per org)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE UNIQUE" }
+      - { name: "po_require_approval", type: "BOOLEAN", constraints: "DEFAULT false", description: "Enable/disable PO approval requirement" }
+      - { name: "po_approval_threshold", type: "DECIMAL(15,4)", constraints: "NULL", description: "Optional threshold amount; null = all POs require approval" }
+      - { name: "po_approval_roles", type: "TEXT[]", constraints: "DEFAULT ARRAY['admin', 'manager']", description: "Role codes that can approve POs" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_planning_settings_org ON planning_settings(org_id)"
+    constraints:
+      - "UNIQUE(org_id) -- Singleton per org"
+
+# RLS Policies
+rls_policies:
+  pattern: "Users Table Lookup (ADR-013)"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "planning_settings"
+      name: "planning_settings_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "All authenticated users can read their org's planning settings"
+
+    - table: "planning_settings"
+      name: "planning_settings_insert"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
+      description: "Only admin/owner can create planning settings"
+
+    - table: "planning_settings"
+      name: "planning_settings_update"
+      operation: "UPDATE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid()) IN ('owner', 'admin')
+      description: "Only admin/owner can update planning settings"
+
+# Default values
+default_values:
+  po_require_approval: false
+  po_approval_threshold: null
+  po_approval_roles: ["admin", "manager"]
+  notes: "When po_approval_threshold is null and po_require_approval is true, ALL POs require approval regardless of amount"
+
+# Validation constraints
+validation_constraints:
+  po_approval_threshold:
+    - "Must be positive (> 0) if set"
+    - "Max 4 decimal places"
+    - "NULL allowed (means all POs require approval)"
+  po_approval_roles:
+    - "Must contain at least one role"
+    - "Roles must exist in roles table (soft validation in service)"
+    - "Stored as TEXT[] PostgreSQL array"

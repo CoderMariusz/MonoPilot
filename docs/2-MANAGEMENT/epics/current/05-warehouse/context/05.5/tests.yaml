@@ -1,0 +1,647 @@
+# Story 05.5 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/license-plate-filter.test.ts"
+    type: "unit"
+    description: "Unit tests for filter logic and service methods"
+
+  - path: "__tests__/integration/api/warehouse/lp-filters.test.ts"
+    type: "integration"
+    description: "Integration tests for LP filter API"
+
+  - path: "__tests__/e2e/warehouse/lp-filters.spec.ts"
+    type: "e2e"
+    description: "E2E tests for filter panel interactions"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-1"
+    name: "LP Number Search"
+    prd_ref: "WH-FR-002"
+    scenarios:
+      - given: "LP 'LP00000123' exists"
+        when: "user searches for 'LP00000123'"
+        then: "LP returned in results AND response time < 200ms"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "LPs: 'LP00000123', 'LP00000124', 'LP00000200'"
+        when: "user searches for 'LP000001'"
+        then: "'LP00000123' and 'LP00000124' returned AND 'LP00000200' not in results AND response time < 300ms"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "LP 'LP00000123' exists"
+        when: "user searches for 'lp00000123' (lowercase)"
+        then: "LP returned in results (case-insensitive)"
+        test_type: "integration"
+        priority: "P1"
+
+      - given: "no LP starting with 'ABC'"
+        when: "user searches for 'ABC123'"
+        then: "empty result set returned AND no error shown"
+        test_type: "integration"
+        priority: "P1"
+
+      - given: "10,000 LPs in database"
+        when: "user searches for LP number prefix"
+        then: "results return in < 300ms AND uses idx_lp_number_search index"
+        test_type: "performance"
+        priority: "P0"
+
+  - id: "AC-2"
+    name: "Batch Number Search"
+    prd_ref: "WH-FR-009"
+    scenarios:
+      - given: "3 LPs with batch_number = 'BATCH-2025-001' AND 2 LPs with batch_number = 'BATCH-2025-002'"
+        when: "user filters by batch_number = 'BATCH-2025-001'"
+        then: "3 LPs with matching batch returned AND response time < 300ms"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "5 LPs with batch_number = 'BATCH-001' AND 10 LPs with batch_number = NULL"
+        when: "user filters by batch_number = 'BATCH-001'"
+        then: "only 5 LPs with 'BATCH-001' returned AND NULL batch LPs excluded"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "LP with batch_number = 'Batch-001'"
+        when: "user searches for 'batch-001' (lowercase)"
+        then: "LP returned (case-insensitive match)"
+        test_type: "integration"
+        priority: "P1"
+
+  - id: "AC-3"
+    name: "Product Filter"
+    scenarios:
+      - given: "20 LPs for product A AND 30 LPs for product B"
+        when: "user filters by product_id = A"
+        then: "only 20 LPs for product A returned"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "LPs for products A, B, C"
+        when: "user filters by product_ids = [A, B]"
+        then: "LPs for products A and B returned AND product C LPs excluded"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "no LPs for product X"
+        when: "user filters by product_id = X"
+        then: "empty result set returned AND message 'No license plates found' displayed"
+        test_type: "integration"
+        priority: "P1"
+
+  - id: "AC-4"
+    name: "Warehouse & Location Filters"
+    scenarios:
+      - given: "50 LPs in Warehouse A AND 30 LPs in Warehouse B"
+        when: "user filters by warehouse_id = A"
+        then: "only 50 LPs in Warehouse A returned"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "10 LPs at location ZONE-A-01 AND 15 LPs at location ZONE-A-02"
+        when: "user filters by location_id = ZONE-A-01"
+        then: "only 10 LPs at ZONE-A-01 returned"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "LP at Warehouse A, Location ZONE-A-01 AND LP at Warehouse B, Location ZONE-A-01"
+        when: "user filters by warehouse_id = A AND location_id = ZONE-A-01"
+        then: "only LP from Warehouse A returned"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "LPs at locations ZONE-A-01, ZONE-A-02, ZONE-B-01"
+        when: "user filters by location_ids = [ZONE-A-01, ZONE-A-02]"
+        then: "LPs from ZONE-A-01 and ZONE-A-02 returned AND ZONE-B-01 LPs excluded"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-5"
+    name: "Status Filters"
+    scenarios:
+      - given: "40 available LPs, 30 reserved LPs, 20 consumed LPs, 10 blocked LPs"
+        when: "user filters by status = 'available'"
+        then: "40 available LPs returned AND other status LPs excluded"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "LPs with various statuses"
+        when: "user filters by statuses = ['available', 'reserved']"
+        then: "available and reserved LPs returned AND consumed and blocked LPs excluded"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "50 pending LPs, 40 passed LPs, 8 failed LPs, 2 quarantine LPs"
+        when: "user filters by qa_status = 'passed'"
+        then: "only 40 passed LPs returned"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "LPs with various status/QA combinations"
+        when: "user filters by status='available' AND qa_status='passed'"
+        then: "only LPs with both conditions returned AND response time < 500ms"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-6"
+    name: "Expiry Date Range Filter"
+    prd_ref: "WH-FR-010"
+    scenarios:
+      - given: "10 LPs expiring on 2025-01-15 AND 15 LPs expiring on 2025-02-15"
+        when: "user filters by expiry_before = '2025-02-01'"
+        then: "10 LPs expiring on 2025-01-15 returned AND 2025-02-15 LPs excluded"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "10 LPs expiring on 2025-01-15 AND 15 LPs expiring on 2025-02-15"
+        when: "user filters by expiry_after = '2025-02-01'"
+        then: "15 LPs expiring on 2025-02-15 returned AND 2025-01-15 LPs excluded"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "LPs expiring on 2025-01-15, 2025-02-15, 2025-03-15"
+        when: "user filters by expiry_after='2025-02-01' AND expiry_before='2025-03-01'"
+        then: "only LPs expiring on 2025-02-15 returned"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "20 LPs with expiry dates AND 30 LPs with expiry_date = NULL"
+        when: "user filters by expiry_before = '2025-12-31'"
+        then: "only 20 LPs with expiry dates considered AND NULL expiry LPs excluded from results"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-7"
+    name: "Combined Multi-Filter Query"
+    scenarios:
+      - given: "100 LPs total"
+        when: "user filters by product_id=A AND status=available AND qa_status=passed"
+        then: "only LPs matching ALL criteria returned AND response time < 500ms"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "10,000 LPs in database"
+        when: "user filters by 5 criteria (product, warehouse, status, qa_status, expiry)"
+        then: "only LPs matching ALL 5 conditions returned AND response time < 500ms AND query uses appropriate composite indexes"
+        test_type: "performance"
+        priority: "P0"
+
+      - given: "100 LPs for product A"
+        when: "user searches 'LP000001' AND filters by product_id = A"
+        then: "only LPs matching BOTH search and filter returned"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "no LPs matching complex filter criteria"
+        when: "user applies multiple filters"
+        then: "empty result set returned AND message 'No license plates match your filters' displayed AND no query timeout or error"
+        test_type: "integration"
+        priority: "P1"
+
+  - id: "AC-8"
+    name: "Sort Options"
+    scenarios:
+      - given: "LPs: LP00000100, LP00000001, LP00000050"
+        when: "user sorts by lp_number ASC"
+        then: "results ordered: LP00000001, LP00000050, LP00000100"
+        test_type: "integration"
+        priority: "P1"
+
+      - given: "LPs created at different times"
+        when: "user requests LP list without sort param"
+        then: "results ordered by created_at DESC (newest first)"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "LPs with expiry dates 2025-01-15, 2025-03-15, 2025-02-15"
+        when: "user sorts by expiry_date ASC"
+        then: "results ordered: 2025-01-15, 2025-02-15, 2025-03-15"
+        test_type: "integration"
+        priority: "P1"
+
+      - given: "5 LPs with expiry dates and 10 LPs with NULL expiry"
+        when: "user sorts by expiry_date ASC"
+        then: "LPs with dates sorted first (ascending) AND NULL expiry LPs appear last"
+        test_type: "integration"
+        priority: "P1"
+
+  - id: "AC-9"
+    name: "Pagination"
+    scenarios:
+      - given: "200 LPs match filter criteria"
+        when: "user requests LP list without pagination params"
+        then: "page 1 returned with 50 items (default limit) AND pagination metadata includes total=200, pages=4"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "200 LPs match filter criteria"
+        when: "user requests page=1 with limit=100"
+        then: "100 items returned AND pagination shows total=200, pages=2"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "200 LPs match filter criteria"
+        when: "user requests page=2 with limit=50"
+        then: "items 51-100 returned AND correct pagination metadata"
+        test_type: "integration"
+        priority: "P1"
+
+      - given: "500 LPs match filter criteria"
+        when: "user requests limit=500"
+        then: "maximum 200 items returned (enforced limit) AND warning 'Maximum page size is 200'"
+        test_type: "integration"
+        priority: "P0"
+
+      - given: "1000 total LPs, 100 match filters"
+        when: "user applies filters and requests page=1"
+        then: "pagination based on filtered count (100) AND shows pages=2 with limit=50"
+        test_type: "integration"
+        priority: "P0"
+
+  - id: "AC-10"
+    name: "Desktop UI - Filter Panel"
+    scenarios:
+      - given: "user on LP list page"
+        when: "user clicks 'Filters' button"
+        then: "filter panel slides in from left AND all filter options visible"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "filter panel open"
+        when: "user selects warehouse = 'WH-001' AND clicks 'Apply Filters'"
+        then: "LP list refreshes with filtered results AND filter chip 'Warehouse: WH-001' appears above table"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "filter panel open"
+        when: "user selects Warehouse, Status, QA Status AND clicks 'Apply Filters'"
+        then: "3 filter chips appear above table AND LP list shows only matching results"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "3 active filter chips displayed"
+        when: "user clicks X on 'Status: available' chip"
+        then: "that filter removed AND LP list refreshes without status filter AND other 2 filters remain active"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "multiple filters applied"
+        when: "user clicks 'Clear All Filters' button"
+        then: "all filter chips removed AND LP list shows unfiltered results (all LPs)"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "filter panel open"
+        when: "user clicks 'Expiring Soon' preset"
+        then: "expiry_before filter automatically set to today + 30 days AND status filter set to 'available' AND filters applied automatically"
+        test_type: "e2e"
+        priority: "P1"
+
+  - id: "AC-11"
+    name: "Desktop UI - Search Input"
+    scenarios:
+      - given: "user on LP list page"
+        when: "user types 'LP000001' in search box"
+        then: "search waits 300ms after last keystroke AND then executes search query AND results display with search term highlighted"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "search term 'LP000001' active with results"
+        when: "user clicks X in search input"
+        then: "search cleared AND full LP list displayed AND all filters remain active (if any)"
+        test_type: "e2e"
+        priority: "P0"
+
+      - given: "user typing in search box"
+        when: "user presses Enter key"
+        then: "search executes immediately (bypasses debounce)"
+        test_type: "e2e"
+        priority: "P1"
+
+  - id: "AC-12"
+    name: "Performance Requirements"
+    scenarios:
+      - given: "10,000 LPs in database"
+        when: "user filters by single criterion (product, warehouse, status)"
+        then: "results return in < 500ms"
+        test_type: "performance"
+        priority: "P0"
+
+      - given: "10,000 LPs in database"
+        when: "user filters by 5+ criteria"
+        then: "results return in < 500ms"
+        test_type: "performance"
+        priority: "P0"
+
+      - given: "10,000 LPs in database"
+        when: "user searches by LP number prefix"
+        then: "results return in < 300ms"
+        test_type: "performance"
+        priority: "P0"
+
+      - given: "10,000 LPs in database"
+        when: "user applies search AND 3+ filters"
+        then: "results return in < 500ms"
+        test_type: "performance"
+        priority: "P0"
+
+      - given: "complex filter query"
+        when: "query EXPLAIN executed"
+        then: "appropriate indexes used (no table scans) AND query plan shows index-only or index scan"
+        test_type: "performance"
+        priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  file: "apps/frontend/lib/services/__tests__/license-plate-filter.test.ts"
+  cases:
+    - name: "list() with LP number search returns prefix matches"
+      setup: "Mock supabase response with LP data"
+      expected: "ilike query called with 'LP000%'"
+
+    - name: "list() with batch number filter uses exact match"
+      setup: "Mock supabase response"
+      expected: "ilike query called with batch_number value"
+
+    - name: "list() with single product filter"
+      setup: "params.product_id = 'uuid'"
+      expected: "eq('product_id', 'uuid') called"
+
+    - name: "list() with multiple products filter (array)"
+      setup: "params.product_ids = ['uuid1', 'uuid2']"
+      expected: "in('product_id', ['uuid1', 'uuid2']) called"
+
+    - name: "list() product_ids takes precedence over product_id"
+      setup: "params.product_id = 'uuid1', params.product_ids = ['uuid2', 'uuid3']"
+      expected: "in() called with product_ids, not eq() with product_id"
+
+    - name: "list() with warehouse filter"
+      setup: "params.warehouse_id = 'uuid'"
+      expected: "eq('warehouse_id', 'uuid') called"
+
+    - name: "list() with location filter"
+      setup: "params.location_id = 'uuid'"
+      expected: "eq('location_id', 'uuid') called"
+
+    - name: "list() with multiple locations filter"
+      setup: "params.location_ids = ['uuid1', 'uuid2']"
+      expected: "in('location_id', ['uuid1', 'uuid2']) called"
+
+    - name: "list() with single status filter"
+      setup: "params.status = 'available'"
+      expected: "eq('status', 'available') called"
+
+    - name: "list() with multiple statuses filter"
+      setup: "params.statuses = ['available', 'reserved']"
+      expected: "in('status', ['available', 'reserved']) called"
+
+    - name: "list() with QA status filter"
+      setup: "params.qa_status = 'passed'"
+      expected: "eq('qa_status', 'passed') called"
+
+    - name: "list() with multiple QA statuses filter"
+      setup: "params.qa_statuses = ['pending', 'passed']"
+      expected: "in('qa_status', ['pending', 'passed']) called"
+
+    - name: "list() with expiry_before filter"
+      setup: "params.expiry_before = '2025-03-31'"
+      expected: "lte('expiry_date', '2025-03-31') called"
+
+    - name: "list() with expiry_after filter"
+      setup: "params.expiry_after = '2025-01-01'"
+      expected: "gte('expiry_date', '2025-01-01') called"
+
+    - name: "list() with expiry range"
+      setup: "params.expiry_after = '2025-01-01', params.expiry_before = '2025-03-31'"
+      expected: "Both gte and lte called"
+
+    - name: "list() with complex multi-filter applies all conditions with AND"
+      setup: "Multiple filter params"
+      expected: "All conditions chained together"
+
+    - name: "list() with sort by expiry_date"
+      setup: "params.sort = 'expiry_date', params.order = 'asc'"
+      expected: "order() called with correct field and direction"
+
+    - name: "list() with pagination"
+      setup: "params.page = 2, params.limit = 50"
+      expected: "range(50, 99) called"
+
+    - name: "list() enforces max limit of 200"
+      setup: "params.limit = 500"
+      expected: "Limit capped at 200"
+
+    - name: "getExpiringSoon() returns correct preset"
+      setup: "Call with days=30"
+      expected: "list() called with status=available, expiry_before=today+30"
+
+    - name: "getAvailableStock() returns correct preset"
+      setup: "Call with product_ids"
+      expected: "list() called with status=available, qa_status=passed, product_ids"
+
+    - name: "searchByBatch() returns exact matches"
+      setup: "Call with batch_number"
+      expected: "list() called with batch_number param"
+
+# Integration Test Cases
+integration_tests:
+  file: "__tests__/integration/api/warehouse/lp-filters.test.ts"
+  cases:
+    - name: "GET with search param returns matching LPs"
+      method: "GET"
+      url: "/api/warehouse/license-plates?search=LP000001"
+      expected: "200 OK with matching LPs"
+
+    - name: "GET with batch_number param returns exact matches"
+      method: "GET"
+      url: "/api/warehouse/license-plates?batch_number=BATCH-001"
+      expected: "200 OK with matching LPs"
+
+    - name: "GET with product_ids param filters correctly"
+      method: "GET"
+      url: "/api/warehouse/license-plates?product_ids=uuid1,uuid2"
+      expected: "200 OK with LPs for specified products"
+
+    - name: "GET with statuses param filters correctly"
+      method: "GET"
+      url: "/api/warehouse/license-plates?statuses=available,reserved"
+      expected: "200 OK with LPs having specified statuses"
+
+    - name: "GET with qa_statuses param filters correctly"
+      method: "GET"
+      url: "/api/warehouse/license-plates?qa_statuses=pending,passed"
+      expected: "200 OK with LPs having specified QA statuses"
+
+    - name: "GET with expiry range params filters correctly"
+      method: "GET"
+      url: "/api/warehouse/license-plates?expiry_after=2025-01-01&expiry_before=2025-03-31"
+      expected: "200 OK with LPs in date range"
+
+    - name: "GET with 5+ combined params returns correct results"
+      method: "GET"
+      url: "/api/warehouse/license-plates?product_id=uuid&warehouse_id=uuid&status=available&qa_status=passed&expiry_after=2025-01-01"
+      expected: "200 OK with LPs matching ALL criteria"
+
+    - name: "GET with invalid date format returns 400"
+      method: "GET"
+      url: "/api/warehouse/license-plates?expiry_before=01-31-2025"
+      expected: "400 Bad Request with validation error"
+
+    - name: "GET with expiry_before < expiry_after returns 400"
+      method: "GET"
+      url: "/api/warehouse/license-plates?expiry_before=2025-01-01&expiry_after=2025-03-31"
+      expected: "400 Bad Request with range validation error"
+
+    - name: "GET with page size > 200 enforces maximum"
+      method: "GET"
+      url: "/api/warehouse/license-plates?limit=500"
+      expected: "200 OK with max 200 items"
+
+    - name: "GET with no matches returns empty array"
+      method: "GET"
+      url: "/api/warehouse/license-plates?product_id=nonexistent"
+      expected: "200 OK with data: [], total: 0"
+
+    - name: "Cross-org access blocked by RLS"
+      method: "GET"
+      url: "/api/warehouse/license-plates"
+      expected: "Only org's LPs returned"
+
+    - name: "Performance test with 10K LPs"
+      method: "GET"
+      url: "/api/warehouse/license-plates?product_id=uuid&status=available"
+      expected: "Response time < 500ms"
+
+# E2E Test Cases
+e2e_tests:
+  file: "__tests__/e2e/warehouse/lp-filters.spec.ts"
+  cases:
+    - name: "Open filter panel"
+      steps:
+        - "Navigate to /warehouse/license-plates"
+        - "Click 'Filters' button"
+      expected: "Filter panel slides in, all options visible"
+
+    - name: "Apply single filter"
+      steps:
+        - "Open filter panel"
+        - "Select warehouse from dropdown"
+        - "Click 'Apply Filters'"
+      expected: "Results update, filter chip appears"
+
+    - name: "Apply multiple filters"
+      steps:
+        - "Open filter panel"
+        - "Select warehouse, status, QA status"
+        - "Click 'Apply Filters'"
+      expected: "Multiple chips appear, combined results shown"
+
+    - name: "Remove filter chip"
+      steps:
+        - "Apply multiple filters"
+        - "Click X on status chip"
+      expected: "Status filter removed, results update, other filters remain"
+
+    - name: "Clear all filters"
+      steps:
+        - "Apply multiple filters"
+        - "Click 'Clear All'"
+      expected: "All chips removed, full list shown"
+
+    - name: "Search LP number with debounce"
+      steps:
+        - "Type 'LP000001' in search"
+        - "Wait 300ms"
+      expected: "Search executes, results update"
+
+    - name: "Search with Enter key"
+      steps:
+        - "Type 'LP000001' in search"
+        - "Press Enter"
+      expected: "Search executes immediately"
+
+    - name: "Apply filter preset"
+      steps:
+        - "Open filter panel"
+        - "Click 'Expiring Soon' preset"
+      expected: "Preset filters applied, results update"
+
+    - name: "Sort results"
+      steps:
+        - "Click expiry_date column header"
+      expected: "Results sorted by expiry"
+
+    - name: "Pagination with filters"
+      steps:
+        - "Apply filters"
+        - "Click page 2"
+      expected: "Page 2 results with filters maintained"
+
+    - name: "Filter state persisted in URL"
+      steps:
+        - "Apply filters"
+        - "Copy URL"
+        - "Open in new tab"
+      expected: "Same filters active in new tab"
+
+    - name: "Empty state with filters"
+      steps:
+        - "Apply filters that match no LPs"
+      expected: "'No license plates match your filters' message, clear filters button"
+
+# Definition of Done
+definition_of_done:
+  - "All filter parameters work correctly (single and array variants)"
+  - "Search performs prefix match with < 300ms response"
+  - "Complex filters (5+ params) respond in < 500ms"
+  - "URL state syncs with filter state"
+  - "Filter chips display correctly and remove works"
+  - "Filter presets apply correct values"
+  - "Pagination respects filter state"
+  - "Empty states display appropriate messages"
+  - "Unit test coverage >= 80%"
+  - "Integration tests cover all filter combinations"
+  - "E2E tests pass for critical flows"
+  - "Performance verified with 10K LP dataset"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Filter logic must be thoroughly tested"
+  integration:
+    target: 85
+    reason: "All API filter combinations must work"
+  e2e:
+    target: 70
+    reason: "Critical UI flows must be covered"
+  files:
+    - "lib/services/license-plate-service.ts (filter methods): 85%"
+    - "lib/validation/license-plate.ts (extended schema): 90%"
+    - "components/warehouse/license-plates/*: 75%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Query performance degradation with complex filters"
+    mitigation: "Composite indexes, query optimization, performance tests"
+    severity: "medium"
+    test_coverage: "AC-12"
+
+  - id: "RISK-02"
+    description: "URL state sync issues with deep linking"
+    mitigation: "Comprehensive URL parsing tests, edge case handling"
+    severity: "low"
+    test_coverage: "e2e: Filter state persisted in URL"
+
+  - id: "RISK-03"
+    description: "Filter panel usability on mobile"
+    mitigation: "Responsive design testing, touch target verification"
+    severity: "low"
+    test_coverage: "Manual testing on mobile devices"

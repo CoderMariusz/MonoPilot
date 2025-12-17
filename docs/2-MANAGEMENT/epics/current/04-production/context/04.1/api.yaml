@@ -1,0 +1,433 @@
+# Story 04.1 - Production Dashboard
+# API endpoints: routes, auth, request/response schemas
+
+endpoints:
+  # KPI Metrics Endpoint
+  - id: "dashboard-kpis"
+    method: "GET"
+    path: "/api/production/dashboard/kpis"
+    description: "Retrieve all 6 KPI metrics for dashboard display"
+    auth: true
+    roles: ["production_manager", "operator", "admin"]
+    file_path: "apps/frontend/app/api/production/dashboard/kpis/route.ts"
+
+    request:
+      query_params: []
+      headers:
+        - name: "Authorization"
+          type: "Bearer token"
+          required: true
+
+    response:
+      success:
+        status: 200
+        content_type: "application/json"
+        schema:
+          type: "object"
+          properties:
+            activeWOs:
+              type: "number"
+              description: "Count of WOs with status In Progress or Paused"
+              example: 7
+            completedToday:
+              type: "number"
+              description: "Count of WOs completed today"
+              example: 12
+            completedThisWeek:
+              type: "number"
+              description: "Count of WOs completed this week (Monday-Sunday)"
+              example: 47
+            avgCycleTimeHrs:
+              type: "number"
+              description: "Average cycle time in hours for today's completed WOs"
+              example: 3.3
+            onTimePercent:
+              type: "number"
+              description: "Percentage of WOs completed on/before scheduled date"
+              example: 75.0
+            timestamp:
+              type: "string"
+              format: "ISO 8601"
+              description: "When metrics were last calculated"
+              example: "2025-12-16T14:30:00Z"
+
+      error:
+        - status: 401
+          message: "Unauthorized"
+        - status: 403
+          message: "Forbidden - org_id mismatch"
+        - status: 500
+          message: "Internal server error"
+
+    caching:
+      enabled: true
+      ttl_seconds: 30
+      key_pattern: "dashboard:kpis:{orgId}"
+
+    performance:
+      target_ms: 500
+      max_records: "N/A (aggregation)"
+
+  # Active Work Orders Endpoint
+  - id: "dashboard-active-wos"
+    method: "GET"
+    path: "/api/production/dashboard/active-wos"
+    description: "Retrieve active work orders with filtering, sorting, pagination"
+    auth: true
+    roles: ["production_manager", "operator", "admin", "viewer"]
+    file_path: "apps/frontend/app/api/production/dashboard/active-wos/route.ts"
+
+    request:
+      query_params:
+        - name: "line"
+          type: "string (UUID)"
+          required: false
+          description: "Filter by production line ID"
+        - name: "product"
+          type: "string (UUID)"
+          required: false
+          description: "Filter by product ID"
+        - name: "status"
+          type: "string"
+          required: false
+          default: "active"
+          description: "Filter by status (active = In Progress + Paused)"
+          values: ["active", "in_progress", "paused"]
+        - name: "page"
+          type: "number"
+          required: false
+          default: 1
+          validation: ">= 1"
+        - name: "limit"
+          type: "number"
+          required: false
+          default: 50
+          validation: "1-100"
+        - name: "sort"
+          type: "string"
+          required: false
+          default: "started_at"
+          values: ["started_at", "wo_number", "product_name", "progress_percent"]
+        - name: "order"
+          type: "string"
+          required: false
+          default: "desc"
+          values: ["asc", "desc"]
+
+    response:
+      success:
+        status: 200
+        content_type: "application/json"
+        schema:
+          type: "object"
+          properties:
+            wos:
+              type: "array"
+              items:
+                type: "object"
+                properties:
+                  id:
+                    type: "string (UUID)"
+                  wo_number:
+                    type: "string"
+                    example: "WO-2025-0156"
+                  product_name:
+                    type: "string"
+                    example: "Wheat Bread"
+                  status:
+                    type: "string"
+                    enum: ["In Progress", "Paused"]
+                  planned_qty:
+                    type: "number"
+                    example: 5000
+                  actual_qty:
+                    type: "number"
+                    example: 3200
+                  progress_percent:
+                    type: "number"
+                    example: 64.0
+                  line_name:
+                    type: "string"
+                    example: "Line 1"
+                  started_at:
+                    type: "string"
+                    format: "ISO 8601"
+                    example: "2025-12-16T08:15:00Z"
+            total:
+              type: "number"
+              description: "Total count for pagination"
+            page:
+              type: "number"
+            limit:
+              type: "number"
+
+      error:
+        - status: 400
+          message: "Invalid filter parameters"
+        - status: 401
+          message: "Unauthorized"
+        - status: 403
+          message: "Forbidden"
+
+    caching:
+      enabled: false
+      note: "Active WOs change frequently, use fresh data"
+
+    performance:
+      target_ms: 1000
+      max_records: 1000
+
+  # Alerts Endpoint
+  - id: "dashboard-alerts"
+    method: "GET"
+    path: "/api/production/dashboard/alerts"
+    description: "Retrieve production alerts (material shortages, delayed WOs)"
+    auth: true
+    roles: ["production_manager", "operator", "admin"]
+    file_path: "apps/frontend/app/api/production/dashboard/alerts/route.ts"
+
+    request:
+      query_params:
+        - name: "types"
+          type: "string[]"
+          required: false
+          default: "['material', 'delay']"
+          description: "Filter alert types"
+          values: ["material", "delay", "quality", "machine", "yield", "oee"]
+
+    response:
+      success:
+        status: 200
+        content_type: "application/json"
+        schema:
+          type: "object"
+          properties:
+            materialShortages:
+              type: "array"
+              items:
+                type: "object"
+                properties:
+                  wo_id:
+                    type: "string (UUID)"
+                  wo_number:
+                    type: "string"
+                  product_name:
+                    type: "string"
+                  availability_percent:
+                    type: "number"
+                    example: 75.0
+                  detected_at:
+                    type: "string"
+                    format: "ISO 8601"
+            delayedWOs:
+              type: "array"
+              items:
+                type: "object"
+                properties:
+                  wo_id:
+                    type: "string (UUID)"
+                  wo_number:
+                    type: "string"
+                  product_name:
+                    type: "string"
+                  days_overdue:
+                    type: "number"
+                    example: 6
+                  scheduled_end_date:
+                    type: "string"
+                    format: "date"
+                    example: "2025-12-10"
+
+    caching:
+      enabled: true
+      ttl_seconds: 30
+      key_pattern: "dashboard:alerts:{orgId}"
+
+    performance:
+      target_ms: 800
+      max_records: 100
+
+  # CSV Export Endpoint
+  - id: "dashboard-export"
+    method: "GET"
+    path: "/api/production/dashboard/export"
+    description: "Export active WOs to CSV file"
+    auth: true
+    roles: ["production_manager", "admin"]
+    file_path: "apps/frontend/app/api/production/dashboard/export/route.ts"
+
+    request:
+      query_params:
+        - name: "line"
+          type: "string (UUID)"
+          required: false
+          description: "Filter by production line"
+        - name: "product"
+          type: "string (UUID)"
+          required: false
+          description: "Filter by product"
+        - name: "format"
+          type: "string"
+          required: false
+          default: "csv"
+          values: ["csv"]
+
+    response:
+      success:
+        status: 200
+        content_type: "text/csv"
+        headers:
+          Content-Disposition: "attachment; filename=active-wos-YYYY-MM-DD-HHmm.csv"
+        columns:
+          - "WO Number"
+          - "Product"
+          - "Status"
+          - "Planned Qty"
+          - "Actual Qty"
+          - "Progress %"
+          - "Line"
+          - "Started At"
+
+      error:
+        - status: 401
+          message: "Unauthorized"
+        - status: 403
+          message: "Forbidden - insufficient permissions"
+
+    performance:
+      target_ms: 2000
+      max_records: 1000
+
+request_validation:
+  schemas:
+    DashboardFiltersSchema:
+      file: "apps/frontend/lib/validation/production-dashboard-schemas.ts"
+      schema: |
+        import { z } from 'zod';
+
+        export const DashboardFiltersSchema = z.object({
+          lineId: z.string().uuid().optional(),
+          productId: z.string().uuid().optional(),
+          page: z.coerce.number().int().positive().default(1),
+          limit: z.coerce.number().int().min(1).max(100).default(50),
+          sort: z.enum(['started_at', 'wo_number', 'product_name', 'progress_percent']).default('started_at'),
+          order: z.enum(['asc', 'desc']).default('desc'),
+        });
+
+    RefreshIntervalSchema:
+      file: "apps/frontend/lib/validation/production-dashboard-schemas.ts"
+      schema: |
+        export const RefreshIntervalSchema = z.enum(['15', '30', '60', '120', 'off']).default('30');
+
+    AlertTypesSchema:
+      file: "apps/frontend/lib/validation/production-dashboard-schemas.ts"
+      schema: |
+        export const AlertTypesSchema = z.array(
+          z.enum(['material', 'delay', 'quality', 'machine', 'yield', 'oee'])
+        ).default(['material', 'delay']);
+
+response_types:
+  file: "apps/frontend/lib/types/production-dashboard.ts"
+  types: |
+    export interface DashboardKPIs {
+      activeWOs: number;
+      completedToday: number;
+      completedThisWeek: number;
+      avgCycleTimeHrs: number;
+      onTimePercent: number;
+      timestamp: string;
+    }
+
+    export interface ActiveWO {
+      id: string;
+      wo_number: string;
+      product_name: string;
+      status: 'In Progress' | 'Paused';
+      planned_qty: number;
+      actual_qty: number;
+      progress_percent: number;
+      line_name: string;
+      started_at: string;
+    }
+
+    export interface ActiveWOsResponse {
+      wos: ActiveWO[];
+      total: number;
+      page: number;
+      limit: number;
+    }
+
+    export interface MaterialShortageAlert {
+      wo_id: string;
+      wo_number: string;
+      product_name: string;
+      availability_percent: number;
+      detected_at: string;
+    }
+
+    export interface DelayedWOAlert {
+      wo_id: string;
+      wo_number: string;
+      product_name: string;
+      days_overdue: number;
+      scheduled_end_date: string;
+    }
+
+    export interface DashboardAlerts {
+      materialShortages: MaterialShortageAlert[];
+      delayedWOs: DelayedWOAlert[];
+    }
+
+error_handling:
+  patterns:
+    validation_error:
+      status: 400
+      format: |
+        {
+          "error": "Validation Error",
+          "message": "Invalid request parameters",
+          "details": [
+            { "field": "line", "message": "Invalid UUID format" }
+          ]
+        }
+
+    unauthorized:
+      status: 401
+      format: |
+        {
+          "error": "Unauthorized",
+          "message": "Authentication required"
+        }
+
+    forbidden:
+      status: 403
+      format: |
+        {
+          "error": "Forbidden",
+          "message": "Insufficient permissions or org_id mismatch"
+        }
+
+    internal_error:
+      status: 500
+      format: |
+        {
+          "error": "Internal Server Error",
+          "message": "An unexpected error occurred",
+          "requestId": "uuid"
+        }
+
+rate_limiting:
+  enabled: false
+  note: "Dashboard endpoints called frequently (auto-refresh), no rate limiting for MVP"
+
+authentication:
+  method: "JWT Bearer Token"
+  extraction: "Supabase auth.uid() from JWT"
+  org_id_source: "users table via auth.uid()"
+  rls_enforcement: "Database level"
+
+cors:
+  enabled: true
+  origins: ["same-origin"]
+  methods: ["GET"]
+  credentials: true

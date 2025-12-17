@@ -1,0 +1,124 @@
+# Story 02.11 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.11"
+  name: "Shelf Life Calculation + Expiry Management"
+  slug: "shelf-life-calculation"
+  epic: "02-technical"
+  phase: "2C-2"
+  complexity: "M"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+  story_points: 8
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes
+  - api.yaml         # Endpoints, schemas, service integration
+  - frontend.yaml    # Components, services, hooks
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["users", "organizations", "RLS pattern"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products", "product_id", "shelf_life_days field"]
+    - story: "02.4"
+      name: "BOMs CRUD"
+      provides: ["boms", "bom_items", "BOM ingredient lookup"]
+    - story: "02.10a"
+      name: "Traceability Forward"
+      provides: ["traceability_links", "lot_genealogy", "expiry_calculation_method"]
+  blocked_by: []
+  blocks:
+    - story: "04.x"
+      name: "Production - Expiry Date Assignment"
+      module: "production"
+    - story: "05.x"
+      name: "Warehouse - FEFO Picking"
+      module: "warehouse"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections: ["FR-2.90", "FR-2.91", "FR-2.92", "FR-2.93"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections: ["Database Schema", "API Design", "product_shelf_life", "Shelf Life Endpoints"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.11.shelf-life-calculation.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-014-shelf-life-config.md"
+      relevance: "PRIMARY - Shelf life configuration modal UI"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-015-cost-history.md"
+      relevance: "Shelf life impact on cost"
+  existing_code:
+    - path: "apps/frontend/lib/services/shelf-life-service.ts"
+      relevance: "EXISTING - Service already implemented, extend/integrate"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "Extend product_shelf_life table (047 exists) + shelf_life_audit_log + trigger"
+  - type: "api"
+    count: 6
+    description: "GET/PUT/POST shelf-life endpoints for products and ingredients"
+  - type: "service"
+    count: 1
+    description: "Extend shelf-life-service.ts with new methods"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for shelf life config and ingredient shelf life"
+  - type: "component"
+    count: 7
+    description: "ShelfLifeConfigModal + sections + summary card"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Migration 047 already created product_shelf_life table - extend with new columns"
+  - "shelf-life-service.ts already exists with calculateProductShelfLife and overrideProductShelfLife"
+  - "Calculation rule: MIN(ingredient shelf lives) - processing_impact - safety_buffer"
+  - "Override requires reason (audit trail mandatory)"
+  - "FEFO settings stored in same table but enforced by Warehouse module (Story 05.x)"
+  - "Recalculation trigger fires when ingredient shelf_life_days changes"
+  - "Use ADR-013 RLS pattern for all new tables"
+  - "Return 404 (not 403) for cross-tenant access"
+
+# MVP vs Future scope
+mvp_scope:
+  included:
+    - Shelf life configuration per product (calculated, override, final)
+    - Automatic calculation from BOM ingredients (min ingredient rule)
+    - Processing impact reduction (configurable days)
+    - Safety buffer percentage (default 20%)
+    - Manual override with required reason
+    - Storage conditions (temp, humidity, special conditions)
+    - Best Before date calculation (fixed mode)
+    - Label format configuration
+    - FEFO/FIFO picking strategy selection
+    - Minimum remaining shelf life threshold
+    - Enforcement level (suggest/warn/block)
+    - Expiry warning threshold configuration
+    - Recalculation trigger on BOM/ingredient changes
+    - Ingredient shelf life reference table
+    - Audit log for all changes
+  deferred:
+    - Storage condition impact calculator (Phase 1)
+    - Override approval workflow (Phase 1 - Quality module)
+    - Multi-temperature zone adjustment (Phase 1)
+    - Real-time temperature monitoring (Phase 2 - IoT)
+    - AI-powered shelf life prediction (Phase 2)

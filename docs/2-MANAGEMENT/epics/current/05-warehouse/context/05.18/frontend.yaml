@@ -1,0 +1,267 @@
+# Story 05.18 - Frontend Specification
+# Purpose: Components, modals, hooks, UI states
+# Agent: FRONTEND-DEV
+
+# This is a Full-stack story with significant frontend work
+is_backend_focused: false
+
+# Components to create
+components:
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/components/LPMergeModal.tsx"
+    description: "Main modal for LP merge workflow"
+    props:
+      selectedLpIds: "string[]"
+      isOpen: "boolean"
+      onClose: "() => void"
+      onSuccess: "(newLpId: string) => void"
+    state:
+      validationResult: "MergeValidationResult | null"
+      isValidating: "boolean"
+      isMerging: "boolean"
+      targetLocationId: "string | null"
+      showConfirmDialog: "boolean"
+    features:
+      - "Multi-select LP display"
+      - "Validation button and results"
+      - "Location picker for target"
+      - "Confirm/Cancel actions"
+      - "Loading states"
+      - "Error handling"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/components/LPMergeValidation.tsx"
+    description: "Validation result display section"
+    props:
+      validationResult: "MergeValidationResult | null"
+      isLoading: "boolean"
+    features:
+      - "Green checkmark for valid"
+      - "Red X with error list for invalid"
+      - "Loading spinner during validation"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/components/LPMergeSummary.tsx"
+    description: "Summary card showing merged LP info"
+    props:
+      summary: "MergeSummary"
+    features:
+      - "Product name and code"
+      - "Total quantity with UoM"
+      - "Batch number (if present)"
+      - "Expiry date (if present)"
+      - "QA status badge"
+      - "LP count"
+      - "Target location display"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/components/LPMergeSelectedList.tsx"
+    description: "Table showing selected LPs to merge"
+    props:
+      lps: "LicensePlate[]"
+      onRemove: "(lpId: string) => void"
+    columns:
+      - "LP Number"
+      - "Product"
+      - "Quantity"
+      - "UoM"
+      - "Batch"
+      - "Expiry"
+      - "Location"
+      - "Remove action"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/components/LPMergeLocationPicker.tsx"
+    description: "Location dropdown filtered by warehouse"
+    props:
+      warehouseId: "string"
+      selectedLocationId: "string | null"
+      onChange: "(locationId: string) => void"
+      defaultLocationId: "string"
+    features:
+      - "Filtered by warehouse_id"
+      - "Shows location full_path"
+      - "Default to first source LP location"
+      - "Loading state"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/license-plates/components/LPMergeConfirmDialog.tsx"
+    description: "Confirmation dialog before executing merge"
+    props:
+      lpCount: "number"
+      totalQuantity: "number"
+      uom: "string"
+      isOpen: "boolean"
+      onConfirm: "() => void"
+      onCancel: "() => void"
+      isLoading: "boolean"
+    content:
+      title: "Confirm LP Merge"
+      message: "Are you sure you want to merge these {lpCount} LPs?"
+      warning: "This will create 1 new LP and mark source LPs as consumed. This action cannot be undone."
+      buttons: ["Cancel", "Confirm Merge"]
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-merge-validation.ts"
+    description: "React Query hook for merge validation"
+    exports:
+      - name: "useMergeValidation"
+        returns: "UseMutationResult<MergeValidationResult, Error, string[]>"
+        pattern: |
+          import { useMutation } from '@tanstack/react-query';
+
+          export function useMergeValidation() {
+            return useMutation({
+              mutationFn: async (sourceLpIds: string[]) => {
+                const response = await fetch('/api/warehouse/license-plates/validate-merge', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ sourceLpIds }),
+                });
+                if (!response.ok) {
+                  throw new Error('Validation request failed');
+                }
+                return response.json();
+              },
+            });
+          }
+
+  - path: "apps/frontend/lib/hooks/use-merge-lps.ts"
+    description: "React Query hook for executing merge"
+    exports:
+      - name: "useMergeLPs"
+        returns: "UseMutationResult<MergeResult, Error, MergeInput>"
+        pattern: |
+          import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+          export function useMergeLPs() {
+            const queryClient = useQueryClient();
+
+            return useMutation({
+              mutationFn: async (input: MergeInput) => {
+                const response = await fetch('/api/warehouse/license-plates/merge', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(input),
+                });
+                if (!response.ok) {
+                  const error = await response.json();
+                  throw new Error(error.error || 'Merge failed');
+                }
+                return response.json();
+              },
+              onSuccess: () => {
+                // Invalidate LP list to refresh
+                queryClient.invalidateQueries({ queryKey: ['license-plates'] });
+              },
+            });
+          }
+
+# UI States
+states:
+  loading:
+    validation: "Skeleton loader with 'Validating...' text"
+    merge: "Button disabled with spinner, 'Merging...' text"
+    location_picker: "Skeleton dropdown"
+
+  empty:
+    no_selection: "Modal disabled if less than 2 LPs selected"
+    no_locations: "Message: 'No locations available in this warehouse'"
+
+  error:
+    validation_failed: "Red error box with list of validation errors"
+    merge_failed: "Toast notification with error message, modal stays open"
+    network_error: "Toast: 'Network error. Please try again.'"
+
+  success:
+    merge_complete: "Toast: 'LPs merged successfully. New LP: {lp_number}'"
+    modal_closes: "Modal closes automatically"
+    list_refresh: "LP list invalidated and refreshed"
+
+# UX Patterns
+ux:
+  patterns:
+    modal: "ShadCN Dialog component"
+    table: "ShadCN Table with hover states"
+    dropdown: "ShadCN Select for location picker"
+    buttons: "ShadCN Button with variants (default, destructive, outline)"
+    badges: "ShadCN Badge for status/QA display"
+    toast: "ShadCN Toast for notifications"
+    skeleton: "ShadCN Skeleton for loading states"
+    alert_dialog: "ShadCN AlertDialog for confirmation"
+
+  colors:
+    valid: "text-green-600 bg-green-50"
+    invalid: "text-red-600 bg-red-50"
+    warning: "text-yellow-600 bg-yellow-50"
+    checking: "text-blue-600 bg-blue-50"
+
+  icons:
+    valid: "CheckCircle (lucide-react)"
+    invalid: "XCircle (lucide-react)"
+    loading: "Loader2 (lucide-react) with animate-spin"
+    merge: "Combine (lucide-react)"
+    remove: "X (lucide-react)"
+
+# Wireframe reference
+wireframes:
+  - id: "WH-MERGE-001"
+    description: "LP list with multi-select and Merge action button"
+    notes:
+      - "Merge button enabled when 2+ LPs selected"
+      - "Button in toolbar: 'Merge ({count})'"
+
+  - id: "WH-MERGE-002"
+    description: "Merge modal - initial state with selected LPs"
+    sections:
+      - "Header: 'Merge License Plates'"
+      - "Selected LPs table"
+      - "Validate button (primary)"
+      - "Close button (outline)"
+
+  - id: "WH-MERGE-003"
+    description: "Merge modal - after validation success"
+    sections:
+      - "Green checkmark: 'LPs are eligible for merge'"
+      - "Summary card with product, qty, batch, expiry"
+      - "Location picker dropdown"
+      - "'Merge LPs' button (enabled)"
+
+  - id: "WH-MERGE-004"
+    description: "Merge modal - validation errors"
+    sections:
+      - "Red X icon with error list"
+      - "Each error as bullet point"
+      - "'Merge LPs' button (disabled)"
+      - "Close button to dismiss"
+
+  - id: "WH-MERGE-005"
+    description: "Confirmation dialog"
+    sections:
+      - "Warning icon"
+      - "Message: 'Are you sure...'"
+      - "Cancel (outline) and Confirm (destructive) buttons"
+
+# Component tree
+component_tree: |
+  LPListPage
+  |-- LPDataTable (with row selection)
+  |   |-- SelectAllCheckbox
+  |   |-- LPRow (with checkbox)
+  |-- LPToolbar
+  |   |-- MergeButton (enabled when 2+ selected)
+  |       |-- onClick => setMergeModalOpen(true)
+  |-- LPMergeModal
+      |-- DialogHeader ("Merge License Plates")
+      |-- LPMergeSelectedList
+      |   |-- Table of selected LPs
+      |   |-- Remove button per row
+      |-- LPMergeValidation
+      |   |-- ValidateButton
+      |   |-- ValidationResult (valid/invalid/loading)
+      |-- LPMergeSummary (shown when valid)
+      |   |-- Product info
+      |   |-- Total quantity
+      |   |-- Batch/Expiry
+      |   |-- QA status badge
+      |-- LPMergeLocationPicker
+      |-- DialogFooter
+          |-- CancelButton
+          |-- MergeButton (triggers confirm dialog)
+          |-- LPMergeConfirmDialog
+              |-- Confirm/Cancel

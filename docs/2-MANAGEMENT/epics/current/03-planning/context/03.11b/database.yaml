@@ -1,0 +1,247 @@
+# Story 03.11b - Database Schema
+# Purpose: Tables, RLS policies, indexes, triggers
+# Agent: BACKEND-DEV (database focus)
+# Status: DEFERRED - Requires Epic 05
+
+migrations:
+  - path: "supabase/migrations/XXX_create_wo_material_reservations.sql"
+    type: "migration"
+    description: "wo_material_reservations table with indexes, RLS, trigger"
+    note: "Migration number TBD after Epic 05 migrations"
+
+tables:
+  - name: "wo_material_reservations"
+    description: "Junction table: wo_materials <-> license_plates for soft reservations"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "wo_material_id", type: "UUID", constraints: "NOT NULL REFERENCES wo_materials(id) ON DELETE CASCADE" }
+      - { name: "lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id)" }
+      - { name: "reserved_qty", type: "DECIMAL(15,6)", constraints: "NOT NULL" }
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'active'" }
+      - { name: "reserved_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "released_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "consumed_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "reserved_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "released_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_wo_mat_reservations_material ON wo_material_reservations(wo_material_id)"
+      - "idx_wo_mat_reservations_lp ON wo_material_reservations(lp_id)"
+      - "idx_wo_mat_reservations_org_status ON wo_material_reservations(org_id, status)"
+    constraints:
+      - "CONSTRAINT chk_reserved_qty CHECK (reserved_qty > 0)"
+      - "CONSTRAINT chk_status CHECK (status IN ('active', 'released', 'consumed'))"
+    notes:
+      - "No unique constraint on (wo_material_id, lp_id) - soft reservations allow overlaps"
+      - "FK to license_plates requires Epic 05 completion"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "wo_material_reservations"
+      name: "wo_mat_reservations_org_isolation"
+      operation: "ALL"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Trigger: Update wo_materials.reserved_qty on reservation changes
+triggers:
+  - name: "update_wo_material_reserved_qty"
+    table: "wo_material_reservations"
+    event: "AFTER INSERT OR UPDATE OR DELETE"
+    for_each: "ROW"
+    description: "Recalculates wo_materials.reserved_qty based on active reservations"
+    sql: |
+      CREATE OR REPLACE FUNCTION update_wo_material_reserved_qty()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+          UPDATE wo_materials
+          SET reserved_qty = COALESCE((
+            SELECT SUM(reserved_qty)
+            FROM wo_material_reservations
+            WHERE wo_material_id = NEW.wo_material_id
+              AND status = 'active'
+          ), 0)
+          WHERE id = NEW.wo_material_id;
+          RETURN NEW;
+        ELSIF TG_OP = 'DELETE' THEN
+          UPDATE wo_materials
+          SET reserved_qty = COALESCE((
+            SELECT SUM(reserved_qty)
+            FROM wo_material_reservations
+            WHERE wo_material_id = OLD.wo_material_id
+              AND status = 'active'
+          ), 0)
+          WHERE id = OLD.wo_material_id;
+          RETURN OLD;
+        END IF;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trg_wo_material_reservation_qty
+      AFTER INSERT OR UPDATE OR DELETE ON wo_material_reservations
+      FOR EACH ROW EXECUTE FUNCTION update_wo_material_reserved_qty();
+
+# FIFO/FEFO Picking Query
+queries:
+  fifo_picking:
+    description: "Select LPs by oldest receipt date (created_at) first"
+    sql: |
+      SELECT
+        lp.id,
+        lp.lp_number,
+        lp.quantity,
+        lp.quantity - COALESCE(SUM(r.reserved_qty), 0) AS available_qty,
+        lp.location_id,
+        loc.name AS location_name,
+        lp.expiry_date,
+        lp.created_at
+      FROM license_plates lp
+      LEFT JOIN wo_material_reservations r
+        ON r.lp_id = lp.id AND r.status = 'active'
+      LEFT JOIN locations loc ON loc.id = lp.location_id
+      WHERE lp.product_id = :product_id
+        AND lp.org_id = :org_id
+        AND lp.status = 'available'
+        AND lp.qa_status = 'passed'
+        AND lp.warehouse_id = :warehouse_id
+      GROUP BY lp.id, lp.lp_number, lp.quantity, lp.location_id,
+               loc.name, lp.expiry_date, lp.created_at
+      HAVING lp.quantity - COALESCE(SUM(r.reserved_qty), 0) > 0
+      ORDER BY lp.created_at ASC;
+
+  fefo_picking:
+    description: "Select LPs by soonest expiry date first, NULL expiry last"
+    sql: |
+      SELECT
+        lp.id,
+        lp.lp_number,
+        lp.quantity,
+        lp.quantity - COALESCE(SUM(r.reserved_qty), 0) AS available_qty,
+        lp.location_id,
+        loc.name AS location_name,
+        lp.expiry_date,
+        lp.created_at
+      FROM license_plates lp
+      LEFT JOIN wo_material_reservations r
+        ON r.lp_id = lp.id AND r.status = 'active'
+      LEFT JOIN locations loc ON loc.id = lp.location_id
+      WHERE lp.product_id = :product_id
+        AND lp.org_id = :org_id
+        AND lp.status = 'available'
+        AND lp.qa_status = 'passed'
+        AND lp.warehouse_id = :warehouse_id
+      GROUP BY lp.id, lp.lp_number, lp.quantity, lp.location_id,
+               loc.name, lp.expiry_date, lp.created_at
+      HAVING lp.quantity - COALESCE(SUM(r.reserved_qty), 0) > 0
+      ORDER BY
+        CASE WHEN lp.expiry_date IS NULL THEN 1 ELSE 0 END,  -- NULL expiry last
+        lp.expiry_date ASC,  -- Soonest expiry first
+        lp.created_at ASC;   -- Tie-breaker: FIFO
+
+# External Dependencies (from Epic 05)
+external_dependencies:
+  - table: "license_plates"
+    source: "Epic 05 - Warehouse Module"
+    required_columns:
+      - "id"
+      - "lp_number"
+      - "product_id"
+      - "quantity"
+      - "status"
+      - "qa_status"
+      - "warehouse_id"
+      - "location_id"
+      - "expiry_date"
+      - "created_at"
+    required_statuses: ["available", "reserved", "consumed", "blocked"]
+    required_qa_statuses: ["pending", "passed", "failed"]
+
+  - table: "warehouse_settings"
+    source: "Epic 05 - Warehouse Module"
+    required_columns:
+      - "enable_fifo"
+      - "enable_fefo"
+
+# Migration SQL Template
+migration_template: |
+  -- Migration: Create wo_material_reservations table
+  -- Story: 03.11b - WO Material Reservations
+  -- Depends: Epic 05 (license_plates table must exist)
+
+  -- Create table
+  CREATE TABLE wo_material_reservations (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id              UUID NOT NULL REFERENCES organizations(id),
+    wo_material_id      UUID NOT NULL REFERENCES wo_materials(id) ON DELETE CASCADE,
+    lp_id               UUID NOT NULL REFERENCES license_plates(id),
+    reserved_qty        DECIMAL(15,6) NOT NULL,
+    status              TEXT NOT NULL DEFAULT 'active',
+    reserved_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    released_at         TIMESTAMPTZ,
+    consumed_at         TIMESTAMPTZ,
+    reserved_by         UUID REFERENCES users(id),
+    released_by         UUID REFERENCES users(id),
+    notes               TEXT,
+    created_at          TIMESTAMPTZ DEFAULT now(),
+
+    CONSTRAINT chk_reserved_qty CHECK (reserved_qty > 0),
+    CONSTRAINT chk_status CHECK (status IN ('active', 'released', 'consumed'))
+  );
+
+  -- Create indexes
+  CREATE INDEX idx_wo_mat_reservations_material ON wo_material_reservations(wo_material_id);
+  CREATE INDEX idx_wo_mat_reservations_lp ON wo_material_reservations(lp_id);
+  CREATE INDEX idx_wo_mat_reservations_org_status ON wo_material_reservations(org_id, status);
+
+  -- Enable RLS
+  ALTER TABLE wo_material_reservations ENABLE ROW LEVEL SECURITY;
+
+  -- Create RLS policy
+  CREATE POLICY "wo_material_reservations org isolation" ON wo_material_reservations
+  FOR ALL USING (
+    org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+  );
+
+  -- Create trigger function
+  CREATE OR REPLACE FUNCTION update_wo_material_reserved_qty()
+  RETURNS TRIGGER AS $$
+  BEGIN
+    IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+      UPDATE wo_materials
+      SET reserved_qty = COALESCE((
+        SELECT SUM(reserved_qty)
+        FROM wo_material_reservations
+        WHERE wo_material_id = NEW.wo_material_id
+          AND status = 'active'
+      ), 0)
+      WHERE id = NEW.wo_material_id;
+      RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+      UPDATE wo_materials
+      SET reserved_qty = COALESCE((
+        SELECT SUM(reserved_qty)
+        FROM wo_material_reservations
+        WHERE wo_material_id = OLD.wo_material_id
+          AND status = 'active'
+      ), 0)
+      WHERE id = OLD.wo_material_id;
+      RETURN OLD;
+    END IF;
+  END;
+  $$ LANGUAGE plpgsql;
+
+  -- Create trigger
+  CREATE TRIGGER trg_wo_material_reservation_qty
+  AFTER INSERT OR UPDATE OR DELETE ON wo_material_reservations
+  FOR EACH ROW EXECUTE FUNCTION update_wo_material_reserved_qty();
+
+  -- Grant permissions
+  GRANT SELECT, INSERT, UPDATE, DELETE ON wo_material_reservations TO authenticated;

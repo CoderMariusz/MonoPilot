@@ -1,0 +1,375 @@
+# Story 03.6 - Frontend Specification
+# Purpose: Components, hooks, UX for bulk PO operations
+# Agent: FRONTEND-DEV
+
+# Component tree overview
+component_overview: |
+  PO List Page (existing from 03.3)
+    +-- Import Button -> ImportWizard
+    +-- Export Button -> ExportDialog
+    +-- Bulk Actions Menu -> BulkActionsMenu
+
+  Import Wizard (4-step modal)
+    +-- Step 1: ImportWizardStepUpload
+    +-- Step 2: ImportWizardStepPreview
+    +-- Step 3: ImportWizardStepProcessing
+    +-- Step 4: ImportWizardStepResults
+
+# Pages (modify existing)
+pages:
+  - path: "apps/frontend/app/(authenticated)/planning/purchase-orders/page.tsx"
+    action: "MODIFY"
+    changes:
+      - "Add Import button in header (opens ImportWizard)"
+      - "Add Export button in header (opens ExportDialog)"
+      - "Add BulkActionsMenu to table toolbar"
+      - "Add checkbox column for row selection"
+      - "Add bulk selection state management"
+
+# New components
+components:
+  # Import Wizard container
+  - path: "apps/frontend/components/planning/purchase-orders/ImportWizard.tsx"
+    description: "Multi-step import wizard modal"
+    props:
+      open: "boolean"
+      onOpenChange: "(open: boolean) => void"
+      onComplete: "(result: BulkCreatePOResult) => void"
+    state:
+      step: "1 | 2 | 3 | 4"
+      file: "File | null"
+      parsedRows: "ImportRow[]"
+      validationResult: "ValidationResult | null"
+      createResult: "BulkCreatePOResult | null"
+      isProcessing: "boolean"
+    shadcn_components:
+      - "Dialog"
+      - "Progress"
+      - "Tabs"
+
+  # Step 1: File upload
+  - path: "apps/frontend/components/planning/purchase-orders/ImportWizardStepUpload.tsx"
+    description: "File upload with drag-drop"
+    props:
+      onFileSelect: "(file: File) => void"
+      onDownloadTemplate: "() => void"
+    features:
+      - "Drag and drop zone"
+      - "File type validation (.xlsx, .csv)"
+      - "File size validation (max 5MB)"
+      - "Download template button"
+      - "Format documentation table"
+    shadcn_components:
+      - "Button"
+      - "Card"
+
+  # Step 2: Preview
+  - path: "apps/frontend/components/planning/purchase-orders/ImportWizardStepPreview.tsx"
+    description: "Preview parsed data grouped by supplier"
+    props:
+      rows: "ImportRow[]"
+      onEditGroup: "(groupIndex: number) => void"
+      onBack: "() => void"
+      onNext: "() => void"
+    features:
+      - "Group products by default supplier"
+      - "Show calculated expected delivery per group"
+      - "Show subtotals per group"
+      - "Edit Group button per supplier group"
+      - "Summary: X POs, Y lines, total value"
+    shadcn_components:
+      - "Card"
+      - "Table"
+      - "Button"
+      - "Accordion"
+
+  # Step 3: Processing
+  - path: "apps/frontend/components/planning/purchase-orders/ImportWizardStepProcessing.tsx"
+    description: "Progress indicator during PO creation"
+    props:
+      totalGroups: "number"
+      completedGroups: "number"
+      currentGroup: "string"
+      results: "POSummary[]"
+    features:
+      - "Progress bar with percentage"
+      - "List of completed POs with status"
+      - "Current group being processed"
+      - "Do not close warning"
+    shadcn_components:
+      - "Progress"
+      - "Card"
+
+  # Step 4: Results
+  - path: "apps/frontend/components/planning/purchase-orders/ImportWizardStepResults.tsx"
+    description: "Results summary with actions"
+    props:
+      result: "BulkCreatePOResult"
+      onViewPOs: "() => void"
+      onDownloadResults: "() => void"
+      onClose: "() => void"
+    features:
+      - "Success/partial success/failure state"
+      - "List of created POs with View/Submit buttons"
+      - "Error list if any failures"
+      - "Download Results button"
+      - "View POs button (filters to created)"
+    shadcn_components:
+      - "Button"
+      - "Table"
+      - "Alert"
+      - "Badge"
+
+  # Export Dialog
+  - path: "apps/frontend/components/planning/purchase-orders/ExportDialog.tsx"
+    description: "Export configuration dialog"
+    props:
+      open: "boolean"
+      onOpenChange: "(open: boolean) => void"
+      selectedPoIds: "string[]"
+      totalPoCount: "number"
+    features:
+      - "Show export count (selected or all)"
+      - "Confirm export button"
+      - "Progress indicator during generation"
+      - "Auto-download when complete"
+    shadcn_components:
+      - "Dialog"
+      - "Button"
+      - "Progress"
+
+  # Bulk Actions Menu
+  - path: "apps/frontend/components/planning/purchase-orders/BulkActionsMenu.tsx"
+    description: "Bulk actions dropdown"
+    props:
+      selectedPoIds: "string[]"
+      selectedStatuses: "string[]"
+      onApprove: "() => void"
+      onReject: "() => void"
+      onCancel: "() => void"
+      onConfirm: "() => void"
+      onExport: "() => void"
+    features:
+      - "Dropdown menu with action items"
+      - "Items enabled/disabled based on selection"
+      - "Confirmation dialogs for destructive actions"
+      - "Permission checks for approve/reject"
+    shadcn_components:
+      - "DropdownMenu"
+      - "AlertDialog"
+
+  # Preview Table (used in Step 2)
+  - path: "apps/frontend/components/planning/purchase-orders/ImportPreviewTable.tsx"
+    description: "Preview table with validation highlights"
+    props:
+      rows: "ImportRowWithValidation[]"
+      showErrors: "boolean"
+    features:
+      - "Row highlighting (green=valid, red=error, yellow=warning)"
+      - "Error messages in Error column"
+      - "Max 50 rows displayed"
+    shadcn_components:
+      - "Table"
+      - "Badge"
+
+  # Error List (used in Step 4)
+  - path: "apps/frontend/components/planning/purchase-orders/ImportErrorList.tsx"
+    description: "Error details display"
+    props:
+      errors: "BulkError[]"
+      onDownload: "() => void"
+    features:
+      - "List of errors with row numbers"
+      - "Download errors as Excel button"
+    shadcn_components:
+      - "Card"
+      - "Button"
+
+  # Edit Group Modal (used from Step 2)
+  - path: "apps/frontend/components/planning/purchase-orders/EditGroupModal.tsx"
+    description: "Edit PO group before import"
+    props:
+      group: "ImportGroup"
+      suppliers: "Supplier[]"
+      warehouses: "Warehouse[]"
+      onSave: "(group: ImportGroup) => void"
+      onCancel: "() => void"
+    features:
+      - "Change supplier"
+      - "Change warehouse"
+      - "Edit expected date"
+      - "Edit payment terms"
+      - "Edit line items (add/remove/modify)"
+    shadcn_components:
+      - "Dialog"
+      - "Select"
+      - "DatePicker"
+      - "Table"
+      - "Input"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-bulk-po-operations.ts"
+    description: "React Query mutations for bulk operations"
+    exports:
+      - name: "useBulkCreatePOs"
+        type: "useMutation"
+        description: "Create POs from product list"
+      - name: "useValidateImport"
+        type: "useMutation"
+        description: "Validate import file"
+      - name: "useExecuteImport"
+        type: "useMutation"
+        description: "Execute validated import"
+      - name: "useExportPOs"
+        type: "useMutation"
+        description: "Export POs to Excel"
+      - name: "useBulkStatusUpdate"
+        type: "useMutation"
+        description: "Bulk update PO status"
+
+  - path: "apps/frontend/lib/hooks/use-po-selection.ts"
+    description: "Row selection state management"
+    exports:
+      - name: "usePOSelection"
+        type: "hook"
+        returns:
+          selectedIds: "string[]"
+          selectedStatuses: "string[]"
+          isAllSelected: "boolean"
+          toggleSelection: "(id: string, status: string) => void"
+          toggleAll: "(ids: string[], statuses: string[]) => void"
+          clearSelection: "() => void"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/po-bulk.ts"
+    content: |
+      export interface ImportRow {
+        product_code: string;
+        quantity: number;
+        expected_delivery?: string;
+        unit_price?: number;
+        notes?: string;
+        warehouse_code?: string;
+      }
+
+      export interface ImportRowWithValidation extends ImportRow {
+        row_number: number;
+        product_name?: string;
+        supplier_name?: string;
+        errors?: string[];
+        warnings?: string[];
+      }
+
+      export interface ImportGroup {
+        supplier_id: string;
+        supplier_name: string;
+        supplier_code: string;
+        warehouse_id?: string;
+        expected_delivery: string;
+        payment_terms?: string;
+        currency: string;
+        tax_code_id: string;
+        lines: ImportRowWithValidation[];
+        subtotal: number;
+      }
+
+      export interface ValidationResult {
+        valid_rows: ImportRowWithValidation[];
+        error_rows: ImportRowWithValidation[];
+        summary: {
+          total: number;
+          valid: number;
+          errors: number;
+          warnings: number;
+        };
+      }
+
+      export interface BulkCreatePOResult {
+        success: boolean;
+        pos_created: POSummary[];
+        errors: BulkError[];
+        total_lines: number;
+        total_value: number;
+      }
+
+      export interface POSummary {
+        po_id: string;
+        po_number: string;
+        supplier_id: string;
+        supplier_name: string;
+        line_count: number;
+        total: number;
+        currency: string;
+        status: string;
+      }
+
+      export interface BulkError {
+        product_code?: string;
+        po_id?: string;
+        po_number?: string;
+        error: string;
+        row_number?: number;
+      }
+
+      export interface BulkStatusUpdateResult {
+        success_count: number;
+        error_count: number;
+        results: {
+          po_id: string;
+          po_number: string;
+          status?: string;
+          error?: string;
+        }[];
+      }
+
+      export type BulkAction = 'approve' | 'reject' | 'cancel' | 'confirm';
+
+# UX References
+ux:
+  wireframes:
+    - id: "PLAN-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-004-po-list.md"
+      sections: ["Bulk Actions Bar", "Export to Excel", "Import POs button"]
+    - id: "PLAN-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-007-po-bulk-import.md"
+      description: "Complete 4-step import wizard wireframe"
+      steps:
+        - "Step 1: File Upload (drag-drop, template download)"
+        - "Step 2: Preview (grouped by supplier, edit groups)"
+        - "Step 3: Validation Results (errors, warnings)"
+        - "Step 4: Create (progress, results)"
+
+  states:
+    - name: "loading"
+      description: "File parsing or PO creation in progress"
+      indicator: "Progress bar with percentage"
+    - name: "empty"
+      description: "No file selected"
+      indicator: "Drag-drop zone with instructions"
+    - name: "error"
+      description: "File format error or API error"
+      indicator: "Alert with error message"
+    - name: "success"
+      description: "Import complete"
+      indicator: "Checkmark icon with PO list"
+    - name: "partial_success"
+      description: "Some POs created, some failed"
+      indicator: "Warning icon with split results"
+
+  accessibility:
+    keyboard:
+      - "Tab: Navigate between wizard steps"
+      - "Enter: Confirm actions"
+      - "Escape: Close modal"
+      - "Arrow keys: Navigate dropdown menus"
+    aria:
+      - "Dialog: role=dialog, aria-modal=true"
+      - "Progress: role=progressbar, aria-valuenow, aria-valuemax"
+      - "Tabs: role=tablist, aria-selected"
+
+  responsive:
+    desktop: "Full modal with side-by-side groups"
+    tablet: "Stacked groups, scrollable"
+    mobile: "Collapsed groups (accordions), smaller table"

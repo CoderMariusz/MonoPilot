@@ -1,0 +1,344 @@
+# Story 03.6 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/po-bulk-service.test.ts"
+    type: "unit"
+    description: "Unit tests for bulk PO operations"
+  - path: "apps/frontend/lib/services/__tests__/excel-service.test.ts"
+    type: "unit"
+    description: "Unit tests for Excel parsing/generation"
+  - path: "apps/frontend/lib/validation/__tests__/po-bulk-schemas.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/app/api/planning/purchase-orders/__tests__/bulk-operations.test.ts"
+    type: "integration"
+    description: "Integration tests for bulk API endpoints"
+  - path: "e2e/planning/po-bulk-operations.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for import wizard and bulk actions"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    name: "Bulk PO Creation from Product List"
+    given: "Planner has a list of products with quantities"
+    when: "Planner submits bulk PO creation request"
+    then: "System creates draft POs grouped by default supplier"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "FR-PLAN-008"
+
+  - id: "AC-02"
+    name: "Excel/CSV Import with Validation"
+    given: "Planner uploads Excel file with product codes and quantities"
+    when: "System validates file format and data"
+    then: "Preview displays with validation status per row"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "Import Wizard Multi-Step Flow"
+    given: "Planner on Import Wizard with valid preview"
+    when: "Planner clicks Create POs"
+    then: "Wizard shows progress and completes with results"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    name: "Excel Export (3 Sheets)"
+    given: "Planner on PO list with selection"
+    when: "Planner clicks Export"
+    then: "Excel file downloads with Summary, Lines, Metadata sheets"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    name: "Bulk Status Update"
+    given: "Planner selects multiple POs"
+    when: "Planner clicks Bulk Approve"
+    then: "All eligible POs transition to approved status"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    name: "Batch Processing & Transaction Safety"
+    given: "Import with 50 products across 3 suppliers"
+    when: "One supplier group has validation error"
+    then: "Other groups succeed, failed group rolls back entirely"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    name: "Service Layer Methods"
+    given: "POBulkService.bulkCreatePOs called"
+    when: "Products have default suppliers"
+    then: "Returns array of created POs grouped correctly"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-08"
+    name: "Validation Schemas"
+    given: "Zod schema validates import row"
+    when: "Valid data provided"
+    then: "Validation passes with type-safe output"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-09"
+    name: "Error Handling"
+    given: "Planner uploads invalid file type"
+    when: "System validates file format"
+    then: "Error message displays, file upload resets"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-10"
+    name: "Performance"
+    given: "Import file with 500 products across 20 suppliers"
+    when: "Planner submits import"
+    then: "Processing completes within 30 seconds"
+    test_type: "performance"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  po_bulk_service:
+    - name: "bulkCreatePOs groups products by default supplier"
+      setup: |
+        - 4 products: 2 from Supplier A, 1 from Supplier B, 1 from Supplier C
+      expected: "Creates 3 draft POs"
+
+    - name: "bulkCreatePOs fails for product without default supplier"
+      setup: |
+        - Product with no supplier_products.is_default = true
+      expected: "Returns error for that product"
+
+    - name: "bulkCreatePOs uses supplier-product price first"
+      setup: |
+        - Product with supplier_products.unit_price = 2.50
+      expected: "PO line has unit_price = 2.50"
+
+    - name: "bulkCreatePOs falls back to std_price"
+      setup: |
+        - Product with no supplier-product price, std_price = 3.00
+      expected: "PO line has unit_price = 3.00"
+
+    - name: "validateImportData catches missing product"
+      setup: |
+        - Row with product_code that doesn't exist
+      expected: "Row marked as error"
+
+    - name: "validateImportData catches negative quantity"
+      setup: |
+        - Row with quantity = -10
+      expected: "Row marked as error"
+
+  excel_service:
+    - name: "parseFile handles .xlsx correctly"
+      setup: "Valid Excel file with 10 rows"
+      expected: "Returns array of 10 parsed rows"
+
+    - name: "parseFile handles .csv correctly"
+      setup: "Valid CSV file (UTF-8)"
+      expected: "Returns parsed rows identical to Excel"
+
+    - name: "parseFile rejects unsupported format"
+      setup: ".txt file"
+      expected: "Throws INVALID_FILE_FORMAT error"
+
+    - name: "createWorkbook generates 3 sheets"
+      setup: "3 POs with lines"
+      expected: "Workbook has Summary, Lines, Metadata sheets"
+
+  po_bulk_schemas:
+    - name: "BulkPOImportRowSchema accepts valid row"
+      input: |
+        { product_code: "RM-001", quantity: 100 }
+      expected: "Validation passes"
+
+    - name: "BulkPOImportRowSchema rejects empty product_code"
+      input: |
+        { product_code: "", quantity: 100 }
+      expected: "Validation fails: product_code required"
+
+    - name: "BulkStatusUpdateSchema rejects empty po_ids"
+      input: |
+        { po_ids: [], action: "approve" }
+      expected: "Validation fails: min 1 PO required"
+
+    - name: "BulkStatusUpdateSchema rejects invalid action"
+      input: |
+        { po_ids: ["uuid"], action: "invalid" }
+      expected: "Validation fails: invalid action"
+
+# Integration Test Cases
+integration_tests:
+  bulk_create:
+    - name: "POST /bulk-create with 3 suppliers, 20 products"
+      setup: |
+        - Create 20 products with default suppliers (3 groups)
+      request: |
+        POST /api/planning/purchase-orders/bulk-create
+        { products: [...20 items] }
+      expected: |
+        - 200 OK
+        - 3 POs created
+        - Correct line counts per PO
+      performance: "<5 seconds"
+
+    - name: "POST /bulk-create with partial failure"
+      setup: |
+        - 10 products: 8 with default supplier, 2 without
+      request: "bulk-create with all 10"
+      expected: |
+        - POs created for 8 valid products
+        - Errors returned for 2 invalid
+
+  import:
+    - name: "POST /import/validate with valid Excel"
+      setup: "Upload valid .xlsx file"
+      expected: |
+        - 200 OK
+        - valid_rows count matches
+        - preview includes product names
+
+    - name: "POST /import/validate with missing column"
+      setup: "Upload Excel without product_code column"
+      expected: |
+        - 400 MISSING_COLUMNS
+        - Error message specifies column
+
+    - name: "POST /import/execute within timeout"
+      setup: "500 valid rows"
+      expected: "Completes within 30 seconds"
+
+  export:
+    - name: "POST /export 3 POs"
+      setup: "3 existing POs with lines"
+      expected: |
+        - Excel file returned
+        - Summary sheet has 3 rows
+        - Lines sheet has all lines
+        - Metadata sheet has export info
+
+    - name: "POST /export filtered"
+      setup: "10 POs, filter status=Draft"
+      expected: "Only Draft POs exported"
+
+  bulk_status:
+    - name: "POST /bulk-status-update approve 10 POs"
+      setup: "10 POs in pending_approval status"
+      request: |
+        { po_ids: [...], action: "approve" }
+      expected: "All 10 transitioned to approved"
+
+    - name: "POST /bulk-status-update partial failure"
+      setup: "5 POs: 4 in pending_approval, 1 in receiving"
+      expected: |
+        - 4 approved
+        - 1 error (cannot approve from receiving)
+
+    - name: "POST /bulk-status-update cancel with receipts blocked"
+      setup: "PO in receiving status with receipts"
+      expected: "Error: cannot cancel PO with receipts"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Import wizard happy path"
+    steps:
+      - "Navigate to /planning/purchase-orders"
+      - "Click Import button"
+      - "Upload Excel file (10 valid rows)"
+      - "Verify preview shows 3 PO groups"
+      - "Click Next to validate"
+      - "Verify 0 errors"
+      - "Click Create POs"
+      - "Wait for progress to complete"
+      - "Verify 3 POs in results"
+      - "Click View POs"
+      - "Verify PO list filtered to new POs"
+
+  - name: "Import wizard with errors"
+    steps:
+      - "Upload file with invalid product code"
+      - "Verify error shown in preview"
+      - "Map invalid product to existing"
+      - "Proceed to create"
+      - "Verify success"
+
+  - name: "Bulk export"
+    steps:
+      - "Navigate to PO list"
+      - "Apply filter: status = Draft"
+      - "Click Export"
+      - "Verify Excel downloads"
+      - "Open Excel, verify 3 sheets"
+
+  - name: "Bulk status update"
+    steps:
+      - "Navigate to PO list"
+      - "Select 5 POs in pending_approval"
+      - "Click Bulk Actions > Approve"
+      - "Confirm dialog"
+      - "Verify toast: 5 POs approved"
+      - "Verify list shows new status"
+
+# Definition of Done
+definition_of_done:
+  - "All 10 Acceptance Criteria passing"
+  - "API endpoints implemented with validation"
+  - "Import wizard UI complete (4 steps)"
+  - "Excel export generates 3 sheets"
+  - "Bulk status update with permission checks"
+  - "Auto-grouping by supplier logic correct"
+  - "Transaction safety: rollback on group failure"
+  - "Zod validation schemas complete"
+  - "Unit tests passing (>80% coverage)"
+  - "Integration tests for all 5 endpoints"
+  - "E2E smoke test passing"
+  - "Performance: 100 products < 5 seconds"
+  - "Performance: 500 row import < 30 seconds"
+  - "RLS policies verified"
+  - "Partial success handling works"
+  - "File limits enforced (5MB, 500 rows)"
+  - "Export limit enforced (1000 POs)"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "po-bulk-service.ts: 80%"
+      - "excel-service.ts: 80%"
+      - "po-bulk-schemas.ts: 90%"
+  integration:
+    target: 80
+    endpoints:
+      - "bulk-create: 90%"
+      - "import/validate: 80%"
+      - "import/execute: 80%"
+      - "export: 80%"
+      - "bulk-status-update: 90%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Large import files may timeout"
+    mitigation: "Batch processing with 50 lines per batch, 60s timeout"
+    severity: "medium"
+    test_coverage: "performance test with 500 rows"
+
+  - id: "RISK-02"
+    description: "Partial success may confuse users"
+    mitigation: "Clear UI showing which POs succeeded vs failed"
+    severity: "low"
+    test_coverage: "e2e test with partial failure"
+
+  - id: "RISK-03"
+    description: "Excel library memory usage"
+    mitigation: "Streaming for large files, limit to 1000 POs export"
+    severity: "medium"
+    test_coverage: "load test with 1000 PO export"

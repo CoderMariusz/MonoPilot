@@ -1,0 +1,455 @@
+# Story 03.1 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # List suppliers with filters
+  - method: "GET"
+    path: "/api/planning/suppliers"
+    description: "List suppliers with filters, search, and pagination"
+    file: "apps/frontend/app/api/planning/suppliers/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      query_params:
+        - { name: "status", type: "string", required: false, values: ["all", "active", "inactive"], default: "all" }
+        - { name: "currency[]", type: "string[]", required: false, description: "Filter by currencies" }
+        - { name: "payment_terms", type: "string", required: false }
+        - { name: "search", type: "string", required: false, description: "Searches code, name, contact_name, email, phone" }
+        - { name: "page", type: "number", required: false, default: 1 }
+        - { name: "limit", type: "number", required: false, default: 20, max: 100 }
+        - { name: "sort", type: "string", required: false, default: "code" }
+        - { name: "order", type: "string", required: false, values: ["asc", "desc"], default: "asc" }
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          type: "Supplier[]"
+          fields:
+            - "id: UUID"
+            - "code: string"
+            - "name: string"
+            - "contact_name: string | null"
+            - "contact_email: string | null"
+            - "contact_phone: string | null"
+            - "currency: string"
+            - "tax_code: { id, code, name, rate }"
+            - "payment_terms: string"
+            - "is_active: boolean"
+            - "products_count: number"
+            - "has_open_pos: boolean"
+            - "created_at: string"
+        meta:
+          total: "number"
+          page: "number"
+          limit: "number"
+          pages: "number"
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+
+  # Get supplier summary KPIs
+  - method: "GET"
+    path: "/api/planning/suppliers/summary"
+    description: "Returns KPI summary for supplier dashboard"
+    file: "apps/frontend/app/api/planning/suppliers/summary/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          total_count: "number"
+          active_count: "number"
+          inactive_count: "number"
+          active_rate: "number"  # percentage
+          this_month_count: "number"
+
+  # Get next available supplier code
+  - method: "GET"
+    path: "/api/planning/suppliers/next-code"
+    description: "Returns next auto-generated supplier code (SUP-XXX)"
+    file: "apps/frontend/app/api/planning/suppliers/next-code/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          code: "string"  # e.g., "SUP-001"
+
+  # Validate supplier code uniqueness
+  - method: "GET"
+    path: "/api/planning/suppliers/validate-code"
+    description: "Check if supplier code is available"
+    file: "apps/frontend/app/api/planning/suppliers/validate-code/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      query_params:
+        - { name: "code", type: "string", required: true }
+        - { name: "exclude_id", type: "string", required: false, description: "Exclude this supplier ID (for edit)" }
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          available: "boolean"
+
+  # Get single supplier
+  - method: "GET"
+    path: "/api/planning/suppliers/:id"
+    description: "Get supplier by ID with full details"
+    file: "apps/frontend/app/api/planning/suppliers/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          type: "Supplier"
+          includes: ["tax_code object", "created_by user", "updated_by user"]
+
+    errors:
+      - { status: 404, code: "SUPPLIER_NOT_FOUND", message: "Supplier not found" }
+
+  # Create supplier
+  - method: "POST"
+    path: "/api/planning/suppliers"
+    description: "Create new supplier"
+    file: "apps/frontend/app/api/planning/suppliers/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "production_manager", "planner", "purchaser"]
+
+    request:
+      body:
+        code: { type: "string", required: true, validation: "2-20 chars, alphanumeric + hyphen" }
+        name: { type: "string", required: true, validation: "2-100 chars" }
+        contact_name: { type: "string", required: false, validation: "max 100 chars" }
+        contact_email: { type: "string", required: false, validation: "valid email format" }
+        contact_phone: { type: "string", required: false, validation: "max 50 chars" }
+        address: { type: "string", required: false, validation: "max 200 chars" }
+        city: { type: "string", required: false, validation: "max 100 chars" }
+        postal_code: { type: "string", required: false, validation: "max 20 chars" }
+        country: { type: "string", required: false, validation: "ISO 3166-1 alpha-2 (2 chars)" }
+        currency: { type: "string", required: true, values: ["PLN", "EUR", "USD", "GBP"] }
+        tax_code_id: { type: "UUID", required: true }
+        payment_terms: { type: "string", required: true, validation: "1-100 chars" }
+        notes: { type: "string", required: false, validation: "max 1000 chars" }
+        is_active: { type: "boolean", required: false, default: true }
+
+    response:
+      status: 201
+      schema:
+        success: true
+        data:
+          type: "Supplier"
+
+    errors:
+      - { status: 400, code: "SUPPLIER_CODE_EXISTS", message: "Supplier code already exists in organization" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed", details: "field-level errors" }
+      - { status: 400, code: "TAX_CODE_NOT_FOUND", message: "Tax code not found" }
+
+  # Update supplier
+  - method: "PUT"
+    path: "/api/planning/suppliers/:id"
+    description: "Update existing supplier"
+    file: "apps/frontend/app/api/planning/suppliers/[id]/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "production_manager", "planner", "purchaser"]
+
+    request:
+      body:
+        # Same as POST, but code may be immutable if supplier has POs
+        code: { type: "string", note: "Immutable if supplier has purchase orders" }
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          type: "Supplier"
+
+    errors:
+      - { status: 400, code: "SUPPLIER_CODE_LOCKED", message: "Cannot change code - supplier has purchase orders" }
+      - { status: 404, code: "SUPPLIER_NOT_FOUND", message: "Supplier not found" }
+
+  # Delete supplier
+  - method: "DELETE"
+    path: "/api/planning/suppliers/:id"
+    description: "Delete supplier (if no POs or products)"
+    file: "apps/frontend/app/api/planning/suppliers/[id]/route.ts"
+    auth: "required"
+    roles: ["admin", "owner"]
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          id: "string"
+          message: "string"
+
+    errors:
+      - { status: 400, code: "SUPPLIER_HAS_PURCHASE_ORDERS", message: "Cannot delete supplier with existing purchase orders", details: { po_count: "number", open_po_count: "number" } }
+      - { status: 400, code: "SUPPLIER_HAS_PRODUCTS", message: "Cannot delete supplier with assigned products", details: { products_count: "number" } }
+      - { status: 404, code: "SUPPLIER_NOT_FOUND", message: "Supplier not found" }
+
+  # Bulk deactivate
+  - method: "POST"
+    path: "/api/planning/suppliers/bulk-deactivate"
+    description: "Deactivate multiple suppliers"
+    file: "apps/frontend/app/api/planning/suppliers/bulk-deactivate/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "production_manager"]
+
+    request:
+      body:
+        supplier_ids: { type: "UUID[]", required: true }
+        reason: { type: "string", required: false }
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          deactivated_count: "number"
+          failed_count: "number"
+          results:
+            type: "array"
+            items:
+              id: "UUID"
+              status: "deactivated | failed"
+              error: "string | null"
+
+  # Bulk activate
+  - method: "POST"
+    path: "/api/planning/suppliers/bulk-activate"
+    description: "Activate multiple inactive suppliers"
+    file: "apps/frontend/app/api/planning/suppliers/bulk-activate/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "production_manager"]
+
+    request:
+      body:
+        supplier_ids: { type: "UUID[]", required: true }
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          activated_count: "number"
+          failed_count: "number"
+          results:
+            type: "array"
+            items:
+              id: "UUID"
+              status: "activated | failed"
+              error: "string | null"
+
+  # Export to Excel
+  - method: "POST"
+    path: "/api/planning/suppliers/export"
+    description: "Export suppliers to Excel"
+    file: "apps/frontend/app/api/planning/suppliers/export/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      body:
+        supplier_ids: { type: "UUID[]", required: false, description: "If empty, export all" }
+        format: { type: "string", required: true, values: ["xlsx"] }
+        include_products: { type: "boolean", required: false, default: false }
+        include_purchase_history: { type: "boolean", required: false, default: false }
+
+    response:
+      status: 200
+      content_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      description: "Binary file download"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/supplier-service.ts"
+    description: "Supplier business logic and API calls"
+    exports:
+      - name: "listSuppliers"
+        type: "async function"
+        params: ["params: SupplierListParams"]
+        returns: "Promise<{ data: Supplier[]; meta: PaginationMeta }>"
+
+      - name: "getSupplierSummary"
+        type: "async function"
+        params: []
+        returns: "Promise<SupplierSummary>"
+
+      - name: "getSupplier"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<Supplier>"
+
+      - name: "createSupplier"
+        type: "async function"
+        params: ["data: CreateSupplierDto"]
+        returns: "Promise<Supplier>"
+
+      - name: "updateSupplier"
+        type: "async function"
+        params: ["id: string", "data: UpdateSupplierDto"]
+        returns: "Promise<Supplier>"
+
+      - name: "deleteSupplier"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<void>"
+
+      - name: "bulkDeactivateSuppliers"
+        type: "async function"
+        params: ["ids: string[]", "reason?: string"]
+        returns: "Promise<BulkActionResult>"
+
+      - name: "bulkActivateSuppliers"
+        type: "async function"
+        params: ["ids: string[]"]
+        returns: "Promise<BulkActionResult>"
+
+      - name: "exportSuppliersToExcel"
+        type: "async function"
+        params: ["params: ExportParams"]
+        returns: "Promise<Blob>"
+
+      - name: "getNextSupplierCode"
+        type: "async function"
+        params: []
+        returns: "Promise<string>"
+
+      - name: "validateSupplierCode"
+        type: "async function"
+        params: ["code: string", "excludeId?: string"]
+        returns: "Promise<boolean>"
+
+      - name: "canDeactivateSupplier"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<ValidationResult>"
+
+      - name: "canDeleteSupplier"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<ValidationResult>"
+
+# Validation Schema (Zod)
+validation:
+  path: "apps/frontend/lib/validation/supplier-schema.ts"
+  schemas:
+    - name: "supplierSchema"
+      fields:
+        code:
+          type: "z.string()"
+          validation: ".min(2).max(20).regex(/^[A-Z0-9-]+$/)"
+          error_messages:
+            min: "Code must be at least 2 characters"
+            max: "Code must be at most 20 characters"
+            regex: "Code must contain only uppercase letters, numbers, and hyphens"
+        name:
+          type: "z.string()"
+          validation: ".min(2).max(100)"
+        contact_name:
+          type: "z.string()"
+          validation: ".max(100).optional().or(z.literal(''))"
+        contact_email:
+          type: "z.string()"
+          validation: ".email().optional().or(z.literal(''))"
+          error_messages:
+            email: "Invalid email format"
+        contact_phone:
+          type: "z.string()"
+          validation: ".max(50).optional()"
+        address:
+          type: "z.string()"
+          validation: ".max(200).optional()"
+        city:
+          type: "z.string()"
+          validation: ".max(100).optional()"
+        postal_code:
+          type: "z.string()"
+          validation: ".max(20).optional()"
+        country:
+          type: "z.string()"
+          validation: ".length(2).optional()"
+          error_messages:
+            length: "Country must be ISO 3166-1 alpha-2 code"
+        currency:
+          type: "z.enum(['PLN', 'EUR', 'USD', 'GBP'])"
+          error_messages:
+            enum: "Currency is required"
+        tax_code_id:
+          type: "z.string()"
+          validation: ".uuid()"
+          error_messages:
+            uuid: "Invalid tax code"
+        payment_terms:
+          type: "z.string()"
+          validation: ".min(1).max(100)"
+          error_messages:
+            min: "Payment terms are required"
+            max: "Payment terms must be at most 100 characters"
+        notes:
+          type: "z.string()"
+          validation: ".max(1000).optional()"
+        is_active:
+          type: "z.boolean()"
+          validation: ".default(true)"
+
+# Error Codes
+error_codes:
+  - code: "SUPPLIER_NOT_FOUND"
+    status: 404
+    message: "Supplier not found"
+    cause: "Invalid ID or cross-tenant access"
+
+  - code: "SUPPLIER_CODE_EXISTS"
+    status: 400
+    message: "Supplier code already exists in organization"
+    cause: "Duplicate code within same org_id"
+
+  - code: "SUPPLIER_CODE_LOCKED"
+    status: 400
+    message: "Cannot change code - supplier has purchase orders"
+    cause: "Attempting to edit code when po_count > 0"
+
+  - code: "SUPPLIER_HAS_PURCHASE_ORDERS"
+    status: 400
+    message: "Cannot delete supplier with existing purchase orders"
+    cause: "Attempting to delete when po_count > 0"
+
+  - code: "SUPPLIER_HAS_PRODUCTS"
+    status: 400
+    message: "Cannot delete supplier with assigned products"
+    cause: "Attempting to delete when products_count > 0"
+
+  - code: "CANNOT_DEACTIVATE_OPEN_POS"
+    status: 400
+    message: "Cannot deactivate supplier with open purchase orders"
+    cause: "Attempting to deactivate when open_po_count > 0"
+
+  - code: "TAX_CODE_NOT_FOUND"
+    status: 400
+    message: "Tax code not found"
+    cause: "Invalid tax_code_id"
+
+  - code: "VALIDATION_ERROR"
+    status: 400
+    message: "Validation failed"
+    details: "Array of field-level errors"

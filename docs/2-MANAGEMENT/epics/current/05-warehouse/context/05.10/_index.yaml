@@ -1,0 +1,110 @@
+# Story 05.10 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.10"
+  name: "GRN CRUD + Items"
+  slug: "grn-crud-items"
+  epic: "05-warehouse"
+  phase: "1"
+  complexity: "L"
+  estimate_days: 5
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes, triggers
+  - api.yaml         # Endpoints, services, validation schemas
+  - frontend.yaml    # Pages, components, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS pattern", "users table"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table"]
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides: ["locations table"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table"]
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings table", "QA defaults", "number formats"]
+    - story: "05.1"
+      name: "LP Table + Basic Service"
+      provides: ["license_plates table", "LP creation on GRN complete"]
+  blocked_by: []
+  blocks:
+    - story: "05.11"
+      name: "GRN from PO"
+    - story: "05.12"
+      name: "GRN from TO"
+    - story: "05.13"
+      name: "ASN Management"
+    - story: "05.14"
+      name: "Label Printing"
+    - story: "05.15"
+      name: "Warehouse Dashboard"
+    - story: "05.17"
+      name: "Scanner Receive"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-001", "WH-FR-003", "WH-FR-004", "WH-FR-009", "WH-FR-010", "WH-FR-029"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections: ["Database Schema", "API Design", "GRN Workflow"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.10.grn-crud-items.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-004-grn-from-po-modal.md"
+      relevance: "GRN UI patterns, field requirements, validation rules"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for grns/grn_items tables"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 4
+    description: "grn_number_sequences, grns, grn_items tables + triggers"
+  - type: "service"
+    count: 1
+    description: "grn-service.ts (CRUD + complete/cancel workflows)"
+  - type: "validation"
+    count: 1
+    description: "grn.ts (Zod schemas)"
+  - type: "api"
+    count: 12
+    description: "GRN and GRN Item endpoints"
+  - type: "pages"
+    count: 4
+    description: "GRN list, detail, create, edit pages"
+  - type: "components"
+    count: 12
+    description: "GRN DataTable, forms, badges, modals"
+  - type: "test"
+    count: 4
+    description: "Unit, integration, RLS, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Master-detail pattern: GRN header + GRN items"
+  - "GRN number format: GRN-YYYY-NNNNN (per org, per year sequence)"
+  - "LP creation happens on GRN complete, not on create"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Return 404 (not 403) for cross-tenant access"
+  - "Transaction handling: GRN + items in single transaction"
+  - "Complete workflow creates 1 LP per GRN item"
+  - "Cancel workflow: draft=simple cancel, completed=consume LPs if available"

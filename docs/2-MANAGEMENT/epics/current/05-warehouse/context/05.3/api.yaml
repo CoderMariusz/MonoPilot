@@ -1,0 +1,488 @@
+# Story 05.3 - API Specification
+# Purpose: Endpoints, services, validation schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# API Endpoints
+endpoints:
+  # Reservation CRUD
+  - method: "GET"
+    path: "/api/warehouse/reservations"
+    description: "List reservations with filters (wo_id, lp_id, status)"
+    file: "apps/frontend/app/api/warehouse/reservations/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "production_manager", "admin", "owner"]
+    query_params:
+      - { name: "wo_id", type: "UUID", required: false }
+      - { name: "to_id", type: "UUID", required: false }
+      - { name: "lp_id", type: "UUID", required: false }
+      - { name: "status", type: "string", required: false, enum: ["active", "released", "consumed"] }
+      - { name: "page", type: "number", required: false, default: 1 }
+      - { name: "limit", type: "number", required: false, default: 50 }
+    response:
+      status: 200
+      type: "PaginatedReservations"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+
+  - method: "GET"
+    path: "/api/warehouse/reservations/:id"
+    description: "Get reservation detail with LP info"
+    file: "apps/frontend/app/api/warehouse/reservations/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      type: "ReservationWithLP"
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "Reservation not found" }
+
+  - method: "POST"
+    path: "/api/warehouse/reservations"
+    description: "Create single reservation"
+    file: "apps/frontend/app/api/warehouse/reservations/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "production_manager", "admin", "owner"]
+    request:
+      body:
+        lp_id: "UUID"
+        wo_id: "UUID (optional)"
+        to_id: "UUID (optional)"
+        wo_material_id: "UUID (optional)"
+        reserved_qty: "number"
+    response:
+      status: 201
+      type: "Reservation"
+    errors:
+      - { status: 400, code: "LP_NOT_AVAILABLE", message: "LP not available for reservation (status: {status})" }
+      - { status: 400, code: "INSUFFICIENT_QTY", message: "Insufficient available quantity (requested: {qty}, available: {available})" }
+      - { status: 400, code: "QA_NOT_PASSED", message: "LP not QA approved for reservation" }
+
+  - method: "PUT"
+    path: "/api/warehouse/reservations/:id"
+    description: "Update reservation (limited fields)"
+    file: "apps/frontend/app/api/warehouse/reservations/[id]/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "production_manager", "admin", "owner"]
+
+  - method: "DELETE"
+    path: "/api/warehouse/reservations/:id"
+    description: "Release/cancel reservation"
+    file: "apps/frontend/app/api/warehouse/reservations/[id]/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "production_manager", "admin", "owner"]
+    response:
+      status: 200
+      type: "Reservation"
+    note: "Sets status to 'released', does not hard delete"
+
+  # Picking/Suggestion endpoints
+  - method: "GET"
+    path: "/api/warehouse/picking/available"
+    description: "Find available LPs for a product using FIFO/FEFO"
+    file: "apps/frontend/app/api/warehouse/picking/available/route.ts"
+    auth: "required"
+    roles: ["*"]
+    query_params:
+      - { name: "product_id", type: "UUID", required: true }
+      - { name: "warehouse_id", type: "UUID", required: false }
+      - { name: "strategy", type: "string", required: false, enum: ["fifo", "fefo", "none"] }
+    response:
+      status: 200
+      type: "AvailableLP[]"
+    errors:
+      - { status: 400, code: "PRODUCT_REQUIRED", message: "product_id is required" }
+
+  - method: "POST"
+    path: "/api/warehouse/picking/suggest"
+    description: "Get picking suggestions with quantity needed"
+    file: "apps/frontend/app/api/warehouse/picking/suggest/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      body:
+        product_id: "UUID"
+        required_qty: "number"
+        warehouse_id: "UUID (optional)"
+    response:
+      status: 200
+      type: "PickSuggestion[]"
+
+  - method: "POST"
+    path: "/api/warehouse/picking/reserve"
+    description: "Reserve LPs for WO (multi-LP allocation)"
+    file: "apps/frontend/app/api/warehouse/picking/reserve/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "production_manager", "admin", "owner"]
+    request:
+      body:
+        wo_id: "UUID"
+        material_id: "UUID"
+        product_id: "UUID"
+        required_qty: "number"
+        warehouse_id: "UUID (optional)"
+    response:
+      status: 200
+      type: "AllocationResult"
+
+  # WO-specific endpoints (for Epic 04.8 integration)
+  - method: "GET"
+    path: "/api/warehouse/work-orders/:woId/reservations"
+    description: "Get all reservations for a Work Order"
+    file: "apps/frontend/app/api/warehouse/work-orders/[woId]/reservations/route.ts"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      type: "ReservationWithLP[]"
+
+  - method: "DELETE"
+    path: "/api/warehouse/work-orders/:woId/reservations"
+    description: "Release all reservations for a Work Order"
+    file: "apps/frontend/app/api/warehouse/work-orders/[woId]/reservations/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "production_manager", "admin", "owner"]
+    response:
+      status: 200
+      schema:
+        released_count: "number"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/lp-reservation-service.ts"
+    description: "LP reservation operations (CRUD, release, consume)"
+    exports:
+      - name: "createReservation"
+        type: "async function"
+        params: ["data: CreateReservationInput"]
+        returns: "Promise<Reservation>"
+      - name: "releaseReservation"
+        type: "async function"
+        params: ["reservationId: string"]
+        returns: "Promise<Reservation>"
+      - name: "releaseAllReservations"
+        type: "async function"
+        params: ["woId: string"]
+        returns: "Promise<number>"
+      - name: "getReservations"
+        type: "async function"
+        params: ["woId: string"]
+        returns: "Promise<ReservationWithLP[]>"
+      - name: "consumeReservation"
+        type: "async function"
+        params: ["reservationId: string", "consumedQty: number"]
+        returns: "Promise<Reservation>"
+      - name: "getAvailableQuantity"
+        type: "async function"
+        params: ["lpId: string"]
+        returns: "Promise<number>"
+
+  - path: "apps/frontend/lib/services/fifo-fefo-service.ts"
+    description: "FIFO/FEFO picking algorithms and suggestions"
+    exports:
+      - name: "findAvailableLPs"
+        type: "async function"
+        params: ["productId: string", "warehouseId?: string", "strategy?: PickingStrategy"]
+        returns: "Promise<AvailableLP[]>"
+      - name: "reserveLPs"
+        type: "async function"
+        params: ["woId: string", "materialId: string", "productId: string", "requiredQty: number", "warehouseId?: string"]
+        returns: "Promise<AllocationResult>"
+      - name: "getPickingStrategy"
+        type: "async function"
+        params: []
+        returns: "Promise<PickingStrategy>"
+      - name: "checkFIFOFEFOViolation"
+        type: "async function"
+        params: ["selectedLpId: string", "suggestedLpId: string"]
+        returns: "Promise<ViolationResult>"
+
+# Validation Schemas
+validation:
+  path: "apps/frontend/lib/validation/reservation-schemas.ts"
+  schemas:
+    - name: "createReservationSchema"
+      content: |
+        import { z } from 'zod';
+
+        export const createReservationSchema = z.object({
+          lp_id: z.string().uuid(),
+          wo_id: z.string().uuid().optional(),
+          to_id: z.string().uuid().optional(),
+          wo_material_id: z.string().uuid().optional(),
+          reserved_qty: z.number().positive("Reserved quantity must be positive"),
+        }).refine(data => data.wo_id || data.to_id, {
+          message: "Either wo_id or to_id must be provided"
+        });
+
+    - name: "reserveLPsSchema"
+      content: |
+        export const reserveLPsSchema = z.object({
+          wo_id: z.string().uuid(),
+          material_id: z.string().uuid(),
+          product_id: z.string().uuid(),
+          required_qty: z.number().positive("Required quantity must be positive"),
+          warehouse_id: z.string().uuid().optional(),
+        });
+
+    - name: "findAvailableLPsSchema"
+      content: |
+        export const findAvailableLPsSchema = z.object({
+          product_id: z.string().uuid(),
+          warehouse_id: z.string().uuid().optional(),
+          strategy: z.enum(['fifo', 'fefo', 'none']).optional(),
+        });
+
+    - name: "consumeReservationSchema"
+      content: |
+        export const consumeReservationSchema = z.object({
+          consumed_qty: z.number().positive("Consumed quantity must be positive"),
+        });
+
+# Types
+types:
+  path: "apps/frontend/lib/types/reservation.ts"
+  content: |
+    export interface Reservation {
+      id: string;
+      org_id: string;
+      lp_id: string;
+      wo_id: string | null;
+      to_id: string | null;
+      wo_material_id: string | null;
+      reserved_qty: number;
+      consumed_qty: number;
+      status: 'active' | 'released' | 'consumed';
+      reserved_at: string;
+      released_at: string | null;
+      reserved_by: string | null;
+      created_at: string;
+    }
+
+    export interface ReservationWithLP extends Reservation {
+      lp: {
+        lp_number: string;
+        product_id: string;
+        product_name: string;
+        quantity: number;
+        uom: string;
+        batch_number: string | null;
+        expiry_date: string | null;
+        location_id: string;
+        location_code: string;
+        warehouse_id: string;
+      };
+      remaining_qty: number;  // reserved_qty - consumed_qty
+    }
+
+    export interface AvailableLP {
+      id: string;
+      lp_number: string;
+      product_id: string;
+      quantity: number;
+      available_qty: number;  // quantity - reserved_qty
+      uom: string;
+      location_id: string;
+      warehouse_id: string;
+      batch_number: string | null;
+      expiry_date: string | null;
+      created_at: string;
+      qa_status: string;
+    }
+
+    export interface AllocationResult {
+      success: boolean;
+      reservations: Reservation[];
+      total_reserved: number;
+      shortfall: number;  // 0 if fully allocated
+      warning?: string;   // FIFO/FEFO violation warning
+    }
+
+    export interface ViolationResult {
+      has_violation: boolean;
+      violation_type: 'fifo' | 'fefo' | null;
+      message: string;
+      selected_lp: AvailableLP;
+      suggested_lp: AvailableLP;
+    }
+
+    export type PickingStrategy = 'fifo' | 'fefo' | 'none';
+
+    export interface PickSuggestion {
+      lp: AvailableLP;
+      suggested_qty: number;  // How much to take from this LP
+      reason: string;  // "FIFO: oldest" or "FEFO: expires 2026-03-01"
+      is_partial: boolean;
+    }
+
+    export interface CreateReservationInput {
+      lp_id: string;
+      wo_id?: string;
+      to_id?: string;
+      wo_material_id?: string;
+      reserved_qty: number;
+    }
+
+# Interface Contract for Epic 04.8
+interface_contract:
+  description: "These methods are the contract that Epic 04.8 will consume"
+  consumers:
+    - epic: "04"
+      story: "04.8"
+      name: "Material Reservations"
+  methods:
+    - name: "findAvailableLPs"
+      usage: "Find LPs to reserve for WO material"
+      example: "const lps = await findAvailableLPs(productId, warehouseId, 'fifo');"
+    - name: "reserveLPs"
+      usage: "Reserve multiple LPs for WO material requirement"
+      example: "const result = await reserveLPs(woId, materialId, productId, 100);"
+    - name: "releaseReservation"
+      usage: "Release reservation when WO cancelled"
+      example: "await releaseReservation(reservationId);"
+    - name: "releaseAllReservations"
+      usage: "Release all reservations when WO cancelled/completed"
+      example: "await releaseAllReservations(woId);"
+    - name: "getReservations"
+      usage: "Get all reservations for WO display"
+      example: "const reservations = await getReservations(woId);"
+    - name: "consumeReservation"
+      usage: "Mark reservation as consumed during material consumption"
+      example: "await consumeReservation(reservationId, consumedQty);"
+    - name: "getAvailableQuantity"
+      usage: "Check available qty before reservation"
+      example: "const availableQty = await getAvailableQuantity(lpId);"
+
+# Service Implementation Patterns
+patterns:
+  fifo_fefo_service: |
+    // apps/frontend/lib/services/fifo-fefo-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+    export type PickingStrategy = 'fifo' | 'fefo' | 'none';
+
+    export async function getPickingStrategy(): Promise<PickingStrategy> {
+      const supabase = createClientComponentClient();
+      const { data: settings } = await supabase
+        .from('warehouse_settings')
+        .select('enable_fifo, enable_fefo')
+        .single();
+
+      if (settings?.enable_fefo) return 'fefo';
+      if (settings?.enable_fifo) return 'fifo';
+      return 'none';
+    }
+
+    export async function findAvailableLPs(
+      productId: string,
+      warehouseId?: string,
+      strategy?: PickingStrategy
+    ): Promise<AvailableLP[]> {
+      const supabase = createClientComponentClient();
+      const effectiveStrategy = strategy || await getPickingStrategy();
+
+      let query = supabase
+        .from('license_plates')
+        .select(`
+          id, lp_number, product_id, quantity, uom,
+          location_id, warehouse_id, batch_number,
+          expiry_date, created_at, qa_status
+        `)
+        .eq('product_id', productId)
+        .eq('status', 'available')
+        .eq('qa_status', 'passed')
+        .or('expiry_date.is.null,expiry_date.gt.now()');
+
+      if (warehouseId) {
+        query = query.eq('warehouse_id', warehouseId);
+      }
+
+      // Apply sort order based on strategy
+      if (effectiveStrategy === 'fefo') {
+        query = query.order('expiry_date', { ascending: true, nullsFirst: false })
+                     .order('created_at', { ascending: true });
+      } else if (effectiveStrategy === 'fifo') {
+        query = query.order('created_at', { ascending: true });
+      }
+
+      const { data: lps, error } = await query;
+      if (error) throw error;
+
+      // Calculate available_qty (subtract active reservations)
+      const lpIds = lps.map(lp => lp.id);
+      const { data: reservations } = await supabase
+        .from('lp_reservations')
+        .select('lp_id, reserved_qty')
+        .in('lp_id', lpIds)
+        .eq('status', 'active');
+
+      const reservedByLp = new Map<string, number>();
+      reservations?.forEach(r => {
+        const current = reservedByLp.get(r.lp_id) || 0;
+        reservedByLp.set(r.lp_id, current + r.reserved_qty);
+      });
+
+      return lps
+        .map(lp => ({
+          ...lp,
+          available_qty: lp.quantity - (reservedByLp.get(lp.id) || 0)
+        }))
+        .filter(lp => lp.available_qty > 0);
+    }
+
+  reservation_service: |
+    // apps/frontend/lib/services/lp-reservation-service.ts
+    export async function reserveLPs(
+      woId: string,
+      materialId: string,
+      productId: string,
+      requiredQty: number,
+      warehouseId?: string
+    ): Promise<AllocationResult> {
+      const supabase = createClientComponentClient();
+      const availableLPs = await findAvailableLPs(productId, warehouseId);
+
+      const reservations: Reservation[] = [];
+      let totalReserved = 0;
+      let remainingQty = requiredQty;
+
+      for (const lp of availableLPs) {
+        if (remainingQty <= 0) break;
+
+        const reserveQty = Math.min(lp.available_qty, remainingQty);
+
+        const { data, error } = await supabase
+          .from('lp_reservations')
+          .insert({
+            lp_id: lp.id,
+            wo_id: woId,
+            wo_material_id: materialId,
+            reserved_qty: reserveQty,
+            status: 'active',
+            reserved_by: (await supabase.auth.getUser()).data.user?.id
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        reservations.push(data);
+        totalReserved += reserveQty;
+        remainingQty -= reserveQty;
+
+        // Update LP status if fully reserved
+        if (reserveQty === lp.available_qty) {
+          await supabase
+            .from('license_plates')
+            .update({ status: 'reserved' })
+            .eq('id', lp.id);
+        }
+      }
+
+      return {
+        success: true,
+        reservations,
+        total_reserved: totalReserved,
+        shortfall: remainingQty > 0 ? remainingQty : 0,
+        warning: remainingQty > 0 ? `Partial allocation: ${remainingQty} units short` : undefined
+      };
+    }

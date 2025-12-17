@@ -1,0 +1,339 @@
+# Story 04.2c - Frontend Specification
+# Purpose: Components, modals, hooks, types
+# Agent: FRONTEND-DEV
+
+# Wireframe Reference
+wireframe:
+  id: "PROD-002"
+  path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-002-wo-execution-detail.md"
+  sections:
+    - "4.5 Complete WO Modal"
+    - "Section 3 Action Bar (Complete WO button)"
+  ac_coverage: "9 AC for FR-PROD-005"
+
+# Components to Create
+components:
+  - path: "apps/frontend/app/(authenticated)/production/execution/components/CompleteWorkOrderButton.tsx"
+    description: "Button to trigger WO completion with permission check"
+    props:
+      - name: "workOrder"
+        type: "WorkOrder"
+        required: true
+      - name: "onComplete"
+        type: "(result: WorkOrderCompletionResult) => void"
+        required: true
+      - name: "disabled"
+        type: "boolean"
+        required: false
+        default: "false"
+    states:
+      - name: "enabled"
+        condition: "status === 'in_progress' AND hasPermission"
+        display: "Primary button with 'Complete WO' text"
+      - name: "disabled_completed"
+        condition: "status === 'completed'"
+        display: "Disabled button with 'Already Completed' text"
+      - name: "disabled_status"
+        condition: "status !== 'in_progress' AND status !== 'completed'"
+        display: "Disabled button with tooltip explaining required status"
+      - name: "disabled_permission"
+        condition: "!hasPermission('production', 'U')"
+        display: "Disabled button, hidden or with tooltip"
+    pattern: |
+      export function CompleteWorkOrderButton({
+        workOrder,
+        onComplete,
+        disabled = false
+      }: CompleteWorkOrderButtonProps) {
+        const [isModalOpen, setIsModalOpen] = useState(false);
+        const { data: context } = useOrgContext();
+
+        const hasPermission = context && hasPermissionFn(context, 'production', 'U');
+        const canComplete = workOrder.status === 'in_progress' && hasPermission && !disabled;
+        const isCompleted = workOrder.status === 'completed';
+
+        return (
+          <>
+            <Button
+              variant={isCompleted ? "secondary" : "default"}
+              disabled={!canComplete}
+              onClick={() => setIsModalOpen(true)}
+            >
+              {isCompleted ? "Already Completed" : "Complete WO"}
+            </Button>
+
+            <CompleteWorkOrderModal
+              open={isModalOpen}
+              onOpenChange={setIsModalOpen}
+              workOrder={workOrder}
+              onComplete={onComplete}
+            />
+          </>
+        );
+      }
+
+  - path: "apps/frontend/app/(authenticated)/production/execution/components/CompleteWorkOrderModal.tsx"
+    description: "Confirmation modal with validation summary and yield display"
+    props:
+      - name: "open"
+        type: "boolean"
+        required: true
+      - name: "onOpenChange"
+        type: "(open: boolean) => void"
+        required: true
+      - name: "workOrder"
+        type: "WorkOrder"
+        required: true
+      - name: "onComplete"
+        type: "(result: WorkOrderCompletionResult) => void"
+        required: true
+    sections:
+      - name: "header"
+        content: "Complete Work Order"
+      - name: "summary"
+        content: |
+          - WO Number
+          - Product Name
+          - Planned Qty vs Produced Qty
+          - Calculated Yield %
+      - name: "warnings"
+        content: |
+          - Low yield warning if yield < 80%
+          - Operations incomplete warning (if applicable)
+      - name: "actions"
+        content: |
+          - Cancel button
+          - Confirm Completion button
+    pattern: |
+      export function CompleteWorkOrderModal({
+        open,
+        onOpenChange,
+        workOrder,
+        onComplete
+      }: CompleteWorkOrderModalProps) {
+        const [isSubmitting, setIsSubmitting] = useState(false);
+        const yieldPercent = (workOrder.produced_qty / workOrder.planned_qty) * 100;
+        const isLowYield = yieldPercent < 80;
+
+        const handleComplete = async () => {
+          setIsSubmitting(true);
+          try {
+            const result = await completeWorkOrder(workOrder.id);
+            onComplete(result);
+            onOpenChange(false);
+            toast.success(`Work order ${workOrder.wo_number} completed`);
+          } catch (error) {
+            toast.error(error.message || 'Failed to complete work order');
+          } finally {
+            setIsSubmitting(false);
+          }
+        };
+
+        return (
+          <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Complete Work Order</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {/* WO Summary */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>WO Number</Label>
+                    <p className="font-medium">{workOrder.wo_number}</p>
+                  </div>
+                  <div>
+                    <Label>Product</Label>
+                    <p className="font-medium">{workOrder.product?.name}</p>
+                  </div>
+                  <div>
+                    <Label>Planned Qty</Label>
+                    <p className="font-medium">{workOrder.planned_qty}</p>
+                  </div>
+                  <div>
+                    <Label>Produced Qty</Label>
+                    <p className="font-medium">{workOrder.produced_qty}</p>
+                  </div>
+                </div>
+
+                {/* Yield Display */}
+                <div className="flex items-center gap-2">
+                  <Label>Calculated Yield</Label>
+                  <WorkOrderYieldBadge yield={yieldPercent} />
+                </div>
+
+                {/* Low Yield Warning */}
+                {isLowYield && (
+                  <Alert variant="warning">
+                    <AlertDescription>
+                      Low yield detected ({yieldPercent.toFixed(1)}%).
+                      Please verify before completing.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleComplete}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Completing..." : "Confirm Completion"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      }
+
+  - path: "apps/frontend/app/(authenticated)/production/execution/components/WorkOrderYieldBadge.tsx"
+    description: "Badge displaying yield percentage with color coding"
+    props:
+      - name: "yield"
+        type: "number"
+        required: true
+      - name: "size"
+        type: "'sm' | 'md' | 'lg'"
+        required: false
+        default: "'md'"
+    color_coding:
+      - condition: "yield >= 95"
+        color: "green"
+        label: "Excellent"
+      - condition: "yield >= 80"
+        color: "blue"
+        label: "Good"
+      - condition: "yield >= 50"
+        color: "yellow"
+        label: "Low"
+      - condition: "yield < 50"
+        color: "red"
+        label: "Critical"
+    pattern: |
+      export function WorkOrderYieldBadge({ yield, size = 'md' }: WorkOrderYieldBadgeProps) {
+        const getVariant = () => {
+          if (yield >= 95) return 'success';
+          if (yield >= 80) return 'default';
+          if (yield >= 50) return 'warning';
+          return 'destructive';
+        };
+
+        return (
+          <Badge variant={getVariant()} className={sizeClasses[size]}>
+            {yield.toFixed(1)}%
+          </Badge>
+        );
+      }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-complete-work-order.ts"
+    description: "React Query mutation for completing work orders"
+    exports:
+      - name: "useCompleteWorkOrder"
+        returns: "UseMutationResult<WorkOrderCompletionResult, Error, string>"
+    pattern: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+      import { completeWorkOrder } from '@/lib/services/work-order-service';
+
+      export function useCompleteWorkOrder() {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: (workOrderId: string) => completeWorkOrder(workOrderId),
+          onSuccess: (data) => {
+            // Invalidate WO queries to refresh data
+            queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['work-order', data.id] });
+            queryClient.invalidateQueries({ queryKey: ['production-dashboard'] });
+          },
+        });
+      }
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/production.ts"
+    additions:
+      - name: "WorkOrderCompletionResult"
+        content: |
+          export interface WorkOrderCompletionResult {
+            id: string;
+            wo_number: string;
+            status: 'completed';
+            completed_at: string;
+            completed_by: string;
+            planned_qty: number;
+            produced_qty: number;
+            actual_yield_percent: number;
+            yield_variance_pct: number;
+            production_time_hours: number;
+            message: string;
+          }
+
+      - name: "CompleteWorkOrderButtonProps"
+        content: |
+          export interface CompleteWorkOrderButtonProps {
+            workOrder: WorkOrder;
+            onComplete: (result: WorkOrderCompletionResult) => void;
+            disabled?: boolean;
+          }
+
+      - name: "CompleteWorkOrderModalProps"
+        content: |
+          export interface CompleteWorkOrderModalProps {
+            open: boolean;
+            onOpenChange: (open: boolean) => void;
+            workOrder: WorkOrder;
+            onComplete: (result: WorkOrderCompletionResult) => void;
+          }
+
+      - name: "WorkOrderYieldBadgeProps"
+        content: |
+          export interface WorkOrderYieldBadgeProps {
+            yield: number;
+            size?: 'sm' | 'md' | 'lg';
+          }
+
+# UX Patterns
+ux:
+  patterns:
+    dialog: "ShadCN Dialog component"
+    button: "ShadCN Button component"
+    badge: "ShadCN Badge component"
+    alert: "ShadCN Alert component"
+    toast: "Sonner toast notifications"
+
+  states:
+    - name: "loading"
+      description: "Button shows spinner while completing"
+    - name: "success"
+      description: "Toast notification with success message"
+    - name: "error"
+      description: "Toast notification with error message"
+    - name: "warning"
+      description: "Yellow alert for low yield warning"
+
+  accessibility:
+    - "Dialog has proper focus management"
+    - "Button has clear disabled state styling"
+    - "Warning alerts have proper ARIA roles"
+    - "Color coding not sole indicator (includes text labels)"
+
+  responsive:
+    desktop: "Modal centered, 480px max width"
+    tablet: "Modal centered, 90% width"
+    mobile: "Modal full width, bottom sheet style"
+
+# Integration with Action Bar
+action_bar_integration:
+  location: "apps/frontend/app/(authenticated)/production/execution/[woId]/page.tsx"
+  note: "Add CompleteWorkOrderButton to the action bar alongside Start, Pause, Resume buttons"
+  button_order:
+    - "Start (when status=released)"
+    - "Pause (when status=in_progress)"
+    - "Resume (when status=paused)"
+    - "Complete WO (when status=in_progress)"

@@ -1,0 +1,323 @@
+# Story 05.13 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/grn-service-over-receipt.test.ts"
+    type: "unit"
+    description: "Unit tests for over-receipt validation logic"
+  - path: "apps/frontend/__tests__/integration/api/warehouse/grns-over-receipt.test.ts"
+    type: "integration"
+    description: "Integration tests for over-receipt scenarios"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    title: "Over-Receipt Disabled (Strict Mode)"
+    given: "warehouse_settings.allow_over_receipt = false"
+    when: "user attempts to receive qty > ordered_qty"
+    then: "API returns 400 error with message 'Over-receipt not allowed'"
+    test_type: "integration"
+    priority: "P0"
+    gherkin: |
+      Given warehouse_settings.allow_over_receipt = false
+      And PO line has ordered_qty = 100
+      And previously received_qty = 0
+      When user attempts to receive qty = 101
+      Then API returns 400 error with message "Over-receipt not allowed. Ordered: 100, Attempting: 101"
+      And GRN creation is blocked
+      And po_lines.received_qty remains unchanged
+
+  - id: "AC-02"
+    title: "Over-Receipt Within Tolerance"
+    given: "allow_over_receipt = true AND tolerance = 10%"
+    when: "receiving qty results in 8% over-receipt"
+    then: "GRN created with over_receipt_flag = true and warning returned"
+    test_type: "integration"
+    priority: "P0"
+    gherkin: |
+      Given warehouse_settings.allow_over_receipt = true
+      And warehouse_settings.over_receipt_tolerance_pct = 10.0
+      And PO line has ordered_qty = 100
+      And previously received_qty = 0
+      When user receives qty = 108
+      Then over-receipt percentage calculated as 8.0%
+      And validation passes (8.0% < 10.0%)
+      And GRN is created successfully
+      And grn_items.over_receipt_flag = true
+      And grn_items.over_receipt_percentage = 8.0
+      And po_lines.received_qty updated to 108
+      And API returns success with warning "Over-receipt within tolerance (8.0% of 10.0%)"
+
+  - id: "AC-03"
+    title: "Over-Receipt Exceeds Tolerance"
+    given: "allow_over_receipt = true AND tolerance = 5%"
+    when: "receiving qty results in 12% over-receipt"
+    then: "API returns 400 error with max allowed quantity"
+    test_type: "integration"
+    priority: "P0"
+    gherkin: |
+      Given warehouse_settings.allow_over_receipt = true
+      And warehouse_settings.over_receipt_tolerance_pct = 5.0
+      And PO line has ordered_qty = 100
+      And previously received_qty = 0
+      When user attempts to receive qty = 112
+      Then over-receipt percentage calculated as 12.0%
+      And validation fails (12.0% > 5.0%)
+      And API returns 400 error with message "Over-receipt exceeds tolerance (12.0% > 5.0%). Reduce quantity to 105 or less."
+      And GRN creation is blocked
+      And po_lines.received_qty remains unchanged
+
+  - id: "AC-04"
+    title: "Cumulative Over-Receipt Calculation"
+    given: "PO line has partial receipt history"
+    when: "new receipt would push cumulative total over tolerance"
+    then: "validation uses cumulative calculation"
+    test_type: "integration"
+    priority: "P0"
+    gherkin: |
+      Given warehouse_settings.allow_over_receipt = true
+      And warehouse_settings.over_receipt_tolerance_pct = 10.0
+      And PO line has ordered_qty = 100
+      And previously received_qty = 95
+      When user attempts to receive qty = 16
+      Then total received = 95 + 16 = 111
+      And over-receipt percentage = (111 - 100) / 100 * 100 = 11.0%
+      And validation fails (11.0% > 10.0%)
+      And API returns 400 error with message "Cumulative over-receipt exceeds tolerance (11.0% > 10.0%). Maximum remaining: 10 units"
+
+  - id: "AC-05"
+    title: "Exact Quantity Match (No Over-Receipt)"
+    given: "receiving qty exactly matches ordered_qty"
+    when: "receipt processed"
+    then: "over_receipt_flag = false, percentage = 0"
+    test_type: "unit"
+    priority: "P0"
+    gherkin: |
+      Given warehouse_settings.allow_over_receipt = true
+      And warehouse_settings.over_receipt_tolerance_pct = 5.0
+      And PO line has ordered_qty = 100
+      And previously received_qty = 0
+      When user receives qty = 100
+      Then over-receipt percentage = 0.0%
+      And validation passes
+      And GRN is created successfully
+      And grn_items.over_receipt_flag = false
+      And grn_items.over_receipt_percentage = 0.0
+
+  - id: "AC-06"
+    title: "Under-Receipt (Always Allowed)"
+    given: "receiving qty < ordered_qty"
+    when: "receipt processed"
+    then: "always allowed regardless of settings"
+    test_type: "unit"
+    priority: "P0"
+    gherkin: |
+      Given warehouse_settings.allow_over_receipt = false
+      And PO line has ordered_qty = 100
+      And previously received_qty = 0
+      When user receives qty = 80
+      Then over-receipt percentage = -20.0%
+      And validation passes
+      And GRN is created successfully
+      And grn_items.over_receipt_flag = false
+      And grn_items.over_receipt_percentage = -20.0
+
+  - id: "AC-07"
+    title: "Zero Tolerance Setting"
+    given: "allow_over_receipt = true AND tolerance = 0%"
+    when: "receiving any qty > ordered_qty"
+    then: "only exact quantity allowed"
+    test_type: "integration"
+    priority: "P0"
+    gherkin: |
+      Given warehouse_settings.allow_over_receipt = true
+      And warehouse_settings.over_receipt_tolerance_pct = 0.0
+      And PO line has ordered_qty = 100
+      And previously received_qty = 0
+      When user attempts to receive qty = 101
+      Then over-receipt percentage = 1.0%
+      And validation fails (1.0% > 0.0%)
+      And API returns 400 error with message "Over-receipt exceeds tolerance (1.0% > 0.0%). Only exact quantity allowed."
+
+  - id: "AC-08"
+    title: "Multi-Line Validation (Atomic)"
+    given: "GRN with multiple PO lines"
+    when: "one line fails validation"
+    then: "entire GRN blocked (atomic transaction)"
+    test_type: "integration"
+    priority: "P0"
+    gherkin: |
+      Given warehouse_settings.allow_over_receipt = true
+      And warehouse_settings.over_receipt_tolerance_pct = 5.0
+      And PO has 3 lines:
+        | Line | Ordered | Receiving |
+        |------|---------|-----------|
+        | 1    | 100     | 104       | # 4% over - OK
+        | 2    | 200     | 220       | # 10% over - FAIL
+        | 3    | 50      | 48        | # under - OK
+      When user submits GRN with all 3 lines
+      Then validation fails on Line 2
+      And API returns 400 error with details:
+        "Line 2 over-receipt exceeds tolerance (10.0% > 5.0%)"
+      And GRN creation is blocked for ALL lines (atomic transaction)
+
+# Unit Test Cases
+unit_tests:
+  grn_service_over_receipt:
+    - name: "validateOverReceipt returns valid for under-receipt"
+      setup: "ordered=100, previous=0, receiving=80, allow=false"
+      expected: "isValid=true, isOverReceipt=false, percentage=-20"
+
+    - name: "validateOverReceipt blocks when disabled and over"
+      setup: "ordered=100, previous=0, receiving=101, allow=false"
+      expected: "isValid=false, message contains 'not allowed'"
+
+    - name: "validateOverReceipt allows within tolerance"
+      setup: "ordered=100, previous=0, receiving=108, allow=true, tolerance=10"
+      expected: "isValid=true, isOverReceipt=true, percentage=8"
+
+    - name: "validateOverReceipt blocks exceeding tolerance"
+      setup: "ordered=100, previous=0, receiving=115, allow=true, tolerance=10"
+      expected: "isValid=false, message contains 'exceeds tolerance'"
+
+    - name: "validateOverReceipt handles cumulative receipts"
+      setup: "ordered=100, previous=95, receiving=16, allow=true, tolerance=10"
+      expected: "isValid=false, percentage=11, total=111"
+
+    - name: "validateOverReceipt handles zero tolerance"
+      setup: "ordered=100, previous=0, receiving=101, allow=true, tolerance=0"
+      expected: "isValid=false, message contains 'Only exact quantity'"
+
+    - name: "validateOverReceipt handles exact match"
+      setup: "ordered=100, previous=0, receiving=100, allow=true, tolerance=10"
+      expected: "isValid=true, isOverReceipt=false, percentage=0"
+
+    - name: "calculateOverReceiptPercentage handles zero ordered"
+      setup: "ordered=0, total=10"
+      expected: "percentage=0 (no division by zero)"
+
+    - name: "calculateOverReceiptPercentage negative for under-receipt"
+      setup: "ordered=100, total=80"
+      expected: "percentage=-20"
+
+    - name: "calculateOverReceiptPercentage positive for over-receipt"
+      setup: "ordered=100, total=115"
+      expected: "percentage=15"
+
+    - name: "validateOverReceipt includes max allowed in error message"
+      setup: "ordered=100, previous=50, receiving=70, allow=true, tolerance=10"
+      expected: "message contains 'Maximum remaining: 60 units'"
+
+# Integration Test Cases
+integration_tests:
+  api_over_receipt:
+    - name: "POST /grns/from-po blocks over-receipt when disabled"
+      setup: "allow_over_receipt=false, PO line ordered=100"
+      action: "Receive qty=101"
+      expected: "400 error, OVER_RECEIPT_NOT_ALLOWED"
+
+    - name: "POST /grns/from-po allows over-receipt within tolerance"
+      setup: "allow_over_receipt=true, tolerance=10%, ordered=100"
+      action: "Receive qty=108"
+      expected: "201 success, over_receipt_warnings populated"
+
+    - name: "POST /grns/from-po blocks over-receipt exceeding tolerance"
+      setup: "allow_over_receipt=true, tolerance=5%, ordered=100"
+      action: "Receive qty=112"
+      expected: "400 error, OVER_RECEIPT_EXCEEDS_TOLERANCE"
+
+    - name: "POST /grns/from-po calculates cumulative over-receipt"
+      setup: "allow_over_receipt=true, tolerance=10%, ordered=100, prev_received=95"
+      action: "Receive qty=16"
+      expected: "400 error, cumulative 111 exceeds 110 max"
+
+    - name: "POST /grns/from-po validates all lines atomically"
+      setup: "3 lines, one exceeds tolerance"
+      action: "Submit multi-line GRN"
+      expected: "400 error, no lines committed"
+
+    - name: "POST /grns/from-po sets over_receipt_flag on grn_items"
+      setup: "allow_over_receipt=true, tolerance=10%"
+      action: "Receive 108 of 100 ordered"
+      expected: "grn_items.over_receipt_flag=true, over_receipt_percentage=8.0"
+
+    - name: "POST /grns/from-po returns warnings array in response"
+      setup: "Over-receipt within tolerance"
+      action: "Receive 108 of 100"
+      expected: "Response includes over_receipt_warnings array"
+
+# Edge Case Tests
+edge_cases:
+  - name: "Zero ordered quantity"
+    scenario: "PO line with ordered_qty=0"
+    expected: "No division by zero, percentage=0"
+
+  - name: "Very small tolerance (0.1%)"
+    scenario: "tolerance=0.1%, ordered=1000, receiving=1002"
+    expected: "0.2% > 0.1%, blocked"
+
+  - name: "Large quantities"
+    scenario: "ordered=999999, receiving=1000000"
+    expected: "Calculation handles without overflow"
+
+  - name: "Decimal quantities"
+    scenario: "ordered=100.50, receiving=110.55"
+    expected: "Correct percentage calculation"
+
+  - name: "Multiple partial receipts"
+    scenario: "5 partial receipts, cumulative near tolerance"
+    expected: "Each receipt checks cumulative total"
+
+  - name: "Exactly at tolerance boundary"
+    scenario: "tolerance=10%, receiving exactly 110 of 100"
+    expected: "Allowed (10% = 10%, edge case)"
+
+  - name: "Rounding precision"
+    scenario: "tolerance=5%, ordered=33, receiving=35"
+    expected: "6.06% > 5%, blocked (not rounded)"
+
+# Definition of Done
+definition_of_done:
+  - "All 8 Acceptance Criteria passing"
+  - "Unit tests >80% coverage for over-receipt validation logic"
+  - "Integration tests verify atomic transaction behavior"
+  - "Error messages are clear and actionable (include max allowed qty)"
+  - "Existing 05.11 GRN workflows not disrupted"
+  - "RLS policies verified (org_id isolation maintained)"
+  - "Performance validated: validation adds <50ms to GRN creation"
+  - "Documentation updated with validation rules"
+  - "Code review approved by BACKEND-DEV"
+  - "Tested with real PO data scenarios"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business-critical validation logic"
+  integration:
+    target: 80
+    reason: "All API scenarios must be tested"
+  files:
+    - "lib/services/grn-service.ts: validateOverReceipt, calculateOverReceiptPercentage: 95%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Rounding errors in percentage calculation"
+    mitigation: "Use precise decimal arithmetic, test edge cases"
+    severity: "medium"
+    test_coverage: "edge_cases"
+
+  - id: "RISK-02"
+    description: "Race condition between fetching PO line and creating GRN"
+    mitigation: "Use database transaction, lock PO line row"
+    severity: "medium"
+    test_coverage: "integration_tests"
+
+  - id: "RISK-03"
+    description: "Multi-line GRN partially committed before validation failure"
+    mitigation: "Validate ALL lines before starting transaction"
+    severity: "high"
+    test_coverage: "AC-08 multi-line atomic validation"

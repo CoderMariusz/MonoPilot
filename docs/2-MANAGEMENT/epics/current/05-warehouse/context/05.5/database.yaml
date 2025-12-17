@@ -1,0 +1,212 @@
+# Story 05.5 - Database Schema
+# Purpose: Additional indexes for advanced filtering performance
+# Agent: BACKEND-DEV (database focus)
+
+# Note: license_plates table created in 05.1
+# This story adds composite indexes for filter combinations
+
+migrations:
+  - path: "supabase/migrations/XXX_lp_filter_indexes.sql"
+    type: "migration"
+    description: "Composite indexes for advanced LP filtering"
+
+# Indexes to add (complementing 05.1 indexes)
+indexes:
+  existing_from_05_1:
+    description: "Indexes already created in 05.1 - verify they exist"
+    indexes:
+      - name: "idx_lp_org_status"
+        columns: "(org_id, status)"
+      - name: "idx_lp_org_product"
+        columns: "(org_id, product_id)"
+      - name: "idx_lp_org_location"
+        columns: "(org_id, location_id)"
+      - name: "idx_lp_org_warehouse"
+        columns: "(org_id, warehouse_id)"
+      - name: "idx_lp_org_qa"
+        columns: "(org_id, qa_status)"
+      - name: "idx_lp_expiry"
+        columns: "(expiry_date)"
+        where: "expiry_date IS NOT NULL"
+      - name: "idx_lp_batch"
+        columns: "(batch_number)"
+        where: "batch_number IS NOT NULL"
+      - name: "idx_lp_created"
+        columns: "(created_at)"
+      - name: "idx_lp_number_search"
+        columns: "(org_id, lp_number text_pattern_ops)"
+
+  new_composite_indexes:
+    description: "New indexes for common multi-filter query patterns"
+    indexes:
+      - name: "idx_lp_product_status_qa"
+        columns: "(org_id, product_id, status, qa_status)"
+        rationale: "Common query: find available+passed LPs for product (Epic 04 consumption)"
+        query_pattern: "WHERE product_id = ? AND status = 'available' AND qa_status = 'passed'"
+
+      - name: "idx_lp_warehouse_location_status"
+        columns: "(org_id, warehouse_id, location_id, status)"
+        rationale: "Filter by warehouse + location + status"
+        query_pattern: "WHERE warehouse_id = ? AND location_id = ? AND status = ?"
+
+      - name: "idx_lp_created_range"
+        columns: "(org_id, created_at)"
+        rationale: "Date range filtering on created_at"
+        query_pattern: "WHERE created_at BETWEEN ? AND ?"
+
+      - name: "idx_lp_expiry_status"
+        columns: "(org_id, expiry_date, status)"
+        where: "expiry_date IS NOT NULL"
+        rationale: "Expiring soon + available stock queries"
+        query_pattern: "WHERE expiry_date <= ? AND status = 'available'"
+
+# Migration SQL
+migration_sql: |
+  -- =============================================================================
+  -- Additional Indexes for LP Search & Advanced Filters (Story 05.5)
+  -- =============================================================================
+
+  -- Composite index for product + status + QA queries (Epic 04 consumption)
+  CREATE INDEX IF NOT EXISTS idx_lp_product_status_qa
+  ON license_plates(org_id, product_id, status, qa_status);
+
+  -- Composite index for warehouse + location + status filtering
+  CREATE INDEX IF NOT EXISTS idx_lp_warehouse_location_status
+  ON license_plates(org_id, warehouse_id, location_id, status);
+
+  -- Date range queries on created_at
+  CREATE INDEX IF NOT EXISTS idx_lp_created_range
+  ON license_plates(org_id, created_at);
+
+  -- Expiry with status for "expiring soon available stock" queries
+  CREATE INDEX IF NOT EXISTS idx_lp_expiry_status
+  ON license_plates(org_id, expiry_date, status)
+  WHERE expiry_date IS NOT NULL;
+
+  -- Comment for documentation
+  COMMENT ON INDEX idx_lp_product_status_qa IS 'Story 05.5: Optimize product+status+QA filter combination for Epic 04';
+  COMMENT ON INDEX idx_lp_warehouse_location_status IS 'Story 05.5: Optimize warehouse+location+status filter combination';
+  COMMENT ON INDEX idx_lp_created_range IS 'Story 05.5: Optimize created_at date range queries';
+  COMMENT ON INDEX idx_lp_expiry_status IS 'Story 05.5: Optimize expiring soon available stock queries';
+
+# Query patterns that benefit from indexes
+query_patterns:
+  simple_product_filter:
+    description: "Filter by product only"
+    sql: |
+      SELECT * FROM license_plates
+      WHERE org_id = ? AND product_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    uses_index: "idx_lp_org_product"
+    target_time: "<500ms"
+
+  multiple_products_filter:
+    description: "Filter by multiple products"
+    sql: |
+      SELECT * FROM license_plates
+      WHERE org_id = ? AND product_id = ANY(?)
+      ORDER BY created_at DESC
+      LIMIT 50
+    uses_index: "idx_lp_org_product"
+    target_time: "<500ms"
+
+  epic_04_consumption:
+    description: "Find LPs for material consumption (Epic 04)"
+    sql: |
+      SELECT * FROM license_plates
+      WHERE org_id = ?
+        AND product_id = ?
+        AND status = 'available'
+        AND qa_status = 'passed'
+        AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
+      ORDER BY created_at ASC  -- FIFO
+      LIMIT 50
+    uses_index: "idx_lp_product_status_qa"
+    target_time: "<300ms"
+
+  warehouse_location_filter:
+    description: "Filter by warehouse and location"
+    sql: |
+      SELECT * FROM license_plates
+      WHERE org_id = ?
+        AND warehouse_id = ?
+        AND location_id = ?
+        AND status = 'available'
+      ORDER BY created_at DESC
+      LIMIT 50
+    uses_index: "idx_lp_warehouse_location_status"
+    target_time: "<500ms"
+
+  expiry_range_filter:
+    description: "Filter by expiry date range"
+    sql: |
+      SELECT * FROM license_plates
+      WHERE org_id = ?
+        AND expiry_date >= ?
+        AND expiry_date <= ?
+        AND status = 'available'
+      ORDER BY expiry_date ASC
+      LIMIT 50
+    uses_index: "idx_lp_expiry_status"
+    target_time: "<500ms"
+
+  complex_multi_filter:
+    description: "Complex filter with 5+ conditions"
+    sql: |
+      SELECT * FROM license_plates
+      WHERE org_id = ?
+        AND product_id = ?
+        AND warehouse_id = ?
+        AND status = 'available'
+        AND qa_status = 'passed'
+        AND expiry_date >= ?
+      ORDER BY expiry_date ASC
+      LIMIT 50
+    uses_index: "idx_lp_product_status_qa (primary), idx_lp_warehouse_location_status (filter)"
+    target_time: "<500ms"
+
+  lp_number_search:
+    description: "LP number prefix search"
+    sql: |
+      SELECT * FROM license_plates
+      WHERE org_id = ?
+        AND lp_number ILIKE ?
+      ORDER BY lp_number ASC
+      LIMIT 20
+    uses_index: "idx_lp_number_search"
+    target_time: "<300ms"
+
+  batch_number_search:
+    description: "Batch number exact match"
+    sql: |
+      SELECT * FROM license_plates
+      WHERE org_id = ?
+        AND LOWER(batch_number) = LOWER(?)
+      ORDER BY created_at DESC
+      LIMIT 50
+    uses_index: "idx_lp_batch"
+    target_time: "<300ms"
+
+# Performance requirements
+performance:
+  targets:
+    simple_filter: "<500ms with 10K LPs"
+    complex_filter: "<500ms with 10K LPs and 5+ conditions"
+    search: "<300ms with 10K LPs"
+    combined_search_filter: "<500ms with 10K LPs"
+
+  testing:
+    - description: "Load test with 10K LP dataset"
+    - description: "EXPLAIN ANALYZE all query patterns"
+    - description: "Verify index usage (no table scans)"
+    - description: "Monitor query plan for composite indexes"
+
+# No new tables - uses existing license_plates from 05.1
+tables: []
+
+# No RLS changes - uses existing policies from 05.1
+rls_policies: []
+
+# No seed data for this story
+seed_data: []

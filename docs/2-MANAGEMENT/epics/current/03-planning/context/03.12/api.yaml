@@ -1,0 +1,449 @@
+# Story 03.12 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # =============================================================================
+  # GET /api/planning/work-orders/:wo_id/operations - List WO Operations
+  # =============================================================================
+  - method: "GET"
+    path: "/api/planning/work-orders/:wo_id/operations"
+    description: "Returns list of WO operations ordered by sequence"
+    file: "apps/frontend/app/api/planning/work-orders/[wo_id]/operations/route.ts"
+    auth: "required"
+    roles: ["PLANNER", "PROD_MANAGER", "OPERATOR", "ADMIN", "SUPER_ADMIN", "VIEWER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        wo_id: "UUID - Work Order ID"
+
+    response:
+      status: 200
+      type: "WOOperationsListResponse"
+      schema:
+        operations:
+          - id: "string (UUID)"
+            wo_id: "string (UUID)"
+            sequence: "number"
+            operation_name: "string"
+            description: "string | null"
+            machine_id: "string (UUID) | null"
+            machine_code: "string | null"
+            machine_name: "string | null"
+            line_id: "string (UUID) | null"
+            line_code: "string | null"
+            line_name: "string | null"
+            expected_duration_minutes: "number | null"
+            expected_yield_percent: "number | null"
+            actual_duration_minutes: "number | null"
+            actual_yield_percent: "number | null"
+            status: "'pending' | 'in_progress' | 'completed' | 'skipped'"
+            started_at: "string (ISO8601) | null"
+            completed_at: "string (ISO8601) | null"
+            started_by: "string (UUID) | null"
+            completed_by: "string (UUID) | null"
+            started_by_user: "{ name: string } | null"
+            completed_by_user: "{ name: string } | null"
+            skip_reason: "string | null"
+            notes: "string | null"
+            created_at: "string (ISO8601)"
+        total: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+        when: "WO does not exist or belongs to different org"
+
+  # =============================================================================
+  # GET /api/planning/work-orders/:wo_id/operations/:op_id - Get Operation Detail
+  # =============================================================================
+  - method: "GET"
+    path: "/api/planning/work-orders/:wo_id/operations/:op_id"
+    description: "Returns full operation detail including instructions and variances"
+    file: "apps/frontend/app/api/planning/work-orders/[wo_id]/operations/[op_id]/route.ts"
+    auth: "required"
+    roles: ["PLANNER", "PROD_MANAGER", "OPERATOR", "ADMIN", "SUPER_ADMIN", "VIEWER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        wo_id: "UUID - Work Order ID"
+        op_id: "UUID - Operation ID"
+
+    response:
+      status: 200
+      type: "WOOperationDetailResponse"
+      schema:
+        id: "string (UUID)"
+        wo_id: "string (UUID)"
+        sequence: "number"
+        operation_name: "string"
+        description: "string | null"
+        instructions: "string | null"
+        machine_id: "string (UUID) | null"
+        machine:
+          id: "string (UUID)"
+          code: "string"
+          name: "string"
+        line_id: "string (UUID) | null"
+        line:
+          id: "string (UUID)"
+          code: "string"
+          name: "string"
+        expected_duration_minutes: "number | null"
+        expected_yield_percent: "number | null"
+        actual_duration_minutes: "number | null"
+        actual_yield_percent: "number | null"
+        duration_variance_minutes: "number | null"
+        yield_variance_percent: "number | null"
+        status: "'pending' | 'in_progress' | 'completed' | 'skipped'"
+        started_at: "string (ISO8601) | null"
+        completed_at: "string (ISO8601) | null"
+        started_by: "string (UUID) | null"
+        completed_by: "string (UUID) | null"
+        started_by_user:
+          id: "string (UUID)"
+          name: "string"
+        completed_by_user:
+          id: "string (UUID)"
+          name: "string"
+        skip_reason: "string | null"
+        notes: "string | null"
+        created_at: "string (ISO8601)"
+        updated_at: "string (ISO8601)"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+      - status: 404
+        code: "OPERATION_NOT_FOUND"
+        message: "Operation not found"
+
+  # =============================================================================
+  # POST /api/planning/work-orders/:wo_id/copy-routing - Manual Copy Trigger
+  # =============================================================================
+  - method: "POST"
+    path: "/api/planning/work-orders/:wo_id/copy-routing"
+    description: "Manually trigger routing operations copy (admin only)"
+    file: "apps/frontend/app/api/planning/work-orders/[wo_id]/copy-routing/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        wo_id: "UUID - Work Order ID"
+      body: null
+
+    response:
+      status: 200
+      type: "CopyRoutingResponse"
+      schema:
+        success: "boolean"
+        operations_created: "number"
+        message: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Admin role required"
+        when: "User does not have ADMIN or SUPER_ADMIN role"
+      - status: 404
+        code: "WO_NOT_FOUND"
+        message: "Work order not found"
+      - status: 400
+        code: "ROUTING_NOT_FOUND"
+        message: "Routing not found"
+        when: "WO has invalid routing_id"
+      - status: 400
+        code: "ROUTING_ORG_MISMATCH"
+        message: "Routing does not belong to this organization"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/wo-operations-service.ts"
+    description: "WO Operations service for routing copy and retrieval"
+    exports:
+      - name: "getOperationsForWO"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<WOOperation[]>"
+        description: "Get all operations for a WO ordered by sequence"
+
+      - name: "getOperationById"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "opId: string"
+        returns: "Promise<WOOperationDetail | null>"
+        description: "Get single operation with full details and variances"
+
+      - name: "copyRoutingToWO"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "orgId: string"
+        returns: "Promise<number>"
+        description: "Copy routing operations to WO, returns count created"
+
+      - name: "calculateExpectedDuration"
+        type: "function"
+        params:
+          - "routingOp: RoutingOperation"
+        returns: "number"
+        description: "Calculate expected duration from routing operation fields"
+
+      - name: "validateOperationSequence"
+        type: "function"
+        params:
+          - "operations: WOOperation[]"
+        returns: "boolean"
+        description: "Validate operation sequences are unique"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/wo-operation.ts"
+    description: "WO Operation TypeScript interfaces"
+    exports:
+      - "WOOperation"
+      - "WOOperationDetail"
+      - "WOOperationStatus"
+      - "WOOperationsListResponse"
+      - "CopyRoutingResponse"
+
+# Implementation Patterns
+patterns:
+  api_list_route: |
+    // apps/frontend/app/api/planning/work-orders/[wo_id]/operations/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { wo_id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const { wo_id } = params;
+
+      // Verify WO exists and belongs to user's org (RLS handles this)
+      const { data: wo, error: woError } = await supabase
+        .from('work_orders')
+        .select('id')
+        .eq('id', wo_id)
+        .single();
+
+      if (woError || !wo) {
+        return NextResponse.json({ error: 'Work order not found' }, { status: 404 });
+      }
+
+      // Get operations with related data
+      const { data: operations, error } = await supabase
+        .from('wo_operations')
+        .select(`
+          *,
+          machine:machines(id, code, name),
+          line:production_lines(id, code, name),
+          started_by_user:users!started_by(name),
+          completed_by_user:users!completed_by(name)
+        `)
+        .eq('wo_id', wo_id)
+        .order('sequence', { ascending: true });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      const mapped = operations?.map(op => ({
+        ...op,
+        machine_code: op.machine?.code ?? null,
+        machine_name: op.machine?.name ?? null,
+        line_code: op.line?.code ?? null,
+        line_name: op.line?.name ?? null,
+      })) ?? [];
+
+      return NextResponse.json({
+        operations: mapped,
+        total: mapped.length,
+      });
+    }
+
+  api_detail_route: |
+    // apps/frontend/app/api/planning/work-orders/[wo_id]/operations/[op_id]/route.ts
+    export async function GET(
+      request: Request,
+      { params }: { params: { wo_id: string; op_id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const { wo_id, op_id } = params;
+
+      const { data: operation, error } = await supabase
+        .from('wo_operations')
+        .select(`
+          *,
+          machine:machines(id, code, name),
+          line:production_lines(id, code, name),
+          started_by_user:users!started_by(id, name),
+          completed_by_user:users!completed_by(id, name)
+        `)
+        .eq('id', op_id)
+        .eq('wo_id', wo_id)
+        .single();
+
+      if (error || !operation) {
+        return NextResponse.json({ error: 'Operation not found' }, { status: 404 });
+      }
+
+      // Calculate variances
+      const duration_variance = operation.actual_duration_minutes && operation.expected_duration_minutes
+        ? operation.actual_duration_minutes - operation.expected_duration_minutes
+        : null;
+
+      const yield_variance = operation.actual_yield_percent && operation.expected_yield_percent
+        ? operation.actual_yield_percent - operation.expected_yield_percent
+        : null;
+
+      return NextResponse.json({
+        ...operation,
+        duration_variance_minutes: duration_variance,
+        yield_variance_percent: yield_variance,
+      });
+    }
+
+  copy_routing_route: |
+    // apps/frontend/app/api/planning/work-orders/[wo_id]/copy-routing/route.ts
+    import { hasRole } from '@/lib/services/permission-service';
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { wo_id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const { wo_id } = params;
+
+      // Check admin role
+      const context = await getOrgContext();
+      if (!context || !hasRole(context, ['ADMIN', 'SUPER_ADMIN'])) {
+        return NextResponse.json({ error: 'Admin role required' }, { status: 403 });
+      }
+
+      // Call database function
+      const { data, error } = await supabase.rpc('copy_routing_to_wo', {
+        p_wo_id: wo_id,
+        p_org_id: context.org_id
+      });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        operations_created: data,
+        message: data > 0
+          ? `${data} operations copied from routing`
+          : 'No operations copied (routing empty or already copied)'
+      });
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/wo-operations-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+    import { WOOperation, WOOperationDetail, RoutingOperation } from '@/lib/types/wo-operation';
+
+    export async function getOperationsForWO(woId: string): Promise<WOOperation[]> {
+      const response = await fetch(`/api/planning/work-orders/${woId}/operations`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.operations;
+    }
+
+    export async function getOperationById(
+      woId: string,
+      opId: string
+    ): Promise<WOOperationDetail | null> {
+      const response = await fetch(
+        `/api/planning/work-orders/${woId}/operations/${opId}`
+      );
+      if (!response.ok) return null;
+      return response.json();
+    }
+
+    export async function copyRoutingToWO(woId: string, orgId: string): Promise<number> {
+      const response = await fetch(
+        `/api/planning/work-orders/${woId}/copy-routing`,
+        { method: 'POST' }
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to copy routing');
+      }
+      const data = await response.json();
+      return data.operations_created;
+    }
+
+    export function calculateExpectedDuration(routingOp: RoutingOperation): number {
+      return (routingOp.duration || 0) +
+             (routingOp.setup_time || 0) +
+             (routingOp.cleanup_time || 0);
+    }
+
+    export function validateOperationSequence(operations: WOOperation[]): boolean {
+      const sequences = operations.map(op => op.sequence);
+      const uniqueSequences = new Set(sequences);
+      return sequences.length === uniqueSequences.size;
+    }
+
+# Integration with Story 03.10 (WO Release)
+integration:
+  story: "03.10"
+  trigger: "WO Release Action"
+  description: |
+    When WO status transitions from 'planned' to 'released':
+    1. Call copyRoutingToWO(woId, orgId)
+    2. Handle gracefully if copy fails (log error, don't block release)
+    3. Return warning if routing empty or wo_copy_routing = false
+
+  code_location: "apps/frontend/lib/services/work-order-service.ts"
+  method: "release()"
+  integration_code: |
+    // In work-order-service.ts release() method
+    export async function release(id: string, notes?: string): Promise<WorkOrder> {
+      // Update status to released
+      const { data: wo, error } = await supabase
+        .from('work_orders')
+        .update({ status: 'released', updated_by: userId })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Trigger routing copy (non-blocking)
+      try {
+        const operationCount = await copyRoutingToWO(id, wo.org_id);
+        console.log(`Copied ${operationCount} operations to WO ${wo.wo_number}`);
+      } catch (copyError) {
+        console.error('Failed to copy routing operations:', copyError);
+        // Don't block release - log warning
+      }
+
+      return wo;
+    }

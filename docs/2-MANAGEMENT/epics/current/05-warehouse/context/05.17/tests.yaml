@@ -1,0 +1,500 @@
+# Story 05.17 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/lp-split-service.test.ts"
+    type: "unit"
+    description: "Unit tests for LP split service"
+
+  - path: "apps/frontend/lib/validation/__tests__/lp-split-schemas.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+
+  - path: "apps/frontend/__tests__/integration/api/warehouse/lp-split.test.ts"
+    type: "integration"
+    description: "Integration tests for split API endpoint"
+
+  - path: "apps/frontend/__tests__/e2e/warehouse/lp-split-workflow.spec.ts"
+    type: "e2e"
+    description: "E2E tests for complete split workflow"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    name: "Split Modal Display"
+    given: "user views LP detail page for LP-001 (qty: 100, status='available')"
+    when: "user clicks 'Split LP' button"
+    then: "Split modal opens with source LP info, quantity input, location selector, preview panel"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    name: "Split Quantity Validation (Valid)"
+    given: "split modal open for LP-001 (qty: 100)"
+    when: "user enters split_qty = 40"
+    then: "No error, preview shows source: 60 kg, new: 40 kg, Split button enabled"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "Split Quantity Validation (Invalid - Greater or Equal)"
+    given: "split modal open for LP-001 (qty: 100)"
+    when: "user enters split_qty = 100 or 120"
+    then: "Error: 'Split quantity must be less than current LP quantity', Split button disabled"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04"
+    name: "Split Quantity Validation (Invalid - Zero or Negative)"
+    given: "split modal open for LP-001 (qty: 100)"
+    when: "user enters split_qty = 0 or -10"
+    then: "Error: 'Split quantity must be greater than 0', Split button disabled"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    name: "Destination Location Selection"
+    given: "split modal open"
+    when: "modal loads"
+    then: "Destination location defaults to source location, can select different"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-06"
+    name: "Settings Toggle Check"
+    given: "warehouse_settings.enable_split_merge = false"
+    when: "user views LP detail page"
+    then: "Split LP button hidden/disabled, API returns 403 if called directly"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    name: "Split Operation Execution (Same Location)"
+    given: "LP-001 (qty: 100, batch: BATCH-123, location: Rack-01)"
+    when: "user executes split with split_qty = 30, destination = Rack-01"
+    then: "Source LP qty = 70, New LP created with qty = 30, genealogy record created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    name: "Split Operation Execution (Different Location)"
+    given: "LP-001 (qty: 100, location: Rack-01)"
+    when: "user executes split with split_qty = 40, destination = Rack-05"
+    then: "Source unchanged at Rack-01, New LP at Rack-05"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-09"
+    name: "Split Inherits All Tracking Fields"
+    given: "source LP with batch, supplier_batch, expiry, manufacture_date, qa_status"
+    when: "split executed"
+    then: "New LP inherits all tracking fields exactly"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    name: "Split Status Validation (LP Not Available)"
+    given: "LP-001 with status = 'reserved'"
+    when: "user attempts to split"
+    then: "Split button disabled, API returns 400"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    name: "QA Status Warning (Pending)"
+    given: "LP-001 with qa_status = 'pending'"
+    when: "user attempts to split"
+    then: "Warning displayed, can proceed, new LP inherits pending status"
+    test_type: "e2e"
+    priority: "P2"
+
+  - id: "AC-12"
+    name: "Transaction Atomicity (Rollback)"
+    given: "split operation in progress"
+    when: "error occurs during transaction"
+    then: "Entire transaction rolled back, source LP unchanged, no new LP, no genealogy"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13"
+    name: "Auto-Generated LP Number"
+    given: "LP number sequence at LP-000042"
+    when: "split executed"
+    then: "New LP receives LP-000043, sequence increments"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-14"
+    name: "API Success Response"
+    given: "valid split request"
+    when: "POST /api/warehouse/license-plates/:id/split"
+    then: "200 OK with sourceLp, newLp, genealogyId"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15"
+    name: "API Validation Error Response"
+    given: "split_qty >= source.quantity"
+    when: "API receives request"
+    then: "400 Bad Request with error details"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-16"
+    name: "API LP Not Found"
+    given: "non-existent LP ID"
+    when: "POST /api/warehouse/license-plates/invalid-id/split"
+    then: "404 Not Found"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-17"
+    name: "API Settings Disabled"
+    given: "enable_split_merge = false"
+    when: "split request submitted"
+    then: "403 Forbidden"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-18"
+    name: "Desktop UI Loading State"
+    given: "split operation in progress"
+    when: "user clicks Split button"
+    then: "Loading spinner, 'Splitting...' text, inputs disabled, modal locked"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-19"
+    name: "Desktop UI Success Feedback"
+    given: "split completed successfully"
+    when: "operation finishes"
+    then: "Success toast with link to new LP, modal closes, LP detail refreshes"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-20"
+    name: "Desktop UI Error Feedback"
+    given: "split operation fails"
+    when: "error returned"
+    then: "Error toast, modal stays open, form re-enabled, can retry"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-21"
+    name: "Genealogy Link Verification"
+    given: "split completed (LP-001 -> LP-002)"
+    when: "user views genealogy for LP-001"
+    then: "Shows descendant LP-002, operation: Split, quantity shown"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-22"
+    name: "RLS Permission Check"
+    given: "user from org_id = 'org-abc'"
+    when: "attempts to split LP from org_id = 'org-xyz'"
+    then: "403 Forbidden, no data leakage"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-23"
+    name: "Performance - Split Operation"
+    given: "split request"
+    when: "executed"
+    then: "Completes in <300ms, total API <500ms"
+    test_type: "performance"
+    priority: "P1"
+
+  - id: "AC-24"
+    name: "Audit Trail"
+    given: "split completed"
+    when: "audit log queried"
+    then: "Entry with user, timestamp, source/new LP IDs, quantities"
+    test_type: "integration"
+    priority: "P2"
+
+  - id: "AC-25"
+    name: "Edge Case - Decimal Split"
+    given: "LP-001 with qty = 100.5 kg"
+    when: "split with split_qty = 40.25 kg"
+    then: "Source: 60.25 kg, New: 40.25 kg, 4 decimal precision maintained"
+    test_type: "unit"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  lp_split_service:
+    - name: "splitLicensePlate creates new LP with correct quantity"
+      setup: "Mock source LP with qty 100"
+      params: ["{ lpId, splitQty: 30 }"]
+      expected: "New LP with qty 30, source reduced to 70"
+
+    - name: "splitLicensePlate throws if settings disabled"
+      setup: "Mock enable_split_merge = false"
+      expected: "Throws ForbiddenError"
+
+    - name: "splitLicensePlate throws if LP not found"
+      setup: "Mock LP not found"
+      expected: "Throws NotFoundError"
+
+    - name: "splitLicensePlate throws if LP status not available"
+      setup: "Mock LP with status='reserved'"
+      expected: "Throws ValidationError with status message"
+
+    - name: "splitLicensePlate throws if split_qty >= LP quantity"
+      setup: "Mock LP with qty 100, request split_qty 100"
+      expected: "Throws ValidationError"
+
+    - name: "splitLicensePlate throws if split_qty <= 0"
+      setup: "Mock LP with qty 100, request split_qty 0"
+      expected: "Throws ValidationError"
+
+    - name: "splitLicensePlate uses source location if destination not provided"
+      setup: "Mock LP, no destinationLocationId in request"
+      expected: "New LP has same location_id as source"
+
+    - name: "splitLicensePlate uses destination location if provided"
+      setup: "Mock LP, destinationLocationId provided"
+      expected: "New LP has destinationLocationId"
+
+    - name: "splitLicensePlate creates genealogy record"
+      setup: "Mock successful split"
+      expected: "Genealogy record with operation_type='split'"
+
+  validation_schemas:
+    - name: "SplitLPSchema rejects negative splitQty"
+      input: "{ splitQty: -10 }"
+      expected: "Validation error"
+
+    - name: "SplitLPSchema rejects zero splitQty"
+      input: "{ splitQty: 0 }"
+      expected: "Validation error"
+
+    - name: "SplitLPSchema accepts positive splitQty"
+      input: "{ splitQty: 50 }"
+      expected: "Valid"
+
+    - name: "SplitLPSchema accepts optional destinationLocationId"
+      input: "{ splitQty: 50, destinationLocationId: 'uuid' }"
+      expected: "Valid"
+
+    - name: "SplitLPSchema rejects invalid destinationLocationId"
+      input: "{ splitQty: 50, destinationLocationId: 'not-uuid' }"
+      expected: "Validation error"
+
+    - name: "validateSplitWithContext rejects qty >= source"
+      input: "splitQty: 100, sourceLpQty: 100"
+      expected: "{ valid: false, error: 'Split quantity must be less than...' }"
+
+    - name: "validateSplitWithContext accepts qty < source"
+      input: "splitQty: 50, sourceLpQty: 100"
+      expected: "{ valid: true }"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoint:
+    - name: "POST /split returns 200 on valid request"
+      setup: "Create LP with qty 100, enable_split_merge = true"
+      request: "POST /api/warehouse/license-plates/{id}/split { splitQty: 30 }"
+      expected: "200 OK with sourceLp (qty 70) and newLp (qty 30)"
+
+    - name: "POST /split returns 400 if splitQty >= LP.quantity"
+      setup: "Create LP with qty 100"
+      request: "POST { splitQty: 100 }"
+      expected: "400 with error 'Split quantity must be less than LP quantity'"
+
+    - name: "POST /split returns 400 if LP status not available"
+      setup: "Create LP with status='blocked'"
+      request: "POST { splitQty: 30 }"
+      expected: "400 with error 'Status must be available'"
+
+    - name: "POST /split returns 403 if settings disabled"
+      setup: "Set enable_split_merge = false"
+      request: "POST { splitQty: 30 }"
+      expected: "403 with error 'Split/merge operations are disabled'"
+
+    - name: "POST /split returns 404 for non-existent LP"
+      setup: "No LP created"
+      request: "POST /api/warehouse/license-plates/fake-uuid/split"
+      expected: "404 Not Found"
+
+    - name: "POST /split creates genealogy record"
+      setup: "Create LP"
+      request: "POST { splitQty: 30 }"
+      verify: "lp_genealogy has record with operation_type='split'"
+
+    - name: "POST /split new LP inherits tracking fields"
+      setup: "Create LP with batch_number, expiry_date, qa_status"
+      request: "POST { splitQty: 30 }"
+      verify: "New LP has same batch_number, expiry_date, qa_status"
+
+    - name: "POST /split transaction rolls back on error"
+      setup: "Create LP, mock genealogy insert failure"
+      request: "POST { splitQty: 30 }"
+      verify: "Source LP unchanged, no new LP created"
+
+  rls_isolation:
+    - name: "User cannot split LP from different org"
+      setup: "Create LP in Org B, authenticate as Org A user"
+      request: "POST /api/warehouse/license-plates/{orgB_lp_id}/split"
+      expected: "404 Not Found (not 403, no data leakage)"
+
+    - name: "Split RLS enforces org_id on all operations"
+      setup: "Create LP, split it, verify genealogy"
+      verify: "All records have correct org_id"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Complete split workflow - same location"
+    steps:
+      - "Navigate to /warehouse/license-plates/{id}"
+      - "Click 'Split LP' button"
+      - "Verify modal opens with LP info"
+      - "Enter split quantity 40"
+      - "Verify preview shows source: 60, new: 40"
+      - "Click 'Split' button"
+      - "Verify success message"
+      - "Verify modal closes"
+      - "Verify LP detail shows updated quantity 60"
+
+  - name: "Complete split workflow - different location"
+    steps:
+      - "Navigate to LP detail"
+      - "Click 'Split LP'"
+      - "Enter split quantity"
+      - "Select different destination location"
+      - "Verify preview shows different location for new LP"
+      - "Click 'Split'"
+      - "Verify success with location info"
+
+  - name: "Split validation prevents invalid quantity"
+    steps:
+      - "Open split modal for LP with qty 100"
+      - "Enter 100 as split quantity"
+      - "Verify error message displayed"
+      - "Verify Split button disabled"
+
+  - name: "Split button hidden when settings disabled"
+    steps:
+      - "Disable enable_split_merge in settings"
+      - "Navigate to LP detail"
+      - "Verify 'Split LP' button not visible"
+
+  - name: "Split button hidden when LP not available"
+    steps:
+      - "Navigate to LP with status='reserved'"
+      - "Verify 'Split LP' button disabled with tooltip"
+
+  - name: "Genealogy updated after split"
+    steps:
+      - "Complete split workflow"
+      - "Navigate to source LP genealogy tab"
+      - "Verify descendant appears with 'Split' badge"
+      - "Click descendant link"
+      - "Verify navigation to new LP detail"
+      - "Verify ancestor shows with 'Split' badge"
+
+  - name: "Keyboard navigation in split modal"
+    steps:
+      - "Open split modal"
+      - "Tab through form fields"
+      - "Verify focus order: quantity -> location -> submit -> cancel"
+      - "Press Escape"
+      - "Verify modal closes"
+
+  - name: "Mobile responsive layout"
+    steps:
+      - "Set viewport to 375x667 (mobile)"
+      - "Open split modal"
+      - "Verify full-screen modal"
+      - "Verify sticky submit button"
+      - "Verify preview is collapsible"
+
+# Performance Test Cases
+performance_tests:
+  - name: "Split API response time"
+    target: "<300ms"
+    scenario: "POST /split with valid data"
+    measure: "Total API response time"
+
+  - name: "Split transaction time"
+    target: "<200ms"
+    scenario: "Database function execution"
+    measure: "split_license_plate() function time"
+
+  - name: "Modal open time"
+    target: "<500ms"
+    scenario: "Click Split button to modal ready"
+    measure: "Time until form is interactive"
+
+# Definition of Done
+definition_of_done:
+  - "split_license_plate() database function created and tested"
+  - "POST /api/warehouse/license-plates/:id/split endpoint working"
+  - "Settings check (enable_split_merge) enforced"
+  - "Status validation (available only) enforced"
+  - "Quantity validation (< source qty) enforced"
+  - "New LP inherits all required fields"
+  - "Genealogy record created with operation_type='split'"
+  - "Transaction atomicity verified"
+  - "RLS policies verified (org isolation)"
+  - "Desktop UI modal complete with all states"
+  - "Preview updates in real-time"
+  - "Loading and error states implemented"
+  - "Success feedback with link to new LP"
+  - "Zod validation schemas in place"
+  - "Unit tests passing (>80% coverage)"
+  - "Integration tests passing"
+  - "E2E test for split workflow passing"
+  - "Performance: <300ms split operation"
+  - "Accessibility: keyboard navigation, screen reader support"
+  - "Mobile responsive layout"
+  - "Code review completed"
+  - "Documentation updated"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/lp-split-service.ts: 85%"
+      - "lib/validation/lp-split-schemas.ts: 95%"
+  integration:
+    target: 75
+    files:
+      - "API endpoint: 100% of routes"
+      - "RLS policies: 100%"
+  e2e:
+    target: 70
+    scenarios:
+      - "Happy path split workflow"
+      - "Validation error handling"
+      - "Settings disabled handling"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Transaction rollback not working correctly"
+    severity: "high"
+    mitigation: "Database function uses explicit transaction, comprehensive tests"
+    test_coverage: "integration_tests.api_endpoint[7]"
+
+  - id: "RISK-02"
+    description: "RLS bypass allowing cross-org splits"
+    severity: "critical"
+    mitigation: "RLS policy on lp_genealogy, integration tests verify isolation"
+    test_coverage: "integration_tests.rls_isolation"
+
+  - id: "RISK-03"
+    description: "Concurrent splits causing data inconsistency"
+    severity: "medium"
+    mitigation: "FOR UPDATE lock in database function"
+    test_coverage: "Manual test or concurrent integration test"
+
+  - id: "RISK-04"
+    description: "Performance degradation with large LP tables"
+    severity: "medium"
+    mitigation: "Indexes on license_plates, performance tests"
+    test_coverage: "performance_tests"

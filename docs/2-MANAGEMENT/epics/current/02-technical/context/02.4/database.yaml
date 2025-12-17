@@ -1,0 +1,243 @@
+# Story 02.4 - Database Schema
+# Purpose: Tables, RLS policies, indexes, triggers, constraints
+# Agent: BACKEND-DEV (database focus)
+
+# Note: boms table may already exist from previous work
+# This file documents the full schema and any new migrations needed
+
+migrations:
+  - path: "supabase/migrations/XXX_create_boms_date_overlap_trigger.sql"
+    type: "migration"
+    description: "Date overlap prevention trigger for boms table"
+    conditional: "Run only if trigger does not exist"
+
+tables:
+  - name: "boms"
+    description: "Bills of Materials with versioning and date validity"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "version", type: "INTEGER", constraints: "NOT NULL DEFAULT 1" }
+      - { name: "bom_type", type: "TEXT", constraints: "DEFAULT 'standard'" }
+      - { name: "routing_id", type: "UUID", constraints: "REFERENCES routings(id) ON DELETE SET NULL" }
+      - { name: "effective_from", type: "DATE", constraints: "NOT NULL" }
+      - { name: "effective_to", type: "DATE", constraints: "" }
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'phased_out', 'inactive'))" }
+      - { name: "output_qty", type: "DECIMAL(15,6)", constraints: "NOT NULL CHECK (output_qty > 0)" }
+      - { name: "output_uom", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "units_per_box", type: "INTEGER", constraints: "" }
+      - { name: "boxes_per_pallet", type: "INTEGER", constraints: "" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_boms_org_product ON boms(org_id, product_id)"
+      - "idx_boms_product ON boms(product_id)"
+      - "idx_boms_effective ON boms(product_id, effective_from, effective_to)"
+      - "idx_boms_status ON boms(org_id, status)"
+      - "idx_boms_routing_id ON boms(routing_id)"
+    constraints:
+      - "UNIQUE(org_id, product_id, version)"
+
+# Date Overlap Prevention Trigger
+triggers:
+  - name: "check_bom_date_overlap"
+    table: "boms"
+    timing: "BEFORE INSERT OR UPDATE"
+    description: "Prevents overlapping date ranges for same product within organization"
+    sql: |
+      CREATE OR REPLACE FUNCTION check_bom_date_overlap()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        -- Check for overlapping date ranges
+        IF EXISTS (
+          SELECT 1 FROM boms
+          WHERE org_id = NEW.org_id
+            AND product_id = NEW.product_id
+            AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid)
+            AND daterange(effective_from, effective_to, '[]') &&
+                daterange(NEW.effective_from, NEW.effective_to, '[]')
+        ) THEN
+          RAISE EXCEPTION 'Date range overlaps with existing BOM for this product';
+        END IF;
+
+        -- Check for multiple BOMs with NULL effective_to (ongoing)
+        IF NEW.effective_to IS NULL AND EXISTS (
+          SELECT 1 FROM boms
+          WHERE org_id = NEW.org_id
+            AND product_id = NEW.product_id
+            AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid)
+            AND effective_to IS NULL
+        ) THEN
+          RAISE EXCEPTION 'Only one BOM can have no end date per product';
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trigger_check_bom_date_overlap
+        BEFORE INSERT OR UPDATE ON boms
+        FOR EACH ROW
+        EXECUTE FUNCTION check_bom_date_overlap();
+
+# Auto-update timestamp trigger
+  - name: "update_boms_updated_at"
+    table: "boms"
+    timing: "BEFORE UPDATE"
+    description: "Auto-updates updated_at timestamp"
+    sql: |
+      CREATE OR REPLACE FUNCTION update_boms_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trigger_update_boms_updated_at
+        BEFORE UPDATE ON boms
+        FOR EACH ROW
+        EXECUTE FUNCTION update_boms_updated_at();
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Single source of truth (users table)"
+    - "Consistent with ADR-013 pattern"
+    - "Performance overhead <1ms per query"
+
+  policies:
+    - table: "boms"
+      name: "boms_org_isolation_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "boms"
+      name: "boms_org_isolation_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "boms"
+      name: "boms_org_isolation_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "boms"
+      name: "boms_org_isolation_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Database Queries for Service Layer
+queries:
+  get_next_version:
+    description: "Get next version number for a product"
+    sql: |
+      SELECT COALESCE(MAX(version), 0) + 1 as next_version
+      FROM boms
+      WHERE org_id = :org_id AND product_id = :product_id;
+
+  check_date_overlap:
+    description: "Check if date range overlaps with existing BOMs"
+    sql: |
+      SELECT id, version, effective_from, effective_to
+      FROM boms
+      WHERE org_id = :org_id
+        AND product_id = :product_id
+        AND id != COALESCE(:exclude_id, '00000000-0000-0000-0000-000000000000'::uuid)
+        AND daterange(effective_from, effective_to, '[]') &&
+            daterange(:effective_from, :effective_to, '[]')
+      LIMIT 1;
+
+  check_work_order_usage:
+    description: "Check if BOM is referenced by Work Orders"
+    sql: |
+      SELECT wo.id, wo.wo_number
+      FROM work_orders wo
+      WHERE wo.bom_id = :bom_id
+      LIMIT 5;
+
+  get_bom_timeline:
+    description: "Get all BOM versions for a product (timeline view)"
+    sql: |
+      SELECT
+        b.id,
+        b.version,
+        b.status,
+        b.effective_from,
+        b.effective_to,
+        b.output_qty,
+        b.output_uom,
+        b.notes,
+        CASE
+          WHEN CURRENT_DATE >= b.effective_from
+            AND (b.effective_to IS NULL OR CURRENT_DATE <= b.effective_to)
+            AND b.status = 'active'
+          THEN true
+          ELSE false
+        END as is_currently_active,
+        EXISTS (
+          SELECT 1 FROM boms b2
+          WHERE b2.org_id = b.org_id
+            AND b2.product_id = b.product_id
+            AND b2.id != b.id
+            AND daterange(b2.effective_from, b2.effective_to, '[]') &&
+                daterange(b.effective_from, b.effective_to, '[]')
+        ) as has_overlap
+      FROM boms b
+      WHERE b.org_id = :org_id
+        AND b.product_id = :product_id
+      ORDER BY b.effective_from DESC, b.version DESC;
+
+  list_boms_with_product:
+    description: "List BOMs with product details for table display"
+    sql: |
+      SELECT
+        b.id,
+        b.org_id,
+        b.product_id,
+        b.version,
+        b.status,
+        b.effective_from,
+        b.effective_to,
+        b.output_qty,
+        b.output_uom,
+        b.notes,
+        b.created_at,
+        b.updated_at,
+        p.code as product_code,
+        p.name as product_name,
+        pt.code as product_type_code,
+        p.uom as product_uom
+      FROM boms b
+      JOIN products p ON b.product_id = p.id
+      LEFT JOIN product_types pt ON p.product_type_id = pt.id
+      WHERE b.org_id = :org_id
+        AND (:search IS NULL OR p.code ILIKE '%' || :search || '%' OR p.name ILIKE '%' || :search || '%')
+        AND (:status IS NULL OR b.status = :status)
+        AND (:product_type IS NULL OR pt.code = :product_type)
+        AND (:effective_date IS NULL OR (
+          CASE :effective_date
+            WHEN 'current' THEN CURRENT_DATE >= b.effective_from
+              AND (b.effective_to IS NULL OR CURRENT_DATE <= b.effective_to)
+            WHEN 'future' THEN b.effective_from > CURRENT_DATE
+            WHEN 'expired' THEN b.effective_to IS NOT NULL AND b.effective_to < CURRENT_DATE
+            ELSE true
+          END
+        ))
+      ORDER BY b.effective_from DESC, b.version DESC
+      LIMIT :limit OFFSET :offset;
+
+# Schema Notes
+notes:
+  - "bom_type defaults to 'standard'; other types (engineering, costing) for future phases"
+  - "routing_id is optional; links to routings table (Phase 1)"
+  - "units_per_box, boxes_per_pallet are packaging fields (Phase 1)"
+  - "effective_to NULL means 'ongoing' with no end date"
+  - "status values: draft (editable), active (in use), phased_out (transitioning), inactive (disabled)"
+  - "Version is auto-incremented per product within organization"
+  - "Database trigger prevents overlapping date ranges - service layer should also validate for better UX"

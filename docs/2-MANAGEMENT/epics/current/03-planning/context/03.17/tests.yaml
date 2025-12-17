@@ -1,0 +1,466 @@
+# Story 03.17 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/planning-settings-service.test.ts"
+    type: "unit"
+    description: "Unit tests for planning settings service layer"
+
+  - path: "apps/frontend/lib/validation/__tests__/planning-settings-schemas.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+
+  - path: "apps/frontend/app/api/settings/planning/__tests__/route.test.ts"
+    type: "unit"
+    description: "Unit tests for API route handlers"
+
+  - path: "apps/frontend/__tests__/e2e/planning-settings.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for Planning Settings page"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    title: "Planning Settings Page Loads"
+    given: "I am authenticated as an administrator"
+    when: "I navigate to /settings/planning"
+    then: |
+      - Page loads successfully
+      - Header shows "Planning Settings"
+      - Description text visible
+      - Three collapsible sections visible (PO, TO, WO)
+      - All sections expanded by default
+      - Save Changes button visible (disabled if no changes)
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    title: "PO Settings Section - Fields and Defaults"
+    given: "I am on the Planning Settings page"
+    when: "The page loads"
+    then: |
+      - PO Settings section displays 7 fields
+      - Require PO Approval: OFF
+      - Approval Threshold Amount: empty (disabled)
+      - Approval Roles: admin, manager selected
+      - Auto-Numbering Prefix: PO-
+      - Auto-Numbering Format: YYYY-NNNNN (example shown)
+      - Default Payment Terms: Net 30
+      - Default Currency: PLN
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    title: "TO Settings Section - Fields and Defaults"
+    given: "I am on the Planning Settings page"
+    when: "The page loads"
+    then: |
+      - TO Settings section displays 5 fields
+      - Allow Partial Shipments: ON
+      - Require License Plate Selection: OFF
+      - Auto-Numbering Prefix: TO-
+      - Auto-Numbering Format: YYYY-NNNNN (example shown)
+      - Default Transit Days: 1
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    title: "WO Settings Section - Fields and Defaults"
+    given: "I am on the Planning Settings page"
+    when: "The page loads"
+    then: |
+      - WO Settings section displays 9 fields
+      - Check Material Availability: ON
+      - Copy Routing Operations: ON
+      - Auto-Select Active BOM: ON
+      - Require BOM to Create WO: ON
+      - Allow Overproduction: OFF
+      - Overproduction Limit: 10 (disabled)
+      - Auto-Numbering Prefix: WO-
+      - Auto-Numbering Format: YYYY-NNNNN (example shown)
+      - Default Scheduling Buffer: 2 hours
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-05"
+    title: "Settings Auto-Initialization"
+    given: "Organization has no planning_settings record"
+    when: "I navigate to /settings/planning"
+    then: |
+      - New planning_settings record created with defaults
+      - All fields display default values
+      - Record has correct org_id
+      - created_at and updated_at set
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    title: "Settings Update - Success Path"
+    given: "I have loaded the Planning Settings page"
+    when: "I change settings and click Save Changes"
+    then: |
+      - Success toast: "Planning settings saved successfully"
+      - Save Changes button becomes disabled
+      - Changes persist on page reload
+      - updated_at timestamp updated
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-07"
+    title: "Settings Update - Validation Errors"
+    given: "I am on the Planning Settings page"
+    when: "I enter invalid auto-number format and click Save"
+    then: |
+      - Validation error displayed: "Format must contain both YYYY and NNNNN"
+      - Settings NOT saved
+      - Field highlighted in red
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-08"
+    title: "Approval Threshold Logic"
+    given: "Various approval settings combinations"
+    when: "Settings are saved"
+    then: |
+      - If po_require_approval=false: No POs require approval
+      - If po_require_approval=true AND threshold=null: ALL POs require approval
+      - If po_require_approval=true AND threshold=X: Only POs >= X require approval
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-09"
+    title: "Collapsible Sections"
+    given: "I am on the Planning Settings page"
+    when: "I click Collapse on PO Settings section"
+    then: |
+      - Section collapses (fields hidden)
+      - Button changes to Expand
+      - State persists in localStorage
+      - Collapsed state retained on page reload
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-10"
+    title: "RLS and Multi-Tenancy"
+    given: "User in Organization A"
+    when: "Loading /settings/planning"
+    then: |
+      - Only Organization A settings visible
+      - API filters by org_id
+      - RLS policy enforces isolation
+      - Org B settings remain unchanged on save
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-11"
+    title: "Unsaved Changes Warning"
+    given: "I have made changes but NOT saved"
+    when: "I navigate away from the page"
+    then: |
+      - Browser confirmation dialog appears
+      - Cancel keeps me on page with changes preserved
+      - OK navigates away, changes discarded
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-12"
+    title: "Settings Used by Dependent Stories"
+    given: "Settings saved in Story 03.17"
+    when: "Creating PO/TO/WO in dependent stories"
+    then: |
+      - PO creation uses: prefix, format, payment_terms, currency
+      - WO creation uses: auto_select_bom, require_bom, material_check
+      - TO creation uses: allow_partial_shipments, prefix, format
+    test_type: "integration"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  planning_settings_service:
+    - name: "getPlanningSettings returns settings for org"
+      setup: "Mock Supabase returning existing settings"
+      expected: "Returns PlanningSettings object"
+
+    - name: "getPlanningSettings auto-initializes for new org"
+      setup: "Mock Supabase returning PGRST116 (no rows)"
+      expected: "Creates new record with defaults and returns it"
+
+    - name: "updatePlanningSettings updates and returns settings"
+      setup: "Mock Supabase update returning updated record"
+      expected: "Returns updated PlanningSettings"
+
+    - name: "initializePlanningSettings creates with defaults"
+      setup: "Mock Supabase insert"
+      expected: "Inserts record with all default values"
+
+  planning_settings_schemas:
+    - name: "validates valid settings"
+      input:
+        po_require_approval: true
+        po_approval_threshold: 5000
+        po_auto_number_prefix: "PO-"
+        po_auto_number_format: "YYYY-NNNNN"
+      expected: "Validation passes"
+
+    - name: "rejects invalid auto-number format - missing YYYY"
+      input:
+        po_auto_number_format: "NNNNN"
+      expected: "Validation fails with format error"
+
+    - name: "rejects invalid auto-number format - missing NNNNN"
+      input:
+        po_auto_number_format: "YYYY"
+      expected: "Validation fails with format error"
+
+    - name: "rejects empty prefix"
+      input:
+        po_auto_number_prefix: ""
+      expected: "Validation fails: Prefix cannot be empty"
+
+    - name: "rejects prefix over 10 chars"
+      input:
+        po_auto_number_prefix: "VERYLONGPREFIX-"
+      expected: "Validation fails: Prefix max 10 characters"
+
+    - name: "rejects invalid prefix characters"
+      input:
+        po_auto_number_prefix: "PO@#$"
+      expected: "Validation fails: alphanumeric with dashes only"
+
+    - name: "rejects negative approval threshold"
+      input:
+        po_approval_threshold: -100
+      expected: "Validation fails"
+
+    - name: "allows null approval threshold"
+      input:
+        po_approval_threshold: null
+      expected: "Validation passes"
+
+    - name: "rejects overproduction limit over 100"
+      input:
+        wo_overproduction_limit: 150
+      expected: "Validation fails: must be 0-100%"
+
+    - name: "rejects transit days over 365"
+      input:
+        to_default_transit_days: 400
+      expected: "Validation fails: max 365"
+
+    - name: "rejects scheduling buffer over 168"
+      input:
+        wo_default_scheduling_buffer_hours: 200
+      expected: "Validation fails: max 168 hours"
+
+    - name: "allows partial updates"
+      input:
+        po_require_approval: true
+      expected: "Validation passes for partial object"
+
+  api_route:
+    - name: "GET returns 401 for unauthenticated request"
+      setup: "No valid JWT"
+      expected: "401 Unauthorized"
+
+    - name: "GET returns settings for authenticated user"
+      setup: "Valid JWT, mock service returns settings"
+      expected: "200 with settings JSON"
+
+    - name: "PATCH returns 401 for unauthenticated request"
+      setup: "No valid JWT"
+      expected: "401 Unauthorized"
+
+    - name: "PATCH returns 403 for non-admin user"
+      setup: "Valid JWT for viewer role"
+      expected: "403 Forbidden"
+
+    - name: "PATCH returns 400 for invalid input"
+      setup: "Valid admin JWT, invalid body"
+      expected: "400 with validation errors"
+
+    - name: "PATCH returns 200 for valid update"
+      setup: "Valid admin JWT, valid body"
+      expected: "200 with success message and updated settings"
+
+# E2E Test Cases
+e2e_tests:
+  planning_settings_page:
+    - name: "Page loads with all sections"
+      steps:
+        - "Navigate to /settings/planning"
+        - "Wait for page load"
+      assertions:
+        - "Page title visible: Planning Settings"
+        - "PO Settings section visible"
+        - "TO Settings section visible"
+        - "WO Settings section visible"
+        - "Save Changes button visible"
+
+    - name: "Settings display default values"
+      steps:
+        - "Navigate to /settings/planning (fresh org)"
+      assertions:
+        - "PO Require Approval toggle is OFF"
+        - "TO Allow Partial Shipments toggle is ON"
+        - "WO Require BOM toggle is ON"
+        - "PO Payment Terms shows Net 30"
+        - "PO Currency shows PLN"
+
+    - name: "Edit and save settings"
+      steps:
+        - "Navigate to /settings/planning"
+        - "Toggle PO Require Approval ON"
+        - "Set Approval Threshold to 5000"
+        - "Click Save Changes"
+      assertions:
+        - "Success toast appears"
+        - "Save button becomes disabled"
+        - "Reload page - changes persisted"
+
+    - name: "Validation error on invalid format"
+      steps:
+        - "Navigate to /settings/planning"
+        - "Clear PO Auto-Numbering Format"
+        - "Enter INVALID"
+        - "Click Save Changes"
+      assertions:
+        - "Error message appears below field"
+        - "Field highlighted in red"
+        - "Settings NOT saved"
+
+    - name: "Section collapse persists"
+      steps:
+        - "Navigate to /settings/planning"
+        - "Click Collapse on PO Settings"
+        - "Reload page"
+      assertions:
+        - "PO Settings section is collapsed"
+        - "TO and WO sections still expanded"
+
+    - name: "Dependent field disabled when parent off"
+      steps:
+        - "Navigate to /settings/planning"
+        - "Verify po_approval_threshold disabled"
+        - "Toggle po_require_approval ON"
+        - "Verify po_approval_threshold enabled"
+        - "Verify wo_overproduction_limit disabled"
+        - "Toggle wo_allow_overproduction ON"
+        - "Verify wo_overproduction_limit enabled"
+      assertions:
+        - "Dependent fields properly enabled/disabled"
+
+    - name: "Unsaved changes warning"
+      steps:
+        - "Navigate to /settings/planning"
+        - "Change any setting"
+        - "Click browser back button"
+      assertions:
+        - "Browser confirmation dialog appears"
+
+# Integration Test Cases
+integration_tests:
+  rls_isolation:
+    - name: "User can only access own org settings"
+      setup: |
+        - Create Org A with settings
+        - Create Org B with settings
+      action: "User A queries planning_settings"
+      expected: "Only Org A settings returned"
+
+    - name: "User cannot update other org settings"
+      setup: |
+        - Create Org A with User A (admin)
+        - Create Org B with settings
+      action: "User A attempts to update Org B settings"
+      expected: "Update affects 0 rows, Org B unchanged"
+
+    - name: "Admin can update own org settings"
+      setup: |
+        - Create Org A with Admin user
+      action: "Admin updates planning_settings"
+      expected: "Update succeeds"
+
+    - name: "Non-admin cannot update settings"
+      setup: |
+        - Create Org A with Viewer user
+      action: "Viewer attempts to update planning_settings"
+      expected: "403 Forbidden from API"
+
+  settings_propagation:
+    - name: "PO creation uses planning settings"
+      setup: |
+        - Save planning_settings with po_auto_number_prefix='PUR-'
+      action: "Create new PO"
+      expected: "PO number starts with PUR-"
+
+    - name: "WO creation checks require_bom setting"
+      setup: |
+        - Save planning_settings with wo_require_bom=true
+        - Product without active BOM
+      action: "Attempt to create WO for product"
+      expected: "WO creation blocked with error"
+
+# Definition of Done
+definition_of_done:
+  - "Planning Settings page renders at /settings/planning"
+  - "All three sections display with correct fields and defaults"
+  - "Collapsible sections work correctly with state persistence"
+  - "GET /api/settings/planning returns settings (auto-initializes if missing)"
+  - "PATCH /api/settings/planning saves changes and returns updated settings"
+  - "Validation errors display for invalid inputs"
+  - "Dependent fields disabled when parent toggle is off"
+  - "Success toast displays after successful save"
+  - "Unsaved changes warning displays when navigating away"
+  - "RLS policies enforce org_id isolation"
+  - "Multi-tenancy tested (org A cannot see org B settings)"
+  - "Settings persist across page reloads"
+  - "Service layer has >80% test coverage"
+  - "API routes have >80% test coverage"
+  - "E2E smoke test passes (load, edit, save, verify)"
+  - "Mobile responsive (sections stack, fields full-width)"
+  - "Dependent stories can read settings from planning_settings table"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Settings validation and service layer need good coverage"
+  integration:
+    target: 80
+    reason: "RLS and multi-tenancy must be verified"
+  e2e:
+    target: 1
+    description: "At least 1 smoke test covering happy path"
+  files:
+    - "lib/services/planning-settings-service.ts: 80%"
+    - "lib/validation/planning-settings-schemas.ts: 90%"
+    - "app/api/settings/planning/route.ts: 80%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "RLS policy misconfiguration could leak settings between orgs"
+    mitigation: "Integration tests with 2+ org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"
+
+  - id: "RISK-02"
+    description: "Auto-initialization race condition on concurrent requests"
+    mitigation: "UNIQUE constraint on org_id prevents duplicates; upsert pattern if needed"
+    severity: "low"
+    test_coverage: "N/A (DB constraint handles)"
+
+  - id: "RISK-03"
+    description: "Settings not propagating to dependent stories"
+    mitigation: "Integration tests for settings propagation"
+    severity: "medium"
+    test_coverage: "integration_tests.settings_propagation"
+
+  - id: "RISK-04"
+    description: "Validation schema out of sync with database constraints"
+    mitigation: "Zod schema matches DB CHECK constraints; unit tests verify"
+    severity: "low"
+    test_coverage: "unit_tests.planning_settings_schemas"

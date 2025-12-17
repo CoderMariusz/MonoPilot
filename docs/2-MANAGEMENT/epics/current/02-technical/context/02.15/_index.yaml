@@ -1,0 +1,83 @@
+# Story 02.15 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.15"
+  name: "Cost History & Variance Analysis"
+  slug: "cost-history-variance"
+  epic: "02-technical"
+  phase: "2C-2"
+  complexity: "S"
+  estimate_days: 2
+  type: "frontend + backend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes
+  - api.yaml         # Endpoints, schemas, errors
+  - frontend.yaml    # Components, wireframes, UX
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "02.9"
+      name: "BOM-Routing Link + Cost Calculation"
+      provides: ["product_costs table", "costing-service.ts", "cost calculation logic"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product_id FK"]
+  blocked_by:
+    - story: "02.9"
+      reason: "Cost history requires product_costs records from BOM cost calculations"
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections: ["FR-2.71", "FR-2.75"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections: ["Costing Tables", "Cost Calculation Flow"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.15.cost-history-variance.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-015-cost-history.md"
+      id: "TEC-015"
+      relevance: "PRIMARY - Cost History page wireframe"
+  adrs: []
+  patterns:
+    - path: "apps/frontend/lib/services/costing-service.ts"
+      relevance: "Existing costing service to extend"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 3
+    description: "GET /history, GET /variance, POST /export endpoints"
+  - type: "service"
+    count: 2
+    description: "cost-history-service.ts, variance-analysis-service.ts"
+  - type: "page"
+    count: 1
+    description: "Cost history page at /technical/costing/products/:id/history"
+  - type: "component"
+    count: 8
+    description: "CostHistoryChart, CostVarianceTable, export components"
+  - type: "test"
+    count: 3
+    description: "Unit tests for trend/variance calculation, integration tests"
+
+# Technical notes
+technical_notes:
+  - "product_costs table already exists from Story 02.9 - use existing table"
+  - "Historical records created automatically on each BOM cost calculation"
+  - "Variance analysis requires production work orders (integration point with Epic 04)"
+  - "Export functionality: CSV, PDF, PNG, Excel formats"
+  - "Use Recharts for interactive cost trend visualization"
+  - "Trend calculations: 30d, 90d, YTD based on product_costs records"
+  - "Variance threshold: 5% or higher triggers warning indicator"

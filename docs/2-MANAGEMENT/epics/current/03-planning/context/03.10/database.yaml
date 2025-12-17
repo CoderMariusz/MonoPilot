@@ -1,0 +1,339 @@
+# Story 03.10 - Database Schema
+# Purpose: Tables, RLS policies, indexes, functions, triggers
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/060_create_work_orders_table.sql"
+    type: "migration"
+    description: "Work orders header table with all fields"
+  - path: "supabase/migrations/061_create_wo_status_history.sql"
+    type: "migration"
+    description: "Status history audit trail table"
+  - path: "supabase/migrations/062_create_wo_daily_sequence.sql"
+    type: "migration"
+    description: "Daily WO number sequence per org"
+  - path: "supabase/migrations/063_wo_functions.sql"
+    type: "migration"
+    description: "generate_wo_number, BOM selection functions"
+  - path: "supabase/migrations/064_wo_triggers.sql"
+    type: "migration"
+    description: "Status history trigger, update timestamp trigger"
+  - path: "supabase/migrations/065_wo_rls_policies.sql"
+    type: "migration"
+    description: "RLS policies for all WO tables"
+
+tables:
+  - name: "work_orders"
+    description: "Work order header - production scheduling"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "wo_number", type: "VARCHAR(20)", constraints: "NOT NULL" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "bom_id", type: "UUID", constraints: "REFERENCES boms(id)" }
+      - { name: "routing_id", type: "UUID", constraints: "REFERENCES routings(id)" }
+      - { name: "planned_quantity", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "produced_quantity", type: "DECIMAL(15,4)", constraints: "DEFAULT 0" }
+      - { name: "uom", type: "VARCHAR(20)", constraints: "NOT NULL" }
+      - { name: "status", type: "VARCHAR(20)", constraints: "NOT NULL DEFAULT 'draft'" }
+      # Scheduling
+      - { name: "planned_start_date", type: "DATE", constraints: "" }
+      - { name: "planned_end_date", type: "DATE", constraints: "" }
+      - { name: "scheduled_start_time", type: "TIME", constraints: "" }
+      - { name: "scheduled_end_time", type: "TIME", constraints: "" }
+      # Assignments
+      - { name: "production_line_id", type: "UUID", constraints: "REFERENCES production_lines(id)" }
+      - { name: "machine_id", type: "UUID", constraints: "REFERENCES machines(id)" }
+      # Priority & Source
+      - { name: "priority", type: "VARCHAR(20)", constraints: "DEFAULT 'normal'" }
+      - { name: "source_of_demand", type: "VARCHAR(30)", constraints: "" }
+      - { name: "source_reference", type: "VARCHAR(50)", constraints: "" }
+      # Execution tracking (updated by Production module)
+      - { name: "started_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "completed_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "paused_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "pause_reason", type: "TEXT", constraints: "" }
+      - { name: "actual_qty", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "yield_percent", type: "DECIMAL(5,2)", constraints: "" }
+      # WO expiry
+      - { name: "expiry_date", type: "DATE", constraints: "" }
+      # Notes
+      - { name: "notes", type: "TEXT", constraints: "" }
+      # Audit fields
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    constraints:
+      - "CONSTRAINT wo_org_number_unique UNIQUE(org_id, wo_number)"
+      - "CONSTRAINT wo_status_check CHECK (status IN ('draft', 'planned', 'released', 'in_progress', 'on_hold', 'completed', 'closed', 'cancelled'))"
+      - "CONSTRAINT wo_priority_check CHECK (priority IN ('low', 'normal', 'high', 'critical'))"
+      - "CONSTRAINT wo_source_check CHECK (source_of_demand IS NULL OR source_of_demand IN ('manual', 'po', 'customer_order', 'forecast'))"
+      - "CONSTRAINT wo_qty_positive CHECK (planned_quantity > 0)"
+      - "CONSTRAINT wo_produced_qty_check CHECK (produced_quantity >= 0)"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_wo_org_status ON work_orders(org_id, status)"
+      - "idx_wo_org_date ON work_orders(org_id, planned_start_date)"
+      - "idx_wo_product ON work_orders(product_id)"
+      - "idx_wo_bom ON work_orders(bom_id)"
+      - "idx_wo_line ON work_orders(production_line_id)"
+      - "idx_wo_machine ON work_orders(machine_id)"
+      - "idx_wo_priority ON work_orders(org_id, priority)"
+      - "idx_wo_created_at ON work_orders(created_at DESC)"
+      - "idx_wo_number ON work_orders(wo_number)"
+
+  - name: "wo_status_history"
+    description: "Status transition audit trail"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "wo_id", type: "UUID", constraints: "NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE" }
+      - { name: "from_status", type: "VARCHAR(20)", constraints: "" }
+      - { name: "to_status", type: "VARCHAR(20)", constraints: "NOT NULL" }
+      - { name: "changed_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "changed_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+    rls: true
+    rls_pattern: "EXISTS (SELECT 1 FROM work_orders wo WHERE wo.id = wo_status_history.wo_id AND wo.org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    indexes:
+      - "idx_wo_history_wo ON wo_status_history(wo_id)"
+      - "idx_wo_history_changed_at ON wo_status_history(changed_at DESC)"
+
+  - name: "wo_daily_sequence"
+    description: "Daily WO number sequence per org (WO-YYYYMMDD-NNNN)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "sequence_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "last_sequence", type: "INTEGER", constraints: "NOT NULL DEFAULT 0" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    constraints:
+      - "CONSTRAINT wo_seq_org_date_unique UNIQUE(org_id, sequence_date)"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Database Functions
+functions:
+  - name: "generate_wo_number"
+    description: "Generate next WO number with daily reset (WO-YYYYMMDD-NNNN)"
+    params:
+      - { name: "p_org_id", type: "UUID" }
+      - { name: "p_date", type: "DATE", default: "CURRENT_DATE" }
+    returns: "TEXT"
+    language: "plpgsql"
+    sql: |
+      DECLARE
+        v_date_str TEXT;
+        v_next_seq INTEGER;
+      BEGIN
+        v_date_str := TO_CHAR(p_date, 'YYYYMMDD');
+
+        -- Insert or update sequence for this org/date
+        INSERT INTO wo_daily_sequence (org_id, sequence_date, last_sequence)
+        VALUES (p_org_id, p_date, 1)
+        ON CONFLICT (org_id, sequence_date)
+        DO UPDATE SET
+          last_sequence = wo_daily_sequence.last_sequence + 1,
+          updated_at = NOW()
+        RETURNING last_sequence INTO v_next_seq;
+
+        RETURN 'WO-' || v_date_str || '-' || LPAD(v_next_seq::TEXT, 4, '0');
+      END;
+
+  - name: "get_active_bom_for_date"
+    description: "Get auto-selected BOM for product on scheduled date"
+    params:
+      - { name: "p_product_id", type: "UUID" }
+      - { name: "p_org_id", type: "UUID" }
+      - { name: "p_scheduled_date", type: "DATE" }
+    returns: "TABLE (bom_id UUID, bom_code VARCHAR, bom_version INTEGER, output_qty DECIMAL, effective_from DATE, effective_to DATE, routing_id UUID, item_count BIGINT)"
+    language: "plpgsql"
+    sql: |
+      BEGIN
+        RETURN QUERY
+        SELECT
+          b.id AS bom_id,
+          b.code AS bom_code,
+          b.version AS bom_version,
+          b.output_qty,
+          b.effective_from,
+          b.effective_to,
+          b.routing_id,
+          (SELECT COUNT(*) FROM bom_items bi WHERE bi.bom_id = b.id) AS item_count
+        FROM boms b
+        WHERE b.product_id = p_product_id
+          AND b.org_id = p_org_id
+          AND b.status = 'active'
+          AND b.effective_from <= p_scheduled_date
+          AND (b.effective_to IS NULL OR b.effective_to >= p_scheduled_date)
+        ORDER BY b.effective_from DESC, b.created_at DESC
+        LIMIT 1;
+      END;
+
+  - name: "get_all_active_boms_for_product"
+    description: "Get all active BOMs for product (manual selection)"
+    params:
+      - { name: "p_product_id", type: "UUID" }
+      - { name: "p_org_id", type: "UUID" }
+    returns: "TABLE (bom_id UUID, bom_code VARCHAR, bom_version INTEGER, output_qty DECIMAL, effective_from DATE, effective_to DATE, routing_id UUID, item_count BIGINT, is_current BOOLEAN)"
+    language: "plpgsql"
+    sql: |
+      BEGIN
+        RETURN QUERY
+        SELECT
+          b.id AS bom_id,
+          b.code AS bom_code,
+          b.version AS bom_version,
+          b.output_qty,
+          b.effective_from,
+          b.effective_to,
+          b.routing_id,
+          (SELECT COUNT(*) FROM bom_items bi WHERE bi.bom_id = b.id) AS item_count,
+          (b.effective_from <= CURRENT_DATE
+            AND (b.effective_to IS NULL OR b.effective_to >= CURRENT_DATE)) AS is_current
+        FROM boms b
+        WHERE b.product_id = p_product_id
+          AND b.org_id = p_org_id
+          AND b.status = 'active'
+        ORDER BY b.effective_from DESC, b.created_at DESC;
+      END;
+
+# Triggers
+triggers:
+  - name: "tr_wo_status_history"
+    description: "Record status change in history table"
+    table: "work_orders"
+    event: "AFTER UPDATE OF status"
+    function: "record_wo_status_change"
+    function_sql: |
+      CREATE OR REPLACE FUNCTION record_wo_status_change()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF OLD.status IS DISTINCT FROM NEW.status THEN
+          INSERT INTO wo_status_history (wo_id, from_status, to_status, changed_by)
+          VALUES (NEW.id, OLD.status, NEW.status, NEW.updated_by);
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+  - name: "tr_wo_update_timestamp"
+    description: "Auto-update updated_at on modification"
+    table: "work_orders"
+    event: "BEFORE UPDATE"
+    function: "update_wo_timestamp"
+    function_sql: |
+      CREATE OR REPLACE FUNCTION update_wo_timestamp()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at := NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    # work_orders
+    - table: "work_orders"
+      name: "wo_select"
+      operation: "SELECT"
+      role: "authenticated"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "work_orders"
+      name: "wo_insert"
+      operation: "INSERT"
+      role: "authenticated"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'planner', 'production_manager')
+        )
+
+    - table: "work_orders"
+      name: "wo_update"
+      operation: "UPDATE"
+      role: "authenticated"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'planner', 'production_manager')
+        )
+
+    - table: "work_orders"
+      name: "wo_delete"
+      operation: "DELETE"
+      role: "authenticated"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND status = 'draft'
+        AND NOT EXISTS (SELECT 1 FROM wo_materials WHERE wo_id = work_orders.id)
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'planner')
+        )
+
+    # wo_status_history
+    - table: "wo_status_history"
+      name: "wo_history_select"
+      operation: "SELECT"
+      role: "authenticated"
+      using: |
+        EXISTS (
+          SELECT 1 FROM work_orders wo
+          WHERE wo.id = wo_status_history.wo_id
+            AND wo.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+
+    - table: "wo_status_history"
+      name: "wo_history_insert"
+      operation: "INSERT"
+      role: "authenticated"
+      with_check: |
+        EXISTS (
+          SELECT 1 FROM work_orders wo
+          WHERE wo.id = wo_status_history.wo_id
+            AND wo.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+
+    # wo_daily_sequence
+    - table: "wo_daily_sequence"
+      name: "wo_seq_all"
+      operation: "ALL"
+      role: "authenticated"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Business Rules for Status Transitions
+status_transitions:
+  draft:
+    allowed_next: ["planned", "cancelled"]
+    editable_fields: ["*"]  # All fields editable
+  planned:
+    allowed_next: ["released", "draft", "cancelled"]
+    editable_fields: ["planned_start_date", "planned_end_date", "scheduled_start_time", "scheduled_end_time", "production_line_id", "machine_id", "priority", "notes"]
+  released:
+    allowed_next: ["in_progress", "cancelled"]
+    locked_fields: ["product_id", "bom_id", "planned_quantity"]
+    editable_fields: ["planned_start_date", "planned_end_date", "scheduled_start_time", "scheduled_end_time", "production_line_id", "machine_id", "priority", "notes"]
+  in_progress:
+    allowed_next: ["on_hold", "completed"]
+    note: "Production module handles this status"
+  on_hold:
+    allowed_next: ["in_progress", "cancelled"]
+    note: "Production module handles this status"
+  completed:
+    allowed_next: ["closed"]
+    editable_fields: []
+  closed:
+    allowed_next: []
+    editable_fields: []
+  cancelled:
+    allowed_next: []
+    editable_fields: []

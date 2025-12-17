@@ -1,0 +1,220 @@
+# Story 04.2b - WO Pause/Resume
+# Index file - Story metadata, dependencies, and deliverables
+
+story:
+  id: "04.2b"
+  name: "Work Order Pause/Resume"
+  epic: "04-production"
+  phase: "0"
+  priority: "P0 (MVP Core)"
+  complexity: "S"
+  estimate_days: 1-2
+  type: "backend + frontend"
+  state: "ready"
+
+description: |
+  Implement Work Order pause/resume functionality allowing operators to temporarily halt
+  production with reason tracking. This story covers:
+  - Pause active WOs with mandatory reason selection
+  - Resume paused WOs
+  - Track pause history with duration calculation
+  - Settings toggle to enable/disable pause functionality
+  - UI buttons conditional on settings and WO status
+
+goal: |
+  Enable production operators to pause and resume work orders with reason tracking,
+  providing visibility into production interruptions and downtime.
+
+user_story: |
+  As a **production operator**, I want to **pause and resume work orders with a reason**
+  so that **I can accurately track production interruptions and downtime causes**.
+
+# Reference Documents
+files_to_read:
+  prd: "docs/1-BASELINE/product/modules/production.md"
+  prd_sections:
+    - "FR-PROD-003"
+  architecture: "docs/1-BASELINE/architecture/modules/production.md"
+  story: "docs/2-MANAGEMENT/epics/current/04-production/04.2b.wo-pause-resume.md"
+  phase_breakdown: "docs/2-MANAGEMENT/epics/current/04-production/PHASE-BREAKDOWN.md"
+  patterns: []
+
+ux:
+  wireframes:
+    - id: "PROD-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-002-wo-execution-detail.md"
+      sections:
+        - "4.2 Pause WO Modal"
+        - "4.3 Resume WO Modal"
+        - "Section 3 - Action Bar"
+      components:
+        - "PauseButton"
+        - "ResumeButton"
+        - "PauseModal"
+        - "ResumeModal"
+        - "PauseReasonSelect"
+  patterns:
+    modal: "ShadCN Dialog pattern"
+    form: "ShadCN Form with Zod validation"
+    button: "ShadCN Button with conditional rendering"
+    select: "ShadCN Select for pause reasons"
+  states:
+    - "loading"
+    - "success"
+    - "error"
+    - "paused"
+    - "in_progress"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      provides: ["organizations", "org_id RLS pattern"]
+    - story: "03.10"
+      provides: ["work_orders table", "status field"]
+    - story: "04.2a"
+      provides: ["WO Start functionality", "In Progress status"]
+
+  optional: []
+
+# LP Dependency Status
+lp_dependency:
+  status: "NO LP dependency"
+  can_proceed: true
+  notes: "This story only manages WO status transitions and pause tracking. No material transactions or License Plates are involved."
+
+# Scope
+scope:
+  in_scope:
+    - "Pause In Progress WOs with mandatory reason"
+    - "Resume Paused WOs"
+    - "Pause reason tracking (machine_breakdown, material_shortage, break, quality_issue, other)"
+    - "Duration calculation (pause to resume)"
+    - "wo_pauses table for full history"
+    - "Settings toggle: allow_pause_wo (default: false)"
+    - "Conditional UI: Show/hide Pause button based on setting"
+    - "API endpoints: POST /api/production/work-orders/:id/pause and /resume"
+    - "Service layer: wo-pause-service.ts"
+    - "Validation: Zod schemas for pause/resume requests"
+
+  out_of_scope:
+    - "WO Start functionality (04.2a)"
+    - "WO Complete functionality (04.2c)"
+    - "Operations tracking (04.3)"
+    - "OEE downtime integration (Phase 2 - 04.9b)"
+    - "Automatic pause on material shortage (future enhancement)"
+    - "Pause notifications/alerts (future enhancement)"
+
+# Deliverables
+deliverables:
+  api_routes:
+    - path: "apps/frontend/app/api/production/work-orders/[id]/pause/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/production/work-orders/[id]/resume/route.ts"
+      methods: ["POST"]
+    - path: "apps/frontend/app/api/production/work-orders/[id]/pause-history/route.ts"
+      methods: ["GET"]
+
+  services:
+    - path: "apps/frontend/lib/services/wo-pause-service.ts"
+      functions:
+        - "isPauseEnabled"
+        - "getPauseReasons"
+        - "pauseWorkOrder"
+        - "resumeWorkOrder"
+        - "getPauseHistory"
+        - "getDowntimeSummary"
+
+  components:
+    - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/WOPauseButton.tsx"
+    - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/WOResumeButton.tsx"
+    - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/WOPauseHistory.tsx"
+    - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/PauseReasonSelect.tsx"
+
+  validation:
+    - path: "apps/frontend/lib/validation/production-schemas.ts"
+      schemas:
+        - "pauseReasonEnum"
+        - "pauseWorkOrderSchema"
+        - "resumeWorkOrderSchema"
+
+  tests:
+    - path: "apps/frontend/lib/services/wo-pause-service.test.ts"
+    - path: "apps/frontend/app/api/production/work-orders/[id]/pause/route.test.ts"
+    - path: "apps/frontend/app/api/production/work-orders/[id]/resume/route.test.ts"
+    - path: "apps/frontend/e2e/production/wo-pause-resume.spec.ts"
+
+# Technical Notes
+technical_notes:
+  status_transitions:
+    pause: "in_progress -> paused"
+    resume: "paused -> in_progress"
+
+  pause_reasons:
+    - code: "machine_breakdown"
+      label: "Machine Breakdown"
+    - code: "material_shortage"
+      label: "Material Shortage"
+    - code: "break"
+      label: "Break/Lunch"
+    - code: "quality_issue"
+      label: "Quality Issue"
+    - code: "other"
+      label: "Other"
+
+  settings_default:
+    allow_pause_wo: false
+
+  roles_allowed:
+    - "admin"
+    - "manager"
+    - "operator"
+
+  performance:
+    target_response_time: "< 500ms p95"
+    target_state_change: "< 1 second"
+
+# Definition of Done
+definition_of_done:
+  - "Migration 036 reviewed (wo_pauses table + production_settings columns)"
+  - "API endpoints implemented and documented"
+  - "Service layer with error handling (WOPauseError class)"
+  - "Zod validation schemas for pause/resume"
+  - "UI components with conditional rendering (allow_pause_wo check)"
+  - "Pause modal with reason dropdown and notes field"
+  - "Resume confirmation modal"
+  - "Pause history table component"
+  - "RLS policies verified on wo_pauses table"
+  - "API tests passing (>80% coverage)"
+  - "E2E smoke test for critical path"
+  - "Performance: Pause/resume operations < 500ms p95"
+  - "Activity logs created for pause/resume events"
+  - "User info included in response (paused_by_user, resumed_by_user)"
+  - "Optimistic locking prevents race conditions"
+  - "Settings: allow_pause_wo toggle functional"
+  - "Settings: Default value set to false (per story requirement)"
+
+# Patterns to Follow
+patterns:
+  rls: "ADR-013 (org_id filter via RLS)"
+  api: "REST with org_id filter, POST for actions"
+  service: "class-based with static methods"
+  validation: "Zod schemas in lib/validation/"
+  error_handling: "Custom error classes (WOPauseError)"
+  transactions: "Atomic operations via Supabase transactions"
+
+# Output Artifacts
+output_artifacts:
+  - "wo_pauses table with RLS"
+  - "Pause/Resume API endpoints"
+  - "wo-pause-service.ts"
+  - "Zod schemas for pause/resume"
+  - "UI components for pause/resume flow"
+  - "Unit and integration tests"
+  - "E2E smoke test"
+
+version_history:
+  - version: "1.0"
+    date: "2025-12-17"
+    changes: "Initial context YAML creation"
+    author: "ARCHITECT-AGENT"

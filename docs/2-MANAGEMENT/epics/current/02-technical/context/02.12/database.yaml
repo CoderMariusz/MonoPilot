@@ -1,0 +1,289 @@
+# Story 02.12 - Database Schema
+# Purpose: Aggregation queries (no new tables - uses existing)
+# Agent: BACKEND-DEV (database focus)
+
+# No new migrations - dashboard uses existing tables
+migrations: []
+
+# Existing tables used by dashboard
+tables_used:
+  - name: "products"
+    description: "Product counts for stats card"
+    columns_used:
+      - "id"
+      - "org_id"
+      - "code"
+      - "name"
+      - "status"
+      - "product_type_id"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - name: "product_types"
+    description: "Product type filter for allergen matrix"
+    columns_used:
+      - "id"
+      - "code"
+      - "name"
+
+  - name: "product_allergens"
+    description: "Allergen relations for matrix"
+    columns_used:
+      - "product_id"
+      - "allergen_id"
+      - "relation_type"  # 'contains' or 'may_contain'
+
+  - name: "allergens"
+    description: "Allergen list for matrix columns"
+    columns_used:
+      - "id"
+      - "code"
+      - "name"
+
+  - name: "boms"
+    description: "BOM counts and timeline data"
+    columns_used:
+      - "id"
+      - "org_id"
+      - "product_id"
+      - "version"
+      - "status"
+      - "effective_from"
+      - "effective_to"
+      - "created_at"
+      - "created_by"
+
+  - name: "routings"
+    description: "Routing counts for stats card"
+    columns_used:
+      - "id"
+      - "org_id"
+      - "is_reusable"
+
+  - name: "product_costs"
+    description: "Cost trends and average cost"
+    columns_used:
+      - "id"
+      - "org_id"
+      - "product_id"
+      - "cost_type"
+      - "material_cost"
+      - "labor_cost"
+      - "overhead_cost"
+      - "total_cost"
+      - "effective_from"
+
+# Aggregation queries
+queries:
+  stats_products:
+    description: "Product counts for stats card"
+    sql: |
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'active') as active,
+        COUNT(*) FILTER (WHERE status = 'inactive') as inactive
+      FROM products
+      WHERE org_id = $1;
+    indexes_needed:
+      - "idx_products_org_status ON products(org_id, status)"
+
+  stats_boms:
+    description: "BOM counts for stats card"
+    sql: |
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'active') as active,
+        COUNT(*) FILTER (WHERE effective_to IS NOT NULL AND effective_to < CURRENT_DATE) as phased
+      FROM boms
+      WHERE org_id = $1;
+    indexes_needed:
+      - "idx_boms_org_status ON boms(org_id, status)"
+
+  stats_routings:
+    description: "Routing counts for stats card"
+    sql: |
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE is_reusable = true) as reusable
+      FROM routings
+      WHERE org_id = $1;
+    indexes_needed:
+      - "idx_routings_org_reusable ON routings(org_id, is_reusable)"
+
+  stats_avg_cost:
+    description: "Average cost with trend"
+    sql: |
+      WITH current_month AS (
+        SELECT AVG(total_cost) as avg_cost
+        FROM product_costs
+        WHERE org_id = $1
+          AND cost_type = 'standard'
+          AND effective_from >= date_trunc('month', CURRENT_DATE)
+      ),
+      previous_month AS (
+        SELECT AVG(total_cost) as avg_cost
+        FROM product_costs
+        WHERE org_id = $1
+          AND cost_type = 'standard'
+          AND effective_from >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month')
+          AND effective_from < date_trunc('month', CURRENT_DATE)
+      )
+      SELECT
+        COALESCE(current_month.avg_cost, 0) as value,
+        CASE
+          WHEN previous_month.avg_cost IS NULL OR previous_month.avg_cost = 0 THEN 0
+          ELSE ((current_month.avg_cost - previous_month.avg_cost) / previous_month.avg_cost * 100)
+        END as trend_percent,
+        CASE
+          WHEN current_month.avg_cost > previous_month.avg_cost THEN 'up'
+          WHEN current_month.avg_cost < previous_month.avg_cost THEN 'down'
+          ELSE 'neutral'
+        END as trend_direction
+      FROM current_month, previous_month;
+    indexes_needed:
+      - "idx_product_costs_org_effective ON product_costs(org_id, effective_from DESC)"
+
+  allergen_matrix:
+    description: "Products x Allergens heatmap data"
+    sql: |
+      SELECT
+        p.id as product_id,
+        p.code as product_code,
+        p.name as product_name,
+        a.id as allergen_id,
+        a.code as allergen_code,
+        a.name as allergen_name,
+        pa.relation_type
+      FROM products p
+      CROSS JOIN allergens a
+      LEFT JOIN product_allergens pa ON p.id = pa.product_id AND a.id = pa.allergen_id
+      WHERE p.org_id = $1
+        AND a.org_id = $1
+        AND ($2 IS NULL OR p.product_type_id = $2)
+      ORDER BY p.code, a.name;
+    indexes_needed:
+      - "idx_product_allergens_product ON product_allergens(product_id, allergen_id)"
+
+  bom_timeline:
+    description: "BOM version changes over time"
+    sql: |
+      SELECT
+        b.id as bom_id,
+        b.product_id,
+        p.code as product_code,
+        p.name as product_name,
+        b.version,
+        b.effective_from,
+        b.created_by as changed_by,
+        u.first_name || ' ' || u.last_name as changed_by_name,
+        b.created_at as changed_at
+      FROM boms b
+      JOIN products p ON b.product_id = p.id
+      LEFT JOIN users u ON b.created_by = u.id
+      WHERE b.org_id = $1
+        AND b.effective_from >= CURRENT_DATE - INTERVAL '$2 months'
+        AND ($3 IS NULL OR b.product_id = $3)
+      ORDER BY b.effective_from DESC
+      LIMIT $4;
+    indexes_needed:
+      - "idx_boms_org_effective ON boms(org_id, effective_from DESC)"
+
+  recent_activity:
+    description: "Recent activity feed (products, BOMs, routings)"
+    sql: |
+      -- Union of recent product, BOM, and routing activities
+      (
+        SELECT
+          id,
+          'product_created' as type,
+          'product' as entity_type,
+          id as entity_id,
+          'Product ' || code || ' created' as description,
+          created_by as user_id,
+          created_at as timestamp
+        FROM products
+        WHERE org_id = $1
+        ORDER BY created_at DESC
+        LIMIT 10
+      )
+      UNION ALL
+      (
+        SELECT
+          b.id,
+          CASE WHEN b.status = 'active' THEN 'bom_activated' ELSE 'bom_created' END as type,
+          'bom' as entity_type,
+          b.id as entity_id,
+          'BOM v' || b.version || ' for ' || p.code ||
+            CASE WHEN b.status = 'active' THEN ' activated' ELSE ' created' END as description,
+          b.created_by as user_id,
+          b.created_at as timestamp
+        FROM boms b
+        JOIN products p ON b.product_id = p.id
+        WHERE b.org_id = $1
+        ORDER BY b.created_at DESC
+        LIMIT 10
+      )
+      UNION ALL
+      (
+        SELECT
+          id,
+          'routing_created' as type,
+          'routing' as entity_type,
+          id as entity_id,
+          'Routing ' || code || ' created' as description,
+          created_by as user_id,
+          created_at as timestamp
+        FROM routings
+        WHERE org_id = $1
+        ORDER BY created_at DESC
+        LIMIT 10
+      )
+      ORDER BY timestamp DESC
+      LIMIT $2;
+    note: "Consider materialized view or activity_log table for production"
+
+  cost_trends:
+    description: "Monthly cost averages for chart"
+    sql: |
+      SELECT
+        to_char(date_trunc('month', effective_from), 'YYYY-MM') as month,
+        AVG(material_cost) as material_cost,
+        AVG(labor_cost) as labor_cost,
+        AVG(overhead_cost) as overhead_cost,
+        AVG(total_cost) as total_cost
+      FROM product_costs
+      WHERE org_id = $1
+        AND cost_type = 'standard'
+        AND effective_from >= CURRENT_DATE - INTERVAL '$2 months'
+      GROUP BY date_trunc('month', effective_from)
+      ORDER BY month;
+    indexes_needed:
+      - "idx_product_costs_org_effective ON product_costs(org_id, effective_from DESC)"
+
+# Required indexes (ensure these exist)
+indexes:
+  - "CREATE INDEX IF NOT EXISTS idx_products_org_status ON products(org_id, status);"
+  - "CREATE INDEX IF NOT EXISTS idx_boms_org_status ON boms(org_id, status);"
+  - "CREATE INDEX IF NOT EXISTS idx_routings_org_reusable ON routings(org_id, is_reusable);"
+  - "CREATE INDEX IF NOT EXISTS idx_product_allergens_product ON product_allergens(product_id, allergen_id);"
+  - "CREATE INDEX IF NOT EXISTS idx_boms_org_effective ON boms(org_id, effective_from DESC);"
+  - "CREATE INDEX IF NOT EXISTS idx_product_costs_org_effective ON product_costs(org_id, effective_from DESC);"
+
+# Caching strategy
+caching:
+  redis_keys:
+    - key: "org:{orgId}:dashboard:stats"
+      ttl: "60"  # 1 minute
+      invalidate_on: ["product.created", "product.updated", "bom.created", "bom.activated", "routing.created"]
+    - key: "org:{orgId}:dashboard:allergen-matrix"
+      ttl: "600"  # 10 minutes
+      invalidate_on: ["product.created", "product_allergen.updated"]
+    - key: "org:{orgId}:dashboard:bom-timeline"
+      ttl: "300"  # 5 minutes
+      invalidate_on: ["bom.created", "bom.activated"]
+    - key: "org:{orgId}:dashboard:recent-activity"
+      ttl: "30"  # 30 seconds
+      invalidate_on: ["product.created", "bom.created", "routing.created"]
+    - key: "org:{orgId}:dashboard:cost-trends"
+      ttl: "300"  # 5 minutes
+      invalidate_on: ["product_cost.calculated"]

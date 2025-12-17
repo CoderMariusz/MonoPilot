@@ -1,0 +1,542 @@
+# Story 03.2 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/supplier-product-service.test.ts"
+    type: "unit"
+    description: "Unit tests for supplier-product service functions"
+
+  - path: "apps/frontend/lib/validation/__tests__/supplier-product-validation.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+
+  - path: "apps/frontend/app/api/planning/suppliers/[supplierId]/products/__tests__/route.test.ts"
+    type: "integration"
+    description: "API integration tests for supplier products endpoints"
+
+  - path: "apps/frontend/components/planning/__tests__/supplier-products-table.test.tsx"
+    type: "component"
+    description: "Component tests for SupplierProductsTable"
+
+  - path: "apps/frontend/components/planning/__tests__/assign-product-modal.test.tsx"
+    type: "component"
+    description: "Component tests for AssignProductModal"
+
+  - path: "supabase/tests/supplier-products-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for supplier_products table"
+
+  - path: "e2e/supplier-products.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for supplier-product workflow"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    name: "Assign Product to Supplier"
+    given: "a user viewing a supplier detail page"
+    when: "they click 'Assign Product' and select a product from the dropdown"
+    then: "the product is linked to the supplier with default values and appears in the supplier's products table"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    name: "Supplier-Specific Pricing"
+    given: "a user assigning a product to a supplier"
+    when: "they enter a unit_price and select a currency"
+    then: "the price is saved and displayed in the supplier-product table"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "Default Supplier Designation"
+    given: "a product with multiple suppliers assigned"
+    when: "a user toggles the 'Default' checkbox for one supplier"
+    then: "only ONE supplier-product assignment has is_default = true for that product"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    name: "Supplier-Specific Lead Time Override"
+    given: "a product with a default supplier_lead_time_days in the products table"
+    when: "a user assigns the product to a supplier and specifies a different lead_time_days"
+    then: "the supplier-specific lead time is used for PO calculations"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    name: "Prevent Duplicate Assignments"
+    given: "a product already assigned to a supplier"
+    when: "a user attempts to assign the same product to the same supplier again"
+    then: "an error message is displayed and the duplicate is blocked"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    name: "Supplier Product Code"
+    given: "a user assigning a product to a supplier"
+    when: "they enter a supplier_product_code"
+    then: "the code is saved and displayed in the table"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-07"
+    name: "MOQ and Order Multiple"
+    given: "a user assigning a product to a supplier"
+    when: "they specify moq and order_multiple"
+    then: "these values are saved and available for PO validation"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-08"
+    name: "Unassign Product from Supplier"
+    given: "a supplier-product assignment exists"
+    when: "a user clicks 'Remove' on the assignment"
+    then: "the assignment is deleted and the product no longer appears in the list"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-09"
+    name: "Display Products on Supplier Detail Page"
+    given: "a supplier with assigned products"
+    when: "a user views the supplier detail page"
+    then: "a Products table displays all assigned products with correct columns"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-10"
+    name: "RLS Org Isolation"
+    given: "User A from Org A and User B from Org B"
+    when: "User A queries supplier_products"
+    then: "only products from Org A's suppliers are returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  supplier_product_service:
+    - name: "getSupplierProducts returns products for valid supplier"
+      setup: "Mock successful Supabase response with 3 products"
+      expected: "Returns array of 3 SupplierProductWithProduct objects"
+
+    - name: "getSupplierProducts filters by search term"
+      setup: "Mock response, call with search='flour'"
+      expected: "Supabase query includes search filter"
+
+    - name: "assignProductToSupplier creates new assignment"
+      setup: "Mock successful insert"
+      expected: "Returns created SupplierProduct"
+
+    - name: "assignProductToSupplier sets other defaults to false"
+      setup: "is_default=true in input, existing default exists"
+      expected: "Calls update to unset existing default before insert"
+
+    - name: "updateSupplierProduct updates existing record"
+      setup: "Mock successful update"
+      expected: "Returns updated SupplierProduct"
+
+    - name: "removeSupplierProduct deletes assignment"
+      setup: "Mock successful delete"
+      expected: "Resolves without error"
+
+    - name: "getDefaultSupplierForProduct returns default supplier"
+      setup: "Mock response with is_default=true"
+      expected: "Returns SupplierProductWithSupplier"
+
+    - name: "getDefaultSupplierForProduct returns null when no default"
+      setup: "Mock empty response"
+      expected: "Returns null"
+
+  validation:
+    - name: "assignProductSchema accepts valid input"
+      input:
+        product_id: "valid-uuid"
+        is_default: true
+        unit_price: 10.50
+        currency: "PLN"
+      expected: "Validation passes"
+
+    - name: "assignProductSchema requires product_id"
+      input: { is_default: true }
+      expected: "Validation fails with 'Product ID must be a valid UUID'"
+
+    - name: "assignProductSchema rejects negative price"
+      input:
+        product_id: "valid-uuid"
+        unit_price: -5
+      expected: "Validation fails with 'Price must be positive'"
+
+    - name: "assignProductSchema rejects invalid currency"
+      input:
+        product_id: "valid-uuid"
+        currency: "BTC"
+      expected: "Validation fails with 'Invalid currency'"
+
+    - name: "assignProductSchema accepts null optional fields"
+      input:
+        product_id: "valid-uuid"
+        unit_price: null
+        currency: null
+      expected: "Validation passes"
+
+    - name: "updateSupplierProductSchema allows partial updates"
+      input:
+        unit_price: 15.00
+      expected: "Validation passes (product_id not required)"
+
+    - name: "assignProductSchema rejects negative lead_time_days"
+      input:
+        product_id: "valid-uuid"
+        lead_time_days: -1
+      expected: "Validation fails with 'Cannot be negative'"
+
+  lead_time_resolution:
+    - name: "resolveLeadTime uses supplier-product lead time when set"
+      input:
+        supplierProduct: { lead_time_days: 10 }
+        product: { supplier_lead_time_days: 7 }
+      expected: "Returns 10"
+
+    - name: "resolveLeadTime falls back to product lead time"
+      input:
+        supplierProduct: { lead_time_days: null }
+        product: { supplier_lead_time_days: 7 }
+      expected: "Returns 7"
+
+    - name: "resolveLeadTime returns 0 when both null"
+      input:
+        supplierProduct: { lead_time_days: null }
+        product: { supplier_lead_time_days: null }
+      expected: "Returns 0"
+
+# Integration Test Cases (API)
+integration_tests:
+  api:
+    - name: "GET /suppliers/:id/products returns products list"
+      setup:
+        - "Create supplier with 2 assigned products"
+      action: "GET /api/planning/suppliers/:supplierId/products"
+      expected:
+        status: 200
+        body:
+          success: true
+          data: "Array with 2 items"
+          meta:
+            total: 2
+
+    - name: "GET /suppliers/:id/products returns 404 for invalid supplier"
+      setup: []
+      action: "GET /api/planning/suppliers/invalid-uuid/products"
+      expected:
+        status: 404
+        body:
+          error: "Supplier not found"
+
+    - name: "POST /suppliers/:id/products creates assignment"
+      setup:
+        - "Create supplier"
+        - "Create product"
+      action: "POST /api/planning/suppliers/:supplierId/products"
+      body:
+        product_id: ":productId"
+        is_default: true
+        unit_price: 10.50
+        currency: "PLN"
+      expected:
+        status: 201
+        body:
+          success: true
+          data:
+            is_default: true
+            unit_price: 10.50
+
+    - name: "POST /suppliers/:id/products returns 400 for duplicate"
+      setup:
+        - "Create supplier"
+        - "Create product"
+        - "Assign product to supplier"
+      action: "POST /api/planning/suppliers/:supplierId/products"
+      body:
+        product_id: ":productId"
+      expected:
+        status: 400
+        body:
+          error: "This product is already assigned to this supplier"
+
+    - name: "PUT /suppliers/:id/products/:productId updates assignment"
+      setup:
+        - "Create supplier-product assignment"
+      action: "PUT /api/planning/suppliers/:supplierId/products/:productId"
+      body:
+        unit_price: 12.00
+        is_default: true
+      expected:
+        status: 200
+        body:
+          success: true
+          data:
+            unit_price: 12.00
+
+    - name: "PUT /suppliers/:id/products/:productId unsets other defaults"
+      setup:
+        - "Create supplier A with product (is_default=true)"
+        - "Create supplier B with same product (is_default=false)"
+      action: "PUT /api/planning/suppliers/:supplierBId/products/:productId"
+      body:
+        is_default: true
+      expected:
+        - "Supplier B assignment has is_default=true"
+        - "Supplier A assignment has is_default=false"
+
+    - name: "DELETE /suppliers/:id/products/:productId removes assignment"
+      setup:
+        - "Create supplier-product assignment"
+      action: "DELETE /api/planning/suppliers/:supplierId/products/:productId"
+      expected:
+        status: 200
+        body:
+          success: true
+
+    - name: "GET /products/:id/default-supplier returns default"
+      setup:
+        - "Create supplier-product with is_default=true"
+      action: "GET /api/planning/products/:productId/default-supplier"
+      expected:
+        status: 200
+        body:
+          success: true
+          data:
+            is_default: true
+            supplier:
+              id: ":supplierId"
+
+    - name: "GET /products/:id/default-supplier returns null when none"
+      setup:
+        - "Create product with no default supplier"
+      action: "GET /api/planning/products/:productId/default-supplier"
+      expected:
+        status: 200
+        body:
+          success: true
+          data: null
+
+  rls:
+    - name: "User can only read own org's supplier products"
+      setup:
+        - "Create Org A with Supplier A1, Product P1, assignment SP1"
+        - "Create Org B with Supplier B1, Product P2, assignment SP2"
+      action: "User A queries supplier_products"
+      expected: "Only SP1 returned, SP2 not visible"
+
+    - name: "User cannot insert for other org's supplier"
+      setup:
+        - "Create Org A with User A"
+        - "Create Org B with Supplier B1"
+      action: "User A attempts to insert supplier_products for Supplier B1"
+      expected: "RLS blocks insert"
+
+    - name: "User cannot update other org's supplier products"
+      setup:
+        - "Create Org A with User A"
+        - "Create Org B with Supplier B1 and assignment"
+      action: "User A attempts to update Org B's assignment"
+      expected: "0 rows affected"
+
+    - name: "User cannot delete other org's supplier products"
+      setup:
+        - "Create Org A with User A"
+        - "Create Org B with Supplier B1 and assignment"
+      action: "User A attempts to delete Org B's assignment"
+      expected: "0 rows affected"
+
+# Component Test Cases
+component_tests:
+  supplier_products_table:
+    - name: "renders products in table"
+      setup: "Mock useSupplierProducts with 3 products"
+      expected: "Table shows 3 rows with product data"
+
+    - name: "shows empty state when no products"
+      setup: "Mock useSupplierProducts with empty array"
+      expected: "Empty state message displayed"
+
+    - name: "shows loading skeleton while fetching"
+      setup: "Mock useSupplierProducts with isLoading=true"
+      expected: "Skeleton rows displayed"
+
+    - name: "search filters products"
+      setup: "Mock useSupplierProducts, type in search input"
+      expected: "useSupplierProducts called with search param"
+
+    - name: "default checkbox displays correctly"
+      setup: "Mock product with is_default=true"
+      expected: "Checkbox shows checked state"
+
+    - name: "lead time shows override label"
+      setup: "Mock product with lead_time_days different from product default"
+      expected: "Shows 'X days (Override)'"
+
+    - name: "edit button calls onEdit"
+      setup: "Mock useSupplierProducts, click Edit"
+      expected: "onEdit callback called with product data"
+
+    - name: "remove button calls onRemove with confirmation"
+      setup: "Mock useSupplierProducts, click Remove, confirm"
+      expected: "onRemove callback called with productId"
+
+  assign_product_modal:
+    - name: "renders when open=true"
+      setup: "Set open=true"
+      expected: "Modal dialog visible"
+
+    - name: "product combobox excludes already assigned"
+      setup: "Pass excludeProductIds=['id1', 'id2']"
+      expected: "Combobox does not show excluded products"
+
+    - name: "form validation shows errors"
+      setup: "Submit with empty product_id"
+      expected: "Error message under product field"
+
+    - name: "submit creates assignment"
+      setup: "Fill form, submit"
+      expected: "useAssignProduct mutation called, onSuccess callback fired"
+
+    - name: "modal closes on successful submit"
+      setup: "Submit successfully"
+      expected: "onOpenChange called with false"
+
+    - name: "submit button disabled while loading"
+      setup: "Mock mutation isLoading=true"
+      expected: "Submit button disabled, shows spinner"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Full supplier-product workflow"
+    steps:
+      - "Navigate to supplier detail page"
+      - "Click Products tab"
+      - "Click '+ Add Product' button"
+      - "Select product from combobox"
+      - "Enter unit_price: 10.50"
+      - "Select currency: PLN"
+      - "Toggle 'Set as Default Supplier'"
+      - "Click Save"
+    expected:
+      - "Modal closes"
+      - "Toast shows 'Product assigned successfully'"
+      - "Table shows new product with price $10.50"
+      - "Default column shows checked"
+
+  - name: "Edit supplier-product assignment"
+    steps:
+      - "Navigate to supplier detail with assigned product"
+      - "Click Edit on product row"
+      - "Change unit_price to 12.00"
+      - "Click Save"
+    expected:
+      - "Modal closes"
+      - "Table shows updated price $12.00"
+
+  - name: "Remove supplier-product assignment"
+    steps:
+      - "Navigate to supplier detail with assigned product"
+      - "Click Remove on product row"
+      - "Confirm deletion"
+    expected:
+      - "Product removed from table"
+      - "Toast shows 'Product removed'"
+
+  - name: "Duplicate assignment prevention"
+    steps:
+      - "Navigate to supplier with assigned product"
+      - "Click '+ Add Product'"
+      - "Try to select already-assigned product"
+    expected:
+      - "Product not available in combobox (excluded)"
+
+  - name: "Default supplier toggle atomicity"
+    steps:
+      - "Create product assigned to Supplier A (default)"
+      - "Assign same product to Supplier B"
+      - "Set Supplier B as default"
+      - "Verify Supplier A is no longer default"
+    expected:
+      - "Only Supplier B shows as default"
+      - "Supplier A default unchecked automatically"
+
+# Definition of Done
+definition_of_done:
+  - "supplier_products table created with RLS policies"
+  - "All 5 API endpoints implemented and return correct responses"
+  - "SupplierProductsTable displays products with search/sort"
+  - "AssignProductModal validates and creates assignments"
+  - "Default supplier toggle enforces single default per product"
+  - "Duplicate assignment returns 400 with clear error"
+  - "RLS verified: cross-org access blocked"
+  - "Unit test coverage >= 80%"
+  - "API integration tests passing"
+  - "E2E smoke test passing"
+  - "Performance: Products tab loads in <500ms for 100 products"
+  - "Accessibility: Screen reader and keyboard navigation tested"
+  - "Code reviewed and approved"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business logic coverage for service and validation"
+  integration:
+    target: 80
+    reason: "API endpoints and RLS policies"
+  component:
+    target: 70
+    reason: "UI component behavior"
+  e2e:
+    target: 100
+    reason: "Critical happy path must be covered"
+  files:
+    - "lib/services/supplier-product-service.ts: 80%"
+    - "lib/validation/supplier-product-validation.ts: 95%"
+    - "components/planning/supplier-products-table.tsx: 70%"
+    - "components/planning/assign-product-modal.tsx: 70%"
+    - "RLS policies: 100% of scenarios tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Default supplier toggle race condition"
+    mitigation: "Use database transaction or RPC function for atomic update"
+    severity: "medium"
+    test_coverage: "integration_tests.api (unsets other defaults)"
+
+  - id: "RISK-02"
+    description: "RLS policy leak via supplier FK"
+    mitigation: "RLS tests verify org isolation through supplier relationship"
+    severity: "high"
+    test_coverage: "integration_tests.rls"
+
+  - id: "RISK-03"
+    description: "Product combobox performance with many products"
+    mitigation: "Implement server-side search, limit results to 50"
+    severity: "low"
+    test_coverage: "Component test with mocked large dataset"
+
+# Performance Targets
+performance:
+  - metric: "Products tab load time"
+    target: "<500ms"
+    condition: "100 assigned products"
+    measurement: "Lighthouse, manual timing"
+
+  - metric: "Product combobox search"
+    target: "<300ms"
+    condition: "1000 products in org"
+    measurement: "API response time"
+
+  - metric: "Assign product save"
+    target: "<400ms"
+    condition: "Standard network"
+    measurement: "E2E timing"

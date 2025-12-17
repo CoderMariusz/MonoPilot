@@ -1,0 +1,466 @@
+# Story 04.1 - Production Dashboard
+# Frontend: pages, components, services, validation, UX patterns
+
+pages:
+  dashboard:
+    path: "app/(authenticated)/production/dashboard/page.tsx"
+    route: "/production/dashboard"
+    title: "Production Dashboard"
+    description: "Real-time production monitoring with KPIs, active WOs, and alerts"
+
+    layout:
+      sections:
+        - id: "header"
+          components: ["Breadcrumb", "RefreshControls"]
+        - id: "kpis"
+          components: ["KPIGrid"]
+        - id: "alerts"
+          components: ["AlertsPanel"]
+        - id: "active-wos"
+          components: ["ActiveWOsTable", "DashboardFilters", "ExportButton"]
+        - id: "quick-actions"
+          components: ["QuickActions"]
+
+    data_fetching:
+      strategy: "parallel fetch on mount + polling"
+      endpoints:
+        - "/api/production/dashboard/kpis"
+        - "/api/production/dashboard/active-wos"
+        - "/api/production/dashboard/alerts"
+      refresh:
+        auto: true
+        interval_seconds: 30
+        configurable: true
+
+components:
+  # KPI Components
+  KPICard:
+    path: "app/(authenticated)/production/dashboard/components/KPICard.tsx"
+    description: "Reusable KPI card with value, trend, and action link"
+    props:
+      - name: "title"
+        type: "string"
+        required: true
+      - name: "value"
+        type: "string | number"
+        required: true
+      - name: "subtitle"
+        type: "string"
+        required: false
+      - name: "accentColor"
+        type: "'green' | 'blue' | 'purple' | 'orange' | 'yellow' | 'red'"
+        required: false
+      - name: "tooltip"
+        type: "string"
+        required: false
+      - name: "onClick"
+        type: "() => void"
+        required: false
+      - name: "loading"
+        type: "boolean"
+        required: false
+    shadcn_components: ["Card", "CardHeader", "CardContent", "Tooltip"]
+
+  KPIGrid:
+    path: "app/(authenticated)/production/dashboard/components/KPIGrid.tsx"
+    description: "Grid layout for 6 KPI cards"
+    children: ["KPICard x 6"]
+    layout: "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+    kpi_cards:
+      - id: "active-wos"
+        title: "Active WOs"
+        dataKey: "activeWOs"
+        accentColor: "green"
+        tooltip: "WOs currently on shop floor (In Progress or Paused)"
+      - id: "completed-today"
+        title: "WOs Today"
+        dataKey: "completedToday"
+        accentColor: "blue"
+        tooltip: "WOs completed today"
+      - id: "completed-week"
+        title: "WOs This Week"
+        dataKey: "completedThisWeek"
+        accentColor: "purple"
+        tooltip: "WOs completed this week (Monday to Sunday)"
+      - id: "avg-cycle-time"
+        title: "Avg Cycle Time"
+        dataKey: "avgCycleTimeHrs"
+        format: "{value} hrs"
+        accentColor: "orange"
+        tooltip: "Average cycle time for WOs completed today"
+      - id: "on-time-percent"
+        title: "On-Time %"
+        dataKey: "onTimePercent"
+        format: "{value}%"
+        accentColor: "dynamic"
+        colorRules:
+          green: ">= 90"
+          yellow: "70-89"
+          red: "< 70"
+        tooltip: "Percentage of WOs completed on or before scheduled date"
+      - id: "oee-placeholder"
+        title: "OEE Today"
+        value: "--"
+        placeholder: true
+        tooltip: "Coming in Phase 2 (Story 04.9a)"
+        accentColor: "gray"
+
+  # Active WOs Table Components
+  ActiveWOsTable:
+    path: "app/(authenticated)/production/dashboard/components/ActiveWOsTable.tsx"
+    description: "Data table for active work orders with expandable rows"
+    shadcn_components: ["Table", "TableHeader", "TableBody", "TableRow", "TableCell", "Badge"]
+    columns:
+      - header: "WO Number"
+        accessor: "wo_number"
+        sortable: true
+      - header: "Product"
+        accessor: "product_name"
+        sortable: true
+      - header: "Status"
+        accessor: "status"
+        cell: "StatusBadge"
+        sortable: false
+      - header: "Qty (Planned/Actual)"
+        accessor: "planned_qty,actual_qty"
+        format: "{planned_qty} / {actual_qty}"
+        sortable: false
+      - header: "Progress"
+        accessor: "progress_percent"
+        cell: "ProgressBar"
+        sortable: true
+      - header: "Line"
+        accessor: "line_name"
+        sortable: false
+      - header: "Started At"
+        accessor: "started_at"
+        format: "relative"
+        sortable: true
+    features:
+      expandable_rows: true
+      row_click_action: "expand"
+      pagination: true
+      page_size: 50
+    empty_state:
+      message: "No active work orders. Start a new WO to begin production."
+      action_button: "Start WO"
+
+  WOTableRow:
+    path: "app/(authenticated)/production/dashboard/components/WOTableRow.tsx"
+    description: "Expandable row component for Active WOs table"
+    expanded_content:
+      - "Materials list with availability status"
+      - "Operations status"
+      - "Notes"
+    actions:
+      - label: "View Full Details"
+        route: "/production/execution?wo_id={id}"
+      - label: "Pause WO"
+        condition: "allow_pause_wo = true && status = 'In Progress'"
+        story: "04.2b"
+      - label: "Complete WO"
+        condition: "has outputs"
+        story: "04.2c"
+
+  DashboardFilters:
+    path: "app/(authenticated)/production/dashboard/components/DashboardFilters.tsx"
+    description: "Filter dropdowns for Line, Product, Status"
+    shadcn_components: ["Select", "SelectTrigger", "SelectContent", "SelectItem", "Badge"]
+    filters:
+      - name: "line"
+        label: "Line"
+        type: "select"
+        placeholder: "All Lines"
+        data_source: "production_lines"
+      - name: "product"
+        label: "Product"
+        type: "select"
+        placeholder: "All Products"
+        data_source: "products (from active WOs)"
+      - name: "status"
+        label: "Status"
+        type: "select"
+        options: ["All", "In Progress", "Paused"]
+        default: "All"
+    features:
+      url_sync: true
+      filter_badges: true
+      clear_all: true
+
+  # Alerts Components
+  AlertsPanel:
+    path: "app/(authenticated)/production/dashboard/components/AlertsPanel.tsx"
+    description: "Panel showing production alerts grouped by type"
+    shadcn_components: ["Card", "CardHeader", "CardContent", "Badge", "Button"]
+    alert_types:
+      - type: "material_shortage"
+        priority: "high"
+        color: "red"
+        icon: "AlertTriangle"
+      - type: "wo_delayed"
+        priority: "medium"
+        color: "yellow"
+        icon: "Clock"
+      - type: "quality_hold"
+        placeholder: true
+        message: "Quality alerts coming in Quality Module (Epic 06)"
+      - type: "machine_downtime"
+        placeholder: true
+        message: "Downtime tracking coming in OEE Module (Story 04.9b)"
+    no_alerts_state:
+      message: "All systems operational. No alerts at this time."
+      icon: "CheckCircle"
+      color: "green"
+
+  AlertItem:
+    path: "app/(authenticated)/production/dashboard/components/AlertItem.tsx"
+    description: "Individual alert component"
+    props:
+      - name: "alert"
+        type: "MaterialShortageAlert | DelayedWOAlert"
+        required: true
+      - name: "onDismiss"
+        type: "() => void"
+        required: false
+      - name: "onClick"
+        type: "() => void"
+        required: false
+
+  # Control Components
+  RefreshControls:
+    path: "app/(authenticated)/production/dashboard/components/RefreshControls.tsx"
+    description: "Auto-refresh toggle and manual refresh button"
+    shadcn_components: ["Switch", "Button", "Label", "Select"]
+    features:
+      auto_refresh_toggle: true
+      manual_refresh_button: true
+      interval_selector: true
+      intervals: ["15", "30", "60", "120", "off"]
+      last_updated_display: true
+    state_persistence: "localStorage"
+    key: "dashboard_refresh_interval"
+
+  QuickActions:
+    path: "app/(authenticated)/production/dashboard/components/QuickActions.tsx"
+    description: "Quick action buttons at bottom of dashboard"
+    shadcn_components: ["Button"]
+    actions:
+      - label: "Start WO"
+        icon: "Play"
+        variant: "default"
+        onClick: "openStartWOModal"
+      - label: "View Schedule"
+        icon: "Calendar"
+        variant: "outline"
+        route: "/planning/schedule"
+
+  StartWOModal:
+    path: "app/(authenticated)/production/dashboard/components/StartWOModal.tsx"
+    description: "Modal to select and start a Released WO"
+    shadcn_components: ["Dialog", "DialogContent", "DialogHeader", "DialogTitle", "Input", "Button", "Table"]
+    features:
+      wo_list_source: "WOs with status = Released"
+      search: true
+      filter_by_wo_number: true
+      filter_by_product: true
+      default_sort: "priority DESC"
+      limit: 5
+    actions:
+      start_wo:
+        triggers: "Story 04.2a workflow"
+
+  ExportButton:
+    path: "app/(authenticated)/production/dashboard/components/ExportButton.tsx"
+    description: "CSV export button for Active WOs table"
+    shadcn_components: ["Button", "DropdownMenu"]
+    features:
+      formats: ["csv"]
+      respects_filters: true
+      filename_pattern: "active-wos-{YYYY-MM-DD-HHmm}.csv"
+
+services:
+  ProductionDashboardService:
+    path: "apps/frontend/lib/services/production-dashboard-service.ts"
+    description: "Service for fetching dashboard data with caching"
+    methods:
+      - name: "getDashboardKPIs"
+        params: ["orgId: string"]
+        returns: "Promise<DashboardKPIs>"
+        caching:
+          enabled: true
+          ttl_seconds: 30
+          key: "dashboard:kpis:{orgId}"
+        logic: |
+          1. Check Redis cache
+          2. If cached, return parsed JSON
+          3. Query all 5 KPIs in parallel
+          4. Combine results
+          5. Cache for 30 seconds
+          6. Return KPIs
+
+      - name: "getActiveWOs"
+        params: ["orgId: string", "filters: DashboardFilters"]
+        returns: "Promise<ActiveWOsResponse>"
+        caching: false
+        logic: |
+          1. Build Supabase query with filters
+          2. Add pagination (page, limit)
+          3. Add sorting (sort, order)
+          4. Execute query with count
+          5. Transform results (calculate progress_percent)
+          6. Return { wos, total, page, limit }
+
+      - name: "getDashboardAlerts"
+        params: ["orgId: string"]
+        returns: "Promise<DashboardAlerts>"
+        caching:
+          enabled: true
+          ttl_seconds: 30
+          key: "dashboard:alerts:{orgId}"
+        logic: |
+          1. Check Redis cache
+          2. Fetch material shortages via RPC
+          3. Fetch delayed WOs via query
+          4. Combine results
+          5. Cache for 30 seconds
+          6. Return { materialShortages, delayedWOs }
+
+      - name: "exportActiveWOsToCSV"
+        params: ["orgId: string", "filters: ExportFilters"]
+        returns: "Promise<string>"
+        logic: |
+          1. Fetch all active WOs (no pagination)
+          2. Transform to CSV rows
+          3. Add headers
+          4. Return CSV string
+
+validation:
+  schemas:
+    path: "apps/frontend/lib/validation/production-dashboard-schemas.ts"
+    exports:
+      - "DashboardFiltersSchema"
+      - "RefreshIntervalSchema"
+      - "AlertTypesSchema"
+      - "ExportFormatSchema"
+
+hooks:
+  useDashboardKPIs:
+    path: "apps/frontend/hooks/use-dashboard-kpis.ts"
+    description: "Hook for fetching and polling KPI data"
+    returns: "{ kpis, loading, error, refresh }"
+    features:
+      auto_refresh: true
+      configurable_interval: true
+
+  useActiveWOs:
+    path: "apps/frontend/hooks/use-active-wos.ts"
+    description: "Hook for fetching active WOs with filters"
+    returns: "{ wos, total, loading, error, refetch }"
+    features:
+      pagination: true
+      filtering: true
+      sorting: true
+
+  useDashboardAlerts:
+    path: "apps/frontend/hooks/use-dashboard-alerts.ts"
+    description: "Hook for fetching dashboard alerts"
+    returns: "{ alerts, loading, error, refresh }"
+    features:
+      auto_refresh: true
+      type_filtering: true
+
+ux:
+  wireframe: "docs/3-ARCHITECTURE/ux/wireframes/PROD-001-production-dashboard.md"
+  components_from_wireframe:
+    - "KPI Cards (6 cards)"
+    - "Alerts & Warnings Panel"
+    - "Active Work Orders Table"
+    - "Auto-Refresh Control"
+    - "Quick Actions"
+
+  patterns:
+    table: "ShadCN DataTable with expandable rows"
+    modal: "ShadCN Dialog pattern"
+    cards: "ShadCN Card with Material Design elevation"
+    filters: "ShadCN Select with badge indicators"
+    toast: "ShadCN Toast for success/error messages"
+
+  states:
+    loading:
+      kpis: "Skeleton cards with animated shimmer"
+      table: "Skeleton rows"
+      alerts: "Skeleton list"
+      message: "Loading production dashboard data..."
+
+    empty:
+      table: "No active work orders message with Start WO CTA"
+      alerts: "All systems operational message"
+
+    error:
+      partial: "Component-level error boundaries"
+      full: "Error state with Retry button"
+      message: "Failed to Load Production Dashboard"
+
+    success:
+      refresh: "Dashboard refreshed toast"
+      export: "CSV downloaded toast"
+
+  responsive:
+    desktop: ">1024px"
+    layout: "6 KPI cards in row, full-width panels"
+
+    tablet: "768-1024px"
+    layout: "2x3 KPI grid, stacked panels"
+
+    mobile: "<768px"
+    layout: "Stacked KPIs, card layout for WOs"
+    note: "Mobile-responsive deferred to Phase 3"
+
+  accessibility:
+    touch_targets: "48x48dp minimum (64x64dp on mobile)"
+    contrast: "4.5:1 minimum for text"
+    aria_roles:
+      - "KPI cards: role='region' aria-label='Key Performance Indicators'"
+      - "Alerts: role='region' aria-label='Production Alerts', aria-live='polite'"
+      - "Table: role='table' with proper headers"
+      - "Progress bars: role='progressbar' with aria-valuenow"
+      - "Auto-refresh: role='switch' aria-checked"
+    keyboard:
+      - "Tab navigation through all interactive elements"
+      - "Enter to activate cards, buttons, rows"
+      - "Arrow keys for table navigation"
+      - "Escape to dismiss modals, clear filters"
+
+  real_time:
+    auto_refresh:
+      default_interval: 30
+      min_interval: 15
+      max_interval: 120
+      off_option: true
+    manual_refresh:
+      button: true
+      keyboard_shortcut: "Ctrl+R / Cmd+R"
+    preserve_state:
+      scroll_position: true
+      filters: true
+      sort_order: true
+      expanded_rows: true
+
+performance:
+  targets:
+    initial_load: "<2s"
+    kpi_refresh: "<500ms"
+    table_load: "<1s"
+    alert_load: "<800ms"
+    auto_refresh: "<300ms"
+
+  optimizations:
+    - "Parallel API calls on mount"
+    - "React Query for caching and deduplication"
+    - "Skeleton loaders for perceived performance"
+    - "Debounced filter changes"
+    - "Virtualized table for large datasets (future)"
+
+  code_splitting:
+    - "StartWOModal lazy loaded"
+    - "ExportButton lazy loaded"

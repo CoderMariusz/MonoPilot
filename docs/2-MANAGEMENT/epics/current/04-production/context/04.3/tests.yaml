@@ -1,0 +1,599 @@
+# Story 04.3 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/operation-service.test.ts"
+    type: "unit"
+    description: "Unit tests for operation start/complete service methods"
+  - path: "apps/frontend/lib/validation/__tests__/operation-execution.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/__tests__/api/production/operations.test.ts"
+    type: "integration"
+    description: "Integration tests for operation API endpoints"
+  - path: "supabase/tests/rls-operation-logs.test.sql"
+    type: "integration"
+    description: "RLS policy tests for operation_logs table"
+  - path: "apps/frontend/__tests__/e2e/production/operation-execution.spec.ts"
+    type: "e2e"
+    description: "E2E tests for operation start/complete flows"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # AC-1: Start Operation
+  - id: "AC-01"
+    title: "Start operation with pending status"
+    given: "wo_operation has status 'pending' and parent WO has status 'in_progress'"
+    when: "operator clicks 'Start Operation'"
+    then: "operation status changes to 'in_progress' within 1 second and started_at/started_by set"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    title: "Start button only visible for pending operations"
+    given: "wo_operation has status 'pending'"
+    when: "operator views operation card"
+    then: "'Start' button is visible and enabled"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    title: "Start button disabled for non-pending operations"
+    given: "wo_operation has status 'in_progress'"
+    when: "operator views operation card"
+    then: "'Start' button is disabled or hidden and 'Complete' button is visible"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    title: "Cannot start operation if WO not in progress"
+    given: "wo_operation status 'pending' and parent WO status 'released'"
+    when: "operator attempts to start operation"
+    then: "error 'Work Order must be started first' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    title: "Cannot start already in-progress operation"
+    given: "wo_operation status 'in_progress'"
+    when: "operator attempts to start operation"
+    then: "'Start' button is disabled and status remains 'in_progress'"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-2: Complete Operation
+  - id: "AC-06"
+    title: "Complete operation with in-progress status"
+    given: "wo_operation has status 'in_progress'"
+    when: "operator clicks 'Complete' and enters yield"
+    then: "status changes to 'completed', duration calculated, yield saved"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    title: "Complete button only visible for in-progress operations"
+    given: "wo_operation has status 'in_progress'"
+    when: "operator views operation card"
+    then: "'Complete' button is visible and enabled"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-08"
+    title: "Cannot complete pending operation"
+    given: "wo_operation status 'pending'"
+    when: "operator attempts to complete operation"
+    then: "error 'Operation must be started first' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-3: Duration Tracking
+  - id: "AC-09"
+    title: "Duration auto-calculated on complete"
+    given: "wo_operation started_at = 09:00:00"
+    when: "operator completes operation at 10:30:00"
+    then: "actual_duration_minutes = 90"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-10"
+    title: "Duration variance calculation"
+    given: "expected_duration = 60 and actual_duration = 75"
+    when: "viewing operation detail"
+    then: "variance = +15 minutes displayed with warning color"
+    test_type: "unit"
+    priority: "P1"
+
+  # AC-4: Yield Tracking
+  - id: "AC-11"
+    title: "Yield capture on complete"
+    given: "operator completes operation with yield = 95.5"
+    when: "complete submitted"
+    then: "actual_yield_percent = 95.5 saved"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-12"
+    title: "Yield field required on complete"
+    given: "wo_operation status 'in_progress'"
+    when: "operator clicks 'Complete' without entering yield"
+    then: "validation error 'Actual yield is required' displays"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-13"
+    title: "Yield must be 0-100%"
+    given: "operator enters actual_yield_percent = 105"
+    when: "attempting to complete"
+    then: "validation error 'Yield must be between 0 and 100%' displays"
+    test_type: "unit"
+    priority: "P0"
+
+  # AC-5: Sequence Enforcement
+  - id: "AC-14"
+    title: "Sequence enforcement enabled - blocks out of order"
+    given: "require_operation_sequence = true and seq 2 not completed"
+    when: "operator attempts to start seq 3"
+    then: "error 'Operation seq 2 must be completed first' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15"
+    title: "Sequence enforcement - allows next operation"
+    given: "require_operation_sequence = true and seq 1 completed"
+    when: "operator starts seq 2"
+    then: "operation starts successfully"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-16"
+    title: "Sequence enforcement disabled"
+    given: "require_operation_sequence = false"
+    when: "operator starts any operation"
+    then: "operation starts successfully regardless of order"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-17"
+    title: "Skipped operations don't block sequence"
+    given: "require_operation_sequence = true and seq 1 skipped"
+    when: "operator starts seq 2"
+    then: "operation starts successfully"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-6: Audit Trail
+  - id: "AC-18"
+    title: "Log created on operation start"
+    given: "wo_operation status 'pending'"
+    when: "operator starts operation"
+    then: "operation_logs record created with event_type='started'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-19"
+    title: "Log created on operation complete"
+    given: "wo_operation status 'in_progress'"
+    when: "operator completes operation"
+    then: "operation_logs record created with event_type='completed' and metadata"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-20"
+    title: "Log history viewable"
+    given: "wo_operation has 2 logs"
+    when: "manager views operation detail"
+    then: "history shows started and completed events with user names"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-7: UI - Operation Cards
+  - id: "AC-21"
+    title: "Operation card displays key info"
+    given: "wo_operation exists"
+    when: "operator views WO detail page"
+    then: "card shows sequence, name, machine, duration, status badge, buttons"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-22"
+    title: "Empty state when no operations"
+    given: "WO has no wo_operations"
+    when: "viewing operations section"
+    then: "message 'No routing operations defined' displays"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-8: Permission Enforcement
+  - id: "AC-23"
+    title: "Production Operator can start/complete"
+    given: "user has PROD_OPERATOR role"
+    when: "viewing operation card"
+    then: "Start and Complete buttons visible"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-24"
+    title: "Planner cannot start/complete"
+    given: "user has PLANNER role"
+    when: "viewing operation card"
+    then: "buttons disabled or hidden, read-only view displayed"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-9: Multi-tenancy
+  - id: "AC-25"
+    title: "Org isolation on operation start"
+    given: "User A from Org A and wo_operation belongs to Org A"
+    when: "User A starts operation"
+    then: "operation starts successfully"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-26"
+    title: "Cross-tenant operation access returns 404"
+    given: "User A from Org A and wo_operation belongs to Org B"
+    when: "User A attempts to start operation"
+    then: "404 Not Found returned (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-27"
+    title: "Operation logs isolated by org"
+    given: "User A from Org A"
+    when: "querying operation_logs"
+    then: "only logs from Org A operations returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # AC-10: API Response and Error Handling
+  - id: "AC-28"
+    title: "Successful start returns updated operation"
+    given: "wo_operation status 'pending'"
+    when: "POST /operations/:id/start"
+    then: "response 200 with status='in_progress' and timestamps"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-29"
+    title: "Sequence violation returns 409"
+    given: "require_operation_sequence=true and prior op not completed"
+    when: "POST /operations/:id/start"
+    then: "response 409 with error message"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-30"
+    title: "Invalid status returns 400"
+    given: "wo_operation status 'completed'"
+    when: "POST /operations/:id/start"
+    then: "response 400 with 'Operation already completed'"
+    test_type: "integration"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  operation_service:
+    - name: "startOperation() updates status to in_progress"
+      setup: "Mock operation with status='pending', WO status='in_progress'"
+      expected: "Returns operation with status='in_progress'"
+
+    - name: "startOperation() sets started_at timestamp"
+      setup: "Mock operation with status='pending'"
+      expected: "started_at within 1 second of now"
+
+    - name: "startOperation() sets started_by to current user"
+      setup: "Mock operation and authenticated user"
+      expected: "started_by equals current user ID"
+
+    - name: "startOperation() rejects non-pending operation"
+      setup: "Mock operation with status='completed'"
+      expected: "Throws BadRequestError"
+
+    - name: "startOperation() rejects if WO not in progress"
+      setup: "Mock WO with status='released'"
+      expected: "Throws BadRequestError with 'WO must be started'"
+
+    - name: "startOperation() enforces sequence when enabled"
+      setup: "Mock setting require_operation_sequence=true, prior op pending"
+      expected: "Throws ConflictError"
+
+    - name: "startOperation() allows any order when sequence disabled"
+      setup: "Mock setting require_operation_sequence=false"
+      expected: "Operation starts regardless of sequence"
+
+    - name: "completeOperation() updates status to completed"
+      setup: "Mock operation with status='in_progress'"
+      expected: "Returns operation with status='completed'"
+
+    - name: "completeOperation() calculates duration correctly"
+      setup: "Mock started_at 60 mins ago"
+      expected: "actual_duration_minutes = 60"
+
+    - name: "completeOperation() saves actual_yield_percent"
+      setup: "Mock operation, input yield=95.5"
+      expected: "actual_yield_percent = 95.5"
+
+    - name: "completeOperation() requires yield input"
+      setup: "Mock operation, no yield in input"
+      expected: "Throws BadRequestError"
+
+    - name: "completeOperation() validates yield range 0-100"
+      setup: "Mock operation, yield=105"
+      expected: "Throws BadRequestError"
+
+    - name: "completeOperation() rejects non-in-progress operation"
+      setup: "Mock operation with status='pending'"
+      expected: "Throws BadRequestError"
+
+    - name: "validateOperationSequence() allows if prior completed"
+      setup: "Mock prior operations all completed"
+      expected: "Returns { allowed: true }"
+
+    - name: "validateOperationSequence() blocks if prior pending"
+      setup: "Mock prior operation with status='pending'"
+      expected: "Returns { allowed: false, reason: 'Operation X must be completed first' }"
+
+    - name: "validateOperationSequence() allows if prior skipped"
+      setup: "Mock prior operation with status='skipped'"
+      expected: "Returns { allowed: true }"
+
+    - name: "getOperationLogs() returns audit trail"
+      setup: "Mock operation with 3 logs"
+      expected: "Returns logs ordered by timestamp DESC"
+
+  validation_schemas:
+    - name: "startOperationSchema accepts empty body"
+      input: "{}"
+      expected: "Valid"
+
+    - name: "startOperationSchema accepts valid started_at"
+      input: "{ started_at: '2025-01-15T10:00:00Z' }"
+      expected: "Valid"
+
+    - name: "startOperationSchema rejects invalid datetime"
+      input: "{ started_at: 'not-a-date' }"
+      expected: "Invalid"
+
+    - name: "completeOperationSchema requires yield"
+      input: "{}"
+      expected: "Invalid - actual_yield_percent required"
+
+    - name: "completeOperationSchema rejects yield > 100"
+      input: "{ actual_yield_percent: 105 }"
+      expected: "Invalid - Yield cannot exceed 100%"
+
+    - name: "completeOperationSchema rejects negative yield"
+      input: "{ actual_yield_percent: -5 }"
+      expected: "Invalid - Yield cannot be negative"
+
+    - name: "completeOperationSchema accepts valid yield"
+      input: "{ actual_yield_percent: 95.5 }"
+      expected: "Valid"
+
+    - name: "completeOperationSchema rejects notes > 2000 chars"
+      input: "{ actual_yield_percent: 95, notes: '...' } (2001 chars)"
+      expected: "Invalid - Notes too long"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "POST /operations/:id/start returns 200"
+      setup: "Create pending operation with WO in_progress"
+      action: "POST /api/production/operations/:id/start"
+      expected: "Status 200, operation.status='in_progress'"
+
+    - name: "POST /operations/:id/start sets timestamps"
+      setup: "Create pending operation"
+      action: "POST /api/production/operations/:id/start"
+      expected: "started_at and updated_at set"
+
+    - name: "POST /operations/:id/start creates audit log"
+      setup: "Create pending operation"
+      action: "POST /api/production/operations/:id/start"
+      expected: "operation_logs record with event_type='started'"
+
+    - name: "POST /operations/:id/start non-pending returns 400"
+      setup: "Create completed operation"
+      action: "POST /api/production/operations/:id/start"
+      expected: "Status 400, error message"
+
+    - name: "POST /operations/:id/start WO not started returns 400"
+      setup: "Create pending operation with WO status='released'"
+      action: "POST /api/production/operations/:id/start"
+      expected: "Status 400, 'Work Order must be started first'"
+
+    - name: "POST /operations/:id/start sequence violation returns 409"
+      setup: "Create operations with seq 1 pending, enable sequence enforcement"
+      action: "POST /api/production/operations/:id/start (seq 2)"
+      expected: "Status 409, 'Previous operation must be completed first'"
+
+    - name: "POST /operations/:id/complete returns 200"
+      setup: "Create in_progress operation"
+      action: "POST with { actual_yield_percent: 95 }"
+      expected: "Status 200, operation.status='completed'"
+
+    - name: "POST /operations/:id/complete calculates duration"
+      setup: "Create in_progress operation started 45 mins ago"
+      action: "POST with yield"
+      expected: "actual_duration_minutes = 45"
+
+    - name: "POST /operations/:id/complete missing yield returns 400"
+      setup: "Create in_progress operation"
+      action: "POST with {}"
+      expected: "Status 400, 'Actual yield is required'"
+
+    - name: "POST /operations/:id/complete invalid yield returns 400"
+      setup: "Create in_progress operation"
+      action: "POST with { actual_yield_percent: 150 }"
+      expected: "Status 400, validation error"
+
+    - name: "POST /operations/:id/complete creates audit log"
+      setup: "Create in_progress operation"
+      action: "POST with yield"
+      expected: "operation_logs record with event_type='completed' and metadata"
+
+    - name: "GET /operations/:id/logs returns logs"
+      setup: "Create operation with 2 logs"
+      action: "GET /api/production/operations/:id/logs"
+      expected: "Status 200, logs array with user names"
+
+    - name: "Cross-org operation access returns 404"
+      setup: "Create operation in Org B, authenticate as Org A user"
+      action: "POST /api/production/operations/:id/start"
+      expected: "Status 404 (not 403)"
+
+    - name: "Permission denied returns 403"
+      setup: "Create operation, authenticate as planner role"
+      action: "POST /api/production/operations/:id/start"
+      expected: "Status 403"
+
+  rls_policies:
+    - name: "User can only read operations from own org"
+      setup: "Create operations in Org A and Org B"
+      action: "User A queries wo_operations"
+      expected: "Only Org A operations returned"
+
+    - name: "User can only read operation_logs from own org"
+      setup: "Create logs in Org A and Org B"
+      action: "User A queries operation_logs"
+      expected: "Only Org A logs returned"
+
+    - name: "operation_logs are immutable"
+      setup: "Create operation log"
+      action: "Attempt to UPDATE or DELETE"
+      expected: "Operation blocked by RLS"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Start operation flow"
+    steps:
+      - "Navigate to WO detail page"
+      - "Click 'Start' on pending operation"
+      - "Confirm in dialog"
+      - "Verify status badge updates to 'In Progress'"
+      - "Verify success toast displays"
+
+  - name: "Start button visibility"
+    steps:
+      - "Navigate to WO detail page with operations"
+      - "Verify 'Start' visible for pending operations"
+      - "Verify 'Complete' visible for in_progress operations"
+      - "Verify no buttons for completed operations"
+
+  - name: "Complete operation flow"
+    steps:
+      - "Start an operation"
+      - "Click 'Complete' button"
+      - "Enter yield in modal"
+      - "Click 'Complete'"
+      - "Verify modal closes"
+      - "Verify status badge updates to 'Completed'"
+      - "Verify duration displays"
+      - "Verify success toast displays"
+
+  - name: "Complete modal validation"
+    steps:
+      - "Open complete modal"
+      - "Clear yield field"
+      - "Click 'Complete'"
+      - "Verify validation error 'Actual yield is required'"
+      - "Enter 150 in yield field"
+      - "Verify validation error 'Yield must be between 0 and 100%'"
+
+  - name: "Operation detail panel"
+    steps:
+      - "Click on operation card (not on buttons)"
+      - "Verify slide-over panel opens"
+      - "Verify shows operation details"
+      - "Verify shows operation logs history"
+      - "Click outside or X to close"
+      - "Verify panel closes"
+
+  - name: "Sequence enforcement alert"
+    steps:
+      - "Enable require_operation_sequence setting"
+      - "Navigate to WO with operations"
+      - "Attempt to start operation seq 2 (seq 1 pending)"
+      - "Verify error toast 'Previous operation must be completed first'"
+      - "Verify operation remains pending"
+
+  - name: "Empty state display"
+    steps:
+      - "Navigate to WO with no operations"
+      - "Verify 'No routing operations defined' message displays"
+
+  - name: "Permission-based UI"
+    steps:
+      - "Login as planner role"
+      - "Navigate to WO detail page"
+      - "Verify Start/Complete buttons are disabled"
+      - "Verify read-only view displayed"
+
+# Definition of Done
+definition_of_done:
+  - "API endpoint POST /operations/:id/start implemented and tested"
+  - "API endpoint POST /operations/:id/complete implemented and tested"
+  - "API endpoint GET /operations/:id/logs implemented and tested"
+  - "operation_logs table created with RLS policies"
+  - "Trigger auto-creates logs on status change"
+  - "operation-service.ts implements all methods"
+  - "Zod schemas validate start/complete requests"
+  - "Status validation enforced (pending->in_progress, in_progress->completed)"
+  - "WO status prerequisite enforced"
+  - "Sequence enforcement respects setting"
+  - "Duration auto-calculation on complete"
+  - "Yield capture with validation"
+  - "All UI components implemented"
+  - "Permission enforcement working"
+  - "Multi-tenancy RLS enforced (404 for cross-org)"
+  - "Unit tests >= 80% coverage"
+  - "Integration tests for all endpoints"
+  - "E2E tests for start/complete flows"
+  - "Loading states implemented"
+  - "Empty/error states handled"
+  - "Accessibility requirements met"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Standard coverage for production code"
+  integration:
+    target: 80
+    reason: "API endpoints must be thoroughly tested"
+  files:
+    - "lib/services/operation-service.ts: 80%"
+    - "lib/validation/operation-execution.ts: 90%"
+    - "components/production/operations/*: 70%"
+    - "API routes: 90%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "RLS policy misconfiguration could leak operation data"
+    mitigation: "Comprehensive integration tests with multi-tenant fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_policies"
+
+  - id: "RISK-02"
+    description: "Sequence enforcement logic edge cases"
+    mitigation: "Thorough unit tests for validateOperationSequence()"
+    severity: "medium"
+    test_coverage: "unit_tests.operation_service"
+
+  - id: "RISK-03"
+    description: "Duration calculation rounding errors"
+    mitigation: "Unit tests with various time scenarios"
+    severity: "low"
+    test_coverage: "unit_tests.operation_service"
+
+  - id: "RISK-04"
+    description: "Trigger not firing for log creation"
+    mitigation: "Integration tests verify log creation"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints"

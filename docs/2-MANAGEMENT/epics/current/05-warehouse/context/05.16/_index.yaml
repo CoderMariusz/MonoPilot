@@ -1,0 +1,124 @@
+# Story 05.16 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.16"
+  name: "Stock Moves CRUD"
+  slug: "stock-moves-crud"
+  epic: "05-warehouse"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+  priority: "P2"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, pages, UX
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides:
+        - "license_plates table"
+        - "LP service methods"
+        - "LP status validation"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "org_id RLS pattern"
+        - "auth.uid() function"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides:
+        - "warehouses table"
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides:
+        - "locations table"
+        - "location capacity checks"
+  optional:
+    - story: "05.2"
+      name: "LP Genealogy"
+      provides:
+        - "lp_genealogy table for split/merge tracking"
+    - story: "05.6"
+      name: "LP Split Workflow"
+      provides:
+        - "LP split service for partial moves"
+
+  blocked_by: []
+
+  blocks:
+    - story: "05.18"
+      name: "Scanner Move Workflow"
+    - story: "05.19"
+      name: "Scanner Putaway"
+    - story: "05.35"
+      name: "Cycle Count Adjustments"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections:
+      - "WH-FR-005"  # Stock Moves
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections:
+      - "Database Schema"
+      - "API Design"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.16.stock-moves-crud.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-006-stock-movements-list.md"
+      id: "WH-006"
+      description: "Stock movements list page"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-007-stock-movement-create-modal.md"
+      id: "WH-007"
+      description: "Stock movement create modal"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for stock_moves table"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "stock_moves table with RLS and indexes"
+  - type: "api"
+    count: 5
+    description: "CRUD + cancel + LP move endpoints"
+  - type: "service"
+    count: 1
+    description: "stock-move-service.ts with 5+ methods"
+  - type: "validation"
+    count: 1
+    description: "stock-move-schema.ts with Zod schemas"
+  - type: "page"
+    count: 2
+    description: "Movements list page + detail page"
+  - type: "component"
+    count: 6
+    description: "Table, filters, modals, history card"
+  - type: "test"
+    count: 2
+    description: "Unit tests + E2E smoke test"
+
+# Technical notes
+technical_notes:
+  - "stock_moves provides audit trail for ALL LP location/qty changes"
+  - "Move number format: SM-YYYY-NNNNN (sequence resets annually)"
+  - "7 move types: transfer, issue, receipt, adjustment, return, quarantine, putaway"
+  - "LP.location_id auto-updated on transfer/putaway/quarantine/return moves"
+  - "Partial moves trigger LP split (depends on 05.6)"
+  - "Cancellation does NOT reverse LP changes - requires manual correction"
+  - "Performance targets: list <500ms, history <200ms for 500 moves"

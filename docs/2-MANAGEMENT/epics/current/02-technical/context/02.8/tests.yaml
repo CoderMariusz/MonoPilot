@@ -1,0 +1,487 @@
+# Story 02.8 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/routing-operations-service.test.ts"
+    type: "unit"
+    description: "Unit tests for routing operations service"
+  - path: "apps/frontend/app/api/v1/technical/routings/[id]/operations/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for operations API endpoints"
+  - path: "apps/frontend/components/technical/routings/__tests__/OperationsTable.test.tsx"
+    type: "component"
+    description: "Component tests for operations table"
+  - path: "apps/frontend/e2e/technical/routing-operations.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for routing operations workflow"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # Operations List
+  - id: "AC-01"
+    given: "user navigates to routing detail `/technical/routings/:id`"
+    when: "operations section loads"
+    then: "operations display in sequence order within 500ms for up to 50 operations"
+    test_type: "e2e"
+    priority: "P0"
+    fr_reference: "FR-2.41"
+
+  - id: "AC-02"
+    given: "routing has 10 operations"
+    when: "operations table renders"
+    then: "each row shows: sequence, name, machine name, duration, setup time, yield%, labor cost/hr, and action buttons"
+    test_type: "component"
+    priority: "P0"
+    fr_reference: "FR-2.41"
+
+  - id: "AC-03"
+    given: "operations table displayed"
+    when: "sequence numbers contain duplicates (parallel ops)"
+    then: "'(Parallel)' indicator appends to operation name"
+    test_type: "component"
+    priority: "P0"
+    fr_reference: "FR-2.48"
+
+  # Parallel Operations (FR-2.48)
+  - id: "AC-04"
+    given: "user creates operation with sequence 2 where sequence 2 already exists"
+    when: "save completes"
+    then: "both operations have sequence 2 (parallel execution)"
+    test_type: "integration"
+    priority: "P0"
+    fr_reference: "FR-2.48"
+
+  - id: "AC-05"
+    given: "operations table has two ops at sequence 2"
+    when: "table renders"
+    then: "both show '(Parallel)' suffix: 'Proofing (Parallel)', 'Heating (Parallel)'"
+    test_type: "component"
+    priority: "P0"
+    fr_reference: "FR-2.48"
+
+  - id: "AC-06"
+    given: "parallel operations exist"
+    when: "total duration calculated"
+    then: "parallel ops use MAX duration (not SUM)"
+    test_type: "unit"
+    priority: "P0"
+    fr_reference: "FR-2.48"
+
+  - id: "AC-07"
+    given: "parallel operations exist"
+    when: "total cost calculated"
+    then: "parallel ops SUM their costs (all incur cost, even if running simultaneously)"
+    test_type: "unit"
+    priority: "P0"
+    fr_reference: "FR-2.48"
+
+  # Time Tracking (FR-2.43)
+  - id: "AC-08"
+    given: "user enters setup_time=5, duration=30, cleanup_time=3"
+    when: "operation saved"
+    then: "total operation time = 38 minutes"
+    test_type: "unit"
+    priority: "P0"
+    fr_reference: "FR-2.43"
+
+  - id: "AC-09"
+    given: "cleanup_time field left empty"
+    when: "operation saved"
+    then: "cleanup_time defaults to 0"
+    test_type: "integration"
+    priority: "P0"
+    fr_reference: "FR-2.43"
+
+  - id: "AC-10"
+    given: "user enters negative setup_time"
+    when: "validation runs"
+    then: "error 'Setup time cannot be negative' displays"
+    test_type: "unit"
+    priority: "P1"
+    fr_reference: "FR-2.43"
+
+  # Machine Assignment (FR-2.44) - Optional
+  - id: "AC-11"
+    given: "user opens operation modal"
+    when: "machines table is empty (no machines configured)"
+    then: "machine dropdown shows empty state with 'No machines configured' and Settings link"
+    test_type: "component"
+    priority: "P0"
+    fr_reference: "FR-2.44"
+
+  - id: "AC-12"
+    given: "user opens operation modal"
+    when: "machines table has entries"
+    then: "machine dropdown shows 'None/Clear' option and list of machines"
+    test_type: "component"
+    priority: "P0"
+    fr_reference: "FR-2.44"
+
+  - id: "AC-13"
+    given: "user assigns machine from 'None' to 'Mixer-01'"
+    when: "save completes"
+    then: "machine column shows 'Mixer-01'"
+    test_type: "integration"
+    priority: "P1"
+    fr_reference: "FR-2.44"
+
+  - id: "AC-14"
+    given: "operation has machine_id = NULL"
+    when: "operation saved and displayed"
+    then: "machine column shows '-' or empty"
+    test_type: "component"
+    priority: "P0"
+    fr_reference: "FR-2.44"
+
+  # Instructions (FR-2.45)
+  - id: "AC-15"
+    given: "user opens operation modal"
+    when: "instructions field visible"
+    then: "textarea shows placeholder and max 2000 chars help text"
+    test_type: "component"
+    priority: "P1"
+    fr_reference: "FR-2.45"
+
+  - id: "AC-16"
+    given: "user enters 1500 characters of instructions"
+    when: "operation saved"
+    then: "instructions stored and retrievable on edit"
+    test_type: "integration"
+    priority: "P1"
+    fr_reference: "FR-2.45"
+
+  - id: "AC-17"
+    given: "user enters 2001 characters in instructions"
+    when: "validation runs"
+    then: "error 'Instructions must be less than 2000 characters' displays"
+    test_type: "unit"
+    priority: "P1"
+    fr_reference: "FR-2.45"
+
+  # Attachments (FR-2.45)
+  - id: "AC-18"
+    given: "user opens operation modal"
+    when: "attachments section visible"
+    then: "upload area shows 'Drop files or click to upload' with accepted formats"
+    test_type: "component"
+    priority: "P1"
+    fr_reference: "FR-2.45"
+
+  - id: "AC-19"
+    given: "user selects a 5MB PDF file"
+    when: "upload completes"
+    then: "file appears in attachments list with name, size, and delete button"
+    test_type: "integration"
+    priority: "P1"
+    fr_reference: "FR-2.45"
+
+  - id: "AC-20"
+    given: "user attempts to upload a 15MB file"
+    when: "validation runs"
+    then: "error 'File size must be less than 10MB' displays"
+    test_type: "unit"
+    priority: "P1"
+    fr_reference: "FR-2.45"
+
+  - id: "AC-21"
+    given: "maximum 5 attachments per operation"
+    when: "user tries to add 6th"
+    then: "error 'Maximum 5 attachments per operation' displays"
+    test_type: "integration"
+    priority: "P1"
+    fr_reference: "FR-2.45"
+
+  # Add/Edit Operations
+  - id: "AC-22"
+    given: "user clicks '[+ Add Operation]'"
+    when: "modal opens"
+    then: "form displays with sequence auto-filled (max + 1)"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-23"
+    given: "user enters sequence '2' which already exists"
+    when: "typing completes"
+    then: "info message shows (NOT blocking error) about parallel operation"
+    test_type: "component"
+    priority: "P0"
+    fr_reference: "FR-2.48"
+
+  - id: "AC-24"
+    given: "user enters name with fewer than 3 characters"
+    when: "save attempted"
+    then: "error 'Name must be at least 3 characters' displays inline"
+    test_type: "unit"
+    priority: "P1"
+
+  # Reorder Operations
+  - id: "AC-25"
+    given: "operation at sequence 2"
+    when: "user clicks [^] (move up)"
+    then: "operation swaps sequence with operation at sequence 1"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-26"
+    given: "operation at sequence 1 (first)"
+    when: "[^] button rendered"
+    then: "button is disabled"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-27"
+    given: "parallel operations at sequence 2 (two operations)"
+    when: "one is moved up"
+    then: "ONLY that operation swaps with sequence 1 (other parallel op remains at 2)"
+    test_type: "integration"
+    priority: "P1"
+    fr_reference: "FR-2.48"
+
+  # Delete Operations
+  - id: "AC-28"
+    given: "user clicks [Del] on operation"
+    when: "confirmation dialog shows"
+    then: "message reads 'Delete operation '[name]'? This action cannot be undone.'"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-29"
+    given: "user confirms delete on operation with attachments"
+    when: "deletion completes"
+    then: "operation removed and attachments deleted from storage"
+    test_type: "integration"
+    priority: "P1"
+    fr_reference: "FR-2.45"
+
+  # Summary Panel
+  - id: "AC-30"
+    given: "routing has operations"
+    when: "summary panel renders"
+    then: "displays: total operations count, total duration (Xh Ym), total setup time, total cleanup time, total labor cost, average yield"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-31"
+    given: "user clicks '[i View Breakdown]'"
+    when: "panel expands"
+    then: "per-operation breakdown displays with individual times and costs"
+    test_type: "component"
+    priority: "P1"
+
+  # Permission Enforcement
+  - id: "AC-32"
+    given: "user without technical write permission"
+    when: "routing detail loaded"
+    then: "'[+ Add Operation]', [Edit], [Del] buttons hidden"
+    test_type: "e2e"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  routing_operations_service:
+    - name: "calculateSummary returns correct totals for sequential ops"
+      setup: "3 operations with seq 1, 2, 3"
+      expected: "SUM of all durations, setup times, cleanup times"
+
+    - name: "calculateSummary uses MAX duration for parallel ops"
+      setup: "2 ops at seq 1 (30min, 45min), 1 op at seq 2 (20min)"
+      expected: "total_duration = 45 + 20 = 65 minutes"
+
+    - name: "calculateSummary SUMs cost for parallel ops"
+      setup: "2 ops at seq 1 with $10 and $15 cost each"
+      expected: "total_labor_cost includes both = $25"
+
+    - name: "detectParallelOperations marks duplicate sequences"
+      setup: "ops with sequences [1, 2, 2, 3]"
+      expected: "ops at seq 2 have isParallel = true"
+
+    - name: "getNextSequence returns max + 1"
+      setup: "ops with sequences [1, 3, 5]"
+      expected: "returns 6"
+
+    - name: "getNextSequence returns 1 for empty list"
+      setup: "no existing operations"
+      expected: "returns 1"
+
+  validation:
+    - name: "operationFormSchema rejects negative setup_time"
+      input: "{ setup_time: -5 }"
+      expected: "validation error"
+
+    - name: "operationFormSchema rejects duration < 1"
+      input: "{ duration: 0 }"
+      expected: "validation error"
+
+    - name: "operationFormSchema allows null machine_id"
+      input: "{ machine_id: null }"
+      expected: "validation passes"
+
+    - name: "operationFormSchema rejects instructions > 2000 chars"
+      input: "{ instructions: '...2001 chars...' }"
+      expected: "validation error"
+
+    - name: "attachmentSchema rejects file > 10MB"
+      input: "File with size 15MB"
+      expected: "validation error"
+
+    - name: "attachmentSchema rejects invalid file type"
+      input: "File with type 'application/zip'"
+      expected: "validation error"
+
+# Integration Test Cases
+integration_tests:
+  operations_crud:
+    - name: "POST /operations creates operation with valid data"
+      setup: "existing routing"
+      action: "POST with sequence=1, name='Mixing', duration=30"
+      expected: "201, operation created with ID"
+
+    - name: "POST /operations allows duplicate sequence (parallel ops)"
+      setup: "routing with operation at seq=1"
+      action: "POST with sequence=1, name='Heating', duration=20"
+      expected: "201, both operations have seq=1"
+
+    - name: "PUT /operations/:opId updates operation"
+      setup: "existing operation"
+      action: "PUT with duration=45"
+      expected: "200, duration updated"
+
+    - name: "DELETE /operations/:opId removes operation and attachments"
+      setup: "operation with 2 attachments"
+      action: "DELETE"
+      expected: "200, operation removed, attachments deleted from storage"
+
+    - name: "PATCH /operations/:opId/reorder swaps sequences"
+      setup: "ops at seq 1 and 2"
+      action: "PATCH with direction='down' on seq 1 op"
+      expected: "sequences swapped"
+
+  attachments:
+    - name: "POST /attachments uploads file to storage"
+      setup: "existing operation"
+      action: "POST with 5MB PDF"
+      expected: "201, attachment record created, file in storage"
+
+    - name: "POST /attachments rejects when max reached"
+      setup: "operation with 5 attachments"
+      action: "POST with new file"
+      expected: "400, MAX_ATTACHMENTS_REACHED"
+
+    - name: "GET /attachments/:id/download returns signed URL"
+      setup: "existing attachment"
+      action: "GET download"
+      expected: "200, signed URL returned"
+
+    - name: "DELETE /attachments/:id removes from storage"
+      setup: "existing attachment"
+      action: "DELETE"
+      expected: "200, file removed from storage"
+
+  rls:
+    - name: "User from Org A cannot see Org B routing operations"
+      setup: "Routing in Org B with operations"
+      action: "User A queries operations"
+      expected: "empty result (RLS blocks)"
+
+    - name: "User from Org A cannot create operation in Org B routing"
+      setup: "Routing in Org B"
+      action: "User A POST operation"
+      expected: "404 (routing not found due to RLS)"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Full operations workflow - create, edit, reorder, delete"
+    steps:
+      - "Navigate to routing detail page"
+      - "Click Add Operation"
+      - "Fill form (seq=1, name='Mixing', duration=15)"
+      - "Save and verify in table"
+      - "Add second operation (seq=2)"
+      - "Reorder operation 2 up (swap with 1)"
+      - "Edit operation (change duration)"
+      - "Delete operation with confirmation"
+    expected: "All operations complete successfully"
+
+  - name: "Parallel operations - create and display"
+    steps:
+      - "Create operation with seq=1"
+      - "Create operation with seq=1 (duplicate)"
+      - "Verify info message shown (not error)"
+      - "Verify both ops display with '(Parallel)' suffix"
+      - "Verify summary uses MAX duration"
+    expected: "Parallel ops work correctly"
+
+  - name: "Machine dropdown - empty state"
+    steps:
+      - "Ensure machines table is empty"
+      - "Open add operation modal"
+      - "Verify machine dropdown shows empty state"
+      - "Save operation with machine_id = null"
+    expected: "Operations work without machines"
+
+  - name: "Attachments workflow"
+    steps:
+      - "Create operation"
+      - "Edit operation"
+      - "Upload PDF attachment (5MB)"
+      - "Verify attachment in list"
+      - "Download attachment"
+      - "Delete attachment"
+      - "Verify removed from list"
+    expected: "Attachment CRUD works"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Core business logic for operations and calculations"
+  integration:
+    target: 80
+    reason: "API endpoints and database interactions"
+  files:
+    - "lib/services/routing-operations-service.ts: 80%"
+    - "lib/validation/operation-schema.ts: 90%"
+    - "API routes: 80%"
+
+# Definition of Done
+definition_of_done:
+  - "Operations table displays within 500ms for 50 operations"
+  - "Add operation with all fields works end-to-end"
+  - "Edit operation updates immediately in UI"
+  - "Delete operation with confirmation works"
+  - "Reorder (up/down) swaps sequences correctly"
+  - "Parallel operations detected and marked with '(Parallel)'"
+  - "Duplicate sequence shows info message (not blocking error)"
+  - "Duration calculated correctly with parallel ops (MAX per sequence)"
+  - "Cost calculated correctly (SUM all ops including parallel)"
+  - "Machine dropdown shows empty state when no machines configured"
+  - "Operations work correctly with machine_id = NULL"
+  - "Instructions field accepts up to 2000 characters"
+  - "Attachments upload works for PDF, PNG, JPG, DOCX"
+  - "Attachment file size limited to 10MB"
+  - "Maximum 5 attachments per operation enforced"
+  - "Permission checks hide unauthorized actions"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover routing-operations-service (>80% coverage)"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Parallel operations duration calculation complexity"
+    mitigation: "Thorough unit tests for calculateSummary with parallel scenarios"
+    severity: "medium"
+    test_coverage: "unit_tests.routing_operations_service"
+
+  - id: "RISK-02"
+    description: "Attachment storage cleanup on delete failure"
+    mitigation: "Ensure CASCADE delete handles DB records, separate cleanup job for orphan files"
+    severity: "low"
+    test_coverage: "integration_tests.attachments"
+
+  - id: "RISK-03"
+    description: "Machine dropdown empty state UX confusion"
+    mitigation: "Clear empty state message with link to Settings"
+    severity: "low"
+    test_coverage: "e2e_tests"

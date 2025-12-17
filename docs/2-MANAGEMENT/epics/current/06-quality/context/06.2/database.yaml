@@ -1,0 +1,113 @@
+# Story 06.2 - Database Schema
+# Purpose: Tables, RLS policies, indexes, triggers
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/062_create_quality_holds_table.sql"
+    type: "migration"
+    description: "Quality holds + hold items tables with RLS + auto-numbering trigger"
+
+tables:
+  - name: "quality_holds"
+    description: "Quality holds to block inventory from consumption pending investigation"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "hold_number", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "reason", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "hold_type", type: "TEXT", constraints: "NOT NULL CHECK (hold_type IN ('qa_pending', 'investigation', 'recall', 'quarantine'))" }
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'released', 'disposed'))" }
+      - { name: "priority", type: "TEXT", constraints: "NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical'))" }
+      - { name: "held_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "held_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "released_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "released_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "release_notes", type: "TEXT", constraints: "" }
+      - { name: "disposition", type: "TEXT", constraints: "CHECK (disposition IN ('release', 'rework', 'scrap', 'return'))" }
+      - { name: "ncr_id", type: "UUID", constraints: "REFERENCES ncr_reports(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_quality_holds_org_status ON quality_holds(org_id, status)"
+      - "idx_quality_holds_org_held_at ON quality_holds(org_id, held_at DESC)"
+      - "idx_quality_holds_org_priority ON quality_holds(org_id, priority) WHERE status = 'active'"
+      - "idx_quality_holds_ncr ON quality_holds(ncr_id) WHERE ncr_id IS NOT NULL"
+    constraints:
+      - "UNIQUE(org_id, hold_number)"
+      - "CONSTRAINT released_fields_consistency CHECK ((status = 'released' AND released_by IS NOT NULL AND released_at IS NOT NULL) OR (status != 'released'))"
+      - "CONSTRAINT disposition_on_release CHECK ((status = 'released' AND disposition IS NOT NULL) OR (status != 'released'))"
+
+  - name: "quality_hold_items"
+    description: "Items (LPs, WOs, batches) placed on quality hold"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "hold_id", type: "UUID", constraints: "NOT NULL REFERENCES quality_holds(id) ON DELETE CASCADE" }
+      - { name: "reference_type", type: "TEXT", constraints: "NOT NULL CHECK (reference_type IN ('lp', 'wo', 'batch'))" }
+      - { name: "reference_id", type: "UUID", constraints: "NOT NULL" }
+      - { name: "quantity_held", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "uom", type: "TEXT", constraints: "" }
+      - { name: "location_id", type: "UUID", constraints: "REFERENCES locations(id)" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+    rls: true
+    rls_pattern: "EXISTS (SELECT 1 FROM quality_holds WHERE quality_holds.id = quality_hold_items.hold_id AND quality_holds.org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    indexes:
+      - "idx_quality_hold_items_hold ON quality_hold_items(hold_id)"
+      - "idx_quality_hold_items_reference ON quality_hold_items(reference_type, reference_id)"
+    constraints:
+      - "UNIQUE(hold_id, reference_type, reference_id)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  policies:
+    - table: "quality_holds"
+      name: "quality_holds_org_isolation"
+      operation: "ALL"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "quality_holds"
+      name: "quality_holds_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "quality_holds"
+      name: "quality_holds_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "quality_hold_items"
+      name: "quality_hold_items_org_isolation"
+      operation: "ALL"
+      using: "EXISTS (SELECT 1 FROM quality_holds WHERE quality_holds.id = quality_hold_items.hold_id AND quality_holds.org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+
+# Triggers
+triggers:
+  - name: "set_hold_number"
+    table: "quality_holds"
+    timing: "BEFORE INSERT"
+    description: "Auto-generate hold_number as QH-YYYYMMDD-NNNN"
+    function: "generate_hold_number()"
+  - name: "set_quality_holds_updated_at"
+    table: "quality_holds"
+    timing: "BEFORE UPDATE"
+    description: "Update updated_at timestamp"
+    function: "update_updated_at_column()"
+
+# LP Blocking Integration
+lp_blocking:
+  description: "CRITICAL - Updates LP qa_status when hold created/released"
+  on_hold_creation:
+    - action: "UPDATE license_plates SET qa_status = 'hold'"
+      condition: "reference_type = 'lp'"
+  on_hold_release:
+    - disposition: "release"
+      action: "UPDATE license_plates SET qa_status = 'passed'"
+    - disposition: "rework"
+      action: "UPDATE license_plates SET qa_status = 'pending'"
+    - disposition: "scrap"
+      action: "UPDATE license_plates SET qa_status = 'scrap', quantity_available = 0"
+    - disposition: "return"
+      action: "UPDATE license_plates SET qa_status = 'rejected'"

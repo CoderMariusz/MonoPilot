@@ -1,0 +1,410 @@
+# Story 04.2b - WO Pause/Resume
+# Acceptance criteria, test specifications, and coverage requirements
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # AC-1: Pause Button Visibility
+  - id: "AC-1"
+    title: "Pause Button Visibility"
+    scenarios:
+      - given: "allow_pause_wo = true AND WO status = 'In Progress'"
+        when: "user views WO execution page"
+        then: "'Pause' button is visible and enabled"
+
+      - given: "allow_pause_wo = false AND WO status = 'In Progress'"
+        when: "user views WO execution page"
+        then: "'Pause' button is NOT visible"
+
+  # AC-2: Pause Work Order
+  - id: "AC-2"
+    title: "Pause Work Order"
+    given: "WO status = 'In Progress' AND allow_pause_wo = true"
+    when: "user clicks 'Pause' and selects reason 'Machine Breakdown'"
+    then:
+      - "WO status changes to 'Paused' within 1 second"
+      - "paused_at timestamp is set to current time (+/- 1 second)"
+      - "New record created in wo_pauses table with pause_reason = 'Machine Breakdown'"
+      - "Success message displays: 'Work order paused'"
+
+  # AC-3: Pause Reason Required
+  - id: "AC-3"
+    title: "Pause Reason Required"
+    given: "user clicks 'Pause' button"
+    when: "no reason is selected and user clicks 'Confirm'"
+    then: "validation error displays: 'Pause reason is required'"
+
+  # AC-4: Invalid Status for Pause
+  - id: "AC-4"
+    title: "Invalid Status for Pause"
+    scenarios:
+      - given: "WO status = 'Completed'"
+        when: "user attempts to pause WO"
+        then: "'Pause' button is disabled"
+
+      - given: "WO status = 'Draft'"
+        when: "user attempts to start then pause WO"
+        then: "error message displays: 'Cannot pause work order with status \"draft\". Only in_progress WOs can be paused.'"
+
+  # AC-5: Already Paused
+  - id: "AC-5"
+    title: "Already Paused"
+    given: "WO status = 'Paused'"
+    when: "user attempts to pause WO again"
+    then: "error message displays: 'Work order is already paused'"
+
+  # AC-6: Resume Work Order
+  - id: "AC-6"
+    title: "Resume Work Order"
+    given: "WO status = 'Paused'"
+    when: "user clicks 'Resume'"
+    then:
+      - "Resume confirmation modal displays"
+      - "Upon confirmation, WO status changes to 'In Progress' within 1 second"
+      - "resumed_at timestamp is set in wo_pauses record"
+      - "Success message displays: 'Work order resumed'"
+
+  # AC-7: Duration Calculation
+  - id: "AC-7"
+    title: "Duration Calculation"
+    given: "WO was paused for 15 minutes"
+    when: "WO is resumed"
+    then: "wo_pauses.duration_minutes = 15 (+/- 1 minute)"
+
+  # AC-8: Pause Not Enabled
+  - id: "AC-8"
+    title: "Pause Not Enabled"
+    given: "allow_pause_wo = false"
+    when: "user attempts to pause WO via API"
+    then: "400 error response: 'Pause functionality is disabled for this organization'"
+
+  # AC-9: Pause History
+  - id: "AC-9"
+    title: "Pause History"
+    given: "WO has been paused 3 times"
+    when: "user views WO execution detail page"
+    then: "Pause History section displays all 3 pause records with:"
+    details:
+      - "Pause reason"
+      - "Paused at timestamp"
+      - "Resumed at timestamp (or 'Currently Paused')"
+      - "Duration in minutes"
+      - "User who paused/resumed"
+
+  # AC-10: Not Paused Status
+  - id: "AC-10"
+    title: "Not Paused Status"
+    given: "WO status = 'In Progress' (not paused)"
+    when: "user attempts to resume WO"
+    then: "error message displays: 'Cannot resume work order with status \"in_progress\". Only paused WOs can be resumed.'"
+
+# Unit Test Specifications
+unit_tests:
+  # Service Tests
+  - file: "apps/frontend/lib/services/wo-pause-service.test.ts"
+    coverage_target: ">= 80%"
+    test_suites:
+      - suite: "isPauseEnabled"
+        tests:
+          - name: "returns true when allow_pause_wo is enabled"
+            mock: "production_settings.allow_pause_wo = true"
+            assert: "returns true"
+
+          - name: "returns false when allow_pause_wo is disabled"
+            mock: "production_settings.allow_pause_wo = false"
+            assert: "returns false"
+
+          - name: "returns false when settings not found"
+            mock: "production_settings = null"
+            assert: "returns false (default)"
+
+      - suite: "pauseWorkOrder"
+        tests:
+          - name: "successfully pauses in_progress WO"
+            input:
+              woId: "valid-wo-id"
+              userId: "valid-user-id"
+              userRole: "operator"
+              orgId: "valid-org-id"
+              pauseReason: "machine_breakdown"
+              notes: "Test note"
+            mock: "WO status = 'in_progress', allow_pause_wo = true"
+            assert: "returns PauseResult with status = 'paused'"
+
+          - name: "throws WOPauseError when pause disabled"
+            mock: "allow_pause_wo = false"
+            assert: "throws WOPauseError with code 'PAUSE_DISABLED'"
+
+          - name: "throws WOPauseError when invalid status"
+            mock: "WO status = 'completed'"
+            assert: "throws WOPauseError with code 'INVALID_STATUS'"
+
+          - name: "throws WOPauseError when already paused"
+            mock: "WO status = 'paused'"
+            assert: "throws WOPauseError with code 'ALREADY_PAUSED'"
+
+          - name: "throws WOPauseError when reason missing"
+            input: "pauseReason = undefined"
+            assert: "throws WOPauseError with code 'REASON_REQUIRED'"
+
+      - suite: "resumeWorkOrder"
+        tests:
+          - name: "successfully resumes paused WO"
+            mock: "WO status = 'paused'"
+            assert: "returns ResumeResult with status = 'in_progress'"
+
+          - name: "calculates duration correctly"
+            mock: "paused_at = 15 minutes ago"
+            assert: "duration_minutes = 15 (+/- 1)"
+
+          - name: "throws WOPauseError when not paused"
+            mock: "WO status = 'in_progress'"
+            assert: "throws WOPauseError with code 'INVALID_STATUS'"
+
+      - suite: "getPauseHistory"
+        tests:
+          - name: "returns empty array when no history"
+            mock: "wo_pauses = []"
+            assert: "returns { pauses: [], total_pauses: 0, total_downtime_minutes: 0 }"
+
+          - name: "returns all pause records"
+            mock: "wo_pauses = [3 records]"
+            assert: "returns all 3 records with user info"
+
+          - name: "calculates total downtime correctly"
+            mock: "wo_pauses = [15 min, 30 min, 45 min]"
+            assert: "total_downtime_minutes = 90"
+
+# API Route Tests
+api_tests:
+  - file: "apps/frontend/app/api/production/work-orders/[id]/pause/route.test.ts"
+    coverage_target: ">= 80%"
+    tests:
+      - name: "POST /pause - success"
+        method: "POST"
+        body:
+          pause_reason: "machine_breakdown"
+          notes: "Test"
+        mock: "Valid WO, pause enabled"
+        expected:
+          status: 200
+          body: "{ status: 'paused', ... }"
+
+      - name: "POST /pause - pause disabled"
+        mock: "allow_pause_wo = false"
+        expected:
+          status: 400
+          body: "{ error: 'PAUSE_DISABLED', message: '...' }"
+
+      - name: "POST /pause - invalid status"
+        mock: "WO status = 'completed'"
+        expected:
+          status: 400
+          body: "{ error: 'INVALID_STATUS', message: '...' }"
+
+      - name: "POST /pause - already paused"
+        mock: "WO status = 'paused'"
+        expected:
+          status: 400
+          body: "{ error: 'ALREADY_PAUSED', message: '...' }"
+
+      - name: "POST /pause - reason required"
+        body: {}
+        expected:
+          status: 400
+          body: "{ error: 'REASON_REQUIRED', message: '...' }"
+
+      - name: "POST /pause - WO not found"
+        mock: "WO does not exist"
+        expected:
+          status: 404
+          body: "{ error: 'NOT_FOUND', message: '...' }"
+
+  - file: "apps/frontend/app/api/production/work-orders/[id]/resume/route.test.ts"
+    coverage_target: ">= 80%"
+    tests:
+      - name: "POST /resume - success"
+        method: "POST"
+        body: {}
+        mock: "WO status = 'paused'"
+        expected:
+          status: 200
+          body: "{ status: 'in_progress', ... }"
+
+      - name: "POST /resume - not paused"
+        mock: "WO status = 'in_progress'"
+        expected:
+          status: 400
+          body: "{ error: 'INVALID_STATUS', message: '...' }"
+
+      - name: "POST /resume - WO not found"
+        mock: "WO does not exist"
+        expected:
+          status: 404
+          body: "{ error: 'NOT_FOUND', message: '...' }"
+
+      - name: "POST /resume - duration calculated"
+        mock: "paused_at = 45 minutes ago"
+        expected:
+          body_contains: "duration_minutes: 45"
+
+# E2E Test Specifications
+e2e_tests:
+  - file: "apps/frontend/e2e/production/wo-pause-resume.spec.ts"
+    framework: "Playwright"
+    test_suites:
+      - suite: "WO Pause/Resume Critical Path"
+        setup:
+          - "Login as operator"
+          - "Create test WO in 'released' status"
+          - "Enable allow_pause_wo in settings"
+          - "Start the WO (status = 'in_progress')"
+        tests:
+          - name: "Complete pause/resume workflow"
+            steps:
+              - action: "Navigate to WO execution page"
+                verify: "Pause button is visible"
+
+              - action: "Click Pause button"
+                verify: "Pause modal opens"
+
+              - action: "Click Confirm without selecting reason"
+                verify: "Validation error: 'Pause reason is required'"
+
+              - action: "Select 'Machine Breakdown' reason"
+                action2: "Enter notes: 'Test pause'"
+                action3: "Click Pause"
+                verify:
+                  - "Modal closes"
+                  - "Toast: 'Work order paused'"
+                  - "WO status shows 'Paused'"
+                  - "Pause button hidden"
+                  - "Resume button visible"
+
+              - action: "Wait 1 minute"
+
+              - action: "Click Resume button"
+                verify: "Resume confirmation modal shows pause info"
+
+              - action: "Click Confirm Resume"
+                verify:
+                  - "Modal closes"
+                  - "Toast: 'Work order resumed'"
+                  - "WO status shows 'In Progress'"
+                  - "Pause button visible"
+                  - "Resume button hidden"
+
+              - action: "Check pause history section"
+                verify:
+                  - "1 pause record displayed"
+                  - "Reason: 'Machine Breakdown'"
+                  - "Duration: ~1 minute"
+
+          - name: "Pause button hidden when disabled in settings"
+            setup: "Set allow_pause_wo = false"
+            steps:
+              - action: "Navigate to WO execution page"
+                verify: "Pause button is NOT visible"
+            cleanup: "Restore allow_pause_wo = true"
+
+          - name: "Multiple pause cycles"
+            steps:
+              - action: "Pause with reason 'Break'"
+              - action: "Resume"
+              - action: "Pause with reason 'Material Shortage'"
+              - action: "Resume"
+              - action: "Check pause history"
+                verify:
+                  - "2 pause records displayed"
+                  - "Correct reasons shown"
+                  - "Total downtime calculated"
+
+# Component Tests
+component_tests:
+  - file: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/WOPauseButton.test.tsx"
+    framework: "Vitest + React Testing Library"
+    tests:
+      - name: "renders when allowPause=true and status=in_progress"
+      - name: "hidden when allowPause=false"
+      - name: "hidden when status=paused"
+      - name: "opens modal on click"
+      - name: "calls onPauseSuccess after successful pause"
+      - name: "shows loading state during API call"
+      - name: "shows error on API failure"
+
+  - file: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/WOResumeButton.test.tsx"
+    framework: "Vitest + React Testing Library"
+    tests:
+      - name: "renders only when status=paused"
+      - name: "hidden when status=in_progress"
+      - name: "shows pause info in confirmation modal"
+      - name: "calls onResumeSuccess after successful resume"
+      - name: "shows loading state during API call"
+      - name: "shows error on API failure"
+
+  - file: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/WOPauseHistory.test.tsx"
+    framework: "Vitest + React Testing Library"
+    tests:
+      - name: "shows loading skeleton initially"
+      - name: "displays empty state when no history"
+      - name: "displays all pause records"
+      - name: "shows 'Currently Paused' for active pause"
+      - name: "calculates and displays total downtime"
+      - name: "shows user names for paused_by and resumed_by"
+
+  - file: "apps/frontend/app/(authenticated)/production/work-orders/[id]/components/PauseReasonSelect.test.tsx"
+    framework: "Vitest + React Testing Library"
+    tests:
+      - name: "renders all pause reason options"
+      - name: "calls onChange when option selected"
+      - name: "shows error state when error prop provided"
+      - name: "is disabled when disabled prop is true"
+
+# Test Coverage Requirements
+coverage:
+  overall_target: ">= 80%"
+  breakdown:
+    service_layer: ">= 85%"
+    api_routes: ">= 80%"
+    components: ">= 75%"
+    e2e: "Critical path covered"
+
+# Test Data
+test_data:
+  work_orders:
+    - id: "test-wo-001"
+      wo_number: "WO-TEST-001"
+      status: "in_progress"
+      org_id: "test-org"
+
+    - id: "test-wo-002"
+      wo_number: "WO-TEST-002"
+      status: "paused"
+      org_id: "test-org"
+      paused_at: "2025-12-17T10:00:00Z"
+
+  pause_records:
+    - wo_id: "test-wo-002"
+      pause_reason: "machine_breakdown"
+      paused_at: "2025-12-17T10:00:00Z"
+      resumed_at: null
+      duration_minutes: null
+
+  users:
+    - id: "test-operator"
+      role: "operator"
+      org_id: "test-org"
+
+  settings:
+    - org_id: "test-org"
+      allow_pause_wo: true
+
+# Definition of Done - Testing
+definition_of_done_testing:
+  - "All AC scenarios have corresponding test cases"
+  - "Unit test coverage >= 80%"
+  - "API route tests cover happy path and all error cases"
+  - "E2E smoke test passes for critical path"
+  - "No test flakiness (tests pass consistently)"
+  - "Test data properly isolated (no cross-test contamination)"
+  - "Mocks properly implemented for external dependencies"
+  - "Performance tests confirm < 500ms response times"

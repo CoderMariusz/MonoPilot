@@ -1,0 +1,245 @@
+# Story 05.7 - Database Schema
+# Purpose: KPI queries, caching strategy, indexes
+# Agent: BACKEND-DEV (database focus)
+
+# No new tables needed - uses existing license_plates, lp_reservations, lp_genealogy
+tables_used:
+  - name: "license_plates"
+    from: "05.1"
+    usage: "KPI aggregations, alerts queries"
+    indexes_required:
+      - "idx_lp_org_status"
+      - "idx_lp_org_qa"
+      - "idx_lp_expiry"
+      - "idx_lp_org_product"
+
+  - name: "lp_reservations"
+    from: "05.3"
+    usage: "Reserved LPs count"
+    indexes_required:
+      - "idx_lp_res_org_status"
+
+  - name: "lp_genealogy"
+    from: "05.2"
+    usage: "Activity feed operations"
+    indexes_required:
+      - "idx_lp_genealogy_org_date"
+
+  - name: "products"
+    from: "02.1"
+    usage: "Low stock alerts (min_stock threshold)"
+
+  - name: "warehouse_settings"
+    from: "05.0"
+    usage: "Dashboard settings (refresh interval, thresholds)"
+
+# KPI Queries (Cached - 1 min TTL)
+kpi_queries:
+  total_lps:
+    description: "Count of all active LPs (not consumed)"
+    sql: |
+      SELECT COUNT(*) AS total_lps
+      FROM license_plates
+      WHERE org_id = $1
+        AND status != 'consumed';
+    index_used: "idx_lp_org_status"
+    expected_time: "<50ms"
+
+  available_lps:
+    description: "Count of available and QA passed LPs"
+    sql: |
+      SELECT COUNT(*) AS available_lps
+      FROM license_plates
+      WHERE org_id = $1
+        AND status = 'available'
+        AND qa_status = 'passed';
+    index_used: "idx_lp_org_status, idx_lp_org_qa"
+    expected_time: "<50ms"
+
+  reserved_lps:
+    description: "Count of LPs with active reservations"
+    sql: |
+      SELECT COUNT(DISTINCT lp_id) AS reserved_lps
+      FROM lp_reservations
+      WHERE org_id = $1
+        AND status = 'active';
+    index_used: "idx_lp_res_org_status"
+    expected_time: "<50ms"
+
+  consumed_today:
+    description: "Count of LPs consumed since midnight (org timezone)"
+    sql: |
+      SELECT COUNT(*) AS consumed_today
+      FROM license_plates
+      WHERE org_id = $1
+        AND status = 'consumed'
+        AND updated_at >= (CURRENT_DATE AT TIME ZONE 'UTC');
+    index_used: "idx_lp_org_status"
+    expected_time: "<50ms"
+    notes: "Use org timezone from organizations.timezone"
+
+  expiring_soon:
+    description: "Count of LPs expiring within 30 days"
+    sql: |
+      SELECT COUNT(*) AS expiring_soon
+      FROM license_plates
+      WHERE org_id = $1
+        AND status = 'available'
+        AND expiry_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '30 days');
+    index_used: "idx_lp_expiry"
+    expected_time: "<50ms"
+
+# Alert Queries (Cached - 1 min TTL)
+alert_queries:
+  low_stock:
+    description: "Products below min_stock threshold"
+    sql: |
+      SELECT
+        p.id AS product_id,
+        p.name AS product_name,
+        p.code AS product_code,
+        COUNT(lp.id) AS current_count,
+        COALESCE(p.min_stock, 0) AS min_stock
+      FROM products p
+      LEFT JOIN license_plates lp ON lp.product_id = p.id
+        AND lp.org_id = $1
+        AND lp.status = 'available'
+        AND lp.qa_status = 'passed'
+      WHERE p.org_id = $1
+        AND p.min_stock IS NOT NULL
+        AND p.min_stock > 0
+      GROUP BY p.id, p.name, p.code, p.min_stock
+      HAVING COUNT(lp.id) < COALESCE(p.min_stock, 0)
+      ORDER BY (COALESCE(p.min_stock, 0) - COUNT(lp.id)) DESC
+      LIMIT 10;
+    expected_time: "<100ms"
+    notes: "Products table must have min_stock column"
+
+  expiring_items:
+    description: "LPs expiring within 30 days"
+    sql: |
+      SELECT
+        lp.id AS lp_id,
+        lp.lp_number,
+        p.name AS product_name,
+        lp.expiry_date,
+        (lp.expiry_date - CURRENT_DATE) AS days_until_expiry
+      FROM license_plates lp
+      JOIN products p ON p.id = lp.product_id
+      WHERE lp.org_id = $1
+        AND lp.status = 'available'
+        AND lp.expiry_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '30 days')
+      ORDER BY lp.expiry_date ASC
+      LIMIT 10;
+    expected_time: "<100ms"
+    color_coding:
+      red: "days_until_expiry < 7"
+      orange: "days_until_expiry BETWEEN 7 AND 14"
+      yellow: "days_until_expiry BETWEEN 15 AND 30"
+
+  blocked_lps:
+    description: "LPs in quarantine or failed QA"
+    sql: |
+      SELECT
+        lp.id AS lp_id,
+        lp.lp_number,
+        p.name AS product_name,
+        lp.qa_status,
+        lp.batch_number AS block_reason
+      FROM license_plates lp
+      JOIN products p ON p.id = lp.product_id
+      WHERE lp.org_id = $1
+        AND lp.qa_status IN ('quarantine', 'failed')
+        AND lp.status = 'blocked'
+      ORDER BY lp.updated_at DESC
+      LIMIT 10;
+    expected_time: "<100ms"
+
+# Activity Feed Query (NOT Cached - real-time)
+activity_query:
+  recent_activity:
+    description: "Last 20 LP operations from genealogy and LP creation"
+    sql: |
+      (
+        SELECT
+          g.operation_date AS timestamp,
+          g.operation_type,
+          lp.id AS lp_id,
+          lp.lp_number,
+          u.first_name || ' ' || u.last_name AS user_name,
+          CONCAT(g.operation_type, ' - ', g.quantity, ' ', lp.uom) AS description
+        FROM lp_genealogy g
+        JOIN license_plates lp ON lp.id = g.child_lp_id
+        LEFT JOIN users u ON u.id = lp.created_by
+        WHERE g.org_id = $1
+      )
+      UNION ALL
+      (
+        SELECT
+          lp.created_at AS timestamp,
+          'create' AS operation_type,
+          lp.id AS lp_id,
+          lp.lp_number,
+          u.first_name || ' ' || u.last_name AS user_name,
+          CONCAT('Created LP - ', lp.quantity, ' ', lp.uom, ' of ', p.name) AS description
+        FROM license_plates lp
+        JOIN products p ON p.id = lp.product_id
+        LEFT JOIN users u ON u.id = lp.created_by
+        WHERE lp.org_id = $1
+      )
+      ORDER BY timestamp DESC
+      LIMIT 20;
+    expected_time: "<200ms"
+    notes: "UNION combines genealogy operations with LP creation events"
+
+# Redis Cache Configuration
+caching:
+  strategy: "write-through with TTL"
+  cache_keys:
+    kpis: "dashboard:kpis:{org_id}"
+    alerts: "dashboard:alerts:{org_id}"
+  ttl:
+    kpis: 60  # 1 minute
+    alerts: 60  # 1 minute
+  invalidation:
+    trigger: "Any LP operation (create, update, consume, split, merge)"
+    method: "Delete cache keys on LP service method completion"
+    keys_to_delete:
+      - "dashboard:kpis:{org_id}"
+      - "dashboard:alerts:{org_id}"
+
+# Index Verification
+index_verification:
+  required_indexes:
+    - name: "idx_lp_org_status"
+      table: "license_plates"
+      columns: ["org_id", "status"]
+      exists: true
+
+    - name: "idx_lp_org_qa"
+      table: "license_plates"
+      columns: ["org_id", "qa_status"]
+      exists: true
+
+    - name: "idx_lp_expiry"
+      table: "license_plates"
+      columns: ["expiry_date"]
+      condition: "WHERE expiry_date IS NOT NULL"
+      exists: true
+
+    - name: "idx_lp_res_org_status"
+      table: "lp_reservations"
+      columns: ["org_id", "status"]
+      exists: false
+      migration_needed: "Add in 05.3 migration"
+
+# RLS Policies
+rls:
+  pattern: "ADR-013"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  tables_with_rls:
+    - license_plates
+    - lp_reservations
+    - lp_genealogy
+    - products
+    - warehouse_settings

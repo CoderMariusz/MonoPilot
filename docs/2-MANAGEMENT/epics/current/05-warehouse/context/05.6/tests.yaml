@@ -1,0 +1,546 @@
+# Story 05.6 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/license-plate-detail.test.ts"
+    type: "unit"
+    description: "Unit tests for LP detail service methods"
+
+  - path: "apps/frontend/app/api/warehouse/license-plates/[id]/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for LP detail API endpoints"
+
+  - path: "apps/frontend/components/warehouse/license-plates/detail/__tests__/"
+    type: "component"
+    description: "Component tests for LP detail components"
+
+  - path: "__tests__/e2e/warehouse/lp-detail.spec.ts"
+    type: "e2e"
+    description: "E2E tests for LP detail page flow"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # AC-1: LP Detail Page Loads
+  - id: "AC-01"
+    title: "LP Detail Page Loads"
+    given: "LP-001 exists with all fields populated"
+    when: "user navigates to /warehouse/license-plates/[id]"
+    then:
+      - "Page loads within 500ms"
+      - "All LP fields displayed in formatted sections"
+      - "Product name, warehouse, and location resolved and displayed"
+      - "Status and QA status badges display with correct colors"
+      - "Page title shows LP number"
+      - "Breadcrumb navigation works"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-2: Overview Tab - Identity Section
+  - id: "AC-02"
+    title: "Overview Tab - Identity Section"
+    given: "LP detail page is open"
+    when: "user views Overview tab"
+    then:
+      - "LP Number displayed large and prominent"
+      - "Status badge with correct color"
+      - "QA Status badge with correct color"
+      - "Source type displayed"
+      - "Created date formatted correctly"
+      - "Updated date formatted correctly"
+    test_type: "component"
+    priority: "P0"
+
+  # AC-3: Overview Tab - Product Section
+  - id: "AC-03"
+    title: "Overview Tab - Product Section"
+    given: "LP detail page is open"
+    when: "user views Overview tab"
+    then:
+      - "Product name with link to product detail"
+      - "Product code displayed"
+      - "Quantity with UoM"
+      - "Catch weight if applicable"
+      - "Visual quantity indicator"
+    test_type: "component"
+    priority: "P0"
+
+  # AC-4: Overview Tab - Location Section
+  - id: "AC-04"
+    title: "Overview Tab - Location Section"
+    given: "LP is located in 'WH-001 > Zone A > Bin 5'"
+    when: "user views Overview tab"
+    then:
+      - "Warehouse name and code with link"
+      - "Full location path displayed"
+    test_type: "component"
+    priority: "P0"
+
+  # AC-5: Overview Tab - Tracking Section
+  - id: "AC-05"
+    title: "Overview Tab - Tracking Section"
+    given: "LP has batch and expiry data"
+    when: "user views Overview tab"
+    then:
+      - "Batch number displayed"
+      - "Supplier batch number if present"
+      - "Expiry date with warning indicator (color coded)"
+      - "Manufacture date displayed"
+      - "Days until expiry calculated"
+    test_type: "component"
+    priority: "P0"
+
+  # AC-6: Overview Tab - References Section
+  - id: "AC-06"
+    title: "Overview Tab - References Section"
+    given: "LP was created from production (WO-001)"
+    when: "user views Overview tab"
+    then:
+      - "Source type 'Production' displayed"
+      - "Work Order link navigates correctly"
+      - "Reference IDs are clickable links"
+    test_type: "component"
+    priority: "P1"
+
+  # AC-8: Genealogy Tab Integration
+  - id: "AC-08"
+    title: "Genealogy Tab - Integration with Story 05.2"
+    given: "LP has genealogy history"
+    when: "user clicks 'Genealogy' tab"
+    then:
+      - "Genealogy panel from Story 05.2 displays"
+      - "Ancestors section shows consumed LPs"
+      - "Descendants section shows created LPs"
+      - "Each node is clickable"
+      - "Empty state if no genealogy"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-9: History Tab Placeholder
+  - id: "AC-09"
+    title: "History Tab - Phase 2 Placeholder"
+    given: "LP detail page is open"
+    when: "user clicks 'History' tab"
+    then:
+      - "Placeholder message displays 'Movement History Coming in Phase 2'"
+      - "Description of future feature shown"
+      - "Icon/illustration for under construction"
+    test_type: "component"
+    priority: "P1"
+
+  # AC-10: Quick Actions - Block LP
+  - id: "AC-10"
+    title: "Quick Actions Panel - Block LP"
+    given: "LP status is 'available'"
+    when: "user clicks 'Block' in quick actions"
+    then:
+      - "Block confirmation modal opens"
+      - "User enters block reason (required, max 500 chars)"
+      - "On confirm API called"
+      - "LP status updates to 'blocked'"
+      - "Status badge changes to red"
+      - "Success toast displayed"
+      - "Modal closes automatically"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-11: Quick Actions - Unblock LP
+  - id: "AC-11"
+    title: "Quick Actions Panel - Unblock LP"
+    given: "LP status is 'blocked'"
+    when: "user clicks 'Unblock' in quick actions"
+    then:
+      - "Unblock confirmation modal opens"
+      - "Displays original block reason"
+      - "On confirm API called"
+      - "LP status updates to 'available'"
+      - "Success toast displayed"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-12: Print Label Disabled
+  - id: "AC-12"
+    title: "Quick Actions Panel - Print Label (Disabled)"
+    given: "LP detail page is open"
+    when: "user hovers over 'Print Label' button"
+    then:
+      - "Button is disabled (greyed out)"
+      - "Tooltip displays Phase 1 message"
+      - "Cursor shows not-allowed"
+      - "Clicking does nothing"
+    test_type: "component"
+    priority: "P2"
+
+  # AC-13: API Endpoint - Get LP Detail
+  - id: "AC-13"
+    title: "API Endpoint - Get LP Detail"
+    given: "valid LP ID"
+    when: "GET /api/warehouse/license-plates/:id is called"
+    then:
+      - "Returns LP with all fields"
+      - "Includes joined product, warehouse, location"
+      - "Response time <200ms"
+      - "Status 200 OK"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-14: API Endpoint - LP Not Found
+  - id: "AC-14"
+    title: "API Endpoint - LP Not Found"
+    given: "invalid LP ID"
+    when: "GET /api/warehouse/license-plates/:id is called"
+    then:
+      - "Returns 404 Not Found"
+      - "Error message 'License Plate not found'"
+      - "Frontend displays 404 page"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-15: Cross-Tenant Protection
+  - id: "AC-15"
+    title: "API Endpoint - Cross-Tenant Protection"
+    given: "LP belongs to Org B, user belongs to Org A"
+    when: "user requests LP detail via API"
+    then:
+      - "RLS policy blocks access"
+      - "Returns 404 Not Found (not 403)"
+      - "Frontend displays 404 page"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # AC-16: Empty State - New LP
+  - id: "AC-16"
+    title: "Empty State - New LP Without History"
+    given: "LP was just created, no genealogy or history"
+    when: "user views LP detail"
+    then:
+      - "Overview tab shows all fields (empty shown as dash)"
+      - "Genealogy tab shows empty state message"
+      - "History tab shows placeholder"
+      - "No errors displayed"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-17: Loading State
+  - id: "AC-17"
+    title: "Loading State"
+    given: "LP detail is loading"
+    when: "page first renders"
+    then:
+      - "Skeleton loaders display for all sections"
+      - "No flash of unstyled content"
+      - "Skeleton matches final layout"
+      - "Transition to loaded state is smooth"
+    test_type: "component"
+    priority: "P1"
+
+  # AC-18: Error State
+  - id: "AC-18"
+    title: "Error State - API Failure"
+    given: "API call fails (500 error)"
+    when: "fetching LP detail"
+    then:
+      - "Error boundary catches error"
+      - "Error message displays"
+      - "Retry button available"
+      - "Support contact info shown"
+    test_type: "e2e"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  lp_detail_service:
+    - name: "getLPDetail returns LP with joined fields"
+      setup: "Mock successful API response"
+      expected: "Returns LPDetailView with product, warehouse, location"
+
+    - name: "getLPDetail returns null for not found"
+      setup: "Mock 404 response"
+      expected: "Returns null"
+
+    - name: "blockLP validates reason is provided"
+      setup: "Call with empty reason"
+      expected: "Throws validation error"
+
+    - name: "blockLP validates reason length"
+      setup: "Call with 600 char reason"
+      expected: "Throws 'Reason must be 500 characters or less'"
+
+    - name: "blockLP returns updated LP"
+      setup: "Mock successful block response"
+      expected: "Returns LP with status='blocked'"
+
+    - name: "unblockLP returns updated LP"
+      setup: "Mock successful unblock response"
+      expected: "Returns LP with status='available'"
+
+  expiry_calculation:
+    - name: "calculates days remaining correctly"
+      setup: "Expiry date 30 days in future"
+      expected: "Returns 30"
+
+    - name: "returns negative for expired"
+      setup: "Expiry date 5 days ago"
+      expected: "Returns -5"
+
+    - name: "returns null for no expiry"
+      setup: "expiry_date is null"
+      expected: "Returns null"
+
+  badge_colors:
+    - name: "returns correct status badge colors"
+      test_cases:
+        - { status: "available", expected: "green" }
+        - { status: "reserved", expected: "yellow" }
+        - { status: "consumed", expected: "gray" }
+        - { status: "blocked", expected: "red" }
+
+    - name: "returns correct QA badge colors"
+      test_cases:
+        - { qaStatus: "pending", expected: "yellow" }
+        - { qaStatus: "passed", expected: "green" }
+        - { qaStatus: "failed", expected: "red" }
+        - { qaStatus: "quarantine", expected: "orange" }
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /license-plates/:id returns LP detail"
+      setup: "Create LP with all fields"
+      action: "GET /api/warehouse/license-plates/:id"
+      expected:
+        - "Status 200"
+        - "All LP fields returned"
+        - "Product joined correctly"
+        - "Warehouse joined correctly"
+        - "Location joined correctly"
+        - "Response time <200ms"
+
+    - name: "GET /license-plates/:id returns 404 for invalid ID"
+      setup: "Use non-existent UUID"
+      action: "GET /api/warehouse/license-plates/:invalid"
+      expected:
+        - "Status 404"
+        - "Error message 'License Plate not found'"
+
+    - name: "GET /license-plates/:id/transactions returns paginated history"
+      setup: "Create LP with 5 transactions"
+      action: "GET /api/warehouse/license-plates/:id/transactions?page=1&limit=10"
+      expected:
+        - "Status 200"
+        - "Returns transactions array"
+        - "Pagination metadata correct"
+
+    - name: "PUT /license-plates/:id/block blocks LP"
+      setup: "Create LP with status='available'"
+      action: "PUT /api/warehouse/license-plates/:id/block with reason"
+      expected:
+        - "Status 200"
+        - "LP status is 'blocked'"
+        - "Transaction logged"
+
+    - name: "PUT /license-plates/:id/block fails without reason"
+      setup: "Create LP"
+      action: "PUT /api/warehouse/license-plates/:id/block without reason"
+      expected:
+        - "Status 400"
+        - "Error 'Reason is required'"
+
+    - name: "PUT /license-plates/:id/block fails for non-available LP"
+      setup: "Create LP with status='blocked'"
+      action: "PUT /api/warehouse/license-plates/:id/block"
+      expected:
+        - "Status 400"
+        - "Error 'LP cannot be blocked (current status: blocked)'"
+
+    - name: "PUT /license-plates/:id/unblock unblocks LP"
+      setup: "Create LP with status='blocked'"
+      action: "PUT /api/warehouse/license-plates/:id/unblock"
+      expected:
+        - "Status 200"
+        - "LP status is 'available'"
+        - "Transaction logged"
+
+  rls_isolation:
+    - name: "User can only view own org LPs"
+      setup: "Create LPs in Org A and Org B"
+      action: "User A requests Org B LP"
+      expected: "Returns 404 (not 403)"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "View LP detail page loads all sections"
+    steps:
+      - "Navigate to /warehouse/license-plates"
+      - "Click on LP row"
+      - "Verify detail page loads"
+      - "Verify all sections display"
+      - "Verify status badges correct colors"
+    assertions:
+      - "Page title shows LP number"
+      - "Breadcrumb displays correctly"
+      - "All overview cards render"
+
+  - name: "Tab navigation works"
+    steps:
+      - "Load LP detail page"
+      - "Click Genealogy tab"
+      - "Verify genealogy content loads"
+      - "Click History tab"
+      - "Verify placeholder displays"
+      - "Click Overview tab"
+      - "Verify overview content"
+    assertions:
+      - "Tab switching is smooth (<100ms)"
+      - "Content changes per tab"
+      - "Active tab indicator updates"
+
+  - name: "Block LP flow complete"
+    steps:
+      - "Load LP detail page (available status)"
+      - "Click Block button"
+      - "Verify modal opens"
+      - "Enter reason 'Quality issue'"
+      - "Click Block LP button"
+      - "Wait for API response"
+    assertions:
+      - "Modal closes"
+      - "Status badge changes to red 'Blocked'"
+      - "Success toast displays"
+      - "Block button changes to Unblock"
+
+  - name: "Unblock LP flow complete"
+    steps:
+      - "Load LP detail page (blocked status)"
+      - "Click Unblock button"
+      - "Verify modal shows original reason"
+      - "Click Unblock LP button"
+    assertions:
+      - "Status badge changes to green 'Available'"
+      - "Success toast displays"
+
+  - name: "Reference links navigate correctly"
+    steps:
+      - "Load LP with WO reference"
+      - "Click WO link in references"
+    assertions:
+      - "Navigates to /production/work-orders/:id"
+      - "Back button returns to LP detail"
+
+  - name: "Empty state handling"
+    steps:
+      - "Create new LP without history"
+      - "Load detail page"
+      - "Navigate to Genealogy tab"
+    assertions:
+      - "Empty state message displays"
+      - "No errors in console"
+
+  - name: "404 page for invalid LP"
+    steps:
+      - "Navigate to /warehouse/license-plates/invalid-uuid"
+    assertions:
+      - "404 page displays"
+      - "Go Back button works"
+
+# Component Test Cases
+component_tests:
+  LPStatusBadge:
+    - name: "renders available badge with green"
+      props: { status: "available" }
+      assertions:
+        - "Has bg-green-100 class"
+        - "Has text-green-800 class"
+        - "Shows 'Available' text"
+
+    - name: "renders blocked badge with red"
+      props: { status: "blocked" }
+      assertions:
+        - "Has bg-red-100 class"
+        - "Has text-red-800 class"
+        - "Shows 'Blocked' text"
+
+  LPExpiryIndicator:
+    - name: "shows EXPIRED badge for past date"
+      props: { expiryDate: "2024-01-01" }
+      assertions:
+        - "Shows red EXPIRED badge"
+
+    - name: "shows warning for 7 days"
+      props: { expiryDate: "(7 days from now)" }
+      assertions:
+        - "Shows red text"
+        - "Shows warning icon"
+
+    - name: "shows N/A for null"
+      props: { expiryDate: null }
+      assertions:
+        - "Shows gray N/A text"
+
+  LPBlockModal:
+    - name: "requires reason input"
+      actions:
+        - "Open modal"
+        - "Leave reason empty"
+        - "Click Block LP"
+      assertions:
+        - "Shows validation error"
+        - "API not called"
+
+    - name: "submits with valid reason"
+      actions:
+        - "Enter reason"
+        - "Click Block LP"
+      assertions:
+        - "API called with reason"
+        - "Modal closes on success"
+
+# Definition of Done
+definition_of_done:
+  - "All AC tests passing"
+  - "Unit test coverage >= 80%"
+  - "Integration tests passing for all endpoints"
+  - "E2E tests passing for critical flows"
+  - "Component tests passing"
+  - "No TypeScript errors"
+  - "No console errors in browser"
+  - "Performance targets met (<500ms load)"
+  - "Accessibility tests passing"
+  - "RLS isolation verified"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Frontend-heavy story with business logic in service"
+  integration:
+    target: 90
+    reason: "API endpoints critical for page functionality"
+  e2e:
+    target: 100
+    reason: "All user flows must be tested"
+    critical_flows:
+      - "View LP detail"
+      - "Block LP"
+      - "Unblock LP"
+      - "Tab navigation"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Genealogy integration depends on 05.2"
+    mitigation: "Mock genealogy component if 05.2 delayed"
+    severity: "medium"
+
+  - id: "RISK-02"
+    description: "Performance with large genealogy trees"
+    mitigation: "Lazy load genealogy tab"
+    severity: "low"
+
+  - id: "RISK-03"
+    description: "Cross-tenant data leakage"
+    mitigation: "Comprehensive RLS tests, return 404 not 403"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"

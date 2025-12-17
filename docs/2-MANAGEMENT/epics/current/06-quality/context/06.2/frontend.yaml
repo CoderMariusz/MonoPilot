@@ -1,0 +1,144 @@
+# Story 06.2 - Frontend Specification
+# Purpose: Pages, components, services, validation, UX
+# Agent: FRONTEND-DEV
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/quality/holds/page.tsx"
+    description: "Holds list page with filters, KPIs, table"
+    wireframe: "docs/3-ARCHITECTURE/ux/wireframes/QA-002-holds-list.md"
+    components:
+      - "HoldStats"
+      - "HoldFilters"
+      - "HoldTable"
+      - "CreateHoldModal"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/[id]/page.tsx"
+    description: "Hold detail page with items and release workflow"
+    components:
+      - "HoldDetail"
+      - "HoldItemsTable"
+      - "ReleaseModal"
+      - "HoldStatusBadge"
+      - "HoldPriorityBadge"
+
+# Components
+components:
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldTable.tsx"
+    description: "Holds list table with aging indicators"
+    props:
+      - "holds: QualityHoldSummary[]"
+      - "onRelease: (id: string) => void"
+      - "onSelect: (ids: string[]) => void"
+    states: ["loading", "empty", "error", "success"]
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldForm.tsx"
+    description: "Create/edit hold form"
+    props:
+      - "onSubmit: (data: CreateHoldInput) => void"
+      - "isLoading: boolean"
+    validation: "createHoldSchema"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldItemsTable.tsx"
+    description: "Items table with reference links"
+    props:
+      - "items: QualityHoldItem[]"
+      - "holdStatus: HoldStatus"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/ReleaseModal.tsx"
+    description: "Release hold modal with disposition selector"
+    props:
+      - "hold: QualityHold"
+      - "onRelease: (data: ReleaseHoldInput) => void"
+      - "isOpen: boolean"
+      - "onClose: () => void"
+    validation: "releaseHoldSchema"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldStatusBadge.tsx"
+    description: "Status badge component (active/released/disposed)"
+    props:
+      - "status: HoldStatus"
+    colors:
+      active: "{ bg: '#FEE2E2', text: '#991B1B' }"
+      released: "{ bg: '#D1FAE5', text: '#065F46' }"
+      disposed: "{ bg: '#F3F4F6', text: '#1F2937' }"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldPriorityBadge.tsx"
+    description: "Priority badge component (critical/high/medium/low)"
+    props:
+      - "priority: HoldPriority"
+    colors:
+      critical: "{ bg: '#FEE2E2', text: '#991B1B' }"
+      high: "{ bg: '#FED7AA', text: '#9A3412' }"
+      medium: "{ bg: '#FEF3C7', text: '#92400E' }"
+      low: "{ bg: '#DBEAFE', text: '#1E40AF' }"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/AgingIndicator.tsx"
+    description: "Aging warning/critical icons with tooltips"
+    props:
+      - "heldAt: string"
+      - "priority: HoldPriority"
+    thresholds:
+      critical: "24h -> warning at 12h, critical at 24h"
+      high: "48h -> warning at 24h, critical at 48h"
+      medium: "72h -> warning at 48h, critical at 72h"
+      low: "168h -> warning at 96h, critical at 168h"
+
+  - path: "apps/frontend/app/(authenticated)/quality/holds/components/HoldStats.tsx"
+    description: "Stats cards for dashboard (4 cards)"
+    props:
+      - "stats: HoldStatsResponse"
+    cards:
+      - "Active Holds (count + % critical)"
+      - "Released Today"
+      - "Critical Priority"
+      - "Avg Hold Time (days)"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/quality-hold-validation.ts"
+    schemas:
+      - name: "createHoldSchema"
+        fields:
+          reason: "z.string().min(10).max(500)"
+          hold_type: "z.enum(['qa_pending', 'investigation', 'recall', 'quarantine'])"
+          priority: "z.enum(['low', 'medium', 'high', 'critical']).default('medium')"
+          items: "z.array(...).min(1, 'At least one item must be added')"
+      - name: "releaseHoldSchema"
+        fields:
+          disposition: "z.enum(['release', 'rework', 'scrap', 'return'])"
+          release_notes: "z.string().min(10).max(1000)"
+
+# UX References
+ux:
+  wireframes:
+    - id: "QA-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/QA-002-holds-list.md"
+      description: "Holds list with 4 KPI cards, filters, table, create/release modals"
+      components: ["HoldStats", "HoldFilters", "HoldTable", "CreateHoldModal", "ReleaseModal"]
+  states:
+    - "loading: Skeleton cards + skeleton table"
+    - "empty: Empty state with create CTA"
+    - "error: Error message with retry"
+    - "success: Full data display"
+    - "filtered_empty: No results with clear filters CTA"
+  patterns:
+    table: "ShadCN DataTable with pagination"
+    modal: "ShadCN Dialog with form"
+    badge: "ShadCN Badge with custom colors"
+    toast: "ShadCN Toast for success/error"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-quality-holds.ts"
+    exports:
+      - name: "useQualityHolds"
+        description: "React Query hook for holds list with filters"
+      - name: "useQualityHold"
+        description: "React Query hook for single hold detail"
+      - name: "useQualityHoldStats"
+        description: "React Query hook for dashboard stats"
+      - name: "useCreateHold"
+        description: "React Query mutation for creating hold"
+      - name: "useReleaseHold"
+        description: "React Query mutation for releasing hold"

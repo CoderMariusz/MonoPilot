@@ -1,0 +1,677 @@
+# Story 02.10a - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET Traceability Config
+  - method: "GET"
+    path: "/api/v1/technical/products/:id/traceability-config"
+    description: "Get traceability configuration for a product"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/traceability-config/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with technical.R permission
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id:
+          type: "UUID"
+          required: true
+          description: "Product ID"
+
+    response:
+      status: 200
+      type: "TraceabilityConfig"
+      schema:
+        id: "UUID"
+        org_id: "UUID"
+        product_id: "UUID"
+        lot_number_format: "string"
+        lot_number_prefix: "string"
+        lot_number_sequence_length: "number (4-10)"
+        traceability_level: "'lot' | 'batch' | 'serial'"
+        standard_batch_size: "number | null"
+        min_batch_size: "number | null"
+        max_batch_size: "number | null"
+        expiry_calculation_method: "'fixed_days' | 'rolling' | 'manual'"
+        processing_buffer_days: "number"
+        gs1_lot_encoding_enabled: "boolean"
+        gs1_expiry_encoding_enabled: "boolean"
+        gs1_sscc_enabled: "boolean"
+        created_at: "ISO8601 datetime"
+        updated_at: "ISO8601 datetime"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Forbidden"
+        when: "User lacks technical.R permission"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+        when: "Product doesn't exist or belongs to different org"
+      - status: 404
+        code: "CONFIG_NOT_FOUND"
+        message: "Traceability configuration not found"
+        when: "No config exists for this product (return default values instead)"
+
+  # PUT Traceability Config
+  - method: "PUT"
+    path: "/api/v1/technical/products/:id/traceability-config"
+    description: "Create or update traceability configuration for a product"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/traceability-config/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]  # technical.U permission
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      params:
+        id:
+          type: "UUID"
+          required: true
+          description: "Product ID"
+      body:
+        lot_number_format:
+          type: "string"
+          required: false
+          default: "LOT-{YYYY}-{SEQ:6}"
+          validation: "5-50 chars, uppercase, numbers, hyphens, valid placeholders"
+        lot_number_prefix:
+          type: "string"
+          required: false
+          default: "LOT-"
+          validation: "1-20 chars"
+        lot_number_sequence_length:
+          type: "number"
+          required: false
+          default: 6
+          validation: "Integer 4-10"
+        traceability_level:
+          type: "string"
+          required: false
+          default: "lot"
+          validation: "One of: lot, batch, serial"
+        standard_batch_size:
+          type: "number"
+          required: false
+          validation: "Positive number or null"
+        min_batch_size:
+          type: "number"
+          required: false
+          validation: "Positive number or null, <= max if both set"
+        max_batch_size:
+          type: "number"
+          required: false
+          validation: "Positive number or null, >= min if both set"
+        expiry_calculation_method:
+          type: "string"
+          required: false
+          default: "fixed_days"
+          validation: "One of: fixed_days, rolling, manual"
+        processing_buffer_days:
+          type: "number"
+          required: false
+          default: 0
+          validation: "Integer 0-365"
+        gs1_lot_encoding_enabled:
+          type: "boolean"
+          required: false
+          default: true
+        gs1_expiry_encoding_enabled:
+          type: "boolean"
+          required: false
+          default: true
+        gs1_sscc_enabled:
+          type: "boolean"
+          required: false
+          default: false
+
+    response:
+      status: 200
+      type: "TraceabilityConfig"
+      description: "Returns the updated configuration"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        when: "Invalid input data"
+        details:
+          - "Invalid lot format placeholder (e.g., {INVALID})"
+          - "min_batch_size > max_batch_size"
+          - "standard_batch_size outside min/max range"
+          - "Invalid traceability_level value"
+          - "Invalid expiry_calculation_method value"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Forbidden"
+        when: "User lacks technical.U permission"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/traceability-config-service.ts"
+    description: "Product traceability configuration service"
+    exports:
+      - name: "getProductTraceabilityConfig"
+        type: "async function"
+        params:
+          - "productId: string"
+        returns: "Promise<TraceabilityConfig | null>"
+        description: "Get traceability config for a product"
+
+      - name: "updateProductTraceabilityConfig"
+        type: "async function"
+        params:
+          - "productId: string"
+          - "config: TraceabilityConfigInput"
+        returns: "Promise<TraceabilityConfig>"
+        description: "Create or update traceability config"
+
+      - name: "validateLotFormat"
+        type: "function"
+        params:
+          - "format: string"
+        returns: "{ valid: boolean; errors: string[] }"
+        description: "Validate lot number format for correct placeholders"
+
+      - name: "parseLotFormat"
+        type: "function"
+        params:
+          - "format: string"
+        returns: "LotFormatParts"
+        description: "Parse lot format into component parts"
+
+      - name: "generateSampleLotNumber"
+        type: "function"
+        params:
+          - "format: string"
+          - "productCode?: string"
+          - "lineCode?: string"
+        returns: "string"
+        description: "Generate sample lot number from format"
+
+  - path: "apps/frontend/lib/services/gs1-service.ts"
+    description: "GS1 encoding and validation service"
+    exports:
+      - name: "encodeLotNumber"
+        type: "function"
+        params:
+          - "lotNumber: string"
+        returns: "string"
+        description: "Encode lot number as GS1-128 AI 10"
+
+      - name: "encodeExpiryDate"
+        type: "function"
+        params:
+          - "expiryDate: Date"
+        returns: "string"
+        description: "Encode expiry date as GS1-128 AI 17 (YYMMDD)"
+
+      - name: "encodeSSCC"
+        type: "function"
+        params:
+          - "extensionDigit: string"
+          - "companyPrefix: string"
+          - "serialReference: string"
+        returns: "string"
+        description: "Generate SSCC-18 code"
+
+      - name: "generateGS1128Barcode"
+        type: "function"
+        params:
+          - "data: GS1Data"
+        returns: "string"
+        description: "Generate full GS1-128 barcode string"
+
+      - name: "validateGTIN14"
+        type: "function"
+        params:
+          - "gtin: string"
+        returns: "{ valid: boolean; error?: string }"
+        description: "Validate GTIN-14 including check digit"
+
+      - name: "calculateCheckDigit"
+        type: "function"
+        params:
+          - "gtinWithoutCheck: string"
+        returns: "number"
+        description: "Calculate check digit using Modulo 10"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/traceability.ts"
+    description: "Traceability TypeScript interfaces"
+    content: |
+      export interface TraceabilityConfig {
+        id: string;
+        org_id: string;
+        product_id: string;
+        lot_number_format: string;
+        lot_number_prefix: string;
+        lot_number_sequence_length: number;
+        traceability_level: 'lot' | 'batch' | 'serial';
+        standard_batch_size: number | null;
+        min_batch_size: number | null;
+        max_batch_size: number | null;
+        expiry_calculation_method: 'fixed_days' | 'rolling' | 'manual';
+        processing_buffer_days: number;
+        gs1_lot_encoding_enabled: boolean;
+        gs1_expiry_encoding_enabled: boolean;
+        gs1_sscc_enabled: boolean;
+        created_at: string;
+        updated_at: string;
+        created_by?: string;
+        updated_by?: string;
+      }
+
+      export interface TraceabilityConfigInput {
+        lot_number_format?: string;
+        lot_number_prefix?: string;
+        lot_number_sequence_length?: number;
+        traceability_level?: 'lot' | 'batch' | 'serial';
+        standard_batch_size?: number | null;
+        min_batch_size?: number | null;
+        max_batch_size?: number | null;
+        expiry_calculation_method?: 'fixed_days' | 'rolling' | 'manual';
+        processing_buffer_days?: number;
+        gs1_lot_encoding_enabled?: boolean;
+        gs1_expiry_encoding_enabled?: boolean;
+        gs1_sscc_enabled?: boolean;
+      }
+
+      export interface LotFormatParts {
+        prefix: string;
+        placeholders: LotFormatPlaceholder[];
+        separators: string[];
+      }
+
+      export interface LotFormatPlaceholder {
+        type: 'YYYY' | 'YY' | 'MM' | 'DD' | 'SEQ' | 'JULIAN' | 'PROD' | 'LINE';
+        length?: number;  // For SEQ:N
+        position: number;
+      }
+
+      export interface GS1Data {
+        gtin?: string;
+        lotNumber?: string;
+        expiryDate?: Date;
+        sscc?: string;
+        serialNumber?: string;
+        quantity?: number;
+      }
+
+      export type TraceabilityLevel = 'lot' | 'batch' | 'serial';
+      export type ExpiryCalculationMethod = 'fixed_days' | 'rolling' | 'manual';
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/v1/technical/products/[id]/traceability-config/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextRequest, NextResponse } from 'next/server';
+    import { traceabilityConfigSchema } from '@/lib/validation/traceability';
+
+    export async function GET(
+      request: NextRequest,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Verify auth and get org context
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Check permission (technical.R)
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id, role:roles(permissions)')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.role?.permissions?.technical?.includes('R')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      // Verify product exists and belongs to user's org
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('id', params.id)
+        .eq('org_id', userData.org_id)
+        .single();
+
+      if (productError || !product) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+      }
+
+      // Get traceability config (or return defaults)
+      const { data: config, error: configError } = await supabase
+        .from('product_traceability_config')
+        .select('*')
+        .eq('product_id', params.id)
+        .single();
+
+      if (configError && configError.code !== 'PGRST116') {
+        return NextResponse.json({ error: configError.message }, { status: 500 });
+      }
+
+      // Return config or default values
+      if (!config) {
+        return NextResponse.json({
+          product_id: params.id,
+          lot_number_format: 'LOT-{YYYY}-{SEQ:6}',
+          lot_number_prefix: 'LOT-',
+          lot_number_sequence_length: 6,
+          traceability_level: 'lot',
+          standard_batch_size: null,
+          min_batch_size: null,
+          max_batch_size: null,
+          expiry_calculation_method: 'fixed_days',
+          processing_buffer_days: 0,
+          gs1_lot_encoding_enabled: true,
+          gs1_expiry_encoding_enabled: true,
+          gs1_sscc_enabled: false,
+          _isDefault: true,  // Flag to indicate defaults
+        });
+      }
+
+      return NextResponse.json(config);
+    }
+
+    export async function PUT(
+      request: NextRequest,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Auth and permission checks (technical.U)
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id, role:roles(permissions)')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.role?.permissions?.technical?.includes('U')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      // Parse and validate body
+      const body = await request.json();
+      const validation = traceabilityConfigSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json({
+          error: 'Validation failed',
+          details: validation.error.errors
+        }, { status: 400 });
+      }
+
+      // Verify product exists
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('id', params.id)
+        .eq('org_id', userData.org_id)
+        .single();
+
+      if (productError || !product) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+      }
+
+      // Upsert config
+      const { data: config, error: upsertError } = await supabase
+        .from('product_traceability_config')
+        .upsert({
+          product_id: params.id,
+          org_id: userData.org_id,
+          ...validation.data,
+          updated_by: user.id,
+        }, { onConflict: 'product_id' })
+        .select()
+        .single();
+
+      if (upsertError) {
+        return NextResponse.json({ error: upsertError.message }, { status: 500 });
+      }
+
+      return NextResponse.json(config);
+    }
+
+  gs1_service: |
+    // apps/frontend/lib/services/gs1-service.ts
+
+    /**
+     * GS1-128 Application Identifiers
+     * AI 10: Batch/Lot Number (max 20 chars)
+     * AI 17: Use By/Expiry Date (YYMMDD)
+     * AI 00: SSCC-18 (18 digits)
+     * AI 01: GTIN (14 digits)
+     */
+
+    const FNC1 = '\u001d';  // Function 1 symbol separator
+
+    export function encodeLotNumber(lotNumber: string): string {
+      if (lotNumber.length > 20) {
+        console.warn('Lot number exceeds GS1-128 AI 10 max length of 20 chars');
+      }
+      return `(10)${lotNumber}`;
+    }
+
+    export function encodeExpiryDate(expiryDate: Date): string {
+      const yy = String(expiryDate.getFullYear()).slice(-2);
+      const mm = String(expiryDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(expiryDate.getDate()).padStart(2, '0');
+      return `(17)${yy}${mm}${dd}`;
+    }
+
+    export function encodeSSCC(
+      extensionDigit: string,
+      companyPrefix: string,
+      serialReference: string
+    ): string {
+      const base = extensionDigit + companyPrefix + serialReference;
+      const checkDigit = calculateCheckDigit(base.padEnd(17, '0'));
+      return `(00)${base}${checkDigit}`;
+    }
+
+    export function generateGS1128Barcode(data: GS1Data): string {
+      const parts: string[] = [];
+
+      if (data.gtin) {
+        parts.push(`(01)${data.gtin}`);
+      }
+      if (data.lotNumber) {
+        parts.push(encodeLotNumber(data.lotNumber));
+      }
+      if (data.expiryDate) {
+        parts.push(encodeExpiryDate(data.expiryDate));
+      }
+      if (data.sscc) {
+        parts.push(`(00)${data.sscc}`);
+      }
+
+      return parts.join(FNC1);
+    }
+
+    export function validateGTIN14(gtin: string): { valid: boolean; error?: string } {
+      // Remove any non-digit characters
+      const digits = gtin.replace(/\D/g, '');
+
+      if (digits.length !== 14) {
+        return { valid: false, error: 'GTIN-14 must be exactly 14 digits' };
+      }
+
+      const checkDigit = parseInt(digits[13], 10);
+      const calculatedCheck = calculateCheckDigit(digits.slice(0, 13));
+
+      if (checkDigit !== calculatedCheck) {
+        return {
+          valid: false,
+          error: `Invalid check digit. Expected ${calculatedCheck}, got ${checkDigit}`
+        };
+      }
+
+      return { valid: true };
+    }
+
+    export function calculateCheckDigit(gtinWithoutCheck: string): number {
+      // Modulo 10 algorithm (GS1 standard)
+      const digits = gtinWithoutCheck.replace(/\D/g, '');
+      let sum = 0;
+
+      for (let i = 0; i < digits.length; i++) {
+        const digit = parseInt(digits[i], 10);
+        // Weight alternates: 3, 1, 3, 1... (from right to left)
+        const weight = (digits.length - i) % 2 === 0 ? 3 : 1;
+        sum += digit * weight;
+      }
+
+      return (10 - (sum % 10)) % 10;
+    }
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/traceability.ts"
+    description: "Zod schemas for traceability configuration"
+    content: |
+      import { z } from 'zod';
+
+      // Valid lot format placeholders
+      const LOT_PLACEHOLDERS = ['{YYYY}', '{YY}', '{MM}', '{DD}', '{JULIAN}', '{PROD}', '{LINE}'];
+      const LOT_SEQ_PATTERN = /\{SEQ:\d+\}/;
+
+      // Lot format validator
+      const lotFormatValidator = (format: string) => {
+        // Check for at least one valid placeholder
+        const hasPlaceholder = LOT_PLACEHOLDERS.some(p => format.includes(p)) ||
+                              LOT_SEQ_PATTERN.test(format);
+        if (!hasPlaceholder) {
+          return false;
+        }
+
+        // Check for invalid placeholders
+        const placeholderPattern = /\{([^}]+)\}/g;
+        let match;
+        while ((match = placeholderPattern.exec(format)) !== null) {
+          const placeholder = `{${match[1]}}`;
+          const isValid = LOT_PLACEHOLDERS.includes(placeholder) ||
+                          /^\{SEQ:\d+\}$/.test(placeholder);
+          if (!isValid) {
+            return false;
+          }
+        }
+
+        return true;
+      };
+
+      export const traceabilityConfigSchema = z.object({
+        lot_number_format: z.string()
+          .min(5, 'Lot format must be at least 5 characters')
+          .max(50, 'Lot format cannot exceed 50 characters')
+          .refine(lotFormatValidator, {
+            message: 'Invalid lot format. Use uppercase, numbers, hyphens, and valid placeholders like {YYYY}, {SEQ:6}'
+          })
+          .optional(),
+
+        lot_number_prefix: z.string()
+          .min(1, 'Prefix must be at least 1 character')
+          .max(20, 'Prefix cannot exceed 20 characters')
+          .optional(),
+
+        lot_number_sequence_length: z.number()
+          .int('Sequence length must be an integer')
+          .min(4, 'Sequence length must be at least 4')
+          .max(10, 'Sequence length cannot exceed 10')
+          .optional(),
+
+        traceability_level: z.enum(['lot', 'batch', 'serial'])
+          .optional(),
+
+        standard_batch_size: z.number()
+          .positive('Standard batch size must be positive')
+          .nullable()
+          .optional(),
+
+        min_batch_size: z.number()
+          .positive('Minimum batch size must be positive')
+          .nullable()
+          .optional(),
+
+        max_batch_size: z.number()
+          .positive('Maximum batch size must be positive')
+          .nullable()
+          .optional(),
+
+        expiry_calculation_method: z.enum(['fixed_days', 'rolling', 'manual'])
+          .optional(),
+
+        processing_buffer_days: z.number()
+          .int('Buffer days must be an integer')
+          .min(0, 'Buffer days cannot be negative')
+          .max(365, 'Buffer days cannot exceed 365')
+          .optional()
+          .default(0),
+
+        gs1_lot_encoding_enabled: z.boolean().optional().default(true),
+        gs1_expiry_encoding_enabled: z.boolean().optional().default(true),
+        gs1_sscc_enabled: z.boolean().optional().default(false),
+
+      }).refine(data => {
+        // Validate min <= max
+        if (data.min_batch_size != null && data.max_batch_size != null) {
+          return data.min_batch_size <= data.max_batch_size;
+        }
+        return true;
+      }, {
+        message: 'Minimum batch size cannot exceed maximum batch size',
+        path: ['min_batch_size'],
+      }).refine(data => {
+        // Validate standard >= min
+        if (data.standard_batch_size != null && data.min_batch_size != null) {
+          return data.standard_batch_size >= data.min_batch_size;
+        }
+        return true;
+      }, {
+        message: 'Standard batch size must be at least the minimum',
+        path: ['standard_batch_size'],
+      }).refine(data => {
+        // Validate standard <= max
+        if (data.standard_batch_size != null && data.max_batch_size != null) {
+          return data.standard_batch_size <= data.max_batch_size;
+        }
+        return true;
+      }, {
+        message: 'Standard batch size cannot exceed maximum',
+        path: ['standard_batch_size'],
+      }).refine(data => {
+        // Validate rolling requires buffer days
+        if (data.expiry_calculation_method === 'rolling') {
+          return data.processing_buffer_days != null && data.processing_buffer_days >= 0;
+        }
+        return true;
+      }, {
+        message: 'Processing buffer days required for rolling expiry method',
+        path: ['processing_buffer_days'],
+      });
+
+      export type TraceabilityConfigInput = z.infer<typeof traceabilityConfigSchema>;

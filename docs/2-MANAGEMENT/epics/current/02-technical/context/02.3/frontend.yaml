@@ -1,0 +1,402 @@
+# Story 02.3 - Frontend Specification
+# Purpose: Pages, components, hooks, services
+# Agent: FRONTEND-DEV
+
+# Page structure
+pages:
+  - path: "apps/frontend/app/(authenticated)/technical/products/[id]/page.tsx"
+    description: "Product detail page with Allergens tab"
+    note: "Extend existing page, add Allergens tab"
+    tabs:
+      - "Basic Info"
+      - "Allergens"  # NEW - this story
+      - "Nutrition"
+      - "BOM"
+      - "History"
+
+# Components to create
+components:
+  - path: "apps/frontend/components/technical/allergens/ProductAllergenSection.tsx"
+    description: "Main allergen management section for product detail"
+    wireframe: "TEC-010"
+    props:
+      productId: "string"
+      productType: "string (raw|wip|finished)"
+    features:
+      - "Contains allergen list"
+      - "May Contain allergen list"
+      - "Add allergen button"
+      - "Inheritance banner (for products with BOM)"
+      - "Recalculate button"
+      - "Empty state for raw materials"
+
+  - path: "apps/frontend/components/technical/allergens/AllergenList.tsx"
+    description: "List of declared allergens with actions"
+    wireframe: "TEC-010"
+    props:
+      allergens: "ProductAllergen[]"
+      relationType: "contains | may_contain"
+      onRemove: "(id: string) => void"
+      readOnly: "boolean"
+    features:
+      - "Allergen icon + name display"
+      - "Source badge (AUTO/MANUAL)"
+      - "Reason display (for may_contain)"
+      - "Source products (for auto-inherited)"
+      - "Remove action"
+
+  - path: "apps/frontend/components/technical/allergens/AddAllergenModal.tsx"
+    description: "Modal for adding allergen declaration"
+    wireframe: "TEC-010"
+    props:
+      productId: "string"
+      existingAllergens: "ProductAllergen[]"
+      onSuccess: "() => void"
+      onCancel: "() => void"
+    features:
+      - "Allergen dropdown (EU 14 + custom)"
+      - "Relation type selector (Contains/May Contain)"
+      - "Reason field (required for May Contain)"
+      - "Validation feedback"
+      - "Submit button"
+
+  - path: "apps/frontend/components/technical/allergens/AllergenBadge.tsx"
+    description: "Badge component for displaying allergen in lists"
+    props:
+      allergen: "Allergen"
+      relationType: "contains | may_contain"
+      source: "auto | manual"
+      showIcon: "boolean"
+      size: "sm | md | lg"
+    features:
+      - "Color-coded by relation type (red=contains, orange=may_contain)"
+      - "Icon from allergen master data"
+      - "Source indicator (AUTO/MANUAL)"
+
+  - path: "apps/frontend/components/technical/allergens/InheritanceBanner.tsx"
+    description: "Banner showing BOM allergen inheritance status"
+    wireframe: "TEC-010"
+    props:
+      status: "InheritanceStatus"
+      onRecalculate: "() => void"
+      loading: "boolean"
+    features:
+      - "Last calculated timestamp"
+      - "BOM version reference"
+      - "Ingredients count"
+      - "Needs recalculation warning"
+      - "Recalculate button"
+
+  - path: "apps/frontend/components/technical/allergens/AllergenIcon.tsx"
+    description: "Allergen icon component with fallback"
+    props:
+      code: "string (A01-A14)"
+      iconUrl: "string | null"
+      size: "number (pixels)"
+      className: "string"
+    features:
+      - "Display icon from URL"
+      - "Fallback to emoji mapping"
+      - "Accessible alt text"
+
+  - path: "apps/frontend/components/technical/products/ProductListAllergenBadges.tsx"
+    description: "Allergen badges for product list rows"
+    wireframe: "TEC-001"
+    props:
+      productId: "string"
+      allergenCount: "number"
+      hasContains: "boolean"
+      hasMayContain: "boolean"
+    features:
+      - "Badge with allergen count"
+      - "Red badge for contains"
+      - "Orange badge for may_contain"
+      - "Tooltip with allergen names"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/product-allergen-service.ts"
+    description: "Product allergen operations"
+    methods:
+      - name: "getProductAllergens"
+        description: "Fetch all allergens for a product"
+        returns: "Promise<ProductAllergensResponse>"
+      - name: "addProductAllergen"
+        description: "Add allergen declaration"
+        returns: "Promise<ProductAllergen>"
+      - name: "removeProductAllergen"
+        description: "Remove allergen declaration"
+        returns: "Promise<void>"
+      - name: "recalculateAllergens"
+        description: "Trigger BOM inheritance recalculation"
+        returns: "Promise<RecalculateAllergensResponse>"
+
+  - path: "apps/frontend/lib/services/allergen-service.ts"
+    description: "Allergen master data service"
+    note: "May exist from 01.12 - extend if needed"
+    methods:
+      - name: "getAllergens"
+        description: "Fetch all allergens (EU 14)"
+        returns: "Promise<AllergensListResponse>"
+      - name: "getAllergensForSelect"
+        description: "Fetch allergens formatted for dropdown"
+        returns: "Promise<AllergenSelectOption[]>"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-product-allergens.ts"
+    description: "React Query hook for product allergens"
+    exports:
+      - name: "useProductAllergens"
+        params: ["productId: string"]
+        returns: "UseQueryResult<ProductAllergensResponse>"
+      - name: "useAddProductAllergen"
+        returns: "UseMutationResult<ProductAllergen, Error, AddProductAllergenRequest>"
+      - name: "useRemoveProductAllergen"
+        returns: "UseMutationResult<void, Error, { productId: string; allergenId: string }>"
+      - name: "useRecalculateAllergens"
+        returns: "UseMutationResult<RecalculateAllergensResponse, Error, string>"
+
+  - path: "apps/frontend/lib/hooks/use-allergens.ts"
+    description: "React Query hook for allergen master data"
+    note: "May exist from 01.12"
+    exports:
+      - name: "useAllergens"
+        returns: "UseQueryResult<AllergensListResponse>"
+      - name: "useAllergensSelect"
+        params: ["lang?: string"]
+        returns: "UseQueryResult<AllergenSelectOption[]>"
+
+# UI Patterns
+ui_patterns:
+  section_layout: |
+    // ProductAllergenSection.tsx structure
+    <div className="space-y-6">
+      {/* Inheritance Banner - only for products with BOM */}
+      {hasBom && <InheritanceBanner status={inheritanceStatus} onRecalculate={handleRecalculate} />}
+
+      {/* Contains Section */}
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Contains (Present in Product)</h3>
+          <Button onClick={() => setShowAddModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Allergen
+          </Button>
+        </div>
+        <AllergenList
+          allergens={containsAllergens}
+          relationType="contains"
+          onRemove={handleRemove}
+          readOnly={!canEdit}
+        />
+      </div>
+
+      {/* May Contain Section */}
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">May Contain (Cross-Contamination Risk)</h3>
+          <Button variant="outline" onClick={() => setShowAddModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Allergen
+          </Button>
+        </div>
+        <AllergenList
+          allergens={mayContainAllergens}
+          relationType="may_contain"
+          onRemove={handleRemove}
+          readOnly={!canEdit}
+        />
+      </div>
+    </div>
+
+  allergen_dropdown: |
+    // Add Allergen Modal - Allergen selector
+    <Select
+      value={selectedAllergen}
+      onValueChange={setSelectedAllergen}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder="Select allergen" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectLabel>EU 14 Allergens</SelectLabel>
+          {allergens.map((allergen) => (
+            <SelectItem
+              key={allergen.id}
+              value={allergen.id}
+              disabled={existingAllergenIds.includes(allergen.id)}
+            >
+              <div className="flex items-center gap-2">
+                <AllergenIcon code={allergen.code} iconUrl={allergen.icon_url} size={16} />
+                <span>{allergen.code} - {allergen.name_en}</span>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+
+  relation_type_radio: |
+    // Relation type selector
+    <RadioGroup value={relationType} onValueChange={setRelationType}>
+      <div className="flex items-center space-x-2">
+        <RadioGroupItem value="contains" id="contains" />
+        <Label htmlFor="contains">Contains (Present in ingredients)</Label>
+      </div>
+      <div className="flex items-center space-x-2">
+        <RadioGroupItem value="may_contain" id="may_contain" />
+        <Label htmlFor="may_contain">May Contain (Cross-contamination risk)</Label>
+      </div>
+    </RadioGroup>
+
+    {/* Reason field - required for may_contain */}
+    {relationType === 'may_contain' && (
+      <div className="space-y-2">
+        <Label htmlFor="reason">
+          Reason <span className="text-red-500">*</span>
+        </Label>
+        <Textarea
+          id="reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Explain the cross-contamination source (min 10 chars)"
+          className={cn(errors.reason && "border-red-500")}
+        />
+        {errors.reason && (
+          <p className="text-sm text-red-500">{errors.reason.message}</p>
+        )}
+      </div>
+    )}
+
+  allergen_badge_colors: |
+    // Badge color scheme
+    const getBadgeVariant = (relationType: string, source: string) => {
+      if (relationType === 'contains') {
+        return 'destructive'; // Red
+      }
+      return 'warning'; // Orange for may_contain
+    };
+
+    const getSourceBadgeVariant = (source: string) => {
+      if (source === 'auto') {
+        return 'success'; // Green - AUTO
+      }
+      return 'secondary'; // Blue - MANUAL
+    };
+
+  empty_states: |
+    // Empty state for raw materials (no BOM)
+    <div className="text-center py-8">
+      <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+      <h3 className="text-lg font-semibold mb-2">No Allergens Auto-Detected</h3>
+      <p className="text-muted-foreground mb-4">
+        This product is a raw material with no BOM. Allergen auto-inheritance requires a Bill of Materials.
+      </p>
+      <Button onClick={() => setShowAddModal(true)}>
+        <Plus className="w-4 h-4 mr-2" />
+        Declare Allergen Manually
+      </Button>
+    </div>
+
+    // Empty state for products with no declarations
+    <div className="text-center py-8">
+      <CheckCircle2 className="w-12 h-12 mx-auto text-green-500 mb-4" />
+      <h3 className="text-lg font-semibold mb-2">No Allergens Declared</h3>
+      <p className="text-muted-foreground mb-4">
+        This product has no allergen declarations. Add allergens manually or recalculate from BOM.
+      </p>
+      <div className="flex justify-center gap-2">
+        <Button onClick={() => setShowAddModal(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Allergen
+        </Button>
+        {hasBom && (
+          <Button variant="outline" onClick={handleRecalculate}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Calculate from BOM
+          </Button>
+        )}
+      </div>
+    </div>
+
+# EU 14 Allergen Icon Mapping (Emoji Fallback)
+allergen_icons:
+  mapping:
+    A01: { emoji: "wheat", fallback: "wheat" }
+    A02: { emoji: "shrimp", fallback: "shrimp" }
+    A03: { emoji: "egg", fallback: "egg" }
+    A04: { emoji: "fish", fallback: "fish" }
+    A05: { emoji: "peanuts", fallback: "peanut" }
+    A06: { emoji: "beans", fallback: "soy" }
+    A07: { emoji: "milk_glass", fallback: "milk" }
+    A08: { emoji: "chestnut", fallback: "tree-nut" }
+    A09: { emoji: "herb", fallback: "celery" }
+    A10: { emoji: "yellow_circle", fallback: "mustard" }
+    A11: { emoji: "seedling", fallback: "sesame" }
+    A12: { emoji: "grapes", fallback: "sulfite" }
+    A13: { emoji: "pea_pod", fallback: "lupin" }
+    A14: { emoji: "shell", fallback: "mollusk" }
+
+# States
+states:
+  loading:
+    description: "Spinner while fetching allergen data"
+    message: "Loading allergen declarations..."
+  empty_no_bom:
+    description: "Raw material with no BOM"
+    message: "No Allergens Auto-Detected"
+    cta: "Declare Allergen Manually"
+  empty_with_bom:
+    description: "Product with BOM but no allergens calculated"
+    message: "No Allergens Declared"
+    cta: "Calculate from BOM"
+  error_missing_data:
+    description: "BOM ingredients missing allergen declarations"
+    message: "Unable to Auto-Calculate Allergens"
+    details: "List of ingredients with missing data"
+  success:
+    description: "Allergens loaded and displayed"
+    sections:
+      - "Inheritance banner (if BOM exists)"
+      - "Contains allergen list"
+      - "May Contain allergen list"
+      - "Actions (Add, Remove, Recalculate)"
+
+# Accessibility
+accessibility:
+  touch_targets: "All buttons, allergen cards >= 48x48dp"
+  contrast: "Badge colors pass WCAG AA"
+  screen_reader:
+    - "Announces 'Allergen Declarations for {product_name}'"
+    - "Allergen list with count"
+    - "Relation type and source for each item"
+  keyboard:
+    - "Tab navigation through allergen items"
+    - "Enter to open details/remove"
+    - "Escape to close modals"
+  focus: "Search/filter input auto-focused on modal open"
+  icons: "All allergen icons have text alternatives"
+
+# Phase 1+ Feature Handling (per Epic 02.0)
+phase_1_features:
+  hidden_completely:
+    - "Add Custom Allergen button"
+    - "Allergen Threshold input fields (ppm/mg)"
+    - "Cross-Contamination section"
+    - "Allergen Risk Score indicator"
+    - "Generate Label button"
+  implementation_note: |
+    Per Epic 02.0 "Future Feature Handling" guidance:
+    - Comment out Phase 1+ UI elements
+    - Do not include disabled buttons (confusing UX)
+    - Phase 1 features can be uncommented when ready
+
+    Example:
+    {/* Phase 1: Custom Allergens
+    <Button onClick={handleAddCustomAllergen}>
+      <Plus className="w-4 h-4 mr-2" />
+      Add Custom Allergen
+    </Button>
+    */}

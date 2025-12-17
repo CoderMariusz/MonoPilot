@@ -1,0 +1,323 @@
+# Story 04.1 - Production Dashboard
+# Database schema: tables used, RLS, indexes, functions
+
+tables:
+  # Primary tables used for dashboard queries
+  work_orders:
+    description: "Main work order table - source for all dashboard KPIs and Active WOs table"
+    ownership: "Epic 03 (Planning)"
+    read_only: true
+    columns_used:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+        usage: "WO identification"
+      - name: "org_id"
+        type: "UUID NOT NULL"
+        usage: "Multi-tenancy filter (RLS)"
+      - name: "wo_number"
+        type: "TEXT NOT NULL"
+        usage: "Display in Active WOs table, WO Number column"
+      - name: "product_id"
+        type: "UUID FK"
+        usage: "Join to products for product name"
+      - name: "production_line_id"
+        type: "UUID FK"
+        usage: "Join to production_lines for line name, filtering"
+      - name: "status"
+        type: "TEXT NOT NULL"
+        usage: "Filter active WOs (In Progress, Paused), KPI calculations"
+        values: ["Draft", "Released", "In Progress", "Paused", "Completed", "Cancelled"]
+      - name: "planned_qty"
+        type: "DECIMAL(15,4)"
+        usage: "Progress % calculation, yield tracking"
+      - name: "actual_qty"
+        type: "DECIMAL(15,4)"
+        usage: "Progress % calculation (actual/planned * 100)"
+      - name: "started_at"
+        type: "TIMESTAMPTZ"
+        usage: "Started At column, cycle time calculation, sorting"
+      - name: "completed_at"
+        type: "TIMESTAMPTZ"
+        usage: "WOs Completed Today/This Week KPIs, cycle time calculation"
+      - name: "scheduled_end_date"
+        type: "DATE"
+        usage: "On-Time % KPI, Delayed WO alerts"
+    rls: true
+    rls_policy: "org_id filter enforced by ADR-013"
+
+  wo_materials:
+    description: "Work order materials - source for material availability calculation"
+    ownership: "Epic 03 (Planning)"
+    read_only: true
+    columns_used:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+        usage: "Material line identification"
+      - name: "org_id"
+        type: "UUID NOT NULL"
+        usage: "Multi-tenancy filter"
+      - name: "wo_id"
+        type: "UUID FK"
+        usage: "Join to work_orders"
+      - name: "product_id"
+        type: "UUID FK"
+        usage: "Material product reference"
+      - name: "required_qty"
+        type: "DECIMAL(15,4)"
+        usage: "Material availability calculation denominator"
+      - name: "consumed_qty"
+        type: "DECIMAL(15,4)"
+        usage: "Material availability calculation numerator"
+    rls: true
+    calculations:
+      material_availability: "(consumed_qty / NULLIF(required_qty, 0)) * 100"
+      shortage_threshold: "< 80%"
+
+  wo_operations:
+    description: "Work order operations - source for cycle time and operation duration"
+    ownership: "Epic 03 (Planning)"
+    read_only: true
+    columns_used:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+        usage: "Operation identification"
+      - name: "org_id"
+        type: "UUID NOT NULL"
+        usage: "Multi-tenancy filter"
+      - name: "wo_id"
+        type: "UUID FK"
+        usage: "Join to work_orders"
+      - name: "started_at"
+        type: "TIMESTAMPTZ"
+        usage: "Cycle time calculation (if needed)"
+      - name: "completed_at"
+        type: "TIMESTAMPTZ"
+        usage: "Cycle time calculation"
+    rls: true
+
+  products:
+    description: "Product master - for product names in Active WOs table"
+    ownership: "Epic 02 (Technical)"
+    read_only: true
+    columns_used:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+        usage: "Product identification"
+      - name: "name"
+        type: "TEXT NOT NULL"
+        usage: "Product Name column in Active WOs table"
+    rls: true
+
+  production_lines:
+    description: "Production lines - for line names and filtering"
+    ownership: "Epic 01 (Settings)"
+    read_only: true
+    columns_used:
+      - name: "id"
+        type: "UUID PRIMARY KEY"
+        usage: "Line identification"
+      - name: "name"
+        type: "TEXT NOT NULL"
+        usage: "Line Name column, filter dropdown"
+    rls: true
+
+indexes:
+  required:
+    - name: "idx_work_orders_dashboard"
+      table: "work_orders"
+      columns: ["org_id", "status", "completed_at", "started_at"]
+      purpose: "Optimize KPI queries (Active WOs count, Completed Today/Week, Avg Cycle Time)"
+
+    - name: "idx_work_orders_scheduled"
+      table: "work_orders"
+      columns: ["org_id", "status", "scheduled_end_date"]
+      purpose: "Optimize Delayed WO alerts query"
+
+    - name: "idx_wo_materials_availability"
+      table: "wo_materials"
+      columns: ["wo_id", "required_qty", "consumed_qty"]
+      purpose: "Optimize material shortage alerts calculation"
+
+  existing_used:
+    - name: "idx_work_orders_org_status"
+      table: "work_orders"
+      columns: ["org_id", "status"]
+      note: "May already exist from Epic 03"
+
+rls_policies:
+  pattern: "ADR-013 - All queries filter by org_id"
+  enforcement: "Database level via Supabase RLS"
+  validation:
+    - "User org_id extracted from JWT"
+    - "All dashboard queries include org_id filter"
+    - "API returns 403 if org_id mismatch detected"
+
+functions:
+  rpc:
+    - name: "get_material_shortage_alerts"
+      purpose: "Calculate material availability per WO and return shortages below threshold"
+      parameters:
+        - name: "p_org_id"
+          type: "UUID"
+        - name: "p_threshold"
+          type: "DECIMAL"
+          default: "80"
+      returns: "TABLE(wo_id UUID, wo_number TEXT, product_name TEXT, availability_percent DECIMAL, detected_at TIMESTAMPTZ)"
+      sql: |
+        SELECT
+          wo.id AS wo_id,
+          wo.wo_number,
+          p.name AS product_name,
+          (SUM(wm.consumed_qty) / NULLIF(SUM(wm.required_qty), 0) * 100) AS availability_percent,
+          NOW() AS detected_at
+        FROM work_orders wo
+        JOIN wo_materials wm ON wo.id = wm.wo_id
+        JOIN products p ON wo.product_id = p.id
+        WHERE wo.org_id = p_org_id
+          AND wo.status IN ('Released', 'In Progress', 'Paused')
+        GROUP BY wo.id, wo.wo_number, p.name
+        HAVING (SUM(wm.consumed_qty) / NULLIF(SUM(wm.required_qty), 0) * 100) < p_threshold
+        ORDER BY availability_percent ASC;
+      security: "SECURITY DEFINER"
+      notes: "Uses aggregate to get per-WO availability across all materials"
+
+migrations:
+  required:
+    - file: "supabase/migrations/YYYYMMDDHHMMSS_add_production_dashboard_indexes.sql"
+      content: |
+        -- Production Dashboard Performance Indexes
+        -- Story 04.1
+
+        -- Index for KPI queries (Active WOs, Completed Today/Week, Avg Cycle Time)
+        CREATE INDEX IF NOT EXISTS idx_work_orders_dashboard
+        ON work_orders(org_id, status, completed_at, started_at);
+
+        -- Index for Delayed WO alerts
+        CREATE INDEX IF NOT EXISTS idx_work_orders_scheduled
+        ON work_orders(org_id, status, scheduled_end_date);
+
+        -- Index for material shortage alerts calculation
+        CREATE INDEX IF NOT EXISTS idx_wo_materials_availability
+        ON wo_materials(wo_id, required_qty, consumed_qty);
+
+        -- RPC function for material shortage alerts
+        CREATE OR REPLACE FUNCTION get_material_shortage_alerts(
+          p_org_id UUID,
+          p_threshold DECIMAL DEFAULT 80
+        )
+        RETURNS TABLE(
+          wo_id UUID,
+          wo_number TEXT,
+          product_name TEXT,
+          availability_percent DECIMAL,
+          detected_at TIMESTAMPTZ
+        )
+        LANGUAGE SQL
+        SECURITY DEFINER
+        AS $$
+          SELECT
+            wo.id AS wo_id,
+            wo.wo_number,
+            p.name AS product_name,
+            ROUND((SUM(wm.consumed_qty) / NULLIF(SUM(wm.required_qty), 0) * 100)::DECIMAL, 1) AS availability_percent,
+            NOW() AS detected_at
+          FROM work_orders wo
+          JOIN wo_materials wm ON wo.id = wm.wo_id
+          JOIN products p ON wo.product_id = p.id
+          WHERE wo.org_id = p_org_id
+            AND wo.status IN ('Released', 'In Progress', 'Paused')
+          GROUP BY wo.id, wo.wo_number, p.name
+          HAVING (SUM(wm.consumed_qty) / NULLIF(SUM(wm.required_qty), 0) * 100) < p_threshold
+          ORDER BY availability_percent ASC;
+        $$;
+
+        COMMENT ON FUNCTION get_material_shortage_alerts IS 'Returns WOs with material availability below threshold for dashboard alerts';
+
+queries:
+  kpi_active_wos:
+    description: "Count of WOs with status In Progress or Paused"
+    sql: |
+      SELECT COUNT(*)
+      FROM work_orders
+      WHERE org_id = $1
+        AND status IN ('In Progress', 'Paused');
+
+  kpi_completed_today:
+    description: "Count of WOs completed today"
+    sql: |
+      SELECT COUNT(*)
+      FROM work_orders
+      WHERE org_id = $1
+        AND status = 'Completed'
+        AND DATE(completed_at) = CURRENT_DATE;
+
+  kpi_completed_this_week:
+    description: "Count of WOs completed this week"
+    sql: |
+      SELECT COUNT(*)
+      FROM work_orders
+      WHERE org_id = $1
+        AND status = 'Completed'
+        AND completed_at >= date_trunc('week', CURRENT_DATE);
+
+  kpi_avg_cycle_time:
+    description: "Average cycle time in hours for today's completed WOs"
+    sql: |
+      SELECT AVG(EXTRACT(EPOCH FROM (completed_at - started_at)) / 3600) AS avg_hours
+      FROM work_orders
+      WHERE org_id = $1
+        AND status = 'Completed'
+        AND DATE(completed_at) = CURRENT_DATE
+        AND started_at IS NOT NULL;
+
+  kpi_on_time_percent:
+    description: "Percentage of today's WOs completed on or before scheduled date"
+    sql: |
+      SELECT
+        ROUND(
+          (COUNT(*) FILTER (WHERE completed_at <= scheduled_end_date)::DECIMAL / NULLIF(COUNT(*), 0) * 100),
+          1
+        ) AS on_time_percent
+      FROM work_orders
+      WHERE org_id = $1
+        AND status = 'Completed'
+        AND DATE(completed_at) = CURRENT_DATE;
+
+  active_wos_list:
+    description: "Active WOs with product, line, and progress"
+    sql: |
+      SELECT
+        wo.id,
+        wo.wo_number,
+        p.name AS product_name,
+        wo.status,
+        wo.planned_qty,
+        wo.actual_qty,
+        LEAST(ROUND((wo.actual_qty / NULLIF(wo.planned_qty, 0) * 100)::DECIMAL, 1), 100) AS progress_percent,
+        pl.name AS line_name,
+        wo.started_at
+      FROM work_orders wo
+      LEFT JOIN products p ON wo.product_id = p.id
+      LEFT JOIN production_lines pl ON wo.production_line_id = pl.id
+      WHERE wo.org_id = $1
+        AND wo.status IN ('In Progress', 'Paused')
+        AND ($2::UUID IS NULL OR wo.production_line_id = $2)
+        AND ($3::UUID IS NULL OR wo.product_id = $3)
+      ORDER BY wo.started_at DESC
+      LIMIT $4 OFFSET $5;
+
+  delayed_wos_alerts:
+    description: "WOs past scheduled date that are not completed"
+    sql: |
+      SELECT
+        wo.id AS wo_id,
+        wo.wo_number,
+        p.name AS product_name,
+        (CURRENT_DATE - wo.scheduled_end_date) AS days_overdue,
+        wo.scheduled_end_date
+      FROM work_orders wo
+      JOIN products p ON wo.product_id = p.id
+      WHERE wo.org_id = $1
+        AND wo.status NOT IN ('Completed', 'Cancelled')
+        AND wo.scheduled_end_date < CURRENT_DATE
+      ORDER BY days_overdue DESC;

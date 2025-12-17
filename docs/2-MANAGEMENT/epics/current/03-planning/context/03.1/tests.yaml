@@ -1,0 +1,552 @@
+# Story 03.1 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/supplier-service.test.ts"
+    type: "unit"
+    description: "Unit tests for supplier service functions"
+
+  - path: "apps/frontend/lib/validation/__tests__/supplier-schema.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schema"
+
+  - path: "apps/frontend/app/api/planning/suppliers/__tests__/route.test.ts"
+    type: "integration"
+    description: "API integration tests for supplier endpoints"
+
+  - path: "e2e/planning/suppliers.spec.ts"
+    type: "e2e"
+    description: "Playwright E2E tests for supplier CRUD flow"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    description: "Supplier List Page with KPIs"
+    given: "I am a logged-in user with Purchaser role"
+    when: "I navigate to /planning/suppliers"
+    then:
+      - "I see 4 KPI cards: Total Suppliers, Active Suppliers, Inactive, This Month Added"
+      - "Active rate percentage calculated correctly: (active_count / total_count) * 100"
+      - "Supplier table with columns: Code, Name, Contact Name, Email, Phone, Status, Products Count"
+      - "Filters: Status (All/Active/Inactive), Currency, Payment Terms, Search"
+      - "Pagination controls (desktop) or Load More button (mobile)"
+      - "Create Supplier and Import action buttons"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    description: "Supplier Code Auto-Generation"
+    given: "I am creating a new supplier"
+    when: "I open the Create Supplier modal"
+    then:
+      - "Supplier Code field pre-filled with next available code (e.g., SUP-001)"
+      - "Checkbox 'Enter manually' (unchecked by default)"
+      - "When I check 'Enter manually', I can override the auto-generated code"
+      - "Code must be unique per organization (validated on blur, debounced 500ms)"
+      - "Code format: 2-20 alphanumeric characters (A-Z, 0-9, hyphen allowed)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    description: "Create Supplier with Required Fields"
+    given: "I am on the Create Supplier modal"
+    when: "I fill in required fields and click Create Supplier"
+    then:
+      - "Supplier created with unique UUID id"
+      - "Current user's org_id"
+      - "is_active = true (default)"
+      - "created_at and created_by auto-populated"
+      - "Success toast: 'Supplier SUP-001 created successfully'"
+      - "Modal closes after 2 seconds"
+      - "Supplier list refreshes showing new supplier"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    description: "Supplier Field Validation"
+    given: "I am creating or editing a supplier"
+    when: "I enter invalid data"
+    then:
+      - "Red alert banner at top: 'Please fix the following errors:'"
+      - "Inline field-level errors with red icon"
+      - "Field borders turn red for invalid inputs"
+      - "Specific error messages for each validation failure"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    description: "Edit Supplier with Code Locking"
+    given: "A supplier exists with code SUP-001 and has purchase orders"
+    when: "I click Edit on the supplier row"
+    then:
+      - "Pre-filled form with existing supplier data"
+      - "Supplier Code field locked (read-only) with lock icon"
+      - "Tooltip: 'Cannot change code - supplier has purchase orders'"
+      - "All other fields editable"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    description: "Filter Suppliers by Status"
+    given: "I have 42 suppliers (38 active, 4 inactive)"
+    when: "I select 'Active' from the Status filter dropdown"
+    then:
+      - "Only suppliers with is_active = true displayed"
+      - "KPI cards unchanged (still show totals)"
+      - "URL updated: /planning/suppliers?status=active"
+      - "Filter persists on page refresh"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-07"
+    description: "Search Suppliers"
+    given: "I am on the supplier list page"
+    when: "I type 'Mill' in the search box"
+    then:
+      - "Debounced search (300ms delay)"
+      - "Suppliers matching 'Mill' in code, name, contact_name, email, or phone"
+      - "URL updated: /planning/suppliers?search=Mill"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-08"
+    description: "Deactivate Supplier (Success)"
+    given: "I have a supplier SUP-005 with no open purchase orders"
+    when: "I select the supplier and click Deactivate Selected"
+    then:
+      - "Confirmation modal displayed"
+      - "After confirmation, supplier is_active = false"
+      - "Supplier hidden from PO supplier dropdowns"
+      - "Success toast: 'Supplier SUP-005 deactivated successfully'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    description: "Block Deactivation if Open POs"
+    given: "I have a supplier SUP-001 with 3 open purchase orders"
+    when: "I try to deactivate the supplier"
+    then:
+      - "Error modal: 'Cannot deactivate supplier with 3 open purchase orders'"
+      - "No changes made to supplier"
+      - "Supplier remains active"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-10"
+    description: "Activate Inactive Supplier"
+    given: "I have an inactive supplier SUP-006"
+    when: "I filter by Inactive, select the supplier, click Activate Selected"
+    then:
+      - "Supplier is_active = true"
+      - "Supplier appears in PO supplier dropdowns"
+      - "Success toast: 'Supplier SUP-006 activated successfully'"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-11"
+    description: "Delete Supplier (Success)"
+    given: "I have a supplier with 0 POs and 0 products assigned"
+    when: "I click Delete and confirm"
+    then:
+      - "Confirmation modal with warning"
+      - "Supplier permanently deleted from database"
+      - "Removed from supplier list"
+      - "Success toast: 'Supplier deleted successfully'"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-12"
+    description: "Block Deletion if POs Exist"
+    given: "I have a supplier with 5 purchase orders"
+    when: "I attempt to delete the supplier"
+    then:
+      - "Error message: 'Cannot delete supplier with existing purchase orders'"
+      - "Details: 'This supplier has 5 purchase orders (3 open, 2 closed)'"
+      - "Suggestion: 'Deactivate the supplier instead'"
+      - "No deletion occurs"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-13"
+    description: "Block Deletion if Products Assigned"
+    given: "I have a supplier with 0 POs and 8 products assigned"
+    when: "I attempt to delete the supplier"
+    then:
+      - "Error message: 'Cannot delete supplier with assigned products'"
+      - "Details: 'This supplier has 8 products assigned'"
+      - "Suggestion: 'Remove product assignments first'"
+      - "No deletion occurs"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-14"
+    description: "Bulk Deactivate Mixed Results"
+    given: "I have selected 3 suppliers (1 with open POs, 2 without)"
+    when: "I click Deactivate Selected and confirm"
+    then:
+      - "Success toast: '2 suppliers deactivated, 1 failed'"
+      - "Detailed results showing success/failure per supplier"
+      - "Supplier list refreshes with updated statuses"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-15"
+    description: "Export Suppliers to Excel"
+    given: "I have selected 2 suppliers"
+    when: "I click Export to Excel"
+    then:
+      - "Excel file download (.xlsx format)"
+      - "File name: suppliers_export_YYYY-MM-DD.xlsx"
+      - "Sheet 1: Supplier master data"
+      - "Sheet 2: Assigned products count"
+      - "Sheet 3: Summary statistics"
+      - "Export completes in <2 seconds for 100 suppliers"
+    test_type: "integration"
+    priority: "P2"
+
+  - id: "AC-16"
+    description: "RLS Policy Enforcement"
+    given: "I am logged in as Org A user"
+    when: "I view the supplier list"
+    then:
+      - "Only see suppliers where org_id = Org A"
+      - "Cannot see, create, update, or delete Org B suppliers"
+      - "Cross-tenant access returns 404 (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-17"
+    description: "Supplier Detail Page Navigation"
+    given: "I am on the supplier list page"
+    when: "I click View Details on a supplier row"
+    then:
+      - "Navigate to /planning/suppliers/[id]"
+      - "See supplier master data (read-only view)"
+      - "See assigned products table (Story 03.2)"
+      - "See purchase order history (if any)"
+      - "Edit and Deactivate buttons available"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-18"
+    description: "Responsive Design"
+    given: "I am viewing on mobile (<768px)"
+    then:
+      - "Card layout (not table)"
+      - "KPI cards stacked vertically"
+      - "Filters in bottom sheet modal"
+      - "Load More button (not numbered pagination)"
+    test_type: "e2e"
+    priority: "P2"
+
+# Unit Test Cases
+unit_tests:
+  validation_schema:
+    - name: "supplierSchema validates valid supplier data"
+      input: { code: "SUP-001", name: "Mill Co", currency: "PLN", tax_code_id: "uuid", payment_terms: "Net 30" }
+      expected: "Validation passes"
+
+    - name: "supplierSchema rejects empty code"
+      input: { code: "", name: "Mill Co", currency: "PLN", tax_code_id: "uuid", payment_terms: "Net 30" }
+      expected: "Error: Code must be at least 2 characters"
+
+    - name: "supplierSchema rejects invalid code format"
+      input: { code: "sup@001", name: "Mill Co", currency: "PLN", tax_code_id: "uuid", payment_terms: "Net 30" }
+      expected: "Error: Code must contain only uppercase letters, numbers, and hyphens"
+
+    - name: "supplierSchema rejects invalid email"
+      input: { code: "SUP-001", name: "Mill Co", contact_email: "invalid", currency: "PLN", tax_code_id: "uuid", payment_terms: "Net 30" }
+      expected: "Error: Invalid email format"
+
+    - name: "supplierSchema rejects missing payment_terms"
+      input: { code: "SUP-001", name: "Mill Co", currency: "PLN", tax_code_id: "uuid" }
+      expected: "Error: Payment terms are required"
+
+    - name: "supplierSchema rejects invalid currency"
+      input: { code: "SUP-001", name: "Mill Co", currency: "XXX", tax_code_id: "uuid", payment_terms: "Net 30" }
+      expected: "Error: Invalid enum value"
+
+    - name: "supplierSchema accepts optional empty contact_name"
+      input: { code: "SUP-001", name: "Mill Co", contact_name: "", currency: "PLN", tax_code_id: "uuid", payment_terms: "Net 30" }
+      expected: "Validation passes"
+
+  business_logic:
+    - name: "canDeleteSupplier returns false if supplier has POs"
+      input: { po_count: 5, products_count: 0 }
+      expected: { allowed: false, reason: "SUPPLIER_HAS_PURCHASE_ORDERS" }
+
+    - name: "canDeleteSupplier returns false if supplier has products"
+      input: { po_count: 0, products_count: 3 }
+      expected: { allowed: false, reason: "SUPPLIER_HAS_PRODUCTS" }
+
+    - name: "canDeleteSupplier returns true if no POs and no products"
+      input: { po_count: 0, products_count: 0 }
+      expected: { allowed: true }
+
+    - name: "canDeactivateSupplier returns false if has open POs"
+      input: { open_po_count: 2 }
+      expected: { allowed: false, reason: "CANNOT_DEACTIVATE_OPEN_POS" }
+
+    - name: "canDeactivateSupplier returns true if no open POs"
+      input: { open_po_count: 0 }
+      expected: { allowed: true }
+
+    - name: "calculateActiveRate returns correct percentage"
+      input: { active_count: 38, total_count: 42 }
+      expected: 90.48
+
+    - name: "calculateActiveRate returns 0 for empty list"
+      input: { active_count: 0, total_count: 0 }
+      expected: 0
+
+# Integration Test Cases
+integration_tests:
+  api:
+    - name: "GET /api/planning/suppliers returns paginated list"
+      setup: "Create 25 suppliers"
+      action: "GET /api/planning/suppliers?page=1&limit=20"
+      expected:
+        - "Status 200"
+        - "data array length 20"
+        - "meta.total = 25"
+        - "meta.pages = 2"
+
+    - name: "GET /api/planning/suppliers filters by status"
+      setup: "Create 10 active, 5 inactive suppliers"
+      action: "GET /api/planning/suppliers?status=active"
+      expected:
+        - "All returned suppliers have is_active = true"
+        - "data array length = 10"
+
+    - name: "GET /api/planning/suppliers searches by name"
+      setup: "Create suppliers: Mill Co, Sugar Inc, Pack Ltd"
+      action: "GET /api/planning/suppliers?search=Mill"
+      expected:
+        - "Returns only Mill Co"
+
+    - name: "GET /api/planning/suppliers/summary returns KPIs"
+      setup: "Create 38 active, 4 inactive, 5 this month"
+      action: "GET /api/planning/suppliers/summary"
+      expected:
+        - "total_count = 42"
+        - "active_count = 38"
+        - "inactive_count = 4"
+        - "active_rate = 90.48"
+        - "this_month_count = 5"
+
+    - name: "POST /api/planning/suppliers creates new supplier"
+      setup: "Valid supplier data"
+      action: "POST /api/planning/suppliers"
+      expected:
+        - "Status 201"
+        - "Returns created supplier with id"
+        - "org_id matches authenticated user"
+
+    - name: "POST /api/planning/suppliers rejects duplicate code"
+      setup: "Create supplier with code SUP-001"
+      action: "POST /api/planning/suppliers with code SUP-001"
+      expected:
+        - "Status 400"
+        - "error.code = SUPPLIER_CODE_EXISTS"
+
+    - name: "PUT /api/planning/suppliers/:id updates supplier"
+      setup: "Create supplier with no POs"
+      action: "PUT with new name"
+      expected:
+        - "Status 200"
+        - "Name updated"
+        - "updated_at changed"
+
+    - name: "PUT /api/planning/suppliers/:id rejects code change if has POs"
+      setup: "Create supplier with 3 POs"
+      action: "PUT with new code"
+      expected:
+        - "Status 400"
+        - "error.code = SUPPLIER_CODE_LOCKED"
+
+    - name: "DELETE /api/planning/suppliers/:id succeeds with no dependencies"
+      setup: "Create supplier with no POs, no products"
+      action: "DELETE"
+      expected:
+        - "Status 200"
+        - "Supplier no longer exists"
+
+    - name: "DELETE /api/planning/suppliers/:id fails with POs"
+      setup: "Create supplier with 5 POs"
+      action: "DELETE"
+      expected:
+        - "Status 400"
+        - "error.code = SUPPLIER_HAS_PURCHASE_ORDERS"
+
+    - name: "POST /api/planning/suppliers/bulk-deactivate handles mixed results"
+      setup: "Create 3 suppliers: 1 with open POs, 2 without"
+      action: "POST bulk-deactivate with all 3 IDs"
+      expected:
+        - "deactivated_count = 2"
+        - "failed_count = 1"
+        - "results array with detailed status"
+
+  rls:
+    - name: "User can only see own org suppliers"
+      setup: "Create Org A with 10 suppliers, Org B with 5 suppliers"
+      action: "Org A user queries suppliers"
+      expected:
+        - "Returns only Org A's 10 suppliers"
+        - "Org B suppliers not visible"
+
+    - name: "Cross-tenant access returns 404"
+      setup: "Create Org A supplier, get Org B user token"
+      action: "GET /api/planning/suppliers/:orgAId with Org B token"
+      expected:
+        - "Status 404"
+        - "error.code = SUPPLIER_NOT_FOUND"
+
+    - name: "Cross-tenant write blocked"
+      setup: "Create Org A supplier"
+      action: "PUT /api/planning/suppliers/:orgAId with Org B token"
+      expected:
+        - "Status 404"
+        - "No data modified"
+
+# E2E Test Cases (Playwright)
+e2e_tests:
+  - name: "Supplier CRUD flow"
+    steps:
+      - "Navigate to /planning/suppliers"
+      - "Verify KPI cards visible"
+      - "Click Create Supplier button"
+      - "Fill form with valid data"
+      - "Submit and verify success toast"
+      - "Verify new supplier in list"
+      - "Click Edit on new supplier"
+      - "Update name"
+      - "Submit and verify update"
+      - "Click Deactivate"
+      - "Confirm and verify status change"
+      - "Filter by Inactive"
+      - "Click Activate"
+      - "Verify status change back to Active"
+
+  - name: "Search and filter"
+    steps:
+      - "Navigate to /planning/suppliers"
+      - "Type 'Mill' in search"
+      - "Wait for debounce"
+      - "Verify filtered results"
+      - "Select Active filter"
+      - "Verify URL updated"
+      - "Refresh page"
+      - "Verify filter persisted"
+      - "Clear filters"
+      - "Verify all suppliers visible"
+
+  - name: "Bulk actions"
+    steps:
+      - "Navigate to /planning/suppliers"
+      - "Select 3 suppliers via checkbox"
+      - "Click Deactivate Selected"
+      - "Confirm in modal"
+      - "Verify toast with results"
+      - "Verify supplier statuses updated"
+
+  - name: "Export"
+    steps:
+      - "Navigate to /planning/suppliers"
+      - "Select 2 suppliers"
+      - "Click Export"
+      - "Wait for download"
+      - "Verify file name format"
+
+  - name: "Responsive mobile view"
+    steps:
+      - "Set viewport to 375x667"
+      - "Navigate to /planning/suppliers"
+      - "Verify card layout (not table)"
+      - "Click Filters"
+      - "Verify bottom sheet opens"
+      - "Select filter"
+      - "Verify filtered results"
+      - "Click Load More"
+      - "Verify more suppliers loaded"
+
+# Performance Tests
+performance_tests:
+  - name: "List 1000 suppliers in <1s"
+    action: "GET /api/planning/suppliers?limit=1000"
+    expected: "Response time < 1000ms"
+
+  - name: "Filter 1000 suppliers in <500ms"
+    action: "GET /api/planning/suppliers?status=active&currency=PLN&limit=1000"
+    expected: "Response time < 500ms"
+
+  - name: "Export 100 suppliers in <3s"
+    action: "POST /api/planning/suppliers/export with 100 suppliers"
+    expected: "Response time < 3000ms"
+
+  - name: "Search debounce"
+    action: "Type 5 characters quickly"
+    expected: "Only 1 API call after 300ms"
+
+# Definition of Done
+definition_of_done:
+  - "All 18 acceptance criteria tested"
+  - "All API endpoints implemented and tested"
+  - "Zod validation schema with >95% coverage"
+  - "RLS policies enforce org isolation"
+  - "Cross-tenant access returns 404 (not 403)"
+  - "Code uniqueness validated on blur (debounced)"
+  - "Code locking enforced if supplier has POs"
+  - "Deactivation blocked if open POs exist"
+  - "Deletion blocked if POs or products exist"
+  - "Bulk actions handle mixed results"
+  - "Excel export generates valid file"
+  - "Unit test coverage >= 90%"
+  - "Integration test coverage >= 80%"
+  - "E2E smoke tests passing"
+  - "Performance targets met"
+  - "Mobile responsive layout"
+  - "Accessibility WCAG AA compliance"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "Business-critical CRUD operations"
+    files:
+      - "lib/services/supplier-service.ts: 90%"
+      - "lib/validation/supplier-schema.ts: 95%"
+  integration:
+    target: 80
+    reason: "API and RLS must be thoroughly tested"
+    files:
+      - "API routes: 80%"
+      - "RLS policies: 100% of rules tested"
+  e2e:
+    target: "Critical path only"
+    reason: "Smoke tests for main user flows"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "RLS policy misconfiguration could leak supplier data"
+    mitigation: "Comprehensive RLS integration tests with multi-org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls"
+
+  - id: "RISK-02"
+    description: "Code uniqueness race condition during bulk import"
+    mitigation: "Database UNIQUE constraint + transaction isolation"
+    severity: "medium"
+    test_coverage: "Concurrent insert test"
+
+  - id: "RISK-03"
+    description: "Excel export timeout for large datasets"
+    mitigation: "Streaming export, pagination, progress indicator"
+    severity: "low"
+    test_coverage: "performance_tests.export"

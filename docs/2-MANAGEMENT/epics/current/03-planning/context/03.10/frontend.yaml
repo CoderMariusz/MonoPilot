@@ -1,0 +1,364 @@
+# Story 03.10 - Frontend Specification
+# Purpose: Pages, components, hooks, UX patterns
+# Agent: FRONTEND-DEV
+
+# Page Files
+pages:
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/page.tsx"
+    description: "WO list page with DataTable, filters, KPI cards"
+    wireframe: "PLAN-013"
+    route: "/planning/work-orders"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/[id]/page.tsx"
+    description: "WO detail/edit page with tabs"
+    wireframe: "PLAN-015"
+    route: "/planning/work-orders/:id"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/new/page.tsx"
+    description: "Create new WO page/modal"
+    wireframe: "PLAN-014"
+    route: "/planning/work-orders/new"
+
+# Components
+components:
+  # List Page Components
+  - path: "apps/frontend/components/planning/work-orders/WODataTable.tsx"
+    description: "Main data table with sorting, filtering, row selection"
+    wireframe: "PLAN-013"
+    props:
+      - "data: WOListItem[]"
+      - "onRowClick: (wo: WOListItem) => void"
+      - "onSelectionChange: (ids: string[]) => void"
+      - "loading: boolean"
+    pattern: "Use ShadCN DataTable with custom columns"
+
+  - path: "apps/frontend/components/planning/work-orders/WOFilters.tsx"
+    description: "Search and filter controls"
+    wireframe: "PLAN-013"
+    filters:
+      - "search: text input with debounce"
+      - "status: multi-select dropdown"
+      - "product: searchable dropdown"
+      - "line: dropdown"
+      - "priority: dropdown"
+      - "dateRange: date range picker"
+
+  - path: "apps/frontend/components/planning/work-orders/WOKPICards.tsx"
+    description: "4 KPI summary cards"
+    wireframe: "PLAN-013"
+    cards:
+      - { title: "Scheduled Today", metric: "count", filter: "today + planned/released" }
+      - { title: "In Progress", metric: "count", filter: "status=in_progress" }
+      - { title: "On Hold", metric: "count", filter: "status=on_hold" }
+      - { title: "This Week", metric: "count", filter: "created this week" }
+
+  - path: "apps/frontend/components/planning/work-orders/WOStatusBadge.tsx"
+    description: "Status badge with color coding"
+    wireframe: "PLAN-013"
+    status_colors:
+      draft: { bg: "bg-gray-100", text: "text-gray-800" }
+      planned: { bg: "bg-blue-100", text: "text-blue-800" }
+      released: { bg: "bg-indigo-100", text: "text-indigo-800" }
+      in_progress: { bg: "bg-yellow-100", text: "text-yellow-800" }
+      on_hold: { bg: "bg-orange-100", text: "text-orange-800" }
+      completed: { bg: "bg-green-100", text: "text-green-800" }
+      closed: { bg: "bg-emerald-100", text: "text-emerald-800" }
+      cancelled: { bg: "bg-red-100", text: "text-red-800" }
+
+  - path: "apps/frontend/components/planning/work-orders/WOPriorityBadge.tsx"
+    description: "Priority badge with color coding"
+    priority_colors:
+      low: { bg: "bg-slate-100", text: "text-slate-600" }
+      normal: { bg: "bg-blue-100", text: "text-blue-700" }
+      high: { bg: "bg-amber-100", text: "text-amber-700" }
+      critical: { bg: "bg-red-100", text: "text-red-700", extra: "font-bold" }
+
+  - path: "apps/frontend/components/planning/work-orders/WOBulkActions.tsx"
+    description: "Bulk action bar for selected WOs"
+    actions:
+      - "Release Selected"
+      - "Export to Excel"
+      - "Print Selected"
+
+  # Form Components
+  - path: "apps/frontend/components/planning/work-orders/WOForm.tsx"
+    description: "Main form container (create/edit)"
+    wireframe: "PLAN-014"
+    sections:
+      - "Basic Info"
+      - "BOM Preview"
+      - "Scheduling"
+      - "Notes"
+
+  - path: "apps/frontend/components/planning/work-orders/WOHeaderForm.tsx"
+    description: "Header fields section"
+    fields:
+      - "product_id: WOProductSelect"
+      - "planned_quantity: number input"
+      - "uom: auto-filled from product"
+      - "planned_start_date: date picker"
+      - "priority: select"
+
+  - path: "apps/frontend/components/planning/work-orders/WOProductSelect.tsx"
+    description: "Product searchable dropdown with BOM lookup trigger"
+    behavior: "On select, triggers BOM auto-selection for scheduled date"
+
+  - path: "apps/frontend/components/planning/work-orders/WOBomSelect.tsx"
+    description: "BOM selection dropdown for manual override"
+    props:
+      - "productId: string"
+      - "scheduledDate: Date"
+      - "value: string | null"
+      - "onChange: (bomId: string | null) => void"
+      - "autoSelected: boolean"
+
+  - path: "apps/frontend/components/planning/work-orders/WOLineSelect.tsx"
+    description: "Production line dropdown"
+
+  - path: "apps/frontend/components/planning/work-orders/WOMachineSelect.tsx"
+    description: "Machine dropdown (filtered by line if selected)"
+
+  # BOM Preview Components
+  - path: "apps/frontend/components/planning/work-orders/WOBomPreview.tsx"
+    description: "BOM preview panel showing selected BOM info"
+    wireframe: "PLAN-014"
+    displays:
+      - "BOM code, version, effective dates"
+      - "Output quantity, item count"
+      - "Linked routing info"
+
+  - path: "apps/frontend/components/planning/work-orders/WOBomSelectionModal.tsx"
+    description: "Modal to manually select from available BOMs"
+    wireframe: "PLAN-014"
+
+  # Detail Page Components
+  - path: "apps/frontend/components/planning/work-orders/WOSummaryPanel.tsx"
+    description: "Header summary info display"
+    wireframe: "PLAN-015"
+
+  - path: "apps/frontend/components/planning/work-orders/WOStatusTimeline.tsx"
+    description: "Status history timeline"
+    wireframe: "PLAN-015 (History tab)"
+
+  # Action Components
+  - path: "apps/frontend/components/planning/work-orders/WOActionsBar.tsx"
+    description: "Action buttons based on status"
+    actions_by_status:
+      draft: ["Save", "Plan", "Cancel", "Delete"]
+      planned: ["Release", "Cancel"]
+      released: ["Start", "Cancel"]
+
+  - path: "apps/frontend/components/planning/work-orders/WODeleteConfirmDialog.tsx"
+    description: "Delete confirmation dialog"
+
+  - path: "apps/frontend/components/planning/work-orders/WOCancelConfirmDialog.tsx"
+    description: "Cancel confirmation with reason input"
+
+  - path: "apps/frontend/components/planning/work-orders/WOStatusTransitionDialog.tsx"
+    description: "Status change confirmation with notes"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-work-orders.ts"
+    description: "React Query hook for WO list"
+    exports:
+      - name: "useWorkOrders"
+        params: ["params: WOListParams"]
+        returns: "UseQueryResult<PaginatedResult<WOListItem>>"
+        queryKey: "['work-orders', params]"
+        staleTime: "30 * 1000"
+
+  - path: "apps/frontend/lib/hooks/use-work-order.ts"
+    description: "React Query hook for single WO"
+    exports:
+      - name: "useWorkOrder"
+        params: ["id: string"]
+        returns: "UseQueryResult<WorkOrderWithRelations>"
+        queryKey: "['work-order', id]"
+        staleTime: "30 * 1000"
+
+  - path: "apps/frontend/lib/hooks/use-work-order-mutations.ts"
+    description: "React Query mutations for WO CRUD"
+    exports:
+      - name: "useCreateWorkOrder"
+        returns: "UseMutationResult"
+        invalidates: "['work-orders']"
+      - name: "useUpdateWorkOrder"
+        returns: "UseMutationResult"
+        invalidates: "['work-orders', 'work-order', id]"
+      - name: "useDeleteWorkOrder"
+        returns: "UseMutationResult"
+        invalidates: "['work-orders']"
+      - name: "usePlanWorkOrder"
+        returns: "UseMutationResult"
+        invalidates: "['work-orders', 'work-order', id]"
+      - name: "useReleaseWorkOrder"
+        returns: "UseMutationResult"
+        invalidates: "['work-orders', 'work-order', id]"
+      - name: "useCancelWorkOrder"
+        returns: "UseMutationResult"
+        invalidates: "['work-orders', 'work-order', id]"
+
+  - path: "apps/frontend/lib/hooks/use-bom-selection.ts"
+    description: "Hook for BOM auto-selection"
+    exports:
+      - name: "useBomForDate"
+        params: ["productId: string | null", "scheduledDate: Date | null"]
+        returns: "UseQueryResult<BomPreview | null>"
+        enabled: "!!productId && !!scheduledDate"
+      - name: "useAvailableBoms"
+        params: ["productId: string | null"]
+        returns: "UseQueryResult<BomPreview[]>"
+        enabled: "!!productId"
+
+  - path: "apps/frontend/lib/hooks/use-wo-status-history.ts"
+    description: "Hook for status history"
+    exports:
+      - name: "useWOStatusHistory"
+        params: ["woId: string"]
+        returns: "UseQueryResult<WOStatusHistory[]>"
+
+# UX Wireframe References
+ux:
+  wireframes:
+    - id: "PLAN-013"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-013-work-order-list.md"
+      components:
+        - "WOKPICards"
+        - "WOFilters"
+        - "WODataTable"
+        - "WOStatusBadge"
+        - "WOPriorityBadge"
+        - "WOBulkActions"
+      states:
+        - "loading"
+        - "empty"
+        - "success"
+        - "error"
+        - "filtered_empty"
+
+    - id: "PLAN-014"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-014-work-order-create-modal.md"
+      components:
+        - "WOForm"
+        - "WOHeaderForm"
+        - "WOProductSelect"
+        - "WOBomSelect"
+        - "WOBomPreview"
+        - "WOBomSelectionModal"
+      states:
+        - "loading"
+        - "success"
+        - "bom_preview_loading"
+        - "validation_error"
+        - "bom_conflict_error"
+        - "saving"
+        - "no_active_bom"
+
+    - id: "PLAN-015"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-015-work-order-detail.md"
+      components:
+        - "WOSummaryPanel"
+        - "WOStatusBadge"
+        - "WOStatusTimeline"
+        - "WOActionsBar"
+      tabs:
+        - "Materials (placeholder for 03.11a)"
+        - "Operations (placeholder for 03.12)"
+        - "Output (placeholder for Epic 04)"
+        - "History"
+      states:
+        - "loading"
+        - "success"
+        - "error"
+
+# UX Patterns
+patterns:
+  table: "ShadCN DataTable with column sorting, row selection"
+  modal: "ShadCN Dialog for create/edit forms"
+  form: "react-hook-form + zod + ShadCN form components"
+  filters: "Controlled inputs with URL query param sync"
+  toast: "ShadCN Toast for success/error notifications"
+  loading: "Skeleton loaders for cards and table"
+  empty: "Empty state illustration with CTA"
+  error: "Error boundary with retry button"
+
+# State Management
+states:
+  list_page:
+    - { name: "loading", description: "Initial load, skeleton UI" }
+    - { name: "empty", description: "No WOs exist, show empty state" }
+    - { name: "success", description: "Data loaded, show table" }
+    - { name: "error", description: "API error, show error state" }
+    - { name: "filtered_empty", description: "Filters return no results" }
+
+  create_form:
+    - { name: "idle", description: "Form ready for input" }
+    - { name: "loading_bom", description: "Loading BOM for selected product/date" }
+    - { name: "bom_selected", description: "BOM auto-selected, show preview" }
+    - { name: "no_bom", description: "No active BOM found, show warning" }
+    - { name: "bom_conflict", description: "Selected BOM invalid for date" }
+    - { name: "submitting", description: "Form submitting" }
+    - { name: "validation_error", description: "Form has validation errors" }
+
+  detail_page:
+    - { name: "loading", description: "Initial load" }
+    - { name: "success", description: "WO loaded" }
+    - { name: "error", description: "WO not found or no access" }
+
+# Responsive Breakpoints
+responsive:
+  desktop: ">1024px"
+  tablet: "768-1024px"
+  mobile: "<768px"
+
+  list_page:
+    desktop: "Full table with all columns"
+    tablet: "Condensed table, 2x2 KPI grid"
+    mobile: "Card list, expandable filters, infinite scroll"
+
+  create_form:
+    desktop: "3-column basic info, full materials table"
+    tablet: "2-column basic info"
+    mobile: "Full-screen modal, stacked fields, collapsible sections"
+
+# Performance
+performance:
+  targets:
+    list_load: "< 300ms"
+    detail_load: "< 500ms"
+    create_submit: "< 1s"
+    bom_selection: "< 100ms"
+    search_debounce: "200ms"
+
+  caching:
+    - key: "['work-orders', params]"
+      staleTime: "30s"
+    - key: "['work-order', id]"
+      staleTime: "30s"
+    - key: "['products', 'finished-goods']"
+      staleTime: "5m"
+    - key: "['production-lines']"
+      staleTime: "5m"
+    - key: "['bom-for-date', productId, date]"
+      staleTime: "1m"
+
+# Accessibility
+accessibility:
+  touch_targets: "48x48dp minimum"
+  contrast: "4.5:1 minimum"
+  keyboard_navigation:
+    - "Tab: Navigate between interactive elements"
+    - "Enter: Activate button/link"
+    - "Space: Toggle checkbox"
+    - "Escape: Close modal/dropdown"
+    - "Arrow keys: Navigate within dropdown"
+  aria:
+    - "role='table' with proper row/cell structure"
+    - "role='status' for status badges"
+    - "aria-expanded for dropdowns"
+    - "aria-disabled for disabled actions"
+  screen_reader:
+    - "Status badges: 'Status: Planned'"
+    - "Priority badges: 'Priority: High'"
+    - "KPI cards: 'Scheduled Today: 12 work orders'"

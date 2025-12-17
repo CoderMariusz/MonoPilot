@@ -1,0 +1,312 @@
+# Story 03.5a - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/settings/planning"
+    description: "Get planning settings for current org (auto-creates if not exists)"
+    file: "apps/frontend/app/api/settings/planning/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users can read
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "PlanningSettings"
+      schema:
+        id: "UUID"
+        org_id: "UUID"
+        po_require_approval: "boolean"
+        po_approval_threshold: "number | null"
+        po_approval_roles: "string[]"
+        created_at: "string (ISO 8601)"
+        updated_at: "string (ISO 8601)"
+      example:
+        id: "550e8400-e29b-41d4-a716-446655440000"
+        org_id: "123e4567-e89b-12d3-a456-426614174000"
+        po_require_approval: true
+        po_approval_threshold: 10000.00
+        po_approval_roles: ["admin", "manager"]
+        created_at: "2025-12-17T10:00:00Z"
+        updated_at: "2025-12-17T14:30:00Z"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+    behavior:
+      auto_create: true
+      auto_create_description: |
+        If no planning_settings record exists for the org,
+        automatically create one with default values:
+        - po_require_approval: false
+        - po_approval_threshold: null
+        - po_approval_roles: ['admin', 'manager']
+
+  - method: "PUT"
+    path: "/api/settings/planning"
+    description: "Update planning settings for current org"
+    file: "apps/frontend/app/api/settings/planning/route.ts"
+    auth: "required"
+    roles: ["admin", "owner"]  # Admin-only
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "PlanningSettingsUpdate"
+        schema:
+          po_require_approval: "boolean (optional)"
+          po_approval_threshold: "number | null (optional)"
+          po_approval_roles: "string[] (optional)"
+        example:
+          po_require_approval: true
+          po_approval_threshold: 5000.00
+          po_approval_roles: ["admin", "manager", "finance_manager"]
+
+    response:
+      status: 200
+      type: "ApiResponse<PlanningSettings>"
+      schema:
+        success: true
+        data: "PlanningSettings"
+        message: "Planning settings updated successfully"
+      example:
+        success: true
+        data:
+          id: "550e8400-e29b-41d4-a716-446655440000"
+          org_id: "123e4567-e89b-12d3-a456-426614174000"
+          po_require_approval: true
+          po_approval_threshold: 5000.00
+          po_approval_roles: ["admin", "manager", "finance_manager"]
+          created_at: "2025-12-17T10:00:00Z"
+          updated_at: "2025-12-17T15:45:00Z"
+        message: "Planning settings updated successfully"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        when: "Invalid input data"
+        details:
+          - field: "po_approval_threshold"
+            errors:
+              - "Threshold must be a positive number"
+              - "Threshold must be greater than zero"
+              - "Threshold can have at most 4 decimal places"
+          - field: "po_approval_roles"
+            errors:
+              - "At least one approval role must be selected"
+
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+      - status: 403
+        code: "FORBIDDEN"
+        message: "You do not have permission to access settings"
+        when: "User is not admin/owner"
+
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Planning settings not found"
+        when: "Settings record doesn't exist (should not happen with auto-create)"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/planning-settings-service.ts"
+    description: "Planning settings CRUD operations"
+    exports:
+      - name: "getPlanningSettings"
+        type: "async function"
+        params: []
+        returns: "Promise<PlanningSettings>"
+        description: "Fetch planning settings for current org (auto-creates if not exists)"
+
+      - name: "updatePlanningSettings"
+        type: "async function"
+        params:
+          - "updates: PlanningSettingsUpdate"
+        returns: "Promise<PlanningSettings>"
+        description: "Update planning settings"
+
+      - name: "getDefaultPlanningSettings"
+        type: "function"
+        params: []
+        returns: "PlanningSettingsDefaults"
+        description: "Return default values for new settings record"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/planning-settings.ts"
+    description: "Planning settings TypeScript interfaces"
+    content: |
+      export interface PlanningSettings {
+        id: string;
+        org_id: string;
+        po_require_approval: boolean;
+        po_approval_threshold: number | null;
+        po_approval_roles: string[];
+        created_at: string;
+        updated_at: string;
+      }
+
+      export interface PlanningSettingsUpdate {
+        po_require_approval?: boolean;
+        po_approval_threshold?: number | null;
+        po_approval_roles?: string[];
+      }
+
+      export interface PlanningSettingsDefaults {
+        po_require_approval: false;
+        po_approval_threshold: null;
+        po_approval_roles: ['admin', 'manager'];
+      }
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/settings/planning/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { planningSettingsUpdateSchema } from '@/lib/validation/planning-settings-schema';
+    import { hasRole } from '@/lib/services/permission-service';
+    import { getOrgContext } from '@/lib/services/org-context-service';
+
+    const DEFAULT_SETTINGS = {
+      po_require_approval: false,
+      po_approval_threshold: null,
+      po_approval_roles: ['admin', 'manager'],
+    };
+
+    export async function GET() {
+      const supabase = createRouteHandlerClient({ cookies });
+      const context = await getOrgContext();
+
+      if (!context) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Try to fetch existing settings
+      let { data: settings, error } = await supabase
+        .from('planning_settings')
+        .select('*')
+        .eq('org_id', context.org_id)
+        .single();
+
+      // Auto-create if not exists
+      if (!settings && error?.code === 'PGRST116') {
+        const { data: newSettings, error: insertError } = await supabase
+          .from('planning_settings')
+          .insert({
+            org_id: context.org_id,
+            ...DEFAULT_SETTINGS,
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          return NextResponse.json({ error: 'Failed to create settings' }, { status: 500 });
+        }
+        settings = newSettings;
+      } else if (error) {
+        return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
+      }
+
+      return NextResponse.json(settings);
+    }
+
+    export async function PUT(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const context = await getOrgContext();
+
+      if (!context) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Check admin permission
+      if (!hasRole(context, ['admin', 'owner'])) {
+        return NextResponse.json(
+          { error: 'You do not have permission to access settings' },
+          { status: 403 }
+        );
+      }
+
+      const body = await request.json();
+
+      // Validate input
+      const result = planningSettingsUpdateSchema.safeParse(body);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: 'Validation failed', details: result.error.flatten() },
+          { status: 400 }
+        );
+      }
+
+      // Update settings
+      const { data: settings, error } = await supabase
+        .from('planning_settings')
+        .update(result.data)
+        .eq('org_id', context.org_id)
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: settings,
+        message: 'Planning settings updated successfully',
+      });
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/planning-settings-service.ts
+    import type { PlanningSettings, PlanningSettingsUpdate } from '@/lib/types/planning-settings';
+
+    const API_BASE = '/api/settings/planning';
+
+    export async function getPlanningSettings(): Promise<PlanningSettings> {
+      const response = await fetch(API_BASE);
+      if (!response.ok) {
+        throw new Error('Failed to fetch planning settings');
+      }
+      return response.json();
+    }
+
+    export async function updatePlanningSettings(
+      updates: PlanningSettingsUpdate
+    ): Promise<PlanningSettings> {
+      const response = await fetch(API_BASE, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update settings');
+      }
+
+      const result = await response.json();
+      return result.data;
+    }
+
+    export function getDefaultPlanningSettings() {
+      return {
+        po_require_approval: false,
+        po_approval_threshold: null,
+        po_approval_roles: ['admin', 'manager'],
+      };
+    }

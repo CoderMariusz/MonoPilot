@@ -1,0 +1,408 @@
+# Story 03.5b - Frontend Specification
+# Purpose: Components, hooks, types, UX patterns
+# Agent: FRONTEND-DEV
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/purchase-order.ts"
+    description: "EXTEND - Add approval types"
+    content: |
+      // Approval action type
+      export type POApprovalAction = 'submitted' | 'approved' | 'rejected';
+
+      // Approval status type
+      export type POApprovalStatus = 'pending' | 'approved' | 'rejected' | null;
+
+      // Approval history entry
+      export interface POApprovalHistory {
+        id: string;
+        po_id: string;
+        action: POApprovalAction;
+        user_id: string;
+        user_name: string;
+        user_role: string;
+        notes: string | null;
+        created_at: string;
+      }
+
+      // Submit response
+      export interface POSubmitResponse {
+        status: 'pending_approval' | 'submitted';
+        approval_required: boolean;
+        notification_sent: boolean;
+        notification_count?: number;
+      }
+
+      // Approve response
+      export interface POApproveResponse {
+        id: string;
+        po_number: string;
+        status: 'approved';
+        approval_status: 'approved';
+        approved_by: {
+          id: string;
+          name: string;
+        };
+        approved_at: string;
+        approval_notes: string | null;
+        notification_sent: boolean;
+      }
+
+      // Reject response
+      export interface PORejectResponse {
+        id: string;
+        po_number: string;
+        status: 'rejected';
+        approval_status: 'rejected';
+        rejected_by: {
+          id: string;
+          name: string;
+        };
+        rejected_at: string;
+        rejection_reason: string;
+        notification_sent: boolean;
+      }
+
+# Components
+components:
+  - path: "apps/frontend/components/planning/purchase-orders/POApprovalModal.tsx"
+    description: "NEW - Approve/Reject modal with form validation"
+    wireframe: "PLAN-008"
+    props:
+      - { name: "po", type: "PurchaseOrderWithLines", required: true }
+      - { name: "mode", type: "'approve' | 'reject'", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onOpenChange", type: "(open: boolean) => void", required: true }
+      - { name: "onSuccess", type: "() => void", required: true }
+    states:
+      - "loading - Fetching PO data"
+      - "ready - Form ready for input"
+      - "submitting - Action in progress"
+      - "success - Action completed"
+      - "error - Action failed"
+    features:
+      - "PO header summary (number, supplier, total, requestor)"
+      - "PO lines table (readonly)"
+      - "Approval threshold indicator"
+      - "Notes textarea (optional for approve, required for reject)"
+      - "Approve/Reject buttons"
+      - "Loading spinner during submission"
+      - "Success/error toast notifications"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POApprovalHistory.tsx"
+    description: "NEW - Timeline display of approval history"
+    props:
+      - { name: "poId", type: "string", required: true }
+      - { name: "maxItems", type: "number", required: false, default: 10 }
+    features:
+      - "Timeline layout with vertical connector"
+      - "Each entry shows: timestamp, user name, role, action, notes"
+      - "Color-coded icons per action type"
+      - "Newest first sorting"
+      - "Pagination for long histories"
+      - "Empty state when no history"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POStatusBadge.tsx"
+    description: "UPDATE - Add approval state styling"
+    existing: true
+    updates:
+      - "Add 'pending_approval' status with yellow/amber badge + clock icon"
+      - "Add pulsing animation for pending_approval"
+      - "Add 'approved' status with green badge + checkmark icon"
+      - "Add 'rejected' status with red badge + X icon"
+      - "Add tooltip on hover with status details"
+    badge_styles:
+      draft: "bg-gray-100 text-gray-800"
+      pending_approval: "bg-yellow-100 text-yellow-800 animate-pulse"
+      approved: "bg-green-100 text-green-800"
+      rejected: "bg-red-100 text-red-800"
+      submitted: "bg-blue-100 text-blue-800"
+      confirmed: "bg-emerald-100 text-emerald-800"
+      receiving: "bg-purple-100 text-purple-800"
+      closed: "bg-teal-100 text-teal-800"
+      cancelled: "bg-gray-100 text-gray-500 line-through"
+
+  - path: "apps/frontend/components/planning/ApprovalStatusBadge.tsx"
+    description: "NEW - Reusable approval status badge component"
+    props:
+      - { name: "status", type: "POApprovalStatus", required: true }
+      - { name: "size", type: "'sm' | 'md' | 'lg'", required: false, default: "'md'" }
+      - { name: "showIcon", type: "boolean", required: false, default: true }
+    features:
+      - "Color-coded badge based on status"
+      - "Icon prefix (checkmark, X, clock)"
+      - "Accessible label"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-po-approval.ts"
+    description: "Hook for approval workflow actions"
+    exports:
+      - name: "usePOApproval"
+        returns: |
+          {
+            submitPO: UseMutationResult;
+            approvePO: UseMutationResult;
+            rejectPO: UseMutationResult;
+            isSubmitting: boolean;
+            isApproving: boolean;
+            isRejecting: boolean;
+          }
+
+  - path: "apps/frontend/lib/hooks/use-po-approval-history.ts"
+    description: "Hook for fetching approval history"
+    exports:
+      - name: "usePOApprovalHistory"
+        params: ["poId: string"]
+        returns: "UseQueryResult<POApprovalHistory[]>"
+
+  - path: "apps/frontend/lib/hooks/use-can-approve.ts"
+    description: "Hook to check if current user can approve POs"
+    exports:
+      - name: "useCanApprove"
+        returns: |
+          {
+            canApprove: boolean;
+            isLoading: boolean;
+            approvalRoles: string[];
+          }
+
+# UX Specification
+ux:
+  wireframes:
+    - id: "PLAN-008"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-008-po-approval-modal.md"
+      description: "Approve/Reject modal with PO summary"
+      components:
+        - "Header with PO number and status"
+        - "PO Summary section (supplier, warehouse, dates, requestor)"
+        - "Lines Summary table (readonly)"
+        - "Totals section (subtotal, tax, total)"
+        - "Approval threshold indicator"
+        - "Notes/Reason textarea"
+        - "Action buttons (Cancel, Approve/Reject)"
+
+  patterns:
+    modal: "ShadCN Dialog with form validation"
+    table: "ShadCN DataTable for lines (readonly)"
+    badge: "ShadCN Badge with custom colors"
+    timeline: "Custom timeline component with Lucide icons"
+    form: "React Hook Form with Zod validation"
+    toast: "Sonner toast for success/error messages"
+
+  states:
+    loading:
+      - "Skeleton loaders for PO summary"
+      - "Disabled action buttons"
+      - "Loading spinner overlay"
+    empty:
+      - "Empty history: 'No approval history yet'"
+    error:
+      - "Error icon with message"
+      - "Retry button"
+      - "Error code display"
+    success:
+      - "Success icon"
+      - "Confirmation message"
+      - "View PO / Close buttons"
+
+  breakpoints:
+    desktop: ">1024px - Centered modal (max 600px width)"
+    tablet: "768-1024px - Centered modal (90% width)"
+    mobile: "<768px - Full-screen modal, stacked layout"
+
+  accessibility:
+    touch_targets: "48dp minimum for all buttons"
+    contrast: "4.5:1 minimum for text"
+    aria:
+      - "role='dialog' aria-modal='true'"
+      - "aria-labelledby for modal title"
+      - "aria-required='true' for rejection reason"
+      - "aria-live='polite' for error messages"
+    keyboard:
+      - "Tab: Navigate between sections"
+      - "Enter: Submit form"
+      - "Escape: Close modal (with confirmation if dirty)"
+    focus:
+      - "On modal open: Focus first focusable element"
+      - "On success: Focus View PO or Close button"
+      - "On error: Focus error message"
+
+# Page Updates
+page_updates:
+  - path: "apps/frontend/app/(authenticated)/planning/purchase-orders/[id]/page.tsx"
+    description: "Update PO detail page"
+    changes:
+      - "Add POApprovalHistory panel"
+      - "Add Review/Approve/Reject buttons for approvers"
+      - "Update status badge to handle approval states"
+      - "Show approval metadata (approved_by, approved_at, notes)"
+
+  - path: "apps/frontend/app/(authenticated)/planning/purchase-orders/page.tsx"
+    description: "Update PO list page"
+    changes:
+      - "Add pending_approval filter option"
+      - "Update status badge column"
+      - "Add Review action for pending POs (for approvers)"
+
+# File Structure
+files_to_create:
+  components:
+    - path: "apps/frontend/components/planning/purchase-orders/POApprovalModal.tsx"
+      type: "component"
+    - path: "apps/frontend/components/planning/purchase-orders/POApprovalHistory.tsx"
+      type: "component"
+    - path: "apps/frontend/components/planning/ApprovalStatusBadge.tsx"
+      type: "component"
+
+  hooks:
+    - path: "apps/frontend/lib/hooks/use-po-approval.ts"
+      type: "hook"
+    - path: "apps/frontend/lib/hooks/use-po-approval-history.ts"
+      type: "hook"
+    - path: "apps/frontend/lib/hooks/use-can-approve.ts"
+      type: "hook"
+
+files_to_update:
+  components:
+    - path: "apps/frontend/components/planning/purchase-orders/POStatusBadge.tsx"
+      type: "component"
+    - path: "apps/frontend/components/planning/purchase-orders/POActionsDropdown.tsx"
+      type: "component"
+
+  pages:
+    - path: "apps/frontend/app/(authenticated)/planning/purchase-orders/[id]/page.tsx"
+      type: "page"
+    - path: "apps/frontend/app/(authenticated)/planning/purchase-orders/page.tsx"
+      type: "page"
+
+  types:
+    - path: "apps/frontend/lib/types/purchase-order.ts"
+      type: "types"
+
+  validation:
+    - path: "apps/frontend/lib/validation/purchase-order-validation.ts"
+      type: "validation"
+
+# Component Pattern Example
+component_patterns:
+  approval_modal: |
+    // POApprovalModal.tsx
+    'use client';
+
+    import { useState } from 'react';
+    import { useForm } from 'react-hook-form';
+    import { zodResolver } from '@hookform/resolvers/zod';
+    import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+    import { Button } from '@/components/ui/button';
+    import { Textarea } from '@/components/ui/textarea';
+    import { toast } from 'sonner';
+    import { usePOApproval } from '@/lib/hooks/use-po-approval';
+    import { approvePoSchema, rejectPoSchema } from '@/lib/validation/purchase-order-validation';
+
+    interface POApprovalModalProps {
+      po: PurchaseOrderWithLines;
+      mode: 'approve' | 'reject';
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+      onSuccess: () => void;
+    }
+
+    export function POApprovalModal({
+      po,
+      mode,
+      open,
+      onOpenChange,
+      onSuccess,
+    }: POApprovalModalProps) {
+      const { approvePO, rejectPO, isApproving, isRejecting } = usePOApproval();
+      const schema = mode === 'approve' ? approvePoSchema : rejectPoSchema;
+
+      const form = useForm({
+        resolver: zodResolver(schema),
+        defaultValues: {
+          notes: '',
+          rejection_reason: '',
+        },
+      });
+
+      const onSubmit = async (data: any) => {
+        try {
+          if (mode === 'approve') {
+            await approvePO.mutateAsync({ poId: po.id, notes: data.notes });
+            toast.success('Purchase order approved successfully');
+          } else {
+            await rejectPO.mutateAsync({ poId: po.id, rejectionReason: data.rejection_reason });
+            toast.success('Purchase order rejected. Creator has been notified.');
+          }
+          onSuccess();
+          onOpenChange(false);
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Action failed');
+        }
+      };
+
+      const isSubmitting = isApproving || isRejecting;
+
+      return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {mode === 'approve' ? 'Approve' : 'Reject'} Purchase Order
+              </DialogTitle>
+            </DialogHeader>
+
+            {/* PO Summary */}
+            <div className="space-y-4">
+              <POSummarySection po={po} />
+              <POLinesTable lines={po.lines} readonly />
+              <POTotalsSection po={po} />
+            </div>
+
+            {/* Form */}
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {mode === 'approve' ? (
+                <Textarea
+                  {...form.register('notes')}
+                  placeholder="Optional notes about this approval..."
+                  className="min-h-[100px]"
+                />
+              ) : (
+                <div>
+                  <Textarea
+                    {...form.register('rejection_reason')}
+                    placeholder="Please provide reason for rejection..."
+                    className="min-h-[100px]"
+                    aria-required="true"
+                  />
+                  {form.formState.errors.rejection_reason && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {form.formState.errors.rejection_reason.message}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant={mode === 'approve' ? 'default' : 'destructive'}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Processing...' : mode === 'approve' ? 'Approve PO' : 'Reject PO'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      );
+    }

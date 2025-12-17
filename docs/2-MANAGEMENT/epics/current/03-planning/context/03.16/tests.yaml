@@ -1,0 +1,437 @@
+# Story 03.16 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/planning-dashboard-service.test.ts"
+    type: "unit"
+    description: "Unit tests for dashboard service layer"
+
+  - path: "apps/frontend/app/api/planning/dashboard/__tests__/kpis.test.ts"
+    type: "unit"
+    description: "Unit tests for KPI endpoint"
+
+  - path: "apps/frontend/app/api/planning/dashboard/__tests__/alerts.test.ts"
+    type: "unit"
+    description: "Unit tests for alerts endpoint"
+
+  - path: "apps/frontend/app/api/planning/dashboard/__tests__/activity.test.ts"
+    type: "unit"
+    description: "Unit tests for activity endpoint"
+
+  - path: "apps/frontend/components/planning/dashboard/__tests__/KPICard.test.tsx"
+    type: "component"
+    description: "Component tests for KPICard"
+
+  - path: "apps/frontend/components/planning/dashboard/__tests__/DashboardKPICards.test.tsx"
+    type: "component"
+    description: "Component tests for KPI cards grid"
+
+  - path: "apps/frontend/components/planning/dashboard/__tests__/DashboardAlerts.test.tsx"
+    type: "component"
+    description: "Component tests for alerts panel"
+
+  - path: "apps/frontend/components/planning/dashboard/__tests__/DashboardActivity.test.tsx"
+    type: "component"
+    description: "Component tests for activity feed"
+
+  - path: "e2e/planning-dashboard.spec.ts"
+    type: "e2e"
+    description: "E2E tests for planning dashboard"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    title: "Dashboard Page Loads"
+    given: "I am authenticated as a user with planning permissions"
+    when: "I navigate to `/planning`"
+    then:
+      - "the dashboard page loads within 2 seconds"
+      - "I see the page header 'Planning Dashboard'"
+      - "I see 6 KPI cards displayed in a grid"
+      - "I see the alert panel and recent activity feed below KPIs"
+      - "I see quick action buttons in the header"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    title: "KPI Cards Display Correctly"
+    given: "I am on the Planning Dashboard"
+    when: "the page loads"
+    then:
+      - "I see KPI card 'PO Pending Approval' with correct count"
+      - "I see KPI card 'PO This Month' with correct count"
+      - "I see KPI card 'TO In Transit' with correct count"
+      - "I see KPI card 'WO Scheduled Today' with correct count"
+      - "I see KPI card 'WO Overdue' with correct count"
+      - "I see KPI card 'Open Orders' with correct count"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    title: "KPI Card Click Navigation"
+    given: "I am on the Planning Dashboard"
+    when: "I click on a KPI card"
+    then: "I am navigated to the corresponding list page with filters applied"
+    test_cases:
+      - { card: "PO Pending Approval", url: "/planning/purchase-orders?approval_status=pending" }
+      - { card: "PO This Month", url: "/planning/purchase-orders?created_this_month=true" }
+      - { card: "TO In Transit", url: "/planning/transfer-orders?status=in_transit" }
+      - { card: "WO Scheduled Today", url: "/planning/work-orders?scheduled_date=today" }
+      - { card: "WO Overdue", url: "/planning/work-orders?overdue=true" }
+      - { card: "Open Orders", url: "/planning/purchase-orders?status=open" }
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    title: "Alert Panel Shows Critical Issues"
+    given: "I am on the Planning Dashboard"
+    when: "the alert panel loads"
+    then:
+      - "I see alerts grouped by type"
+      - "Overdue POs show: PO number, supplier name, days overdue, expected date"
+      - "Alerts are sorted by severity (Critical then Warning)"
+      - "Clicking an alert navigates to the related entity"
+      - "If no alerts exist, I see 'No alerts - all clear!' message"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    title: "Recent Activity Feed Shows Last 20 Actions"
+    given: "I am on the Planning Dashboard"
+    when: "the activity feed loads"
+    then:
+      - "I see the last 20 planning actions sorted by timestamp (newest first)"
+      - "Each activity item shows: entity type icon, entity number, action type, user name, timestamp"
+      - "Clicking an activity item navigates to the entity detail page"
+      - "If no activity exists, I see 'No recent activity' message"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    title: "Quick Actions Create Entities"
+    given: "I am on the Planning Dashboard"
+    when: "I click a quick action button"
+    then: "the corresponding creation page/modal opens"
+    test_cases:
+      - { button: "Create PO", action: "navigates to /planning/purchase-orders/new" }
+      - { button: "Create TO", action: "navigates to /planning/transfer-orders/new" }
+      - { button: "Create WO", action: "navigates to /planning/work-orders/new" }
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-07"
+    title: "Dashboard Data Caching"
+    given: "dashboard data is requested"
+    when: "the API endpoints are called"
+    then:
+      - "responses are cached in Redis with 2-minute TTL"
+      - "subsequent requests within 2 minutes return cached data"
+      - "cache keys are namespaced by org_id"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-08"
+    title: "Dashboard Handles Zero State"
+    given: "the organization has no POs, TOs, or WOs"
+    when: "I load the Planning Dashboard"
+    then:
+      - "all KPI cards show '0'"
+      - "alert panel shows 'No alerts - all clear!'"
+      - "activity feed shows 'No recent activity'"
+      - "quick action buttons are still visible and functional"
+      - "I see a help message prompting to create first order"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-09"
+    title: "Dashboard Performance"
+    given: "the organization has 1000+ POs, TOs, and WOs"
+    when: "I load the Planning Dashboard"
+    then:
+      - "the page loads in < 2 seconds"
+      - "KPI calculations are optimized with COUNT queries"
+      - "activity feed uses LIMIT 20 with index on created_at DESC"
+    test_type: "performance"
+    priority: "P0"
+
+  - id: "AC-10"
+    title: "RLS and Multi-Tenancy"
+    given: "I am a user in organization A"
+    when: "I load the Planning Dashboard"
+    then:
+      - "I only see data for organization A"
+      - "all queries filter by org_id = current_user.org_id"
+      - "RLS policies prevent cross-org data leakage"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  planning_dashboard_service:
+    - name: "getKPIs returns all 6 metrics"
+      setup: "Mock Supabase client with count responses"
+      expected: "Returns DashboardKPIs object with all 6 fields"
+
+    - name: "getKPIs returns cached data when available"
+      setup: "Mock Redis with cached KPI data"
+      expected: "Returns cached data without DB call"
+
+    - name: "getKPIs fetches from DB when cache miss"
+      setup: "Mock Redis returning null, Supabase with data"
+      expected: "Fetches from DB and stores in cache"
+
+    - name: "getAlerts returns overdue POs"
+      setup: "Mock Supabase with overdue PO data"
+      expected: "Returns alerts with severity based on days overdue"
+
+    - name: "getAlerts sorts by severity"
+      setup: "Mock Supabase with mixed severity alerts"
+      expected: "Critical alerts appear before warning alerts"
+
+    - name: "getRecentActivity returns 20 items"
+      setup: "Mock Supabase with 50 activity records"
+      expected: "Returns exactly 20 items sorted by timestamp DESC"
+
+    - name: "invalidateDashboardCache clears all keys"
+      setup: "Mock Redis del method"
+      expected: "Deletes kpis, alerts, activity cache keys for org"
+
+  kpi_endpoint:
+    - name: "GET /api/planning/dashboard/kpis returns 200 for authenticated user"
+      setup: "Mock valid session"
+      expected: "Returns 200 with DashboardKPIs"
+
+    - name: "GET /api/planning/dashboard/kpis returns 401 without auth"
+      setup: "No session"
+      expected: "Returns 401 Unauthorized"
+
+    - name: "GET /api/planning/dashboard/kpis returns 500 on DB error"
+      setup: "Mock Supabase error"
+      expected: "Returns 500 with error message"
+
+  alerts_endpoint:
+    - name: "GET /api/planning/dashboard/alerts respects limit param"
+      setup: "Mock 20 alerts, limit=5"
+      expected: "Returns exactly 5 alerts"
+
+    - name: "GET /api/planning/dashboard/alerts validates limit range"
+      setup: "limit=100 (out of range)"
+      expected: "Returns 400 with validation error"
+
+  activity_endpoint:
+    - name: "GET /api/planning/dashboard/activity returns recent actions"
+      setup: "Mock activity data"
+      expected: "Returns activities sorted by timestamp DESC"
+
+    - name: "GET /api/planning/dashboard/activity defaults to 20 items"
+      setup: "No limit param"
+      expected: "Returns at most 20 items"
+
+# Component Test Cases
+component_tests:
+  kpi_card:
+    - name: "renders title and value"
+      props: { title: "Open Orders", value: 24, icon: "FileText", href: "/planning/purchase-orders" }
+      expected: "Displays title 'Open Orders' and value '24'"
+
+    - name: "applies warning variant when specified"
+      props: { title: "WO Overdue", value: 3, variant: "warning" }
+      expected: "Card has warning styling (yellow border)"
+
+    - name: "applies critical variant when specified"
+      props: { title: "WO Overdue", value: 5, variant: "critical" }
+      expected: "Card has critical styling (red border)"
+
+    - name: "navigates to href on click"
+      props: { href: "/planning/purchase-orders" }
+      action: "click"
+      expected: "Router push called with href"
+
+    - name: "is keyboard accessible"
+      action: "focus and enter"
+      expected: "Card receives focus and activates on Enter"
+
+  dashboard_kpi_cards:
+    - name: "renders 6 KPI cards"
+      props: { kpis: mockKPIs }
+      expected: "6 KPICard components rendered"
+
+    - name: "shows skeleton when loading"
+      props: { kpis: null, isLoading: true }
+      expected: "6 skeleton cards displayed"
+
+  dashboard_alerts:
+    - name: "renders alerts grouped by severity"
+      props: { alerts: mixedAlerts }
+      expected: "Critical alerts section before warning section"
+
+    - name: "shows empty state when no alerts"
+      props: { alerts: [] }
+      expected: "Displays 'No alerts - all clear!' message"
+
+    - name: "clicking alert navigates to entity"
+      props: { alerts: [overduePOAlert] }
+      action: "click alert"
+      expected: "Router push to /planning/purchase-orders/{id}"
+
+  dashboard_activity:
+    - name: "renders activity items with relative time"
+      props: { activities: recentActivities }
+      expected: "Shows '2 hours ago', 'Yesterday' etc."
+
+    - name: "shows empty state when no activity"
+      props: { activities: [] }
+      expected: "Displays 'No recent activity' message"
+
+    - name: "shows entity type icon"
+      props: { activities: [poCreatedActivity] }
+      expected: "ShoppingCart icon for purchase_order type"
+
+# Integration Test Cases
+integration_tests:
+  rls_isolation:
+    - name: "Dashboard KPIs respect org isolation"
+      setup:
+        - "Create Org A with 5 POs"
+        - "Create Org B with 10 POs"
+      action: "User A fetches dashboard KPIs"
+      expected: "Returns 5 for open_orders, not 15"
+
+    - name: "Dashboard alerts respect org isolation"
+      setup:
+        - "Create Org A with 2 overdue POs"
+        - "Create Org B with 3 overdue POs"
+      action: "User A fetches dashboard alerts"
+      expected: "Returns 2 alerts, not 5"
+
+    - name: "Dashboard activity respect org isolation"
+      setup:
+        - "Create Org A with 5 recent activities"
+        - "Create Org B with 10 recent activities"
+      action: "User A fetches dashboard activity"
+      expected: "Returns 5 activities, not 15"
+
+  cache_behavior:
+    - name: "Dashboard data is cached per org"
+      setup:
+        - "Org A fetches KPIs"
+        - "Org B fetches KPIs"
+      expected: "Separate cache entries for each org"
+
+    - name: "Cache invalidates on PO create"
+      setup:
+        - "Fetch KPIs (cached)"
+        - "Create new PO"
+        - "Fetch KPIs again"
+      expected: "Second fetch shows updated count"
+
+# E2E Test Cases
+e2e_tests:
+  dashboard_load:
+    - name: "Dashboard loads within 2 seconds"
+      steps:
+        - "Navigate to /planning"
+        - "Wait for KPI cards to render"
+      expected: "Page fully loaded in < 2000ms"
+
+    - name: "Dashboard shows correct page title"
+      steps:
+        - "Navigate to /planning"
+      expected: "Page title is 'Planning Dashboard'"
+
+  kpi_navigation:
+    - name: "Click PO Pending Approval navigates correctly"
+      steps:
+        - "Navigate to /planning"
+        - "Click 'PO Pending Approval' KPI card"
+      expected: "URL is /planning/purchase-orders?approval_status=pending"
+
+    - name: "Click WO Overdue navigates correctly"
+      steps:
+        - "Navigate to /planning"
+        - "Click 'WO Overdue' KPI card"
+      expected: "URL is /planning/work-orders?overdue=true"
+
+  quick_actions:
+    - name: "Create PO quick action works"
+      steps:
+        - "Navigate to /planning"
+        - "Click 'Create PO' button"
+      expected: "Navigation to /planning/purchase-orders/new"
+
+  responsive:
+    - name: "Dashboard is responsive on mobile"
+      viewport: "375x667"
+      steps:
+        - "Navigate to /planning"
+      expected: "KPI cards stack vertically"
+
+    - name: "Dashboard is responsive on tablet"
+      viewport: "768x1024"
+      steps:
+        - "Navigate to /planning"
+      expected: "KPI cards in 2-column grid"
+
+  zero_state:
+    - name: "Empty dashboard shows onboarding message"
+      setup: "New org with no POs, TOs, WOs"
+      steps:
+        - "Navigate to /planning"
+      expected: "Shows 'Get started' message with quick action CTAs"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Dashboard aggregation logic needs good coverage"
+  integration:
+    target: 85
+    reason: "RLS and caching must be thoroughly tested"
+  e2e:
+    target: 70
+    reason: "Core user flows must work"
+  files:
+    - "lib/services/planning-dashboard-service.ts: 80%"
+    - "app/api/planning/dashboard/*/route.ts: 80%"
+    - "components/planning/dashboard/*.tsx: 75%"
+
+# Definition of Done
+definition_of_done:
+  - "Dashboard page renders at /planning route"
+  - "All 6 KPI cards display correct data"
+  - "KPI cards are clickable and navigate to filtered lists"
+  - "Alert panel shows overdue POs and pending approvals"
+  - "Recent activity feed shows last 20 actions"
+  - "Quick action buttons open PO/TO/WO creation flows"
+  - "Zero state displays when no data exists"
+  - "RLS policies enforce org_id filtering on all queries"
+  - "Dashboard data cached in Redis with 2-minute TTL"
+  - "Cache invalidated on PO/TO/WO create/update/delete"
+  - "API routes have >= 80% test coverage"
+  - "Service layer has >= 80% test coverage"
+  - "E2E smoke test passes (dashboard loads within 2 seconds)"
+  - "Performance tested with 1000+ entities (< 2 second load time)"
+  - "Mobile responsive (dashboard stacks vertically on small screens)"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Performance degradation with large datasets"
+    mitigation: "Use COUNT queries with proper indexes, cache with 2-min TTL"
+    severity: "medium"
+    test_coverage: "performance tests"
+
+  - id: "RISK-02"
+    description: "Cache invalidation race conditions"
+    mitigation: "Use atomic Redis operations, accept eventual consistency"
+    severity: "low"
+    test_coverage: "cache_behavior integration tests"
+
+  - id: "RISK-03"
+    description: "Cross-org data leak in aggregations"
+    mitigation: "All queries parameterized with org_id, integration tests verify isolation"
+    severity: "high"
+    test_coverage: "rls_isolation integration tests"

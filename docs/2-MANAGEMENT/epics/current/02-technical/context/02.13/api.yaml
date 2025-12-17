@@ -1,0 +1,554 @@
+# Story 02.13 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET Product Nutrition
+  - method: "GET"
+    path: "/api/technical/nutrition/products/:id"
+    description: "Get nutrition data for a product"
+    file: "apps/frontend/app/api/technical/nutrition/products/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      params:
+        id: "UUID - product_id"
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "ProductNutritionResponse"
+      schema: |
+        {
+          product_id: string;
+          serving_size: number | null;
+          serving_unit: 'g' | 'ml' | 'oz' | 'cup' | 'tbsp' | 'piece';
+          servings_per_container: number | null;
+          is_manual_override: boolean;
+          override_source?: 'lab_test' | 'supplier_coa' | 'database' | 'calculated' | 'manual';
+          override_reference?: string;
+          override_notes?: string;
+          override_by?: string;
+          override_at?: string;
+          calculated_at?: string;
+          bom_version_used?: number;
+          // Macronutrients (per 100g/100ml)
+          energy_kcal: number;
+          energy_kj?: number;
+          protein_g: number;
+          fat_g: number;
+          saturated_fat_g?: number;
+          trans_fat_g?: number;
+          carbohydrate_g: number;
+          sugar_g?: number;
+          added_sugar_g?: number;
+          fiber_g?: number;
+          sodium_mg?: number;
+          salt_g?: number;
+          cholesterol_mg?: number;
+          // Micronutrients
+          vitamin_d_mcg?: number;
+          calcium_mg?: number;
+          iron_mg?: number;
+          potassium_mg?: number;
+        }
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "NUTRITION_NOT_FOUND"
+        message: "Nutrition data not found for this product"
+
+  # POST Calculate Nutrition from BOM
+  - method: "POST"
+    path: "/api/technical/nutrition/products/:id/calculate"
+    description: "Calculate nutrition from active BOM ingredients"
+    file: "apps/frontend/app/api/technical/nutrition/products/[id]/calculate/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "production_manager", "planner"]
+
+    request:
+      params:
+        id: "UUID - product_id"
+      body:
+        bom_id?: "UUID - optional, defaults to active BOM"
+        actual_yield_kg?: "number - optional, for yield adjustment"
+        allow_partial?: "boolean - continue with missing ingredient data (default: false)"
+
+    response:
+      status: 200
+      type: "CalculateNutritionResponse"
+      schema: |
+        {
+          ingredients: Array<{
+            id: string;
+            name: string;
+            code: string;
+            quantity: number;
+            unit: string;
+            nutrients: NutrientProfile;
+            contribution_percent: number;
+          }>;
+          yield: {
+            expected_kg: number;
+            actual_kg: number;
+            factor: number;
+          };
+          total_per_batch: NutrientProfile;
+          per_100g: NutrientProfile;
+          missing_ingredients: Array<{
+            id: string;
+            name: string;
+            code: string;
+            quantity: number;
+          }>;
+          warnings: string[];
+          metadata: {
+            bom_version: number;
+            bom_id: string;
+            calculated_at: string;
+          };
+        }
+
+    errors:
+      - status: 400
+        code: "NO_ACTIVE_BOM"
+        message: "Product has no active BOM"
+      - status: 400
+        code: "MISSING_INGREDIENT_NUTRITION"
+        message: "Missing nutrition data for ingredients"
+        data: "{ missing: [{id, name, code}] }"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+
+  # PUT Override Nutrition (Manual Entry)
+  - method: "PUT"
+    path: "/api/technical/nutrition/products/:id/override"
+    description: "Manually override nutrition values with audit trail"
+    file: "apps/frontend/app/api/technical/nutrition/products/[id]/override/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "production_manager", "quality_manager"]
+
+    request:
+      params:
+        id: "UUID - product_id"
+      body:
+        serving_size: "number - required"
+        serving_unit: "'g' | 'ml' | 'oz' | 'cup' | 'tbsp' | 'piece'"
+        servings_per_container: "number - required"
+        energy_kcal: "number - required"
+        protein_g: "number - required"
+        fat_g: "number - required"
+        carbohydrate_g: "number - required"
+        salt_g: "number - required"
+        fiber_g?: "number"
+        sugar_g?: "number"
+        saturated_fat_g?: "number"
+        sodium_mg?: "number"
+        trans_fat_g?: "number"
+        cholesterol_mg?: "number"
+        added_sugar_g?: "number"
+        vitamin_d_mcg?: "number"
+        calcium_mg?: "number"
+        iron_mg?: "number"
+        potassium_mg?: "number"
+        source: "'lab_test' | 'supplier_coa' | 'database' | 'manual' - required"
+        reference?: "string - required if source is lab_test or supplier_coa"
+        notes?: "string"
+
+    response:
+      status: 200
+      type: "ProductNutritionResponse"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid nutrition values"
+      - status: 400
+        code: "REFERENCE_REQUIRED"
+        message: "Reference is required for lab test or supplier CoA source"
+
+  # GET Nutrition Label
+  - method: "GET"
+    path: "/api/technical/nutrition/products/:id/label"
+    description: "Generate nutrition label (PDF/SVG/HTML)"
+    file: "apps/frontend/app/api/technical/nutrition/products/[id]/label/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      params:
+        id: "UUID - product_id"
+      query:
+        format: "'fda' | 'eu' | 'canada' - default: fda"
+        output: "'pdf' | 'svg' | 'html' - default: html"
+        width?: "number - inches, default: 4"
+        height?: "number - inches, default: 6"
+
+    response:
+      status: 200
+      type: "NutritionLabelResponse"
+      schema: |
+        {
+          pdf_url?: string;   // Pre-signed URL for PDF download
+          svg_content?: string; // Inline SVG for preview
+          html_content?: string; // HTML for preview rendering
+          format: 'fda' | 'eu' | 'canada';
+          product: {
+            name: string;
+            code: string;
+          };
+        }
+
+    errors:
+      - status: 400
+        code: "SERVING_SIZE_REQUIRED"
+        message: "Serving size is required for label generation"
+      - status: 404
+        code: "NUTRITION_NOT_FOUND"
+        message: "Nutrition data not found"
+
+  # GET FDA RACC Lookup
+  - method: "GET"
+    path: "/api/technical/nutrition/racc"
+    description: "Lookup FDA Reference Amount Customarily Consumed"
+    file: "apps/frontend/app/api/technical/nutrition/racc/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      query:
+        category: "string - product category (e.g., 'bread', 'cookies')"
+
+    response:
+      status: 200
+      type: "RaccLookupResponse"
+      schema: |
+        {
+          category: string;
+          racc_grams: number;
+          racc_description: string;
+          common_servings: Array<{
+            description: string;
+            grams: number;
+          }>;
+        }
+
+    errors:
+      - status: 404
+        code: "CATEGORY_NOT_FOUND"
+        message: "FDA RACC category not found"
+
+  # POST Ingredient Nutrition
+  - method: "POST"
+    path: "/api/technical/nutrition/ingredients/:id"
+    description: "Add or update ingredient nutrition data"
+    file: "apps/frontend/app/api/technical/nutrition/ingredients/[id]/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "production_manager", "quality_manager"]
+
+    request:
+      params:
+        id: "UUID - ingredient product_id"
+      body:
+        per_unit?: "number - default: 100"
+        unit?: "'g' | 'ml' - default: g"
+        source: "'usda' | 'eurofir' | 'supplier_coa' | 'manual' - required"
+        source_id?: "string - external database ID"
+        source_date?: "date"
+        confidence?: "'high' | 'medium' | 'low' - default: medium"
+        notes?: "string"
+        energy_kcal: "number"
+        protein_g: "number"
+        fat_g: "number"
+        carbohydrate_g: "number"
+        # ... other nutrient fields
+
+    response:
+      status: 200
+      type: "IngredientNutritionResponse"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid nutrition values"
+      - status: 404
+        code: "INGREDIENT_NOT_FOUND"
+        message: "Ingredient product not found"
+
+  # GET Ingredient Nutrition
+  - method: "GET"
+    path: "/api/technical/nutrition/ingredients/:id"
+    description: "Get ingredient nutrition data"
+    file: "apps/frontend/app/api/technical/nutrition/ingredients/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      params:
+        id: "UUID - ingredient product_id"
+
+    response:
+      status: 200
+      type: "IngredientNutritionResponse"
+
+    errors:
+      - status: 404
+        code: "INGREDIENT_NUTRITION_NOT_FOUND"
+        message: "Nutrition data not found for this ingredient"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/nutrition-service.ts"
+    description: "Nutrition calculation engine and CRUD operations"
+    exports:
+      - name: "NutritionService"
+        type: "class"
+        methods:
+          - name: "getProductNutrition"
+            params: ["productId: string"]
+            returns: "Promise<ProductNutrition | null>"
+          - name: "calculateFromBOM"
+            params: ["productId: string", "bomId?: string", "actualYieldKg?: number"]
+            returns: "Promise<CalculationResult>"
+          - name: "saveOverride"
+            params: ["productId: string", "data: NutritionOverrideInput"]
+            returns: "Promise<ProductNutrition>"
+          - name: "getIngredientNutrition"
+            params: ["ingredientId: string"]
+            returns: "Promise<IngredientNutrition | null>"
+          - name: "saveIngredientNutrition"
+            params: ["ingredientId: string", "data: IngredientNutritionInput"]
+            returns: "Promise<IngredientNutrition>"
+          - name: "getBatchIngredientNutrition"
+            params: ["ingredientIds: string[]"]
+            returns: "Promise<Map<string, IngredientNutrition>>"
+
+  - path: "apps/frontend/lib/services/serving-calculator-service.ts"
+    description: "Serving size calculation utilities"
+    exports:
+      - name: "ServingCalculatorService"
+        type: "class"
+        methods:
+          - name: "calculateByWeight"
+            params: ["totalWeightG: number", "numServings: number"]
+            returns: "ServingSize"
+          - name: "calculateByDimensions"
+            params: ["totalWeightG: number", "lengthCm: number", "widthCm: number", "thicknessCm: number"]
+            returns: "ServingSize"
+          - name: "calculateByVolume"
+            params: ["totalVolumeMl: number", "servingSizeMl: number"]
+            returns: "ServingSize"
+          - name: "lookupRACC"
+            params: ["category: string"]
+            returns: "RACCReference | null"
+          - name: "validateAgainstRACC"
+            params: ["servingSizeG: number", "raccG: number"]
+            returns: "RACCValidation"
+
+  - path: "apps/frontend/lib/services/label-export-service.ts"
+    description: "PDF/SVG label generation"
+    exports:
+      - name: "LabelExportService"
+        type: "class"
+        methods:
+          - name: "generateFDALabel"
+            params: ["nutrition: ProductNutrition"]
+            returns: "Promise<LabelOutput>"
+          - name: "generateEULabel"
+            params: ["nutrition: ProductNutrition"]
+            returns: "Promise<LabelOutput>"
+          - name: "exportPDF"
+            params: ["labelHtml: string", "options: PDFOptions"]
+            returns: "Promise<Blob>"
+          - name: "exportSVG"
+            params: ["labelHtml: string"]
+            returns: "string"
+
+# Validation Schemas (Zod)
+validation_schemas:
+  - path: "apps/frontend/lib/validation/nutrition-schema.ts"
+    exports:
+      - name: "nutritionOverrideSchema"
+        schema: |
+          z.object({
+            serving_size: z.number().min(0.1).max(10000),
+            serving_unit: z.enum(['g', 'ml', 'oz', 'cup', 'tbsp', 'piece']),
+            servings_per_container: z.number().int().min(1).max(1000),
+            energy_kcal: z.number().min(0).max(9999),
+            protein_g: z.number().min(0).max(999.9),
+            fat_g: z.number().min(0).max(999.9),
+            carbohydrate_g: z.number().min(0).max(999.9),
+            salt_g: z.number().min(0).max(99.9),
+            fiber_g: z.number().min(0).max(999.9).optional(),
+            sugar_g: z.number().min(0).max(999.9).optional(),
+            saturated_fat_g: z.number().min(0).max(999.9).optional(),
+            sodium_mg: z.number().min(0).max(99999).optional(),
+            trans_fat_g: z.number().min(0).max(999.9).optional(),
+            cholesterol_mg: z.number().min(0).max(9999).optional(),
+            added_sugar_g: z.number().min(0).max(999.9).optional(),
+            vitamin_d_mcg: z.number().min(0).max(9999).optional(),
+            calcium_mg: z.number().min(0).max(99999).optional(),
+            iron_mg: z.number().min(0).max(9999).optional(),
+            potassium_mg: z.number().min(0).max(99999).optional(),
+            source: z.enum(['lab_test', 'supplier_coa', 'database', 'manual']),
+            reference: z.string().max(100).optional(),
+            notes: z.string().max(500).optional(),
+          }).refine(
+            (data) => {
+              if (data.source === 'lab_test' || data.source === 'supplier_coa') {
+                return !!data.reference;
+              }
+              return true;
+            },
+            { message: 'Reference is required for lab test or supplier CoA source' }
+          )
+
+      - name: "productNutritionResponseSchema"
+        description: "Response schema for GET product nutrition"
+
+  - path: "apps/frontend/lib/validation/ingredient-nutrition-schema.ts"
+    exports:
+      - name: "ingredientNutritionSchema"
+        schema: |
+          z.object({
+            per_unit: z.number().min(1).max(1000).default(100),
+            unit: z.enum(['g', 'ml']).default('g'),
+            source: z.enum(['usda', 'eurofir', 'supplier_coa', 'manual']),
+            source_id: z.string().max(50).optional(),
+            source_date: z.string().datetime().optional(),
+            confidence: z.enum(['high', 'medium', 'low']).default('medium'),
+            notes: z.string().max(500).optional(),
+            energy_kcal: z.number().min(0).max(9999).optional(),
+            protein_g: z.number().min(0).max(999.9).optional(),
+            fat_g: z.number().min(0).max(999.9).optional(),
+            carbohydrate_g: z.number().min(0).max(999.9).optional(),
+            sugar_g: z.number().min(0).max(999.9).optional(),
+            fiber_g: z.number().min(0).max(999.9).optional(),
+            sodium_mg: z.number().min(0).max(99999).optional(),
+            // ... other nutrients
+          })
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/nutrition.ts"
+    description: "Nutrition TypeScript interfaces"
+    exports:
+      - "ProductNutrition"
+      - "IngredientNutrition"
+      - "NutrientProfile"
+      - "CalculationResult"
+      - "NutritionOverrideInput"
+      - "ServingSize"
+      - "RACCReference"
+      - "RACCValidation"
+      - "LabelOutput"
+      - "PDFOptions"
+
+# Calculation Algorithm Pattern
+calculation_pattern: |
+  // apps/frontend/lib/services/nutrition-service.ts
+
+  async calculateFromBOM(
+    productId: string,
+    bomId?: string,
+    actualYieldKg?: number
+  ): Promise<CalculationResult> {
+    // Step 1: Load BOM and items
+    const bom = bomId
+      ? await this.bomService.getBom(bomId)
+      : await this.bomService.getActiveBom(productId);
+
+    if (!bom) throw new Error('NO_ACTIVE_BOM');
+
+    const bomItems = await this.bomService.getBomItems(bom.id);
+
+    // Step 2: Fetch ingredient nutrition (batch query)
+    const ingredientIds = bomItems.map(item => item.component_id);
+    const nutritionData = await this.getBatchIngredientNutrition(ingredientIds);
+
+    // Step 3: Check for missing data
+    const missingIngredients = bomItems.filter(
+      item => !nutritionData.has(item.component_id)
+    );
+
+    if (missingIngredients.length > 0) {
+      return { error: 'MISSING_INGREDIENT_NUTRITION', missing: missingIngredients };
+    }
+
+    // Step 4: Calculate weighted totals (per batch)
+    const totalNutrients: NutrientProfile = {};
+    const ingredientContributions = [];
+
+    for (const item of bomItems) {
+      const nutrition = nutritionData.get(item.component_id)!;
+      const quantityG = this.convertToGrams(item.quantity, item.uom);
+
+      for (const [nutrient, valuePer100g] of Object.entries(nutrition)) {
+        if (typeof valuePer100g !== 'number') continue;
+        const weighted = (valuePer100g / 100) * quantityG;
+        totalNutrients[nutrient] = (totalNutrients[nutrient] || 0) + weighted;
+      }
+
+      ingredientContributions.push({
+        ...item,
+        nutrients: nutrition,
+        contribution_percent: 0, // calculated after total
+      });
+    }
+
+    // Step 5: Apply yield adjustment
+    const expectedOutputKg = bom.output_qty;
+    const actualOutputKg = actualYieldKg ?? expectedOutputKg;
+    const yieldFactor = expectedOutputKg / actualOutputKg;
+
+    for (const [nutrient, value] of Object.entries(totalNutrients)) {
+      totalNutrients[nutrient] = value * yieldFactor;
+    }
+
+    // Step 6: Convert to per 100g
+    const outputGrams = actualOutputKg * 1000;
+    const per100g: NutrientProfile = {};
+
+    for (const [nutrient, value] of Object.entries(totalNutrients)) {
+      per100g[nutrient] = (value / outputGrams) * 100;
+    }
+
+    // Step 7: Calculate contribution percentages
+    for (const contrib of ingredientContributions) {
+      contrib.contribution_percent =
+        (contrib.nutrients.energy_kcal / totalNutrients.energy_kcal) * 100;
+    }
+
+    return {
+      ingredients: ingredientContributions,
+      yield: { expected_kg: expectedOutputKg, actual_kg: actualOutputKg, factor: yieldFactor },
+      total_per_batch: totalNutrients,
+      per_100g: per100g,
+      missing_ingredients: [],
+      warnings: [],
+      metadata: {
+        bom_version: bom.version,
+        bom_id: bom.id,
+        calculated_at: new Date().toISOString(),
+      },
+    };
+  }
+
+# Caching Strategy
+caching:
+  keys:
+    - key: "org:{orgId}:product:{productId}:nutrition"
+      ttl: 600  # 10 minutes
+      invalidate_on: ["BOM change", "Ingredient nutrition change", "Manual override"]
+    - key: "org:{orgId}:ingredient:{ingredientId}:nutrition"
+      ttl: 600  # 10 minutes
+      invalidate_on: ["Ingredient nutrition update"]
+    - key: "global:fda-racc-table"
+      ttl: 86400  # 24 hours
+      invalidate_on: ["Rarely - FDA updates"]

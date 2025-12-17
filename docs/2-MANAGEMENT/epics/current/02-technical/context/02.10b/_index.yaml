@@ -1,0 +1,235 @@
+# Story 02.10b - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+# Phase: DEFERRED - Requires Epic 05 (Warehouse/License Plates)
+
+story:
+  id: "02.10b"
+  name: "Traceability Queries & Genealogy"
+  slug: "traceability-queries"
+  epic: "02-technical"
+  phase: "DEFERRED"  # NOT implementable until Epic 05 complete
+  complexity: "L"  # Large - recursive queries, tree visualization, recall simulation
+  estimate_days: 8
+  type: "backend + frontend"
+  state: "deferred"
+  parent_story: "02.10"  # Split from parent story 02.10
+
+  # Deferred reason
+  deferred_reason: |
+    Traceability queries require the `license_plates` and `lp_genealogy` tables
+    which are created in Epic 05 (Warehouse). These tables capture:
+    1. license_plates: Actual inventory with lot numbers, quantities, locations
+    2. lp_genealogy: Parent-child relationships between LPs
+    3. Consumption records: Links between work orders and consumed/produced LPs
+    Without these tables, traceability queries have no data to query.
+
+  estimated_start: "After Epic 05 completion (Q2 2025)"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Recursive CTE queries, required tables from Epic 05
+  - api.yaml         # Endpoints, request/response schemas
+  - frontend.yaml    # Components, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "02.10a"
+      name: "Traceability Configuration"
+      provides:
+        - "product_traceability_config table"
+        - "GS1 encoding service"
+        - "Lot format validation"
+        - "Traceability search page framework"
+        - "TraceabilitySearch component"
+      reason: "Configuration foundation must exist before queries"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides:
+        - "org_id context"
+        - "RLS policies"
+      reason: "Multi-tenant isolation required for all trace queries"
+
+  cross_epic_required:
+    - epic: "05"
+      name: "Warehouse Module"
+      stories:
+        - "05.1"  # LP Creation (license_plates table)
+        - "05.7"  # LP Genealogy (lp_genealogy table)
+        - "04.18" # Consumption with genealogy recording
+      provides:
+        - "license_plates table"
+        - "lp_genealogy table"
+        - "traceability_links table"
+        - "Consumption records with parent/child LP relationships"
+        - "LP status tracking (available, in_production, shipped, consumed, quarantine)"
+      reason: "ALL trace queries depend on LP and genealogy tables from Epic 05"
+
+  optional: []
+
+  blocked_by:
+    - epic: "05"
+      reason: "Cannot implement until license_plates and lp_genealogy tables exist"
+
+  blocks:
+    - story: "Epic 07"
+      name: "Shipping Module"
+      reason: "Shipped LP traceability for customer notifications"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections:
+      - "FR-2.60"  # Forward traceability (where used)
+      - "FR-2.61"  # Backward traceability (what consumed)
+      - "FR-2.62"  # Recall simulation
+      - "FR-2.63"  # Genealogy tree visualization
+      - "FR-2.65"  # Traceability matrix report
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections:
+      - "Traceability Tables"
+      - "Recursive CTE for Forward Trace"
+      - "traceability_links table schema"
+      - "lot_genealogy table schema"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.10b.traceability-queries.md"
+  parent_story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.10.traceability.md"
+    reason: "Original combined specification (archived)"
+  sibling_story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.10a.traceability-configuration.md"
+    reason: "Configuration foundation - must be complete first"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-016-traceability-search.md"
+      relevance: "Full traceability search, tree view, matrix view, recall simulation"
+  adrs: []  # No ADRs specific to this story
+
+# High-level deliverables (DEFERRED)
+deliverables:
+  - type: "api"
+    count: 6
+    status: "deferred"
+    description: "Traceability query endpoints"
+    files:
+      - "apps/frontend/app/api/v1/technical/tracing/forward/route.ts"
+      - "apps/frontend/app/api/v1/technical/tracing/backward/route.ts"
+      - "apps/frontend/app/api/v1/technical/tracing/recall/route.ts"
+      - "apps/frontend/app/api/v1/technical/tracing/genealogy/[lpId]/route.ts"
+      - "apps/frontend/app/api/v1/technical/tracing/recall/[id]/export/route.ts"
+      - "apps/frontend/app/api/v1/technical/tracing/matrix/[lpId]/export/route.ts"
+  - type: "service"
+    count: 2
+    status: "deferred"
+    description: "Traceability query service extensions"
+    files:
+      - "apps/frontend/lib/services/traceability-service.ts (extended from 02.10a)"
+      - "apps/frontend/lib/services/recall-simulation-service.ts"
+  - type: "component"
+    count: 6
+    status: "deferred"
+    description: "Traceability visualization components"
+    files:
+      - "components/technical/traceability/TraceResultsList.tsx"
+      - "components/technical/traceability/TraceResultsTree.tsx"
+      - "components/technical/traceability/TraceResultsMatrix.tsx"
+      - "components/technical/traceability/RecallSimulationPanel.tsx"
+      - "components/technical/traceability/GenealogyTree.tsx"
+      - "components/technical/traceability/TraceNodeDetails.tsx"
+  - type: "validation"
+    count: 1
+    status: "deferred"
+    description: "Traceability search schemas"
+    files:
+      - "apps/frontend/lib/validation/tracing.ts"
+  - type: "test"
+    count: 3
+    status: "deferred"
+    description: "Unit + integration + performance tests"
+    files:
+      - "apps/frontend/lib/services/__tests__/traceability-service.test.ts"
+      - "apps/frontend/app/api/v1/technical/tracing/__tests__/"
+      - "supabase/tests/traceability-queries.test.sql"
+
+# Technical notes
+technical_notes:
+  - "DEFERRED story - requires Epic 05 (Warehouse) tables: license_plates, lp_genealogy"
+  - "Forward trace uses recursive CTE with cycle prevention (path tracking)"
+  - "Backward trace reverses parent/child join direction"
+  - "max_depth parameter limits recursion (default 20, max 50)"
+  - "Tree visualization: D3.js or React Flow for interactive genealogy tree"
+  - "Recall simulation combines forward + backward trace + financial impact"
+  - "Performance target: <3s for 100 levels/1000 nodes, <5s for recall simulation"
+  - "Virtual scrolling for large datasets (1000+ rows in matrix view)"
+  - "Export formats: CSV, Excel, PDF for matrix; FDA JSON/XML for recall"
+
+# Scope clarification
+scope:
+  in_scope:
+    - "POST /api/technical/tracing/forward - Forward trace (where used)"
+    - "POST /api/technical/tracing/backward - Backward trace (what consumed)"
+    - "POST /api/technical/tracing/recall - Recall simulation with impact"
+    - "GET /api/technical/tracing/genealogy/:lpId - Genealogy tree data"
+    - "GET /api/technical/tracing/recall/:id/export - Export recall report"
+    - "GET /api/technical/tracing/matrix/:lpId/export - Export traceability matrix"
+    - "TraceResultsList component (list view)"
+    - "TraceResultsTree component (D3.js tree view)"
+    - "TraceResultsMatrix component (matrix view)"
+    - "RecallSimulationPanel component (recall results)"
+    - "GenealogyTree component (tree visualization)"
+    - "CSV/Excel export for traceability matrix"
+    - "PDF export for recall simulation report"
+    - "Performance tests for large genealogy trees"
+
+  out_of_scope:
+    - "Traceability configuration (covered in 02.10a)"
+    - "GS1 encoding service (covered in 02.10a)"
+    - "Lot format setup (covered in 02.10a)"
+    - "Search page framework (covered in 02.10a)"
+    - "license_plates table (Epic 05 - Warehouse)"
+    - "lp_genealogy table (Epic 05 - Warehouse)"
+    - "Real-time D3.js tree visualization (use React Flow for simplicity)"
+    - "Customer notification email generation (Epic 07 - Shipping)"
+    - "FDA report XML export (regulatory compliance phase)"
+    - "Cross-contamination tracking (FR-2.67 - Future)"
+    - "Ingredient origin tracking (FR-2.66 - Future)"
+
+# Risk notes
+risks:
+  - id: "RISK-01"
+    description: "Epic 05 delayed"
+    mitigation: "02.10a provides value independently (config, GS1 encoding)"
+    severity: "medium"
+  - id: "RISK-02"
+    description: "Genealogy performance with large datasets"
+    mitigation: "Use materialized paths, indexed queries, max_depth limits"
+    severity: "medium"
+  - id: "RISK-03"
+    description: "Complex tree visualization"
+    mitigation: "Start with list view, add tree view incrementally; use React Flow instead of D3.js"
+    severity: "low"
+  - id: "RISK-04"
+    description: "Large recall simulations"
+    mitigation: "Add pagination, background processing for >10K LPs"
+    severity: "medium"
+
+# Relationship to sibling story
+relationship:
+  sibling: "02.10a"
+  description: |
+    02.10a (Config - READY)              02.10b (Queries - DEFERRED)
+    ------------------                   -----------------
+    - product_traceability_config table  - Forward/backward trace APIs
+    - GS1 encoding service               - Recall simulation API
+    - Lot format validation              - Genealogy tree API
+    - Search page framework              - Tree/matrix visualizations
+    - Config modal                       - Export functionality
+
+    No LP dependency                     Requires:
+                                         - license_plates table (Epic 05)
+                                         - lp_genealogy table (Epic 05)
+                                         - Consumption records (Epic 05)

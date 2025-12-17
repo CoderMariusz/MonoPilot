@@ -1,0 +1,362 @@
+# Story 04.2c - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/production/work-orders/:id/complete"
+    description: "Complete a work order, setting status to 'completed'"
+    file: "apps/frontend/app/api/production/work-orders/[id]/complete/route.ts"
+    auth: "required"
+    roles: ["production_manager", "production_operator", "admin", "owner"]
+    permission: "production.wo.complete"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - Work Order ID"
+      body: null  # No body required - uses existing WO data
+
+    response:
+      status: 200
+      type: "WorkOrderCompletionResult"
+      schema:
+        id: "UUID"
+        wo_number: "string"
+        status: "'completed'"
+        completed_at: "ISO8601 timestamp"
+        completed_by: "UUID"
+        planned_qty: "number"
+        produced_qty: "number"
+        actual_yield_percent: "number (2 decimal places)"
+        yield_variance_pct: "number (can be negative)"
+        production_time_hours: "number"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "WO must be In Progress to complete"
+        when: "WO status is not 'in_progress'"
+      - status: 400
+        code: "OPERATIONS_INCOMPLETE"
+        message: "All operations must be completed before closing the WO"
+        when: "require_operation_sequence=true AND some operations not completed"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "You do not have permission to complete work orders"
+        when: "User lacks production.wo.complete permission"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Work order not found"
+        when: "WO doesn't exist or belongs to different org"
+      - status: 500
+        code: "COMPLETION_FAILED"
+        message: "Failed to complete work order"
+        when: "Database error during update"
+
+  - method: "POST"
+    path: "/api/production/work-orders/:id/auto-complete"
+    description: "Internal endpoint - triggered when produced_qty >= planned_qty"
+    file: "apps/frontend/app/api/production/work-orders/[id]/auto-complete/route.ts"
+    auth: "required"
+    internal: true
+    note: "Called internally when yield tracking updates produced_qty"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - Work Order ID"
+      body: null
+
+    response:
+      status: 200
+      type: "AutoCompleteResult"
+      schema:
+        id: "UUID"
+        wo_number: "string"
+        status: "'completed'"
+        auto_completed: true
+        completed_at: "ISO8601 timestamp"
+
+    errors:
+      - status: 400
+        code: "AUTO_COMPLETE_DISABLED"
+        message: "Auto-complete is disabled in production settings"
+        when: "auto_complete_wo = false"
+      - status: 400
+        code: "BELOW_TARGET"
+        message: "Produced quantity has not reached planned quantity"
+        when: "produced_qty < planned_qty"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/work-order-service.ts"
+    description: "Work order lifecycle service"
+    exports:
+      - name: "completeWorkOrder"
+        type: "async function"
+        params:
+          - "workOrderId: string"
+        returns: "Promise<WorkOrderCompletionResult>"
+        description: "Complete a work order with validation and yield calculation"
+        implementation: |
+          // 1. Validate WO status = 'in_progress'
+          // 2. Get production_settings for org
+          // 3. If require_operation_sequence = true, validate all operations completed
+          // 4. Calculate yield: (produced_qty / planned_qty * 100)
+          // 5. Update work_orders: status = 'completed', completed_at = now(), completed_by = auth.uid()
+          // 6. Log material reservation release placeholder (Phase 0)
+          // 7. Return completion result
+
+      - name: "checkAutoComplete"
+        type: "async function"
+        params:
+          - "workOrderId: string"
+        returns: "Promise<boolean>"
+        description: "Check if WO should auto-complete and trigger if so"
+        implementation: |
+          // 1. Get production_settings.auto_complete_wo
+          // 2. If false, return false
+          // 3. Get WO planned_qty and produced_qty
+          // 4. If produced_qty >= planned_qty, call completeWorkOrder()
+          // 5. Return true if auto-completed, false otherwise
+
+      - name: "validateOperationsComplete"
+        type: "async function"
+        params:
+          - "workOrderId: string"
+        returns: "Promise<{ complete: boolean; total: number; completed: number }>"
+        description: "Check if all operations are completed"
+
+      - name: "calculateYield"
+        type: "function"
+        params:
+          - "producedQty: number"
+          - "plannedQty: number"
+        returns: "{ yieldPercent: number; variancePct: number }"
+        description: "Calculate yield percentage and variance"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/production.ts"
+    description: "Production TypeScript interfaces"
+    exports:
+      - name: "WorkOrderCompletionResult"
+        type: "interface"
+        fields:
+          - "id: string"
+          - "wo_number: string"
+          - "status: 'completed'"
+          - "completed_at: string"
+          - "completed_by: string"
+          - "planned_qty: number"
+          - "produced_qty: number"
+          - "actual_yield_percent: number"
+          - "yield_variance_pct: number"
+          - "production_time_hours: number"
+          - "message: string"
+
+      - name: "AutoCompleteResult"
+        type: "interface"
+        fields:
+          - "id: string"
+          - "wo_number: string"
+          - "status: 'completed'"
+          - "auto_completed: boolean"
+          - "completed_at: string"
+
+# Validation
+validation:
+  - path: "apps/frontend/lib/validation/production-schemas.ts"
+    description: "Zod schemas for production validation"
+    exports:
+      - name: "completeWorkOrderSchema"
+        type: "zod schema"
+        schema: |
+          z.object({
+            // No body required - uses WO ID from URL params
+          })
+        note: "Completion uses existing WO data, no additional input required"
+
+      - name: "autoCompleteCheckSchema"
+        type: "zod schema"
+        schema: |
+          z.object({
+            workOrderId: z.string().uuid(),
+            producedQty: z.number().positive(),
+            plannedQty: z.number().positive(),
+          })
+
+# Implementation Patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/production/work-orders/[id]/complete/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { completeWorkOrder } from '@/lib/services/work-order-service';
+    import { hasPermission, getOrgContext } from '@/lib/services/org-context-service';
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // 1. Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // 2. Permission check
+      const context = await getOrgContext();
+      if (!context || !hasPermission(context, 'production', 'U')) {
+        return NextResponse.json(
+          { error: 'You do not have permission to complete work orders' },
+          { status: 403 }
+        );
+      }
+
+      // 3. Call service
+      try {
+        const result = await completeWorkOrder(params.id);
+        return NextResponse.json(result);
+      } catch (error) {
+        if (error.code === 'INVALID_STATUS') {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        if (error.code === 'OPERATIONS_INCOMPLETE') {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        if (error.code === 'NOT_FOUND') {
+          return NextResponse.json({ error: error.message }, { status: 404 });
+        }
+        console.error('Complete WO error:', error);
+        return NextResponse.json(
+          { error: 'Failed to complete work order' },
+          { status: 500 }
+        );
+      }
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/work-order-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+    export async function completeWorkOrder(
+      workOrderId: string
+    ): Promise<WorkOrderCompletionResult> {
+      const supabase = createClientComponentClient();
+
+      // 1. Get WO and validate status
+      const { data: wo, error: woError } = await supabase
+        .from('work_orders')
+        .select('*, product:products(name)')
+        .eq('id', workOrderId)
+        .single();
+
+      if (woError || !wo) {
+        throw { code: 'NOT_FOUND', message: 'Work order not found' };
+      }
+
+      if (wo.status !== 'in_progress') {
+        throw { code: 'INVALID_STATUS', message: 'WO must be In Progress to complete' };
+      }
+
+      // 2. Get production settings
+      const { data: settings } = await supabase
+        .from('production_settings')
+        .select('require_operation_sequence, auto_complete_wo')
+        .single();
+
+      // 3. Validate operations if sequence required
+      if (settings?.require_operation_sequence) {
+        const { data: ops } = await supabase
+          .from('wo_operations')
+          .select('status')
+          .eq('wo_id', workOrderId);
+
+        const incomplete = ops?.filter(op => op.status !== 'completed');
+        if (incomplete && incomplete.length > 0) {
+          throw {
+            code: 'OPERATIONS_INCOMPLETE',
+            message: 'All operations must be completed before closing the WO'
+          };
+        }
+      }
+
+      // 4. Calculate yield
+      const yieldPercent = (wo.produced_qty / wo.planned_qty) * 100;
+      const variancePct = ((wo.produced_qty - wo.planned_qty) / wo.planned_qty) * 100;
+
+      // 5. Update work order
+      const { data: updated, error: updateError } = await supabase
+        .from('work_orders')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          actual_yield_percent: Math.round(yieldPercent * 100) / 100,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', workOrderId)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw { code: 'COMPLETION_FAILED', message: 'Failed to complete work order' };
+      }
+
+      // 6. Log material reservation release placeholder (Phase 0)
+      console.log(`Material reservation release skipped - Epic 05 required (WO: ${wo.wo_number})`);
+
+      // 7. Return result
+      const productionHours = wo.started_at
+        ? (Date.now() - new Date(wo.started_at).getTime()) / (1000 * 60 * 60)
+        : 0;
+
+      return {
+        id: updated.id,
+        wo_number: updated.wo_number,
+        status: 'completed',
+        completed_at: updated.completed_at,
+        completed_by: updated.completed_by,
+        planned_qty: updated.planned_qty,
+        produced_qty: updated.produced_qty,
+        actual_yield_percent: updated.actual_yield_percent,
+        yield_variance_pct: Math.round(variancePct * 100) / 100,
+        production_time_hours: Math.round(productionHours * 10) / 10,
+        message: `Work order ${updated.wo_number} completed successfully`
+      };
+    }
+
+# Error Handling
+error_handling:
+  table:
+    - scenario: "WO not found"
+      http_status: 404
+      error_message: "Work order not found"
+      action: "Log, return error"
+    - scenario: "Invalid status (not in_progress)"
+      http_status: 400
+      error_message: "WO must be In Progress to complete"
+      action: "Return error"
+    - scenario: "Operations incomplete"
+      http_status: 400
+      error_message: "All operations must be completed"
+      action: "Return error with count"
+    - scenario: "Permission denied"
+      http_status: 403
+      error_message: "You do not have permission to complete work orders"
+      action: "Return error"
+    - scenario: "Database error"
+      http_status: 500
+      error_message: "Failed to complete work order"
+      action: "Log error, rollback if needed"

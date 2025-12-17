@@ -1,0 +1,668 @@
+# Story 05.1 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/license-plate-service.test.ts"
+    type: "unit"
+    description: "Unit tests for LP service methods"
+  - path: "apps/frontend/app/api/warehouse/license-plates/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for LP API endpoints"
+  - path: "supabase/tests/rls-license-plates.test.sql"
+    type: "integration"
+    description: "RLS policy tests for license_plates table"
+  - path: "apps/frontend/__tests__/e2e/warehouse/license-plates.spec.ts"
+    type: "e2e"
+    description: "E2E tests for LP list and detail pages"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # AC-1: LP Table Creation
+  - id: "AC-01"
+    name: "LP table exists with all required columns"
+    given: "database migration runs"
+    when: "schema is inspected"
+    then: "license_plates table has all 27 columns with correct types and constraints"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-2: LP Number Auto-Generation
+  - id: "AC-02.1"
+    name: "Generate LP number with default prefix"
+    given: "warehouse_settings.auto_generate_lp_number = true, prefix = 'LP', length = 8"
+    when: "LP is created without lp_number"
+    then: "system generates LP number 'LP00000001'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02.2"
+    name: "Generate LP number with custom prefix"
+    given: "warehouse_settings.lp_number_prefix = 'INV-', length = 6"
+    when: "LP is created without lp_number"
+    then: "system generates LP number 'INV-000001'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02.3"
+    name: "LP number uniqueness validation"
+    given: "LP 'LP00000001' exists in org A"
+    when: "user creates another LP with 'LP00000001' in org A"
+    then: "system returns 409 Conflict error"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02.4"
+    name: "Same LP number allowed across orgs"
+    given: "LP 'LP00000001' exists in org A"
+    when: "user creates LP 'LP00000001' in org B"
+    then: "LP created successfully"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-3: LP CRUD Operations
+  - id: "AC-03.1"
+    name: "List LPs with pagination"
+    given: "100 LPs exist in warehouse"
+    when: "user requests GET /api/warehouse/license-plates?page=1&limit=50"
+    then: "response returns 50 LPs with pagination metadata"
+    test_type: "integration"
+    priority: "P0"
+    performance: "<500ms"
+
+  - id: "AC-03.2"
+    name: "Filter LPs by status"
+    given: "50 available LPs and 30 reserved LPs"
+    when: "user requests GET /api/warehouse/license-plates?status=available"
+    then: "only 50 available LPs returned"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03.3"
+    name: "Filter LPs by QA status"
+    given: "40 passed LPs and 60 pending LPs"
+    when: "user requests GET /api/warehouse/license-plates?qa_status=passed"
+    then: "only 40 passed LPs returned"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03.4"
+    name: "Search LPs by LP number prefix"
+    given: "LPs: LP00000001, LP00000002, LP00000100"
+    when: "user requests GET /api/warehouse/license-plates?search=LP000001"
+    then: "LP00000001, LP00000100 returned"
+    test_type: "integration"
+    priority: "P0"
+    performance: "<300ms"
+
+  - id: "AC-03.5"
+    name: "Get LP detail"
+    given: "LP 'LP00000001' exists with all tracking fields"
+    when: "user requests GET /api/warehouse/license-plates/{id}"
+    then: "response includes all LP fields with product and location joined"
+    test_type: "integration"
+    priority: "P0"
+    performance: "<100ms"
+
+  - id: "AC-03.6"
+    name: "Create LP with required fields"
+    given: "valid product_id, location_id, warehouse_id"
+    when: "POST /api/warehouse/license-plates"
+    then: "LP created with auto-generated lp_number, status='available'"
+    test_type: "integration"
+    priority: "P0"
+    performance: "<200ms"
+
+  # AC-4: LP Status Management
+  - id: "AC-04.1"
+    name: "Block LP"
+    given: "LP with status = 'available'"
+    when: "PUT /api/warehouse/license-plates/{id}/block"
+    then: "LP.status = 'blocked'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04.2"
+    name: "Unblock LP"
+    given: "LP with status = 'blocked'"
+    when: "PUT /api/warehouse/license-plates/{id}/unblock"
+    then: "LP.status = 'available'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04.3"
+    name: "Update QA status"
+    given: "LP with qa_status = 'pending'"
+    when: "PUT /api/warehouse/license-plates/{id}/qa-status with qa_status = 'passed'"
+    then: "LP.qa_status = 'passed'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04.4"
+    name: "Consumed LP is immutable"
+    given: "LP with status = 'consumed'"
+    when: "user attempts to update any field"
+    then: "system returns 400 error"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-5: LP Consumption (Epic 04 Critical)
+  - id: "AC-05.1"
+    name: "Consume full LP quantity"
+    given: "LP with quantity = 100, status = 'available', qa_status = 'passed'"
+    when: "consumeLP(lp_id, consume_qty=100, wo_id)"
+    then: "LP.quantity = 0, LP.status = 'consumed', LP.consumed_by_wo_id = wo_id"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-05.2"
+    name: "Partial LP consumption"
+    given: "LP with quantity = 100"
+    when: "consumeLP(lp_id, consume_qty=30, wo_id)"
+    then: "LP.quantity = 70, LP.status = 'available'"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-05.3"
+    name: "Consumption blocked if LP not available"
+    given: "LP with status = 'blocked'"
+    when: "consumeLP(lp_id, consume_qty=50, wo_id)"
+    then: "error 'LP not available for consumption'"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-05.4"
+    name: "Consumption blocked if QA not passed"
+    given: "LP with qa_status = 'pending'"
+    when: "consumeLP(lp_id, consume_qty=50, wo_id)"
+    then: "error 'LP not QA approved for consumption'"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-05.5"
+    name: "Consumption blocked if insufficient quantity"
+    given: "LP with quantity = 30"
+    when: "consumeLP(lp_id, consume_qty=50, wo_id)"
+    then: "error 'Consume quantity exceeds available quantity'"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-05.6"
+    name: "Consumption blocked for expired LP"
+    given: "LP with expiry_date = past date"
+    when: "consumeLP(lp_id, consume_qty=50, wo_id)"
+    then: "error 'LP is expired'"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  # AC-6: LP Output Creation (Epic 04 Critical)
+  - id: "AC-06.1"
+    name: "Create output LP from production"
+    given: "valid WO with product_id, location_id, warehouse_id"
+    when: "createOutputLP(...)"
+    then: "new LP created with auto-generated lp_number, source='production', wo_id set"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-06.2"
+    name: "Calculate expiry from shelf life"
+    given: "product.shelf_life_days = 90, manufacture_date = '2025-12-16'"
+    when: "createOutputLP without expiry_date"
+    then: "LP.expiry_date = '2026-03-16'"
+    test_type: "unit"
+    priority: "P1"
+
+  # AC-7: LP Availability Query (Epic 04 Critical)
+  - id: "AC-07.1"
+    name: "Get available LPs for product"
+    given: "10 LPs for product A: 5 available, 3 reserved, 2 consumed"
+    when: "getAvailableLPs(product_id=A)"
+    then: "returns 5 LPs with status='available' AND qa_status='passed'"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-07.2"
+    name: "Get available LPs ordered by FIFO"
+    given: "LPs created at different times"
+    when: "getAvailableLPs(product_id=A, order='fifo')"
+    then: "LPs returned ORDER BY created_at ASC"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-07.3"
+    name: "Get available LPs ordered by FEFO"
+    given: "LPs with different expiry dates"
+    when: "getAvailableLPs(product_id=A, order='fefo')"
+    then: "LPs returned ORDER BY expiry_date ASC"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-07.4"
+    name: "Exclude expired LPs from suggestions"
+    given: "LP with expiry_date < today"
+    when: "getAvailableLPs(product_id=A)"
+    then: "expired LP NOT in results"
+    test_type: "unit"
+    priority: "P0"
+
+  # AC-10: RLS Policy Enforcement
+  - id: "AC-10.1"
+    name: "Org isolation on LP list"
+    given: "User A from Org A, User B from Org B, LPs in both orgs"
+    when: "User A requests /api/warehouse/license-plates"
+    then: "only Org A LPs returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-10.2"
+    name: "Cross-tenant LP access returns 404"
+    given: "LP belongs to Org B"
+    when: "User A from Org A requests /api/warehouse/license-plates/{orgB_lp_id}"
+    then: "404 Not Found returned (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-10.3"
+    name: "RLS on insert validates FKs"
+    given: "User A from Org A"
+    when: "creating LP with warehouse_id from Org B"
+    then: "RLS blocks insert"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # AC-11: Performance Requirements
+  - id: "AC-11.1"
+    name: "LP lookup performance"
+    given: "LP exists"
+    when: "GET /api/warehouse/license-plates/{id}"
+    then: "response time < 100ms"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-11.2"
+    name: "LP list performance"
+    given: "10,000 LPs in warehouse"
+    when: "GET /api/warehouse/license-plates with filters"
+    then: "response time < 500ms"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-11.3"
+    name: "LP search performance"
+    given: "10,000 LPs"
+    when: "search by LP number prefix"
+    then: "response time < 300ms"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  license_plate_service:
+    # CRUD
+    - name: "create() generates LP number when auto enabled"
+      setup: "Mock warehouse_settings with auto_generate=true"
+      expected: "LP created with generated number LP00000001"
+
+    - name: "create() uses provided LP number when manual"
+      setup: "Input with lp_number='CUSTOM-001'"
+      expected: "LP created with 'CUSTOM-001'"
+
+    - name: "create() blocks duplicate LP number"
+      setup: "LP 'LP00000001' already exists"
+      expected: "409 Conflict returned"
+
+    - name: "update() blocks changes to consumed LP"
+      setup: "LP with status='consumed'"
+      expected: "400 error returned"
+
+    # Consumption (Critical for Epic 04)
+    - name: "consumeLP() decrements quantity"
+      setup: "LP with qty=100"
+      params: ["lp_id", "consume_qty=30", "wo_id"]
+      expected: "LP.quantity = 70"
+
+    - name: "consumeLP() sets consumed status on full consume"
+      setup: "LP with qty=100"
+      params: ["lp_id", "consume_qty=100", "wo_id"]
+      expected: "LP.status = 'consumed', LP.consumed_by_wo_id = wo_id"
+
+    - name: "consumeLP() blocks if status != available"
+      setup: "LP with status='blocked'"
+      expected: "Error: LP not available"
+
+    - name: "consumeLP() blocks if qa_status != passed"
+      setup: "LP with qa_status='pending'"
+      expected: "Error: LP not QA approved"
+
+    - name: "consumeLP() blocks if insufficient qty"
+      setup: "LP with qty=30"
+      params: ["lp_id", "consume_qty=50", "wo_id"]
+      expected: "Error: Insufficient quantity"
+
+    - name: "consumeLP() blocks if expired"
+      setup: "LP with expiry_date='2025-01-01' (past)"
+      expected: "Error: LP is expired"
+
+    # Output Creation (Critical for Epic 04)
+    - name: "createOutputLP() generates LP number"
+      setup: "Valid input"
+      expected: "LP created with auto-generated number"
+
+    - name: "createOutputLP() sets source=production"
+      setup: "Valid input"
+      expected: "LP.source = 'production'"
+
+    - name: "createOutputLP() links to WO"
+      setup: "Input with wo_id"
+      expected: "LP.wo_id = wo_id"
+
+    - name: "createOutputLP() calculates expiry from shelf life"
+      setup: "Product with shelf_life_days=90, manufacture_date provided"
+      expected: "expiry_date = manufacture_date + 90 days"
+
+    # Availability Queries (Critical for Epic 04)
+    - name: "getAvailableLPs() filters correctly"
+      setup: "Mix of available, reserved, consumed LPs"
+      expected: "Only status=available AND qa_status=passed returned"
+
+    - name: "getAvailableLPs() orders by FIFO"
+      setup: "LPs with different created_at"
+      params: ["product_id", "order='fifo'"]
+      expected: "Ordered by created_at ASC"
+
+    - name: "getAvailableLPs() orders by FEFO"
+      setup: "LPs with different expiry_date"
+      params: ["product_id", "order='fefo'"]
+      expected: "Ordered by expiry_date ASC"
+
+    - name: "getAvailableLPs() excludes expired"
+      setup: "LP with expiry_date in past"
+      expected: "Expired LP not in results"
+
+    # Status Management
+    - name: "block() updates status to blocked"
+      setup: "LP with status='available'"
+      expected: "LP.status = 'blocked'"
+
+    - name: "unblock() restores available status"
+      setup: "LP with status='blocked'"
+      expected: "LP.status = 'available'"
+
+    - name: "updateQAStatus() updates qa_status"
+      setup: "LP with qa_status='pending'"
+      params: ["id", "qa_status='passed'"]
+      expected: "LP.qa_status = 'passed'"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /license-plates returns paginated list"
+      method: "GET"
+      path: "/api/warehouse/license-plates?page=1&limit=20"
+      expected_status: 200
+      assertions:
+        - "data is array"
+        - "pagination.total >= 0"
+        - "pagination.page = 1"
+        - "pagination.limit = 20"
+
+    - name: "GET /license-plates?status=available filters correctly"
+      method: "GET"
+      path: "/api/warehouse/license-plates?status=available"
+      expected_status: 200
+      assertions:
+        - "all items have status='available'"
+
+    - name: "GET /license-plates?search=LP000 searches by prefix"
+      method: "GET"
+      path: "/api/warehouse/license-plates?search=LP000"
+      expected_status: 200
+      performance: "<300ms"
+      assertions:
+        - "all lp_numbers start with 'LP000'"
+
+    - name: "GET /license-plates/:id returns LP detail"
+      method: "GET"
+      path: "/api/warehouse/license-plates/{valid_id}"
+      expected_status: 200
+      assertions:
+        - "includes product joined data"
+        - "includes location joined data"
+
+    - name: "GET /license-plates/:id with invalid ID returns 404"
+      method: "GET"
+      path: "/api/warehouse/license-plates/invalid-uuid"
+      expected_status: 404
+
+    - name: "POST /license-plates creates LP"
+      method: "POST"
+      path: "/api/warehouse/license-plates"
+      body: "valid CreateLPInput"
+      expected_status: 201
+      assertions:
+        - "lp_number is generated"
+        - "status = 'available'"
+
+    - name: "POST /license-plates with duplicate number returns 409"
+      method: "POST"
+      path: "/api/warehouse/license-plates"
+      body: "input with existing lp_number"
+      expected_status: 409
+
+    - name: "PUT /license-plates/:id/block blocks LP"
+      method: "PUT"
+      path: "/api/warehouse/license-plates/{id}/block"
+      expected_status: 200
+      assertions:
+        - "status = 'blocked'"
+
+    - name: "Cross-org access returns 404"
+      setup: "LP belongs to different org"
+      method: "GET"
+      path: "/api/warehouse/license-plates/{other_org_lp_id}"
+      expected_status: 404
+      security: true
+
+  rls_isolation:
+    - name: "User can only read own org LPs"
+      setup: "Create Org A with LP-A, Org B with LP-B"
+      action: "User A queries license_plates table"
+      expected: "Only LP-A visible, LP-B not visible"
+
+    - name: "User cannot insert LP with other org's warehouse"
+      setup: "User A, warehouse belongs to Org B"
+      action: "User A attempts to create LP with warehouse_id from Org B"
+      expected: "RLS blocks insert"
+
+    - name: "Cross-tenant update blocked"
+      setup: "User A from Org A, LP belongs to Org B"
+      action: "User A attempts to update LP"
+      expected: "RLS blocks update, 0 rows affected"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "View LP list page"
+    steps:
+      - "Navigate to /warehouse/license-plates"
+      - "Wait for page to load"
+    expected:
+      - "KPI cards displayed"
+      - "DataTable displayed with LPs"
+      - "Page loads in < 500ms"
+
+  - name: "Filter LPs by status"
+    steps:
+      - "Navigate to /warehouse/license-plates"
+      - "Open status filter dropdown"
+      - "Select 'available'"
+    expected:
+      - "Table updates to show only available LPs"
+      - "All visible LPs have green 'Available' badge"
+
+  - name: "Search LPs by number"
+    steps:
+      - "Navigate to /warehouse/license-plates"
+      - "Type 'LP000' in search input"
+      - "Wait 300ms for debounce"
+    expected:
+      - "Table filters to matching LP numbers"
+      - "Response in < 300ms after debounce"
+
+  - name: "View LP detail panel"
+    steps:
+      - "Navigate to /warehouse/license-plates"
+      - "Click on LP row"
+    expected:
+      - "Detail panel slides in from right"
+      - "All LP fields displayed"
+      - "Product, location info shown"
+
+  - name: "Sort by column"
+    steps:
+      - "Navigate to /warehouse/license-plates"
+      - "Click 'Expiry' column header"
+    expected:
+      - "Table sorts by expiry_date ASC"
+      - "Click again sorts DESC"
+
+  - name: "Pagination works"
+    steps:
+      - "Navigate to /warehouse/license-plates (100+ LPs)"
+      - "Click page 2"
+    expected:
+      - "Shows items 51-100"
+      - "Page indicator shows '2'"
+
+  - name: "Status badge colors correct"
+    steps:
+      - "Navigate to /warehouse/license-plates"
+      - "View LPs with different statuses"
+    expected:
+      - "Available: green badge"
+      - "Reserved: yellow badge"
+      - "Consumed: gray badge"
+      - "Blocked: red badge"
+
+  - name: "QA badge colors correct"
+    steps:
+      - "Navigate to /warehouse/license-plates"
+      - "View LPs with different QA statuses"
+    expected:
+      - "Pending: yellow badge"
+      - "Passed: green badge"
+      - "Failed: red badge"
+      - "Quarantine: orange badge"
+
+  - name: "Expiry indicator colors correct"
+    steps:
+      - "Navigate to /warehouse/license-plates"
+      - "View LPs with different expiry dates"
+    expected:
+      - "Expired: red with 'EXPIRED' label"
+      - "< 7 days: red indicator"
+      - "7-30 days: yellow indicator"
+      - "> 30 days: green (no indicator)"
+
+# Definition of Done
+definition_of_done:
+  database:
+    - "license_plates table created with all columns"
+    - "lp_number_sequences table created"
+    - "generate_lp_number() function works correctly"
+    - "All indexes created for performance"
+    - "RLS policies enforce org isolation"
+    - "RLS prevents cross-tenant access (returns 404)"
+
+  api:
+    - "All endpoints return correct HTTP status codes"
+    - "Validation errors return 400 with messages"
+    - "Cross-tenant access returns 404"
+    - "Response time targets met"
+
+  service:
+    - "consumeLP() validates and processes correctly (Epic 04 critical)"
+    - "createOutputLP() creates production LPs correctly (Epic 04 critical)"
+    - "getAvailableLPs() returns correct filtered/sorted results (Epic 04 critical)"
+    - "All Epic 04 integration methods tested and working"
+
+  frontend:
+    - "LP list page renders DataTable"
+    - "Filters work correctly"
+    - "Search debounces and filters"
+    - "Pagination works"
+    - "Sorting works"
+    - "Detail panel displays all info"
+    - "Status/QA badges display correct colors"
+    - "Expiry indicators show warnings"
+
+  testing:
+    - "Unit tests: >80% coverage on service"
+    - "Integration tests: All endpoints covered"
+    - "RLS tests: Multi-tenancy verified"
+    - "E2E tests: Critical flows passing"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    critical_paths:
+      - "consumeLP: 95%"
+      - "createOutputLP: 95%"
+      - "getAvailableLPs: 95%"
+    reason: "Epic 04 integration methods are critical"
+  integration:
+    target: 80
+    reason: "All API endpoints must be tested"
+  e2e:
+    target: 70
+    reason: "Critical user flows covered"
+  files:
+    - "lib/services/license-plate-service.ts: 80%"
+    - "lib/validation/license-plate.ts: 90%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "RLS policy misconfiguration could leak LP data across tenants"
+    mitigation: "Comprehensive integration tests with 2+ org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"
+
+  - id: "RISK-02"
+    description: "consumeLP() race condition could over-consume"
+    mitigation: "Use atomic UPDATE with qty check, transaction isolation"
+    severity: "high"
+    test_coverage: "unit_tests.consumeLP"
+
+  - id: "RISK-03"
+    description: "LP number sequence could have conflicts under high concurrency"
+    mitigation: "Atomic upsert with row lock in generate_lp_number()"
+    severity: "medium"
+    test_coverage: "unit_tests.create"
+
+  - id: "RISK-04"
+    description: "Performance degradation with large LP count"
+    mitigation: "Indexes designed for all query patterns, pagination enforced"
+    severity: "medium"
+    test_coverage: "integration_tests.performance"
+
+  - id: "RISK-05"
+    description: "Missing Epic 04 service method blocks production module"
+    mitigation: "All methods defined in interface, validated against Epic 04 spec"
+    severity: "critical"
+    test_coverage: "unit_tests.epic_04_methods"

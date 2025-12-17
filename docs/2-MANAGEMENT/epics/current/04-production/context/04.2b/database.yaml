@@ -1,0 +1,239 @@
+# Story 04.2b - WO Pause/Resume
+# Database schema, tables, RLS policies, and indexes
+
+database:
+  # New table for pause history
+  tables:
+    - name: "wo_pauses"
+      description: "Tracks work order pause/resume history with reasons and durations"
+      migration: "supabase/migrations/036_*.sql (existing)"
+      columns:
+        - name: "id"
+          type: "UUID"
+          constraints: "PRIMARY KEY DEFAULT uuid_generate_v4()"
+        - name: "org_id"
+          type: "UUID"
+          constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE"
+        - name: "work_order_id"
+          type: "UUID"
+          constraints: "NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE"
+        - name: "pause_reason"
+          type: "VARCHAR(100)"
+          constraints: "NULL"
+          values:
+            - "machine_breakdown"
+            - "material_shortage"
+            - "break"
+            - "quality_issue"
+            - "other"
+        - name: "notes"
+          type: "TEXT"
+          constraints: "NULL"
+        - name: "paused_at"
+          type: "TIMESTAMP WITH TIME ZONE"
+          constraints: "NOT NULL DEFAULT NOW()"
+        - name: "paused_by_user_id"
+          type: "UUID"
+          constraints: "NOT NULL REFERENCES users(id)"
+        - name: "resumed_at"
+          type: "TIMESTAMP WITH TIME ZONE"
+          constraints: "NULL"
+        - name: "resumed_by_user_id"
+          type: "UUID"
+          constraints: "NULL REFERENCES users(id)"
+        - name: "duration_minutes"
+          type: "INTEGER"
+          constraints: "DEFAULT 0"
+          calculation: "ROUND((resumed_at - paused_at) / 60000)"
+        - name: "created_at"
+          type: "TIMESTAMP WITH TIME ZONE"
+          constraints: "DEFAULT NOW()"
+        - name: "updated_at"
+          type: "TIMESTAMP WITH TIME ZONE"
+          constraints: "DEFAULT NOW()"
+      constraints:
+        - name: "downtime_nonnegative"
+          type: "CHECK"
+          definition: "duration_minutes >= 0"
+      indexes:
+        - name: "idx_wo_pauses_work_order"
+          columns: ["work_order_id"]
+        - name: "idx_wo_pauses_org"
+          columns: ["org_id"]
+        - name: "idx_wo_pauses_paused_at"
+          columns: ["paused_at"]
+      rls:
+        enabled: true
+        policies:
+          - name: "wo_pauses_isolation"
+            operation: "ALL"
+            using: "org_id = (auth.jwt() ->> 'org_id')::uuid"
+
+  # Existing table updates
+  table_updates:
+    - name: "production_settings"
+      description: "Add allow_pause_wo column if not exists"
+      changes:
+        - column: "allow_pause_wo"
+          type: "BOOLEAN"
+          default: "false"
+          migration_note: "Migration 036 sets default to true, but story specifies false"
+
+    - name: "work_orders"
+      description: "Existing fields used by pause/resume"
+      fields_used:
+        - name: "status"
+          type: "TEXT"
+          values:
+            - "draft"
+            - "released"
+            - "in_progress"
+            - "paused"
+            - "completed"
+            - "cancelled"
+        - name: "paused_at"
+          type: "TIMESTAMP WITH TIME ZONE"
+          description: "Current pause timestamp (for active pause)"
+        - name: "paused_by_user_id"
+          type: "UUID"
+          constraints: "REFERENCES users(id)"
+          description: "User who paused (for active pause)"
+
+# SQL for wo_pauses table (reference)
+sql_reference:
+  create_table: |
+    CREATE TABLE wo_pauses (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      work_order_id UUID NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+
+      -- Pause details
+      pause_reason VARCHAR(100),
+      notes TEXT,
+
+      -- Timestamps
+      paused_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      paused_by_user_id UUID NOT NULL REFERENCES users(id),
+      resumed_at TIMESTAMP WITH TIME ZONE,
+      resumed_by_user_id UUID REFERENCES users(id),
+
+      -- Calculated
+      duration_minutes INTEGER DEFAULT 0,
+
+      -- Audit
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+      CONSTRAINT downtime_nonnegative CHECK (duration_minutes >= 0)
+    );
+
+  create_indexes: |
+    CREATE INDEX idx_wo_pauses_work_order ON wo_pauses(work_order_id);
+    CREATE INDEX idx_wo_pauses_org ON wo_pauses(org_id);
+    CREATE INDEX idx_wo_pauses_paused_at ON wo_pauses(paused_at);
+
+  create_rls: |
+    ALTER TABLE wo_pauses ENABLE ROW LEVEL SECURITY;
+
+    CREATE POLICY wo_pauses_isolation ON wo_pauses
+      FOR ALL
+      USING (org_id = (auth.jwt() ->> 'org_id')::uuid);
+
+  alter_production_settings: |
+    ALTER TABLE production_settings
+      ADD COLUMN IF NOT EXISTS allow_pause_wo BOOLEAN DEFAULT false;
+
+# Data Operations
+operations:
+  pause_work_order:
+    description: "Atomic operation to pause a work order"
+    steps:
+      - "BEGIN TRANSACTION"
+      - "UPDATE work_orders SET status = 'paused', paused_at = NOW(), paused_by_user_id = :userId WHERE id = :woId AND status = 'in_progress'"
+      - "INSERT INTO wo_pauses (org_id, work_order_id, pause_reason, notes, paused_at, paused_by_user_id) VALUES (...)"
+      - "COMMIT"
+    rollback: "ROLLBACK on any failure"
+
+  resume_work_order:
+    description: "Atomic operation to resume a paused work order"
+    steps:
+      - "BEGIN TRANSACTION"
+      - "UPDATE work_orders SET status = 'in_progress', paused_at = NULL, paused_by_user_id = NULL WHERE id = :woId AND status = 'paused'"
+      - "UPDATE wo_pauses SET resumed_at = NOW(), resumed_by_user_id = :userId, duration_minutes = EXTRACT(EPOCH FROM (NOW() - paused_at)) / 60 WHERE work_order_id = :woId AND resumed_at IS NULL"
+      - "COMMIT"
+    rollback: "ROLLBACK on any failure"
+
+# Query Patterns
+queries:
+  get_pause_history:
+    description: "Get all pause records for a work order"
+    sql: |
+      SELECT
+        wp.id,
+        wp.pause_reason,
+        wp.notes,
+        wp.paused_at,
+        wp.resumed_at,
+        wp.duration_minutes,
+        pauser.id as paused_by_id,
+        pauser.first_name as paused_by_first_name,
+        pauser.last_name as paused_by_last_name,
+        resumer.id as resumed_by_id,
+        resumer.first_name as resumed_by_first_name,
+        resumer.last_name as resumed_by_last_name
+      FROM wo_pauses wp
+      LEFT JOIN users pauser ON wp.paused_by_user_id = pauser.id
+      LEFT JOIN users resumer ON wp.resumed_by_user_id = resumer.id
+      WHERE wp.work_order_id = :woId
+        AND wp.org_id = :orgId
+      ORDER BY wp.paused_at DESC;
+
+  get_active_pause:
+    description: "Get the current active pause (if any) for a work order"
+    sql: |
+      SELECT * FROM wo_pauses
+      WHERE work_order_id = :woId
+        AND org_id = :orgId
+        AND resumed_at IS NULL
+      ORDER BY paused_at DESC
+      LIMIT 1;
+
+  get_downtime_summary:
+    description: "Get total downtime summary for a work order"
+    sql: |
+      SELECT
+        COUNT(*) as total_pauses,
+        COALESCE(SUM(duration_minutes), 0) as total_downtime_minutes,
+        pause_reason,
+        SUM(duration_minutes) as reason_total_minutes
+      FROM wo_pauses
+      WHERE work_order_id = :woId
+        AND org_id = :orgId
+        AND resumed_at IS NOT NULL
+      GROUP BY pause_reason;
+
+  check_pause_enabled:
+    description: "Check if pause is enabled for the organization"
+    sql: |
+      SELECT allow_pause_wo
+      FROM production_settings
+      WHERE org_id = :orgId;
+
+# Migration Notes
+migration_notes:
+  - "Migration 036 should already create wo_pauses table"
+  - "Verify RLS policy exists and is correct"
+  - "production_settings.allow_pause_wo default may differ from migration (story requires false)"
+  - "Ensure indexes exist for performance"
+  - "work_orders table already has status, paused_at, paused_by_user_id fields"
+
+# Performance Considerations
+performance:
+  indexes_required:
+    - "idx_wo_pauses_work_order for quick lookup by WO"
+    - "idx_wo_pauses_org for RLS filter optimization"
+    - "idx_wo_pauses_paused_at for chronological queries"
+  query_optimization:
+    - "Use indexed columns in WHERE clauses"
+    - "Limit result sets for pause history"
+    - "Use transactions for atomic operations"

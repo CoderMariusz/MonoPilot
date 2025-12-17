@@ -1,0 +1,174 @@
+# Story 05.19 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.19"
+  name: "Scanner Receive Workflow"
+  slug: "scanner-receive"
+  epic: "05-warehouse"
+  phase: "Phase 2 (Scanner Workflows)"
+  complexity: "L"
+  estimate_days: 5
+  type: "backend + frontend (mobile)"
+  state: "ready"
+  model: "OPUS"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # No new tables, uses existing (GRNs, LPs, warehouse_settings)
+  - api.yaml         # Scanner endpoints, validation schemas
+  - frontend.yaml    # Mobile scanner components, audio/haptic feedback
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.11"
+      name: "GRN from PO"
+      provides: ["GRNService", "grns", "grn_items"]
+    - story: "05.14"
+      name: "Label Printing"
+      provides: ["LabelPrintService", "print_jobs"]
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides: ["LicensePlateService", "license_plates"]
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings", "scanner_settings"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses"]
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides: ["locations"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products"]
+    - story: "03.3"
+      name: "PO CRUD"
+      provides: ["purchase_orders", "po_lines"]
+  blocked_by: []
+  blocks:
+    - story: "05.19b"
+      name: "Scanner Receive Offline Queue (Phase 3)"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-011", "WH-FR-003", "WH-FR-001", "WH-FR-009", "WH-FR-010", "WH-FR-014"]
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-010-scanner-receive.md"
+      description: "Primary scanner receive workflow wireframe"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-012-scanner-putaway.md"
+      description: "Related putaway workflow for patterns"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-011-scanner-move.md"
+      description: "Related move workflow for patterns"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.19.scanner-receive.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for scanner endpoints"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 6
+    description: "Scanner receive endpoints"
+    paths:
+      - "POST /api/warehouse/scanner/receive"
+      - "GET /api/warehouse/scanner/pending-receipts"
+      - "POST /api/warehouse/scanner/validate-receipt"
+      - "GET /api/warehouse/scanner/lookup/po/:barcode"
+      - "GET /api/warehouse/scanner/lookup/product/:barcode"
+      - "GET /api/warehouse/scanner/lookup/location/:barcode"
+  - type: "service"
+    count: 1
+    description: "ScannerReceiveService with 7 methods"
+    path: "apps/frontend/lib/services/scanner-receive-service.ts"
+  - type: "validation"
+    count: 4
+    description: "Zod schemas for scanner operations"
+    path: "apps/frontend/lib/validation/scanner-receive.ts"
+  - type: "page"
+    count: 1
+    description: "Scanner receive page"
+    path: "apps/frontend/app/(authenticated)/scanner/receive/page.tsx"
+  - type: "component"
+    count: 15
+    description: "Scanner workflow components with mobile-first UI"
+  - type: "test"
+    count: 4
+    description: "Unit, integration, E2E, RLS tests"
+
+# Technical notes
+technical_notes:
+  - "Mobile-first UI with 48dp+ touch targets"
+  - "5-step wizard workflow: Select PO -> Review Lines -> Enter Details -> Confirm -> Success"
+  - "Audio feedback: success (880Hz), error (220Hz), confirm (660Hz+880Hz), alert (440Hz)"
+  - "Haptic feedback on supported devices"
+  - "High contrast colors for warehouse lighting conditions"
+  - "Response time targets: <500ms for all operations"
+  - "Integrates with existing GRNService (05.11) and LabelPrintService (05.14)"
+  - "Offline support deferred to 05.19b (Phase 3)"
+
+# PRD Coverage
+prd_coverage:
+  primary:
+    - id: "WH-FR-011"
+      name: "Scanner Receive"
+      coverage: "Full"
+  integrated:
+    - id: "WH-FR-003"
+      name: "GRN from PO"
+      coverage: "Integrated via GRNService"
+    - id: "WH-FR-001"
+      name: "LP Creation"
+      coverage: "Integrated via LicensePlateService"
+    - id: "WH-FR-009"
+      name: "Batch Tracking"
+      coverage: "Full - scanner entry"
+    - id: "WH-FR-010"
+      name: "Expiry Tracking"
+      coverage: "Full - scanner entry"
+    - id: "WH-FR-014"
+      name: "Label Print"
+      coverage: "Integrated via LabelPrintService"
+
+# Out of Scope
+out_of_scope:
+  - feature: "Offline Queue Support"
+    deferred_to: "05.19b (Phase 3)"
+    reason: "Requires IndexedDB, sync logic"
+  - feature: "GS1 Barcode Parsing (AI codes)"
+    deferred_to: "05.24"
+    reason: "Advanced GS1 feature"
+  - feature: "ASN Pre-fill"
+    deferred_to: "05.10"
+    reason: "ASN workflow separate"
+  - feature: "Catch Weight Entry"
+    deferred_to: "05.27"
+    reason: "Phase 3 feature"
+  - feature: "Scanner Login/Session"
+    deferred_to: "05.16"
+    reason: "Separate authentication story"
+
+# Risk Assessment
+risks:
+  - id: "RISK-01"
+    description: "Camera permission issues"
+    impact: "HIGH"
+    likelihood: "MEDIUM"
+    mitigation: "Clear permission prompts, manual entry fallback"
+  - id: "RISK-02"
+    description: "Barcode scanning reliability"
+    impact: "MEDIUM"
+    likelihood: "MEDIUM"
+    mitigation: "Multiple barcode libraries tested, manual fallback"
+  - id: "RISK-03"
+    description: "Network latency on warehouse floor"
+    impact: "HIGH"
+    likelihood: "MEDIUM"
+    mitigation: "Loading indicators, retry logic, future offline support"

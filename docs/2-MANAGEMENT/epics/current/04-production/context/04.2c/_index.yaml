@@ -1,0 +1,127 @@
+# Story 04.2c - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "04.2c"
+  name: "WO Complete (Execution End)"
+  slug: "wo-complete"
+  epic: "04-production"
+  phase: "0"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend + frontend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, updates, RLS
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, modals, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + RLS"
+      provides: ["org_id isolation", "user authentication"]
+    - story: "01.11"
+      name: "Production Lines CRUD"
+      provides: ["production_lines table", "line assignment validation"]
+    - story: "03.10"
+      name: "WO CRUD"
+      provides: ["work_orders table", "status field"]
+    - story: "03.12"
+      name: "WO Operations"
+      provides: ["wo_operations table", "operation status tracking"]
+    - story: "04.2a"
+      name: "WO Start"
+      provides: ["status = in_progress", "started_at timestamp"]
+    - story: "04.2b"
+      name: "WO Pause/Resume"
+      provides: ["paused status handling", "status validation"]
+    - story: "04.5"
+      name: "Production Settings"
+      provides: ["auto_complete_wo flag", "require_operation_sequence flag"]
+  blocked_by:
+    - story: "04.2a"
+      reason: "WO must be started before it can be completed"
+  blocks:
+    - story: "04.3"
+      name: "Operation Start/Complete"
+      note: "Operations tracking builds on WO lifecycle"
+    - story: "04.7a"
+      name: "Output Registration (Desktop)"
+      note: "Phase 1 - requires LP infrastructure"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections: ["FR-PROD-005"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/production.md"
+    sections: ["Database Schema", "API Design", "Data Flow"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/04.2c.wo-complete.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-002-wo-execution-detail.md"
+      sections: ["4.5 Complete WO Modal", "Section 3 Action Bar"]
+  phase_breakdown:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/PHASE-BREAKDOWN.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for multi-tenancy"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 2
+    description: "POST /api/production/work-orders/:id/complete, POST /api/production/work-orders/:id/auto-complete"
+  - type: "service"
+    count: 2
+    description: "completeWorkOrder(), checkAutoComplete() in work-order-service.ts"
+  - type: "component"
+    count: 3
+    description: "CompleteWorkOrderButton, CompleteWorkOrderModal, WorkOrderYieldBadge"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for completion in production-schemas.ts"
+  - type: "test"
+    count: 4
+    description: "Unit tests, E2E tests for complete flow"
+
+# Technical notes
+technical_notes:
+  - "Phase 0 scope: WO completion WITHOUT output LP creation"
+  - "Status transition: In Progress -> Completed (must validate current status)"
+  - "Yield calculation: (produced_qty / planned_qty) * 100"
+  - "Yield variance: (actual_yield - target_yield) / target_yield * 100"
+  - "Timestamp fields: completed_at (server time), completed_by (auth.uid())"
+  - "All operations must be complete if require_operation_sequence = true"
+  - "Auto-complete triggers when produced_qty >= planned_qty AND auto_complete_wo = true"
+  - "Material reservation release is PLACEHOLDER in Phase 0 (logs message, no error)"
+  - "Permission required: production.wo.complete"
+  - "Immutability: Completed WOs cannot be reopened (future story)"
+  - "Use POST method for state transition (not PATCH)"
+
+# MVP Scope Clarification
+mvp_scope:
+  included:
+    - "Manual WO completion with status transition"
+    - "Timestamp tracking (completed_at, completed_by)"
+    - "Yield calculation from WO metadata (produced_qty / planned_qty)"
+    - "Auto-complete based on setting (without output validation)"
+    - "Operation sequence validation (if enabled)"
+    - "Material reservation release placeholder"
+    - "Complete WO button with validation modal"
+    - "Low yield warning (<80%)"
+  excluded:
+    - "Output registration requirement validation (Story 04.7a - Phase 1)"
+    - "By-product registration validation (Story 04.7c - Phase 1)"
+    - "LP-based output quantity tracking (Story 04.7a - Phase 1)"
+    - "Consumption validation (Story 04.6a - Phase 1)"
+    - "OEE metrics update (Story 04.9a - Phase 2)"
+    - "Genealogy record closure (Story 04.7a - Phase 1)"

@@ -1,0 +1,453 @@
+# Story 02.1 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# API Version
+api_version: "v1"
+base_path: "/api/v1/technical"
+
+endpoints:
+  # Products CRUD
+  - method: "GET"
+    path: "/api/v1/technical/products"
+    description: "List products with pagination, filtering, and search"
+    file: "apps/frontend/app/api/v1/technical/products/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users can read
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        - { name: "search", type: "string", required: false, description: "Filter by code or name (min 2 chars)" }
+        - { name: "type", type: "string", required: false, description: "Filter by product_type code (RM, WIP, FG, PKG, BP)" }
+        - { name: "status", type: "string", required: false, description: "Filter by status (active, inactive, discontinued)" }
+        - { name: "sort", type: "string", required: false, default: "created_at", description: "Sort field (code, name, type, version, created_at)" }
+        - { name: "order", type: "string", required: false, default: "desc", description: "Sort order (asc, desc)" }
+        - { name: "page", type: "integer", required: false, default: 1, description: "Page number" }
+        - { name: "limit", type: "integer", required: false, default: 20, max: 100, description: "Items per page" }
+
+    response:
+      status: 200
+      type: "PaginatedResult<Product>"
+      schema:
+        data:
+          - id: "UUID"
+            org_id: "UUID"
+            code: "string"
+            name: "string"
+            description: "string | null"
+            product_type_id: "UUID"
+            product_type:
+              id: "UUID"
+              code: "string"
+              name: "string"
+            base_uom: "string"
+            status: "string"
+            version: "integer"
+            barcode: "string | null"
+            gtin: "string | null"
+            lead_time_days: "integer"
+            moq: "decimal | null"
+            std_price: "decimal | null"
+            cost_per_unit: "decimal | null"
+            min_stock: "decimal | null"
+            max_stock: "decimal | null"
+            expiry_policy: "string"
+            shelf_life_days: "integer | null"
+            storage_conditions: "string | null"
+            created_at: "timestamp"
+            updated_at: "timestamp"
+        pagination:
+          page: "integer"
+          limit: "integer"
+          total: "integer"
+          total_pages: "integer"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+  - method: "POST"
+    path: "/api/v1/technical/products"
+    description: "Create a new product"
+    file: "apps/frontend/app/api/v1/technical/products/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        code: { type: "string", required: true, validation: "min 2, max 50, regex: ^[A-Z0-9-]+$" }
+        name: { type: "string", required: true, validation: "min 2, max 255" }
+        description: { type: "string", required: false, validation: "max 1000" }
+        product_type_id: { type: "UUID", required: true }
+        base_uom: { type: "string", required: true }
+        barcode: { type: "string", required: false, validation: "max 100" }
+        gtin: { type: "string", required: false, validation: "exactly 14 digits, valid check digit" }
+        category_id: { type: "UUID", required: false }
+        lead_time_days: { type: "integer", required: false, default: 7, validation: "min 0, max 365" }
+        moq: { type: "decimal", required: false, validation: "positive if provided" }
+        std_price: { type: "decimal", required: false, validation: "min 0, max 4 decimals" }
+        cost_per_unit: { type: "decimal", required: false, validation: "min 0, max 4 decimals" }
+        min_stock: { type: "decimal", required: false, validation: "min 0" }
+        max_stock: { type: "decimal", required: false, validation: "min 0, >= min_stock" }
+        expiry_policy: { type: "enum", required: false, default: "none", values: ["fixed", "rolling", "none"] }
+        shelf_life_days: { type: "integer", required: false, validation: "min 1, max 3650, required if expiry_policy != none" }
+        storage_conditions: { type: "string", required: false, validation: "max 500" }
+        status: { type: "enum", required: false, default: "active", values: ["active", "inactive"] }
+
+    response:
+      status: 201
+      type: "Product"
+      schema:
+        id: "UUID"
+        # ... all product fields
+        version: 1
+        created_at: "timestamp"
+        updated_at: "timestamp"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        when: "Invalid request body"
+      - status: 400
+        code: "SKU_ALREADY_EXISTS"
+        message: "SKU already exists in your organization"
+        when: "Duplicate code within org"
+      - status: 400
+        code: "INVALID_GTIN"
+        message: "Invalid GTIN-14 format (must be 14 digits with valid check digit)"
+        when: "GTIN fails validation"
+      - status: 400
+        code: "MIN_STOCK_EXCEEDS_MAX"
+        message: "Minimum stock cannot exceed maximum stock"
+        when: "min_stock > max_stock"
+      - status: 400
+        code: "SHELF_LIFE_REQUIRED"
+        message: "Shelf life is required when expiry policy is set"
+        when: "expiry_policy != none and no shelf_life_days"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks create permission"
+
+  - method: "GET"
+    path: "/api/v1/technical/products/:id"
+    description: "Get product by ID"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      path_params:
+        - { name: "id", type: "UUID", required: true }
+
+    response:
+      status: 200
+      type: "Product"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Product not found"
+        when: "Product does not exist OR belongs to different org (security: no existence leak)"
+
+  - method: "PUT"
+    path: "/api/v1/technical/products/:id"
+    description: "Update product (code and product_type_id are immutable)"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      path_params:
+        - { name: "id", type: "UUID", required: true }
+      body:
+        # Same as POST but code and product_type_id are NOT allowed
+        name: { type: "string", required: false }
+        description: { type: "string", required: false }
+        base_uom: { type: "string", required: false }
+        # ... all other editable fields
+
+    response:
+      status: 200
+      type: "Product"
+
+    errors:
+      - status: 400
+        code: "IMMUTABLE_FIELD"
+        message: "Cannot modify code or product type after creation"
+        when: "Attempt to change code or product_type_id"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks update permission"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Product not found"
+        when: "Product does not exist OR belongs to different org"
+
+  - method: "DELETE"
+    path: "/api/v1/technical/products/:id"
+    description: "Soft delete product (only if no BOMs, work orders, or inventory)"
+    file: "apps/frontend/app/api/v1/technical/products/[id]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      path_params:
+        - { name: "id", type: "UUID", required: true }
+
+    response:
+      status: 204
+      type: "null"
+
+    errors:
+      - status: 400
+        code: "PRODUCT_IN_USE"
+        message: "Cannot delete product with active BOMs, work orders, or inventory"
+        when: "Product has references"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks delete permission"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Product not found"
+        when: "Product does not exist OR belongs to different org"
+
+  # Product Types CRUD
+  - method: "GET"
+    path: "/api/v1/technical/product-types"
+    description: "List all product types for current org"
+    file: "apps/frontend/app/api/v1/technical/product-types/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "ProductType[]"
+      schema:
+        - id: "UUID"
+          org_id: "UUID"
+          code: "string"
+          name: "string"
+          is_default: "boolean"
+          is_active: "boolean"
+          created_at: "timestamp"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/product-service.ts"
+    description: "Product CRUD operations"
+    exports:
+      - name: "ProductService"
+        type: "class"
+        methods:
+          - name: "list"
+            params: ["params: ProductListParams"]
+            returns: "Promise<PaginatedResult<Product>>"
+          - name: "getById"
+            params: ["id: string"]
+            returns: "Promise<Product | null>"
+          - name: "create"
+            params: ["data: CreateProductInput"]
+            returns: "Promise<Product>"
+          - name: "update"
+            params: ["id: string", "data: UpdateProductInput"]
+            returns: "Promise<Product>"
+          - name: "delete"
+            params: ["id: string"]
+            returns: "Promise<void>"
+          - name: "checkSkuExists"
+            params: ["sku: string"]
+            returns: "Promise<boolean>"
+          - name: "getActiveBOMsForProduct"
+            params: ["productId: string"]
+            returns: "Promise<BOM[]>"
+
+  - path: "apps/frontend/lib/services/product-type-service.ts"
+    description: "Product type operations"
+    exports:
+      - name: "ProductTypeService"
+        type: "class"
+        methods:
+          - name: "list"
+            params: []
+            returns: "Promise<ProductType[]>"
+          - name: "getById"
+            params: ["id: string"]
+            returns: "Promise<ProductType | null>"
+          - name: "ensureDefaultTypes"
+            params: []
+            returns: "Promise<void>"
+            description: "Creates default product types for org if not exists"
+
+# Implementation patterns
+patterns:
+  list_endpoint: |
+    // apps/frontend/app/api/v1/technical/products/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextRequest, NextResponse } from 'next/server';
+    import { productListParamsSchema } from '@/lib/validation/product';
+
+    export async function GET(request: NextRequest) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const { searchParams } = new URL(request.url);
+
+      // Parse and validate query params
+      const params = productListParamsSchema.parse({
+        search: searchParams.get('search'),
+        type: searchParams.get('type'),
+        status: searchParams.get('status'),
+        sort: searchParams.get('sort') || 'created_at',
+        order: searchParams.get('order') || 'desc',
+        page: parseInt(searchParams.get('page') || '1'),
+        limit: Math.min(parseInt(searchParams.get('limit') || '20'), 100),
+      });
+
+      // Build query with RLS automatic filtering
+      let query = supabase
+        .from('products')
+        .select(`
+          *,
+          product_type:product_types(id, code, name)
+        `, { count: 'exact' });
+
+      // Apply filters
+      if (params.search && params.search.length >= 2) {
+        query = query.or(`code.ilike.%${params.search}%,name.ilike.%${params.search}%`);
+      }
+      if (params.type) {
+        query = query.eq('product_type.code', params.type);
+      }
+      if (params.status) {
+        query = query.eq('status', params.status);
+      }
+
+      // Apply sorting and pagination
+      query = query
+        .order(params.sort, { ascending: params.order === 'asc' })
+        .range((params.page - 1) * params.limit, params.page * params.limit - 1);
+
+      const { data, count, error } = await query;
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        data,
+        pagination: {
+          page: params.page,
+          limit: params.limit,
+          total: count || 0,
+          total_pages: Math.ceil((count || 0) / params.limit),
+        },
+      });
+    }
+
+  create_endpoint: |
+    // apps/frontend/app/api/v1/technical/products/route.ts (POST)
+    export async function POST(request: NextRequest) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Get current user's org_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id, role:roles(code)')
+        .eq('id', user.id)
+        .single();
+
+      // Check permission
+      if (!['SUPER_ADMIN', 'ADMIN', 'PRODUCTION_MANAGER'].includes(userData.role.code)) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+      }
+
+      const body = await request.json();
+      const validatedData = createProductSchema.parse(body);
+
+      // Check SKU uniqueness
+      const { data: existing } = await supabase
+        .from('products')
+        .select('id')
+        .eq('code', validatedData.code)
+        .single();
+
+      if (existing) {
+        return NextResponse.json(
+          { error: 'SKU already exists in your organization', code: 'SKU_ALREADY_EXISTS' },
+          { status: 400 }
+        );
+      }
+
+      // Create product
+      const { data: product, error } = await supabase
+        .from('products')
+        .insert({
+          ...validatedData,
+          org_id: userData.org_id,
+          version: 1,
+          created_by: user.id,
+          updated_by: user.id,
+        })
+        .select(`*, product_type:product_types(id, code, name)`)
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json(product, { status: 201 });
+    }
+
+  cross_tenant_404: |
+    // Security: Return 404 (not 403) for cross-tenant access
+    // RLS filters out other orgs' products, so .single() returns null
+    // This prevents existence leak
+    const { data: product, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single();
+
+    if (!product) {
+      // Could be: doesn't exist OR belongs to other org
+      // Always return 404 to prevent existence leak
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    }

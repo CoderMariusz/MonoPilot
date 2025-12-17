@@ -1,0 +1,514 @@
+# Story 02.10a - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/traceability-config-service.test.ts"
+    type: "unit"
+    description: "Unit tests for traceability config service"
+  - path: "apps/frontend/lib/services/__tests__/gs1-service.test.ts"
+    type: "unit"
+    description: "Unit tests for GS1 encoding service (critical)"
+  - path: "apps/frontend/lib/validation/__tests__/traceability.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/app/api/v1/technical/products/[id]/traceability-config/__tests__/route.test.ts"
+    type: "integration"
+    description: "API integration tests"
+  - path: "supabase/tests/product_traceability_config_rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for traceability config table"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # Lot Number Format Configuration
+  - id: "AC-01"
+    category: "Lot Number Format"
+    given: "a user editing product lot settings"
+    when: "they configure lot format as 'LOT-{YYYY}-{SEQ:6}'"
+    then: "the pattern is saved and validated for correct placeholders"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    category: "Lot Number Format"
+    given: "a user configuring lot format"
+    when: "they enter an invalid placeholder (e.g., {INVALID})"
+    then: "validation error is displayed"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    category: "Lot Number Format"
+    given: "multiple products"
+    when: "each has a unique lot format prefix"
+    then: "lot numbers remain unique within the organization"
+    test_type: "integration"
+    priority: "P1"
+
+  # Batch Size Defaults
+  - id: "AC-04"
+    category: "Batch Size"
+    given: "a user setting batch defaults"
+    when: "they enter standard_batch_size=1000, min_batch=500, max_batch=2000"
+    then: "values are validated (min <= standard <= max)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    category: "Batch Size"
+    given: "min_batch > max_batch"
+    when: "user attempts to save"
+    then: "validation error prevents save"
+    test_type: "unit"
+    priority: "P0"
+
+  # Traceability Level
+  - id: "AC-06"
+    category: "Traceability Level"
+    given: "a user configuring traceability"
+    when: "they select 'lot' level"
+    then: "product tracks at lot granularity (multiple units per lot)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    category: "Traceability Level"
+    given: "a user configuring traceability"
+    when: "they select 'batch' level"
+    then: "product tracks at batch granularity (production run based)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    category: "Traceability Level"
+    given: "a user configuring traceability"
+    when: "they select 'serial' level"
+    then: "product tracks at unit level (1 unit = 1 serial number)"
+    test_type: "integration"
+    priority: "P0"
+
+  # Expiry Date Rules
+  - id: "AC-09"
+    category: "Expiry Calculation"
+    given: "expiry_calculation_method = 'fixed_days'"
+    when: "configuration saved"
+    then: "system stores method for future lot creation"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    category: "Expiry Calculation"
+    given: "expiry_calculation_method = 'rolling'"
+    when: "configuration saved"
+    then: "processing_buffer_days field is required"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-11"
+    category: "Expiry Calculation"
+    given: "expiry_calculation_method = 'manual'"
+    when: "configuration saved"
+    then: "system records manual entry required"
+    test_type: "integration"
+    priority: "P1"
+
+  # GS1 Compliance
+  - id: "AC-12"
+    category: "GS1 Compliance"
+    given: "GS1 lot encoding enabled"
+    when: "configuration saved"
+    then: "gs1_lot_encoding_enabled = true stored"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13"
+    category: "GS1 Compliance"
+    given: "lot number exceeds 20 characters"
+    when: "validation runs"
+    then: "warning is displayed (GS1 AI 10 max length)"
+    test_type: "unit"
+    priority: "P1"
+
+  # GS1 Encoding Service
+  - id: "AC-14"
+    category: "GS1 Service"
+    given: "lot number 'LOT-2025-000001'"
+    when: "encodeLotNumber() called"
+    then: "returns GS1-128 AI 10 encoded string '(10)LOT-2025-000001'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-15"
+    category: "GS1 Service"
+    given: "expiry date 2025-06-15"
+    when: "encodeExpiryDate() called"
+    then: "returns '(17)250615' (YYMMDD format)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-16"
+    category: "GS1 Service"
+    given: "GTIN '12345678901234'"
+    when: "validateGTIN14() called"
+    then: "validates check digit correctly"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-17"
+    category: "GS1 Service"
+    given: "GTIN with invalid check digit"
+    when: "validateGTIN14() called"
+    then: "returns { valid: false, error: 'Invalid check digit...' }"
+    test_type: "unit"
+    priority: "P0"
+
+  # Traceability Search Page
+  - id: "AC-18"
+    category: "Traceability Page"
+    given: "user navigates to /technical/traceability"
+    when: "page loads"
+    then: "shows search form with direction toggle"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-19"
+    category: "Traceability Page"
+    given: "user attempts to search before Epic 05"
+    when: "search executed"
+    then: "shows empty state: 'License Plates and genealogy tracking will be available in Epic 05 (Warehouse)'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-20"
+    category: "Traceability Page"
+    given: "traceability page rendered"
+    when: "list/tree/matrix view toggles clicked"
+    then: "shows 'Coming Soon' placeholder"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Multi-tenancy
+  - id: "AC-21"
+    category: "Multi-tenancy"
+    given: "User A from Org A"
+    when: "they save traceability config"
+    then: "config stored with org_id isolation"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-22"
+    category: "Multi-tenancy"
+    given: "User A attempts to access config for Product X from Org B"
+    when: "API called"
+    then: "404 Not Found returned (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  traceability_config_service:
+    - name: "getProductTraceabilityConfig returns config for valid product"
+      setup: "Mock successful API response"
+      expected: "Returns TraceabilityConfig object"
+
+    - name: "getProductTraceabilityConfig returns defaults for unconfigured product"
+      setup: "Mock 404 response (no config)"
+      expected: "Returns default config with _isDefault flag"
+
+    - name: "updateProductTraceabilityConfig saves valid config"
+      setup: "Mock successful API response"
+      expected: "Returns saved config"
+
+    - name: "validateLotFormat returns valid for correct format"
+      input: "LOT-{YYYY}-{SEQ:6}"
+      expected: "{ valid: true, errors: [] }"
+
+    - name: "validateLotFormat returns invalid for unknown placeholder"
+      input: "LOT-{INVALID}-001"
+      expected: "{ valid: false, errors: ['Invalid placeholder: {INVALID}'] }"
+
+    - name: "parseLotFormat extracts components correctly"
+      input: "LOT-{YYYY}-{SEQ:6}"
+      expected: "{ prefix: 'LOT-', placeholders: [{type: 'YYYY'}, {type: 'SEQ', length: 6}] }"
+
+    - name: "generateSampleLotNumber produces correct output"
+      input: "LOT-{YYYY}-{SEQ:6}"
+      expected: "LOT-2025-000001 (or similar based on current date)"
+
+  gs1_service:
+    - name: "encodeLotNumber formats AI 10 correctly"
+      input: "LOT-2025-000001"
+      expected: "(10)LOT-2025-000001"
+
+    - name: "encodeLotNumber warns for long lot numbers"
+      input: "VERYLONGLOTNUM123456789"
+      expected: "Warning logged, still returns encoded string"
+
+    - name: "encodeExpiryDate formats AI 17 correctly"
+      input: "new Date('2025-06-15')"
+      expected: "(17)250615"
+
+    - name: "encodeExpiryDate handles end of month correctly"
+      input: "new Date('2025-12-31')"
+      expected: "(17)251231"
+
+    - name: "encodeSSCC generates valid 18-digit code"
+      input: "{ extensionDigit: '0', companyPrefix: '1234567', serialReference: '0000001' }"
+      expected: "(00)012345670000001X (with valid check digit)"
+
+    - name: "validateGTIN14 returns true for valid GTIN"
+      input: "12345678901231"
+      expected: "{ valid: true }"
+
+    - name: "validateGTIN14 returns false for wrong length"
+      input: "123456789"
+      expected: "{ valid: false, error: 'GTIN-14 must be exactly 14 digits' }"
+
+    - name: "validateGTIN14 returns false for invalid check digit"
+      input: "12345678901230"
+      expected: "{ valid: false, error: 'Invalid check digit. Expected 1, got 0' }"
+
+    - name: "calculateCheckDigit computes Modulo 10 correctly"
+      input: "1234567890123"
+      expected: "1"
+
+    - name: "generateGS1128Barcode combines multiple AIs"
+      input: "{ gtin: '12345678901234', lotNumber: 'LOT001', expiryDate: new Date('2025-06-15') }"
+      expected: "(01)12345678901234(10)LOT001(17)250615"
+
+  validation_schemas:
+    - name: "traceabilityConfigSchema accepts valid config"
+      input: "{ lot_number_format: 'LOT-{YYYY}-{SEQ:6}', traceability_level: 'lot' }"
+      expected: "validation.success === true"
+
+    - name: "traceabilityConfigSchema rejects invalid lot format"
+      input: "{ lot_number_format: '{INVALID}' }"
+      expected: "validation.success === false"
+
+    - name: "traceabilityConfigSchema rejects min > max batch"
+      input: "{ min_batch_size: 100, max_batch_size: 50 }"
+      expected: "validation.success === false, error on min_batch_size"
+
+    - name: "traceabilityConfigSchema rejects standard outside range"
+      input: "{ min_batch_size: 100, max_batch_size: 200, standard_batch_size: 50 }"
+      expected: "validation.success === false, error on standard_batch_size"
+
+    - name: "traceabilityConfigSchema requires buffer for rolling expiry"
+      input: "{ expiry_calculation_method: 'rolling' }"
+      expected: "validation.success === false, error on processing_buffer_days"
+
+    - name: "traceabilityConfigSchema accepts all valid traceability levels"
+      inputs:
+        - "{ traceability_level: 'lot' }"
+        - "{ traceability_level: 'batch' }"
+        - "{ traceability_level: 'serial' }"
+      expected: "All pass validation"
+
+# Integration Test Cases (API)
+integration_tests:
+  api_endpoints:
+    - name: "GET /products/:id/traceability-config returns config"
+      setup: |
+        - Create Org A with User A
+        - Create Product P1 for Org A
+        - Create traceability config for P1
+      action: "GET /api/v1/technical/products/:id/traceability-config"
+      expected: "200 OK with config object"
+
+    - name: "GET /products/:id/traceability-config returns defaults if no config"
+      setup: |
+        - Create Org A with User A
+        - Create Product P1 without traceability config
+      action: "GET /api/v1/technical/products/:id/traceability-config"
+      expected: "200 OK with default values and _isDefault: true"
+
+    - name: "GET /products/:id/traceability-config returns 404 for other org product"
+      setup: |
+        - Create Org A with User A
+        - Create Org B with Product P2
+      action: "User A: GET /api/v1/technical/products/P2/traceability-config"
+      expected: "404 Product not found"
+
+    - name: "PUT /products/:id/traceability-config creates new config"
+      setup: |
+        - Create Org A with Admin A
+        - Create Product P1 without config
+      action: "PUT /api/v1/technical/products/:id/traceability-config with valid data"
+      expected: "200 OK with created config"
+
+    - name: "PUT /products/:id/traceability-config updates existing config"
+      setup: |
+        - Create Org A with Admin A
+        - Create Product P1 with existing config
+      action: "PUT /api/v1/technical/products/:id/traceability-config with updated data"
+      expected: "200 OK with updated config, updated_at changed"
+
+    - name: "PUT /products/:id/traceability-config returns 400 for invalid data"
+      setup: |
+        - Create Org A with Admin A
+        - Create Product P1
+      action: "PUT with { min_batch_size: 100, max_batch_size: 50 }"
+      expected: "400 Validation failed"
+
+    - name: "PUT /products/:id/traceability-config returns 403 for viewer"
+      setup: |
+        - Create Org A with Viewer user
+        - Create Product P1
+      action: "Viewer: PUT /api/v1/technical/products/:id/traceability-config"
+      expected: "403 Forbidden"
+
+  rls_policies:
+    - name: "RLS blocks read from other org"
+      setup: |
+        - Create Org A with User A and Product P1 with config
+        - Create Org B with User B
+      action: "User B queries product_traceability_config for P1"
+      expected: "No rows returned"
+
+    - name: "RLS allows read from own org"
+      setup: |
+        - Create Org A with User A and Product P1 with config
+      action: "User A queries product_traceability_config for P1"
+      expected: "Config returned"
+
+    - name: "RLS blocks write to other org product"
+      setup: |
+        - Create Org A with Admin A
+        - Create Org B with Product P2
+      action: "Admin A attempts to insert config for P2"
+      expected: "RLS blocks insert"
+
+    - name: "RLS allows write to own org product"
+      setup: |
+        - Create Org A with Admin A and Product P1
+      action: "Admin A inserts config for P1"
+      expected: "Insert succeeds"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Traceability page shows empty state before Epic 05"
+    steps:
+      - "Navigate to /technical/traceability"
+      - "Verify search form renders with direction toggle"
+      - "Verify empty state message appears"
+      - "Verify message mentions Epic 05 (Warehouse)"
+    expected: "Empty state displayed with correct message"
+
+  - name: "LotConfigModal saves configuration"
+    steps:
+      - "Navigate to product edit page"
+      - "Click 'Configure' on Traceability section"
+      - "Enter lot format 'LOT-{YYYY}-{SEQ:6}'"
+      - "Select traceability level 'batch'"
+      - "Enter batch sizes (min: 100, standard: 500, max: 1000)"
+      - "Enable GS1 lot encoding"
+      - "Click Save"
+    expected: "Modal closes, toast shows success, section updated"
+
+  - name: "LotConfigModal shows validation errors"
+    steps:
+      - "Open LotConfigModal"
+      - "Enter invalid lot format '{INVALID}'"
+      - "Enter min_batch > max_batch"
+      - "Click Save"
+    expected: "Inline errors shown, save blocked"
+
+# Definition of Done
+definition_of_done:
+  - "Lot number format configuration saves and validates correctly"
+  - "Batch size constraints enforced (min <= standard <= max)"
+  - "Traceability level selection persists per product"
+  - "Expiry calculation method options available (fixed, rolling, manual)"
+  - "GS1 encoding service correctly encodes AI 10 (lot) and AI 17 (expiry)"
+  - "GS1 GTIN-14 validation works correctly with check digit"
+  - "Traceability search page shows framework with empty state"
+  - "Empty state message explains Epic 05 dependency"
+  - "RLS enforces org isolation on config table"
+  - "Cross-tenant config access returns 404"
+  - "Unit tests pass with >= 90% coverage for GS1 service"
+  - "Unit tests pass with >= 80% coverage for config service"
+  - "Integration tests cover config CRUD"
+  - "Loading states displayed during save operations"
+  - "Error states handled with validation messages"
+
+# Coverage Requirements
+coverage:
+  unit:
+    gs1_service:
+      target: 95
+      reason: "GS1 compliance is critical for barcode scanning"
+    traceability_config_service:
+      target: 80
+      reason: "Standard CRUD operations"
+    validation:
+      target: 90
+      reason: "Data integrity important"
+  integration:
+    target: 80
+    reason: "API endpoints and RLS must be thoroughly tested"
+  files:
+    - "lib/services/gs1-service.ts: 95%"
+    - "lib/services/traceability-config-service.ts: 80%"
+    - "lib/validation/traceability.ts: 90%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "GS1 encoding errors could cause barcode scanning failures"
+    mitigation: "Comprehensive unit tests for all GS1 functions, test with real scanners"
+    severity: "high"
+    test_coverage: "unit_tests.gs1_service"
+
+  - id: "RISK-02"
+    description: "RLS policy misconfiguration could leak config data"
+    mitigation: "Integration tests with multi-org fixtures"
+    severity: "medium"
+    test_coverage: "integration_tests.rls_policies"
+
+  - id: "RISK-03"
+    description: "Lot format validation may miss edge cases"
+    mitigation: "Test all placeholder combinations and invalid inputs"
+    severity: "medium"
+    test_coverage: "unit_tests.traceability_config_service"
+
+  - id: "RISK-04"
+    description: "Users may be confused by empty traceability page"
+    mitigation: "Clear empty state message explaining Epic 05 dependency"
+    severity: "low"
+    test_coverage: "e2e_tests"
+
+# Test Data
+test_data:
+  valid_lot_formats:
+    - "LOT-{YYYY}-{SEQ:6}"
+    - "{PROD}-{YYMMDD}-{SEQ:4}"
+    - "{JULIAN}{YY}-{SEQ:5}"
+    - "L{LINE}-{YYYY}{MM}{DD}-{SEQ:4}"
+    - "BRD-{YYYY}-{MM}-{SEQ:6}"
+
+  invalid_lot_formats:
+    - "{INVALID}"
+    - "LOT-{invalid}-001"
+    - "{}"
+    - "PLAIN_TEXT_NO_PLACEHOLDERS"
+    - "{SEQ}"  # Missing length
+
+  valid_gtins:
+    - { gtin: "12345678901231", valid: true }
+    - { gtin: "00012345600012", valid: true }
+    - { gtin: "59012345678903", valid: true }
+
+  invalid_gtins:
+    - { gtin: "12345678901230", error: "Invalid check digit" }
+    - { gtin: "123456789", error: "Must be 14 digits" }
+    - { gtin: "ABCDEFGHIJKLMN", error: "Must be numeric" }
+
+  expiry_dates:
+    - { date: "2025-06-15", encoded: "(17)250615" }
+    - { date: "2025-12-31", encoded: "(17)251231" }
+    - { date: "2030-01-01", encoded: "(17)300101" }

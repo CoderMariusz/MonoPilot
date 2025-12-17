@@ -1,0 +1,117 @@
+# Story 03.13 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.13"
+  name: "WO Material Availability Check"
+  slug: "material-availability"
+  epic: "03-planning"
+  phase: "1"  # Phase 1 - After Epic 05 LP table
+  complexity: "M"
+  estimate_days: 4
+  type: "backend + frontend"
+  state: "deferred"  # Blocked until Epic 05 completes
+  priority: "P1"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # No new tables, uses license_plates from Epic 05
+  - api.yaml         # GET /work-orders/:id/availability endpoint
+  - frontend.yaml    # Availability panel components
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id", "RLS patterns"]
+    - story: "03.10"
+      name: "WO CRUD + BOM Auto-Select"
+      provides: ["work_orders table", "bom_id"]
+    - story: "03.11a"
+      name: "WO BOM Snapshot"
+      provides: ["wo_materials table", "required_qty per material"]
+    - story: "03.17"
+      name: "Planning Settings"
+      provides: ["planning_settings.wo_material_check toggle"]
+    - story: "05.1"
+      name: "License Plates Table + CRUD"
+      provides: ["license_plates table", "LicensePlateService.getAvailableLPs()", "LicensePlateService.getTotalAvailableQty()"]
+      blocker: true
+      reason: "Availability algorithm requires LP table to sum inventory quantities"
+
+  blocked_by:
+    - story: "05.1"
+      name: "License Plates Table + CRUD"
+      reason: "Cannot calculate availability without license_plates table"
+
+  blocks:
+    - story: "03.11b"
+      name: "WO Material Reservation"
+      reason: "Reservation depends on knowing availability first"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-021"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["Work Order Tables", "Material Availability"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.13.material-availability.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-015-work-order-detail.md"
+      id: "PLAN-015"
+      relevance: "WO Detail page Materials tab - availability indicators"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for license_plates queries"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "Context YAML structure pattern"
+    - path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.1.lp-table-crud.md"
+      relevance: "License plates schema and service methods"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 1
+    description: "GET /api/planning/work-orders/:id/availability"
+  - type: "service"
+    count: 1
+    description: "material-availability-service.ts"
+  - type: "validation"
+    count: 1
+    description: "material-availability.ts Zod schemas"
+  - type: "component"
+    count: 5
+    description: "WOAvailabilityPanel, AvailabilityMaterialRow, AvailabilityTrafficLight, AvailabilitySummaryCard, AvailabilityWarningModal"
+  - type: "test"
+    count: 3
+    description: "Unit tests (coverage/status calculation), integration tests (API), RLS tests"
+
+# Phases
+phases:
+  phase_0:
+    description: "Mock implementation (before Epic 05)"
+    behavior: "API returns 100% availability for all materials"
+    implemented: false
+  phase_1:
+    description: "Real implementation (after Epic 05)"
+    behavior: "API queries license_plates for actual inventory"
+    implemented: false
+
+# Technical notes
+technical_notes:
+  - "DEFERRED - Requires Epic 05.1 License Plates table"
+  - "Phase 0 returns mock 100% availability until LP table exists"
+  - "Availability algorithm: SUM(LP.qty) - SUM(reservations from other WOs)"
+  - "Traffic light: Green >= 100%, Yellow 50-99%, Red < 50%"
+  - "Redis caching with 30 sec TTL per WO"
+  - "Respects wo_material_check setting toggle"
+  - "Non-blocking: users can proceed with shortages (warning modal)"
+  - "Filter expired LPs (expiry_date < today) from available count"

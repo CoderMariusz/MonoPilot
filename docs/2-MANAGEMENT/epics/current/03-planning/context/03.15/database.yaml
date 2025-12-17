@@ -1,0 +1,218 @@
+# Story 03.15 - Database Schema
+# Purpose: Indexes for Gantt performance (no new tables)
+# Agent: BACKEND-DEV (database focus)
+
+# No new migrations needed - work_orders table exists from 03.10
+migrations: []
+
+# No new tables - uses existing work_orders from 03.10
+tables: []
+
+# New indexes for Gantt query performance
+indexes:
+  - path: "supabase/migrations/XXX_add_gantt_indexes.sql"
+    type: "migration"
+    description: "Add composite indexes for Gantt chart queries"
+    indexes:
+      - name: "idx_work_orders_gantt_line"
+        table: "work_orders"
+        columns: ["org_id", "production_line_id", "planned_start_date", "scheduled_start_time"]
+        where: "status != 'completed'"
+        rationale: "Optimizes Gantt query grouped by production line"
+
+      - name: "idx_work_orders_gantt_machine"
+        table: "work_orders"
+        columns: ["org_id", "machine_id", "planned_start_date", "scheduled_start_time"]
+        where: "status != 'completed'"
+        rationale: "Optimizes Gantt query grouped by machine"
+
+      - name: "idx_work_orders_gantt_date_status"
+        table: "work_orders"
+        columns: ["org_id", "planned_start_date", "status"]
+        where: "status != 'completed'"
+        rationale: "Optimizes date range + status filtering"
+
+# SQL for indexes
+index_sql: |
+  -- Migration: Add indexes for Gantt chart performance
+  -- Story: 03.15 - WO Gantt Chart View
+
+  -- Index for Gantt grouped by production line
+  CREATE INDEX IF NOT EXISTS idx_work_orders_gantt_line
+    ON work_orders(org_id, production_line_id, planned_start_date, scheduled_start_time)
+    WHERE status != 'completed';
+
+  -- Index for Gantt grouped by machine
+  CREATE INDEX IF NOT EXISTS idx_work_orders_gantt_machine
+    ON work_orders(org_id, machine_id, planned_start_date, scheduled_start_time)
+    WHERE status != 'completed';
+
+  -- Index for date range + status filtering
+  CREATE INDEX IF NOT EXISTS idx_work_orders_gantt_date_status
+    ON work_orders(org_id, planned_start_date, status)
+    WHERE status != 'completed';
+
+  -- Comment for documentation
+  COMMENT ON INDEX idx_work_orders_gantt_line IS 'Optimizes Gantt chart queries grouped by production line (Story 03.15)';
+  COMMENT ON INDEX idx_work_orders_gantt_machine IS 'Optimizes Gantt chart queries grouped by machine (Story 03.15)';
+  COMMENT ON INDEX idx_work_orders_gantt_date_status IS 'Optimizes Gantt chart date range + status filter queries (Story 03.15)';
+
+# Existing table reference (from 03.10)
+existing_tables:
+  work_orders:
+    description: "Work orders table - Gantt uses these fields"
+    key_fields:
+      - name: "id"
+        type: "UUID"
+        usage: "WO identifier"
+      - name: "org_id"
+        type: "UUID"
+        usage: "Multi-tenant isolation"
+      - name: "wo_number"
+        type: "TEXT"
+        usage: "Display on Gantt bar"
+      - name: "product_id"
+        type: "UUID"
+        usage: "Join to products for name/code"
+      - name: "status"
+        type: "TEXT"
+        usage: "Bar color mapping"
+      - name: "planned_start_date"
+        type: "DATE"
+        usage: "Bar position (X-axis)"
+      - name: "planned_end_date"
+        type: "DATE"
+        usage: "Bar end position (if multi-day)"
+      - name: "scheduled_start_time"
+        type: "TIME"
+        usage: "Bar left edge time"
+      - name: "scheduled_end_time"
+        type: "TIME"
+        usage: "Bar right edge time"
+      - name: "production_line_id"
+        type: "UUID"
+        usage: "Swimlane assignment (by line)"
+      - name: "machine_id"
+        type: "UUID"
+        usage: "Swimlane assignment (by machine)"
+      - name: "priority"
+        type: "TEXT"
+        usage: "Optional icon/indicator"
+      - name: "planned_quantity"
+        type: "DECIMAL(15,4)"
+        usage: "Display on bar/tooltip"
+      - name: "produced_quantity"
+        type: "DECIMAL(15,4)"
+        usage: "Calculate progress_percent"
+      - name: "uom"
+        type: "TEXT"
+        usage: "Display with quantity"
+
+  production_lines:
+    description: "Production lines - used for swimlane grouping"
+    key_fields:
+      - name: "id"
+        type: "UUID"
+        usage: "Swimlane identifier"
+      - name: "name"
+        type: "TEXT"
+        usage: "Swimlane header label"
+      - name: "capacity_hours_per_day"
+        type: "DECIMAL"
+        usage: "Optional capacity indicator"
+
+  machines:
+    description: "Machines - used for swimlane grouping (alternative view)"
+    key_fields:
+      - name: "id"
+        type: "UUID"
+        usage: "Swimlane identifier"
+      - name: "name"
+        type: "TEXT"
+        usage: "Swimlane header label"
+
+  products:
+    description: "Products - joined for display"
+    key_fields:
+      - name: "id"
+        type: "UUID"
+        usage: "FK from work_orders"
+      - name: "code"
+        type: "TEXT"
+        usage: "Display on bar"
+      - name: "name"
+        type: "TEXT"
+        usage: "Display on bar"
+
+# RLS - no new policies needed
+rls_policies:
+  note: "Gantt queries go through existing work_orders RLS policies from 03.10"
+  existing_policies:
+    - table: "work_orders"
+      policy: "Users can only see WOs from their organization"
+      pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Query patterns for Gantt
+query_patterns:
+  gantt_by_line: |
+    -- Gantt data grouped by production line
+    SELECT
+      pl.id as swimlane_id,
+      pl.name as swimlane_name,
+      'line' as swimlane_type,
+      pl.capacity_hours_per_day,
+      json_agg(
+        json_build_object(
+          'id', wo.id,
+          'wo_number', wo.wo_number,
+          'product', json_build_object(
+            'id', p.id,
+            'code', p.code,
+            'name', p.name
+          ),
+          'status', wo.status,
+          'priority', wo.priority,
+          'quantity', wo.planned_quantity,
+          'uom', wo.uom,
+          'scheduled_date', wo.planned_start_date,
+          'scheduled_start_time', wo.scheduled_start_time,
+          'scheduled_end_time', wo.scheduled_end_time,
+          'duration_hours', EXTRACT(EPOCH FROM (wo.scheduled_end_time - wo.scheduled_start_time)) / 3600,
+          'progress_percent', CASE
+            WHEN wo.planned_quantity > 0 THEN ROUND((wo.produced_quantity / wo.planned_quantity) * 100)
+            ELSE 0
+          END,
+          'is_overdue', (wo.scheduled_end_time < CURRENT_TIME AND wo.planned_start_date <= CURRENT_DATE AND wo.status NOT IN ('completed', 'closed'))
+        ) ORDER BY wo.scheduled_start_time
+      ) as work_orders
+    FROM production_lines pl
+    LEFT JOIN work_orders wo ON wo.production_line_id = pl.id
+      AND wo.org_id = $1
+      AND wo.planned_start_date BETWEEN $2 AND $3
+      AND wo.status = ANY($4)
+    LEFT JOIN products p ON p.id = wo.product_id
+    WHERE pl.org_id = $1
+      AND pl.is_active = true
+    GROUP BY pl.id, pl.name, pl.capacity_hours_per_day
+    HAVING COUNT(wo.id) > 0  -- Hide empty swimlanes
+    ORDER BY pl.name;
+
+  check_availability: |
+    -- Check for overlapping WOs on a production line
+    SELECT
+      wo.id,
+      wo.wo_number,
+      p.name as product_name,
+      wo.scheduled_start_time::text,
+      wo.scheduled_end_time::text
+    FROM work_orders wo
+    JOIN products p ON p.id = wo.product_id
+    WHERE wo.org_id = $1
+      AND wo.production_line_id = $2
+      AND wo.planned_start_date = $3
+      AND wo.status != 'completed'
+      AND wo.id != COALESCE($6, '00000000-0000-0000-0000-000000000000')
+      AND (
+        (wo.scheduled_start_time < $5 AND wo.scheduled_end_time > $4)
+      );
+    -- $4 = new_start_time, $5 = new_end_time, $6 = exclude_wo_id

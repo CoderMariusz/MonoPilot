@@ -1,0 +1,130 @@
+# Story 03.7 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.7"
+  name: "PO Status Lifecycle (Configurable Statuses)"
+  slug: "po-status-lifecycle"
+  epic: "03-planning"
+  phase: "P0"
+  complexity: "S"
+  estimate_days: 2
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, types, hooks
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns"]
+    - story: "03.3"
+      name: "PO CRUD + Lines"
+      provides: ["purchase_orders table", "po_status_history table", "PO service"]
+    - story: "03.5b"
+      name: "PO Approval Workflow"
+      provides: ["approval_status field", "approval transitions"]
+  blocked_by:
+    - story: "03.3"
+    - story: "03.5b"
+  blocks:
+    - story: "03.5a"
+      name: "PO Approval Setup"
+      reason: "Uses status transitions for approval workflow"
+    - story: "03.6"
+      name: "Bulk PO Creation"
+      reason: "Uses status management for batch operations"
+    - epic: "05"
+      name: "Warehouse - PO Receiving"
+      reason: "Triggers status transitions on receipt"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-007", "FR-PLAN-011", "5.4 PO Status Lifecycle"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["Database Schema", "API Design"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.7.po-status-lifecycle.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-006-po-detail.md"
+      relevance: "Status transitions, History Tab, Status badges"
+  related_stories:
+    - path: "docs/2-MANAGEMENT/epics/current/03-planning/03.3.po-crud-lines.md"
+      relevance: "Base PO table, status_history table"
+    - path: "docs/2-MANAGEMENT/epics/current/03-planning/03.5b.po-approval-workflow.md"
+      relevance: "Approval status transitions"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "Context YAML structure pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 3
+    description: "po_statuses, po_status_transitions tables + seed data"
+  - type: "service"
+    count: 1
+    description: "po-status-service.ts with state machine logic"
+  - type: "api"
+    count: 11
+    description: "Status CRUD, transitions, operations endpoints"
+  - type: "component"
+    count: 9
+    description: "Status config UI, badges, timeline, dropdowns"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for status operations"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "State machine pattern - all transitions validated against rules"
+  - "System statuses cannot be deleted or renamed (is_system=true)"
+  - "Status codes are immutable after creation"
+  - "Status history audit trail with user/timestamp/notes"
+  - "Auto-transitions: confirmed->receiving, receiving->closed"
+  - "Conditional transitions: draft->submitted requires lines > 0"
+  - "Admin-only configuration, all users can view/transition"
+  - "Status colors from constrained TailwindCSS palette"
+
+# Key business rules
+business_rules:
+  - rule: "System statuses"
+    description: "draft, submitted, confirmed, receiving, closed, cancelled cannot be deleted/renamed"
+  - rule: "Status uniqueness"
+    description: "Status code must be unique per organization"
+  - rule: "In-use protection"
+    description: "Cannot delete status if any POs currently use it"
+  - rule: "Transition validation"
+    description: "All status changes must have an allowed transition rule"
+  - rule: "Conditional transitions"
+    description: "draft->submitted requires at least 1 line item"
+  - rule: "Multi-tenancy"
+    description: "Status configs isolated per organization"
+  - rule: "Admin-only config"
+    description: "Only ADMIN/SUPER_ADMIN can manage status configuration"
+
+# PRD Traceability
+prd_coverage:
+  - fr_id: "FR-PLAN-007"
+    requirement: "PO Status Lifecycle"
+    priority: "Must Have"
+    coverage: "FULL"
+  - fr_id: "FR-PLAN-011"
+    requirement: "Configurable PO Statuses"
+    priority: "Should Have"
+    coverage: "FULL"

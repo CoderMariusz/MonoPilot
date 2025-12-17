@@ -1,0 +1,411 @@
+# Story 03.15 - Frontend Specification
+# Purpose: Components, hooks, types, UX
+# Agent: FRONTEND-DEV (component focus)
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/gantt.ts"
+    content: |
+      export type ZoomLevel = 'day' | 'week' | 'month';
+      export type ViewBy = 'line' | 'machine';
+      export type WOStatus = 'draft' | 'planned' | 'released' | 'in_progress' | 'on_hold' | 'completed' | 'closed';
+      export type MaterialStatus = 'ok' | 'low' | 'insufficient';
+
+      export interface GanttProduct {
+        id: string;
+        code: string;
+        name: string;
+      }
+
+      export interface GanttWorkOrder {
+        id: string;
+        wo_number: string;
+        product: GanttProduct;
+        status: WOStatus;
+        priority: string;
+        quantity: number;
+        uom: string;
+        scheduled_date: string;
+        scheduled_start_time: string;
+        scheduled_end_time: string;
+        duration_hours: number;
+        progress_percent: number | null;
+        material_status: MaterialStatus;
+        is_overdue: boolean;
+        created_at: string;
+      }
+
+      export interface GanttSwimlane {
+        id: string;
+        name: string;
+        type: ViewBy;
+        capacity_hours_per_day?: number;
+        work_orders: GanttWorkOrder[];
+      }
+
+      export interface GanttDateRange {
+        from_date: string;
+        to_date: string;
+      }
+
+      export interface GanttFilters {
+        view_by: ViewBy;
+        status: WOStatus[];
+        line_id?: string;
+        product_id?: string;
+        search?: string;
+      }
+
+      export interface GanttDataResponse {
+        swimlanes: GanttSwimlane[];
+        date_range: GanttDateRange;
+        filters_applied: GanttFilters;
+      }
+
+      export interface RescheduleParams {
+        scheduled_date: string;
+        scheduled_start_time: string;
+        scheduled_end_time: string;
+        production_line_id?: string;
+        validate_dependencies?: boolean;
+        validate_materials?: boolean;
+      }
+
+      export interface RescheduleResponse {
+        success: boolean;
+        data: {
+          id: string;
+          wo_number: string;
+          scheduled_date: string;
+          scheduled_start_time: string;
+          scheduled_end_time: string;
+          production_line_id: string;
+          line_name: string;
+          duration_hours: number;
+        };
+        warnings: string[];
+        conflicts: any[];
+      }
+
+      export interface AvailabilityConflict {
+        wo_id: string;
+        wo_number: string;
+        product_name: string;
+        scheduled_start_time: string;
+        scheduled_end_time: string;
+      }
+
+      export interface AvailabilityCheckResponse {
+        is_available: boolean;
+        conflicts: AvailabilityConflict[];
+        capacity_utilization: number;
+        warnings: string[];
+      }
+
+# React Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-gantt-data.ts"
+    description: "React Query hook for fetching Gantt data"
+    exports:
+      - name: "useGanttData"
+        params: ["filters: GanttFilters"]
+        returns: "UseQueryResult<GanttDataResponse>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { getGanttData } from '@/lib/services/gantt-service';
+
+      export function useGanttData(filters: GanttFilters) {
+        return useQuery({
+          queryKey: ['gantt-data', filters],
+          queryFn: () => getGanttData(filters),
+          staleTime: 2 * 60 * 1000, // 2 minutes
+          refetchOnWindowFocus: true,
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-reschedule-wo.ts"
+    description: "Mutation hook for rescheduling work orders"
+    exports:
+      - name: "useRescheduleWO"
+        returns: "UseMutationResult<RescheduleResponse, Error, { woId: string; params: RescheduleParams }>"
+    pattern: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+      import { rescheduleWO } from '@/lib/services/gantt-service';
+      import { toast } from 'sonner';
+
+      export function useRescheduleWO() {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: ({ woId, params }) => rescheduleWO(woId, params),
+          onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['gantt-data'] });
+            toast.success(`${data.data.wo_number} rescheduled to ${data.data.scheduled_date}`);
+          },
+          onError: (error) => {
+            toast.error(error.message || 'Failed to reschedule work order');
+          },
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-check-availability.ts"
+    description: "Mutation hook for checking line availability"
+    exports:
+      - name: "useCheckAvailability"
+        returns: "UseMutationResult<AvailabilityCheckResponse, Error, AvailabilityCheckParams>"
+
+# Page
+pages:
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/page.tsx"
+    description: "Main Gantt chart page"
+    layout: "Authenticated layout with sidebar"
+    pattern: |
+      import { GanttChart } from './components/GanttChart';
+      import { GanttFilters } from './components/GanttFilters';
+      import { GanttLegend } from './components/GanttLegend';
+      import { useGanttData } from '@/lib/hooks/use-gantt-data';
+
+      export default function GanttPage() {
+        const [filters, setFilters] = useState<GanttFilters>(defaultFilters);
+        const { data, isLoading, isError, refetch } = useGanttData(filters);
+
+        if (isLoading) return <GanttLoadingState />;
+        if (isError) return <GanttErrorState onRetry={refetch} />;
+        if (!data?.swimlanes.length) return <GanttEmptyState />;
+
+        return (
+          <div className="flex flex-col h-full">
+            <GanttFilters filters={filters} onChange={setFilters} />
+            <GanttLegend />
+            <GanttChart data={data} />
+          </div>
+        );
+      }
+
+# Components
+components:
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttChart.tsx"
+    description: "Main Gantt chart container component"
+    props:
+      - "data: GanttDataResponse"
+    features:
+      - "Renders timeline header and swimlanes"
+      - "Manages zoom level state"
+      - "Handles horizontal/vertical scrolling"
+      - "Renders today indicator"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttTimeline.tsx"
+    description: "Timeline header with date/time scale"
+    props:
+      - "dateRange: GanttDateRange"
+      - "zoomLevel: ZoomLevel"
+    features:
+      - "Renders date markers based on zoom level"
+      - "Day zoom: 4-hour increments"
+      - "Week zoom: daily markers"
+      - "Month zoom: weekly markers"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttSwimlane.tsx"
+    description: "Individual swimlane row (production line or machine)"
+    props:
+      - "swimlane: GanttSwimlane"
+      - "zoomLevel: ZoomLevel"
+      - "onWOClick: (wo: GanttWorkOrder) => void"
+      - "onWODrop: (wo: GanttWorkOrder, newPosition: Position) => void"
+    features:
+      - "Renders swimlane header (line/machine name)"
+      - "Renders WO bars within swimlane"
+      - "Handles drag-drop events for WOs"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttWOBar.tsx"
+    description: "Draggable work order bar"
+    props:
+      - "workOrder: GanttWorkOrder"
+      - "zoomLevel: ZoomLevel"
+      - "onClick: () => void"
+      - "onDragStart: () => void"
+      - "onDragEnd: (newPosition: Position) => void"
+    features:
+      - "Status-based background color"
+      - "Progress bar overlay for in_progress WOs"
+      - "Overdue indicator (red + warning icon)"
+      - "Truncated label based on zoom level"
+      - "Draggable for reschedule"
+      - "Resizable handles for duration adjustment"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttFilters.tsx"
+    description: "Filters bar (date range, status, line, search)"
+    props:
+      - "filters: GanttFilters"
+      - "onChange: (filters: GanttFilters) => void"
+    features:
+      - "Date range selector with presets (Today, This Week, This Month, Custom)"
+      - "Status multi-select dropdown"
+      - "Production line multi-select dropdown"
+      - "Search input (WO number, product name)"
+      - "View by toggle (Line / Machine)"
+      - "Zoom level buttons (Day / Week / Month)"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttLegend.tsx"
+    description: "Status color legend"
+    features:
+      - "Shows all status colors with labels"
+      - "Includes overdue indicator explanation"
+      - "Collapsible on mobile"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttQuickView.tsx"
+    description: "WO detail slide-in panel"
+    props:
+      - "workOrder: GanttWorkOrder | null"
+      - "onClose: () => void"
+    features:
+      - "Slides in from right"
+      - "Shows WO details (number, product, status, schedule, quantity)"
+      - "Material status indicator"
+      - "Action buttons: View Full Details, Edit, Reschedule"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttRescheduleDialog.tsx"
+    description: "Confirmation dialog for reschedule"
+    props:
+      - "open: boolean"
+      - "workOrder: GanttWorkOrder"
+      - "newSchedule: { date, start, end, lineId? }"
+      - "onConfirm: () => void"
+      - "onCancel: () => void"
+      - "warnings: string[]"
+    features:
+      - "Shows old vs new schedule"
+      - "Displays warnings (material availability, dependencies)"
+      - "Confirm/Cancel buttons"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttTodayIndicator.tsx"
+    description: "Vertical 'today' line"
+    props:
+      - "dateRange: GanttDateRange"
+      - "containerWidth: number"
+    features:
+      - "Red dashed vertical line at current date/time"
+      - "Auto-updates every 60 seconds"
+      - "Only visible if today in range"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttEmptyState.tsx"
+    description: "Empty state when no WOs"
+    features:
+      - "Calendar icon"
+      - '"No Work Orders Scheduled" message'
+      - "Create First Work Order button"
+      - "Switch to List View link"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/components/GanttErrorState.tsx"
+    description: "Error state on API failure"
+    props:
+      - "onRetry: () => void"
+    features:
+      - "Error icon"
+      - '"Failed to Load Schedule View" message'
+      - "Retry button"
+      - "Switch to List View link"
+
+# UX Specifications
+ux:
+  wireframes:
+    - id: "PLAN-016"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-016-wo-gantt-view.md"
+      description: "WO Gantt/Schedule View"
+      components:
+        - "GanttChart"
+        - "GanttTimeline"
+        - "GanttSwimlane"
+        - "GanttWOBar"
+        - "GanttFilters"
+        - "GanttLegend"
+        - "GanttQuickView"
+        - "GanttRescheduleDialog"
+        - "GanttTodayIndicator"
+        - "GanttEmptyState"
+        - "GanttErrorState"
+
+  status_colors:
+    draft: { bg: "#F3F4F6", border: "#9CA3AF", style: "dashed" }
+    planned: { bg: "#DBEAFE", border: "#3B82F6", style: "solid" }
+    released: { bg: "#CFFAFE", border: "#06B6D4", style: "solid" }
+    in_progress: { bg: "#EDE9FE", border: "#8B5CF6", style: "solid" }
+    on_hold: { bg: "#FED7AA", border: "#F97316", style: "solid" }
+    completed: { bg: "#D1FAE5", border: "#10B981", style: "solid" }
+    overdue: { bg: "#FEE2E2", border: "#EF4444", style: "solid", icon: "warning" }
+
+  zoom_levels:
+    day:
+      time_scale: "4-hour increments"
+      visible_days: "1-3"
+      hour_markers: "Every 4 hours (8am, 12pm, 4pm, 8pm)"
+      label_display: "Full: WO-00156: Chocolate Bar (1000pc)"
+    week:
+      time_scale: "Days"
+      visible_days: "7-14"
+      day_markers: "Mon, Tue, Wed..."
+      label_display: "Truncated: WO-00156: Choc..."
+    month:
+      time_scale: "Weeks"
+      visible_days: "30-60"
+      week_markers: "Week 1, Week 2..."
+      label_display: "Minimal: WO-156"
+
+  states:
+    - "loading"
+    - "empty"
+    - "error"
+    - "success"
+    - "filtered_empty"
+
+  interactions:
+    desktop:
+      click: "Open WO detail quick view"
+      drag_horizontal: "Reschedule date/time"
+      drag_vertical: "Change line assignment"
+      resize: "Adjust scheduled duration"
+      right_click: "Open context menu"
+      hover: "Show tooltip with WO details"
+    mobile:
+      tap: "Open WO detail quick view (full screen)"
+      long_press: "Open action menu"
+      swipe: "Scroll timeline"
+
+  responsive:
+    desktop:
+      min_width: "1024px"
+      layout: "Full Gantt with drag-drop"
+    tablet:
+      width_range: "768-1024px"
+      layout: "Condensed Gantt, long-press to reschedule"
+      changes:
+        - "Bar height reduced to 40px"
+        - "Labels truncated"
+    mobile:
+      max_width: "768px"
+      layout: "List-based timeline (cards)"
+      changes:
+        - "Swimlanes become collapsible sections"
+        - "WO bars become cards"
+        - "No drag-drop (use modal)"
+
+# Accessibility
+accessibility:
+  touch_targets: "48x48dp minimum (64dp on mobile)"
+  contrast:
+    text: "4.5:1 minimum"
+    status_badges: "WCAG AA compliant"
+  aria:
+    chart: 'role="application" aria-label="Work Order Schedule Gantt Chart"'
+    swimlane: 'role="rowgroup" aria-label="Production line: {name}, {count} work orders"'
+    wo_bar: 'role="button" aria-label="Work Order {wo_number}, {product}, {status}, scheduled {date} {start} to {end}"'
+    today: 'role="separator" aria-label="Current date and time indicator"'
+  keyboard:
+    tab: "Move through filters, zoom controls, WO bars"
+    arrow_keys: "Navigate between WO bars"
+    enter: "Open WO detail quick view"
+    space: "Toggle WO selection (batch)"
+    ctrl_arrow: "Reschedule (move 1 hour or 1 line)"
+    escape: "Close quick view, cancel drag"
+    home_end: "Jump to first/last WO in swimlane"
+    pageup_pagedown: "Scroll timeline by 1 day"

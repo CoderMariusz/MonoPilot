@@ -1,0 +1,420 @@
+# Story 02.8 - Frontend Specification
+# Purpose: Components, services, types, UX patterns
+# Agent: FRONTEND-DEV
+
+# UX Reference
+ux:
+  wireframes:
+    - id: "TEC-008a"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-008a-routing-detail.md"
+      description: "PRIMARY - Operations table, modal, summary panel, empty states"
+      components:
+        - "OperationsTable"
+        - "OperationModal (Add/Edit)"
+        - "OperationsSummaryPanel"
+        - "RelatedBOMsSection"
+        - "MachineDropdown"
+        - "AttachmentUpload"
+    - id: "TEC-008"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-008-routing-modal.md"
+      description: "Context - Routing header editing (via Edit Routing button)"
+
+  patterns:
+    table: "ShadCN DataTable with inline row actions"
+    modal: "ShadCN Dialog with react-hook-form"
+    select: "ShadCN Select with empty state handling"
+    toast: "ShadCN Toast for success/error feedback"
+    skeleton: "ShadCN Skeleton for loading states"
+    textarea: "ShadCN Textarea for instructions"
+
+  states:
+    - loading: "Skeleton UI for routing header and spinner for operations"
+    - empty: "Clipboard icon, 'No operations yet', CTA button, example banner"
+    - error: "Error banner with retry button, back to list link"
+    - success: "Operations table with actions and summary panel"
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/technical/routings/[id]/page.tsx"
+    description: "Routing detail page with operations management (TEC-008a)"
+    features:
+      - "Routing header display (code, name, status, version, reusable)"
+      - "Operations table with CRUD actions"
+      - "Add/Edit operation modal"
+      - "Reorder operations (up/down arrows)"
+      - "Cost & duration summary panel with breakdown"
+      - "Related BOMs section"
+      - "Permission-based action visibility"
+
+# Components
+components:
+  - path: "apps/frontend/components/technical/routings/RoutingDetailHeader.tsx"
+    description: "Routing header info display (read-only)"
+    props:
+      - "routing: Routing"
+      - "onEdit: () => void"
+    features:
+      - "Code (prominent), Name, Status badge"
+      - "Version display, Reusable flag"
+      - "Description, Usage count"
+      - "Edit Routing button"
+      - "Back to Routings link"
+
+  - path: "apps/frontend/components/technical/routings/OperationsTable.tsx"
+    description: "Operations table with inline actions"
+    props:
+      - "operations: RoutingOperation[]"
+      - "routingId: string"
+      - "onEdit: (op: RoutingOperation) => void"
+      - "onDelete: (op: RoutingOperation) => void"
+      - "onReorder: (opId: string, direction: 'up' | 'down') => void"
+      - "isLoading: boolean"
+      - "canEdit: boolean"
+    features:
+      - "Columns: Seq, Name, Machine, Duration, Setup, Actions"
+      - "Sub-row: Yield %, Labor Cost/Hr"
+      - "Parallel ops: '(Parallel)' suffix on name"
+      - "Actions: [^] [v] [Edit] [Del]"
+      - "Attachment count badge"
+      - "Disable [^] on first, [v] on last"
+
+  - path: "apps/frontend/components/technical/routings/OperationRow.tsx"
+    description: "Single operation row in table"
+    props:
+      - "operation: RoutingOperation"
+      - "isFirst: boolean"
+      - "isLast: boolean"
+      - "isParallel: boolean"
+      - "onEdit: () => void"
+      - "onDelete: () => void"
+      - "onMoveUp: () => void"
+      - "onMoveDown: () => void"
+      - "canEdit: boolean"
+
+  - path: "apps/frontend/components/technical/routings/OperationModal.tsx"
+    description: "Add/Edit operation modal"
+    props:
+      - "open: boolean"
+      - "onClose: () => void"
+      - "routingId: string"
+      - "operation: RoutingOperation | null"
+      - "existingSequences: number[]"
+      - "onSuccess: () => void"
+    features:
+      - "Create mode: auto-suggest next sequence"
+      - "Edit mode: pre-populate all fields"
+      - "Parallel ops info message (not blocking error)"
+      - "All operation fields with validation"
+      - "Attachments section (in edit mode)"
+
+  - path: "apps/frontend/components/technical/routings/OperationsSummaryPanel.tsx"
+    description: "Cost & duration summary with expandable breakdown"
+    props:
+      - "operations: RoutingOperation[]"
+    features:
+      - "Total operations count"
+      - "Total duration (formatted as 'Xh Ym')"
+      - "Total setup time, cleanup time"
+      - "Total labor cost (formatted as '$X.XX')"
+      - "Average yield (weighted)"
+      - "Expandable breakdown per operation"
+      - "Parallel ops: use MAX duration per sequence"
+
+  - path: "apps/frontend/components/technical/routings/RelatedBOMsSection.tsx"
+    description: "BOMs using this routing"
+    props:
+      - "boms: RelatedBOM[]"
+      - "maxDisplay: number"
+    features:
+      - "List of BOM codes with product names"
+      - "Version display"
+      - "Max 5 shown, 'View All BOMs' link"
+      - "Empty: 'Not used yet'"
+
+  - path: "apps/frontend/components/technical/routings/OperationsEmptyState.tsx"
+    description: "Empty state when no operations"
+    props:
+      - "onAddFirst: () => void"
+    features:
+      - "Clipboard icon"
+      - "'No operations yet' message"
+      - "'Add First Operation' CTA"
+      - "Example operations banner"
+
+  - path: "apps/frontend/components/technical/routings/MachineDropdown.tsx"
+    description: "Machine selector with empty state handling"
+    props:
+      - "value: string | null"
+      - "onChange: (machineId: string | null) => void"
+      - "disabled: boolean"
+    features:
+      - "Empty state: 'No machines configured' with Settings link"
+      - "'None/Not assigned' option (saves NULL)"
+      - "Machine list: '{code} - {name}'"
+      - "Graceful handling when machines table empty"
+
+  - path: "apps/frontend/components/technical/routings/AttachmentUpload.tsx"
+    description: "File upload component for operation attachments"
+    props:
+      - "operationId: string"
+      - "routingId: string"
+      - "currentCount: number"
+      - "maxCount: number"
+      - "onUploadComplete: (attachment: OperationAttachment) => void"
+    features:
+      - "Drag-and-drop zone"
+      - "File type validation (PDF, PNG, JPG, DOCX)"
+      - "Size validation (10MB max)"
+      - "Progress indicator"
+      - "Disabled when max reached"
+
+  - path: "apps/frontend/components/technical/routings/AttachmentList.tsx"
+    description: "List of attachments with download/delete actions"
+    props:
+      - "attachments: OperationAttachment[]"
+      - "onDelete: (attachId: string) => void"
+      - "onDownload: (attachId: string) => void"
+      - "canDelete: boolean"
+    features:
+      - "File name, type icon, size display"
+      - "Download button (opens in new tab for PDF)"
+      - "Delete button with confirmation"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-routing-operations.ts"
+    description: "React Query hook for operations CRUD"
+    exports:
+      - name: "useRoutingOperations"
+        params: ["routingId: string"]
+        returns: "UseQueryResult<OperationsListResponse>"
+      - name: "useCreateOperation"
+        returns: "UseMutationResult<RoutingOperation, Error, CreateOperationRequest>"
+      - name: "useUpdateOperation"
+        returns: "UseMutationResult<RoutingOperation, Error, UpdateOperationRequest>"
+      - name: "useDeleteOperation"
+        returns: "UseMutationResult<void, Error, string>"
+      - name: "useReorderOperation"
+        returns: "UseMutationResult<ReorderResponse, Error, ReorderRequest>"
+
+  - path: "apps/frontend/lib/hooks/use-machines.ts"
+    description: "React Query hook for machines dropdown"
+    exports:
+      - name: "useMachines"
+        returns: "UseQueryResult<Machine[]>"
+      - name: "useHasMachines"
+        returns: "UseQueryResult<boolean>"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/routing-operation.ts"
+    content: |
+      export interface RoutingOperation {
+        id: string;
+        routing_id: string;
+        sequence: number;
+        name: string;
+        description: string | null;
+        machine_id: string | null;
+        machine_name: string | null;
+        machine_code: string | null;
+        setup_time: number;
+        duration: number;
+        cleanup_time: number;
+        labor_cost_per_hour: number;
+        instructions: string | null;
+        attachments?: OperationAttachment[];
+        attachment_count: number;
+        created_at: string;
+        updated_at: string;
+      }
+
+      export interface OperationAttachment {
+        id: string;
+        operation_id: string;
+        file_name: string;
+        file_type: 'pdf' | 'png' | 'jpg' | 'jpeg' | 'docx';
+        file_size: number;
+        storage_path: string;
+        uploaded_by: string;
+        uploaded_at: string;
+      }
+
+      export interface OperationsSummary {
+        total_operations: number;
+        total_duration: number;
+        total_setup_time: number;
+        total_cleanup_time: number;
+        total_labor_cost: number;
+        average_yield: number;
+      }
+
+      export interface CreateOperationRequest {
+        sequence: number;
+        name: string;
+        description?: string | null;
+        machine_id?: string | null;
+        setup_time?: number;
+        duration: number;
+        cleanup_time?: number;
+        labor_cost_per_hour?: number;
+        instructions?: string | null;
+      }
+
+      export interface UpdateOperationRequest extends Partial<CreateOperationRequest> {
+        id: string;
+      }
+
+      export interface ReorderRequest {
+        direction: 'up' | 'down';
+      }
+
+      export interface ReorderResponse {
+        success: true;
+        updated_operations: Array<{ id: string; sequence: number }>;
+      }
+
+      export interface RelatedBOM {
+        id: string;
+        product_code: string;
+        product_name: string;
+        version: string;
+      }
+
+      export interface OperationsListResponse {
+        operations: RoutingOperation[];
+        summary: OperationsSummary;
+      }
+
+# Utility Functions
+utilities:
+  - name: "detectParallelOperations"
+    description: "Detect operations with duplicate sequences"
+    code: |
+      const detectParallelOperations = (operations: RoutingOperation[]) => {
+        const sequenceCounts = operations.reduce((acc, op) => {
+          acc[op.sequence] = (acc[op.sequence] || 0) + 1;
+          return acc;
+        }, {} as Record<number, number>);
+
+        return operations.map(op => ({
+          ...op,
+          isParallel: sequenceCounts[op.sequence] > 1,
+          displayName: sequenceCounts[op.sequence] > 1
+            ? `${op.name} (Parallel)`
+            : op.name
+        }));
+      };
+
+  - name: "calculateTotalDuration"
+    description: "Calculate total duration with parallel ops (MAX per sequence)"
+    code: |
+      const calculateTotalDuration = (operations: RoutingOperation[]) => {
+        const grouped = operations.reduce((acc, op) => {
+          if (!acc[op.sequence]) acc[op.sequence] = [];
+          acc[op.sequence].push(op);
+          return acc;
+        }, {} as Record<number, RoutingOperation[]>);
+
+        return Object.values(grouped).reduce((total, group) => {
+          const maxTime = Math.max(...group.map(op =>
+            op.setup_time + op.duration + op.cleanup_time
+          ));
+          return total + maxTime;
+        }, 0);
+      };
+
+  - name: "formatDuration"
+    description: "Format minutes as 'Xh Ym'"
+    code: |
+      const formatDuration = (minutes: number): string => {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (hours > 0) {
+          return `${hours}h ${mins}m`;
+        }
+        return `${mins}m`;
+      };
+
+  - name: "getStoragePath"
+    description: "Generate storage path for attachment"
+    code: |
+      const getStoragePath = (
+        orgId: string,
+        routingId: string,
+        operationId: string,
+        fileName: string
+      ): string => {
+        const timestamp = Date.now();
+        const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+        return `${orgId}/${routingId}/${operationId}/${timestamp}_${sanitizedName}`;
+      };
+
+# Validation Schema (Zod)
+validation:
+  path: "apps/frontend/lib/validation/operation-schema.ts"
+  content: |
+    import { z } from 'zod';
+
+    export const operationFormSchema = z.object({
+      sequence: z.number()
+        .int("Sequence must be an integer")
+        .min(1, "Sequence must be at least 1"),
+      name: z.string()
+        .min(3, "Name must be at least 3 characters")
+        .max(100, "Name must be less than 100 characters"),
+      description: z.string()
+        .max(500, "Description must be less than 500 characters")
+        .nullable()
+        .optional(),
+      machine_id: z.string().uuid().nullable().optional(),
+      setup_time: z.number()
+        .int("Setup time must be an integer")
+        .min(0, "Setup time cannot be negative")
+        .default(0),
+      duration: z.number()
+        .int("Duration must be an integer")
+        .min(1, "Duration must be at least 1 minute"),
+      cleanup_time: z.number()
+        .int("Cleanup time must be an integer")
+        .min(0, "Cleanup time cannot be negative")
+        .default(0),
+      labor_cost_per_hour: z.number()
+        .min(0, "Labor cost cannot be negative")
+        .default(0),
+      instructions: z.string()
+        .max(2000, "Instructions must be less than 2000 characters")
+        .nullable()
+        .optional(),
+    });
+
+    export type OperationFormValues = z.infer<typeof operationFormSchema>;
+
+    // Attachment validation
+    const ALLOWED_MIME_TYPES = [
+      'application/pdf',
+      'image/png',
+      'image/jpeg',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+
+    export const attachmentSchema = z.object({
+      file: z.instanceof(File)
+        .refine(file => file.size <= 10 * 1024 * 1024,
+          "File size must be less than 10MB")
+        .refine(file => ALLOWED_MIME_TYPES.includes(file.type),
+          "File type not allowed (PDF, PNG, JPG, DOCX only)"),
+    });
+
+# Implementation Notes
+implementation_notes:
+  - "Use ShadCN DataTable for operations table"
+  - "Use ShadCN Dialog for operation modal"
+  - "Use react-hook-form with Zod resolver for form validation"
+  - "Parallel ops: show info message (not error) when duplicate sequence entered"
+  - "Machine dropdown: gracefully handle empty machines table"
+  - "No toast for reorder - instant visual feedback is sufficient"
+  - "Attachments section visible in edit mode only (operation must exist first)"
+  - "Delete attachment from storage when operation deleted"
+  - "Refresh summary panel when operations change"
+  - "Permission checks: hide edit/delete actions for read-only users"

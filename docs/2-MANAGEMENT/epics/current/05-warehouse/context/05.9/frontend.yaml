@@ -1,0 +1,281 @@
+# Story 05.9 - Frontend Specification
+# Purpose: Components, pages, UX patterns, wireframe references
+# Agent: FRONTEND-DEV
+
+# Page structure
+pages:
+  - path: "app/(authenticated)/warehouse/asns/[id]/page.tsx"
+    description: "ASN detail page - add Receive button that opens ReceiveModal"
+    modifications:
+      - "Add 'Receive' button in header actions (when status is pending or partial)"
+      - "Button opens ReceiveModal component"
+      - "Disable button when status is 'received' or 'cancelled'"
+
+# Components to create
+components:
+  - path: "apps/frontend/components/warehouse/asns/ReceiveModal.tsx"
+    description: "Main receive workflow modal - master dialog for ASN receiving"
+    props:
+      - { name: "asnId", type: "string", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onOpenChange", type: "(open: boolean) => void", required: true }
+      - { name: "onSuccess", type: "(result: ASNReceiveResult) => void", required: false }
+    features:
+      - "Fetch ASN receive preview on open"
+      - "Display ASN header info (number, supplier, expected date)"
+      - "Warehouse and location selection dropdowns"
+      - "List of items with pre-filled expected quantities"
+      - "Inline editable received_qty for each item"
+      - "Variance reason dropdown per item (when variance exists)"
+      - "Submit button to execute receive"
+      - "Loading state during submission"
+      - "Success summary with variances"
+    state:
+      - "preview: ASNReceivePreview | null"
+      - "formState: Map<itemId, ReceiveItemState>"
+      - "selectedWarehouse: string"
+      - "selectedLocation: string"
+      - "isSubmitting: boolean"
+      - "result: ASNReceiveResult | null"
+    shadcn_components:
+      - "Dialog"
+      - "DialogContent"
+      - "DialogHeader"
+      - "DialogTitle"
+      - "DialogDescription"
+      - "Button"
+      - "Select"
+      - "Input"
+      - "Table"
+      - "Badge"
+
+  - path: "apps/frontend/components/warehouse/asns/ReceiveItemRow.tsx"
+    description: "Individual item row within receive workflow with variance display"
+    props:
+      - { name: "item", type: "ASNReceiveItemPreview", required: true }
+      - { name: "value", type: "ReceiveItemInput", required: true }
+      - { name: "onChange", type: "(value: ReceiveItemInput) => void", required: true }
+      - { name: "errors", type: "Record<string, string>", required: false }
+    features:
+      - "Display product name, SKU, UoM"
+      - "Show expected qty (read-only)"
+      - "Show already received qty"
+      - "Input for this session's received qty"
+      - "Live variance calculation"
+      - "VarianceBadge showing under/over/exact"
+      - "Variance reason dropdown (when under/over)"
+      - "Batch number input (if required by settings)"
+      - "Expiry date picker (if required by settings)"
+    shadcn_components:
+      - "TableRow"
+      - "TableCell"
+      - "Input"
+      - "Select"
+      - "DatePicker"
+
+  - path: "apps/frontend/components/warehouse/asns/VarianceBadge.tsx"
+    description: "Color-coded badge showing variance status"
+    props:
+      - { name: "variance", type: "number", required: true }
+      - { name: "expectedQty", type: "number", required: true }
+      - { name: "showPercent", type: "boolean", required: false, default: true }
+    features:
+      - "Calculate variance_percent"
+      - "Determine indicator (under/over/exact)"
+      - "Display appropriate color and text"
+    colors:
+      under:
+        badge_class: "bg-red-100 text-red-800 border-red-200"
+        icon: "TrendingDown or ChevronDown"
+        text_format: "-{variance} units ({percent}%)"
+      over:
+        badge_class: "bg-yellow-100 text-yellow-800 border-yellow-200"
+        icon: "TrendingUp or ChevronUp"
+        text_format: "+{variance} units ({percent}%)"
+      exact:
+        badge_class: "bg-green-100 text-green-800 border-green-200"
+        icon: "Check"
+        text_format: "Exact match"
+    shadcn_components:
+      - "Badge"
+
+  - path: "apps/frontend/components/warehouse/asns/ReceiveSummary.tsx"
+    description: "Completion summary showing GRN created and variance report"
+    props:
+      - { name: "result", type: "ASNReceiveResult", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+      - { name: "onReceiveMore", type: "() => void", required: false }
+    features:
+      - "Display success message with GRN number"
+      - "Show number of LPs created"
+      - "ASN status update (partial/received)"
+      - "Variance summary table"
+      - "Total variance count and flags"
+      - "Action buttons: Close, Receive More Items, View GRN"
+    shadcn_components:
+      - "Alert"
+      - "AlertTitle"
+      - "AlertDescription"
+      - "Table"
+      - "Button"
+      - "Badge"
+
+# UX patterns
+ux:
+  wireframes:
+    - id: "WH-010"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-010-scanner-receive.md"
+      relevance: "Reference for receive workflow patterns (adapted for desktop modal)"
+      components_referenced:
+        - "Order lines display pattern"
+        - "Variance indicators"
+        - "Success confirmation pattern"
+
+  patterns:
+    modal: "ShadCN Dialog - full-width on mobile, max-w-4xl on desktop"
+    table: "ShadCN Table with inline editing for received_qty"
+    form: "React Hook Form with Zod validation"
+    loading: "Skeleton loader for preview fetch, spinner for submission"
+
+  states:
+    - state: "loading"
+      description: "Fetching ASN receive preview"
+      elements: ["Skeleton rows for items table", "Disabled submit button"]
+
+    - state: "ready"
+      description: "Preview loaded, ready for input"
+      elements: ["Items table with inputs", "Enabled submit button"]
+
+    - state: "submitting"
+      description: "Receive request in progress"
+      elements: ["Disabled inputs", "Spinner on submit button", "Progress indicator"]
+
+    - state: "success"
+      description: "Receive completed successfully"
+      elements: ["ReceiveSummary component", "Close/action buttons"]
+
+    - state: "error"
+      description: "Submission failed"
+      elements: ["Error alert at top", "Inline field errors", "Retry button"]
+
+  accessibility:
+    - "Modal focus trap"
+    - "Keyboard navigation within table (Tab through inputs)"
+    - "ARIA labels for variance indicators"
+    - "Screen reader announcements for success/error"
+    - "Escape key closes modal (with confirmation if dirty)"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-asn-receive-preview.ts"
+    description: "React Query hook for fetching ASN receive preview"
+    exports:
+      - name: "useASNReceivePreview"
+        params: ["asnId: string"]
+        returns: "UseQueryResult<ASNReceivePreview>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+
+      export function useASNReceivePreview(asnId: string) {
+        return useQuery({
+          queryKey: ['asn-receive-preview', asnId],
+          queryFn: () => fetch(`/api/warehouse/asns/${asnId}/receive`).then(r => r.json()),
+          enabled: !!asnId,
+          staleTime: 30 * 1000, // 30 seconds
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-asn-receive.ts"
+    description: "React Query mutation hook for executing ASN receive"
+    exports:
+      - name: "useASNReceive"
+        returns: "UseMutationResult<ASNReceiveResult, Error, ASNReceiveInput>"
+    pattern: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+      export function useASNReceive() {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: async ({ asnId, data }: ASNReceiveInput) => {
+            const response = await fetch(`/api/warehouse/asns/${asnId}/receive`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data),
+            });
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || 'Receive failed');
+            }
+            return response.json();
+          },
+          onSuccess: (data, variables) => {
+            // Invalidate related queries
+            queryClient.invalidateQueries({ queryKey: ['asn', variables.asnId] });
+            queryClient.invalidateQueries({ queryKey: ['asn-receive-preview', variables.asnId] });
+            queryClient.invalidateQueries({ queryKey: ['asns'] });
+            queryClient.invalidateQueries({ queryKey: ['license-plates'] });
+          },
+        });
+      }
+
+# Form state management
+forms:
+  - name: "ReceiveItemInput"
+    fields:
+      - { name: "asn_item_id", type: "string", required: true }
+      - { name: "received_qty", type: "number", required: true, default: "remaining_qty" }
+      - { name: "batch_number", type: "string", required: "conditional" }
+      - { name: "supplier_batch_number", type: "string", required: false }
+      - { name: "expiry_date", type: "string", required: "conditional" }
+      - { name: "manufacture_date", type: "string", required: false }
+      - { name: "variance_reason", type: "VarianceReason", required: false }
+      - { name: "variance_notes", type: "string", required: false }
+
+  - name: "ReceiveFormState"
+    description: "Overall form state for the receive modal"
+    fields:
+      - { name: "warehouse_id", type: "string", required: true }
+      - { name: "location_id", type: "string", required: true }
+      - { name: "items", type: "ReceiveItemInput[]", required: true }
+      - { name: "notes", type: "string", required: false }
+
+# Integration with existing components
+integration:
+  - component: "ASN detail page"
+    file: "apps/frontend/app/(authenticated)/warehouse/asns/[id]/page.tsx"
+    changes:
+      - "Import ReceiveModal component"
+      - "Add state: receiveModalOpen"
+      - "Add Receive button in page header"
+      - "Render ReceiveModal with ASN ID"
+
+  - component: "Warehouse navigation"
+    file: "apps/frontend/components/warehouse/nav/WarehouseNav.tsx"
+    changes:
+      - "No changes required (ASN menu item already exists from 05.8)"
+
+# Responsive design
+responsive:
+  mobile:
+    breakpoint: "< 768px"
+    modal: "Full screen sheet (bottom to top)"
+    table: "Card-based layout for items (stacked)"
+    inputs: "Full width, larger touch targets"
+
+  tablet:
+    breakpoint: "768px - 1024px"
+    modal: "max-w-2xl centered"
+    table: "Standard table with horizontal scroll if needed"
+
+  desktop:
+    breakpoint: "> 1024px"
+    modal: "max-w-4xl centered"
+    table: "Full table with all columns visible"
+
+# Performance considerations
+performance:
+  - "Debounce variance calculation (300ms)"
+  - "Memoize ReceiveItemRow with React.memo"
+  - "Virtualize items table if > 20 items"
+  - "Prefetch warehouse/location data on modal open"

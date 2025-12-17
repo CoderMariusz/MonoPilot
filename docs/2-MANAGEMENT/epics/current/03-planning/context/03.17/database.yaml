@@ -1,0 +1,232 @@
+# Story 03.17 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_planning_settings.sql"
+    type: "migration"
+    description: "planning_settings table with RLS and auto-initialization trigger"
+
+tables:
+  - name: "planning_settings"
+    description: "Module configuration for Planning (PO/TO/WO settings) - singleton per org"
+    columns:
+      # Primary key and tenant
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE" }
+
+      # PO Settings (7 fields)
+      - { name: "po_require_approval", type: "BOOLEAN", constraints: "DEFAULT false", description: "Require approval before PO confirmation" }
+      - { name: "po_approval_threshold", type: "DECIMAL(15,4)", constraints: "DEFAULT NULL", description: "Approval required above this amount (null = all POs if approval enabled)" }
+      - { name: "po_approval_roles", type: "TEXT[]", constraints: "DEFAULT ARRAY['admin', 'manager']", description: "Roles that can approve POs" }
+      - { name: "po_auto_number_prefix", type: "TEXT", constraints: "DEFAULT 'PO-'", description: "Prefix for auto-generated PO numbers" }
+      - { name: "po_auto_number_format", type: "TEXT", constraints: "DEFAULT 'YYYY-NNNNN'", description: "Format pattern with YYYY (year) and NNNNN (sequence)" }
+      - { name: "po_default_payment_terms", type: "TEXT", constraints: "DEFAULT 'Net 30'", description: "Default payment terms for new POs" }
+      - { name: "po_default_currency", type: "TEXT", constraints: "DEFAULT 'PLN'", description: "Default currency for new POs" }
+
+      # TO Settings (5 fields)
+      - { name: "to_allow_partial_shipments", type: "BOOLEAN", constraints: "DEFAULT true", description: "Allow TOs to be shipped in multiple shipments" }
+      - { name: "to_require_lp_selection", type: "BOOLEAN", constraints: "DEFAULT false", description: "Require LP assignment when creating TO" }
+      - { name: "to_auto_number_prefix", type: "TEXT", constraints: "DEFAULT 'TO-'", description: "Prefix for auto-generated TO numbers" }
+      - { name: "to_auto_number_format", type: "TEXT", constraints: "DEFAULT 'YYYY-NNNNN'", description: "Format pattern with YYYY and NNNNN" }
+      - { name: "to_default_transit_days", type: "INTEGER", constraints: "DEFAULT 1", description: "Default transit time in days" }
+
+      # WO Settings (9 fields)
+      - { name: "wo_material_check", type: "BOOLEAN", constraints: "DEFAULT true", description: "Check material availability on WO create" }
+      - { name: "wo_copy_routing", type: "BOOLEAN", constraints: "DEFAULT true", description: "Auto-copy routing operations to WO" }
+      - { name: "wo_auto_select_bom", type: "BOOLEAN", constraints: "DEFAULT true", description: "Auto-select active BOM for product" }
+      - { name: "wo_require_bom", type: "BOOLEAN", constraints: "DEFAULT true", description: "Block WO creation without active BOM" }
+      - { name: "wo_allow_overproduction", type: "BOOLEAN", constraints: "DEFAULT false", description: "Allow actual qty > planned qty" }
+      - { name: "wo_overproduction_limit", type: "DECIMAL(5,2)", constraints: "DEFAULT 10", description: "Max overproduction percentage (0-100)" }
+      - { name: "wo_auto_number_prefix", type: "TEXT", constraints: "DEFAULT 'WO-'", description: "Prefix for auto-generated WO numbers" }
+      - { name: "wo_auto_number_format", type: "TEXT", constraints: "DEFAULT 'YYYY-NNNNN'", description: "Format pattern with YYYY and NNNNN" }
+      - { name: "wo_default_scheduling_buffer_hours", type: "INTEGER", constraints: "DEFAULT 2", description: "Buffer time for scheduling (0-168 hours)" }
+
+      # Status Configuration (Phase 2 - exists in table but NOT exposed in MVP UI)
+      - { name: "po_statuses", type: "JSONB", constraints: "NOT NULL DEFAULT '[\"draft\",\"submitted\",\"pending_approval\",\"approved\",\"confirmed\",\"receiving\",\"closed\",\"cancelled\"]'::jsonb", description: "Phase 2: PO status list" }
+      - { name: "to_statuses", type: "JSONB", constraints: "NOT NULL DEFAULT '[\"draft\",\"planned\",\"partially_shipped\",\"shipped\",\"partially_received\",\"received\",\"closed\"]'::jsonb", description: "Phase 2: TO status list" }
+      - { name: "wo_statuses", type: "JSONB", constraints: "NOT NULL DEFAULT '[\"draft\",\"planned\",\"released\",\"in_progress\",\"on_hold\",\"completed\",\"closed\",\"cancelled\"]'::jsonb", description: "Phase 2: WO status list" }
+
+      # MRP Settings (Phase 2 - exists in table but NOT exposed in MVP UI)
+      - { name: "mrp_enabled", type: "BOOLEAN", constraints: "DEFAULT false", description: "Phase 2: Enable MRP features" }
+      - { name: "safety_stock_days", type: "INTEGER", constraints: "DEFAULT 7", description: "Phase 2: Safety stock days" }
+      - { name: "forecast_horizon_days", type: "INTEGER", constraints: "DEFAULT 30", description: "Phase 2: Forecast horizon" }
+
+      # Audit
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_planning_settings_org ON planning_settings(org_id)"
+    constraints:
+      - "UNIQUE(org_id)"
+      - "CHECK(po_approval_threshold IS NULL OR po_approval_threshold >= 0)"
+      - "CHECK(to_default_transit_days >= 0 AND to_default_transit_days <= 365)"
+      - "CHECK(wo_overproduction_limit >= 0 AND wo_overproduction_limit <= 100)"
+      - "CHECK(wo_default_scheduling_buffer_hours >= 0 AND wo_default_scheduling_buffer_hours <= 168)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "planning_settings"
+      name: "planning_settings_select_own_org"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "planning_settings"
+      name: "planning_settings_update_own_org"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "planning_settings"
+      name: "planning_settings_insert_system"
+      operation: "INSERT"
+      with_check: "true"
+      notes: "Allow system/service to create initial settings record"
+
+# Auto-initialization trigger (optional - can also be done in service layer)
+triggers:
+  - name: "update_planning_settings_updated_at"
+    table: "planning_settings"
+    timing: "BEFORE UPDATE"
+    operation: "UPDATE"
+    function: |
+      CREATE OR REPLACE FUNCTION update_planning_settings_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+# Full migration SQL
+migration_sql: |
+  -- Planning Settings Table
+  CREATE TABLE IF NOT EXISTS planning_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
+
+    -- PO Settings
+    po_require_approval BOOLEAN DEFAULT false,
+    po_approval_threshold DECIMAL(15,4),
+    po_approval_roles TEXT[] DEFAULT ARRAY['admin', 'manager'],
+    po_auto_number_prefix TEXT DEFAULT 'PO-',
+    po_auto_number_format TEXT DEFAULT 'YYYY-NNNNN',
+    po_default_payment_terms TEXT DEFAULT 'Net 30',
+    po_default_currency TEXT DEFAULT 'PLN',
+
+    -- TO Settings
+    to_allow_partial_shipments BOOLEAN DEFAULT true,
+    to_require_lp_selection BOOLEAN DEFAULT false,
+    to_auto_number_prefix TEXT DEFAULT 'TO-',
+    to_auto_number_format TEXT DEFAULT 'YYYY-NNNNN',
+    to_default_transit_days INTEGER DEFAULT 1,
+
+    -- WO Settings
+    wo_material_check BOOLEAN DEFAULT true,
+    wo_copy_routing BOOLEAN DEFAULT true,
+    wo_auto_select_bom BOOLEAN DEFAULT true,
+    wo_require_bom BOOLEAN DEFAULT true,
+    wo_allow_overproduction BOOLEAN DEFAULT false,
+    wo_overproduction_limit DECIMAL(5,2) DEFAULT 10,
+    wo_auto_number_prefix TEXT DEFAULT 'WO-',
+    wo_auto_number_format TEXT DEFAULT 'YYYY-NNNNN',
+    wo_default_scheduling_buffer_hours INTEGER DEFAULT 2,
+
+    -- Status Configuration (Phase 2)
+    po_statuses JSONB NOT NULL DEFAULT '["draft","submitted","pending_approval","approved","confirmed","receiving","closed","cancelled"]'::jsonb,
+    to_statuses JSONB NOT NULL DEFAULT '["draft","planned","partially_shipped","shipped","partially_received","received","closed"]'::jsonb,
+    wo_statuses JSONB NOT NULL DEFAULT '["draft","planned","released","in_progress","on_hold","completed","closed","cancelled"]'::jsonb,
+
+    -- MRP Settings (Phase 2)
+    mrp_enabled BOOLEAN DEFAULT false,
+    safety_stock_days INTEGER DEFAULT 7,
+    forecast_horizon_days INTEGER DEFAULT 30,
+
+    -- Audit
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    -- Constraints
+    CONSTRAINT chk_po_approval_threshold CHECK (po_approval_threshold IS NULL OR po_approval_threshold >= 0),
+    CONSTRAINT chk_to_transit_days CHECK (to_default_transit_days >= 0 AND to_default_transit_days <= 365),
+    CONSTRAINT chk_wo_overproduction_limit CHECK (wo_overproduction_limit >= 0 AND wo_overproduction_limit <= 100),
+    CONSTRAINT chk_wo_scheduling_buffer CHECK (wo_default_scheduling_buffer_hours >= 0 AND wo_default_scheduling_buffer_hours <= 168)
+  );
+
+  -- Index
+  CREATE INDEX IF NOT EXISTS idx_planning_settings_org ON planning_settings(org_id);
+
+  -- RLS
+  ALTER TABLE planning_settings ENABLE ROW LEVEL SECURITY;
+
+  CREATE POLICY "planning_settings_select_own_org"
+    ON planning_settings FOR SELECT
+    USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "planning_settings_update_own_org"
+    ON planning_settings FOR UPDATE
+    USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()))
+    WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "planning_settings_insert_system"
+    ON planning_settings FOR INSERT
+    WITH CHECK (true);
+
+  -- Updated_at trigger
+  CREATE OR REPLACE FUNCTION update_planning_settings_updated_at()
+  RETURNS TRIGGER AS $$
+  BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql;
+
+  CREATE TRIGGER trg_planning_settings_updated_at
+    BEFORE UPDATE ON planning_settings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_planning_settings_updated_at();
+
+# Default values summary
+defaults:
+  po_settings:
+    po_require_approval: false
+    po_approval_threshold: null
+    po_approval_roles: ["admin", "manager"]
+    po_auto_number_prefix: "PO-"
+    po_auto_number_format: "YYYY-NNNNN"
+    po_default_payment_terms: "Net 30"
+    po_default_currency: "PLN"
+
+  to_settings:
+    to_allow_partial_shipments: true
+    to_require_lp_selection: false
+    to_auto_number_prefix: "TO-"
+    to_auto_number_format: "YYYY-NNNNN"
+    to_default_transit_days: 1
+
+  wo_settings:
+    wo_material_check: true
+    wo_copy_routing: true
+    wo_auto_select_bom: true
+    wo_require_bom: true
+    wo_allow_overproduction: false
+    wo_overproduction_limit: 10
+    wo_auto_number_prefix: "WO-"
+    wo_auto_number_format: "YYYY-NNNNN"
+    wo_default_scheduling_buffer_hours: 2
+
+# Enum values
+enums:
+  payment_terms:
+    values: ["Net 30", "Net 60", "Net 90", "2/10 Net 30", "Due on Receipt"]
+    default: "Net 30"
+  currency:
+    values: ["PLN", "EUR", "USD", "GBP"]
+    default: "PLN"

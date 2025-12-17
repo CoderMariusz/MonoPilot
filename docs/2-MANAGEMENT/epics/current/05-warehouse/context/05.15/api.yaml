@@ -1,0 +1,436 @@
+# Story 05.15 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # Validation Endpoint
+  - method: "POST"
+    path: "/api/warehouse/grns/validate-over-receipt"
+    description: "Pre-validate over-receipt for a PO line before GRN creation"
+    file: "apps/frontend/app/api/warehouse/grns/validate-over-receipt/route.ts"
+    auth: "required"
+    roles: ["warehouse_operator", "warehouse_manager", "admin", "owner"]
+
+    request:
+      body:
+        po_line_id: "string (UUID) - PO line to validate"
+        receiving_qty: "number - Quantity attempting to receive"
+
+    response:
+      status: 200
+      type: "ValidateOverReceiptResponse"
+      schema:
+        allowed: "boolean - Can proceed without approval"
+        requires_approval: "boolean - Over tolerance, needs approval"
+        over_receipt_pct: "number - Calculated percentage"
+        max_allowed_qty: "number | null - Max within tolerance"
+        error: "string | null - Error message if not allowed"
+        warning: "string | null - Warning if within tolerance"
+        approval:
+          id: "string | null - Existing approval ID if found"
+          status: "string | null - pending/approved/rejected"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid request body"
+      - status: 404
+        code: "PO_LINE_NOT_FOUND"
+        message: "PO line not found"
+
+  # Create Approval Request
+  - method: "POST"
+    path: "/api/warehouse/over-receipt-approvals"
+    description: "Create a new over-receipt approval request"
+    file: "apps/frontend/app/api/warehouse/over-receipt-approvals/route.ts"
+    auth: "required"
+    roles: ["warehouse_operator", "warehouse_manager", "admin", "owner"]
+
+    request:
+      body:
+        po_id: "string (UUID)"
+        po_line_id: "string (UUID)"
+        requesting_qty: "number - Quantity requesting to receive"
+        reason: "string - Required justification (min 10 chars)"
+
+    response:
+      status: 201
+      type: "OverReceiptApproval"
+      schema:
+        id: "string (UUID)"
+        status: "pending"
+        requested_by: "string (UUID)"
+        requested_at: "string (ISO timestamp)"
+        over_receipt_pct: "number"
+        # ... full approval object
+
+    errors:
+      - status: 400
+        code: "DUPLICATE_PENDING"
+        message: "Pending approval already exists for this PO line"
+      - status: 400
+        code: "REASON_REQUIRED"
+        message: "Reason is required for over-receipt approval"
+      - status: 400
+        code: "REASON_TOO_SHORT"
+        message: "Reason must be at least 10 characters"
+      - status: 404
+        code: "PO_NOT_FOUND"
+        message: "Purchase order not found"
+      - status: 404
+        code: "PO_LINE_NOT_FOUND"
+        message: "PO line not found"
+
+  # List Approvals
+  - method: "GET"
+    path: "/api/warehouse/over-receipt-approvals"
+    description: "List over-receipt approvals with filtering and pagination"
+    file: "apps/frontend/app/api/warehouse/over-receipt-approvals/route.ts"
+    auth: "required"
+    roles: ["warehouse_operator", "warehouse_manager", "admin", "owner"]
+
+    request:
+      query_params:
+        status: "string? - Filter: pending|approved|rejected"
+        po_id: "string? (UUID) - Filter by PO"
+        requested_by: "string? (UUID) - Filter by requester"
+        date_from: "string? (ISO date) - Filter from date"
+        date_to: "string? (ISO date) - Filter to date"
+        sort: "string? - Sort field: requested_at|over_receipt_pct"
+        order: "string? - Sort order: asc|desc"
+        page: "number? - Page number (default 1)"
+        limit: "number? - Items per page (default 50, max 100)"
+
+    response:
+      status: 200
+      type: "PaginatedResult<OverReceiptApproval>"
+      schema:
+        data: "OverReceiptApproval[]"
+        pagination:
+          page: "number"
+          limit: "number"
+          total: "number"
+          total_pages: "number"
+
+  # Get Approval Detail
+  - method: "GET"
+    path: "/api/warehouse/over-receipt-approvals/:id"
+    description: "Get single approval request details"
+    file: "apps/frontend/app/api/warehouse/over-receipt-approvals/[id]/route.ts"
+    auth: "required"
+    roles: ["warehouse_operator", "warehouse_manager", "admin", "owner"]
+
+    response:
+      status: 200
+      type: "OverReceiptApprovalDetail"
+      schema:
+        # Full approval object with expanded relations
+        id: "string"
+        po: "{ id, po_number, supplier_name }"
+        po_line: "{ id, product_name, ordered_qty, received_qty }"
+        product: "{ id, name, sku }"
+        requester: "{ id, first_name, last_name, email }"
+        reviewer: "{ id, first_name, last_name, email } | null"
+        # ... other fields
+
+    errors:
+      - status: 404
+        code: "APPROVAL_NOT_FOUND"
+        message: "Approval request not found"
+        note: "Also returned for cross-tenant access (no existence leak)"
+
+  # Approve Request
+  - method: "POST"
+    path: "/api/warehouse/over-receipt-approvals/:id/approve"
+    description: "Approve an over-receipt request (manager only)"
+    file: "apps/frontend/app/api/warehouse/over-receipt-approvals/[id]/approve/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "admin", "owner"]
+
+    request:
+      body:
+        review_notes: "string? - Optional notes"
+
+    response:
+      status: 200
+      type: "OverReceiptApproval"
+      schema:
+        id: "string"
+        status: "approved"
+        reviewed_by: "string (UUID)"
+        reviewed_at: "string (ISO timestamp)"
+        review_notes: "string | null"
+
+    errors:
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Only warehouse managers can approve over-receipts"
+      - status: 400
+        code: "ALREADY_REVIEWED"
+        message: "Approval request already reviewed"
+      - status: 404
+        code: "APPROVAL_NOT_FOUND"
+        message: "Approval request not found"
+
+  # Reject Request
+  - method: "POST"
+    path: "/api/warehouse/over-receipt-approvals/:id/reject"
+    description: "Reject an over-receipt request (manager only)"
+    file: "apps/frontend/app/api/warehouse/over-receipt-approvals/[id]/reject/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "admin", "owner"]
+
+    request:
+      body:
+        review_notes: "string - Required for rejection (min 10 chars)"
+
+    response:
+      status: 200
+      type: "OverReceiptApproval"
+      schema:
+        id: "string"
+        status: "rejected"
+        reviewed_by: "string (UUID)"
+        reviewed_at: "string (ISO timestamp)"
+        review_notes: "string"
+
+    errors:
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Only warehouse managers can reject over-receipts"
+      - status: 400
+        code: "REVIEW_NOTES_REQUIRED"
+        message: "Review notes required for rejection"
+      - status: 400
+        code: "ALREADY_REVIEWED"
+        message: "Approval request already reviewed"
+      - status: 404
+        code: "APPROVAL_NOT_FOUND"
+        message: "Approval request not found"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/over-receipt-service.ts"
+    description: "Over-receipt validation and approval workflow service"
+    exports:
+      - name: "OverReceiptService"
+        type: "class"
+        methods:
+          - name: "validateOverReceipt"
+            static: true
+            params:
+              - "poLineId: string"
+              - "receivingQty: number"
+            returns: "Promise<OverReceiptValidationResult>"
+            description: "Validate over-receipt for a PO line"
+
+          - name: "requestApproval"
+            static: true
+            params:
+              - "input: CreateApprovalInput"
+            returns: "Promise<OverReceiptApproval>"
+            description: "Create approval request"
+
+          - name: "approveRequest"
+            static: true
+            params:
+              - "input: ReviewApprovalInput"
+            returns: "Promise<OverReceiptApproval>"
+            description: "Approve over-receipt request"
+
+          - name: "rejectRequest"
+            static: true
+            params:
+              - "input: ReviewApprovalInput"
+            returns: "Promise<OverReceiptApproval>"
+            description: "Reject over-receipt request"
+
+          - name: "list"
+            static: true
+            params:
+              - "params: ApprovalListParams"
+            returns: "Promise<PaginatedResult<OverReceiptApproval>>"
+            description: "List approvals with filtering"
+
+          - name: "getById"
+            static: true
+            params:
+              - "id: string"
+            returns: "Promise<OverReceiptApprovalDetail | null>"
+            description: "Get approval by ID with expanded relations"
+
+          - name: "canApprove"
+            static: true
+            params:
+              - "userId: string"
+            returns: "Promise<boolean>"
+            description: "Check if user can approve (is manager)"
+
+          - name: "getPendingApprovalForLine"
+            static: true
+            params:
+              - "poLineId: string"
+            returns: "Promise<OverReceiptApproval | null>"
+            description: "Get pending approval for PO line"
+
+# Validation Schemas (Zod)
+validation:
+  path: "apps/frontend/lib/validation/over-receipt.ts"
+  schemas:
+    - name: "validateOverReceiptSchema"
+      description: "Validate over-receipt request body"
+      fields:
+        po_line_id: "z.string().uuid()"
+        receiving_qty: "z.number().positive().max(999999999)"
+
+    - name: "createOverReceiptApprovalSchema"
+      description: "Create approval request body"
+      fields:
+        po_id: "z.string().uuid()"
+        po_line_id: "z.string().uuid()"
+        requesting_qty: "z.number().positive().max(999999999)"
+        reason: "z.string().min(10).max(1000)"
+
+    - name: "reviewOverReceiptApprovalSchema"
+      description: "Approve request body"
+      fields:
+        review_notes: "z.string().max(1000).optional()"
+
+    - name: "rejectOverReceiptApprovalSchema"
+      description: "Reject request body"
+      fields:
+        review_notes: "z.string().min(10).max(1000)"
+
+    - name: "approvalListQuerySchema"
+      description: "List query parameters"
+      fields:
+        status: "z.enum(['pending', 'approved', 'rejected']).optional()"
+        po_id: "z.string().uuid().optional()"
+        requested_by: "z.string().uuid().optional()"
+        date_from: "z.string().optional()"
+        date_to: "z.string().optional()"
+        sort: "z.enum(['requested_at', 'over_receipt_pct']).default('requested_at')"
+        order: "z.enum(['asc', 'desc']).default('desc')"
+        page: "z.coerce.number().int().positive().default(1)"
+        limit: "z.coerce.number().int().min(1).max(100).default(50)"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/over-receipt.ts"
+    exports:
+      - name: "OverReceiptValidationResult"
+        fields:
+          - "allowed: boolean"
+          - "requiresApproval: boolean"
+          - "overReceiptPct: number"
+          - "maxAllowedQty?: number"
+          - "error?: string"
+          - "warning?: string"
+          - "existingApproval?: { id: string; status: string }"
+
+      - name: "OverReceiptApproval"
+        fields:
+          - "id: string"
+          - "orgId: string"
+          - "poId: string"
+          - "poLineId: string"
+          - "productId: string"
+          - "orderedQty: number"
+          - "alreadyReceivedQty: number"
+          - "requestingQty: number"
+          - "totalAfterReceipt: number"
+          - "overReceiptPct: number"
+          - "tolerancePct: number"
+          - "reason: string"
+          - "status: 'pending' | 'approved' | 'rejected'"
+          - "requestedBy: string"
+          - "requestedAt: string"
+          - "reviewedBy?: string"
+          - "reviewedAt?: string"
+          - "reviewNotes?: string"
+
+      - name: "CreateApprovalInput"
+        fields:
+          - "poId: string"
+          - "poLineId: string"
+          - "requestingQty: number"
+          - "reason: string"
+
+      - name: "ReviewApprovalInput"
+        fields:
+          - "approvalId: string"
+          - "reviewNotes?: string"
+
+# Implementation patterns
+patterns:
+  service_validation: |
+    // Example: validateOverReceipt implementation
+    static async validateOverReceipt(
+      poLineId: string,
+      receivingQty: number
+    ): Promise<OverReceiptValidationResult> {
+      const supabase = createServerClient();
+
+      // Get PO line with ordered/received qty
+      const { data: poLine } = await supabase
+        .from('purchase_order_lines')
+        .select('ordered_qty, received_qty, product_id, purchase_order_id')
+        .eq('id', poLineId)
+        .single();
+
+      // Get warehouse settings
+      const { data: settings } = await supabase
+        .from('warehouse_settings')
+        .select('allow_over_receipt, over_receipt_tolerance_pct')
+        .single();
+
+      // Check for existing pending approval
+      const { data: existing } = await supabase
+        .from('over_receipt_approvals')
+        .select('id, status')
+        .eq('po_line_id', poLineId)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      // Calculate over-receipt percentage
+      const totalReceived = (poLine.received_qty || 0) + receivingQty;
+      const overReceiptPct = ((totalReceived - poLine.ordered_qty) / poLine.ordered_qty) * 100;
+
+      // Apply validation rules...
+    }
+
+  role_check: |
+    // Example: Manager role check before approve/reject
+    const { data: user } = await supabase
+      .from('users')
+      .select('role:roles(code)')
+      .eq('id', userId)
+      .single();
+
+    const managerRoles = ['warehouse_manager', 'admin', 'owner'];
+    if (!managerRoles.includes(user.role.code)) {
+      throw new ApiError(403, 'Only warehouse managers can approve over-receipts');
+    }
+
+# Error handling
+error_handling:
+  standard_errors:
+    - code: "VALIDATION_ERROR"
+      status: 400
+      use_for: "Zod validation failures"
+    - code: "DUPLICATE_PENDING"
+      status: 400
+      use_for: "Existing pending approval for PO line"
+    - code: "ALREADY_REVIEWED"
+      status: 400
+      use_for: "Approval already approved/rejected"
+    - code: "FORBIDDEN"
+      status: 403
+      use_for: "Non-manager attempting approve/reject"
+    - code: "NOT_FOUND"
+      status: 404
+      use_for: "Resource not found or cross-tenant access"
+
+  cross_tenant:
+    behavior: "Return 404 (not 403) to prevent existence leak"
+    pattern: "RLS automatically filters, results in empty/null response"

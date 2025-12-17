@@ -1,0 +1,130 @@
+# Story 02.14 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.14"
+  name: "BOM Advanced Features: Version Comparison, Yield & Scaling"
+  slug: "bom-advanced-features"
+  epic: "02-technical"
+  phase: "MVP"
+  complexity: "M"
+  estimate_days: 5
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Database queries (recursive CTE, no new tables)
+  - api.yaml         # Endpoints, request/response schemas
+  - frontend.yaml    # Components, services, integration
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "02.6"
+      name: "BOM CRUD"
+      provides:
+        - "boms table"
+        - "bom_items table"
+        - "bom-service.ts"
+        - "BOM API endpoints"
+  related:
+    - story: "02.4"
+      name: "BOMs List"
+      provides:
+        - "BOM list page"
+        - "BOM filtering"
+    - story: "02.5"
+      name: "BOM Items Management"
+      provides:
+        - "bom_items CRUD"
+        - "BOMItemsTable component"
+  blocked_by: []
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections:
+      - "FR-2.25"  # BOM version comparison (diff view)
+      - "FR-2.29"  # BOM multi-level explosion
+      - "FR-2.34"  # BOM yield calculation
+      - "FR-2.35"  # BOM scaling (batch size adjust)
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections:
+      - "Database Schema"
+      - "API Design"
+      - "Cost Calculation Logic"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.14.bom-advanced-features.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-005-boms-list.md"
+      relevance: "Version comparison button location"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006-bom-modal.md"
+      relevance: "Multi-level explosion, scaling modal, yield display"
+
+# Existing implementation (extend these)
+existing_code:
+  services:
+    - path: "apps/frontend/lib/services/bom-service.ts"
+      functions:
+        - "scaleBOM(bomId, multiplier)"       # Already implemented - read-only scaling
+        - "calculateBOMYield(bomId, plannedQuantity)"  # Already implemented - yield calculation
+      note: "Extend these existing functions"
+  schemas:
+    - path: "apps/frontend/lib/validation/bom-schemas.ts"
+      note: "Add new schemas for comparison, scaling requests"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 4
+    description: "Compare, explode, scale, yield endpoints"
+    endpoints:
+      - "GET /api/technical/boms/:id/compare/:compareId"
+      - "GET /api/technical/boms/:id/explosion"
+      - "POST /api/technical/boms/:id/scale"
+      - "GET /api/technical/boms/:id/yield"
+  - type: "component"
+    count: 4
+    description: "BOMComparisonModal, MultiLevelExplosion, BOMScaleModal, YieldAnalysisPanel"
+  - type: "service"
+    count: 1
+    description: "Extend bom-service.ts with comparison and explosion logic"
+  - type: "test"
+    count: 3
+    description: "Unit tests for algorithms, integration tests for endpoints, E2E for UI"
+
+# Technical notes
+technical_notes:
+  - "bom-service.ts already has scaleBOM() and calculateBOMYield() - extend these"
+  - "Multi-level explosion uses recursive CTE with max 10 levels depth"
+  - "Version comparison uses component_id as key for matching items"
+  - "Return 404 for cross-tenant access (not 403)"
+  - "Version comparison must be same product (validation rule)"
+  - "Scaling is preview-only by default, explicit flag to apply changes"
+
+# Feature scope
+scope:
+  in_scope:
+    - "GET /api/technical/boms/:id/compare/:compareId - Compare two BOM versions"
+    - "POST /api/technical/boms/:id/scale - Scale BOM to new batch size"
+    - "GET /api/technical/boms/:id/yield - Get yield analysis"
+    - "PUT /api/technical/boms/:id/yield - Update yield settings"
+    - "BOM version comparison modal with side-by-side diff view"
+    - "Yield calculation display on BOM detail"
+    - "Batch size scaling tool with preview"
+    - "Diff highlighting for changed ingredients"
+
+  out_of_scope_mvp:
+    - "Historical yield tracking from production (Phase 1)"
+    - "Yield optimization recommendations (Phase 1)"
+    - "Deep copy with dependencies (Phase 1)"
+    - "Multi-BOM comparison (more than 2 versions) (Phase 2)"
+    - "Scaling with alternative ingredient substitution (Phase 2)"
+    - "Clone to different organization (Phase 2)"

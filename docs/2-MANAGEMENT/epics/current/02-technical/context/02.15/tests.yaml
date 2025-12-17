@@ -1,0 +1,435 @@
+# Story 02.15 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/cost-history-service.test.ts"
+    type: "unit"
+    description: "Unit tests for trend calculation and cost history"
+  - path: "apps/frontend/lib/services/__tests__/variance-analysis-service.test.ts"
+    type: "unit"
+    description: "Unit tests for variance calculation"
+  - path: "apps/frontend/app/api/technical/costing/products/[id]/history/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for cost history API"
+  - path: "apps/frontend/app/api/technical/costing/variance/report/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for variance API"
+  - path: "apps/frontend/components/technical/costing/__tests__/CostTrendChart.test.tsx"
+    type: "component"
+    description: "Component tests for chart rendering"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # Cost History Display
+  - id: "AC-01"
+    section: "Cost History Display"
+    given: "product 'Bread Loaf White' has 47 cost records"
+    when: "user navigates to cost history page"
+    then: "history displays within 1 second"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "FR-2.75"
+
+  - id: "AC-02"
+    section: "Cost History Display"
+    given: "cost history page loaded"
+    when: "current cost summary shows"
+    then: "current cost $2.46/kg, previous cost $2.38/kg, change +$0.08 (+3.4%) displayed"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "FR-2.75"
+
+  - id: "AC-03"
+    section: "Cost History Display"
+    given: "cost history page loaded"
+    when: "trends display"
+    then: "30-day, 90-day, YTD trends shown with arrows"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.75"
+
+  # Cost Trend Chart
+  - id: "AC-04"
+    section: "Cost Trend Chart"
+    given: "cost history with 12 months data"
+    when: "chart renders"
+    then: "line chart shows cost trend over time"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-05"
+    section: "Cost Trend Chart"
+    given: "chart displayed"
+    when: "toggle buttons shown"
+    then: "user can enable/disable Material, Labor, Overhead, Total lines"
+    test_type: "component"
+    priority: "P1"
+
+  - id: "AC-06"
+    section: "Cost Trend Chart"
+    given: "chart displayed"
+    when: "user hovers over data point for March 2025"
+    then: "tooltip shows Material, Labor, Overhead with percentages and total"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-07"
+    section: "Cost Trend Chart"
+    given: "chart displayed"
+    when: "user clicks data point"
+    then: "navigation to specific cost calculation detail occurs"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Variance Analysis (FR-2.71)
+  - id: "AC-08"
+    section: "Variance Analysis"
+    given: "variance analysis section displayed"
+    when: "period is 'Last 30 Days'"
+    then: "work orders analyzed count shows"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "FR-2.71"
+
+  - id: "AC-09"
+    section: "Variance Analysis"
+    given: "variance displayed for material cost"
+    when: "standard=$185.50, actual=$188.20"
+    then: "variance shows +$2.70 (+1.5%)"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.71"
+
+  - id: "AC-10"
+    section: "Variance Analysis"
+    given: "labor variance >5%"
+    when: "displayed"
+    then: "warning indicator shows 'Significant variance in Labor Cost'"
+    test_type: "unit"
+    priority: "P0"
+    prd_ref: "FR-2.71"
+
+  - id: "AC-11"
+    section: "Variance Analysis"
+    given: "no production data exists"
+    when: "variance section displays"
+    then: "message shows 'No variance data available yet. Run production to compare.'"
+    test_type: "integration"
+    priority: "P1"
+
+  # Date Range Filtering
+  - id: "AC-12"
+    section: "Date Range Filtering"
+    given: "user sets date range 2024-01-01 to 2025-12-11"
+    when: "filters applied"
+    then: "chart and table update to show only that range"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-13"
+    section: "Date Range Filtering"
+    given: "user clicks 'Reset Filters'"
+    when: "applied"
+    then: "default last 12 months with all types display"
+    test_type: "component"
+    priority: "P2"
+
+  # Export Functionality
+  - id: "AC-14"
+    section: "Export Functionality"
+    given: "export modal open"
+    when: "CSV format selected"
+    then: "data inclusion checkboxes show"
+    test_type: "component"
+    priority: "P1"
+
+  - id: "AC-15"
+    section: "Export Functionality"
+    given: "export confirmed with CSV"
+    when: "download completes"
+    then: "file downloads with correct filename pattern"
+    test_type: "integration"
+    priority: "P1"
+
+  # Loading/Empty/Error States
+  - id: "AC-16"
+    section: "Loading State"
+    given: "user navigates to cost history"
+    when: "data loading"
+    then: "spinner with 'Loading Cost History...' displays"
+    test_type: "component"
+    priority: "P1"
+
+  - id: "AC-17"
+    section: "Empty State"
+    given: "product has no cost calculations"
+    when: "page loads"
+    then: "empty state shows 'No Cost History Available' with CTA"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-18"
+    section: "Error State"
+    given: "API fails"
+    when: "error occurs"
+    then: "error state shows with Retry button"
+    test_type: "integration"
+    priority: "P1"
+
+  # Cost History Table
+  - id: "AC-19"
+    section: "Cost History Table"
+    given: "47 records exist"
+    when: "table paginated at 10 per page"
+    then: "pagination shows 'Showing 10 of 47 records'"
+    test_type: "component"
+    priority: "P1"
+
+  - id: "AC-20"
+    section: "Cost History Table"
+    given: "user clicks column header 'Date'"
+    when: "clicked"
+    then: "table sorts by date"
+    test_type: "component"
+    priority: "P2"
+
+# Unit Test Cases
+unit_tests:
+  cost_history_service:
+    - name: "calculateTrends returns correct 30d trend"
+      setup: "Array of costs spanning 30 days with 5% increase"
+      expected: "Returns trend_30d close to 5%"
+
+    - name: "calculateTrends returns 0 for insufficient data"
+      setup: "Array with only 1 cost record"
+      expected: "Returns trend_30d = 0"
+
+    - name: "calculateTrends calculates YTD correctly"
+      setup: "Array of costs from Jan 1 to current date"
+      expected: "Returns correct YTD percentage"
+
+    - name: "calculateTrends handles negative trends"
+      setup: "Array where recent costs are lower"
+      expected: "Returns negative percentage"
+
+  variance_analysis_service:
+    - name: "calculateVariance returns correct material variance"
+      setup: "standard=185.50, actual=188.20"
+      expected: "variance=2.70, variance_percent=1.46%"
+
+    - name: "calculateVariance identifies significant variances"
+      setup: "labor variance at 7.9%"
+      expected: "significant_variances includes labor component"
+
+    - name: "calculateVariance returns empty for no work orders"
+      setup: "actualCosts array is empty"
+      expected: "work_orders_analyzed = 0, components = null"
+
+    - name: "calculateVariance averages multiple work orders"
+      setup: "3 work orders with varying costs"
+      expected: "actual values are averages of all work orders"
+
+    - name: "identifySignificantVariances uses threshold correctly"
+      setup: "variance of 4.9% with 5% threshold"
+      expected: "Not flagged as significant"
+
+    - name: "identifySignificantVariances flags direction correctly"
+      setup: "variance of +6% and -7%"
+      expected: "'over' for +6%, 'under' for -7%"
+
+  component_breakdown:
+    - name: "getComponentBreakdown calculates percentages"
+      setup: "material=185, labor=42, overhead=18"
+      expected: "Percentages sum to 100%"
+
+    - name: "getComponentBreakdown calculates changes"
+      setup: "current vs 3 months ago values"
+      expected: "change amounts and percentages correct"
+
+  cost_drivers:
+    - name: "getCostDrivers returns top 5 by impact"
+      setup: "10 ingredients with varying impacts"
+      expected: "Returns 5 highest impact ingredients"
+
+    - name: "getCostDrivers calculates impact correctly"
+      setup: "ingredient change = $4, total change = $8"
+      expected: "impact_percent = 50%"
+
+# Integration Test Cases
+integration_tests:
+  cost_history_api:
+    - name: "GET /history returns paginated results"
+      setup: "Product with 50 cost records"
+      action: "GET with page=1, limit=10"
+      expected: "Returns 10 records, pagination.total=50"
+
+    - name: "GET /history filters by date range"
+      setup: "Records spanning 2 years"
+      action: "GET with from=2025-01-01, to=2025-06-30"
+      expected: "Only records in range returned"
+
+    - name: "GET /history filters by cost type"
+      setup: "Mixed standard and actual records"
+      action: "GET with type=standard"
+      expected: "Only standard records returned"
+
+    - name: "GET /history returns 404 for invalid product"
+      setup: "Non-existent product ID"
+      action: "GET /history"
+      expected: "404 Product not found"
+
+    - name: "GET /history enforces RLS"
+      setup: "Product from different org"
+      action: "GET /history as user from org B"
+      expected: "404 Not found (not 403)"
+
+  variance_report_api:
+    - name: "GET /variance/report returns variance data"
+      setup: "Product with work order cost_variances"
+      action: "GET with productId and period=30"
+      expected: "Returns variance components"
+
+    - name: "GET /variance/report handles no production"
+      setup: "Product with no work orders"
+      action: "GET /variance/report"
+      expected: "work_orders_analyzed = 0"
+
+  export_api:
+    - name: "POST /export generates CSV"
+      setup: "Product with cost history"
+      action: "POST with format=csv"
+      expected: "Returns download_url for CSV file"
+
+    - name: "POST /export validates format"
+      setup: "Invalid format in request"
+      action: "POST with format=invalid"
+      expected: "400 Invalid export format"
+
+# Component Test Cases
+component_tests:
+  CostTrendChart:
+    - name: "renders chart with data"
+      setup: "12 months of cost data"
+      expected: "LineChart renders with all data points"
+
+    - name: "toggles lines on checkbox change"
+      setup: "All toggles enabled"
+      action: "Uncheck Material toggle"
+      expected: "Material line hidden from chart"
+
+    - name: "shows tooltip on hover"
+      setup: "Chart rendered"
+      action: "Hover over data point"
+      expected: "Tooltip displays with breakdown"
+
+  CostHistoryTable:
+    - name: "renders with pagination"
+      setup: "50 records, limit 10"
+      expected: "Shows 10 rows with pagination controls"
+
+    - name: "sorts on column click"
+      setup: "Table rendered"
+      action: "Click Date column header"
+      expected: "Rows reorder by date"
+
+  VarianceAnalysisSection:
+    - name: "shows warning for significant variance"
+      setup: "Variance with 7.9% labor"
+      expected: "Warning indicator visible"
+
+    - name: "shows empty state when no data"
+      setup: "work_orders_analyzed = 0"
+      expected: "'No variance data available' message"
+
+  ExportOptionsModal:
+    - name: "shows format options"
+      setup: "Modal opened"
+      expected: "CSV, PDF, PNG, Excel radio buttons visible"
+
+    - name: "shows preview for CSV"
+      setup: "CSV format selected"
+      expected: "First 5 rows preview shown"
+
+# Definition of Done
+definition_of_done:
+  - "Cost history page loads within 1 second"
+  - "Current cost summary displays with accurate trends"
+  - "Chart displays correctly with all cost component lines"
+  - "Chart tooltips show detailed breakdown on hover"
+  - "Chart data points are clickable (navigate to detail)"
+  - "Component breakdown shows current vs historical with changes"
+  - "Top 5 cost drivers display with impact percentages"
+  - "Variance analysis shows Standard vs Actual with warnings"
+  - "Significant variances (>5%) are highlighted"
+  - "Date range filtering updates chart and table"
+  - "CSV export includes all selected data"
+  - "PDF export includes charts and tables"
+  - "PNG export renders chart at correct resolution"
+  - "Excel export creates multi-sheet workbook"
+  - "Pagination works for >100 history records"
+  - "Column sorting works in history table"
+  - "Empty state displays for products without cost history"
+  - "All API endpoints have integration tests"
+  - "Cost calculation services have >80% unit test coverage"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Core calculation logic requires thorough testing"
+    files:
+      - "lib/services/cost-history-service.ts: 80%"
+      - "lib/services/variance-analysis-service.ts: 80%"
+  integration:
+    target: 70
+    reason: "API endpoints with data filtering need coverage"
+  component:
+    target: 60
+    reason: "Interactive components should have basic coverage"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Variance analysis depends on Production module (Epic 04)"
+    mitigation: "Show 'No production data' message until Epic 04 complete"
+    severity: "low"
+    test_coverage: "AC-11"
+
+  - id: "RISK-02"
+    description: "Large cost history datasets may impact performance"
+    mitigation: "Pagination, indexes on product_costs table, caching"
+    severity: "medium"
+    test_coverage: "integration_tests.cost_history_api"
+
+  - id: "RISK-03"
+    description: "Trend calculations may be inaccurate with sparse data"
+    mitigation: "Return 0 for insufficient data, show 'N/A' in UI"
+    severity: "low"
+    test_coverage: "unit_tests.cost_history_service"
+
+# Test Data Fixtures
+fixtures:
+  product_with_history:
+    description: "Product with 47 cost records spanning 12 months"
+    data:
+      product_id: "uuid-product-001"
+      product_code: "BREAD-001"
+      product_name: "Bread Loaf White"
+      cost_records: 47
+      date_range: "2024-01-01 to 2025-12-11"
+
+  product_no_history:
+    description: "Product with no cost calculations"
+    data:
+      product_id: "uuid-product-002"
+      product_code: "PROD-999"
+      cost_records: 0
+
+  variance_data:
+    description: "Product with variance records from work orders"
+    data:
+      product_id: "uuid-product-001"
+      work_orders: 12
+      period_days: 30

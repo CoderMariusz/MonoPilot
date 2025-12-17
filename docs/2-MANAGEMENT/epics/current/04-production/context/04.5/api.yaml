@@ -1,0 +1,426 @@
+# Story 04.5 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/production/settings"
+    description: "Retrieve production settings for current org. Creates defaults if none exist (upsert)."
+    file: "apps/frontend/app/api/production/settings/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users can read
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "ProductionSettings"
+      schema:
+        id: "UUID"
+        org_id: "UUID"
+        # WO Execution
+        allow_pause_wo: "boolean"
+        auto_complete_wo: "boolean"
+        require_operation_sequence: "boolean"
+        # Material Consumption
+        allow_over_consumption: "boolean"
+        allow_partial_lp_consumption: "boolean"
+        # Output
+        require_qa_on_output: "boolean"
+        auto_create_by_product_lp: "boolean"
+        # Reservations
+        enable_material_reservations: "boolean"
+        # Dashboard
+        dashboard_refresh_seconds: "integer"
+        show_material_alerts: "boolean"
+        show_delay_alerts: "boolean"
+        show_quality_alerts: "boolean"
+        # OEE
+        enable_oee_tracking: "boolean"
+        target_oee_percent: "number"
+        enable_downtime_tracking: "boolean"
+        # Metadata
+        created_at: "ISO8601 timestamp"
+        updated_at: "ISO8601 timestamp"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+
+    implementation_notes:
+      - "Upsert pattern: If no settings exist, create with defaults and return"
+      - "Response time < 200ms"
+      - "RLS automatically filters by org_id"
+
+  - method: "PUT"
+    path: "/api/production/settings"
+    description: "Update production settings. Partial updates allowed."
+    file: "apps/frontend/app/api/production/settings/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "production_manager"]  # Managers can update
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "Partial<ProductionSettings>"
+        example:
+          allow_pause_wo: true
+          dashboard_refresh_seconds: 15
+          show_material_alerts: false
+
+    response:
+      status: 200
+      type: "ProductionSettings"
+      description: "Full updated settings object"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Validation failed"
+        when: "Invalid field values"
+        details:
+          field: "dashboard_refresh_seconds"
+          error: "Refresh interval must be at least 5 seconds"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks production module update permission"
+
+    implementation_notes:
+      - "Partial updates: Only update fields provided in request body"
+      - "Unspecified fields remain unchanged"
+      - "Response time < 300ms"
+      - "All changes atomic (single transaction)"
+
+# Validation Rules
+validation:
+  dashboard_refresh_seconds:
+    type: "integer"
+    min: 5
+    max: 300
+    error_min: "Refresh interval must be at least 5 seconds"
+    error_max: "Refresh interval cannot exceed 300 seconds"
+
+  target_oee_percent:
+    type: "number"
+    min: 0
+    max: 100
+    error_min: "Target OEE must be at least 0"
+    error_max: "Target OEE cannot exceed 100"
+
+  boolean_fields:
+    - allow_pause_wo
+    - auto_complete_wo
+    - require_operation_sequence
+    - allow_over_consumption
+    - allow_partial_lp_consumption
+    - require_qa_on_output
+    - auto_create_by_product_lp
+    - enable_material_reservations
+    - show_material_alerts
+    - show_delay_alerts
+    - show_quality_alerts
+    - enable_oee_tracking
+    - enable_downtime_tracking
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/production-settings-service.ts"
+    description: "Production settings CRUD and helper functions"
+    exports:
+      - name: "getProductionSettings"
+        type: "async function"
+        params: []
+        returns: "Promise<ProductionSettings>"
+        description: "Fetch settings for current org (creates defaults if none exist)"
+
+      - name: "updateProductionSettings"
+        type: "async function"
+        params:
+          - "updates: Partial<ProductionSettings>"
+        returns: "Promise<ProductionSettings>"
+        description: "Update settings (partial update)"
+
+      - name: "isWoPauseAllowed"
+        type: "async function"
+        params: []
+        returns: "Promise<boolean>"
+        description: "Helper: Check if WO pause is allowed"
+
+      - name: "getDashboardRefreshInterval"
+        type: "async function"
+        params: []
+        returns: "Promise<number>"
+        description: "Helper: Get dashboard refresh interval in seconds"
+
+      - name: "getDefaultSettings"
+        type: "function"
+        params: []
+        returns: "ProductionSettings"
+        description: "Return default settings object"
+
+      - name: "ProductionSettings"
+        type: "interface"
+        description: "Full settings interface"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/production-settings.ts"
+    content: |
+      export interface ProductionSettings {
+        id: string;
+        org_id: string;
+        // WO Execution (Phase 0)
+        allow_pause_wo: boolean;
+        auto_complete_wo: boolean;
+        require_operation_sequence: boolean;
+        // Material Consumption (Phase 1)
+        allow_over_consumption: boolean;
+        allow_partial_lp_consumption: boolean;
+        // Output (Phase 1)
+        require_qa_on_output: boolean;
+        auto_create_by_product_lp: boolean;
+        // Reservations (Phase 1)
+        enable_material_reservations: boolean;
+        // Dashboard (Phase 0)
+        dashboard_refresh_seconds: number;
+        show_material_alerts: boolean;
+        show_delay_alerts: boolean;
+        show_quality_alerts: boolean;
+        // OEE (Phase 2)
+        enable_oee_tracking: boolean;
+        target_oee_percent: number;
+        enable_downtime_tracking: boolean;
+        // Metadata
+        created_at: string;
+        updated_at: string;
+      }
+
+      export type UpdateProductionSettingsInput = Partial<Omit<ProductionSettings, 'id' | 'org_id' | 'created_at' | 'updated_at'>>;
+
+      export interface SettingsGroup {
+        id: string;
+        label: string;
+        phase: '0' | '1' | '2';
+        enforced: boolean;
+        tooltip?: string;
+        settings: SettingConfig[];
+      }
+
+      export interface SettingConfig {
+        key: keyof ProductionSettings;
+        label: string;
+        description: string;
+        type: 'toggle' | 'number';
+        default: boolean | number;
+        validation?: {
+          min?: number;
+          max?: number;
+          errorMin?: string;
+          errorMax?: string;
+        };
+      }
+
+# Validation (Zod)
+validation_schemas:
+  - path: "apps/frontend/lib/validation/production-settings.ts"
+    content: |
+      import { z } from 'zod';
+
+      export const productionSettingsSchema = z.object({
+        // WO Execution
+        allow_pause_wo: z.boolean().default(false),
+        auto_complete_wo: z.boolean().default(false),
+        require_operation_sequence: z.boolean().default(true),
+
+        // Material Consumption
+        allow_over_consumption: z.boolean().default(false),
+        allow_partial_lp_consumption: z.boolean().default(true),
+
+        // Output
+        require_qa_on_output: z.boolean().default(true),
+        auto_create_by_product_lp: z.boolean().default(true),
+
+        // Reservations
+        enable_material_reservations: z.boolean().default(true),
+
+        // Dashboard
+        dashboard_refresh_seconds: z.number()
+          .int()
+          .min(5, "Refresh interval must be at least 5 seconds")
+          .max(300, "Refresh interval cannot exceed 300 seconds")
+          .default(30),
+        show_material_alerts: z.boolean().default(true),
+        show_delay_alerts: z.boolean().default(true),
+        show_quality_alerts: z.boolean().default(true),
+
+        // OEE
+        enable_oee_tracking: z.boolean().default(false),
+        target_oee_percent: z.number()
+          .min(0, "Target OEE must be at least 0")
+          .max(100, "Target OEE cannot exceed 100")
+          .default(85),
+        enable_downtime_tracking: z.boolean().default(false),
+      });
+
+      export const updateProductionSettingsSchema = productionSettingsSchema.partial();
+
+      export type ProductionSettingsInput = z.infer<typeof productionSettingsSchema>;
+      export type UpdateProductionSettingsInput = z.infer<typeof updateProductionSettingsSchema>;
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/production/settings/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { updateProductionSettingsSchema } from '@/lib/validation/production-settings';
+
+    export async function GET() {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Try to get existing settings
+      let { data: settings, error } = await supabase
+        .from('production_settings')
+        .select('*')
+        .single();
+
+      // If no settings exist, create defaults
+      if (error?.code === 'PGRST116') {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('org_id')
+          .eq('id', user.id)
+          .single();
+
+        if (!userData) {
+          return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        const { data: newSettings, error: insertError } = await supabase
+          .from('production_settings')
+          .insert({ org_id: userData.org_id })
+          .select()
+          .single();
+
+        if (insertError) {
+          return NextResponse.json({ error: 'Failed to create settings' }, { status: 500 });
+        }
+
+        settings = newSettings;
+      }
+
+      return NextResponse.json(settings);
+    }
+
+    export async function PUT(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const body = await request.json();
+
+      // Validate input
+      const parseResult = updateProductionSettingsSchema.safeParse(body);
+      if (!parseResult.success) {
+        const errors = parseResult.error.flatten().fieldErrors;
+        return NextResponse.json({
+          error: 'Validation failed',
+          details: errors,
+        }, { status: 400 });
+      }
+
+      const { data: settings, error } = await supabase
+        .from('production_settings')
+        .update({
+          ...parseResult.data,
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
+      }
+
+      return NextResponse.json(settings);
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/production-settings-service.ts
+    import type { ProductionSettings, UpdateProductionSettingsInput } from '@/lib/types/production-settings';
+
+    export async function getProductionSettings(): Promise<ProductionSettings> {
+      const response = await fetch('/api/production/settings');
+      if (!response.ok) {
+        throw new Error('Failed to fetch production settings');
+      }
+      return response.json();
+    }
+
+    export async function updateProductionSettings(
+      updates: UpdateProductionSettingsInput
+    ): Promise<ProductionSettings> {
+      const response = await fetch('/api/production/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details ? JSON.stringify(error.details) : error.error);
+      }
+
+      return response.json();
+    }
+
+    // Helper functions for consuming stories
+    export async function isWoPauseAllowed(): Promise<boolean> {
+      const settings = await getProductionSettings();
+      return settings.allow_pause_wo;
+    }
+
+    export async function getDashboardRefreshInterval(): Promise<number> {
+      const settings = await getProductionSettings();
+      return settings.dashboard_refresh_seconds;
+    }
+
+    export function getDefaultSettings(): Partial<ProductionSettings> {
+      return {
+        allow_pause_wo: false,
+        auto_complete_wo: false,
+        require_operation_sequence: true,
+        allow_over_consumption: false,
+        allow_partial_lp_consumption: true,
+        require_qa_on_output: true,
+        auto_create_by_product_lp: true,
+        enable_material_reservations: true,
+        dashboard_refresh_seconds: 30,
+        show_material_alerts: true,
+        show_delay_alerts: true,
+        show_quality_alerts: true,
+        enable_oee_tracking: false,
+        target_oee_percent: 85,
+        enable_downtime_tracking: false,
+      };
+    }

@@ -1,0 +1,281 @@
+# Story 05.13 - API Specification
+# Purpose: Service methods, validation, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# NOTE: No new endpoints - this story ENHANCES existing 05.11 endpoints
+
+endpoints_enhanced:
+  - method: "POST"
+    path: "/api/warehouse/grns/from-po/:poId"
+    source_story: "05.11"
+    enhancement: "Add over-receipt validation before GRN creation"
+    file: "apps/frontend/app/api/warehouse/grns/from-po/[poId]/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+
+    validation_flow:
+      - step: 1
+        action: "Fetch warehouse_settings for org"
+        fields: ["allow_over_receipt", "over_receipt_tolerance_pct"]
+      - step: 2
+        action: "For each GRN item, fetch po_line quantities"
+        fields: ["ordered_qty", "received_qty"]
+      - step: 3
+        action: "Calculate over-receipt percentage per line"
+        formula: "((previous_received + current_receiving - ordered) / ordered) * 100"
+      - step: 4
+        action: "Validate each line against settings"
+        check: "all lines must pass validation"
+      - step: 5
+        action: "If any line fails, return 400 with line-specific errors"
+      - step: 6
+        action: "If all pass, proceed with GRN creation from 05.11"
+      - step: 7
+        action: "Set over_receipt_flag and over_receipt_percentage on grn_items"
+
+    response_modifications:
+      success_with_warning:
+        status: 201
+        body:
+          grn: "GRN object"
+          items: "GRN items with over_receipt_flag"
+          over_receipt_warnings:
+            - po_line_id: "uuid"
+              ordered_qty: 100
+              total_received: 108
+              over_receipt_pct: 8.0
+              message: "Over-receipt within tolerance (8.0% of 10.0%)"
+
+    errors:
+      - status: 400
+        code: "OVER_RECEIPT_NOT_ALLOWED"
+        message: "Over-receipt not allowed. Ordered: {ordered}, Attempting: {total}"
+        when: "allow_over_receipt = false AND receiving > ordered"
+
+      - status: 400
+        code: "OVER_RECEIPT_EXCEEDS_TOLERANCE"
+        message: "Over-receipt exceeds tolerance ({pct}% > {tolerance}%). Maximum remaining: {max} units"
+        when: "allow_over_receipt = true AND percentage > tolerance"
+
+      - status: 400
+        code: "MULTI_LINE_VALIDATION_FAILED"
+        message: "Line {line_num} over-receipt exceeds tolerance ({pct}% > {tolerance}%)"
+        when: "Multi-line GRN with at least one line exceeding tolerance"
+        details:
+          failed_lines: "array of failed line details"
+
+  - method: "POST"
+    path: "/api/warehouse/grns/from-to/:toId"
+    source_story: "05.12"
+    enhancement: "Same over-receipt validation applies to TO receipts"
+    note: "Uses identical validation logic, different source table (to_lines)"
+
+# Service Layer
+services:
+  - path: "apps/frontend/lib/services/grn-service.ts"
+    description: "Extended GRN service with over-receipt validation"
+    extends: "Story 05.11 GRNService"
+    new_exports:
+      - name: "validateOverReceipt"
+        type: "static method"
+        params:
+          - name: "orderedQty"
+            type: "number"
+            description: "Original ordered quantity from PO/TO line"
+          - name: "previouslyReceivedQty"
+            type: "number"
+            description: "Already received quantity before this receipt"
+          - name: "receivingQty"
+            type: "number"
+            description: "Current quantity being received"
+          - name: "settings"
+            type: "WarehouseSettings"
+            description: "Warehouse settings with over-receipt config"
+        returns: "OverReceiptValidation"
+        description: "Validate over-receipt against settings and return result"
+
+      - name: "calculateOverReceiptPercentage"
+        type: "static method"
+        params:
+          - name: "orderedQty"
+            type: "number"
+          - name: "totalReceivedQty"
+            type: "number"
+        returns: "number"
+        description: "Calculate percentage (can be negative for under-receipt)"
+
+# Types
+types:
+  - name: "OverReceiptValidation"
+    fields:
+      - { name: "isValid", type: "boolean", description: "Whether receipt is allowed" }
+      - { name: "percentage", type: "number", description: "Over-receipt percentage (negative = under)" }
+      - { name: "message", type: "string", description: "Warning or error message" }
+      - { name: "isOverReceipt", type: "boolean", description: "True if receiving more than ordered" }
+
+  - name: "OverReceiptWarning"
+    fields:
+      - { name: "poLineId", type: "string", description: "UUID of PO line" }
+      - { name: "orderedQty", type: "number" }
+      - { name: "totalReceived", type: "number" }
+      - { name: "overReceiptPct", type: "number" }
+      - { name: "message", type: "string" }
+
+# Implementation patterns
+patterns:
+  validate_over_receipt: |
+    // apps/frontend/lib/services/grn-service.ts
+    interface OverReceiptValidation {
+      isValid: boolean;
+      percentage: number;
+      message: string;
+      isOverReceipt: boolean;
+    }
+
+    export class GRNService {
+      static validateOverReceipt(
+        orderedQty: number,
+        previouslyReceivedQty: number,
+        receivingQty: number,
+        settings: { allow_over_receipt: boolean; over_receipt_tolerance_pct: number }
+      ): OverReceiptValidation {
+        const totalReceived = previouslyReceivedQty + receivingQty;
+        const overReceiptQty = totalReceived - orderedQty;
+        const percentage = orderedQty > 0
+          ? (overReceiptQty / orderedQty) * 100
+          : 0;
+
+        // Under-receipt is always allowed
+        if (overReceiptQty <= 0) {
+          return {
+            isValid: true,
+            percentage: percentage,
+            message: '',
+            isOverReceipt: false
+          };
+        }
+
+        // Over-receipt disabled
+        if (!settings.allow_over_receipt) {
+          return {
+            isValid: false,
+            percentage: percentage,
+            message: `Over-receipt not allowed. Ordered: ${orderedQty}, Attempting: ${totalReceived}`,
+            isOverReceipt: true
+          };
+        }
+
+        // Check tolerance
+        const tolerance = settings.over_receipt_tolerance_pct || 0;
+        if (percentage > tolerance) {
+          const maxAllowed = Math.floor(orderedQty * (1 + tolerance / 100) - previouslyReceivedQty);
+          return {
+            isValid: false,
+            percentage: percentage,
+            message: `Over-receipt exceeds tolerance (${percentage.toFixed(1)}% > ${tolerance.toFixed(1)}%). Maximum remaining: ${maxAllowed} units`,
+            isOverReceipt: true
+          };
+        }
+
+        // Within tolerance - allowed with warning
+        return {
+          isValid: true,
+          percentage: percentage,
+          message: `Over-receipt within tolerance (${percentage.toFixed(1)}% of ${tolerance.toFixed(1)}%)`,
+          isOverReceipt: true
+        };
+      }
+
+      static calculateOverReceiptPercentage(
+        orderedQty: number,
+        totalReceivedQty: number
+      ): number {
+        if (orderedQty === 0) return 0;
+        return ((totalReceivedQty - orderedQty) / orderedQty) * 100;
+      }
+    }
+
+  api_route_enhancement: |
+    // In POST /api/warehouse/grns/from-po/[poId]/route.ts
+    // Add this validation BEFORE creating GRN (from 05.11)
+
+    async function validateAllLinesOverReceipt(
+      items: GRNItemInput[],
+      poLines: Map<string, POLine>,
+      settings: WarehouseSettings
+    ): Promise<{ valid: boolean; errors: string[]; warnings: OverReceiptWarning[] }> {
+      const errors: string[] = [];
+      const warnings: OverReceiptWarning[] = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const poLine = poLines.get(item.po_line_id);
+        if (!poLine) continue;
+
+        const validation = GRNService.validateOverReceipt(
+          poLine.ordered_qty,
+          poLine.received_qty,
+          item.received_qty,
+          settings
+        );
+
+        if (!validation.isValid) {
+          errors.push(`Line ${i + 1}: ${validation.message}`);
+        } else if (validation.isOverReceipt) {
+          warnings.push({
+            poLineId: item.po_line_id,
+            orderedQty: poLine.ordered_qty,
+            totalReceived: poLine.received_qty + item.received_qty,
+            overReceiptPct: validation.percentage,
+            message: validation.message
+          });
+        }
+      }
+
+      return { valid: errors.length === 0, errors, warnings };
+    }
+
+# Validation Schema (Zod)
+validation:
+  path: "apps/frontend/lib/validation/grn-validation.ts"
+  enhancement: "No schema changes - validation is in service layer"
+  note: |
+    Over-receipt validation happens AFTER Zod schema validation.
+    Zod validates field types and formats.
+    Over-receipt validates business rules against database state.
+
+# Error response format
+error_format:
+  over_receipt_blocked: |
+    {
+      "error": {
+        "code": "OVER_RECEIPT_EXCEEDS_TOLERANCE",
+        "message": "Over-receipt exceeds tolerance (15.0% > 10.0%). Maximum remaining: 5 units",
+        "details": {
+          "po_line_id": "uuid",
+          "ordered_qty": 100,
+          "previously_received": 0,
+          "attempting": 115,
+          "tolerance_pct": 10.0,
+          "over_receipt_pct": 15.0,
+          "max_allowed": 110
+        }
+      }
+    }
+
+  multi_line_failure: |
+    {
+      "error": {
+        "code": "MULTI_LINE_VALIDATION_FAILED",
+        "message": "GRN validation failed for 1 line(s)",
+        "details": {
+          "failed_lines": [
+            {
+              "line_index": 2,
+              "po_line_id": "uuid",
+              "message": "Over-receipt exceeds tolerance (10.0% > 5.0%)"
+            }
+          ]
+        }
+      }
+    }

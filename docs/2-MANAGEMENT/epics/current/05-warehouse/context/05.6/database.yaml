@@ -1,0 +1,163 @@
+# Story 05.6 - Database Schema
+# Purpose: Tables, RLS policies, indexes, audit log
+# Agent: BACKEND-DEV (database focus)
+
+# Note: This story primarily consumes existing tables from 05.1 and 05.2
+# The new table (lp_transactions) is for audit logging
+
+migrations:
+  - path: "supabase/migrations/XXX_create_lp_transactions_table.sql"
+    type: "migration"
+    description: "LP audit log table for status changes and actions"
+
+# Existing tables consumed (from 05.1, 05.2)
+existing_tables:
+  - name: "license_plates"
+    source: "05.1"
+    columns_used:
+      - id
+      - org_id
+      - lp_number
+      - product_id
+      - quantity
+      - uom
+      - location_id
+      - warehouse_id
+      - status
+      - qa_status
+      - batch_number
+      - supplier_batch_number
+      - expiry_date
+      - manufacture_date
+      - source
+      - grn_id
+      - wo_id
+      - consumed_by_wo_id
+      - parent_lp_id
+      - catch_weight_kg
+      - gtin
+      - sscc
+      - pallet_id
+      - created_at
+      - created_by
+      - updated_at
+
+  - name: "lp_genealogy"
+    source: "05.2"
+    columns_used:
+      - id
+      - parent_lp_id
+      - child_lp_id
+      - operation_type
+      - quantity
+      - operation_date
+      - wo_id
+
+# New table for this story
+tables:
+  - name: "lp_transactions"
+    description: "Audit log for LP status changes, blocks, and significant actions"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id) ON DELETE CASCADE" }
+      - { name: "transaction_type", type: "TEXT", constraints: "NOT NULL CHECK (transaction_type IN ('status_change', 'qa_change', 'block', 'unblock', 'quantity_change', 'location_change'))" }
+      - { name: "old_value", type: "TEXT", constraints: "" }
+      - { name: "new_value", type: "TEXT", constraints: "" }
+      - { name: "reason", type: "TEXT", constraints: "" }
+      - { name: "reference_type", type: "TEXT", constraints: "CHECK (reference_type IN ('wo', 'grn', 'stock_move', 'manual'))" }
+      - { name: "reference_id", type: "UUID", constraints: "" }
+      - { name: "performed_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "performed_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_lp_transactions_lp ON lp_transactions(lp_id)"
+      - "idx_lp_transactions_org ON lp_transactions(org_id)"
+      - "idx_lp_transactions_type ON lp_transactions(transaction_type)"
+      - "idx_lp_transactions_date ON lp_transactions(performed_at DESC)"
+
+# RLS Policies
+rls_policies:
+  pattern: "Users Table Lookup (ADR-013)"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "lp_transactions"
+      name: "lp_transactions_select_org"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "lp_transactions"
+      name: "lp_transactions_insert_org"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Queries for LP Detail View
+queries:
+  get_lp_detail:
+    description: "Get LP with all joined relationships for detail view"
+    sql: |
+      SELECT
+        lp.*,
+        p.name as product_name,
+        p.code as product_code,
+        w.name as warehouse_name,
+        w.code as warehouse_code,
+        l.full_path as location_full_path,
+        u.first_name || ' ' || u.last_name as created_by_name
+      FROM license_plates lp
+      LEFT JOIN products p ON lp.product_id = p.id
+      LEFT JOIN warehouses w ON lp.warehouse_id = w.id
+      LEFT JOIN locations l ON lp.location_id = l.id
+      LEFT JOIN users u ON lp.created_by = u.id
+      WHERE lp.id = $1
+        AND lp.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    performance_target: "<200ms"
+
+  get_lp_transactions:
+    description: "Get transaction history for LP"
+    sql: |
+      SELECT
+        t.*,
+        u.first_name || ' ' || u.last_name as performed_by_name
+      FROM lp_transactions t
+      LEFT JOIN users u ON t.performed_by = u.id
+      WHERE t.lp_id = $1
+        AND t.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      ORDER BY t.performed_at DESC
+      LIMIT $2 OFFSET $3
+    performance_target: "<300ms"
+
+# Block/Unblock operations
+block_operations:
+  block_lp:
+    description: "Block LP and log transaction"
+    steps:
+      - "Update license_plates SET status = 'blocked' WHERE id = $1"
+      - "Insert into lp_transactions (transaction_type='block', old_value='available', new_value='blocked', reason=$2)"
+    validation:
+      - "LP status must be 'available'"
+      - "Reason is required (max 500 chars)"
+
+  unblock_lp:
+    description: "Unblock LP and log transaction"
+    steps:
+      - "Update license_plates SET status = 'available' WHERE id = $1"
+      - "Insert into lp_transactions (transaction_type='unblock', old_value='blocked', new_value='available')"
+    validation:
+      - "LP status must be 'blocked'"
+
+# Performance indexes from 05.1 that support this story
+supporting_indexes:
+  - name: "idx_lp_org_status"
+    table: "license_plates"
+    columns: ["org_id", "status"]
+    purpose: "Fast LP lookup by status"
+
+  - name: "idx_lp_parent"
+    table: "license_plates"
+    columns: ["parent_lp_id"]
+    condition: "WHERE parent_lp_id IS NOT NULL"
+    purpose: "Genealogy parent lookup"

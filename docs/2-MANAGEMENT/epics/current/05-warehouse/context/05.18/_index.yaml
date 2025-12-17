@@ -1,0 +1,102 @@
+# Story 05.18 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.18"
+  name: "LP Merge Workflow"
+  slug: "lp-merge-workflow"
+  epic: "05-warehouse"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "backend + frontend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Table updates, genealogy records
+  - api.yaml         # Endpoints, validation, errors
+  - frontend.yaml    # Components, modals, states
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides: ["license_plates table", "LicensePlateService"]
+    - story: "05.2"
+      name: "LP Genealogy"
+      provides: ["lp_genealogy table", "LPGenealogyService.linkMerge()"]
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings.enable_split_merge"]
+    - story: "01.1"
+      name: "Org Context + RLS"
+      provides: ["org_id patterns", "RLS policies"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table FK"]
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides: ["locations table FK"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table FK"]
+  blocked_by:
+    - story: "05.1"
+    - story: "05.2"
+  blocks:
+    - story: "05.21"
+      name: "Scanner LP Merge"
+      reason: "Scanner interface for merge uses same service layer"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-007", "WH-FR-002", "WH-FR-028"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.18.lp-merge-workflow.md"
+  patterns:
+    - "apps/frontend/lib/services/license-plate-service.ts"
+    - "apps/frontend/lib/services/lp-genealogy-service.ts"
+    - "docs/2-MANAGEMENT/epics/current/05-warehouse/05.1.lp-table-crud.md"
+    - "docs/2-MANAGEMENT/epics/current/05-warehouse/05.2.lp-genealogy.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for org isolation"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 2
+    description: "POST /validate-merge, POST /merge"
+  - type: "service"
+    count: 2
+    description: "validateMerge(), merge() methods in LicensePlateService"
+  - type: "validation"
+    count: 2
+    description: "validateMergeSchema, mergeLPSchema"
+  - type: "frontend"
+    count: 6
+    description: "Merge modal and related components"
+  - type: "test"
+    count: 3
+    description: "Unit, integration, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Merge requires all source LPs to match: product, batch, expiry, QA status, warehouse, UoM"
+  - "Creates new LP with combined quantity, marks source LPs as consumed"
+  - "Uses LPGenealogyService.linkMerge() from Story 05.2 for traceability"
+  - "Transaction must be atomic - all or nothing"
+  - "Source LPs marked consumed_by_wo_id=NULL (warehouse operation, not production)"
+  - "New LP gets source='merge' and parent_lp_id set to first source LP"
+  - "NULL batch/expiry values are considered equal for merge validation"
+  - "Target location defaults to first source LP location if not specified"
+  - "Performance target: <800ms for merge of 5 LPs"

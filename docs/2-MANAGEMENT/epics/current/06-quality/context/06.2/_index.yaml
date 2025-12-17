@@ -1,0 +1,117 @@
+# Story 06.2 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "06.2"
+  name: "Quality Holds CRUD"
+  slug: "quality-holds-crud"
+  epic: "06-quality"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Pages, components, services, validation
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "RLS pattern"]
+    - story: "01.5"
+      name: "Users CRUD"
+      provides: ["users table", "user assignments for held_by, released_by"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product reference for holds"]
+    - story: "05.1"
+      name: "License Plates Table"
+      provides: ["license_plates table", "LP blocking integration"]
+    - story: "05.7"
+      name: "LP QA Status Management"
+      provides: ["qa_status field on license_plates"]
+    - story: "06.0"
+      name: "Quality Settings"
+      provides: ["quality_settings table", "hold configuration"]
+    - story: "06.1"
+      name: "Quality Status Types"
+      provides: ["status enum definitions", "qa_status values"]
+  optional:
+    - story: "04.3"
+      name: "Work Orders Table"
+      provides: ["work_orders table", "WO reference for holds"]
+  blocked_by: []
+  blocks:
+    - story: "06.5"
+      name: "Incoming Inspection"
+      reason: "Can create holds from failed inspections"
+    - story: "06.9"
+      name: "Basic NCR Creation"
+      reason: "Can link NCR to hold"
+    - story: "06.13"
+      name: "NCR Workflow"
+      reason: "Full NCR-hold integration"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-002"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["Database Schema", "API Design", "quality_holds", "quality_hold_items"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.2.quality-holds-crud.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-002-holds-list.md"
+      relevance: "PRIMARY - Holds list page with filters, KPIs, table"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-009-ncr-list.md"
+      relevance: "REFERENCE - NCR list pattern (for NCR linking)"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-009-ncr-detail.md"
+      relevance: "REFERENCE - NCR detail pattern (for hold-NCR relationship)"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for multi-tenant isolation"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Database tables: quality_holds, quality_hold_items + RLS + triggers"
+  - type: "api"
+    count: 6
+    description: "CRUD endpoints + release + active + stats"
+  - type: "service"
+    count: 2
+    description: "quality-hold-service.ts, LP blocking integration"
+  - type: "validation"
+    count: 2
+    description: "createHoldSchema, releaseHoldSchema (Zod)"
+  - type: "pages"
+    count: 3
+    description: "HoldsList, HoldDetail, CreateHoldModal"
+  - type: "components"
+    count: 7
+    description: "HoldTable, HoldForm, ReleaseModal, etc."
+  - type: "test"
+    count: 4
+    description: "Unit + integration + RLS + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "CRITICAL: LP blocking logic must update LP qa_status on hold creation/release"
+  - "Hold auto-numbering: QH-YYYYMMDD-NNNN via database trigger"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Return 404 (not 403) for cross-tenant access"
+  - "Disposition logic: release->passed, rework->pending, scrap->scrap+qty=0, return->rejected"
+  - "Hold aging thresholds: critical=24h, high=48h, medium=72h, low=168h"
+  - "NCR linking is read-only in Phase 1A - full integration in Phase 2 (06.13)"

@@ -1,0 +1,435 @@
+# Story 05.12 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/grn-service-to.test.ts"
+    type: "unit"
+    description: "Unit tests for GRN service TO receipt methods"
+  - path: "apps/frontend/app/api/warehouse/grns/from-to/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for GRN from TO API endpoint"
+  - path: "apps/frontend/__tests__/integration/warehouse/grn-to-rls.test.ts"
+    type: "integration"
+    description: "RLS tests for TO receipt - multi-tenancy isolation"
+  - path: "apps/frontend/__tests__/e2e/warehouse/receive-to.spec.ts"
+    type: "e2e"
+    description: "E2E tests for receive TO wizard flow"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # AC-1: Happy path full receipt
+  - id: "AC-01"
+    title: "Create GRN from TO - Full Receipt"
+    given: "TO 'TO-2025-00001' exists with status = 'shipped' and 3 lines"
+    when: "POST /api/warehouse/grns/from-to/TO-2025-00001 with all lines at full qty"
+    then:
+      - "Response status = 201 Created"
+      - "GRN created with source_type='to', to_id populated"
+      - "3 GRN items created, each with lp_id"
+      - "3 License Plates created at destination warehouse"
+      - "TO lines updated with received_qty = shipped_qty"
+      - "TO status updated to 'received'"
+      - "Response time < 500ms"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "WH-FR-004"
+
+  # AC-2: Partial receipt
+  - id: "AC-02"
+    title: "Partial Receipt Updates TO Status"
+    given: "TO with status = 'shipped' and 1 line (shipped_qty=1000, received_qty=0)"
+    when: "Receiving 400 units"
+    then:
+      - "GRN created with status='completed'"
+      - "1 LP created with qty=400"
+      - "TO line.received_qty updated to 400"
+      - "TO status updated to 'partial'"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "WH-FR-004"
+
+  # AC-3: TO status validation
+  - id: "AC-03"
+    title: "Cannot Receive from Draft TO"
+    given: "TO with status = 'draft'"
+    when: "POST /api/warehouse/grns/from-to/{toId}"
+    then:
+      - "Response status = 400"
+      - "Error code = INVALID_TO_STATUS"
+      - "Error message contains 'shipped or partial'"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-4: Variance tracking
+  - id: "AC-04"
+    title: "Variance Tracking - Shortage"
+    given: "TO line with shipped_qty=100"
+    when: "Receiving 95 units with variance_reason='damaged'"
+    then:
+      - "GRN created successfully"
+      - "grn_items.received_qty = 95"
+      - "grn_items.notes contains variance_reason"
+      - "Response includes variance summary"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "WH-FR-004"
+
+  # AC-5: Variance reason required
+  - id: "AC-05"
+    title: "Variance Reason Required When Qty Differs"
+    given: "TO line with shipped_qty=100"
+    when: "Receiving 95 units WITHOUT variance_reason"
+    then:
+      - "Response status = 400"
+      - "Error code = VARIANCE_REASON_REQUIRED"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-6: Transit location - move LP
+  - id: "AC-06"
+    title: "Move LP from Transit Location"
+    given: "warehouse_settings.enable_transit_location = true"
+    and: "TO line has transit LP 'LP00000050' at transit location"
+    when: "Receiving TO line with destination location 'ZONE-A'"
+    then:
+      - "Existing LP 'LP00000050' moved to 'ZONE-A'"
+      - "LP.warehouse_id updated to destination warehouse"
+      - "LP.location_id updated to 'ZONE-A'"
+      - "No new LP created"
+    test_type: "integration"
+    priority: "P1"
+    prd_ref: "WH-FR-004"
+
+  # AC-7: Transit location disabled - create LP
+  - id: "AC-07"
+    title: "Create New LP When Transit Disabled"
+    given: "warehouse_settings.enable_transit_location = false"
+    when: "Receiving TO line"
+    then:
+      - "New LP created at destination warehouse"
+      - "LP.source = 'receipt'"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-8: Destination warehouse validation
+  - id: "AC-08"
+    title: "Must Receive at Destination Warehouse"
+    given: "TO with to_warehouse_id = Warehouse B"
+    when: "POST with warehouse_id = Warehouse A"
+    then:
+      - "Response status = 400"
+      - "Error code = WAREHOUSE_MISMATCH"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-9: Batch required validation
+  - id: "AC-09"
+    title: "Batch Required When Setting Enabled"
+    given: "warehouse_settings.require_batch_on_receipt = true"
+    when: "Receiving without batch_number"
+    then:
+      - "Response status = 400"
+      - "Error code = BATCH_REQUIRED"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "WH-FR-009"
+
+  # AC-10: Expiry required validation
+  - id: "AC-10"
+    title: "Expiry Required When Setting Enabled"
+    given: "warehouse_settings.require_expiry_on_receipt = true"
+    when: "Receiving without expiry_date"
+    then:
+      - "Response status = 400"
+      - "Error code = EXPIRY_REQUIRED"
+    test_type: "integration"
+    priority: "P0"
+    prd_ref: "WH-FR-010"
+
+  # AC-11: RLS - org isolation
+  - id: "AC-11"
+    title: "Org Isolation on TO Receipt"
+    given: "User A from Org A, User B from Org B, TOs in both orgs"
+    when: "User A requests /api/warehouse/grns/from-to/{orgB_to_id}"
+    then:
+      - "Response status = 404 (not 403)"
+      - "TO from Org B not accessible"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # AC-12: Transaction atomicity
+  - id: "AC-12"
+    title: "Failed LP Creation Rolls Back GRN"
+    given: "Valid TO and receipt data"
+    and: "LP creation fails (simulated error)"
+    when: "Attempting to create GRN"
+    then:
+      - "Entire transaction rolled back"
+      - "No GRN created"
+      - "No GRN items created"
+      - "TO lines not updated"
+      - "Error message returned"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-13: Performance
+  - id: "AC-13"
+    title: "GRN Creation Performance"
+    given: "TO with 10 lines"
+    when: "Creating GRN for all 10 lines"
+    then:
+      - "Operation completes in < 500ms"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-14: Desktop UI wizard flow
+  - id: "AC-14"
+    title: "Complete Receive TO Wizard Flow"
+    given: "User navigates to /warehouse/receiving"
+    when: "Selecting TO and completing wizard"
+    then:
+      - "Step 1: TO info displayed correctly"
+      - "Step 2: Receipt inputs work, variance detected"
+      - "Step 3: Summary shows correctly"
+      - "Step 4: Success shows GRN number and LP numbers"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-15: Over receipt blocked
+  - id: "AC-15"
+    title: "Cannot Receive More Than Shipped"
+    given: "TO line with shipped_qty=100, received_qty=80"
+    when: "Attempting to receive 30 (total would be 110)"
+    then:
+      - "Response status = 400"
+      - "Error code = OVER_RECEIPT"
+      - "Error message shows shipped=100, already_received=80, attempting=30"
+    test_type: "integration"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  grn_service_to:
+    - name: "createFromTO() creates GRN with correct fields"
+      setup: "Mock TO with status=shipped, valid items"
+      expected: "GRN created with source_type='to', to_id populated"
+
+    - name: "createFromTO() creates LP for each item"
+      setup: "TO with 3 lines"
+      expected: "3 LPs created, each linked to grn_item"
+
+    - name: "createFromTO() updates TO line received_qty"
+      setup: "TO line with received_qty=0, receiving 500"
+      expected: "to_line.received_qty = 500 after operation"
+
+    - name: "createFromTO() updates TO status to partial"
+      setup: "TO with 2 lines, receiving only 1 fully"
+      expected: "TO.status = 'partial'"
+
+    - name: "createFromTO() updates TO status to received"
+      setup: "TO with all lines fully received"
+      expected: "TO.status = 'received'"
+
+    - name: "createFromTO() blocks draft TO"
+      setup: "TO with status='draft'"
+      expected: "Throws error with code INVALID_TO_STATUS"
+
+    - name: "createFromTO() blocks cancelled TO"
+      setup: "TO with status='cancelled'"
+      expected: "Throws error with code INVALID_TO_STATUS"
+
+    - name: "createFromTO() validates destination warehouse"
+      setup: "TO.to_warehouse_id = WH-B, request.warehouse_id = WH-A"
+      expected: "Throws error with code WAREHOUSE_MISMATCH"
+
+    - name: "createFromTO() rolls back on LP failure"
+      setup: "Mock LP creation to fail"
+      expected: "No GRN created, no items created, TO unchanged"
+
+    - name: "validateTOReceipt() returns batch required error"
+      setup: "settings.require_batch_on_receipt=true, no batch provided"
+      expected: "Validation result contains batch error"
+
+    - name: "validateTOReceipt() returns expiry required error"
+      setup: "settings.require_expiry_on_receipt=true, no expiry provided"
+      expected: "Validation result contains expiry error"
+
+    - name: "validateTOReceipt() returns variance reason required"
+      setup: "shipped_qty=100, received_qty=95, no reason"
+      expected: "Validation result contains variance_reason error"
+
+    - name: "calculateTOVariance() returns correct values"
+      setup: "shipped_qty=100, received_qty=95"
+      expected: "variance_qty=-5, variance_pct=-5.00"
+
+    - name: "handleTransitLP() moves LP when enabled"
+      setup: "enable_transit_location=true, transit LP exists"
+      expected: "LP.location_id and warehouse_id updated"
+
+    - name: "handleTransitLP() creates new LP when disabled"
+      setup: "enable_transit_location=false"
+      expected: "New LP created with source='receipt'"
+
+    - name: "getReceivableTOs() returns only shipped/partial"
+      setup: "TOs with various statuses"
+      expected: "Only TOs with status in [shipped, partial] returned"
+
+    - name: "getTOLinesForReceipt() includes received_qty"
+      setup: "TO with some lines partially received"
+      expected: "Each line shows shipped_qty, received_qty, remaining_qty"
+
+    - name: "updateTOStatus() correctly determines status"
+      setup: "TO with mixed receipt status on lines"
+      expected: "Status correctly set to partial or received"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "POST /grns/from-to/:toId creates GRN successfully"
+      setup: "Valid TO with shipped status, valid request body"
+      expected: "201 response with GRN data"
+
+    - name: "POST /grns/from-to/:toId creates LPs"
+      setup: "Valid TO receipt request"
+      expected: "LP records exist in database"
+
+    - name: "POST /grns/from-to/:toId updates TO status"
+      setup: "Full receipt of TO"
+      expected: "TO.status = 'received' in database"
+
+    - name: "POST /grns/from-to/:toId with invalid TO returns 404"
+      setup: "Non-existent TO ID"
+      expected: "404 response"
+
+    - name: "POST /grns/from-to/:toId with wrong org returns 404"
+      setup: "TO belongs to different org"
+      expected: "404 response (not 403)"
+
+    - name: "POST /grns/from-to/:toId with wrong warehouse returns 400"
+      setup: "warehouse_id != TO.to_warehouse_id"
+      expected: "400 with WAREHOUSE_MISMATCH"
+
+    - name: "POST /grns/from-to/:toId tracks variance"
+      setup: "Received qty differs from shipped"
+      expected: "Response includes variance data"
+
+    - name: "GET /receiving/pending-tos returns paginated list"
+      setup: "Multiple TOs with shipped/partial status"
+      expected: "200 with paginated TO list"
+
+    - name: "GET /receiving/to/:toId/lines returns line details"
+      setup: "Valid TO"
+      expected: "200 with lines including shipped/received/remaining"
+
+    - name: "Response times meet requirements"
+      setup: "TO with 10 lines"
+      expected: "< 500ms for GRN creation, < 300ms for line query"
+
+  rls_isolation:
+    - name: "User can only receive TOs from own org"
+      setup: "TOs in Org A and Org B"
+      action: "User A queries pending TOs"
+      expected: "Only Org A TOs visible"
+
+    - name: "Cross-tenant TO receipt blocked"
+      setup: "User A attempts to receive Org B TO"
+      expected: "404 returned"
+
+    - name: "GRN inherits org_id from user"
+      setup: "User creates GRN from TO"
+      expected: "GRN.org_id matches user's org"
+
+# E2E Test Cases
+e2e_tests:
+  receive_to_wizard:
+    - name: "Complete receive TO wizard - happy path"
+      steps:
+        - "Navigate to /warehouse/receiving"
+        - "Select pending TO from table"
+        - "Review TO info in Step 1"
+        - "Enter receipt quantities in Step 2"
+        - "Confirm in Step 3"
+        - "Verify success in Step 4"
+      expected: "GRN created, LP numbers displayed"
+
+    - name: "Partial receipt flow"
+      steps:
+        - "Select TO with multiple lines"
+        - "Receive only some lines"
+        - "Complete wizard"
+      expected: "TO status shows 'partial', only selected lines received"
+
+    - name: "Variance entry flow"
+      steps:
+        - "Enter received_qty < shipped_qty"
+        - "Verify variance warning appears"
+        - "Select variance reason"
+        - "Complete wizard"
+      expected: "Variance captured in response"
+
+    - name: "Validation errors shown"
+      steps:
+        - "Try to proceed without required batch"
+        - "Try to proceed with variance but no reason"
+      expected: "Inline errors displayed, cannot proceed"
+
+    - name: "Mobile responsive flow"
+      viewport: "375x812"
+      steps:
+        - "Navigate to receiving"
+        - "Complete wizard on mobile"
+      expected: "All steps work, touch targets adequate"
+
+# Definition of Done
+definition_of_done:
+  - "All AC tests pass"
+  - "Unit test coverage >= 80% on TO receipt methods"
+  - "Integration tests cover all API error cases"
+  - "RLS isolation verified with 2+ org fixtures"
+  - "E2E wizard flow passing"
+  - "Performance requirements met (< 500ms)"
+  - "No regression on existing GRN from PO (05.11)"
+  - "Transit location both modes tested"
+  - "Variance tracking working end-to-end"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Service methods critical for data integrity"
+  integration:
+    target: 80
+    reason: "API must handle all edge cases"
+  files:
+    - "lib/services/grn-service.ts (TO methods): 80%"
+    - "lib/validation/grn.ts (TO schemas): 100%"
+    - "API routes: All error codes covered"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Transit location logic complexity may cause bugs"
+    mitigation: "Thorough testing of both transit enabled/disabled modes"
+    severity: "medium"
+    test_coverage: "AC-06, AC-07, unit tests for handleTransitLP"
+
+  - id: "RISK-02"
+    description: "Transaction rollback may leave partial state"
+    mitigation: "Comprehensive rollback tests, database transaction isolation"
+    severity: "high"
+    test_coverage: "AC-12"
+
+  - id: "RISK-03"
+    description: "Variance calculation edge cases (0 shipped, negative)"
+    mitigation: "Unit tests for calculateTOVariance with edge cases"
+    severity: "low"
+    test_coverage: "unit tests"
+
+  - id: "RISK-04"
+    description: "TO status race condition with concurrent receipts"
+    mitigation: "Database-level locking on TO updates, test concurrent access"
+    severity: "medium"
+    test_coverage: "Integration test with concurrent requests"

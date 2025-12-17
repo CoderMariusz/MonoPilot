@@ -1,0 +1,660 @@
+# Story 05.10 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/grn-service.test.ts"
+    type: "unit"
+    description: "Unit tests for GRN service methods"
+  - path: "apps/frontend/lib/validation/__tests__/grn.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "__tests__/integration/api/warehouse/grns.test.ts"
+    type: "integration"
+    description: "Integration tests for GRN API endpoints"
+  - path: "supabase/tests/grn-rls-isolation.test.sql"
+    type: "integration"
+    description: "Integration tests for RLS policies"
+  - path: "__tests__/e2e/warehouse/grn.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for GRN workflows"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # AC-1: GRN Table Creation
+  - id: "AC-01"
+    name: "GRNs table exists with all required columns"
+    given: "database migration runs"
+    when: "schema is inspected"
+    then: "grns table has all columns per specification"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-2: GRN Items Table Creation
+  - id: "AC-02"
+    name: "GRN Items table exists with all required columns"
+    given: "database migration runs"
+    when: "schema is inspected"
+    then: "grn_items table has all columns with FK constraints"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-3: GRN Number Auto-Generation
+  - id: "AC-03"
+    name: "Generate GRN number with year and sequence"
+    given: "GRN number generation function exists"
+    when: "new GRN is created without grn_number"
+    then: "system generates GRN number 'GRN-2025-00001' format"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03b"
+    name: "GRN number sequence resets per year"
+    given: "current year is 2026 and previous GRN was 'GRN-2025-99999'"
+    when: "new GRN is created"
+    then: "system generates 'GRN-2026-00001'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-03c"
+    name: "GRN number uniqueness validation"
+    given: "GRN 'GRN-2025-00001' exists in org A"
+    when: "user creates another GRN with same number in org A"
+    then: "system returns 409 Conflict error"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-4: Create GRN with Items
+  - id: "AC-04"
+    name: "Create draft GRN with single item"
+    given: "valid warehouse_id, location_id, product_id"
+    when: "POST /api/warehouse/grns with items"
+    then: "GRN created with status = 'draft' and items"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04b"
+    name: "Create GRN with multiple items"
+    given: "valid GRN data"
+    when: "POST /api/warehouse/grns with 5 items"
+    then: "GRN created with 5 grn_items records, sequential line_number"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-5: Read GRN Operations
+  - id: "AC-05"
+    name: "List GRNs with pagination"
+    given: "100 GRNs exist"
+    when: "GET /api/warehouse/grns?page=1&limit=20"
+    then: "response returns 20 GRNs with pagination metadata"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05b"
+    name: "Filter GRNs by status"
+    given: "50 draft GRNs and 30 completed GRNs"
+    when: "GET /api/warehouse/grns?status=completed"
+    then: "only 30 completed GRNs returned"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05c"
+    name: "Get GRN detail with items"
+    given: "GRN with 3 items exists"
+    when: "GET /api/warehouse/grns/{id}"
+    then: "response includes GRN header and 3 grn_items"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-6: Update GRN (Draft Only)
+  - id: "AC-06"
+    name: "Update draft GRN header"
+    given: "GRN with status = 'draft'"
+    when: "PUT /api/warehouse/grns/{id} with updated notes"
+    then: "GRN notes updated"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06b"
+    name: "Block update on completed GRN"
+    given: "GRN with status = 'completed'"
+    when: "PUT /api/warehouse/grns/{id} with any changes"
+    then: "400 error: Cannot modify completed GRN"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-7: GRN Item CRUD
+  - id: "AC-07"
+    name: "Add item to draft GRN"
+    given: "draft GRN with 2 items"
+    when: "POST /api/warehouse/grns/{id}/items with new item"
+    then: "grn_items record created with line_number = 3"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07b"
+    name: "Update GRN item quantity"
+    given: "draft GRN with item (received_qty = 100)"
+    when: "PUT /api/warehouse/grns/{id}/items/{itemId} with received_qty = 150"
+    then: "grn_item.received_qty = 150 and GRN.total_qty recalculated"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07c"
+    name: "Remove item from draft GRN"
+    given: "draft GRN with 3 items"
+    when: "DELETE /api/warehouse/grns/{id}/items/{itemId}"
+    then: "grn_item deleted and GRN.total_items = 2"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07d"
+    name: "Block item modification on completed GRN"
+    given: "completed GRN with items"
+    when: "POST/PUT/DELETE /api/warehouse/grns/{id}/items"
+    then: "400 error: Cannot modify items on completed GRN"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-8: Complete GRN Workflow
+  - id: "AC-08"
+    name: "Complete GRN creates License Plates"
+    given: "draft GRN with 2 items"
+    when: "POST /api/warehouse/grns/{id}/complete"
+    then: "GRN.status = 'completed' and 2 new license_plates created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08b"
+    name: "Complete GRN - LP inherits item data"
+    given: "draft GRN item with batch_number, expiry_date, qa_status"
+    when: "GRN completed"
+    then: "created LP has matching batch, expiry, qa_status, location"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08c"
+    name: "Complete GRN - validation required batch"
+    given: "draft GRN item missing required batch (require_batch_on_receipt = true)"
+    when: "POST /api/warehouse/grns/{id}/complete"
+    then: "400 error: Batch number required for product"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08d"
+    name: "Complete empty GRN blocked"
+    given: "draft GRN with 0 items"
+    when: "POST /api/warehouse/grns/{id}/complete"
+    then: "400 error: Cannot complete GRN with no items"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08e"
+    name: "Complete GRN - transaction rollback on failure"
+    given: "draft GRN with 3 items, item 2 has invalid data"
+    when: "POST /api/warehouse/grns/{id}/complete"
+    then: "error returned, GRN remains draft, no LPs created"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-9: Cancel GRN Workflow
+  - id: "AC-09"
+    name: "Cancel draft GRN"
+    given: "draft GRN"
+    when: "POST /api/warehouse/grns/{id}/cancel with reason"
+    then: "GRN.status = 'cancelled' with cancellation fields set"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09b"
+    name: "Cancel completed GRN - marks LPs as consumed"
+    given: "completed GRN with 2 created LPs (status = 'available')"
+    when: "POST /api/warehouse/grns/{id}/cancel with reason"
+    then: "GRN.status = 'cancelled' and both LPs status = 'consumed'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09c"
+    name: "Cancel completed GRN - block if LP in use"
+    given: "completed GRN with LP.status = 'reserved'"
+    when: "POST /api/warehouse/grns/{id}/cancel"
+    then: "400 error: Cannot cancel GRN - LP is reserved"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-10: RLS Policy Enforcement
+  - id: "AC-10"
+    name: "Org isolation on GRN list"
+    given: "User A from Org A and User B from Org B with GRNs in both orgs"
+    when: "User A requests /api/warehouse/grns"
+    then: "only Org A GRNs returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-10b"
+    name: "Cross-tenant GRN access returns 404"
+    given: "GRN belongs to Org B"
+    when: "User A from Org A requests /api/warehouse/grns/{orgB_grn_id}"
+    then: "404 Not Found returned (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # AC-11-14: UI Tests
+  - id: "AC-11"
+    name: "View GRN list page"
+    given: "user navigates to /warehouse/receiving"
+    when: "page loads"
+    then: "GRN DataTable displays within 500ms"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-12"
+    name: "Create GRN via form"
+    given: "user on GRN list page"
+    when: "user clicks 'New GRN' and fills form"
+    then: "GRN created and user redirected to detail page"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-13"
+    name: "View GRN detail page"
+    given: "completed GRN with 3 items"
+    when: "user navigates to /warehouse/receiving/{id}"
+    then: "GRN header and items table displayed"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-14"
+    name: "Edit draft GRN"
+    given: "draft GRN"
+    when: "user clicks Edit and modifies items"
+    then: "changes saved successfully"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-15: Performance Requirements
+  - id: "AC-15"
+    name: "GRN list with filters < 500ms"
+    given: "1000 GRNs in warehouse"
+    when: "GET /api/warehouse/grns with filters"
+    then: "response time < 500ms"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-15b"
+    name: "GRN detail with items < 300ms"
+    given: "GRN with 50 items"
+    when: "GET /api/warehouse/grns/{id}"
+    then: "response time < 300ms"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-15c"
+    name: "GRN completion transaction < 2s"
+    given: "draft GRN with 10 items"
+    when: "POST /api/warehouse/grns/{id}/complete"
+    then: "all LPs created in < 2 seconds"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-16: Indexes
+  - id: "AC-16"
+    name: "Indexes exist for common queries"
+    given: "grns table"
+    when: "schema inspected"
+    then: "all specified indexes exist"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  grn_service:
+    - name: "create() generates GRN number"
+      description: "Verify GRN-YYYY-NNNNN format"
+      setup: "Mock Supabase client"
+      expected: "GRN number follows pattern"
+
+    - name: "create() creates items with sequential line numbers"
+      description: "Line numbers 1, 2, 3..."
+      setup: "Create GRN with 3 items"
+      expected: "Items have line_number 1, 2, 3"
+
+    - name: "create() updates aggregates"
+      description: "total_items, total_qty set correctly"
+      setup: "Create GRN with items"
+      expected: "Totals match item count and qty sum"
+
+    - name: "create() validates required fields"
+      description: "400 on missing warehouse_id"
+      setup: "Omit warehouse_id"
+      expected: "Validation error returned"
+
+    - name: "update() succeeds on draft"
+      description: "Notes updated"
+      setup: "Draft GRN"
+      expected: "Update succeeds"
+
+    - name: "update() blocks on completed"
+      description: "Error returned"
+      setup: "Completed GRN"
+      expected: "CANNOT_MODIFY error"
+
+    - name: "update() blocks on cancelled"
+      description: "Error returned"
+      setup: "Cancelled GRN"
+      expected: "CANNOT_MODIFY error"
+
+    - name: "addItem() increments line number"
+      description: "New item gets max+1"
+      setup: "GRN with 2 items"
+      expected: "New item line_number = 3"
+
+    - name: "addItem() updates aggregates"
+      description: "Totals recalculated"
+      setup: "Add item"
+      expected: "total_items and total_qty updated"
+
+    - name: "removeItem() updates aggregates"
+      description: "Totals recalculated"
+      setup: "Remove item"
+      expected: "Totals decreased"
+
+    - name: "complete() creates LPs"
+      description: "One LP per item"
+      setup: "Draft GRN with 2 items"
+      expected: "2 LPs created"
+
+    - name: "complete() sets status = completed"
+      description: "Status change"
+      setup: "Draft GRN"
+      expected: "status = 'completed'"
+
+    - name: "complete() sets completed_at/by"
+      description: "Audit fields"
+      setup: "Complete GRN"
+      expected: "Audit fields populated"
+
+    - name: "complete() validates batch required"
+      description: "Error if missing"
+      setup: "require_batch_on_receipt = true, no batch"
+      expected: "BATCH_REQUIRED error"
+
+    - name: "complete() validates expiry required"
+      description: "Error if missing"
+      setup: "require_expiry_on_receipt = true, no expiry"
+      expected: "EXPIRY_REQUIRED error"
+
+    - name: "complete() validates at least one item"
+      description: "Error if empty"
+      setup: "GRN with 0 items"
+      expected: "NO_ITEMS error"
+
+    - name: "complete() rollback on LP creation failure"
+      description: "All or nothing"
+      setup: "Mock LP creation failure on item 2"
+      expected: "No LPs created, GRN remains draft"
+
+    - name: "cancel() draft succeeds"
+      description: "Status = cancelled"
+      setup: "Draft GRN with reason"
+      expected: "Status updated"
+
+    - name: "cancel() completed with available LPs"
+      description: "LPs consumed"
+      setup: "Completed GRN, all LPs available"
+      expected: "LPs status = 'consumed'"
+
+    - name: "cancel() blocks if LP reserved"
+      description: "Error returned"
+      setup: "Completed GRN, LP reserved"
+      expected: "LP_IN_USE error"
+
+    - name: "cancel() blocks if LP consumed"
+      description: "Error returned"
+      setup: "Completed GRN, LP already consumed"
+      expected: "LP_IN_USE error"
+
+  validation_schemas:
+    - name: "createGRNSchema validates required source_type"
+      setup: "Omit source_type"
+      expected: "Validation error"
+
+    - name: "createGRNSchema validates PO ID for PO source"
+      setup: "source_type = 'po', no po_id"
+      expected: "Refinement error"
+
+    - name: "createGRNSchema validates at least one item"
+      setup: "Empty items array"
+      expected: "Validation error"
+
+    - name: "createGRNItemSchema validates positive received_qty"
+      setup: "received_qty = -1"
+      expected: "Validation error"
+
+    - name: "grnQuerySchema coerces page to number"
+      setup: "page = '1'"
+      expected: "Parsed as number 1"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /grns returns paginated list"
+      setup: "50 GRNs exist"
+      action: "GET /api/warehouse/grns?page=1&limit=20"
+      expected: "20 items, pagination.total = 50"
+
+    - name: "GET /grns?status=completed filters"
+      setup: "30 draft, 20 completed"
+      action: "GET /api/warehouse/grns?status=completed"
+      expected: "20 items returned"
+
+    - name: "GET /grns/:id returns GRN with items"
+      setup: "GRN with 3 items"
+      action: "GET /api/warehouse/grns/{id}"
+      expected: "GRN object with items array"
+
+    - name: "GET /grns/:id with invalid ID returns 404"
+      setup: "Non-existent ID"
+      action: "GET /api/warehouse/grns/{invalid_id}"
+      expected: "404 Not Found"
+
+    - name: "POST /grns creates GRN with items"
+      setup: "Valid CreateGRNInput"
+      action: "POST /api/warehouse/grns"
+      expected: "201 Created with GRN data"
+
+    - name: "PUT /grns/:id updates draft GRN"
+      setup: "Draft GRN"
+      action: "PUT /api/warehouse/grns/{id}"
+      expected: "200 OK with updated data"
+
+    - name: "PUT /grns/:id blocks on completed"
+      setup: "Completed GRN"
+      action: "PUT /api/warehouse/grns/{id}"
+      expected: "400 CANNOT_MODIFY"
+
+    - name: "POST /grns/:id/items adds item"
+      setup: "Draft GRN"
+      action: "POST /api/warehouse/grns/{id}/items"
+      expected: "201 Created with GRNItem"
+
+    - name: "DELETE /grns/:id/items/:itemId removes item"
+      setup: "Draft GRN with 3 items"
+      action: "DELETE /api/warehouse/grns/{id}/items/{itemId}"
+      expected: "204 No Content, GRN has 2 items"
+
+    - name: "POST /grns/:id/complete creates LPs"
+      setup: "Draft GRN with 2 valid items"
+      action: "POST /api/warehouse/grns/{id}/complete"
+      expected: "200 OK with created_lps array (2 items)"
+
+    - name: "POST /grns/:id/complete validates batch"
+      setup: "Draft GRN, require_batch_on_receipt = true, no batch"
+      action: "POST /api/warehouse/grns/{id}/complete"
+      expected: "400 BATCH_REQUIRED"
+
+    - name: "POST /grns/:id/cancel cancels draft"
+      setup: "Draft GRN"
+      action: "POST /api/warehouse/grns/{id}/cancel with reason"
+      expected: "200 OK, status = cancelled"
+
+    - name: "POST /grns/:id/cancel cancels completed"
+      setup: "Completed GRN, LPs available"
+      action: "POST /api/warehouse/grns/{id}/cancel with reason"
+      expected: "200 OK, LPs consumed"
+
+    - name: "POST /grns/:id/cancel blocks if LP reserved"
+      setup: "Completed GRN, LP reserved"
+      action: "POST /api/warehouse/grns/{id}/cancel"
+      expected: "400 LP_IN_USE"
+
+  rls_isolation:
+    - name: "User can only read own organization GRNs"
+      setup: "Create Org A with User A and GRN A, Create Org B with User B and GRN B"
+      action: "User A queries grns table"
+      expected: "Only GRN A returned, GRN B not visible"
+
+    - name: "Cross-tenant GRN access returns 404"
+      setup: "GRN belongs to Org B"
+      action: "User A requests /api/warehouse/grns/{orgB_grn_id}"
+      expected: "404 Not Found"
+
+    - name: "User cannot update GRN from other org"
+      setup: "GRN belongs to Org B"
+      action: "User A attempts update"
+      expected: "RLS blocks write, 404 returned"
+
+    - name: "GRN items inherit org isolation via FK"
+      setup: "GRN items linked to GRN in Org B"
+      action: "User A queries grn_items"
+      expected: "No items visible"
+
+# E2E Test Cases
+e2e_tests:
+  grn_workflow:
+    - name: "View GRN list page"
+      steps:
+        - "Navigate to /warehouse/receiving"
+        - "Wait for DataTable to load"
+      expected: "Table displays, columns visible"
+
+    - name: "Filter GRNs by status"
+      steps:
+        - "Open filter panel"
+        - "Select status = Completed"
+      expected: "Only completed GRNs shown"
+
+    - name: "Search GRNs by number"
+      steps:
+        - "Type 'GRN-2025-001' in search"
+        - "Wait for debounce"
+      expected: "Matching GRNs displayed"
+
+    - name: "Create new GRN with items"
+      steps:
+        - "Click New GRN button"
+        - "Select source type = Adjustment"
+        - "Select warehouse and location"
+        - "Add 2 items with products and quantities"
+        - "Click Save as Draft"
+      expected: "GRN created, redirected to detail page"
+
+    - name: "View GRN detail"
+      steps:
+        - "Navigate to /warehouse/receiving/{id}"
+      expected: "Header info and items table displayed"
+
+    - name: "Edit draft GRN"
+      steps:
+        - "Click Edit button"
+        - "Add new item"
+        - "Click Save Changes"
+      expected: "Item added, totals updated"
+
+    - name: "Complete GRN flow"
+      steps:
+        - "View draft GRN detail"
+        - "Click Complete button"
+        - "Confirm in modal"
+      expected: "GRN completed, LPs created, success message"
+
+    - name: "Cancel draft GRN"
+      steps:
+        - "View draft GRN detail"
+        - "Click Cancel button"
+        - "Enter reason"
+        - "Confirm"
+      expected: "GRN cancelled, status badge updated"
+
+    - name: "Print GRN"
+      steps:
+        - "View GRN detail"
+        - "Click Print button"
+      expected: "Print view opens/print dialog triggered"
+
+# Definition of Done
+definition_of_done:
+  - "All database tables created with correct schema"
+  - "All RLS policies enforced and tested"
+  - "All API endpoints implemented and documented"
+  - "Validation schemas complete with all fields"
+  - "GRN service methods implemented"
+  - "Complete workflow creates LPs correctly"
+  - "Cancel workflow handles LP status correctly"
+  - "Transaction rollback on failure"
+  - "Frontend pages render correctly"
+  - "Form validation displays errors"
+  - "Unit test coverage >= 80%"
+  - "Integration test coverage >= 80%"
+  - "RLS tests pass for multi-tenancy"
+  - "E2E tests pass for critical flows"
+  - "Response times meet requirements"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business logic requires solid coverage"
+  integration:
+    target: 80
+    reason: "API and RLS must be thoroughly tested"
+  files:
+    - "lib/services/grn-service.ts: 80%"
+    - "lib/validation/grn.ts: 90%"
+    - "RLS policies: 100% of policy rules tested"
+    - "All API endpoints: tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "LP creation failure mid-transaction could leave inconsistent state"
+    mitigation: "Full transaction rollback, comprehensive error handling"
+    severity: "high"
+    test_coverage: "complete workflow tests"
+
+  - id: "RISK-02"
+    description: "Performance with many items (50+) in single GRN"
+    mitigation: "Batch insert, proper indexes, pagination"
+    severity: "medium"
+    test_coverage: "performance tests"
+
+  - id: "RISK-03"
+    description: "RLS policy gaps could leak cross-tenant data"
+    mitigation: "Comprehensive RLS tests with 2+ org fixtures"
+    severity: "high"
+    test_coverage: "rls_isolation tests"
+
+  - id: "RISK-04"
+    description: "GRN number sequence conflicts under concurrent requests"
+    mitigation: "Atomic upsert with row lock in generate_grn_number"
+    severity: "medium"
+    test_coverage: "concurrent request tests"
+
+  - id: "RISK-05"
+    description: "Cancellation affects downstream LP usage"
+    mitigation: "Validate LP status before cancel, block if in use"
+    severity: "high"
+    test_coverage: "cancel workflow tests"

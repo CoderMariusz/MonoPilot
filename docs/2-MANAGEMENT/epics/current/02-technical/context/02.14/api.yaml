@@ -1,0 +1,542 @@
+# Story 02.14 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# API Endpoints
+endpoints:
+  # ==========================================================================
+  # BOM Version Comparison (FR-2.25)
+  # ==========================================================================
+  - method: "GET"
+    path: "/api/technical/boms/:id/compare/:compareId"
+    description: "Compare two BOM versions side-by-side"
+    file: "apps/frontend/app/api/technical/boms/[id]/compare/[compareId]/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "planner", "viewer"]
+
+    request:
+      params:
+        id: "UUID - First BOM ID (typically older version)"
+        compareId: "UUID - Second BOM ID (typically newer version)"
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "BomComparisonResponse"
+      schema:
+        bom_1:
+          id: "string (UUID)"
+          version: "string"
+          effective_from: "string (ISO date)"
+          effective_to: "string | null"
+          output_qty: "number"
+          output_uom: "string"
+          status: "string"
+          items: "BomItemSummary[]"
+        bom_2:
+          id: "string (UUID)"
+          version: "string"
+          effective_from: "string (ISO date)"
+          effective_to: "string | null"
+          output_qty: "number"
+          output_uom: "string"
+          status: "string"
+          items: "BomItemSummary[]"
+        differences:
+          added: "BomItemSummary[] - In bom_2, not in bom_1"
+          removed: "BomItemSummary[] - In bom_1, not in bom_2"
+          modified: "ModifiedItem[] - Changed between versions"
+        summary:
+          total_items_v1: "number"
+          total_items_v2: "number"
+          total_added: "number"
+          total_removed: "number"
+          total_modified: "number"
+          weight_change_kg: "number"
+          weight_change_percent: "number"
+
+    errors:
+      - status: 400
+        code: "SAME_VERSION"
+        message: "Cannot compare version to itself"
+        when: "id === compareId"
+      - status: 400
+        code: "DIFFERENT_PRODUCTS"
+        message: "Versions must be from same product"
+        when: "BOMs have different product_id"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+        when: "Either BOM doesn't exist or belongs to different org"
+
+  # ==========================================================================
+  # Multi-Level BOM Explosion (FR-2.29)
+  # ==========================================================================
+  - method: "GET"
+    path: "/api/technical/boms/:id/explosion"
+    description: "Get multi-level BOM explosion (recursive)"
+    file: "apps/frontend/app/api/technical/boms/[id]/explosion/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "planner", "viewer"]
+
+    request:
+      params:
+        id: "UUID - BOM ID to explode"
+      query:
+        maxDepth: "number (optional, default 10, max 10)"
+        includeQuantities: "boolean (optional, default true)"
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "BomExplosionResponse"
+      schema:
+        bom_id: "string (UUID)"
+        product_code: "string"
+        product_name: "string"
+        output_qty: "number"
+        output_uom: "string"
+        levels:
+          - level: "number (1-10)"
+            items:
+              - item_id: "string (UUID)"
+                component_id: "string (UUID)"
+                component_code: "string"
+                component_name: "string"
+                component_type: "string (raw, wip, finished, packaging)"
+                quantity: "number"
+                cumulative_qty: "number - Rolled up quantity"
+                uom: "string"
+                scrap_percent: "number"
+                has_sub_bom: "boolean"
+                path: "string[] - Component IDs from root to this item"
+        total_levels: "number"
+        total_items: "number"
+        raw_materials_summary:
+          - component_id: "string (UUID)"
+            component_code: "string"
+            component_name: "string"
+            total_qty: "number - Sum of all occurrences"
+            uom: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+      - status: 422
+        code: "CIRCULAR_REFERENCE"
+        message: "Circular BOM reference detected"
+        when: "A component references itself or ancestor"
+
+  # ==========================================================================
+  # BOM Scaling (FR-2.35)
+  # ==========================================================================
+  - method: "POST"
+    path: "/api/technical/boms/:id/scale"
+    description: "Scale BOM to new batch size"
+    file: "apps/frontend/app/api/technical/boms/[id]/scale/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager"]
+
+    request:
+      params:
+        id: "UUID - BOM ID to scale"
+      body:
+        target_batch_size: "number - New output quantity (required if no scale_factor)"
+        target_uom: "string - UoM for target (default: BOM output_uom)"
+        scale_factor: "number - Direct multiplier (optional, alternative to target_batch_size)"
+        preview_only: "boolean - If true, don't save changes (default: true)"
+        round_decimals: "number - Decimal places for rounding (default: 3)"
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+
+    response:
+      status: 200
+      type: "ScaleBomResponse"
+      schema:
+        original_batch_size: "number"
+        new_batch_size: "number"
+        scale_factor: "number"
+        items:
+          - id: "string (UUID)"
+            component_code: "string"
+            component_name: "string"
+            original_quantity: "number"
+            new_quantity: "number"
+            uom: "string"
+            rounded: "boolean - True if rounding was applied"
+        warnings: "string[] - Rounding warnings"
+        applied: "boolean - True if changes were saved"
+
+    errors:
+      - status: 400
+        code: "INVALID_SCALE"
+        message: "Batch size must be positive"
+        when: "target_batch_size <= 0 or scale_factor <= 0"
+      - status: 400
+        code: "MISSING_SCALE_PARAM"
+        message: "Either target_batch_size or scale_factor required"
+        when: "Neither provided"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Cannot modify BOM"
+        when: "User lacks write permission and preview_only=false"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+
+  # ==========================================================================
+  # BOM Yield (FR-2.34)
+  # ==========================================================================
+  - method: "GET"
+    path: "/api/technical/boms/:id/yield"
+    description: "Get yield analysis for BOM"
+    file: "apps/frontend/app/api/technical/boms/[id]/yield/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "planner", "viewer"]
+
+    request:
+      params:
+        id: "UUID - BOM ID"
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "BomYieldResponse"
+      schema:
+        bom_id: "string (UUID)"
+        theoretical_yield_percent: "number - (output / input) * 100"
+        expected_yield_percent: "number | null - User-configured target"
+        input_total_kg: "number - Sum of all inputs"
+        output_qty_kg: "number - Expected output"
+        loss_factors: "LossFactor[] - Breakdown of yield loss"
+        actual_yield_avg: "number | null - From production data (Phase 1)"
+        variance_from_expected: "number | null"
+        variance_warning: "boolean - True if variance > threshold"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+
+  - method: "PUT"
+    path: "/api/technical/boms/:id/yield"
+    description: "Update yield configuration"
+    file: "apps/frontend/app/api/technical/boms/[id]/yield/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager"]
+
+    request:
+      params:
+        id: "UUID - BOM ID"
+      body:
+        expected_yield_percent: "number - Target yield (0-100)"
+        variance_threshold_percent: "number - Warning threshold (default 5)"
+        # Note: loss_factors table is Phase 1 - not in MVP
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+
+    response:
+      status: 200
+      type: "BomYieldResponse"
+
+    errors:
+      - status: 400
+        code: "INVALID_YIELD"
+        message: "Yield percent must be between 0 and 100"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Cannot modify BOM"
+      - status: 404
+        code: "BOM_NOT_FOUND"
+        message: "BOM not found"
+
+# ==========================================================================
+# Type Definitions
+# ==========================================================================
+types:
+  - name: "BomItemSummary"
+    description: "Simplified BOM item for comparison"
+    fields:
+      id: "string"
+      component_id: "string"
+      component_code: "string"
+      component_name: "string"
+      quantity: "number"
+      uom: "string"
+      sequence: "number"
+      operation_seq: "number | null"
+      scrap_percent: "number"
+      is_output: "boolean"
+
+  - name: "ModifiedItem"
+    description: "Item that changed between versions"
+    fields:
+      item_id: "string"
+      component_id: "string"
+      component_code: "string"
+      component_name: "string"
+      field: "string - 'quantity' | 'uom' | 'scrap_percent' | 'sequence'"
+      old_value: "string | number"
+      new_value: "string | number"
+      change_percent: "number | null - For numeric changes"
+
+  - name: "LossFactor"
+    description: "Yield loss factor breakdown"
+    fields:
+      type: "string - 'moisture' | 'trim' | 'process' | 'custom'"
+      description: "string"
+      loss_percent: "number"
+
+  - name: "ScaledItem"
+    description: "BOM item with scaled quantities"
+    fields:
+      id: "string"
+      component_code: "string"
+      component_name: "string"
+      original_quantity: "number"
+      new_quantity: "number"
+      uom: "string"
+      rounded: "boolean"
+
+# ==========================================================================
+# Zod Validation Schemas
+# ==========================================================================
+validation_schemas:
+  - path: "apps/frontend/lib/validation/bom-advanced-schemas.ts"
+    content: |
+      import { z } from 'zod';
+
+      // Scale BOM Request
+      export const scaleBomRequestSchema = z.object({
+        target_batch_size: z.number().positive().optional(),
+        target_uom: z.string().optional(),
+        scale_factor: z.number().positive().optional(),
+        preview_only: z.boolean().default(true),
+        round_decimals: z.number().int().min(0).max(6).default(3),
+      }).refine(
+        (data) => data.target_batch_size !== undefined || data.scale_factor !== undefined,
+        { message: 'Either target_batch_size or scale_factor required' }
+      );
+
+      export type ScaleBomRequest = z.infer<typeof scaleBomRequestSchema>;
+
+      // Update Yield Request
+      export const updateYieldRequestSchema = z.object({
+        expected_yield_percent: z.number().min(0).max(100),
+        variance_threshold_percent: z.number().min(0).max(100).default(5),
+      });
+
+      export type UpdateYieldRequest = z.infer<typeof updateYieldRequestSchema>;
+
+      // Explosion Query Params
+      export const explosionQuerySchema = z.object({
+        maxDepth: z.coerce.number().int().min(1).max(10).default(10),
+        includeQuantities: z.coerce.boolean().default(true),
+      });
+
+      export type ExplosionQuery = z.infer<typeof explosionQuerySchema>;
+
+      // Comparison Response Types
+      export const bomItemSummarySchema = z.object({
+        id: z.string().uuid(),
+        component_id: z.string().uuid(),
+        component_code: z.string(),
+        component_name: z.string(),
+        quantity: z.number(),
+        uom: z.string(),
+        sequence: z.number(),
+        operation_seq: z.number().nullable(),
+        scrap_percent: z.number(),
+        is_output: z.boolean(),
+      });
+
+      export type BomItemSummary = z.infer<typeof bomItemSummarySchema>;
+
+      export const modifiedItemSchema = z.object({
+        item_id: z.string().uuid(),
+        component_id: z.string().uuid(),
+        component_code: z.string(),
+        component_name: z.string(),
+        field: z.enum(['quantity', 'uom', 'scrap_percent', 'sequence', 'operation_seq']),
+        old_value: z.union([z.string(), z.number()]),
+        new_value: z.union([z.string(), z.number()]),
+        change_percent: z.number().nullable(),
+      });
+
+      export type ModifiedItem = z.infer<typeof modifiedItemSchema>;
+
+# ==========================================================================
+# Service Functions
+# ==========================================================================
+services:
+  - path: "apps/frontend/lib/services/bom-service.ts"
+    description: "Extend existing BOM service with advanced features"
+    existing_functions:
+      - name: "scaleBOM"
+        signature: "(bomId: string, multiplier: number) => Promise<BOMScaleResult>"
+        note: "Already implemented - read-only preview"
+      - name: "calculateBOMYield"
+        signature: "(bomId: string, plannedQuantity: number) => Promise<YieldCalculation>"
+        note: "Already implemented - basic yield calculation"
+
+    new_functions:
+      - name: "compareBOMVersions"
+        signature: "(bomId1: string, bomId2: string) => Promise<BomComparisonResponse>"
+        description: "Compare two BOM versions and return diff"
+
+      - name: "explodeBOM"
+        signature: "(bomId: string, maxDepth?: number) => Promise<BomExplosionResponse>"
+        description: "Multi-level BOM explosion with recursive CTE"
+
+      - name: "applyBOMScaling"
+        signature: "(bomId: string, request: ScaleBomRequest) => Promise<ScaleBomResponse>"
+        description: "Scale BOM and optionally apply changes"
+
+      - name: "updateBOMYield"
+        signature: "(bomId: string, request: UpdateYieldRequest) => Promise<BomYieldResponse>"
+        description: "Update yield configuration"
+
+# ==========================================================================
+# Implementation Patterns
+# ==========================================================================
+patterns:
+  comparison_algorithm: |
+    // Comparison algorithm using component_id as key
+    const compareBomVersions = async (
+      bomId1: string,
+      bomId2: string
+    ): Promise<BomComparisonResponse> => {
+      // 1. Fetch both BOMs with items
+      const [bom1, bom2] = await Promise.all([
+        getBOMWithItems(bomId1),
+        getBOMWithItems(bomId2),
+      ]);
+
+      // 2. Validate same product
+      if (bom1.product_id !== bom2.product_id) {
+        throw new Error('DIFFERENT_PRODUCTS');
+      }
+
+      // 3. Build maps keyed by component_id
+      const items1Map = new Map(bom1.items.map(i => [i.component_id, i]));
+      const items2Map = new Map(bom2.items.map(i => [i.component_id, i]));
+
+      // 4. Find differences
+      const added: BomItemSummary[] = [];
+      const removed: BomItemSummary[] = [];
+      const modified: ModifiedItem[] = [];
+
+      // Items in bom2 not in bom1 = added
+      for (const [componentId, item] of items2Map) {
+        if (!items1Map.has(componentId)) {
+          added.push(mapToSummary(item));
+        }
+      }
+
+      // Items in bom1 not in bom2 = removed
+      for (const [componentId, item] of items1Map) {
+        if (!items2Map.has(componentId)) {
+          removed.push(mapToSummary(item));
+        }
+      }
+
+      // Items in both = check for modifications
+      for (const [componentId, item1] of items1Map) {
+        const item2 = items2Map.get(componentId);
+        if (!item2) continue;
+
+        // Compare fields
+        for (const field of ['quantity', 'uom', 'scrap_percent', 'sequence']) {
+          if (item1[field] !== item2[field]) {
+            modified.push({
+              item_id: item1.id,
+              component_id: componentId,
+              component_code: item1.component_code,
+              component_name: item1.component_name,
+              field,
+              old_value: item1[field],
+              new_value: item2[field],
+              change_percent: typeof item1[field] === 'number'
+                ? ((item2[field] - item1[field]) / item1[field]) * 100
+                : null,
+            });
+          }
+        }
+      }
+
+      return { bom_1: bom1, bom_2: bom2, differences: { added, removed, modified }, summary };
+    };
+
+  scaling_with_apply: |
+    // Scale BOM with optional apply
+    const applyBOMScaling = async (
+      bomId: string,
+      request: ScaleBomRequest
+    ): Promise<ScaleBomResponse> => {
+      const bom = await getBOMWithItems(bomId);
+
+      // Calculate scale factor
+      const scaleFactor = request.scale_factor ??
+        (request.target_batch_size! / bom.output_qty);
+
+      if (scaleFactor <= 0) {
+        throw new Error('INVALID_SCALE');
+      }
+
+      const warnings: string[] = [];
+      const scaledItems = bom.items.map(item => {
+        const newQty = item.quantity * scaleFactor;
+        const roundedQty = roundToDecimals(newQty, request.round_decimals ?? 3);
+        const wasRounded = newQty !== roundedQty;
+
+        if (wasRounded && newQty < 0.001) {
+          warnings.push(`${item.component_name} rounded from ${newQty.toFixed(6)} to ${roundedQty}`);
+        }
+
+        return {
+          id: item.id,
+          component_code: item.component_code,
+          component_name: item.component_name,
+          original_quantity: item.quantity,
+          new_quantity: roundedQty,
+          uom: item.uom,
+          rounded: wasRounded,
+        };
+      });
+
+      // Apply changes if not preview-only
+      if (!request.preview_only) {
+        await applyScalingChanges(bomId, scaledItems, request.target_batch_size!);
+      }
+
+      return {
+        original_batch_size: bom.output_qty,
+        new_batch_size: request.target_batch_size!,
+        scale_factor: scaleFactor,
+        items: scaledItems,
+        warnings,
+        applied: !request.preview_only,
+      };
+    };

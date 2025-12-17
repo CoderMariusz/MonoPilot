@@ -1,0 +1,446 @@
+# Story 03.7 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# API Endpoints
+endpoints:
+  # ============================================
+  # STATUS CONFIGURATION (Admin Only)
+  # ============================================
+
+  - method: "GET"
+    path: "/api/v1/settings/planning/po-statuses"
+    description: "List all PO statuses for organization"
+    file: "apps/frontend/app/api/settings/planning/po-statuses/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        include_inactive: "boolean (default: false)"
+    response:
+      status: 200
+      type: "POStatus[]"
+      schema:
+        data:
+          type: "array"
+          items:
+            id: "UUID"
+            org_id: "UUID"
+            code: "string"
+            name: "string"
+            color: "string"
+            display_order: "integer"
+            is_system: "boolean"
+            is_active: "boolean"
+            description: "string | null"
+            usage_count: "integer"
+            created_at: "timestamp"
+            updated_at: "timestamp"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+
+  - method: "POST"
+    path: "/api/v1/settings/planning/po-statuses"
+    description: "Create custom status"
+    file: "apps/frontend/app/api/settings/planning/po-statuses/route.ts"
+    auth: "required"
+    roles: ["owner", "admin"]
+    request:
+      body:
+        code: "string (required, lowercase_snake)"
+        name: "string (required)"
+        color: "string (enum, default: gray)"
+        display_order: "integer (optional)"
+        description: "string (optional)"
+    response:
+      status: 201
+      type: "POStatus"
+    errors:
+      - { status: 400, code: "DUPLICATE_CODE", message: "Status code must be unique" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "Name and code are required" }
+      - { status: 403, code: "FORBIDDEN", message: "Admin access required" }
+
+  - method: "GET"
+    path: "/api/v1/settings/planning/po-statuses/:id"
+    description: "Get status details"
+    file: "apps/frontend/app/api/settings/planning/po-statuses/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      type: "POStatus"
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "Status not found" }
+
+  - method: "PUT"
+    path: "/api/v1/settings/planning/po-statuses/:id"
+    description: "Update status (name, color, order - not code)"
+    file: "apps/frontend/app/api/settings/planning/po-statuses/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin"]
+    request:
+      body:
+        name: "string (optional, blocked for system statuses)"
+        color: "string (optional)"
+        display_order: "integer (optional)"
+        description: "string (optional)"
+        is_active: "boolean (optional)"
+    response:
+      status: 200
+      type: "POStatus"
+    errors:
+      - { status: 400, code: "CANNOT_MODIFY_SYSTEM", message: "System statuses cannot be renamed" }
+      - { status: 403, code: "FORBIDDEN", message: "Admin access required" }
+      - { status: 404, code: "NOT_FOUND", message: "Status not found" }
+
+  - method: "DELETE"
+    path: "/api/v1/settings/planning/po-statuses/:id"
+    description: "Delete custom status"
+    file: "apps/frontend/app/api/settings/planning/po-statuses/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin"]
+    response:
+      status: 204
+    errors:
+      - { status: 400, code: "STATUS_IN_USE", message: "Cannot delete. X POs use this status." }
+      - { status: 400, code: "CANNOT_DELETE_SYSTEM", message: "System statuses cannot be deleted" }
+      - { status: 403, code: "FORBIDDEN", message: "Admin access required" }
+      - { status: 404, code: "NOT_FOUND", message: "Status not found" }
+
+  - method: "PUT"
+    path: "/api/v1/settings/planning/po-statuses/reorder"
+    description: "Bulk update display_order"
+    file: "apps/frontend/app/api/settings/planning/po-statuses/reorder/route.ts"
+    auth: "required"
+    roles: ["owner", "admin"]
+    request:
+      body:
+        status_ids: "UUID[] (ordered list)"
+    response:
+      status: 200
+      body:
+        message: "Status order updated"
+    errors:
+      - { status: 403, code: "FORBIDDEN", message: "Admin access required" }
+
+  # ============================================
+  # TRANSITION RULES CONFIGURATION (Admin Only)
+  # ============================================
+
+  - method: "GET"
+    path: "/api/v1/settings/planning/po-statuses/:id/transitions"
+    description: "Get allowed transitions for a status"
+    file: "apps/frontend/app/api/settings/planning/po-statuses/[id]/transitions/route.ts"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      type: "POStatusTransition[]"
+      schema:
+        data:
+          type: "array"
+          items:
+            id: "UUID"
+            from_status: "POStatus"
+            to_status: "POStatus"
+            is_system: "boolean"
+            requires_approval: "boolean"
+            requires_reason: "boolean"
+
+  - method: "PUT"
+    path: "/api/v1/settings/planning/po-statuses/:id/transitions"
+    description: "Update allowed transitions for a status"
+    file: "apps/frontend/app/api/settings/planning/po-statuses/[id]/transitions/route.ts"
+    auth: "required"
+    roles: ["owner", "admin"]
+    request:
+      body:
+        allowed_to_status_ids: "UUID[]"
+    response:
+      status: 200
+      body:
+        message: "Transitions updated"
+    errors:
+      - { status: 400, code: "CANNOT_REMOVE_SYSTEM", message: "System-required transition cannot be removed" }
+      - { status: 403, code: "FORBIDDEN", message: "Admin access required" }
+
+  # ============================================
+  # PO STATUS OPERATIONS (All Users)
+  # ============================================
+
+  - method: "GET"
+    path: "/api/v1/planning/purchase-orders/:id/status/available"
+    description: "Get available next statuses for a PO"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/status/available/route.ts"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      type: "POStatus[]"
+      schema:
+        data:
+          type: "array"
+          items:
+            id: "UUID"
+            code: "string"
+            name: "string"
+            color: "string"
+        current_status: "POStatus"
+
+  - method: "POST"
+    path: "/api/v1/planning/purchase-orders/:id/status"
+    description: "Change PO status"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/status/route.ts"
+    auth: "required"
+    roles: ["planner", "purchaser", "admin", "owner"]
+    request:
+      body:
+        to_status: "string (status code)"
+        notes: "string (optional)"
+    response:
+      status: 200
+      type: "PurchaseOrder"
+      schema:
+        data:
+          id: "UUID"
+          status: "string"
+          previous_status: "string"
+          transitioned_at: "timestamp"
+          transitioned_by: "UUID"
+    errors:
+      - { status: 400, code: "INVALID_TRANSITION", message: "Invalid status transition: X -> Y" }
+      - { status: 400, code: "TRANSITION_BLOCKED", message: "Cannot submit PO without line items" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions" }
+      - { status: 404, code: "NOT_FOUND", message: "PO not found" }
+
+  - method: "GET"
+    path: "/api/v1/planning/purchase-orders/:id/status/history"
+    description: "Get status history timeline"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/status/history/route.ts"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      type: "POStatusHistory[]"
+      schema:
+        data:
+          type: "array"
+          items:
+            id: "UUID"
+            from_status: "string | null"
+            to_status: "string"
+            changed_by: "string | null"
+            changed_at: "timestamp"
+            notes: "string | null"
+            user:
+              name: "string"
+              email: "string"
+
+  - method: "GET"
+    path: "/api/v1/planning/purchase-orders/:id/status/validate"
+    description: "Validate status transition (dry run)"
+    file: "apps/frontend/app/api/planning/purchase-orders/[id]/status/validate/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      query_params:
+        to_status: "string (required)"
+    response:
+      status: 200
+      schema:
+        valid: "boolean"
+        reason: "string | null"
+        warnings: "string[]"
+
+  # ============================================
+  # UTILITY ENDPOINTS
+  # ============================================
+
+  - method: "GET"
+    path: "/api/v1/settings/planning/po-statuses/defaults"
+    description: "Get default status configuration (for org setup)"
+    file: "apps/frontend/app/api/settings/planning/po-statuses/defaults/route.ts"
+    auth: "required"
+    roles: ["owner", "admin"]
+    response:
+      status: 200
+      schema:
+        statuses: "POStatus[]"
+        transitions: "POStatusTransition[]"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/po-status-service.ts"
+    description: "PO status management service with state machine"
+    exports:
+      # Status CRUD
+      - name: "listStatuses"
+        params: ["orgId: string"]
+        returns: "Promise<POStatus[]>"
+      - name: "getStatus"
+        params: ["id: string"]
+        returns: "Promise<POStatus | null>"
+      - name: "createStatus"
+        params: ["data: CreateStatusInput"]
+        returns: "Promise<POStatus>"
+      - name: "updateStatus"
+        params: ["id: string", "data: UpdateStatusInput"]
+        returns: "Promise<POStatus>"
+      - name: "deleteStatus"
+        params: ["id: string"]
+        returns: "Promise<void>"
+      - name: "reorderStatuses"
+        params: ["orgId: string", "statusIds: string[]"]
+        returns: "Promise<void>"
+      # Transition Rules
+      - name: "getStatusTransitions"
+        params: ["statusId: string"]
+        returns: "Promise<POStatusTransition[]>"
+      - name: "updateStatusTransitions"
+        params: ["statusId: string", "allowedToStatusIds: string[]"]
+        returns: "Promise<void>"
+      # Status Operations
+      - name: "getAvailableTransitions"
+        params: ["currentStatus: string", "poId: string"]
+        returns: "Promise<POStatus[]>"
+      - name: "validateTransition"
+        params: ["poId: string", "toStatus: string"]
+        returns: "Promise<ValidationResult>"
+      - name: "transitionStatus"
+        params: ["poId: string", "toStatus: string", "userId: string", "notes?: string"]
+        returns: "Promise<PurchaseOrder>"
+      # History
+      - name: "getStatusHistory"
+        params: ["poId: string"]
+        returns: "Promise<POStatusHistory[]>"
+      - name: "recordStatusHistory"
+        params: ["poId: string", "fromStatus: string | null", "toStatus: string", "userId: string | null", "notes?: string"]
+        returns: "Promise<POStatusHistory>"
+      # Business Rules
+      - name: "canDeleteStatus"
+        params: ["statusId: string"]
+        returns: "Promise<{ allowed: boolean; reason?: string; poCount?: number }>"
+      - name: "getStatusUsageCount"
+        params: ["statusId: string"]
+        returns: "Promise<number>"
+      # Setup
+      - name: "createDefaultStatuses"
+        params: ["orgId: string"]
+        returns: "Promise<void>"
+
+# Validation (Zod)
+validation:
+  path: "apps/frontend/lib/validation/po-status.ts"
+  schemas:
+    - name: "statusColorEnum"
+      type: "z.enum"
+      values: ["gray", "blue", "yellow", "green", "purple", "emerald", "red", "orange", "amber", "teal", "indigo"]
+
+    - name: "createPOStatusSchema"
+      fields:
+        code: "z.string().min(2).max(50).regex(/^[a-z_]+$/)"
+        name: "z.string().min(2).max(100)"
+        color: "statusColorEnum.default('gray')"
+        display_order: "z.number().int().min(1).optional()"
+        description: "z.string().max(500).optional().nullable()"
+
+    - name: "updatePOStatusSchema"
+      fields:
+        name: "z.string().min(2).max(100).optional()"
+        color: "statusColorEnum.optional()"
+        display_order: "z.number().int().min(1).optional()"
+        description: "z.string().max(500).optional().nullable()"
+        is_active: "z.boolean().optional()"
+
+    - name: "updateStatusTransitionsSchema"
+      fields:
+        allowed_to_status_ids: "z.array(z.string().uuid()).min(0).max(20)"
+
+    - name: "transitionStatusSchema"
+      fields:
+        to_status: "z.string().min(2).max(50)"
+        notes: "z.string().max(500).optional().nullable()"
+
+    - name: "reorderStatusesSchema"
+      fields:
+        status_ids: "z.array(z.string().uuid()).min(1)"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/po-status.ts"
+    exports:
+      - name: "POStatus"
+        fields:
+          - "id: string"
+          - "org_id: string"
+          - "code: string"
+          - "name: string"
+          - "color: StatusColor"
+          - "display_order: number"
+          - "is_system: boolean"
+          - "is_active: boolean"
+          - "description: string | null"
+          - "created_at: string"
+          - "updated_at: string"
+
+      - name: "POStatusTransition"
+        fields:
+          - "id: string"
+          - "org_id: string"
+          - "from_status_id: string"
+          - "to_status_id: string"
+          - "is_system: boolean"
+          - "requires_approval: boolean"
+          - "requires_reason: boolean"
+          - "condition_function: string | null"
+          - "created_at: string"
+          - "from_status?: POStatus"
+          - "to_status?: POStatus"
+
+      - name: "POStatusHistory"
+        fields:
+          - "id: string"
+          - "po_id: string"
+          - "from_status: string | null"
+          - "to_status: string"
+          - "changed_by: string | null"
+          - "changed_at: string"
+          - "notes: string | null"
+          - "transition_metadata: Record<string, any> | null"
+          - "user?: { name: string; email: string }"
+
+      - name: "ValidationResult"
+        fields:
+          - "valid: boolean"
+          - "reason?: string"
+          - "warnings?: string[]"
+
+      - name: "StatusColor"
+        type: "type alias"
+        value: "'gray' | 'blue' | 'yellow' | 'green' | 'purple' | 'emerald' | 'red' | 'orange' | 'amber' | 'teal' | 'indigo'"
+
+# Error Codes
+error_codes:
+  - code: "DUPLICATE_CODE"
+    http: 400
+    message: "Status code must be unique"
+  - code: "STATUS_IN_USE"
+    http: 400
+    message: "Cannot delete. {count} POs use this status. Change their status first."
+  - code: "CANNOT_DELETE_SYSTEM"
+    http: 400
+    message: "System statuses cannot be deleted"
+  - code: "CANNOT_MODIFY_SYSTEM"
+    http: 400
+    message: "System statuses cannot be renamed"
+  - code: "CANNOT_REMOVE_SYSTEM_TRANSITION"
+    http: 400
+    message: "System-required transition cannot be removed"
+  - code: "INVALID_TRANSITION"
+    http: 400
+    message: "Invalid status transition: {from} -> {to}"
+  - code: "TRANSITION_BLOCKED"
+    http: 400
+    message: "Cannot submit PO without line items"

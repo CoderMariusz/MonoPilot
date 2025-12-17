@@ -1,0 +1,224 @@
+# Story 02.5b - Database Schema
+# Purpose: Tables, columns, indexes for Phase 1B advanced BOM items
+# Agent: BACKEND-DEV (database focus)
+# Note: Extends existing bom_items table from 02.5a - no new tables required
+
+# No new migrations needed - columns exist from previous migrations
+migrations:
+  existing:
+    - path: "supabase/migrations/049_add_uom_validation.sql"
+      type: "migration"
+      description: "Already contains bom_items columns used in Phase 1B"
+      columns_used:
+        - "line_ids UUID[]"
+        - "consume_whole_lp BOOLEAN"
+        - "is_by_product BOOLEAN"
+        - "yield_percent DECIMAL(5,2)"
+        - "condition_flags JSONB"
+
+# Tables (existing - no new tables created)
+tables:
+  # Primary table - existing, extends with Phase 1B fields
+  - name: "bom_items"
+    description: "BOM line items - Phase 1B uses existing columns"
+    status: "existing"
+    phase_1b_columns:
+      - name: "condition_flags"
+        type: "JSONB"
+        constraints: "DEFAULT NULL"
+        description: "Conditional item flags, e.g., {\"organic\": true, \"vegan\": true}"
+        usage: "FR-2.26 - Conditional BOM items"
+      - name: "line_ids"
+        type: "UUID[]"
+        constraints: "DEFAULT NULL"
+        description: "Production line IDs - NULL = all lines, specific IDs = restricted"
+        usage: "FR-2.33 - BOM production line assignment"
+        nullable: true
+        fk_target: "production_lines(id)"
+      - name: "is_by_product"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+        description: "True for byproduct outputs, false for input components"
+        usage: "FR-2.27 - BOM byproducts"
+      - name: "is_output"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+        description: "Alias for is_by_product (backward compatibility)"
+        usage: "FR-2.27 - BOM byproducts"
+      - name: "yield_percent"
+        type: "DECIMAL(5,2)"
+        constraints: "DEFAULT NULL"
+        description: "Byproduct yield % - required when is_by_product=true"
+        usage: "FR-2.27 - BOM byproducts (yield %)"
+        validation: "Required if is_by_product=true"
+      - name: "consume_whole_lp"
+        type: "BOOLEAN"
+        constraints: "DEFAULT false"
+        description: "LP consumption mode - true = consume entire LP, false = partial"
+        usage: "License Plate consumption control"
+
+  # Junction table for BOM-Production Lines (existing)
+  - name: "bom_production_lines"
+    description: "BOM to production lines many-to-many (existing)"
+    status: "existing"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "bom_id", type: "UUID", constraints: "NOT NULL REFERENCES boms(id) ON DELETE CASCADE" }
+      - { name: "line_id", type: "UUID", constraints: "NOT NULL REFERENCES production_lines(id)" }
+      - { name: "labor_cost_per_hour", type: "DECIMAL(15,4)", constraints: "DEFAULT NULL" }
+    rls: true
+    rls_pattern: "bom_id IN (SELECT id FROM boms WHERE org_id = auth_org_id())"
+    indexes:
+      - "UNIQUE(bom_id, line_id)"
+    constraints:
+      - "UNIQUE(bom_id, line_id)"
+
+  # Conditional flags lookup table (existing)
+  - name: "conditional_flags"
+    description: "System-defined conditional flags (organic, vegan, etc.)"
+    status: "existing"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "code", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "is_default", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = auth_org_id()"
+    indexes:
+      - "UNIQUE(org_id, code)"
+    seed_data:
+      - { code: "organic", name: "Organic", is_default: true }
+      - { code: "vegan", name: "Vegan", is_default: true }
+      - { code: "gluten_free", name: "Gluten-Free", is_default: true }
+      - { code: "kosher", name: "Kosher", is_default: true }
+      - { code: "halal", name: "Halal", is_default: true }
+
+# Indexes (existing - no new indexes needed)
+indexes:
+  existing:
+    - name: "idx_bom_items_bom"
+      table: "bom_items"
+      columns: ["bom_id"]
+      description: "Fast lookup of items by BOM"
+    - name: "idx_bom_items_product"
+      table: "bom_items"
+      columns: ["product_id"]
+      description: "Fast lookup of BOMs using a product"
+
+  recommended:
+    - name: "idx_bom_items_byproduct"
+      table: "bom_items"
+      columns: ["bom_id", "is_by_product"]
+      condition: "WHERE is_by_product = true"
+      description: "Fast filtering of byproducts per BOM"
+      sql: "CREATE INDEX IF NOT EXISTS idx_bom_items_byproduct ON bom_items(bom_id) WHERE is_by_product = true;"
+
+# RLS Policies (existing - no changes needed)
+rls_policies:
+  bom_items:
+    - name: "bom_items_org_isolation"
+      operation: "ALL"
+      using: "bom_id IN (SELECT id FROM boms WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+      description: "Items inherit RLS from parent BOM"
+
+  bom_production_lines:
+    - name: "bom_production_lines_org_isolation"
+      operation: "ALL"
+      using: "bom_id IN (SELECT id FROM boms WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+      description: "Junction table inherits RLS from parent BOM"
+
+  conditional_flags:
+    - name: "conditional_flags_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Flags scoped to organization"
+
+# Database constraints
+constraints:
+  bom_items:
+    - name: "bom_item_yield_required_for_byproduct"
+      type: "check"
+      expression: "(is_by_product = false) OR (yield_percent IS NOT NULL)"
+      description: "yield_percent required when is_by_product=true"
+      sql: |
+        ALTER TABLE bom_items
+        ADD CONSTRAINT bom_item_yield_required_for_byproduct
+        CHECK ((is_by_product = false) OR (yield_percent IS NOT NULL));
+
+# Query patterns for Phase 1B
+query_patterns:
+  get_byproducts:
+    description: "Get all byproducts for a BOM"
+    sql: |
+      SELECT bi.*, p.code AS product_code, p.name AS product_name
+      FROM bom_items bi
+      JOIN products p ON bi.product_id = p.id
+      WHERE bi.bom_id = $1
+        AND bi.is_by_product = true
+      ORDER BY bi.sequence;
+
+  get_items_with_flags:
+    description: "Get items filtered by conditional flags"
+    sql: |
+      SELECT bi.*, p.code AS product_code, p.name AS product_name
+      FROM bom_items bi
+      JOIN products p ON bi.product_id = p.id
+      WHERE bi.bom_id = $1
+        AND bi.condition_flags ? $2  -- JSONB key exists
+      ORDER BY bi.sequence;
+
+  get_items_for_line:
+    description: "Get items available for a specific production line"
+    sql: |
+      SELECT bi.*, p.code AS product_code, p.name AS product_name
+      FROM bom_items bi
+      JOIN products p ON bi.product_id = p.id
+      WHERE bi.bom_id = $1
+        AND (bi.line_ids IS NULL OR $2 = ANY(bi.line_ids))
+      ORDER BY bi.sequence;
+
+  bulk_insert_items:
+    description: "Bulk insert BOM items (for import)"
+    sql: |
+      INSERT INTO bom_items (
+        bom_id, product_id, quantity, uom, sequence, scrap_percent,
+        operation_seq, consume_whole_lp, line_ids, is_by_product,
+        yield_percent, condition_flags, notes
+      )
+      SELECT
+        $1 AS bom_id,
+        (item->>'product_id')::UUID,
+        (item->>'quantity')::DECIMAL,
+        item->>'uom',
+        (item->>'sequence')::INTEGER,
+        COALESCE((item->>'scrap_percent')::DECIMAL, 0),
+        (item->>'operation_seq')::INTEGER,
+        COALESCE((item->>'consume_whole_lp')::BOOLEAN, false),
+        (SELECT ARRAY(SELECT jsonb_array_elements_text(item->'line_ids'))::UUID[]),
+        COALESCE((item->>'is_by_product')::BOOLEAN, false),
+        (item->>'yield_percent')::DECIMAL,
+        (item->'condition_flags')::JSONB,
+        item->>'notes'
+      FROM jsonb_array_elements($2) AS item
+      RETURNING *;
+
+# TypeScript type for condition_flags JSONB
+condition_flags_schema: |
+  // Available condition flags
+  interface ConditionFlags {
+    organic?: boolean;
+    vegan?: boolean;
+    gluten_free?: boolean;
+    kosher?: boolean;
+    halal?: boolean;
+    [key: string]: boolean | undefined;  // Allow custom flags
+  }
+
+  // Example JSONB value
+  const exampleFlags: ConditionFlags = {
+    organic: true,
+    vegan: true
+  };

@@ -1,0 +1,142 @@
+# Story 02.7 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.7"
+  name: "Routings CRUD + Header Management"
+  slug: "routings-crud"
+  epic: "02-technical"
+  phase: "MVP"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes, triggers
+  - api.yaml         # Endpoints, schemas, validation
+  - frontend.yaml    # Pages, components, services
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "roles", "org_context_service", "permission_service"]
+      rationale: "RLS policies depend on org_id from users table lookup (ADR-013)"
+  optional:
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products"]
+      rationale: "Routings can be linked to products via BOMs (not blocking)"
+  blocked_by: []
+  blocks:
+    - story: "02.8"
+      name: "Routing Operations CRUD"
+      rationale: "Operations belong to routings - requires routing header first"
+    - story: "02.5"
+      name: "BOM Routing Assignment"
+      rationale: "BOMs reference routings via routing_id FK"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections:
+      - "FR-2.40"  # Routing CRUD (name, version, reusable)
+      - "FR-2.46"  # Routing versioning
+      - "FR-2.54"  # Routing unique code identifier
+      - "FR-2.55"  # Routing reusability flag
+      - "FR-2.51"  # Routing setup cost configuration
+      - "FR-2.52"  # Routing working cost per unit/batch
+      - "FR-2.53"  # Routing overhead percentage
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections:
+      - "Database Schema"
+      - "API Design"
+      - "Routings Endpoints"
+      - "Cost Calculation Logic"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.7.routings-crud.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-009-routing-level-costs.md"
+      relevance: "PRIMARY - Routing cost fields (setup_cost, working_cost_per_unit, overhead_percent, currency)"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for org isolation"
+  wireframes:
+    - id: "TEC-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-007-routings-list.md"
+      description: "Routings list page with search, filters, clone, delete"
+    - id: "TEC-008"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-008-routing-modal.md"
+      description: "Create/Edit routing modal with cost configuration"
+    - id: "TEC-008a"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-008a-routing-detail.md"
+      description: "Routing detail page with header info and operations"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 0
+    description: "Uses existing migrations 043, 044 (routings table already has cost fields)"
+  - type: "api"
+    count: 7
+    description: "CRUD endpoints for routings + clone + BOM usage check"
+  - type: "service"
+    count: 1
+    description: "routing-service.ts with CRUD operations"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for routing create/update"
+  - type: "page"
+    count: 2
+    description: "Routings list page + detail page"
+  - type: "component"
+    count: 5
+    description: "RoutingsDataTable, CreateRoutingModal, CloneRoutingModal, DeleteRoutingDialog, RoutingDetailPage"
+  - type: "test"
+    count: 4
+    description: "Unit + integration + API + RLS tests"
+
+# Technical notes
+technical_notes:
+  - "Routing code must be unique per organization (UNIQUE(org_id, code))"
+  - "Code format: uppercase alphanumeric + hyphens (e.g., RTG-BREAD-01)"
+  - "Version auto-increments on edit via database trigger"
+  - "Cost fields (ADR-009): setup_cost, working_cost_per_unit, overhead_percent, currency"
+  - "is_reusable flag: true = can assign to multiple BOMs, false = product-specific"
+  - "Delete with BOM usage: sets bom.routing_id to NULL, shows warning"
+  - "Clone copies routing header + all operations with new IDs"
+  - "RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# ADR-009 Implementation Notes
+adr_009_notes:
+  description: "Routing-Level Cost Configuration"
+  status: "IMPLEMENTED (migrations 043, 044)"
+  fields:
+    - name: "setup_cost"
+      type: "DECIMAL(10,2)"
+      default: 0
+      description: "Fixed cost per routing run (tooling, changeover)"
+    - name: "working_cost_per_unit"
+      type: "DECIMAL(10,4)"
+      default: 0
+      description: "Variable cost per output unit (utilities, consumables)"
+    - name: "overhead_percent"
+      type: "DECIMAL(5,2)"
+      default: 0
+      description: "Factory overhead percentage (0-100%)"
+    - name: "currency"
+      type: "TEXT"
+      default: "PLN"
+      description: "Currency for cost fields"
+  rationale:
+    - "Costs are intrinsic to routing - no separate table needed"
+    - "Routing versioning captures cost changes automatically"
+    - "BOM Snapshot pattern preserves costs at Work Order creation"

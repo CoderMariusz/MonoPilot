@@ -1,0 +1,361 @@
+# Story 02.15 - Frontend Specification
+# Purpose: Components, pages, UX wireframes, patterns
+# Agent: FRONTEND-DEV
+
+# Page
+page:
+  path: "/technical/costing/products/:id/history"
+  file: "apps/frontend/app/(authenticated)/technical/costing/products/[id]/history/page.tsx"
+  title: "Cost History & Trends"
+  breadcrumb: "Technical > Products > {Product Name} > Cost History"
+
+# UX Wireframe Reference
+ux:
+  wireframes:
+    - id: "TEC-015"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-015-cost-history.md"
+      status: "96% Complete"
+      components:
+        - "Current Cost Summary Card"
+        - "Filters Section"
+        - "Cost Trend Chart"
+        - "Cost Component Breakdown Table"
+        - "Top Cost Drivers Section"
+        - "Cost History Table"
+        - "Variance Analysis Section"
+        - "Export Options Modal"
+
+  states:
+    - state: "loading"
+      description: "Spinner + 'Loading Cost History...' with progress bar"
+    - state: "empty"
+      description: "'No Cost History Available' with link to Recipe Costing"
+    - state: "error"
+      description: "Error message with Retry button"
+    - state: "success"
+      description: "Full cost history with chart, tables, variance"
+    - state: "limited"
+      description: "For products with < 3 data points, show limited view"
+
+  patterns:
+    table: "ShadCN DataTable with pagination and column sorting"
+    modal: "ShadCN Dialog for export options"
+    chart: "Recharts LineChart with custom tooltips"
+    card: "ShadCN Card for summary sections"
+    filter: "ShadCN DatePicker, Select, Checkbox components"
+
+# Components
+components:
+  - path: "apps/frontend/components/technical/costing/CostHistoryPage.tsx"
+    description: "Main page component orchestrating all sections"
+    props:
+      productId: "string"
+    features:
+      - "Fetches cost history on mount"
+      - "Manages filter state"
+      - "Coordinates data between child components"
+
+  - path: "apps/frontend/components/technical/costing/CostSummaryCard.tsx"
+    description: "Current cost summary with trends"
+    props:
+      summary: "CostHistorySummary"
+      productCode: "string"
+      onViewLatest: "() => void"
+    features:
+      - "Current cost per unit display"
+      - "Change amount with percentage and arrow indicator"
+      - "30d, 90d, YTD trend indicators"
+      - "Link to Recipe Costing (TEC-013)"
+
+  - path: "apps/frontend/components/technical/costing/CostTrendChart.tsx"
+    description: "Interactive Recharts line chart for cost trends"
+    props:
+      data: "CostHistoryItem[]"
+      onPointClick: "(item: CostHistoryItem) => void"
+      toggles: "{ material: boolean, labor: boolean, overhead: boolean, total: boolean }"
+      onToggleChange: "(component: string, value: boolean) => void"
+    features:
+      - "Multi-line chart (Material, Labor, Overhead, Total)"
+      - "Toggleable lines via checkboxes"
+      - "Custom tooltip with detailed breakdown"
+      - "Clickable data points navigate to detail"
+      - "Zoom controls (1mo, 3mo, 6mo, 12mo, 24mo)"
+      - "Responsive sizing"
+
+  - path: "apps/frontend/components/technical/costing/CostChartTooltip.tsx"
+    description: "Custom tooltip for cost chart hover"
+    props:
+      active: "boolean"
+      payload: "TooltipPayload[]"
+      label: "string"
+    features:
+      - "Shows date, all cost components with percentages"
+      - "Cost per unit display"
+      - "Change from previous calculation"
+      - "BOM version reference"
+      - "Click for full detail link"
+
+  - path: "apps/frontend/components/technical/costing/ComponentBreakdownTable.tsx"
+    description: "Table showing current vs historical cost breakdown"
+    props:
+      breakdown: "ComponentBreakdown"
+      comparisonPeriod: "'1mo' | '3mo' | '6mo' | '1yr'"
+      onPeriodChange: "(period: string) => void"
+    features:
+      - "Material, Labor, Overhead rows with Total"
+      - "Current vs Historical columns"
+      - "Change column with percentage"
+      - "% of Total column"
+      - "Row highlighting (red for >5% increase, green for decrease)"
+
+  - path: "apps/frontend/components/technical/costing/CostDriversPanel.tsx"
+    description: "Top ingredient cost contributors panel"
+    props:
+      drivers: "CostDriver[]"
+      biggestDriver: "CostDriver | null"
+    features:
+      - "Top 5 ingredients by cost impact"
+      - "Current vs Historical comparison"
+      - "Impact percentage column"
+      - "Biggest driver summary text"
+      - "Expandable to show all ingredients"
+
+  - path: "apps/frontend/components/technical/costing/CostHistoryTable.tsx"
+    description: "Paginated table of all cost records"
+    props:
+      data: "CostHistoryItem[]"
+      pagination: "PaginationInfo"
+      onPageChange: "(page: number) => void"
+      onRowClick: "(item: CostHistoryItem) => void"
+      onSort: "(column: string, direction: 'asc' | 'desc') => void"
+    features:
+      - "Columns: Date, Type, Material, Labor, Overhead, Total, Change"
+      - "Sortable columns"
+      - "Pagination with page size selector"
+      - "Row click navigates to detail"
+      - "Search/filter input"
+      - "Column visibility selector"
+
+  - path: "apps/frontend/components/technical/costing/VarianceAnalysisSection.tsx"
+    description: "Standard vs Actual variance comparison"
+    props:
+      variance: "VarianceReportResponse | null"
+      period: "number"
+      onPeriodChange: "(days: number) => void"
+      onViewDetailedReport: "() => void"
+    features:
+      - "Period selector (7, 30, 90, 365 days)"
+      - "Work orders analyzed count"
+      - "Component table (Standard vs Actual vs Variance)"
+      - "Warning indicator for significant variances (>5%)"
+      - "Link to detailed variance report"
+      - "Empty state when no production data"
+
+  - path: "apps/frontend/components/technical/costing/CostHistoryFilters.tsx"
+    description: "Filter controls for cost history"
+    props:
+      filters: "CostHistoryFilters"
+      onChange: "(filters: CostHistoryFilters) => void"
+      onReset: "() => void"
+      onExport: "() => void"
+    features:
+      - "Date range picker (start, end)"
+      - "Cost type dropdown (All, Standard, Actual, Planned)"
+      - "Component checkboxes (Material, Labor, Overhead)"
+      - "Chart type dropdown (Line, Bar, Area)"
+      - "Reset Filters button"
+      - "Export button (opens modal)"
+
+  - path: "apps/frontend/components/technical/costing/ExportOptionsModal.tsx"
+    description: "Modal for configuring export options"
+    props:
+      open: "boolean"
+      onClose: "() => void"
+      productId: "string"
+      dateRange: "{ from: Date, to: Date }"
+    features:
+      - "Format selection (CSV, PDF, PNG, Excel)"
+      - "Data inclusion checkboxes"
+      - "Custom filename input"
+      - "CSV options (delimiter, encoding)"
+      - "Preview first 5 rows"
+      - "File size estimate"
+      - "Download button"
+
+  - path: "apps/frontend/components/technical/costing/CostTrendIndicator.tsx"
+    description: "Reusable trend arrow indicator"
+    props:
+      value: "number"
+      showValue: "boolean"
+      size: "'sm' | 'md' | 'lg'"
+    features:
+      - "Up/down/neutral arrow based on value"
+      - "Color coding (red for up, green for down)"
+      - "Optional percentage display"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-cost-history.ts"
+    description: "React Query hook for cost history data"
+    exports:
+      - name: "useCostHistory"
+        params: ["productId: string", "options?: CostHistoryOptions"]
+        returns: "UseQueryResult<CostHistoryResponse>"
+
+  - path: "apps/frontend/lib/hooks/use-variance-report.ts"
+    description: "React Query hook for variance analysis"
+    exports:
+      - name: "useVarianceReport"
+        params: ["productId: string", "periodDays: number"]
+        returns: "UseQueryResult<VarianceReportResponse>"
+
+  - path: "apps/frontend/lib/hooks/use-cost-export.ts"
+    description: "Mutation hook for cost export"
+    exports:
+      - name: "useCostExport"
+        returns: "UseMutationResult<ExportResult, Error, ExportOptions>"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/cost-history.ts"
+    content: |
+      export interface CostHistoryResponse {
+        product: {
+          id: string;
+          code: string;
+          name: string;
+        };
+        summary: CostHistorySummary;
+        history: CostHistoryItem[];
+        pagination: PaginationInfo;
+        component_breakdown: ComponentBreakdownData;
+        cost_drivers: CostDriver[];
+      }
+
+      export interface CostHistorySummary {
+        current_cost: number;
+        current_cost_per_unit: number;
+        previous_cost: number | null;
+        change_amount: number;
+        change_percentage: number;
+        trend_30d: number;
+        trend_90d: number;
+        trend_ytd: number;
+      }
+
+      export interface CostHistoryItem {
+        id: string;
+        cost_type: 'standard' | 'actual' | 'planned';
+        material_cost: number;
+        labor_cost: number;
+        overhead_cost: number;
+        total_cost: number;
+        cost_per_unit: number;
+        effective_from: string;
+        effective_to: string | null;
+        created_at: string;
+        created_by: string;
+        bom_version?: number;
+      }
+
+      export interface ComponentBreakdownData {
+        current: ComponentBreakdown;
+        historical: ComponentBreakdown;
+        changes: ComponentChanges;
+      }
+
+      export interface ComponentBreakdown {
+        material: number;
+        labor: number;
+        overhead: number;
+        total: number;
+      }
+
+      export interface ComponentChanges {
+        material: { amount: number; percent: number };
+        labor: { amount: number; percent: number };
+        overhead: { amount: number; percent: number };
+        total: { amount: number; percent: number };
+      }
+
+      export interface CostDriver {
+        ingredient_id: string;
+        ingredient_name: string;
+        ingredient_code: string;
+        current_cost: number;
+        historical_cost: number;
+        change_amount: number;
+        change_percent: number;
+        impact_percent: number;
+      }
+
+      export interface CostHistoryFilters {
+        from: Date | null;
+        to: Date | null;
+        costType: 'all' | 'standard' | 'actual' | 'planned';
+        components: {
+          material: boolean;
+          labor: boolean;
+          overhead: boolean;
+        };
+        chartType: 'line' | 'bar' | 'area';
+      }
+
+      export interface PaginationInfo {
+        total: number;
+        page: number;
+        limit: number;
+        total_pages: number;
+      }
+
+# Libraries
+libraries:
+  - name: "recharts"
+    purpose: "Interactive line charts for cost trends"
+    components: ["LineChart", "Line", "XAxis", "YAxis", "Tooltip", "Legend", "ResponsiveContainer"]
+
+  - name: "papaparse"
+    purpose: "CSV generation for export"
+
+  - name: "jspdf"
+    purpose: "PDF report generation"
+
+  - name: "html2canvas"
+    purpose: "Chart to PNG export"
+
+  - name: "exceljs"
+    purpose: "Excel multi-sheet workbook generation"
+
+# Accessibility
+accessibility:
+  - "All interactive elements have minimum 48x48dp touch targets"
+  - "Chart colors pass WCAG AA contrast requirements"
+  - "Screen reader announces table headers and chart data"
+  - "Keyboard navigation: Tab through filters, Enter to select"
+  - "ARIA labels on chart, tooltips have role='tooltip'"
+  - "Alternative data table available for chart content"
+  - "Focus indicators on all interactive elements"
+
+# Responsive Design
+responsive:
+  mobile:
+    - "Chart stacks below filters"
+    - "Tables become horizontal scrollable"
+    - "Export modal full-screen"
+    - "Component sections stack vertically"
+  tablet:
+    - "Two-column layout for breakdown tables"
+    - "Chart maintains full width"
+  desktop:
+    - "Full layout as per wireframe"
+    - "Side-by-side sections where appropriate"
+
+# Performance
+performance:
+  - "Debounce filter changes (500ms)"
+  - "Lazy load chart when scrolled into view"
+  - "Paginate history table (default 10 records)"
+  - "Client-side filtering for <100 records"
+  - "React Query cache with 5 min stale time"
+  - "Throttle tooltip hover events (100ms)"
+  - "Aggregate chart data to max 100 points for large ranges"

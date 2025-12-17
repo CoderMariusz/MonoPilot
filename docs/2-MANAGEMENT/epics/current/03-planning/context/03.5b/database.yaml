@@ -1,0 +1,160 @@
+# Story 03.5b - Database Schema
+# Purpose: Tables, RLS policies, indexes
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_po_approval_history.sql"
+    type: "migration"
+    description: "PO approval history tracking table with RLS"
+
+tables:
+  - name: "po_approval_history"
+    description: "Tracks all approval workflow actions (submit, approve, reject)"
+    is_new: true
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "po_id", type: "UUID", constraints: "NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE" }
+      - { name: "action", type: "TEXT", constraints: "NOT NULL CHECK (action IN ('submitted', 'approved', 'rejected'))" }
+      - { name: "user_id", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "user_name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "user_role", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_po_approval_history_po ON po_approval_history(po_id)"
+      - "idx_po_approval_history_created ON po_approval_history(created_at DESC)"
+      - "idx_po_approval_history_org ON po_approval_history(org_id)"
+    constraints:
+      - "UNIQUE(org_id, id)"
+    notes:
+      - "user_name and user_role are denormalized for historical accuracy"
+      - "Append-only table - records never updated or deleted"
+      - "ON DELETE CASCADE from purchase_orders is acceptable for cleanup"
+
+  - name: "purchase_orders"
+    description: "Existing table - approval fields already defined in 03.3"
+    is_new: false
+    relevant_columns:
+      - { name: "status", type: "VARCHAR(20)", note: "Add 'pending_approval', 'approved', 'rejected' to CHECK constraint if not present" }
+      - { name: "approval_status", type: "VARCHAR(20)", note: "Values: pending, approved, rejected, null" }
+      - { name: "approved_by", type: "UUID", note: "References users(id)" }
+      - { name: "approved_at", type: "TIMESTAMPTZ", note: "Timestamp of approval/rejection" }
+      - { name: "approval_notes", type: "TEXT", note: "Approval notes or rejection reason" }
+    notes:
+      - "These fields already exist per 03.3 schema"
+      - "No migration needed for purchase_orders table itself"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "po_approval_history"
+      name: "po_approval_history_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "po_approval_history"
+      name: "po_approval_history_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "po_approval_history"
+      name: "po_approval_history_no_update"
+      operation: "UPDATE"
+      using: "false"
+      note: "Append-only - no updates allowed"
+
+    - table: "po_approval_history"
+      name: "po_approval_history_no_delete"
+      operation: "DELETE"
+      using: "false"
+      note: "Append-only - no manual deletes (CASCADE from PO allowed)"
+
+# SQL Template
+sql_template: |
+  -- Migration: Create PO Approval History Table
+  -- Story: 03.5b - PO Approval Workflow
+  -- Date: YYYY-MM-DD
+
+  -- Create approval history table
+  CREATE TABLE po_approval_history (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id            UUID NOT NULL REFERENCES organizations(id),
+    po_id             UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+    action            TEXT NOT NULL CHECK (action IN ('submitted', 'approved', 'rejected')),
+    user_id           UUID NOT NULL REFERENCES users(id),
+    user_name         TEXT NOT NULL,
+    user_role         TEXT NOT NULL,
+    notes             TEXT,
+    created_at        TIMESTAMPTZ DEFAULT now(),
+
+    CONSTRAINT po_approval_history_org_unique UNIQUE(org_id, id)
+  );
+
+  -- Indexes
+  CREATE INDEX idx_po_approval_history_po ON po_approval_history(po_id);
+  CREATE INDEX idx_po_approval_history_created ON po_approval_history(created_at DESC);
+  CREATE INDEX idx_po_approval_history_org ON po_approval_history(org_id);
+
+  -- Enable RLS
+  ALTER TABLE po_approval_history ENABLE ROW LEVEL SECURITY;
+
+  -- RLS Policies
+  CREATE POLICY "po_approval_history_select"
+  ON po_approval_history FOR SELECT
+  TO authenticated
+  USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "po_approval_history_insert"
+  ON po_approval_history FOR INSERT
+  TO authenticated
+  WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  -- Append-only: No updates or deletes
+  CREATE POLICY "po_approval_history_no_update"
+  ON po_approval_history FOR UPDATE
+  TO authenticated
+  USING (false);
+
+  CREATE POLICY "po_approval_history_no_delete"
+  ON po_approval_history FOR DELETE
+  TO authenticated
+  USING (false);
+
+  -- Comment
+  COMMENT ON TABLE po_approval_history IS 'Tracks PO approval workflow actions (submit, approve, reject)';
+
+# Type Definitions
+types:
+  - name: "POApprovalAction"
+    typescript: "'submitted' | 'approved' | 'rejected'"
+
+  - name: "POApprovalHistory"
+    typescript: |
+      interface POApprovalHistory {
+        id: string;
+        org_id: string;
+        po_id: string;
+        action: POApprovalAction;
+        user_id: string;
+        user_name: string;
+        user_role: string;
+        notes: string | null;
+        created_at: string;
+      }
+
+  - name: "POApprovalStatus"
+    typescript: "'pending' | 'approved' | 'rejected' | null"
+
+# Validation Notes
+validation_notes:
+  - "po_id must reference valid PO in same org"
+  - "user_id must reference valid user in same org"
+  - "action must be one of: submitted, approved, rejected"
+  - "user_name cannot be empty"
+  - "user_role cannot be empty"

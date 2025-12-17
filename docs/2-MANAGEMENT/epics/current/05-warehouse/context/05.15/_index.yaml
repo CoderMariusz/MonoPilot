@@ -1,0 +1,127 @@
+# Story 05.15 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.15"
+  name: "Over-Receipt Handling (Advanced)"
+  slug: "over-receipt-handling"
+  epic: "05-warehouse"
+  phase: "Phase 1 (Goods Receipt)"
+  complexity: "S"
+  estimate_days: 2
+  type: "backend+frontend"
+  state: "ready"
+  model: "SONNET"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Pages, components, UX
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Relationship to 05.13
+related_stories:
+  complementary:
+    - story: "05.13"
+      name: "Over-Receipt Control (Basic)"
+      relationship: "05.13 provides basic validation logic; 05.15 adds approval workflow"
+      differentiation:
+        - "05.13: Backend validation only (block/allow based on tolerance)"
+        - "05.15: Full workflow with settings UI, approval system, manager approval page"
+        - "05.13 explicitly defers approval workflow to 'Phase 2+' - which is 05.15"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.13"
+      name: "Over-Receipt Control"
+      provides: ["validateOverReceipt()", "calculateOverReceiptPercentage()"]
+      status: "ready"
+    - story: "05.11"
+      name: "GRN from PO"
+      provides: ["grns table", "grn_items table", "GRNService"]
+      status: "ready"
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings table"]
+      status: "ready"
+    - story: "01.1"
+      name: "Org Context + RLS"
+      provides: ["org_id context", "RLS patterns"]
+      status: "done"
+    - story: "01.2"
+      name: "User Management"
+      provides: ["users table for approver reference"]
+      status: "done"
+  blocked_by: []
+  blocks:
+    - story: "05.12"
+      name: "GRN from TO"
+      reason: "Same over-receipt logic for transfers"
+    - story: "05.19"
+      name: "Scanner Receive"
+      reason: "Mobile over-receipt handling"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-029", "WH-FR-003"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.15.over-receipt-handling.md"
+  related_story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.13.over-receipt-control.md"
+  patterns:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for approvals table"
+    - path: "apps/frontend/lib/services/grn-service.ts"
+      relevance: "Existing GRN service to integrate with"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 3
+    description: "Add settings columns, create approvals table, add FK to grn_items"
+  - type: "service"
+    count: 1
+    description: "OverReceiptService with validation, approval, review methods"
+  - type: "api"
+    count: 6
+    description: "Validation endpoint + CRUD for approvals + approve/reject actions"
+  - type: "validation"
+    count: 5
+    description: "Zod schemas for validation, approval request, review actions, list query"
+  - type: "pages"
+    count: 2
+    description: "Warehouse settings (enhanced), Approval list page"
+  - type: "components"
+    count: 8
+    description: "Warning/error banners, modals, data table, status displays"
+  - type: "test"
+    count: 4
+    description: "Unit, integration, permission, E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Extends 05.13 basic validation with full approval workflow"
+  - "Manager approval required when over-receipt exceeds tolerance"
+  - "Single pending approval per PO line (enforced by unique constraint)"
+  - "GRN integration checks for approved over-receipt before creating"
+  - "Use ADR-013 RLS pattern for org isolation on approvals"
+  - "Role-based write protection: only warehouse_manager/admin can approve"
+
+# Business rules summary
+business_rules:
+  - "Tolerance Range: 0-100%"
+  - "allow_over_receipt=false: Block all over-receipt"
+  - "allow_over_receipt=true + within tolerance: Allow with warning"
+  - "allow_over_receipt=true + exceeds tolerance: Require approval"
+  - "Only warehouse_manager/admin can approve/reject"
+  - "Single pending approval per PO line at a time"
+  - "Rejection requires review notes"
+  - "All over-receipt events logged for audit"

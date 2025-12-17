@@ -1,0 +1,198 @@
+# Story 02.9 - Database Schema
+# Purpose: Document existing tables and fields used for costing
+# Agent: BACKEND-DEV (database focus)
+# Note: No new migrations - uses existing schema from migrations 043, 045, 046
+
+# Existing migrations used (DO NOT CREATE NEW)
+migrations:
+  existing:
+    - path: "supabase/migrations/043_add_routing_costs.sql"
+      type: "existing"
+      description: "Routing cost fields (setup_cost, working_cost_per_unit, overhead_percent, currency)"
+      status: "deployed"
+    - path: "supabase/migrations/045_add_routing_id_to_boms.sql"
+      type: "existing"
+      description: "boms.routing_id FK to routings table"
+      status: "deployed"
+    - path: "supabase/migrations/046_add_product_pricing.sql"
+      type: "existing"
+      description: "products.std_price, products.expiry_policy"
+      status: "deployed"
+
+# Tables referenced (not created - already exist)
+tables:
+  - name: "routings"
+    description: "Routing definitions with cost fields (ADR-009)"
+    relevant_columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "code", type: "VARCHAR(50)", constraints: "UNIQUE per org" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "setup_cost", type: "DECIMAL(10,2)", constraints: "DEFAULT 0", description: "Fixed cost per routing run (tooling, changeover)" }
+      - { name: "working_cost_per_unit", type: "DECIMAL(10,4)", constraints: "DEFAULT 0", description: "Variable cost per output unit" }
+      - { name: "overhead_percent", type: "DECIMAL(5,2)", constraints: "DEFAULT 0", description: "Overhead % applied to subtotal" }
+      - { name: "currency", type: "TEXT", constraints: "DEFAULT 'PLN'", description: "Cost currency" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_routings_org_code ON routings(org_id, code)"
+
+  - name: "routing_operations"
+    description: "Operations within a routing with labor costs"
+    relevant_columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "routing_id", type: "UUID", constraints: "NOT NULL REFERENCES routings(id)" }
+      - { name: "sequence", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "duration", type: "INTEGER", constraints: "", description: "Run time in minutes" }
+      - { name: "setup_time", type: "INTEGER", constraints: "DEFAULT 0", description: "Setup time in minutes" }
+      - { name: "cleanup_time", type: "INTEGER", constraints: "DEFAULT 0", description: "Cleanup time in minutes" }
+      - { name: "labor_cost_per_hour", type: "DECIMAL(15,4)", constraints: "", description: "Labor rate per hour" }
+      - { name: "machine_id", type: "UUID", constraints: "REFERENCES machines(id)" }
+    rls: false  # Accessed via routing RLS
+    indexes:
+      - "idx_routing_operations_routing ON routing_operations(routing_id)"
+
+  - name: "boms"
+    description: "Bill of Materials with routing reference"
+    relevant_columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "routing_id", type: "UUID", constraints: "REFERENCES routings(id)", description: "Migration 045 - links BOM to routing" }
+      - { name: "output_qty", type: "DECIMAL(15,4)", constraints: "DEFAULT 1", description: "Batch output quantity" }
+      - { name: "output_uom", type: "TEXT", constraints: "NOT NULL" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_boms_routing_id ON boms(routing_id)"
+
+  - name: "bom_items"
+    description: "BOM ingredients/components"
+    relevant_columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "bom_id", type: "UUID", constraints: "NOT NULL REFERENCES boms(id)" }
+      - { name: "component_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)", description: "Ingredient product" }
+      - { name: "quantity", type: "DECIMAL(15,6)", constraints: "NOT NULL, >0" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "scrap_percent", type: "DECIMAL(5,2)", constraints: "DEFAULT 0" }
+      - { name: "operation_seq", type: "INTEGER", constraints: "", description: "Links to routing operation sequence" }
+    rls: false  # Accessed via BOM RLS
+    indexes:
+      - "idx_bom_items_bom ON bom_items(bom_id)"
+      - "idx_bom_items_component ON bom_items(component_id)"
+
+  - name: "bom_production_lines"
+    description: "BOM to production line assignments with labor cost override"
+    relevant_columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "bom_id", type: "UUID", constraints: "NOT NULL REFERENCES boms(id)" }
+      - { name: "line_id", type: "UUID", constraints: "NOT NULL REFERENCES production_lines(id)" }
+      - { name: "labor_cost_per_hour", type: "DECIMAL(15,4)", constraints: "", description: "Line-specific labor rate override" }
+    rls: false  # Accessed via BOM RLS
+
+  - name: "products"
+    description: "Product master with cost and pricing fields"
+    relevant_columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "code", type: "TEXT", constraints: "NOT NULL (SKU)" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "cost_per_unit", type: "DECIMAL(15,4)", constraints: "", description: "Unit cost for costing calculations (used as ingredient cost)" }
+      - { name: "std_price", type: "DECIMAL(15,4)", constraints: "", description: "Standard selling price for margin analysis (migration 046)" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL (base UoM)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - name: "product_costs"
+    description: "Calculated costs storage with effective dates"
+    relevant_columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "cost_type", type: "TEXT", constraints: "NOT NULL", description: "standard, actual, planned" }
+      - { name: "material_cost", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "labor_cost", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "overhead_cost", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "total_cost", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "effective_from", type: "DATE", constraints: "NOT NULL" }
+      - { name: "effective_to", type: "DATE", constraints: "" }
+      - { name: "calculation_method", type: "TEXT", constraints: "", description: "bom_routing, actual_production, manual" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Cost Calculation Data Flow
+data_flow:
+  ingredient_cost_source:
+    description: "products.cost_per_unit field is the source for ingredient costs"
+    lookup: "SELECT cost_per_unit FROM products WHERE id = bom_items.component_id"
+    note: "NOT a separate ingredient_costs table - costs are on products"
+
+  labor_rate_hierarchy:
+    description: "Labor rate lookup order (first non-null wins)"
+    priority:
+      1: "bom_production_lines.labor_cost_per_hour (line-specific override)"
+      2: "routing_operations.labor_cost_per_hour (operation default)"
+      3: "org_settings.default_labor_rate (org default - fallback)"
+
+  routing_cost_fields:
+    description: "ADR-009 routing-level cost fields"
+    fields:
+      setup_cost: "Fixed per routing run (tooling, changeover) - added once per batch"
+      working_cost_per_unit: "Variable per output unit - multiplied by batch quantity"
+      overhead_percent: "Percentage applied to subtotal after all other costs"
+      currency: "Currency code for all cost fields (default PLN)"
+
+# Cost Formula Documentation
+cost_formula:
+  description: |
+    Total Cost = Material Cost + Labor Cost + Routing Costs + Overhead
+
+    Where:
+    - Material Cost = SUM(bom_item.quantity * (1 + scrap_percent/100) * ingredient.cost_per_unit)
+    - Labor Cost = SUM((op.duration + op.setup_time + op.cleanup_time) / 60 * op.labor_cost_per_hour)
+    - Routing Setup Cost = routing.setup_cost (fixed per batch)
+    - Routing Working Cost = routing.working_cost_per_unit * batch_qty
+    - Subtotal = Material + Labor + Setup + Working
+    - Overhead = Subtotal * (routing.overhead_percent / 100)
+    - Total = Subtotal + Overhead
+    - Cost Per Unit = Total / batch_qty
+
+  example: |
+    Given:
+      - Material Cost: $185.50
+      - Labor Cost: $42.00
+      - Routing Setup Cost: $50.00
+      - Routing Working Cost: $15.00 (0.15 * 100 kg)
+      - Overhead: 12%
+
+    Calculation:
+      Subtotal = 185.50 + 42.00 + 50.00 + 15.00 = $292.50
+      Overhead = 292.50 * 0.12 = $35.10
+      Total = 292.50 + 35.10 = $327.60
+      Cost per kg = 327.60 / 100 = $3.28
+
+# Database Constraints Used
+constraints:
+  - table: "bom_items"
+    constraint: "CHECK (quantity > 0)"
+    description: "Quantity must be positive (migration 049)"
+  - table: "bom_items"
+    constraint: "Trigger: validate_uom_match"
+    description: "Warning if UoM != component base UoM (migration 049)"
+  - table: "routings"
+    constraint: "UNIQUE(org_id, code)"
+    description: "Routing code must be unique per org"
+  - table: "boms"
+    constraint: "FK: routing_id REFERENCES routings(id)"
+    description: "BOM can reference one routing (migration 045)"
+
+# Indexes for Cost Calculation Performance
+performance_indexes:
+  - "idx_bom_items_bom ON bom_items(bom_id)"
+  - "idx_bom_items_component ON bom_items(component_id)"
+  - "idx_routing_operations_routing ON routing_operations(routing_id)"
+  - "idx_boms_routing_id ON boms(routing_id)"
+  - "idx_products_org_id ON products(org_id)"

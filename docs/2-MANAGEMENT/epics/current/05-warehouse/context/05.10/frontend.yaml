@@ -1,0 +1,334 @@
+# Story 05.10 - Frontend Specification
+# Purpose: Pages, components, hooks, UI patterns
+# Agent: FRONTEND-DEV
+
+# Page Routes
+pages:
+  - path: "apps/frontend/app/(authenticated)/warehouse/receiving/page.tsx"
+    description: "GRN list page with DataTable"
+    route: "/warehouse/receiving"
+    features:
+      - "DataTable with sorting, pagination"
+      - "Filter panel (status, source, date, warehouse)"
+      - "Search by GRN number (debounced)"
+      - "Action buttons (New GRN, filters)"
+      - "Status badges, source badges"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/receiving/new/page.tsx"
+    description: "GRN creation page"
+    route: "/warehouse/receiving/new"
+    features:
+      - "Source type selector"
+      - "Warehouse/location dropdowns"
+      - "Items entry table (add/remove items)"
+      - "Product selector with search"
+      - "Save as Draft / Save and Complete actions"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/receiving/[id]/page.tsx"
+    description: "GRN detail page (view mode)"
+    route: "/warehouse/receiving/{id}"
+    features:
+      - "GRN header info (number, date, status, source, warehouse)"
+      - "Items table with LP links"
+      - "Action buttons (Edit, Complete, Cancel, Print)"
+      - "Status-dependent button visibility"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/receiving/[id]/edit/page.tsx"
+    description: "GRN edit page (draft only)"
+    route: "/warehouse/receiving/{id}/edit"
+    features:
+      - "Editable GRN form"
+      - "Add/update/remove items"
+      - "Save Changes action"
+
+# Components
+components:
+  location: "apps/frontend/components/warehouse/grn/"
+  items:
+    - name: "GRNDataTable.tsx"
+      description: "DataTable with sorting, pagination, row actions"
+      props:
+        - "data: GRN[]"
+        - "pagination: PaginationMeta"
+        - "onPageChange: (page: number) => void"
+        - "onSort: (column: string, order: 'asc' | 'desc') => void"
+      columns:
+        - { name: "grn_number", label: "GRN Number", sortable: true }
+        - { name: "source_type", label: "Source", sortable: true }
+        - { name: "supplier/reference", label: "Supplier/Ref", sortable: false }
+        - { name: "total_items", label: "Items", sortable: true }
+        - { name: "total_qty", label: "Total Qty", sortable: true }
+        - { name: "status", label: "Status", sortable: true }
+        - { name: "receipt_date", label: "Receipt Date", sortable: true }
+        - { name: "actions", label: "", sortable: false }
+
+    - name: "GRNFilters.tsx"
+      description: "Filter panel with status, source, date range, warehouse selectors"
+      props:
+        - "filters: GRNListParams"
+        - "onFilterChange: (filters: GRNListParams) => void"
+      elements:
+        - "Status select (All, Draft, Completed, Cancelled)"
+        - "Source type select (All, PO, TO, Production, Return, Adjustment)"
+        - "Date range picker (from_date, to_date)"
+        - "Warehouse select"
+        - "Clear filters button"
+
+    - name: "GRNSearchInput.tsx"
+      description: "GRN number search with 300ms debounce"
+      props:
+        - "value: string"
+        - "onChange: (value: string) => void"
+      behavior:
+        - "Debounce 300ms before triggering search"
+        - "Clear button when value present"
+        - "Search icon"
+
+    - name: "GRNStatusBadge.tsx"
+      description: "Status badge with color coding"
+      props:
+        - "status: GRNStatus"
+      colors:
+        draft: "bg-yellow-100 text-yellow-800"
+        completed: "bg-green-100 text-green-800"
+        cancelled: "bg-gray-100 text-gray-500"
+
+    - name: "GRNSourceBadge.tsx"
+      description: "Source type badge with icon"
+      props:
+        - "sourceType: GRNSourceType"
+      icons:
+        po: "Package (blue)"
+        to: "Truck (purple)"
+        production: "Factory (orange)"
+        return: "Undo (yellow)"
+        adjustment: "PlusMinus (gray)"
+
+    - name: "GRNForm.tsx"
+      description: "Create/edit form for GRN"
+      props:
+        - "initialData?: GRN"
+        - "onSubmit: (data: CreateGRNInput | UpdateGRNInput) => void"
+        - "isLoading: boolean"
+        - "mode: 'create' | 'edit'"
+      sections:
+        - "Source type selector (create only)"
+        - "Receipt information (location, date, notes)"
+        - "Items entry table"
+
+    - name: "GRNItemsTable.tsx"
+      description: "Editable items table for GRN form"
+      props:
+        - "items: CreateGRNItemInput[]"
+        - "onChange: (items: CreateGRNItemInput[]) => void"
+        - "readOnly: boolean"
+      features:
+        - "Add row button"
+        - "Remove row button per row"
+        - "Inline editing (qty, batch, expiry, location, qa_status)"
+        - "Product selector per row"
+
+    - name: "GRNItemRow.tsx"
+      description: "Single item row with inline editing"
+      props:
+        - "item: CreateGRNItemInput"
+        - "index: number"
+        - "onChange: (item: CreateGRNItemInput) => void"
+        - "onRemove: () => void"
+        - "readOnly: boolean"
+
+    - name: "GRNProductSelector.tsx"
+      description: "Product search/select dropdown"
+      props:
+        - "value: string | null"
+        - "onChange: (productId: string, product: Product) => void"
+      features:
+        - "Search by name/code"
+        - "Display product name and code"
+        - "Auto-populate UoM on selection"
+
+    - name: "GRNDetailHeader.tsx"
+      description: "GRN header section on detail page"
+      props:
+        - "grn: GRN"
+      displays:
+        - "GRN number, status badge"
+        - "Receipt date, warehouse, location"
+        - "Source type and reference (PO/TO number)"
+        - "Total items and quantity"
+        - "Created/completed/cancelled by info"
+
+    - name: "GRNDetailItems.tsx"
+      description: "Read-only items list on detail page"
+      props:
+        - "items: GRNItem[]"
+      columns:
+        - "Line #"
+        - "Product (name, code)"
+        - "Qty / UoM"
+        - "Batch"
+        - "Expiry"
+        - "Location"
+        - "QA Status"
+        - "LP Number (link)"
+
+    - name: "GRNDetailActions.tsx"
+      description: "Action buttons on detail page"
+      props:
+        - "grn: GRN"
+        - "onEdit: () => void"
+        - "onComplete: () => void"
+        - "onCancel: () => void"
+        - "onPrint: () => void"
+      buttons:
+        - { name: "Edit", visible: "status === 'draft'", variant: "outline" }
+        - { name: "Complete", visible: "status === 'draft'", variant: "default" }
+        - { name: "Cancel", visible: "status !== 'cancelled'", variant: "destructive" }
+        - { name: "Print", visible: "always", variant: "outline" }
+
+    - name: "GRNPrintView.tsx"
+      description: "Print-friendly layout"
+      props:
+        - "grn: GRN"
+      content:
+        - "GRN number, date, status"
+        - "Source reference"
+        - "Items table (batch, expiry, qty)"
+        - "Total items and quantity"
+
+    - name: "GRNEmptyState.tsx"
+      description: "No GRNs message"
+      content:
+        - "Icon (Package)"
+        - "Title: No Goods Receipt Notes"
+        - "Description: Create your first GRN to track incoming inventory"
+        - "Action: Create GRN button"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-grns.ts"
+    description: "React Query hooks for GRN operations"
+    exports:
+      - name: "useGRNs"
+        type: "hook"
+        params: ["params: GRNListParams"]
+        returns: "UseQueryResult<PaginatedResult<GRN>>"
+        queryKey: "['grns', params]"
+
+      - name: "useGRN"
+        type: "hook"
+        params: ["id: string"]
+        returns: "UseQueryResult<GRN>"
+        queryKey: "['grns', id]"
+
+      - name: "useCreateGRN"
+        type: "hook"
+        returns: "UseMutationResult<GRN, Error, CreateGRNInput>"
+        invalidates: "['grns']"
+
+      - name: "useUpdateGRN"
+        type: "hook"
+        returns: "UseMutationResult<GRN, Error, { id: string; data: UpdateGRNInput }>"
+        invalidates: "['grns', id]"
+
+      - name: "useCompleteGRN"
+        type: "hook"
+        returns: "UseMutationResult<CompleteGRNResult, Error, string>"
+        invalidates: "['grns', id]"
+
+      - name: "useCancelGRN"
+        type: "hook"
+        returns: "UseMutationResult<GRN, Error, { id: string; reason: string }>"
+        invalidates: "['grns', id]"
+
+      - name: "useAddGRNItem"
+        type: "hook"
+        returns: "UseMutationResult<GRNItem, Error, { grnId: string; item: CreateGRNItemInput }>"
+        invalidates: "['grns', grnId]"
+
+      - name: "useUpdateGRNItem"
+        type: "hook"
+        returns: "UseMutationResult<GRNItem, Error, { grnId: string; itemId: string; data: UpdateGRNItemInput }>"
+        invalidates: "['grns', grnId]"
+
+      - name: "useRemoveGRNItem"
+        type: "hook"
+        returns: "UseMutationResult<void, Error, { grnId: string; itemId: string }>"
+        invalidates: "['grns', grnId]"
+
+# UX References
+ux:
+  wireframes:
+    - id: "WH-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-004-grn-from-po-modal.md"
+      relevance: "GRN creation flow, item entry, validation patterns"
+      components_used:
+        - "GRNForm"
+        - "GRNItemsTable"
+        - "GRNProductSelector"
+        - "GRNStatusBadge"
+
+  patterns:
+    table: "ShadCN DataTable with TanStack Table"
+    modal: "ShadCN Dialog for confirmations"
+    form: "react-hook-form with Zod resolver"
+    toast: "ShadCN Toast for success/error messages"
+    badge: "ShadCN Badge with custom colors"
+    button: "ShadCN Button with variants"
+    select: "ShadCN Select with search (for products)"
+    date_picker: "ShadCN DatePicker"
+
+  states:
+    - name: "loading"
+      description: "Skeleton loading for table and forms"
+    - name: "empty"
+      description: "GRNEmptyState when no GRNs exist"
+    - name: "error"
+      description: "Error boundary with retry button"
+    - name: "success"
+      description: "Toast notification on success"
+
+  validation_display:
+    - "Inline field errors below inputs"
+    - "Error summary at form top for submit errors"
+    - "Red border on invalid fields"
+    - "Disabled submit button when form invalid"
+
+# Responsive Breakpoints
+responsive:
+  desktop: ">1024px"
+  tablet: "768-1024px"
+  mobile: "<768px"
+  notes:
+    - "DataTable horizontal scroll on mobile"
+    - "Filter panel collapsible on mobile"
+    - "Form fields stack on mobile"
+    - "Action buttons stack on mobile"
+
+# Accessibility
+accessibility:
+  touch_targets: "48dp minimum"
+  contrast: "4.5:1 minimum"
+  wcag_level: "AA"
+  keyboard_navigation: "full support"
+  screen_reader:
+    - "GRN list: Goods Receipt Notes table, {count} items"
+    - "Status: Status {status}"
+    - "Actions: Edit GRN, Complete GRN, Cancel GRN, Print GRN"
+  focus:
+    - "Visible focus ring on all interactive elements"
+    - "Focus trap in modals"
+    - "Return focus to trigger on modal close"
+
+# Performance
+performance:
+  targets:
+    - "Page load: <500ms"
+    - "List render: <300ms"
+    - "Form validation: <50ms (client-side)"
+    - "Search debounce: 300ms"
+  optimizations:
+    - "React Query caching (staleTime: 30s)"
+    - "Virtualized list for large item tables"
+    - "Lazy load detail page"
+    - "Optimistic updates for item operations"

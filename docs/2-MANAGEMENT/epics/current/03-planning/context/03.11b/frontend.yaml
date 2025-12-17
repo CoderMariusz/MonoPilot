@@ -1,0 +1,290 @@
+# Story 03.11b - Frontend Specification
+# Purpose: Components, hooks, types, UX patterns
+# Agent: FRONTEND-DEV
+# Status: DEFERRED - Requires Epic 05
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/wo-reservation.ts"
+    content: |
+      export interface WOMaterialReservation {
+        id: string;
+        org_id: string;
+        wo_material_id: string;
+        lp_id: string;
+        reserved_qty: number;
+        status: ReservationStatus;
+        reserved_at: string;
+        released_at: string | null;
+        consumed_at: string | null;
+        reserved_by: string | null;
+        released_by: string | null;
+        notes: string | null;
+        created_at: string;
+        // Joined fields
+        lp_number?: string;
+        location_name?: string | null;
+        expiry_date?: string | null;
+      }
+
+      export type ReservationStatus = 'active' | 'released' | 'consumed';
+
+      export interface AvailableLP {
+        id: string;
+        lp_number: string;
+        quantity: number;
+        available_qty: number;  // quantity minus existing reservations
+        location: string;
+        expiry_date: string | null;
+        created_at: string;
+      }
+
+      export interface ReservationResult {
+        success: boolean;
+        materials_processed: number;
+        fully_reserved: number;
+        partially_reserved: number;
+        shortages: MaterialShortage[];
+      }
+
+      export interface MaterialShortage {
+        material_name: string;
+        required_qty: number;
+        reserved_qty: number;
+        shortage: number;
+      }
+
+      export interface ReservationCoverage {
+        percent: number;
+        shortage: number;
+        status: 'full' | 'partial' | 'none';
+      }
+
+      export interface LPSelection {
+        lp_id: string;
+        lp_number: string;
+        quantity: number;
+      }
+
+# Components
+components:
+  - path: "apps/frontend/components/planning/work-orders/ReservedLPsList.tsx"
+    description: "List of reserved LPs per material (expandable row content)"
+    props:
+      woMaterialId: "string"
+      woId: "string"
+      canModify: "boolean"
+      onReleased: "() => void"
+    features:
+      - "DataTable showing reserved LPs"
+      - "Columns: LP Number, Location, Quantity, Expiry, Actions"
+      - "Release button per row (if canModify)"
+      - "Empty state: 'No LPs reserved' with Reserve button"
+      - "Loading skeleton"
+    pattern: "ShadCN DataTable with expansion"
+
+  - path: "apps/frontend/components/planning/work-orders/ReservedLPRow.tsx"
+    description: "Single LP reservation row with release action"
+    props:
+      reservation: "WOMaterialReservation"
+      canModify: "boolean"
+      onRelease: "(reservationId: string) => void"
+    features:
+      - "Display LP number, location, quantity, expiry"
+      - "Release button with confirmation dialog"
+      - "Visual indicator if LP over-reserved"
+
+  - path: "apps/frontend/components/planning/work-orders/ReserveLPModal.tsx"
+    description: "Modal for manual LP selection and reservation"
+    props:
+      woId: "string"
+      woMaterialId: "string"
+      productId: "string"
+      requiredQty: "number"
+      currentReservedQty: "number"
+      open: "boolean"
+      onOpenChange: "(open: boolean) => void"
+      onReserved: "() => void"
+    features:
+      - "ShadCN Dialog"
+      - "AvailableLPsTable for LP selection"
+      - "Quantity input per selected LP"
+      - "Multi-select LPs for batch reservation"
+      - "Validation: cannot reserve more than LP available"
+      - "Warning for over-reservation (soft)"
+      - "Submit creates reservations via API"
+
+  - path: "apps/frontend/components/planning/work-orders/AvailableLPsTable.tsx"
+    description: "Table of available LPs for selection"
+    props:
+      productId: "string"
+      warehouseId: "string"
+      algorithm: "'fifo' | 'fefo'"
+      onSelect: "(lps: AvailableLP[]) => void"
+      selectedLps: "string[]"
+    features:
+      - "ShadCN DataTable with checkbox selection"
+      - "Columns: Select, LP Number, Available Qty, Location, Expiry, Receipt Date"
+      - "Sorted by FIFO/FEFO algorithm"
+      - "Row highlighting for over-reserved LPs"
+      - "Empty state: 'No available LPs for this material'"
+
+  - path: "apps/frontend/components/planning/work-orders/ReservationStatusBadge.tsx"
+    description: "Badge showing reservation coverage status"
+    props:
+      requiredQty: "number"
+      reservedQty: "number"
+      variant: "'default' | 'compact'"
+    features:
+      - "Green badge: 'Reserved' (100% coverage)"
+      - "Yellow badge: 'Partially Reserved (X/Y kg)'"
+      - "Gray badge: 'Not Reserved'"
+      - "Red warning: 'Short X kg' if shortage"
+      - "Compact variant for table cells"
+
+  - path: "apps/frontend/components/planning/work-orders/WOMaterialRow.tsx"
+    description: "Updated material row with expand/collapse for reservations"
+    updates:
+      - "Add expand/collapse chevron"
+      - "Show Reserved column with count and ReservationStatusBadge"
+      - "Expanded content: ReservedLPsList"
+      - "Reserve button opens ReserveLPModal"
+    existing_path: "apps/frontend/components/planning/work-orders/WOMaterialRow.tsx"
+
+  - path: "apps/frontend/components/planning/work-orders/WOMaterialsTable.tsx"
+    description: "Updated materials table with reservation support"
+    updates:
+      - "Add Reserved column"
+      - "Show LP count per material"
+      - "Support row expansion for reservations"
+      - "Reserve Materials quick action button"
+    existing_path: "apps/frontend/components/planning/work-orders/WOMaterialsTable.tsx"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-wo-reservations.ts"
+    description: "React Query hooks for WO reservations"
+    exports:
+      - name: "useWOMaterialReservations"
+        params: ["woId: string", "materialId: string"]
+        returns: "UseQueryResult<WOMaterialReservation[]>"
+      - name: "useAvailableLPs"
+        params: ["woId: string", "materialId: string"]
+        returns: "UseQueryResult<AvailableLP[]>"
+      - name: "useCreateReservation"
+        returns: "UseMutationResult<void, Error, CreateReservationParams>"
+      - name: "useReleaseReservation"
+        returns: "UseMutationResult<void, Error, string>"
+      - name: "useReserveAllMaterials"
+        params: ["woId: string"]
+        returns: "UseMutationResult<ReservationResult>"
+
+# UX Patterns from Wireframe
+ux:
+  wireframes:
+    - id: "PLAN-015"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-015-work-order-detail.md"
+      sections: ["Materials Tab", "Materials Table Columns"]
+      components:
+        - "WOMaterialsTable"
+        - "WOMaterialRow"
+        - "ReservedLPsList"
+        - "ReserveLPModal"
+
+  patterns:
+    table: "ShadCN DataTable with row expansion"
+    modal: "ShadCN Dialog with form"
+    badge: "ShadCN Badge with variants"
+    button: "ShadCN Button with loading state"
+    skeleton: "ShadCN Skeleton for loading"
+    alert: "ShadCN Alert for warnings"
+
+  states:
+    - name: "loading"
+      description: "Skeleton loading for reservations list"
+    - name: "empty"
+      description: "'No LPs reserved' with Reserve button"
+    - name: "error"
+      description: "Error alert with retry button"
+    - name: "success"
+      description: "Reservations displayed with actions"
+    - name: "partial"
+      description: "Yellow warning for partial coverage"
+    - name: "shortage"
+      description: "Red alert for shortage"
+
+  accessibility:
+    touch_targets: "48dp minimum for all buttons"
+    contrast: "4.5:1 for text and badges"
+    screen_reader:
+      - "Expandable rows announced as 'Material row, expandable'"
+      - "Badge content read: 'Reserved 80 of 100 kilograms'"
+      - "Release button: 'Release reservation for LP-2024-001'"
+    keyboard:
+      - "Tab: Navigate between rows and actions"
+      - "Enter: Expand/collapse row, activate buttons"
+      - "Escape: Close modal"
+
+  responsive:
+    desktop:
+      description: "Full table with all columns visible"
+      columns: ["#", "Material", "Required", "Reserved", "Consumed", "Remaining", "Status", "Actions"]
+    tablet:
+      description: "Condensed columns, expandable details"
+      columns: ["Material", "Required", "Reserved", "Actions"]
+    mobile:
+      description: "Card-based layout per material"
+      layout: "Stacked cards with expand for reservations"
+
+# Page Updates
+pages:
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/[id]/page.tsx"
+    updates:
+      - "Import new reservation components"
+      - "Pass canModify prop based on WO status"
+      - "Handle reservation callbacks for refetch"
+
+# Quick Actions
+quick_actions:
+  - name: "Reserve Materials"
+    location: "WO Detail page - Quick Actions section"
+    visible_when: "WO status IN ('planned', 'released')"
+    action: "Triggers POST /api/planning/work-orders/:id/reserve-all"
+    result: "Shows ReservationResult with shortages if any"
+
+  - name: "Release" (per LP)
+    location: "ReservedLPsList row"
+    visible_when: "canModify && reservation.status === 'active'"
+    action: "DELETE /api/planning/work-orders/:id/reservations/:reservationId"
+    confirmation: "ShadCN AlertDialog: 'Release this LP reservation?'"
+
+# Visual Indicators
+visual_indicators:
+  reservation_status:
+    full:
+      badge: "green"
+      icon: "CheckCircle"
+      text: "Reserved"
+    partial:
+      badge: "yellow"
+      icon: "AlertCircle"
+      text: "Partially Reserved (X/Y)"
+    none:
+      badge: "gray"
+      icon: "Circle"
+      text: "Not Reserved"
+    shortage:
+      badge: "red"
+      icon: "XCircle"
+      text: "Short X kg"
+
+  lp_status:
+    available:
+      color: "default"
+      description: "LP available for reservation"
+    over_reserved:
+      color: "warning"
+      description: "LP reserved by multiple WOs (soft)"
+    low_qty:
+      color: "warning"
+      description: "LP available qty < 20% of original"

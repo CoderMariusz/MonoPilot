@@ -1,0 +1,115 @@
+# Story 03.6 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.6"
+  name: "PO Bulk Operations"
+  slug: "po-bulk-operations"
+  epic: "03-planning"
+  phase: "1"
+  complexity: "M"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables (none new), validation
+  - api.yaml         # Endpoints for bulk operations
+  - frontend.yaml    # Components, import wizard, export dialog
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table", "warehouse_id validation"]
+    - story: "01.13"
+      name: "Tax Codes CRUD"
+      provides: ["tax_codes table", "tax_code_id validation"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product lookup by code"]
+    - story: "03.1"
+      name: "Suppliers CRUD"
+      provides: ["suppliers table", "supplier defaults"]
+    - story: "03.2"
+      name: "Supplier-Product Assignment"
+      provides: ["supplier_products table", "default supplier lookup", "pricing"]
+    - story: "03.3"
+      name: "PO CRUD + Lines"
+      provides: ["purchase_orders table", "purchase_order_lines table", "PO creation logic"]
+    - story: "03.4"
+      name: "PO Totals + Tax Calculations"
+      provides: ["total calculations", "tax amount calculations"]
+  blocked_by:
+    - story: "03.3"
+      reason: "Bulk operations use PO creation foundation"
+  blocks:
+    - story: "03.5a"
+      name: "PO Approval Workflow - Backend"
+      reason: "Bulk approval builds on bulk operations"
+    - story: "03.5b"
+      name: "PO Approval Workflow - Frontend"
+      reason: "Bulk approval UI uses bulk action patterns"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections:
+      - "FR-PLAN-008"  # Bulk PO Creation
+      - "FR-PLAN-005"  # PO CRUD (extends)
+      - "Section 5.5"  # Bulk operations
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections:
+      - "Bulk Operations"
+      - "Import/Export"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.6.po-bulk-operations.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-004-po-list.md"
+      sections: ["Bulk Actions Bar", "Export", "Import"]
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-007-po-bulk-import.md"
+      description: "Complete 4-step import wizard"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "Context YAML structure pattern"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS pattern for bulk operations"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 5
+    description: "bulk-create, import/validate, import/execute, export, bulk-status-update"
+  - type: "service"
+    count: 2
+    description: "po-bulk-service.ts, excel-service.ts"
+  - type: "component"
+    count: 10
+    description: "Import wizard (4 steps), export dialog, bulk actions menu, etc."
+  - type: "validation"
+    count: 1
+    description: "po-bulk-schemas.ts (Zod schemas)"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Uses existing purchase_orders and purchase_order_lines tables from 03.3"
+  - "Auto-grouping by default supplier from supplier_products"
+  - "Transaction per supplier group - partial success allowed"
+  - "Excel export has 3 sheets: Summary, Lines, Metadata"
+  - "Import limit: 500 rows max, 5MB file size"
+  - "Export limit: 1000 POs max"
+  - "Use xlsx library for Excel parsing/generation"

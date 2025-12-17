@@ -1,0 +1,454 @@
+# Story 02.13 - Frontend Specification
+# Purpose: Components, hooks, types, UX references
+# Agent: FRONTEND-DEV
+
+# UX References
+ux:
+  wireframes:
+    - id: "TEC-009"
+      name: "Nutrition Facts Panel"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-009-nutrition-panel.md"
+      components:
+        - "NutritionPanelModal"
+        - "NutritionFactsPreview"
+        - "NutritionOverrideForm"
+        - "ServingCalculator"
+        - "LabelFormatSpec"
+      states: ["loading", "empty", "error", "success"]
+
+    - id: "TEC-011"
+      name: "Nutrition Calculator"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-011-nutrition-calculator.md"
+      components:
+        - "NutritionCalculator"
+        - "IngredientBreakdownTable"
+        - "YieldAdjustmentPanel"
+        - "NutritionComparisonTable"
+      states: ["loading", "empty", "error", "success"]
+
+  patterns:
+    modal: "ShadCN Dialog (xl size: 800px)"
+    table: "ShadCN Table with sortable columns"
+    form: "ShadCN Form with react-hook-form + zod"
+    toast: "ShadCN Toast for success/error messages"
+    tabs: "ShadCN Tabs for label format switching"
+
+  states:
+    - loading: "Spinner + 'Calculating nutrition from BOM...' with progress steps"
+    - empty: "'No Nutrition Data' card with CTA to enter manually"
+    - error: "Red banner with missing ingredients list + quick actions"
+    - success: "Nutrition panel with FDA label preview + actions"
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/technical/nutrition/NutritionPanelModal.tsx"
+    description: "Main modal for viewing/editing product nutrition"
+    props:
+      - { name: "productId", type: "string", required: true }
+      - { name: "productName", type: "string", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onOpenChange", type: "(open: boolean) => void", required: true }
+    features:
+      - "Auto-calculation status banner (calculated/manual override)"
+      - "Serving information inputs"
+      - "FDA label preview (NutritionFactsPreview)"
+      - "Actions: Recalculate, Override, Export PDF, Print Label"
+    wireframe: "TEC-009"
+
+  - path: "apps/frontend/components/technical/nutrition/NutritionFactsPreview.tsx"
+    description: "FDA 2016 format nutrition label display"
+    props:
+      - { name: "nutrition", type: "ProductNutrition", required: true }
+      - { name: "servingSize", type: "number", required: true }
+      - { name: "servingUnit", type: "string", required: true }
+      - { name: "servingsPerContainer", type: "number", required: false }
+    features:
+      - "FDA 2016 vertical format"
+      - "% Daily Value calculations"
+      - "Proper typography (Helvetica, sizes as spec)"
+      - "Responsive sizing"
+    wireframe: "TEC-009 (FDA 2016 Label Format Specification)"
+
+  - path: "apps/frontend/components/technical/nutrition/NutritionOverrideForm.tsx"
+    description: "Manual nutrition entry form"
+    props:
+      - { name: "defaultValues", type: "Partial<NutritionOverrideInput>", required: false }
+      - { name: "onSubmit", type: "(data: NutritionOverrideInput) => Promise<void>", required: true }
+      - { name: "isLoading", type: "boolean", required: false }
+    features:
+      - "All macronutrient fields with validation"
+      - "Optional micronutrient fields"
+      - "Source selection (Lab Test, Supplier CoA, Database, Manual)"
+      - "Reference field (required for lab_test/supplier_coa)"
+      - "Notes field"
+    wireframe: "TEC-009 (Manual Override section)"
+
+  - path: "apps/frontend/components/technical/nutrition/ServingCalculator.tsx"
+    description: "Serving size calculation modal"
+    props:
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onOpenChange", type: "(open: boolean) => void", required: true }
+      - { name: "productCategory", type: "string", required: false }
+      - { name: "onApply", type: "(serving: ServingSize) => void", required: true }
+    features:
+      - "4 calculation methods: weight, dimensions, volume, manual"
+      - "Quick-select common serving sizes"
+      - "FDA RACC lookup and validation"
+      - "Real-time serving size preview"
+    wireframe: "TEC-009 (Serving Size Calculator Modal)"
+
+  - path: "apps/frontend/components/technical/nutrition/IngredientBreakdownTable.tsx"
+    description: "Table showing ingredient nutrition contributions"
+    props:
+      - { name: "ingredients", type: "IngredientContribution[]", required: true }
+      - { name: "onAddMissingData", type: "(ingredientId: string) => void", required: false }
+    features:
+      - "Sortable columns (qty, energy, protein, fat, carbs)"
+      - "Percentage contribution row"
+      - "Color-coded by contribution (>20% green, 10-20% yellow)"
+      - "Expandable rows for full nutrient profile"
+      - "Missing data indicators with 'Add Data' links"
+    wireframe: "TEC-011 (Ingredient Nutrition Breakdown)"
+
+  - path: "apps/frontend/components/technical/nutrition/AllergenLabelSection.tsx"
+    description: "Allergen warnings section for labels"
+    props:
+      - { name: "productId", type: "string", required: true }
+    features:
+      - "Contains: list from product_allergens (relation_type='contains')"
+      - "May Contain: list from product_allergens (relation_type='may_contain')"
+      - "FDA/EU formatting options"
+      - "Empty state: 'Allergen Free' badge or hidden"
+    wireframe: "TEC-009 (implied from allergen label generation AC)"
+
+  - path: "apps/frontend/components/technical/nutrition/LabelFormatSpec.tsx"
+    description: "Print-ready label preview with specifications"
+    props:
+      - { name: "nutrition", type: "ProductNutrition", required: true }
+      - { name: "format", type: "'fda' | 'eu'", required: false, default: "'fda'" }
+      - { name: "onExportPDF", type: "() => void", required: true }
+      - { name: "onExportSVG", type: "() => void", required: true }
+      - { name: "onPrint", type: "() => void", required: true }
+    features:
+      - "4x6 inch label preview with margins"
+      - "Typography specifications displayed"
+      - "FDA compliance checklist"
+      - "Export buttons (PDF, SVG, Print)"
+    wireframe: "TEC-009 (FDA 2016 Label Format Specification)"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-product-nutrition.ts"
+    exports:
+      - name: "useProductNutrition"
+        params: ["productId: string"]
+        returns: "UseQueryResult<ProductNutrition | null>"
+        description: "Fetch product nutrition data"
+
+      - name: "useCalculateNutrition"
+        returns: "UseMutationResult<CalculationResult, Error, CalculateParams>"
+        description: "Trigger nutrition calculation from BOM"
+
+      - name: "useSaveNutritionOverride"
+        returns: "UseMutationResult<ProductNutrition, Error, OverrideParams>"
+        description: "Save manual nutrition override"
+
+  - path: "apps/frontend/lib/hooks/use-ingredient-nutrition.ts"
+    exports:
+      - name: "useIngredientNutrition"
+        params: ["ingredientId: string"]
+        returns: "UseQueryResult<IngredientNutrition | null>"
+        description: "Fetch single ingredient nutrition"
+
+      - name: "useBatchIngredientNutrition"
+        params: ["ingredientIds: string[]"]
+        returns: "UseQueryResult<Map<string, IngredientNutrition>>"
+        description: "Fetch multiple ingredient nutrition in batch"
+
+      - name: "useSaveIngredientNutrition"
+        returns: "UseMutationResult<IngredientNutrition, Error, SaveParams>"
+        description: "Save ingredient nutrition data"
+
+  - path: "apps/frontend/lib/hooks/use-nutrition-label.ts"
+    exports:
+      - name: "useNutritionLabel"
+        params: ["productId: string", "format: string"]
+        returns: "UseQueryResult<LabelOutput>"
+        description: "Generate nutrition label"
+
+      - name: "useFdaRacc"
+        params: ["category: string"]
+        returns: "UseQueryResult<RACCReference | null>"
+        description: "Lookup FDA RACC by category"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/nutrition.ts"
+    content: |
+      export interface ProductNutrition {
+        id: string;
+        org_id: string;
+        product_id: string;
+        serving_size: number | null;
+        serving_unit: 'g' | 'ml' | 'oz' | 'cup' | 'tbsp' | 'piece';
+        servings_per_container: number | null;
+        is_manual_override: boolean;
+        override_source?: 'lab_test' | 'supplier_coa' | 'database' | 'calculated' | 'manual';
+        override_reference?: string;
+        override_notes?: string;
+        override_by?: string;
+        override_at?: string;
+        calculated_at?: string;
+        bom_version_used?: number;
+        // Macronutrients (per 100g/100ml)
+        energy_kcal: number;
+        energy_kj?: number;
+        protein_g: number;
+        fat_g: number;
+        saturated_fat_g?: number;
+        trans_fat_g?: number;
+        carbohydrate_g: number;
+        sugar_g?: number;
+        added_sugar_g?: number;
+        fiber_g?: number;
+        sodium_mg?: number;
+        salt_g?: number;
+        cholesterol_mg?: number;
+        // Micronutrients
+        vitamin_d_mcg?: number;
+        calcium_mg?: number;
+        iron_mg?: number;
+        potassium_mg?: number;
+        vitamin_c_mg?: number;
+        vitamin_a_mcg?: number;
+        // Metadata
+        created_at: string;
+        updated_at: string;
+      }
+
+      export interface IngredientNutrition {
+        id: string;
+        org_id: string;
+        ingredient_id: string;
+        per_unit: number;
+        unit: 'g' | 'ml';
+        source: 'usda' | 'eurofir' | 'supplier_coa' | 'manual';
+        source_id?: string;
+        source_date?: string;
+        verified_by?: string;
+        confidence: 'high' | 'medium' | 'low';
+        notes?: string;
+        // All nutrient fields same as ProductNutrition
+        energy_kcal?: number;
+        protein_g?: number;
+        fat_g?: number;
+        // ... etc
+        created_at: string;
+        updated_at: string;
+      }
+
+      export interface NutrientProfile {
+        energy_kcal?: number;
+        energy_kj?: number;
+        protein_g?: number;
+        fat_g?: number;
+        saturated_fat_g?: number;
+        trans_fat_g?: number;
+        carbohydrate_g?: number;
+        sugar_g?: number;
+        added_sugar_g?: number;
+        fiber_g?: number;
+        sodium_mg?: number;
+        salt_g?: number;
+        cholesterol_mg?: number;
+        vitamin_d_mcg?: number;
+        calcium_mg?: number;
+        iron_mg?: number;
+        potassium_mg?: number;
+        [key: string]: number | undefined;
+      }
+
+      export interface IngredientContribution {
+        id: string;
+        name: string;
+        code: string;
+        quantity: number;
+        unit: string;
+        nutrients: NutrientProfile;
+        contribution_percent: number;
+        has_nutrition_data: boolean;
+      }
+
+      export interface CalculationResult {
+        ingredients: IngredientContribution[];
+        yield: {
+          expected_kg: number;
+          actual_kg: number;
+          factor: number;
+        };
+        total_per_batch: NutrientProfile;
+        per_100g: NutrientProfile;
+        missing_ingredients: Array<{
+          id: string;
+          name: string;
+          code: string;
+          quantity: number;
+        }>;
+        warnings: string[];
+        metadata: {
+          bom_version: number;
+          bom_id: string;
+          calculated_at: string;
+        };
+      }
+
+      export interface NutritionOverrideInput {
+        serving_size: number;
+        serving_unit: 'g' | 'ml' | 'oz' | 'cup' | 'tbsp' | 'piece';
+        servings_per_container: number;
+        energy_kcal: number;
+        protein_g: number;
+        fat_g: number;
+        carbohydrate_g: number;
+        salt_g: number;
+        fiber_g?: number;
+        sugar_g?: number;
+        saturated_fat_g?: number;
+        sodium_mg?: number;
+        trans_fat_g?: number;
+        cholesterol_mg?: number;
+        added_sugar_g?: number;
+        vitamin_d_mcg?: number;
+        calcium_mg?: number;
+        iron_mg?: number;
+        potassium_mg?: number;
+        source: 'lab_test' | 'supplier_coa' | 'database' | 'manual';
+        reference?: string;
+        notes?: string;
+      }
+
+      export interface ServingSize {
+        serving_size_g: number;
+        servings_per_container: number;
+        calculation_method: 'weight' | 'dimensions' | 'volume' | 'manual';
+      }
+
+      export interface RACCReference {
+        category: string;
+        racc_grams: number;
+        racc_description: string;
+        common_servings: Array<{
+          description: string;
+          grams: number;
+        }>;
+      }
+
+      export interface RACCValidation {
+        matches: boolean;
+        racc: number;
+        calculated: number;
+        variance_percent: number;
+        warning?: string;
+      }
+
+      export interface LabelOutput {
+        pdf_url?: string;
+        svg_content?: string;
+        html_content?: string;
+        format: 'fda' | 'eu' | 'canada';
+      }
+
+# FDA Daily Values Constant
+constants:
+  - path: "apps/frontend/lib/constants/fda-daily-values.ts"
+    content: |
+      export const FDA_DAILY_VALUES = {
+        energy_kcal: 2000,
+        fat_g: 78,
+        saturated_fat_g: 20,
+        cholesterol_mg: 300,
+        sodium_mg: 2300,
+        carbohydrate_g: 275,
+        fiber_g: 28,
+        added_sugar_g: 50,
+        protein_g: 50,
+        vitamin_d_mcg: 20,
+        calcium_mg: 1300,
+        iron_mg: 18,
+        potassium_mg: 4700,
+      } as const;
+
+      export function calculatePercentDV(
+        nutrient: keyof typeof FDA_DAILY_VALUES,
+        amount: number
+      ): number {
+        const dv = FDA_DAILY_VALUES[nutrient];
+        return Math.round((amount / dv) * 100);
+      }
+
+  - path: "apps/frontend/lib/constants/fda-racc-table.ts"
+    description: "FDA RACC lookup table (139 categories)"
+    content: |
+      export const FDA_RACC_TABLE: Record<string, {
+        racc_g: number;
+        description: string;
+        common_servings: string[];
+      }> = {
+        bread: { racc_g: 50, description: '2 slices', common_servings: ['1 slice (25g)', '2 slices (50g)'] },
+        cookies: { racc_g: 30, description: '2-3 cookies', common_servings: ['1 cookie (15g)', '3 cookies (30g)'] },
+        crackers: { racc_g: 30, description: '15 crackers', common_servings: ['5 crackers (10g)', '15 crackers (30g)'] },
+        cereals_hot: { racc_g: 40, description: '1 cup cooked', common_servings: ['1/2 cup dry (40g)'] },
+        cereals_cold: { racc_g: 40, description: '1 cup', common_servings: ['1 cup (40g)'] },
+        milk: { racc_g: 240, description: '1 cup (8 fl oz)', common_servings: ['1 cup (240ml)'] },
+        yogurt: { racc_g: 225, description: '1 container', common_servings: ['1 container (225g)'] },
+        cheese: { racc_g: 30, description: '1 slice', common_servings: ['1 slice (30g)'] },
+        butter: { racc_g: 15, description: '1 tbsp', common_servings: ['1 tbsp (15g)'] },
+        soft_drinks: { racc_g: 360, description: '12 fl oz', common_servings: ['12 fl oz (360ml)'] },
+        juice: { racc_g: 240, description: '8 fl oz', common_servings: ['8 fl oz (240ml)'] },
+        // ... 128 more categories
+      };
+
+# Integration with Existing Components
+integration:
+  product_detail_page:
+    path: "apps/frontend/app/(authenticated)/technical/products/[id]/page.tsx"
+    add_button: |
+      <Button
+        variant="outline"
+        onClick={() => setNutritionPanelOpen(true)}
+      >
+        <Calculator className="h-4 w-4 mr-2" />
+        Nutrition Facts
+      </Button>
+    add_modal: |
+      <NutritionPanelModal
+        productId={product.id}
+        productName={product.name}
+        open={nutritionPanelOpen}
+        onOpenChange={setNutritionPanelOpen}
+      />
+
+  bom_detail_page:
+    path: "apps/frontend/app/(authenticated)/technical/boms/[id]/page.tsx"
+    add_link: |
+      <Button variant="ghost" size="sm" onClick={handlePreviewNutrition}>
+        Preview Nutrition
+      </Button>
+
+# Accessibility Requirements
+accessibility:
+  - "Touch targets: All buttons, inputs >= 48x48dp"
+  - "Contrast: Pass WCAG AA (4.5:1 for text)"
+  - "Screen reader: Announce modal title, field labels, validation errors"
+  - "Keyboard: Tab navigation, Enter to submit, Escape to close"
+  - "Focus management: Focus first input on modal open"
+  - "ARIA: Modal has role='dialog', proper labels for all form fields"
+  - "Tables: Proper <th> headers, <caption>, sortable columns announced"
+
+# Performance Considerations
+performance:
+  - "Lazy load nutrition modal (React.lazy + Suspense)"
+  - "Debounce serving size inputs (300ms)"
+  - "Cache FDA RACC table in localStorage"
+  - "Use React Query for API caching (10 min stale time)"
+  - "Virtualize ingredient table if >50 rows"

@@ -1,0 +1,385 @@
+# Story 03.9b - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+# Status: DEFERRED - Requires Epic 05 license_plates table
+
+endpoints:
+  - method: "POST"
+    path: "/api/planning/transfer-orders/:id/lines/:lineId/assign-lps"
+    description: "Assign License Plates to a TO line"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/assign-lps/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "planner"]
+    deferred: true
+
+    request:
+      params:
+        id: "UUID - Transfer Order ID"
+        lineId: "UUID - TO Line ID"
+      body:
+        schema:
+          lps:
+            type: "Array<{ lp_id: UUID, quantity: number }>"
+            min_items: 1
+            max_items: 100
+
+    response:
+      status: 200
+      type: "AssignLPsResponse"
+      schema:
+        success: "boolean"
+        assignments: "Array<TOLineLPAssignment>"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_REQUEST"
+        message: "At least one License Plate must be assigned"
+        when: "Empty lps array"
+      - status: 400
+        code: "LP_NOT_IN_WAREHOUSE"
+        message: "LP-2024-00456 is not located in source warehouse WH-001"
+        when: "LP warehouse_id != TO from_warehouse_id"
+      - status: 400
+        code: "LP_PRODUCT_MISMATCH"
+        message: "LP-2024-00456 contains Product B, but TO line requires Product A"
+        when: "LP product_id != TO line product_id"
+      - status: 400
+        code: "LP_INSUFFICIENT_QTY"
+        message: "LP-001 has only 50 units available, cannot assign 60 units"
+        when: "LP available_qty < requested quantity"
+      - status: 400
+        code: "LP_ALREADY_ASSIGNED"
+        message: "LP-001 is already assigned to this TO line"
+        when: "Duplicate assignment attempt"
+      - status: 400
+        code: "QTY_MISMATCH"
+        message: "Total LP quantity (80) does not match TO line quantity (100)"
+        when: "to_require_exact_qty_match=true and sum != line qty"
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Cannot assign LPs to TO with status SHIPPED"
+        when: "TO status not in (draft, planned)"
+      - status: 404
+        code: "TO_NOT_FOUND"
+        message: "Transfer Order not found"
+        when: "TO does not exist or belongs to different org"
+      - status: 404
+        code: "LINE_NOT_FOUND"
+        message: "TO Line not found"
+        when: "Line does not exist or belongs to different TO"
+
+  - method: "GET"
+    path: "/api/planning/transfer-orders/:id/lines/:lineId/lps"
+    description: "Get LP assignments for a TO line"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/lps/route.ts"
+    auth: "required"
+    roles: ["*"]
+    deferred: true
+
+    request:
+      params:
+        id: "UUID - Transfer Order ID"
+        lineId: "UUID - TO Line ID"
+
+    response:
+      status: 200
+      type: "GetLPAssignmentsResponse"
+      schema:
+        assignments:
+          type: "Array"
+          items:
+            id: "UUID"
+            lp_id: "UUID"
+            lp_number: "string"
+            lot_number: "string | null"
+            expiry_date: "string | null"
+            location: "string | null"
+            quantity: "number"
+            product:
+              id: "UUID"
+              code: "string"
+              name: "string"
+        total_assigned: "number"
+        total_required: "number"
+        is_complete: "boolean"
+
+    errors:
+      - status: 404
+        code: "TO_NOT_FOUND"
+        message: "Transfer Order not found"
+      - status: 404
+        code: "LINE_NOT_FOUND"
+        message: "TO Line not found"
+
+  - method: "DELETE"
+    path: "/api/planning/transfer-orders/:id/lines/:lineId/lps/:lpId"
+    description: "Remove LP assignment from TO line"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/lps/[lpId]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "planner"]
+    deferred: true
+
+    request:
+      params:
+        id: "UUID - Transfer Order ID"
+        lineId: "UUID - TO Line ID"
+        lpId: "UUID - License Plate ID"
+
+    response:
+      status: 200
+      type: "RemoveLPResponse"
+      schema:
+        success: "boolean"
+        message: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Cannot remove LPs from TO with status SHIPPED"
+        when: "TO status not in (draft, planned)"
+      - status: 404
+        code: "ASSIGNMENT_NOT_FOUND"
+        message: "LP assignment not found"
+        when: "LP not assigned to this TO line"
+
+  - method: "GET"
+    path: "/api/planning/transfer-orders/:id/lines/:lineId/available-lps"
+    description: "Get available LPs for TO line (used by LP Picker)"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/available-lps/route.ts"
+    auth: "required"
+    roles: ["*"]
+    deferred: true
+
+    request:
+      params:
+        id: "UUID - Transfer Order ID"
+        lineId: "UUID - TO Line ID"
+      query:
+        lot_number: "string (optional) - Filter by lot number"
+        expiry_from: "string YYYY-MM-DD (optional) - Filter by min expiry date"
+        expiry_to: "string YYYY-MM-DD (optional) - Filter by max expiry date"
+        search: "string (optional) - Search by LP number"
+
+    response:
+      status: 200
+      type: "AvailableLPsResponse"
+      schema:
+        lps:
+          type: "Array"
+          items:
+            id: "UUID"
+            lp_number: "string"
+            lot_number: "string | null"
+            expiry_date: "string | null"
+            location: "string | null"
+            available_qty: "number"
+            uom: "string"
+            warehouse:
+              id: "UUID"
+              code: "string"
+              name: "string"
+            product:
+              id: "UUID"
+              code: "string"
+              name: "string"
+        total_count: "number"
+
+    errors:
+      - status: 404
+        code: "TO_NOT_FOUND"
+        message: "Transfer Order not found"
+      - status: 404
+        code: "LINE_NOT_FOUND"
+        message: "TO Line not found"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/to-lp-service.ts"
+    description: "LP assignment service for Transfer Orders"
+    deferred: true
+    exports:
+      - name: "assignLPsToTOLine"
+        type: "async function"
+        params:
+          - "toId: string"
+          - "toLineId: string"
+          - "lps: Array<{ lp_id: string; quantity: number }>"
+        returns: "Promise<{ success: boolean; assignments?: TOLineLPAssignment[]; error?: string }>"
+        description: "Validate and assign LPs to TO line"
+        business_rules:
+          - "Validate TO exists and belongs to org"
+          - "Validate TO line exists and belongs to TO"
+          - "Validate TO status is DRAFT or PLANNED"
+          - "Validate each LP: warehouse, product, available qty"
+          - "Validate total quantity if exact match required"
+          - "Insert rows into to_line_lps table"
+
+      - name: "getAvailableLPsForTOLine"
+        type: "async function"
+        params:
+          - "toId: string"
+          - "toLineId: string"
+          - "filters?: { lot_number?: string; expiry_from?: string; expiry_to?: string; search?: string }"
+        returns: "Promise<AvailableLP[]>"
+        description: "Get LPs available for assignment to TO line"
+        query_logic:
+          - "Filter by warehouse_id = TO.from_warehouse_id"
+          - "Filter by product_id = TO line.product_id"
+          - "Filter by available_qty > 0"
+          - "Filter by status = 'active'"
+          - "Exclude LPs already assigned to other TOs (optional business rule)"
+          - "Apply optional filters: lot_number, expiry_date range, lp_number search"
+
+      - name: "removeLPFromTOLine"
+        type: "async function"
+        params:
+          - "toId: string"
+          - "toLineId: string"
+          - "lpId: string"
+        returns: "Promise<{ success: boolean; error?: string }>"
+        description: "Remove LP assignment from TO line"
+
+      - name: "getLPAssignmentsForTOLine"
+        type: "async function"
+        params:
+          - "toId: string"
+          - "toLineId: string"
+        returns: "Promise<{ assignments: TOLineLPAssignment[]; total_assigned: number; total_required: number; is_complete: boolean }>"
+        description: "Get LP assignments with completion status"
+
+      - name: "validateLPAssignment"
+        type: "function"
+        params:
+          - "lp: LicensePlate"
+          - "toLine: TransferOrderLine"
+          - "fromWarehouse: Warehouse"
+          - "requestedQty: number"
+        returns: "{ valid: boolean; error?: string }"
+        description: "Validate single LP assignment against business rules"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/to-lp.ts"
+    description: "TypeScript interfaces for TO LP assignment"
+    deferred: true
+    exports:
+      - name: "TOLineLPAssignment"
+        fields:
+          - "id: string"
+          - "to_line_id: string"
+          - "lp_id: string"
+          - "quantity: number"
+          - "created_at: string"
+          - "created_by: string | null"
+          - "lp_number: string"
+          - "lot_number: string | null"
+          - "expiry_date: string | null"
+          - "location: string | null"
+      - name: "AvailableLP"
+        fields:
+          - "id: string"
+          - "lp_number: string"
+          - "lot_number: string | null"
+          - "expiry_date: string | null"
+          - "location: string | null"
+          - "available_qty: number"
+          - "uom: string"
+          - "warehouse: { id: string; code: string; name: string }"
+          - "product: { id: string; code: string; name: string }"
+      - name: "AssignLPsRequest"
+        fields:
+          - "lps: Array<{ lp_id: string; quantity: number }>"
+      - name: "LPSelection"
+        fields:
+          - "lp_id: string"
+          - "quantity: number"
+
+# Validation schemas
+validation:
+  - path: "apps/frontend/lib/validation/to-lp-validation.ts"
+    description: "Zod schemas for LP assignment requests"
+    deferred: true
+    schemas:
+      - name: "LPAssignmentSchema"
+        code: |
+          z.object({
+            lp_id: z.string().uuid("Invalid LP ID"),
+            quantity: z.number()
+              .positive("Quantity must be greater than 0")
+              .max(99999.9999, "Quantity too large"),
+          })
+
+      - name: "AssignLPsRequestSchema"
+        code: |
+          z.object({
+            lps: z.array(LPAssignmentSchema)
+              .min(1, "At least one License Plate must be assigned")
+              .max(100, "Cannot assign more than 100 License Plates at once"),
+          })
+
+      - name: "AvailableLPsQuerySchema"
+        code: |
+          z.object({
+            lot_number: z.string().max(50).optional(),
+            expiry_from: z.string()
+              .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)")
+              .optional(),
+            expiry_to: z.string()
+              .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)")
+              .optional(),
+            search: z.string().max(100).optional(),
+          })
+
+# API route implementation pattern
+patterns:
+  assign_lps_route: |
+    // apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/assign-lps/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { AssignLPsRequestSchema } from '@/lib/validation/to-lp-validation';
+    import { assignLPsToTOLine } from '@/lib/services/to-lp-service';
+
+    export async function POST(
+      request: Request,
+      { params }: { params: { id: string; lineId: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // 1. Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // 2. Parse and validate request body
+      const body = await request.json();
+      const validation = AssignLPsRequestSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json({
+          success: false,
+          error: validation.error.errors[0].message
+        }, { status: 400 });
+      }
+
+      // 3. Call service
+      const result = await assignLPsToTOLine(
+        params.id,
+        params.lineId,
+        validation.data.lps
+      );
+
+      if (!result.success) {
+        return NextResponse.json({
+          success: false,
+          error: result.error
+        }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        assignments: result.assignments,
+        message: `${result.assignments?.length} License Plate(s) assigned successfully`
+      });
+    }

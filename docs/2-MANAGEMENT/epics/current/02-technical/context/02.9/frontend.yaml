@@ -1,0 +1,478 @@
+# Story 02.9 - Frontend Specification
+# Purpose: Components, hooks, services for BOM costing UI
+# Agent: FRONTEND-DEV
+# Wireframe: TEC-013-recipe-costing.md
+
+# UX Reference
+ux:
+  wireframes:
+    - id: "TEC-013"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-013-recipe-costing.md"
+      components:
+        - "CostSummary"
+        - "MaterialCostsTable"
+        - "LaborCostsTable"
+        - "OverheadCostsSection"
+        - "CostBreakdownChart"
+        - "RecalculateButton"
+        - "MarginAnalysis"
+        - "StaleCostWarning"
+  patterns:
+    table: "ShadCN DataTable with sorting"
+    card: "ShadCN Card for cost summary"
+    button: "ShadCN Button with loading state"
+    alert: "ShadCN Alert for warnings"
+    progress: "ShadCN Progress for bar chart"
+  states:
+    - "loading"
+    - "empty"
+    - "error"
+    - "success"
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/technical/bom/cost/CostSummary.tsx"
+    description: "Main cost summary card with totals and margin analysis"
+    props:
+      - "bomId: string"
+      - "onRecalculate?: () => void"
+    uses:
+      - "useBOMCost hook"
+      - "CostBreakdownTable"
+      - "MarginAnalysis"
+      - "RecalculateButton"
+      - "StaleCostWarning"
+    wireframe_ref: "TEC-013 - Cost Summary Card"
+    content: |
+      interface CostSummaryProps {
+        bomId: string;
+        onRecalculate?: () => void;
+      }
+
+      export function CostSummary({ bomId, onRecalculate }: CostSummaryProps) {
+        const { data: cost, isLoading, error, refetch } = useBOMCost(bomId);
+
+        if (isLoading) return <CostSummaryLoading />;
+        if (error) return <CostSummaryError error={error} bomId={bomId} />;
+        if (!cost) return <CostSummaryEmpty bomId={bomId} />;
+
+        return (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Cost Summary</CardTitle>
+              <RecalculateButton
+                onClick={async () => {
+                  await refetch();
+                  onRecalculate?.();
+                }}
+                disabled={false}
+              />
+            </CardHeader>
+            <CardContent>
+              {cost.is_stale && <StaleCostWarning />}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Total Cost per Batch</Label>
+                  <Value>{formatCurrency(cost.total_cost, cost.currency)}</Value>
+                </div>
+                <div>
+                  <Label>Cost per Unit</Label>
+                  <Value>{formatCurrency(cost.cost_per_unit, cost.currency)}</Value>
+                </div>
+              </div>
+
+              <CostBreakdownChart
+                materialCost={cost.material_cost}
+                laborCost={cost.labor_cost}
+                overheadCost={cost.overhead_cost}
+              />
+
+              {cost.margin_analysis && (
+                <MarginAnalysis
+                  stdPrice={cost.margin_analysis.std_price}
+                  targetMargin={cost.margin_analysis.target_margin_percent}
+                  actualMargin={cost.margin_analysis.actual_margin_percent}
+                  belowTarget={cost.margin_analysis.below_target}
+                />
+              )}
+
+              <div className="text-sm text-muted-foreground mt-4">
+                Last Calculated: {formatDateTime(cost.calculated_at)}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      }
+
+  - path: "apps/frontend/components/technical/bom/cost/CostBreakdownTable.tsx"
+    description: "Expandable tables for material and labor cost breakdown"
+    props:
+      - "materials: MaterialCostBreakdown[]"
+      - "operations: OperationCostBreakdown[]"
+      - "currency: string"
+    wireframe_ref: "TEC-013 - Material Costs Section, Labor Costs Section"
+    content: |
+      interface CostBreakdownTableProps {
+        materials: MaterialCostBreakdown[];
+        operations: OperationCostBreakdown[];
+        currency: string;
+      }
+
+      export function CostBreakdownTable({ materials, operations, currency }: CostBreakdownTableProps) {
+        return (
+          <Tabs defaultValue="materials">
+            <TabsList>
+              <TabsTrigger value="materials">
+                Material Costs ({formatCurrency(totalMaterialCost, currency)})
+              </TabsTrigger>
+              <TabsTrigger value="labor">
+                Labor Costs ({formatCurrency(totalLaborCost, currency)})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="materials">
+              <MaterialCostsTable materials={materials} currency={currency} />
+            </TabsContent>
+
+            <TabsContent value="labor">
+              <LaborCostsTable operations={operations} currency={currency} />
+            </TabsContent>
+          </Tabs>
+        );
+      }
+
+  - path: "apps/frontend/components/technical/bom/cost/MaterialCostsTable.tsx"
+    description: "Table showing material/ingredient costs"
+    props:
+      - "materials: MaterialCostBreakdown[]"
+      - "currency: string"
+    wireframe_ref: "TEC-013 - Material Costs Section"
+    columns:
+      - "Ingredient (code + name)"
+      - "Qty + UoM"
+      - "Unit Cost"
+      - "Scrap %"
+      - "Total Cost"
+      - "% of Total"
+
+  - path: "apps/frontend/components/technical/bom/cost/LaborCostsTable.tsx"
+    description: "Table showing operation labor costs"
+    props:
+      - "operations: OperationCostBreakdown[]"
+      - "currency: string"
+    wireframe_ref: "TEC-013 - Labor Costs Section"
+    columns:
+      - "Operation (seq + name)"
+      - "Machine"
+      - "Setup Time"
+      - "Duration"
+      - "Cleanup Time"
+      - "Rate/hr"
+      - "Cost"
+      - "% of Total"
+
+  - path: "apps/frontend/components/technical/bom/cost/CostBreakdownChart.tsx"
+    description: "Horizontal bar chart showing cost category percentages"
+    props:
+      - "materialCost: number"
+      - "laborCost: number"
+      - "overheadCost: number"
+    wireframe_ref: "TEC-013 - Cost Breakdown Chart"
+    content: |
+      export function CostBreakdownChart({ materialCost, laborCost, overheadCost }: Props) {
+        const total = materialCost + laborCost + overheadCost;
+        const materialPercent = (materialCost / total) * 100;
+        const laborPercent = (laborCost / total) * 100;
+        const overheadPercent = (overheadCost / total) * 100;
+
+        return (
+          <div className="space-y-2 mt-4">
+            <div className="flex items-center gap-2">
+              <Progress value={materialPercent} className="flex-1 bg-blue-100" />
+              <span className="text-sm w-32">
+                Material {materialPercent.toFixed(1)}%
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Progress value={laborPercent} className="flex-1 bg-green-100" />
+              <span className="text-sm w-32">
+                Labor {laborPercent.toFixed(1)}%
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Progress value={overheadPercent} className="flex-1 bg-orange-100" />
+              <span className="text-sm w-32">
+                Overhead {overheadPercent.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        );
+      }
+
+  - path: "apps/frontend/components/technical/bom/cost/MarginAnalysis.tsx"
+    description: "Margin calculation display with warning indicator"
+    props:
+      - "stdPrice: number | null"
+      - "targetMargin: number"
+      - "actualMargin: number | null"
+      - "belowTarget: boolean"
+    wireframe_ref: "TEC-013 - Cost Summary Card (margin section)"
+    content: |
+      export function MarginAnalysis({ stdPrice, targetMargin, actualMargin, belowTarget }: Props) {
+        if (!stdPrice || actualMargin === null) {
+          return (
+            <div className="text-sm text-muted-foreground">
+              Set standard price on product to see margin analysis
+            </div>
+          );
+        }
+
+        return (
+          <div className="border-t pt-4 mt-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Standard Price</Label>
+                <Value>{formatCurrency(stdPrice)}</Value>
+              </div>
+              <div>
+                <Label>Target Margin</Label>
+                <Value>{targetMargin}%</Value>
+              </div>
+              <div>
+                <Label>Actual Margin</Label>
+                <Value className={belowTarget ? 'text-red-500' : 'text-green-500'}>
+                  {actualMargin.toFixed(1)}%
+                  {belowTarget && (
+                    <Badge variant="destructive" className="ml-2">Below target</Badge>
+                  )}
+                </Value>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+  - path: "apps/frontend/components/technical/bom/cost/StaleCostWarning.tsx"
+    description: "Warning banner when cost data is outdated"
+    props: []
+    wireframe_ref: "TEC-013 - Stale cost indicator"
+    content: |
+      export function StaleCostWarning() {
+        return (
+          <Alert variant="warning" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Cost data outdated</AlertTitle>
+            <AlertDescription>
+              Ingredient costs, BOM items, or routing have changed since last calculation.
+              Click Recalculate for latest costs.
+            </AlertDescription>
+          </Alert>
+        );
+      }
+
+  - path: "apps/frontend/components/technical/bom/cost/RecalculateButton.tsx"
+    description: "Button to trigger cost recalculation with loading state"
+    props:
+      - "onClick: () => Promise<void>"
+      - "disabled?: boolean"
+    wireframe_ref: "TEC-013 - Recalculate button"
+    content: |
+      export function RecalculateButton({ onClick, disabled }: Props) {
+        const [isLoading, setIsLoading] = useState(false);
+
+        const handleClick = async () => {
+          setIsLoading(true);
+          try {
+            await onClick();
+            toast.success('Costing updated successfully');
+          } catch (error) {
+            toast.error('Failed to recalculate costs');
+          } finally {
+            setIsLoading(false);
+          }
+        };
+
+        return (
+          <Button
+            variant="outline"
+            onClick={handleClick}
+            disabled={disabled || isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Calculating...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Recalculate
+              </>
+            )}
+          </Button>
+        );
+      }
+
+  - path: "apps/frontend/components/technical/bom/cost/CostSummaryEmpty.tsx"
+    description: "Empty state when no cost data available"
+    props:
+      - "bomId: string"
+    wireframe_ref: "TEC-013 - No Costing Data Available state"
+
+  - path: "apps/frontend/components/technical/bom/cost/CostSummaryError.tsx"
+    description: "Error state with specific error messages"
+    props:
+      - "error: Error"
+      - "bomId: string"
+    wireframe_ref: "TEC-013 - Costing Calculation Failed state"
+
+  - path: "apps/frontend/components/technical/bom/cost/CostSummaryLoading.tsx"
+    description: "Loading skeleton state"
+    props: []
+    wireframe_ref: "TEC-013 - Loading state"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-bom-cost.ts"
+    description: "React Query hook for fetching BOM cost data"
+    exports:
+      - name: "useBOMCost"
+        params:
+          - "bomId: string"
+        returns: "UseQueryResult<BOMCostResponse>"
+    content: |
+      import { useQuery } from '@tanstack/react-query';
+      import { BOMCostResponse } from '@/lib/types/costing';
+
+      export function useBOMCost(bomId: string) {
+        return useQuery<BOMCostResponse>({
+          queryKey: ['bom-cost', bomId],
+          queryFn: async () => {
+            const response = await fetch(`/api/v1/technical/boms/${bomId}/cost`);
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || 'Failed to fetch cost');
+            }
+            return response.json();
+          },
+          staleTime: 5 * 60 * 1000, // 5 minutes
+          enabled: !!bomId,
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-recalculate-cost.ts"
+    description: "React Query mutation for recalculating BOM cost"
+    exports:
+      - name: "useRecalculateCost"
+        params: []
+        returns: "UseMutationResult<RecalculateCostResponse, Error, string>"
+    content: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+      import { RecalculateCostResponse } from '@/lib/types/costing';
+
+      export function useRecalculateCost() {
+        const queryClient = useQueryClient();
+
+        return useMutation<RecalculateCostResponse, Error, string>({
+          mutationFn: async (bomId: string) => {
+            const response = await fetch(
+              `/api/v1/technical/boms/${bomId}/recalculate-cost`,
+              { method: 'POST' }
+            );
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || 'Failed to recalculate cost');
+            }
+            return response.json();
+          },
+          onSuccess: (data, bomId) => {
+            // Invalidate cost query to refresh
+            queryClient.invalidateQueries({ queryKey: ['bom-cost', bomId] });
+          },
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-routing-cost.ts"
+    description: "React Query hook for fetching routing-only cost"
+    exports:
+      - name: "useRoutingCost"
+        params:
+          - "routingId: string"
+          - "batchSize?: number"
+        returns: "UseQueryResult<RoutingCostResponse>"
+
+# Page Integration
+pages:
+  - path: "apps/frontend/app/(authenticated)/technical/boms/[id]/page.tsx"
+    description: "BOM detail page - add CostSummary section"
+    modification: "Add CostSummary component below BOM items table"
+    wireframe_ref: "TEC-013 integration point"
+    integration: |
+      // Add import
+      import { CostSummary } from '@/components/technical/bom/cost/CostSummary';
+
+      // Add after BOM items section
+      <section className="mt-8">
+        <CostSummary bomId={params.id} />
+      </section>
+
+# Phase 1+ Features - Hidden in MVP
+future_features:
+  hidden_completely:
+    - "Currency selector/converter (Phase 1)"
+    - "Lock Cost button (Phase 1)"
+    - "Cost version history dropdown (Phase 1)"
+    - "Compare to Actual button (Phase 2)"
+    - "Cost trend charts (Phase 2)"
+    - "What-If Analysis button (Phase 2)"
+    - "Cost optimization suggestions panel (Phase 2)"
+  implementation_pattern: |
+    {/* Phase 1: Multi-Currency
+    <CurrencySelector value={currency} onChange={setCurrency} />
+    */}
+
+    {/* Phase 1: Cost Locking
+    <Button onClick={handleLockCost}>Lock Cost for Production</Button>
+    */}
+
+    {/* Phase 2: Cost Variance Analysis
+    <Button onClick={() => setShowVariance(true)}>Compare to Actual</Button>
+    */}
+
+# State Management
+state:
+  loading:
+    component: "CostSummaryLoading"
+    wireframe_ref: "TEC-013 - Loading state"
+    behavior: "Skeleton animation while cost is being fetched"
+  empty:
+    component: "CostSummaryEmpty"
+    wireframe_ref: "TEC-013 - No Costing Data Available"
+    behavior: "Show steps to configure costing + Calculate button"
+  error:
+    component: "CostSummaryError"
+    wireframe_ref: "TEC-013 - Costing Calculation Failed"
+    behavior: "Show specific error (missing costs, no routing) + fix links"
+  success:
+    component: "CostSummary (main)"
+    wireframe_ref: "TEC-013 - Success State"
+    behavior: "Full cost breakdown with margin analysis"
+
+# Utilities
+utilities:
+  - path: "apps/frontend/lib/utils/format-currency.ts"
+    description: "Currency formatting utility"
+    content: |
+      export function formatCurrency(
+        amount: number,
+        currency: string = 'PLN',
+        locale: string = 'pl-PL'
+      ): string {
+        return new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(amount);
+      }

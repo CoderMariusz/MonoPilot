@@ -1,0 +1,121 @@
+# Story 05.6 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.6"
+  name: "LP Detail + Transaction History"
+  slug: "lp-detail-history"
+  epic: "05-warehouse"
+  phase: "0"
+  complexity: "S"
+  estimate_days: 2
+  type: "frontend + backend"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables (lp_transactions audit log)
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, pages, UX patterns
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.1"
+      name: "LP Table + Basic Service"
+      provides:
+        - "license_plates table"
+        - "LicensePlateService"
+        - "LP CRUD endpoints"
+    - story: "05.2"
+      name: "LP Genealogy"
+      provides:
+        - "lp_genealogy table"
+        - "GenealogyService"
+        - "Genealogy tree components"
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides:
+        - "warehouses table"
+        - "warehouse display info"
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides:
+        - "locations table"
+        - "location full_path"
+    - story: "02.1"
+      name: "Products CRUD"
+      provides:
+        - "products table"
+        - "product name/code"
+  blocked_by: []
+  blocks:
+    - story: "04.6a-e"
+      name: "Material Consumption"
+      reason: "Operators need LP detail view before consumption"
+    - story: "04.7a-d"
+      name: "Output Registration"
+      reason: "Confirm output LP was registered correctly"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections:
+      - "WH-FR-002"    # LP Tracking
+      - "WH-FR-007"    # LP Merge (detail view shows history)
+      - "WH-FR-008"    # QA Status Management
+      - "WH-FR-028"    # Genealogy Tree View
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections:
+      - "Database Schema"
+      - "API Design"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.6.lp-detail-history.md"
+  wireframes:
+    - id: "WH-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+      description: "LP Detail Page wireframe with tabs and states"
+  patterns:
+    - path: "apps/frontend/app/(authenticated)/settings/page.tsx"
+      relevance: "Page layout pattern"
+    - path: "apps/frontend/components/ui/tabs.tsx"
+      relevance: "ShadCN Tabs component"
+    - path: "apps/frontend/components/ui/badge.tsx"
+      relevance: "Status badge component"
+    - path: "apps/frontend/components/ui/dialog.tsx"
+      relevance: "Modal dialog pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 2
+    description: "GET /license-plates/:id, GET /license-plates/:id/transactions"
+  - type: "service"
+    count: 1
+    description: "getLPDetail(), LP block/unblock methods"
+  - type: "page"
+    count: 4
+    description: "page.tsx, loading.tsx, error.tsx, not-found.tsx"
+  - type: "component"
+    count: 17
+    description: "LP detail header, tabs, cards, modals"
+  - type: "test"
+    count: 4
+    description: "Unit, integration, E2E, component tests"
+
+# Technical notes
+technical_notes:
+  - "Phase 0 MVP - History tab shows placeholder 'Coming in Phase 2'"
+  - "Genealogy tab integrates with Story 05.2 components"
+  - "Print Label button disabled with tooltip (Story 05.14)"
+  - "Block/unblock requires reason (max 500 chars)"
+  - "Status badges follow wireframe color mapping"
+  - "Expiry indicator: Red <7 days, Yellow <30 days, Green >30 days"
+  - "Return 404 (not 403) for cross-tenant access"
+  - "Performance: Detail view loads in <500ms"

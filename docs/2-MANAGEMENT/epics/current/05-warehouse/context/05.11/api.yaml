@@ -1,0 +1,614 @@
+# Story 05.11 - API Specification
+# Purpose: Endpoints, request/response schemas, validation, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # ============================================================================
+  # Primary Endpoint: Create GRN from PO
+  # ============================================================================
+  - method: "POST"
+    path: "/api/warehouse/grns/from-po/:poId"
+    description: "Create GRN from Purchase Order - creates GRN + LPs, updates PO"
+    file: "apps/frontend/app/api/warehouse/grns/from-po/[poId]/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+
+    request:
+      params:
+        poId: "UUID - Purchase Order ID"
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "CreateGRNFromPORequest"
+        schema:
+          warehouse_id:
+            type: "string"
+            format: "uuid"
+            required: true
+            description: "Receiving warehouse ID"
+          location_id:
+            type: "string"
+            format: "uuid"
+            required: true
+            description: "Default receiving location ID"
+          notes:
+            type: "string"
+            maxLength: 2000
+            required: false
+            description: "Optional GRN notes"
+          items:
+            type: "array"
+            minItems: 1
+            maxItems: 100
+            required: true
+            items:
+              type: "CreateGRNItemRequest"
+              schema:
+                po_line_id:
+                  type: "string"
+                  format: "uuid"
+                  required: true
+                received_qty:
+                  type: "number"
+                  minimum: 0.0001
+                  maximum: 999999999
+                  required: true
+                batch_number:
+                  type: "string"
+                  maxLength: 100
+                  required: "conditional"
+                  condition: "warehouse_settings.require_batch_on_receipt = true"
+                supplier_batch_number:
+                  type: "string"
+                  maxLength: 100
+                  required: false
+                expiry_date:
+                  type: "string"
+                  format: "YYYY-MM-DD"
+                  required: "conditional"
+                  condition: "warehouse_settings.require_expiry_on_receipt = true"
+                manufacture_date:
+                  type: "string"
+                  format: "YYYY-MM-DD"
+                  required: false
+                location_id:
+                  type: "string"
+                  format: "uuid"
+                  required: false
+                  description: "Override default location for this item"
+                notes:
+                  type: "string"
+                  maxLength: 500
+                  required: false
+
+    response:
+      success:
+        status: 201
+        type: "CreateGRNFromPOResponse"
+        schema:
+          grn:
+            id: "string (UUID)"
+            grn_number: "string"
+            source_type: "'po'"
+            po_id: "string (UUID)"
+            supplier_id: "string (UUID)"
+            receipt_date: "string (ISO 8601)"
+            warehouse_id: "string (UUID)"
+            location_id: "string (UUID)"
+            status: "'completed'"
+            notes: "string | null"
+            created_at: "string (ISO 8601)"
+            received_by: "string (UUID)"
+          items:
+            type: "array"
+            items:
+              id: "string (UUID)"
+              product_id: "string (UUID)"
+              product_name: "string"
+              ordered_qty: "number"
+              received_qty: "number"
+              uom: "string"
+              lp_id: "string (UUID)"
+              lp_number: "string"
+              batch_number: "string | null"
+              expiry_date: "string | null"
+              location_id: "string (UUID)"
+              qa_status: "string"
+          po_status: "string"
+          over_receipt_warnings:
+            type: "array"
+            items:
+              po_line_id: "string (UUID)"
+              ordered_qty: "number"
+              total_received: "number"
+              over_receipt_pct: "number"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Request validation failed"
+        scenarios:
+          - "Missing required field"
+          - "Invalid field format"
+          - "received_qty <= 0"
+          - "items array empty"
+      - status: 400
+        code: "PO_INVALID_STATUS"
+        message: "Cannot receive from PO with status '{status}'. PO must be approved, confirmed, or partial."
+        scenarios:
+          - "PO status is 'draft'"
+          - "PO status is 'cancelled'"
+          - "PO status is 'closed'"
+      - status: 400
+        code: "BATCH_REQUIRED"
+        message: "Batch number required for receipt"
+        scenarios:
+          - "warehouse_settings.require_batch_on_receipt = true AND batch_number empty"
+      - status: 400
+        code: "EXPIRY_REQUIRED"
+        message: "Expiry date required for receipt"
+        scenarios:
+          - "warehouse_settings.require_expiry_on_receipt = true AND expiry_date empty"
+      - status: 400
+        code: "EXPIRY_IN_PAST"
+        message: "Expiry date cannot be in the past"
+        scenarios:
+          - "expiry_date < current_date"
+      - status: 400
+        code: "OVER_RECEIPT_NOT_ALLOWED"
+        message: "Over-receipt not allowed. Ordered: {ordered}, Already received: {received}, Attempting: {attempting}"
+        scenarios:
+          - "allow_over_receipt = false AND total would exceed ordered"
+      - status: 400
+        code: "OVER_RECEIPT_EXCEEDS_TOLERANCE"
+        message: "Over-receipt exceeds tolerance. Max allowed: {max} ({tolerance}% tolerance), Attempting: {total}"
+        scenarios:
+          - "allow_over_receipt = true AND total exceeds tolerance"
+      - status: 400
+        code: "LINE_ALREADY_RECEIVED"
+        message: "PO line already fully received"
+        scenarios:
+          - "PO line received_qty >= quantity AND allow_over_receipt = false"
+      - status: 404
+        code: "PO_NOT_FOUND"
+        message: "Purchase Order not found"
+        scenarios:
+          - "PO ID does not exist"
+          - "PO belongs to different org (RLS)"
+      - status: 404
+        code: "PO_LINE_NOT_FOUND"
+        message: "PO line {po_line_id} not found"
+        scenarios:
+          - "PO line ID does not exist on this PO"
+      - status: 404
+        code: "WAREHOUSE_NOT_FOUND"
+        message: "Warehouse not found"
+        scenarios:
+          - "Warehouse ID does not exist or inactive"
+      - status: 404
+        code: "LOCATION_NOT_FOUND"
+        message: "Location not found"
+        scenarios:
+          - "Location ID does not exist or not in warehouse"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        scenarios:
+          - "User lacks warehouse module access"
+      - status: 500
+        code: "TRANSACTION_FAILED"
+        message: "Failed to create GRN. Transaction rolled back."
+        scenarios:
+          - "Database error during transaction"
+          - "LP creation failed"
+
+  # ============================================================================
+  # Supporting Endpoints
+  # ============================================================================
+  - method: "GET"
+    path: "/api/warehouse/receiving/pending-pos"
+    description: "List POs available for receiving"
+    file: "apps/frontend/app/api/warehouse/receiving/pending-pos/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+
+    request:
+      query:
+        warehouse_id:
+          type: "string"
+          format: "uuid"
+          required: false
+        supplier_id:
+          type: "string"
+          format: "uuid"
+          required: false
+        search:
+          type: "string"
+          required: false
+          description: "Search by PO number"
+        page:
+          type: "number"
+          default: 1
+        limit:
+          type: "number"
+          default: 50
+          max: 100
+
+    response:
+      success:
+        status: 200
+        type: "PendingPOsResponse"
+        schema:
+          data:
+            type: "array"
+            items:
+              id: "string (UUID)"
+              po_number: "string"
+              supplier:
+                id: "string (UUID)"
+                code: "string"
+                name: "string"
+              warehouse_id: "string (UUID)"
+              expected_delivery_date: "string | null"
+              status: "'approved' | 'confirmed' | 'partial'"
+              lines_count: "number"
+              receive_percent: "number"
+              total: "number"
+              currency: "string"
+          pagination:
+            page: "number"
+            limit: "number"
+            total: "number"
+            total_pages: "number"
+
+  - method: "GET"
+    path: "/api/warehouse/receiving/po/:poId/lines"
+    description: "Get PO lines for receiving wizard with received quantities"
+    file: "apps/frontend/app/api/warehouse/receiving/po/[poId]/lines/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+
+    request:
+      params:
+        poId: "UUID - Purchase Order ID"
+
+    response:
+      success:
+        status: 200
+        type: "POLinesForReceivingResponse"
+        schema:
+          po:
+            id: "string (UUID)"
+            po_number: "string"
+            status: "string"
+            supplier:
+              id: "string (UUID)"
+              code: "string"
+              name: "string"
+            warehouse:
+              id: "string (UUID)"
+              code: "string"
+              name: "string"
+              default_receiving_location_id: "string (UUID) | null"
+            expected_delivery_date: "string | null"
+          lines:
+            type: "array"
+            items:
+              id: "string (UUID)"
+              line_number: "number"
+              product:
+                id: "string (UUID)"
+                code: "string"
+                name: "string"
+                is_catch_weight: "boolean"
+                shelf_life_days: "number | null"
+              quantity: "number"
+              received_qty: "number"
+              remaining_qty: "number"
+              uom: "string"
+              unit_price: "number"
+          settings:
+            auto_generate_lp_number: "boolean"
+            require_batch_on_receipt: "boolean"
+            require_expiry_on_receipt: "boolean"
+            allow_over_receipt: "boolean"
+            over_receipt_tolerance_pct: "number"
+            default_qa_status: "string"
+
+  - method: "POST"
+    path: "/api/warehouse/grns/validate"
+    description: "Validate receipt data before commit (pre-flight check)"
+    file: "apps/frontend/app/api/warehouse/grns/validate/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+
+    request:
+      body:
+        type: "ValidateGRNRequest"
+        description: "Same schema as CreateGRNFromPORequest"
+
+    response:
+      success:
+        status: 200
+        type: "ValidateGRNResponse"
+        schema:
+          valid: "boolean"
+          errors:
+            type: "array"
+            items:
+              field: "string"
+              message: "string"
+              po_line_id: "string | null"
+          warnings:
+            type: "array"
+            items:
+              field: "string"
+              message: "string"
+              po_line_id: "string | null"
+
+  - method: "GET"
+    path: "/api/warehouse/grns"
+    description: "List GRNs with filtering and pagination"
+    file: "apps/frontend/app/api/warehouse/grns/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner", "viewer"]
+
+    request:
+      query:
+        status: "'draft' | 'completed' | 'cancelled'"
+        source_type: "'po' | 'to' | 'return' | 'adjustment'"
+        po_id: "UUID"
+        warehouse_id: "UUID"
+        supplier_id: "UUID"
+        date_from: "YYYY-MM-DD"
+        date_to: "YYYY-MM-DD"
+        search: "string (GRN number search)"
+        sort: "'grn_number' | 'receipt_date' | 'created_at'"
+        order: "'asc' | 'desc'"
+        page: "number (default: 1)"
+        limit: "number (default: 50, max: 100)"
+
+    response:
+      success:
+        status: 200
+        type: "GRNListResponse"
+        schema:
+          data:
+            type: "array"
+            items:
+              id: "string (UUID)"
+              grn_number: "string"
+              source_type: "string"
+              po_number: "string | null"
+              supplier_name: "string | null"
+              receipt_date: "string (ISO 8601)"
+              warehouse_name: "string"
+              items_count: "number"
+              status: "string"
+              created_at: "string (ISO 8601)"
+          pagination:
+            page: "number"
+            limit: "number"
+            total: "number"
+            total_pages: "number"
+
+  - method: "GET"
+    path: "/api/warehouse/grns/:id"
+    description: "Get GRN detail with items and LP references"
+    file: "apps/frontend/app/api/warehouse/grns/[id]/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner", "viewer"]
+
+    request:
+      params:
+        id: "UUID - GRN ID"
+
+    response:
+      success:
+        status: 200
+        type: "GRNDetailResponse"
+        schema:
+          grn:
+            id: "string (UUID)"
+            grn_number: "string"
+            source_type: "string"
+            po_id: "string | null"
+            po_number: "string | null"
+            supplier:
+              id: "string (UUID)"
+              name: "string"
+            receipt_date: "string (ISO 8601)"
+            warehouse:
+              id: "string (UUID)"
+              name: "string"
+            location:
+              id: "string (UUID)"
+              code: "string"
+              name: "string"
+            status: "string"
+            notes: "string | null"
+            received_by:
+              id: "string (UUID)"
+              name: "string"
+            created_at: "string (ISO 8601)"
+          items:
+            type: "array"
+            items:
+              id: "string (UUID)"
+              product:
+                id: "string (UUID)"
+                code: "string"
+                name: "string"
+              ordered_qty: "number"
+              received_qty: "number"
+              uom: "string"
+              batch_number: "string | null"
+              supplier_batch_number: "string | null"
+              expiry_date: "string | null"
+              manufacture_date: "string | null"
+              location:
+                id: "string (UUID)"
+                code: "string"
+              qa_status: "string"
+              lp:
+                id: "string (UUID)"
+                lp_number: "string"
+              notes: "string | null"
+
+# ============================================================================
+# Services
+# ============================================================================
+services:
+  - path: "apps/frontend/lib/services/grn-service.ts"
+    description: "GRN business logic and transaction orchestration"
+    exports:
+      - name: "GRNService"
+        type: "class"
+        methods:
+          - name: "createFromPO"
+            type: "static async"
+            params:
+              - "input: CreateGRNFromPOInput"
+            returns: "Promise<CreateGRNFromPOResult>"
+            description: "Main method - creates GRN, items, LPs, updates PO"
+          - name: "validateReceipt"
+            type: "static async"
+            params:
+              - "input: CreateGRNFromPOInput"
+            returns: "Promise<GRNValidationResult>"
+            description: "Pre-validation before commit"
+          - name: "calculateOverReceipt"
+            type: "static async"
+            params:
+              - "poLineId: string"
+              - "attemptingQty: number"
+            returns: "Promise<OverReceiptCalculation>"
+            description: "Calculate over-receipt for a PO line"
+          - name: "list"
+            type: "static async"
+            params:
+              - "params: GRNListParams"
+            returns: "Promise<PaginatedResult<GRN>>"
+          - name: "getById"
+            type: "static async"
+            params:
+              - "id: string"
+            returns: "Promise<GRNWithItems | null>"
+          - name: "generateGRNNumber"
+            type: "static async"
+            returns: "Promise<string>"
+          - name: "getReceivablePOs"
+            type: "static async"
+            params:
+              - "params?: { warehouseId?: string; supplierId?: string }"
+            returns: "Promise<ReceivablePO[]>"
+          - name: "getPOLinesForReceipt"
+            type: "static async"
+            params:
+              - "poId: string"
+            returns: "Promise<POLinesForReceipt>"
+          - name: "updatePOStatus"
+            type: "static async"
+            params:
+              - "poId: string"
+            returns: "Promise<void>"
+            description: "Internal - update PO status based on line receipts"
+
+# ============================================================================
+# Validation Schemas (Zod)
+# ============================================================================
+validation:
+  path: "apps/frontend/lib/validation/grn.ts"
+  schemas:
+    - name: "createGRNItemSchema"
+      code: |
+        export const createGRNItemSchema = z.object({
+          po_line_id: z.string().uuid("Invalid PO line ID"),
+          received_qty: z.number()
+            .positive("Received quantity must be positive")
+            .max(999999999, "Quantity too large"),
+          batch_number: z.string()
+            .max(100, "Batch number max 100 characters")
+            .nullable()
+            .optional(),
+          supplier_batch_number: z.string()
+            .max(100, "Supplier batch number max 100 characters")
+            .nullable()
+            .optional(),
+          expiry_date: z.string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)")
+            .nullable()
+            .optional(),
+          manufacture_date: z.string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)")
+            .nullable()
+            .optional(),
+          location_id: z.string().uuid("Invalid location ID").optional(),
+          notes: z.string().max(500).nullable().optional(),
+        });
+
+    - name: "createGRNFromPOSchema"
+      code: |
+        export const createGRNFromPOSchema = z.object({
+          warehouse_id: z.string().uuid("Invalid warehouse ID"),
+          location_id: z.string().uuid("Invalid location ID"),
+          notes: z.string().max(2000).optional(),
+          items: z.array(createGRNItemSchema)
+            .min(1, "At least one item required")
+            .max(100, "Maximum 100 items per GRN"),
+        });
+
+    - name: "grnListQuerySchema"
+      code: |
+        export const grnListQuerySchema = z.object({
+          status: z.enum(['draft', 'completed', 'cancelled']).optional(),
+          source_type: z.enum(['po', 'to', 'return', 'adjustment']).optional(),
+          po_id: z.string().uuid().optional(),
+          warehouse_id: z.string().uuid().optional(),
+          supplier_id: z.string().uuid().optional(),
+          date_from: z.string().optional(),
+          date_to: z.string().optional(),
+          search: z.string().min(1).optional(),
+          sort: z.enum(['grn_number', 'receipt_date', 'created_at']).default('receipt_date'),
+          order: z.enum(['asc', 'desc']).default('desc'),
+          page: z.coerce.number().int().positive().default(1),
+          limit: z.coerce.number().int().min(1).max(100).default(50),
+        });
+
+# ============================================================================
+# Types
+# ============================================================================
+types:
+  path: "apps/frontend/lib/types/grn.ts"
+  exports:
+    - "GRN"
+    - "GRNItem"
+    - "GRNStatus"
+    - "GRNSourceType"
+    - "CreateGRNFromPOInput"
+    - "CreateGRNFromPOResult"
+    - "GRNValidationResult"
+    - "OverReceiptCalculation"
+    - "ReceivablePO"
+    - "POLineForReceipt"
+
+# ============================================================================
+# Performance Requirements
+# ============================================================================
+performance:
+  - endpoint: "POST /grns/from-po/:poId"
+    target: "< 500ms for 1 line, < 1000ms for 10 lines"
+  - endpoint: "GET /grns"
+    target: "< 500ms with 1000 GRNs in org"
+  - endpoint: "GET /grns/:id"
+    target: "< 200ms"
+  - endpoint: "GET /receiving/pending-pos"
+    target: "< 500ms"
+  - endpoint: "GET /receiving/po/:poId/lines"
+    target: "< 300ms for 50 lines"
+  - endpoint: "POST /grns/validate"
+    target: "< 300ms"

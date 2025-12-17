@@ -1,0 +1,418 @@
+# Story 03.3 - Frontend Specification
+# Purpose: Pages, components, hooks, wireframe references
+# Agent: FRONTEND-DEV
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/planning/purchase-orders/page.tsx"
+    description: "PO List page with DataTable, filters, KPI cards"
+    wireframe: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-004-po-list.md"
+    components:
+      - "PODataTable"
+      - "POFilters"
+      - "POKPICards"
+      - "POStatusBadge"
+    states:
+      - "loading"
+      - "empty"
+      - "error"
+      - "success"
+
+  - path: "apps/frontend/app/(authenticated)/planning/purchase-orders/[id]/page.tsx"
+    description: "PO Detail/Edit page with lines, history, documents"
+    wireframe: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-006-po-detail.md"
+    components:
+      - "POHeader"
+      - "POLinesTable"
+      - "POTotalsPanel"
+      - "POStatusTimeline"
+      - "POActionsBar"
+    states:
+      - "loading"
+      - "error"
+      - "success"
+      - "editing"
+
+  - path: "apps/frontend/app/(authenticated)/planning/purchase-orders/new/page.tsx"
+    description: "Create new PO page with form and lines"
+    wireframe: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-005-po-create-edit-modal.md"
+    components:
+      - "POForm"
+      - "POHeaderForm"
+      - "POLinesTable"
+      - "POTotalsPanel"
+    states:
+      - "loading"
+      - "empty_lines"
+      - "success"
+      - "validation_error"
+      - "saving"
+
+# Components
+components:
+  # List Page Components
+  - path: "apps/frontend/components/planning/purchase-orders/PODataTable.tsx"
+    description: "DataTable with sorting, filtering, row selection"
+    props:
+      - { name: "data", type: "POListItem[]" }
+      - { name: "isLoading", type: "boolean" }
+      - { name: "onRowClick", type: "(po: POListItem) => void" }
+      - { name: "onSelectionChange", type: "(ids: string[]) => void" }
+    wireframe_ref: "PLAN-004 - PO Table"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POFilters.tsx"
+    description: "Search + status/supplier/date filters bar"
+    props:
+      - { name: "onFilterChange", type: "(filters: POFilterParams) => void" }
+      - { name: "suppliers", type: "Supplier[]" }
+      - { name: "warehouses", type: "Warehouse[]" }
+    wireframe_ref: "PLAN-004 - Filters Bar"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POKPICards.tsx"
+    description: "4 KPI summary cards (Open, Pending, Overdue, This Month)"
+    props:
+      - { name: "data", type: "POSummary" }
+      - { name: "isLoading", type: "boolean" }
+      - { name: "onCardClick", type: "(type: string) => void" }
+    wireframe_ref: "PLAN-004 - KPI Summary Cards"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POStatusBadge.tsx"
+    description: "Status badge with color coding"
+    props:
+      - { name: "status", type: "POStatus" }
+      - { name: "size", type: "'sm' | 'md' | 'lg'", default: "md" }
+    colors:
+      draft: "bg-gray-100 text-gray-800"
+      submitted: "bg-blue-100 text-blue-800"
+      pending_approval: "bg-yellow-100 text-yellow-800"
+      confirmed: "bg-green-100 text-green-800"
+      receiving: "bg-purple-100 text-purple-800"
+      closed: "bg-emerald-100 text-emerald-800"
+      cancelled: "bg-red-100 text-red-800"
+    wireframe_ref: "PLAN-004 - Status Badge Colors"
+
+  # Form Components
+  - path: "apps/frontend/components/planning/purchase-orders/POForm.tsx"
+    description: "Master form container (header + lines)"
+    props:
+      - { name: "initialData", type: "PurchaseOrderWithLines | null" }
+      - { name: "mode", type: "'create' | 'edit'" }
+      - { name: "onSubmit", type: "(data: CreatePOInput | UpdatePOInput) => Promise<void>" }
+      - { name: "onCancel", type: "() => void" }
+    wireframe_ref: "PLAN-005 - Full Form"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POHeaderForm.tsx"
+    description: "Header fields section (supplier, dates, warehouse, etc.)"
+    props:
+      - { name: "form", type: "UseFormReturn<CreatePOInput>" }
+      - { name: "suppliers", type: "Supplier[]" }
+      - { name: "warehouses", type: "Warehouse[]" }
+      - { name: "taxCodes", type: "TaxCode[]" }
+      - { name: "onSupplierChange", type: "(supplierId: string) => void" }
+    wireframe_ref: "PLAN-005 - Header Section"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POSupplierSelect.tsx"
+    description: "Supplier dropdown with cascade defaults"
+    props:
+      - { name: "value", type: "string" }
+      - { name: "onChange", type: "(supplierId: string, defaults: SupplierDefaults) => void" }
+      - { name: "suppliers", type: "Supplier[]" }
+    behavior:
+      - "On selection, fetch supplier defaults (currency, tax_code, payment_terms)"
+      - "Cascade defaults to form fields"
+      - "Show lead time info"
+    wireframe_ref: "PLAN-005 - Supplier Selection Behavior"
+
+  # Lines Components
+  - path: "apps/frontend/components/planning/purchase-orders/POLinesTable.tsx"
+    description: "Editable lines DataTable"
+    props:
+      - { name: "lines", type: "POLine[]" }
+      - { name: "isEditable", type: "boolean" }
+      - { name: "onAddLine", type: "() => void" }
+      - { name: "onEditLine", type: "(lineId: string) => void" }
+      - { name: "onDeleteLine", type: "(lineId: string) => void" }
+    columns:
+      - { id: "#", width: "40px", sortable: false }
+      - { id: "product", width: "250px", sortable: false }
+      - { id: "quantity", width: "80px", sortable: false }
+      - { id: "uom", width: "60px", sortable: false }
+      - { id: "unit_price", width: "100px", sortable: false }
+      - { id: "discount", width: "80px", sortable: false }
+      - { id: "line_total", width: "100px", sortable: false }
+      - { id: "actions", width: "80px", sortable: false }
+    wireframe_ref: "PLAN-005 - Lines Section"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POLineModal.tsx"
+    description: "Add/Edit line modal with product search"
+    props:
+      - { name: "isOpen", type: "boolean" }
+      - { name: "mode", type: "'add' | 'edit'" }
+      - { name: "initialData", type: "POLine | null" }
+      - { name: "supplierId", type: "string" }
+      - { name: "taxCodeId", type: "string" }
+      - { name: "onSubmit", type: "(data: CreatePOLineInput) => Promise<void>" }
+      - { name: "onClose", type: "() => void" }
+    states:
+      - "empty"
+      - "searching"
+      - "no_results"
+      - "product_selected"
+      - "duplicate_warning"
+      - "validation_error"
+      - "submitting"
+    wireframe_ref: "PLAN-009 - Add PO Line Modal"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POProductSelect.tsx"
+    description: "Product search with price lookup"
+    props:
+      - { name: "supplierId", type: "string" }
+      - { name: "onSelect", type: "(product: Product, price: PriceInfo) => void" }
+      - { name: "excludeProductIds", type: "string[]" }
+    behavior:
+      - "Search products by name or code"
+      - "Debounce 300ms, min 2 chars"
+      - "On select, fetch supplier-product price"
+      - "Show price source (supplier vs standard)"
+    wireframe_ref: "PLAN-009 - Product Search Autocomplete"
+
+  # Detail Page Components
+  - path: "apps/frontend/components/planning/purchase-orders/POHeader.tsx"
+    description: "Read-only header info display"
+    props:
+      - { name: "po", type: "PurchaseOrderWithLines" }
+    wireframe_ref: "PLAN-006 - Header Info Section"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POTotalsPanel.tsx"
+    description: "Totals display panel (subtotal, tax, total)"
+    props:
+      - { name: "subtotal", type: "number" }
+      - { name: "taxAmount", type: "number" }
+      - { name: "discountTotal", type: "number" }
+      - { name: "total", type: "number" }
+      - { name: "currency", type: "Currency" }
+      - { name: "receivedValue", type: "number (optional)" }
+    wireframe_ref: "PLAN-005 - Totals Section, PLAN-006 - Totals"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POStatusTimeline.tsx"
+    description: "Status history timeline"
+    props:
+      - { name: "history", type: "POStatusHistory[]" }
+      - { name: "isLoading", type: "boolean" }
+    wireframe_ref: "PLAN-006 - History Tab View"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POActionsBar.tsx"
+    description: "Action buttons based on status"
+    props:
+      - { name: "po", type: "PurchaseOrder" }
+      - { name: "onSubmit", type: "() => Promise<void>" }
+      - { name: "onConfirm", type: "() => Promise<void>" }
+      - { name: "onCancel", type: "() => Promise<void>" }
+      - { name: "onEdit", type: "() => void" }
+      - { name: "onPrint", type: "() => void" }
+    wireframe_ref: "PLAN-006 - Header Actions"
+
+  # Dialog Components
+  - path: "apps/frontend/components/planning/purchase-orders/PODeleteConfirmDialog.tsx"
+    description: "Delete confirmation dialog"
+    props:
+      - { name: "isOpen", type: "boolean" }
+      - { name: "poNumber", type: "string" }
+      - { name: "onConfirm", type: "() => Promise<void>" }
+      - { name: "onCancel", type: "() => void" }
+
+  - path: "apps/frontend/components/planning/purchase-orders/POCancelConfirmDialog.tsx"
+    description: "Cancel confirmation with reason input"
+    props:
+      - { name: "isOpen", type: "boolean" }
+      - { name: "poNumber", type: "string" }
+      - { name: "onConfirm", type: "(reason?: string) => Promise<void>" }
+      - { name: "onCancel", type: "() => void" }
+
+  - path: "apps/frontend/components/planning/purchase-orders/POStatusTransitionDialog.tsx"
+    description: "Status change confirmation"
+    props:
+      - { name: "isOpen", type: "boolean" }
+      - { name: "currentStatus", type: "POStatus" }
+      - { name: "targetStatus", type: "POStatus" }
+      - { name: "onConfirm", type: "() => Promise<void>" }
+      - { name: "onCancel", type: "() => void" }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-purchase-orders.ts"
+    description: "React Query hooks for PO operations"
+    exports:
+      - name: "usePurchaseOrders"
+        description: "List POs with pagination and filters"
+        params: "params: POListParams"
+        returns: "UseQueryResult<PaginatedResult<POListItem>>"
+
+      - name: "usePurchaseOrder"
+        description: "Get single PO with lines"
+        params: "id: string"
+        returns: "UseQueryResult<PurchaseOrderWithLines>"
+
+      - name: "usePOSummary"
+        description: "Get KPI summary data"
+        returns: "UseQueryResult<POSummary>"
+
+      - name: "useCreatePO"
+        description: "Create PO mutation"
+        returns: "UseMutationResult<PurchaseOrderWithLines, Error, CreatePOInput>"
+
+      - name: "useUpdatePO"
+        description: "Update PO mutation"
+        returns: "UseMutationResult<PurchaseOrderWithLines, Error, UpdatePOInput>"
+
+      - name: "useDeletePO"
+        description: "Delete PO mutation"
+        returns: "UseMutationResult<void, Error, string>"
+
+      - name: "useSubmitPO"
+        description: "Submit PO mutation"
+        returns: "UseMutationResult<PurchaseOrder, Error, string>"
+
+      - name: "useConfirmPO"
+        description: "Confirm PO mutation"
+        returns: "UseMutationResult<PurchaseOrder, Error, string>"
+
+      - name: "useCancelPO"
+        description: "Cancel PO mutation"
+        returns: "UseMutationResult<PurchaseOrder, Error, { id: string; reason?: string }>"
+
+      - name: "useAddPOLine"
+        description: "Add line mutation"
+        returns: "UseMutationResult<POLine, Error, { poId: string; line: CreatePOLineInput }>"
+
+      - name: "useUpdatePOLine"
+        description: "Update line mutation"
+        returns: "UseMutationResult<POLine, Error, { poId: string; lineId: string; data: UpdatePOLineInput }>"
+
+      - name: "useDeletePOLine"
+        description: "Delete line mutation"
+        returns: "UseMutationResult<void, Error, { poId: string; lineId: string }>"
+
+      - name: "usePOStatusHistory"
+        description: "Get status history"
+        params: "poId: string"
+        returns: "UseQueryResult<POStatusHistory[]>"
+
+# UX Wireframe References
+ux:
+  wireframes:
+    - id: "PLAN-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-004-po-list.md"
+      screens:
+        - name: "Success State (Desktop)"
+          components: ["POKPICards", "POFilters", "PODataTable"]
+        - name: "Loading State"
+          components: ["Skeleton cards", "Skeleton table"]
+        - name: "Empty State"
+          components: ["EmptyState illustration", "Create button"]
+        - name: "Error State"
+          components: ["Error message", "Retry button"]
+
+    - id: "PLAN-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-005-po-create-edit-modal.md"
+      screens:
+        - name: "Create Mode"
+          components: ["POHeaderForm", "POLinesTable", "POTotalsPanel"]
+        - name: "Edit Mode"
+          components: ["POHeaderForm (with PO number)", "POLinesTable", "POTotalsPanel"]
+        - name: "Empty Lines State"
+          components: ["Empty state", "Add First Line button"]
+        - name: "Validation Error State"
+          components: ["Error banner", "Field errors"]
+
+    - id: "PLAN-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-006-po-detail.md"
+      screens:
+        - name: "Lines Tab"
+          components: ["POHeader", "POLinesTable (read-only)", "POTotalsPanel"]
+        - name: "History Tab"
+          components: ["POHeader", "POStatusTimeline"]
+        - name: "Documents Tab"
+          components: ["POHeader", "DocumentsList"]
+        - name: "Receiving Tab"
+          components: ["POHeader", "ReceiptsList", "ReceivingSummary"]
+
+    - id: "PLAN-009"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-009-add-po-line-modal.md"
+      screens:
+        - name: "Add Mode"
+          components: ["POProductSelect", "LineDetailsForm", "CalculatedValues"]
+        - name: "Edit Mode"
+          components: ["Product (read-only)", "LineDetailsForm", "CalculatedValues"]
+        - name: "Duplicate Warning"
+          components: ["Warning banner", "Edit/Add Anyway buttons"]
+
+  patterns:
+    table: "ShadCN DataTable with TanStack Table"
+    modal: "ShadCN Dialog component"
+    form: "react-hook-form with Zod validation"
+    toast: "ShadCN Toast for success/error messages"
+    select: "ShadCN Select/Combobox"
+    date_picker: "ShadCN DatePicker"
+
+  states:
+    - "loading - Skeleton UI"
+    - "empty - Empty state illustration with CTA"
+    - "error - Error message with retry button"
+    - "success - Data displayed"
+    - "saving - Disabled buttons with spinner"
+
+# Responsive Design
+responsive:
+  breakpoints:
+    desktop: ">1024px - Full table with all columns"
+    tablet: "768-1024px - Condensed table, 2-column forms"
+    mobile: "<768px - Card layout, stacked forms, bottom action bar"
+
+  mobile_specifics:
+    - "Table becomes card list"
+    - "Filters collapse into dropdown"
+    - "Pagination becomes 'Load More'"
+    - "Forms use full-width stacked layout"
+    - "Modal becomes full-screen"
+
+# Accessibility
+accessibility:
+  touch_targets:
+    minimum: "48x48dp"
+    table_rows: "64px height"
+    buttons: "48dp height"
+
+  contrast:
+    text: "4.5:1 minimum"
+    badges: "WCAG AA compliant"
+
+  screen_reader:
+    - "Proper heading hierarchy"
+    - "Table with scope attributes"
+    - "ARIA labels on interactive elements"
+    - "Status badges announced"
+
+  keyboard:
+    - "Tab: Navigate between elements"
+    - "Enter: Activate buttons/links"
+    - "Space: Toggle checkboxes"
+    - "Escape: Close modals"
+    - "Arrow keys: Navigate dropdowns"
+
+# Performance
+performance:
+  targets:
+    list_load: "<300ms"
+    detail_load: "<500ms"
+    create_po: "<1s"
+    line_recalculation: "<100ms"
+    search_debounce: "200ms"
+
+  caching:
+    - key: "org:{orgId}:po-list:{filters_hash}"
+      ttl: "1 min"
+    - key: "org:{orgId}:po-summary"
+      ttl: "2 min"
+    - key: "org:{orgId}:suppliers:dropdown"
+      ttl: "5 min"

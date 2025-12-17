@@ -1,0 +1,433 @@
+# Story 04.2b - WO Pause/Resume
+# API endpoints, request/response schemas, and validation
+
+api_endpoints:
+  # POST /api/production/work-orders/:id/pause
+  - endpoint: "pause"
+    method: "POST"
+    path: "/api/production/work-orders/:id/pause"
+    file: "apps/frontend/app/api/production/work-orders/[id]/pause/route.ts"
+    description: "Pause an active work order with mandatory reason"
+    auth:
+      required: true
+      roles: ["admin", "manager", "operator"]
+    params:
+      id:
+        type: "string (UUID)"
+        description: "Work order ID"
+        required: true
+    request:
+      content_type: "application/json"
+      schema:
+        pause_reason:
+          type: "enum"
+          required: true
+          values:
+            - "machine_breakdown"
+            - "material_shortage"
+            - "break"
+            - "quality_issue"
+            - "other"
+          description: "Reason for pausing the work order"
+        notes:
+          type: "string"
+          required: false
+          max_length: 500
+          description: "Optional operator notes about the pause"
+      example:
+        pause_reason: "machine_breakdown"
+        notes: "Awaiting maintenance for mixer motor"
+    response:
+      success:
+        status: 200
+        schema:
+          id:
+            type: "string (UUID)"
+            description: "Work order ID"
+          wo_number:
+            type: "string"
+            description: "Work order number"
+          status:
+            type: "string"
+            value: "paused"
+          paused_at:
+            type: "string (ISO timestamp)"
+            description: "When the WO was paused"
+          paused_by_user_id:
+            type: "string (UUID)"
+            description: "User who paused the WO"
+          paused_by_user:
+            type: "object"
+            properties:
+              id: "string (UUID)"
+              first_name: "string"
+              last_name: "string"
+          pause_reason:
+            type: "string"
+            description: "Selected pause reason"
+          notes:
+            type: "string | null"
+            description: "Operator notes"
+        example:
+          id: "550e8400-e29b-41d4-a716-446655440000"
+          wo_number: "WO-2025-0156"
+          status: "paused"
+          paused_at: "2025-12-17T10:30:00Z"
+          paused_by_user_id: "660e8400-e29b-41d4-a716-446655440001"
+          paused_by_user:
+            id: "660e8400-e29b-41d4-a716-446655440001"
+            first_name: "John"
+            last_name: "Smith"
+          pause_reason: "machine_breakdown"
+          notes: "Awaiting maintenance for mixer motor"
+    errors:
+      - status: 400
+        code: "PAUSE_DISABLED"
+        message: "Pause functionality is disabled for this organization"
+        condition: "allow_pause_wo = false"
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Cannot pause work order with status '{status}'. Only in_progress WOs can be paused."
+        condition: "WO status != 'in_progress'"
+      - status: 400
+        code: "ALREADY_PAUSED"
+        message: "Work order is already paused"
+        condition: "WO status = 'paused'"
+      - status: 400
+        code: "REASON_REQUIRED"
+        message: "Pause reason is required"
+        condition: "pause_reason is empty or missing"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Work order not found"
+        condition: "WO does not exist or not in org"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "You do not have permission to pause work orders"
+        condition: "User role not allowed"
+
+  # POST /api/production/work-orders/:id/resume
+  - endpoint: "resume"
+    method: "POST"
+    path: "/api/production/work-orders/:id/resume"
+    file: "apps/frontend/app/api/production/work-orders/[id]/resume/route.ts"
+    description: "Resume a paused work order"
+    auth:
+      required: true
+      roles: ["admin", "manager", "operator"]
+    params:
+      id:
+        type: "string (UUID)"
+        description: "Work order ID"
+        required: true
+    request:
+      content_type: "application/json"
+      schema: {}
+      example: {}
+      notes: "Empty body - no additional data required for resume"
+    response:
+      success:
+        status: 200
+        schema:
+          id:
+            type: "string (UUID)"
+            description: "Work order ID"
+          wo_number:
+            type: "string"
+            description: "Work order number"
+          status:
+            type: "string"
+            value: "in_progress"
+          pause_history:
+            type: "array"
+            description: "History of pause events for this WO"
+            items:
+              id:
+                type: "string (UUID)"
+              pause_reason:
+                type: "string | null"
+              notes:
+                type: "string | null"
+              paused_at:
+                type: "string (ISO timestamp)"
+              resumed_at:
+                type: "string (ISO timestamp)"
+              duration_minutes:
+                type: "number"
+        example:
+          id: "550e8400-e29b-41d4-a716-446655440000"
+          wo_number: "WO-2025-0156"
+          status: "in_progress"
+          pause_history:
+            - id: "770e8400-e29b-41d4-a716-446655440002"
+              pause_reason: "machine_breakdown"
+              notes: "Awaiting maintenance for mixer motor"
+              paused_at: "2025-12-17T10:30:00Z"
+              resumed_at: "2025-12-17T11:15:00Z"
+              duration_minutes: 45
+    errors:
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "Cannot resume work order with status '{status}'. Only paused WOs can be resumed."
+        condition: "WO status != 'paused'"
+      - status: 400
+        code: "NOT_PAUSED"
+        message: "Work order is not currently paused"
+        condition: "WO status = 'in_progress'"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Work order not found"
+        condition: "WO does not exist or not in org"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "You do not have permission to resume work orders"
+        condition: "User role not allowed"
+
+  # GET /api/production/work-orders/:id/pause-history
+  - endpoint: "pause-history"
+    method: "GET"
+    path: "/api/production/work-orders/:id/pause-history"
+    file: "apps/frontend/app/api/production/work-orders/[id]/pause-history/route.ts"
+    description: "Get pause history for a work order"
+    auth:
+      required: true
+      roles: ["admin", "manager", "operator"]
+    params:
+      id:
+        type: "string (UUID)"
+        description: "Work order ID"
+        required: true
+    request:
+      query_params: []
+    response:
+      success:
+        status: 200
+        schema:
+          total_pauses:
+            type: "number"
+            description: "Total number of pause events"
+          total_downtime_minutes:
+            type: "number"
+            description: "Total downtime in minutes across all pauses"
+          pauses:
+            type: "array"
+            description: "List of pause events"
+            items:
+              id:
+                type: "string (UUID)"
+              pause_reason:
+                type: "string | null"
+              notes:
+                type: "string | null"
+              paused_at:
+                type: "string (ISO timestamp)"
+              resumed_at:
+                type: "string | null (ISO timestamp)"
+              duration_minutes:
+                type: "number | null"
+              paused_by_user:
+                type: "object | null"
+                properties:
+                  id: "string (UUID)"
+                  first_name: "string"
+                  last_name: "string"
+              resumed_by_user:
+                type: "object | null"
+                properties:
+                  id: "string (UUID)"
+                  first_name: "string"
+                  last_name: "string"
+        example:
+          total_pauses: 3
+          total_downtime_minutes: 95
+          pauses:
+            - id: "770e8400-e29b-41d4-a716-446655440002"
+              pause_reason: "machine_breakdown"
+              notes: "Mixer motor failed"
+              paused_at: "2025-12-17T10:30:00Z"
+              resumed_at: "2025-12-17T11:15:00Z"
+              duration_minutes: 45
+              paused_by_user:
+                id: "660e8400-e29b-41d4-a716-446655440001"
+                first_name: "John"
+                last_name: "Smith"
+              resumed_by_user:
+                id: "660e8400-e29b-41d4-a716-446655440001"
+                first_name: "John"
+                last_name: "Smith"
+            - id: "770e8400-e29b-41d4-a716-446655440003"
+              pause_reason: "break"
+              notes: null
+              paused_at: "2025-12-17T12:00:00Z"
+              resumed_at: "2025-12-17T12:30:00Z"
+              duration_minutes: 30
+              paused_by_user:
+                id: "660e8400-e29b-41d4-a716-446655440001"
+                first_name: "John"
+                last_name: "Smith"
+              resumed_by_user:
+                id: "660e8400-e29b-41d4-a716-446655440001"
+                first_name: "John"
+                last_name: "Smith"
+            - id: "770e8400-e29b-41d4-a716-446655440004"
+              pause_reason: "quality_issue"
+              notes: "QA inspection in progress"
+              paused_at: "2025-12-17T14:00:00Z"
+              resumed_at: null
+              duration_minutes: null
+              paused_by_user:
+                id: "660e8400-e29b-41d4-a716-446655440001"
+                first_name: "John"
+                last_name: "Smith"
+              resumed_by_user: null
+    errors:
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Work order not found"
+        condition: "WO does not exist or not in org"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "You do not have permission to view pause history"
+        condition: "User role not allowed"
+
+# Validation Schemas (Zod)
+validation:
+  file: "apps/frontend/lib/validation/production-schemas.ts"
+  schemas:
+    pauseReasonEnum:
+      type: "z.enum"
+      values:
+        - "machine_breakdown"
+        - "material_shortage"
+        - "break"
+        - "quality_issue"
+        - "other"
+      code: |
+        export const pauseReasonEnum = z.enum([
+          'machine_breakdown',
+          'material_shortage',
+          'break',
+          'quality_issue',
+          'other'
+        ])
+
+    pauseWorkOrderSchema:
+      type: "z.object"
+      fields:
+        pause_reason:
+          schema: "pauseReasonEnum"
+          required: true
+        notes:
+          schema: "z.string().max(500).optional()"
+          required: false
+      code: |
+        export const pauseWorkOrderSchema = z.object({
+          pause_reason: pauseReasonEnum,
+          notes: z.string().max(500).optional()
+        })
+
+        export type PauseWorkOrderInput = z.infer<typeof pauseWorkOrderSchema>
+
+    resumeWorkOrderSchema:
+      type: "z.object"
+      fields: {}
+      code: |
+        export const resumeWorkOrderSchema = z.object({})
+
+        export type ResumeWorkOrderInput = z.infer<typeof resumeWorkOrderSchema>
+
+# Business Rules for API
+business_rules:
+  pause:
+    preconditions:
+      - "allow_pause_wo setting must be true"
+      - "WO status must be 'in_progress'"
+      - "User must have allowed role (admin, manager, operator)"
+    validation:
+      - "pause_reason must be provided and valid enum value"
+      - "notes must be <= 500 characters if provided"
+    atomic_operation:
+      - "Update work_orders.status to 'paused'"
+      - "Set work_orders.paused_at to current timestamp"
+      - "Set work_orders.paused_by_user_id to current user"
+      - "Insert new record into wo_pauses"
+    optimistic_locking:
+      - "WHERE clause includes status = 'in_progress'"
+      - "Prevents race conditions"
+
+  resume:
+    preconditions:
+      - "WO status must be 'paused'"
+      - "User must have allowed role (admin, manager, operator)"
+    validation:
+      - "No additional input required"
+    atomic_operation:
+      - "Update work_orders.status to 'in_progress'"
+      - "Clear work_orders.paused_at"
+      - "Clear work_orders.paused_by_user_id"
+      - "Update wo_pauses: set resumed_at, resumed_by_user_id, duration_minutes"
+    duration_calculation:
+      formula: "ROUND((resumed_at - paused_at) / 60000)"
+      tolerance: "+/- 1 minute"
+
+# Pause Reason Codes
+pause_reason_codes:
+  - code: "machine_breakdown"
+    label: "Machine Breakdown"
+    description: "Equipment failure or malfunction"
+    planned: false
+
+  - code: "material_shortage"
+    label: "Material Shortage"
+    description: "Required materials not available"
+    planned: false
+
+  - code: "break"
+    label: "Break/Lunch"
+    description: "Scheduled operator break"
+    planned: true
+
+  - code: "quality_issue"
+    label: "Quality Issue"
+    description: "QA inspection or quality hold"
+    planned: false
+
+  - code: "other"
+    label: "Other"
+    description: "Other reason (specify in notes)"
+    planned: false
+
+# Error Handling
+error_handling:
+  error_class: "WOPauseError"
+  error_codes:
+    PAUSE_DISABLED: "Pause functionality disabled in settings"
+    INVALID_STATUS: "Invalid WO status for operation"
+    ALREADY_PAUSED: "WO is already paused"
+    NOT_PAUSED: "WO is not paused"
+    REASON_REQUIRED: "Pause reason is required"
+    NOT_FOUND: "Work order not found"
+    FORBIDDEN: "Permission denied"
+    INTERNAL_ERROR: "Internal server error"
+
+# Rate Limiting (if applicable)
+rate_limiting:
+  enabled: false
+  notes: "No rate limiting for pause/resume - infrequent operations"
+
+# Audit Logging
+audit_logging:
+  enabled: true
+  events:
+    - event: "wo.paused"
+      data:
+        - "wo_id"
+        - "pause_reason"
+        - "paused_by_user_id"
+        - "paused_at"
+    - event: "wo.resumed"
+      data:
+        - "wo_id"
+        - "resumed_by_user_id"
+        - "resumed_at"
+        - "duration_minutes"

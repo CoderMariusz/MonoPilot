@@ -1,0 +1,91 @@
+# Story 04.4 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "04.4"
+  name: "Yield Tracking (Manual Entry)"
+  slug: "yield-tracking"
+  epic: "04-production"
+  phase: "0"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id isolation", "user context"]
+    - story: "03.10"
+      name: "Work Order Generation"
+      provides: ["work_orders table", "planned_quantity field"]
+    - story: "04.2a"
+      name: "Work Order Start"
+      provides: ["WO status transitions", "In Progress state"]
+  blocked_by: []
+  blocks:
+    - story: "04.7a"
+      name: "Output Registration Desktop"
+      reason: "Automatic yield from outputs extends this manual yield"
+    - story: "04.10c"
+      name: "Yield Analysis Report"
+      reason: "Uses yield data from this story"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections: ["FR-PROD-014"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/production.md"
+    sections: ["Database Schema", "API Design", "Business Rules"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/04.4.yield-tracking.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-002-wo-execution-detail.md"
+      sections: ["4.4 Complete Operation Modal", "Yield display"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS pattern for yield_logs table"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Create yield_logs table with RLS policies"
+  - type: "api"
+    count: 2
+    description: "PATCH /work-orders/:id/yield, GET /work-orders/:id/yield/history"
+  - type: "service"
+    count: 1
+    description: "yield-service.ts with calculation and validation logic"
+  - type: "validation"
+    count: 1
+    description: "yield-validation.ts with Zod schemas"
+  - type: "component"
+    count: 5
+    description: "YieldSection, YieldEntryForm, YieldGauge, YieldHistoryTable, YieldWarningBanner"
+  - type: "test"
+    count: 3
+    description: "Unit (yield calculation), integration (API), E2E (yield workflow)"
+
+# Technical notes
+technical_notes:
+  - "Phase 0 scope: Manual yield entry only (automatic from outputs deferred to 04.7a)"
+  - "Yield formula: (produced_quantity / planned_quantity) * 100, rounded to 1 decimal"
+  - "Yield thresholds: green >= 80%, yellow 70-79%, red < 70%"
+  - "yield_logs table tracks all manual entries with old/new values"
+  - "Status restriction: Yield entry only when WO status = 'In Progress'"
+  - "Overproduction control via production_settings.allow_overproduction flag"
+  - "Performance: Yield updates must complete within 500ms"

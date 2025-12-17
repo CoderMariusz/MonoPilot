@@ -1,0 +1,177 @@
+# Story 03.9b - Database Schema
+# Purpose: Tables, RLS policies, indexes
+# Agent: BACKEND-DEV (database focus)
+# Status: DEFERRED - Requires Epic 05 license_plates table
+
+migrations:
+  - path: "supabase/migrations/XXX_create_to_line_lps.sql"
+    type: "migration"
+    description: "Junction table for LP assignments to TO lines"
+    deferred: true
+    blocked_by: "Epic 05 license_plates table must exist first"
+
+tables:
+  - name: "to_line_lps"
+    description: "License Plate assignments to Transfer Order lines"
+    purpose: "Pre-selection of specific LPs for transfer, enabling precise inventory control"
+    deferred: true
+    blocked_by: "license_plates table (Epic 05)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "to_line_id", type: "UUID", constraints: "NOT NULL REFERENCES transfer_order_lines(id) ON DELETE CASCADE" }
+      - { name: "lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id)" }
+      - { name: "quantity", type: "DECIMAL(15,4)", constraints: "NOT NULL CHECK (quantity > 0)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "Chained via TO line -> TO -> org_id"
+    indexes:
+      - "idx_to_line_lps_to_line_id ON to_line_lps(to_line_id)"
+      - "idx_to_line_lps_lp_id ON to_line_lps(lp_id)"
+    constraints:
+      - "UNIQUE(to_line_id, lp_id) -- Same LP cannot be assigned twice to same line"
+
+# External tables required (from Epic 05)
+external_tables:
+  - name: "license_plates"
+    epic: "05"
+    story: "05.1"
+    required_columns:
+      - { name: "id", type: "UUID", purpose: "FK for to_line_lps.lp_id" }
+      - { name: "lp_number", type: "TEXT", purpose: "Human-readable LP identifier" }
+      - { name: "product_id", type: "UUID", purpose: "Validation: must match TO line product" }
+      - { name: "warehouse_id", type: "UUID", purpose: "Validation: must match TO from_warehouse" }
+      - { name: "lot_number", type: "TEXT", purpose: "Display in LP picker, traceability" }
+      - { name: "expiry_date", type: "DATE", purpose: "Filter in LP picker, FEFO logic" }
+      - { name: "location", type: "TEXT", purpose: "Display in LP picker" }
+      - { name: "status", type: "TEXT", purpose: "Filter: only 'active' LPs can be assigned" }
+  - name: "lp_inventory"
+    epic: "05"
+    story: "05.1"
+    required_columns:
+      - { name: "lp_id", type: "UUID", purpose: "Join to license_plates" }
+      - { name: "available_qty", type: "DECIMAL", purpose: "Validation: must be >= assigned quantity" }
+      - { name: "reserved_qty", type: "DECIMAL", purpose: "Future: LP reservation tracking" }
+      - { name: "uom", type: "TEXT", purpose: "Display in LP picker" }
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Chained Foreign Key Lookup"
+  pattern_sql: |
+    EXISTS (
+      SELECT 1 FROM transfer_order_lines tol
+      JOIN transfer_orders to ON tol.transfer_order_id = to.id
+      WHERE tol.id = to_line_lps.to_line_id
+        AND to.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    )
+  rationale:
+    - "No org_id column on to_line_lps (normalized via FK chain)"
+    - "RLS enforced through transfer_order_lines -> transfer_orders -> org_id"
+    - "ON DELETE CASCADE handles cleanup when TO line deleted"
+
+  policies:
+    - table: "to_line_lps"
+      name: "to_line_lps_org_isolation"
+      operation: "SELECT"
+      using: |
+        EXISTS (
+          SELECT 1 FROM transfer_order_lines tol
+          JOIN transfer_orders to ON tol.transfer_order_id = to.id
+          WHERE tol.id = to_line_lps.to_line_id
+            AND to.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+    - table: "to_line_lps"
+      name: "to_line_lps_write"
+      operation: "INSERT"
+      with_check: |
+        EXISTS (
+          SELECT 1 FROM transfer_order_lines tol
+          JOIN transfer_orders to ON tol.transfer_order_id = to.id
+          WHERE tol.id = to_line_lps.to_line_id
+            AND to.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND to.status IN ('draft', 'planned')
+        )
+    - table: "to_line_lps"
+      name: "to_line_lps_delete"
+      operation: "DELETE"
+      using: |
+        EXISTS (
+          SELECT 1 FROM transfer_order_lines tol
+          JOIN transfer_orders to ON tol.transfer_order_id = to.id
+          WHERE tol.id = to_line_lps.to_line_id
+            AND to.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+            AND to.status IN ('draft', 'planned')
+        )
+
+# Migration SQL (to be created after Epic 05)
+migration_sql: |
+  -- Migration: YYYYMMDDHHMMSS_create_to_line_lps.sql
+  -- Prerequisite: Epic 05 license_plates table must exist
+
+  CREATE TABLE to_line_lps (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    to_line_id          UUID NOT NULL REFERENCES transfer_order_lines(id) ON DELETE CASCADE,
+    lp_id               UUID NOT NULL REFERENCES license_plates(id),
+    quantity            DECIMAL(15,4) NOT NULL CHECK (quantity > 0),
+    created_at          TIMESTAMPTZ DEFAULT now(),
+    created_by          UUID REFERENCES users(id),
+
+    UNIQUE(to_line_id, lp_id)
+  );
+
+  -- Indexes
+  CREATE INDEX idx_to_line_lps_to_line_id ON to_line_lps(to_line_id);
+  CREATE INDEX idx_to_line_lps_lp_id ON to_line_lps(lp_id);
+
+  -- Enable RLS
+  ALTER TABLE to_line_lps ENABLE ROW LEVEL SECURITY;
+
+  -- RLS Policy: Org isolation via TO line -> TO -> org_id chain
+  CREATE POLICY to_line_lps_org_isolation ON to_line_lps
+    FOR SELECT
+    USING (
+      EXISTS (
+        SELECT 1 FROM transfer_order_lines tol
+        JOIN transfer_orders to ON tol.transfer_order_id = to.id
+        WHERE tol.id = to_line_lps.to_line_id
+          AND to.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      )
+    );
+
+  CREATE POLICY to_line_lps_insert ON to_line_lps
+    FOR INSERT
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM transfer_order_lines tol
+        JOIN transfer_orders to ON tol.transfer_order_id = to.id
+        WHERE tol.id = to_line_lps.to_line_id
+          AND to.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND to.status IN ('draft', 'planned')
+      )
+    );
+
+  CREATE POLICY to_line_lps_delete ON to_line_lps
+    FOR DELETE
+    USING (
+      EXISTS (
+        SELECT 1 FROM transfer_order_lines tol
+        JOIN transfer_orders to ON tol.transfer_order_id = to.id
+        WHERE tol.id = to_line_lps.to_line_id
+          AND to.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+          AND to.status IN ('draft', 'planned')
+      )
+    );
+
+  -- Comment
+  COMMENT ON TABLE to_line_lps IS 'License Plate assignments to Transfer Order lines for pre-selection';
+
+# Settings columns (added to planning_settings table)
+planning_settings_columns:
+  - name: "to_require_lp_selection"
+    type: "BOOLEAN"
+    default: "false"
+    description: "When enabled, TOs cannot be shipped without pre-assigned LPs"
+  - name: "to_require_exact_qty_match"
+    type: "BOOLEAN"
+    default: "false"
+    description: "When enabled, sum of LP quantities must equal TO line quantity"

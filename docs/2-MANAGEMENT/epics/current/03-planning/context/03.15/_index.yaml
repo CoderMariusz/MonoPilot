@@ -1,0 +1,108 @@
+# Story 03.15 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.15"
+  name: "WO Gantt Chart View"
+  slug: "wo-gantt-view"
+  epic: "03-planning"
+  phase: "P1"
+  complexity: "M"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Indexes (no new tables)
+  - api.yaml         # Endpoints, services, validation
+  - frontend.yaml    # Components, hooks, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns"]
+    - story: "01.9"
+      name: "Production Lines CRUD"
+      provides: ["production_lines table", "swimlane grouping"]
+    - story: "01.10"
+      name: "Machines CRUD"
+      provides: ["machines table", "machine swimlanes"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product names for WO bars"]
+    - story: "03.10"
+      name: "WO CRUD + BOM Auto-Select"
+      provides: ["work_orders table", "WO data model"]
+    - story: "03.14"
+      name: "WO Scheduling"
+      provides: ["scheduled_date", "scheduled_start_time", "scheduled_end_time fields"]
+      note: "Story 03.14 is DEFERRED - Gantt can work with basic scheduled_date from 03.10"
+  soft:
+    - story: "03.11a"
+      name: "WO Materials (BOM Snapshot)"
+      provides: ["wo_materials table", "material_status indicator"]
+  blocked_by: []
+  blocks: []
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["FR-PLAN-024"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["Work Orders", "Database Schema"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.15.wo-gantt-view.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-016-wo-gantt-view.md"
+      id: "PLAN-016"
+      description: "WO Gantt/Schedule View wireframe with all states"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for org_id isolation"
+  patterns:
+    - path: "apps/frontend/lib/services/work-order-service.ts"
+      relevance: "Existing WO service patterns (if exists)"
+    - path: "apps/frontend/app/(authenticated)/planning/work-orders/page.tsx"
+      relevance: "Existing WO list page patterns"
+
+# High-level deliverables
+deliverables:
+  - type: "api"
+    count: 4
+    description: "GET /gantt, POST /reschedule, POST /check-availability, GET /gantt/export"
+  - type: "service"
+    count: 1
+    description: "gantt-service.ts"
+  - type: "validation"
+    count: 1
+    description: "gantt-schemas.ts"
+  - type: "page"
+    count: 1
+    description: "Gantt chart page"
+  - type: "component"
+    count: 10
+    description: "GanttChart, GanttTimeline, GanttBar, GanttFilters, etc."
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "No new database tables - uses existing work_orders table"
+  - "Add 3 composite indexes for Gantt query performance"
+  - "Gantt data aggregation groups WOs by swimlane (line or machine)"
+  - "Drag-drop reschedule calls POST /reschedule endpoint"
+  - "Pre-drop validation calls POST /check-availability"
+  - "PDF export uses html2canvas + jsPDF (client-side) or server-side rendering"
+  - "Today indicator auto-updates every 60 seconds"
+  - "Status colors per PLAN-016 wireframe: draft=gray, planned=blue, released=cyan, in_progress=purple, on_hold=orange, completed=green, overdue=red"
+  - "Mobile fallback: list-based timeline (cards) instead of full Gantt"
+  - "Cache strategy: 2-min TTL for schedule data, invalidate on reschedule"

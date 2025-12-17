@@ -1,0 +1,290 @@
+# Story 05.8 - Frontend Specification
+# Purpose: Pages, components, hooks, UX patterns
+# Agent: FRONTEND-DEV
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/warehouse/asns/page.tsx"
+    description: "ASN list page with table, filters, search"
+    features:
+      - "DataTable with columns: ASN Number, PO Number, Supplier, Expected Date, Status, Items Count, Created"
+      - "Search by ASN number, PO number, supplier name"
+      - "Filter by status (pending, partial, received, cancelled)"
+      - "Filter by expected date range"
+      - "Filter by supplier"
+      - "Pagination (20 per page)"
+      - "Sort by columns (toggle asc/desc)"
+      - "Feature flag check: enable_asn"
+      - "Empty state when no ASNs"
+      - "New ASN button"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/asns/new/page.tsx"
+    description: "Create new ASN page (from PO)"
+    features:
+      - "PO dropdown (filter to confirmed/receiving POs)"
+      - "Supplier auto-filled from PO (read-only)"
+      - "Expected date field (default from PO expected_delivery_date)"
+      - "Carrier field (text)"
+      - "Tracking number field (text)"
+      - "Notes field (textarea)"
+      - "Items auto-populated from PO lines"
+      - "Items table with editable quantities"
+      - "Save as pending"
+      - "Cancel/back navigation"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/asns/[id]/page.tsx"
+    description: "ASN detail page (master-detail view)"
+    features:
+      - "Header section: ASN number, status badge, PO link, supplier"
+      - "Detail fields: expected date, actual date, carrier, tracking (link), notes"
+      - "Progress bar: items received vs expected"
+      - "Items table: Product, Expected Qty, Received Qty, UoM, Batch, GTIN, Expiry"
+      - "Edit button (if status=pending)"
+      - "Cancel button (if status=pending)"
+      - "Receive button -> initiate GRN creation"
+      - "Read-only mode for received/cancelled status"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/asns/[id]/edit/page.tsx"
+    description: "Edit ASN page"
+    features:
+      - "Same as create page but pre-filled"
+      - "Cannot change PO or supplier"
+      - "Can edit: expected date, carrier, tracking, notes"
+      - "Can add/edit/delete items (if status=pending)"
+      - "Validation on save"
+
+# Components
+components:
+  - path: "apps/frontend/components/warehouse/asns/AsnList.tsx"
+    description: "ASN list table with sorting, filtering, pagination"
+    props:
+      - "data: ASNListItem[]"
+      - "pagination: PaginationState"
+      - "onSort: (column: string) => void"
+      - "onPageChange: (page: number) => void"
+      - "onRowClick: (asn: ASNListItem) => void"
+    uses:
+      - "ShadCN DataTable"
+      - "AsnStatusBadge"
+
+  - path: "apps/frontend/components/warehouse/asns/AsnFilters.tsx"
+    description: "Filter controls for ASN list"
+    props:
+      - "filters: ASNFilters"
+      - "onChange: (filters: ASNFilters) => void"
+      - "suppliers: Supplier[]"
+    uses:
+      - "ShadCN Select"
+      - "ShadCN DateRangePicker"
+      - "ShadCN Input (search)"
+
+  - path: "apps/frontend/components/warehouse/asns/AsnForm.tsx"
+    description: "ASN header form (PO, dates, carrier, tracking)"
+    props:
+      - "initialData?: ASN"
+      - "onSubmit: (data: CreateASNInput | UpdateASNInput) => void"
+      - "isLoading: boolean"
+      - "mode: 'create' | 'edit'"
+    uses:
+      - "react-hook-form"
+      - "Zod resolver"
+      - "ShadCN Form components"
+      - "AsnItemsTable"
+
+  - path: "apps/frontend/components/warehouse/asns/AsnItemsTable.tsx"
+    description: "ASN items table with inline editing"
+    props:
+      - "items: ASNItem[]"
+      - "onChange: (items: ASNItem[]) => void"
+      - "readOnly: boolean"
+      - "onAddItem: () => void"
+      - "onEditItem: (itemId: string) => void"
+      - "onDeleteItem: (itemId: string) => void"
+    uses:
+      - "ShadCN Table"
+      - "ShadCN Button"
+      - "ShadCN AlertDialog (delete confirm)"
+
+  - path: "apps/frontend/components/warehouse/asns/AsnItemForm.tsx"
+    description: "Add/edit ASN item modal/drawer"
+    props:
+      - "initialData?: ASNItem"
+      - "onSubmit: (data: CreateASNItemInput | UpdateASNItemInput) => void"
+      - "onCancel: () => void"
+      - "isLoading: boolean"
+      - "existingProductIds: string[]"
+    uses:
+      - "ShadCN Dialog/Sheet"
+      - "ProductSearchSelect"
+      - "react-hook-form"
+      - "Zod resolver"
+
+  - path: "apps/frontend/components/warehouse/asns/AsnStatusBadge.tsx"
+    description: "Status badge with color coding"
+    props:
+      - "status: ASNStatus"
+    colors:
+      pending: "bg-yellow-100 text-yellow-800"
+      partial: "bg-blue-100 text-blue-800"
+      received: "bg-green-100 text-green-800"
+      cancelled: "bg-red-100 text-red-800"
+
+  - path: "apps/frontend/components/warehouse/asns/AsnDetailPanel.tsx"
+    description: "ASN detail view (read-only header and metadata)"
+    props:
+      - "asn: ASNWithDetails"
+    displays:
+      - "ASN number (header)"
+      - "PO number (link)"
+      - "Supplier name"
+      - "Expected date"
+      - "Actual date (if received)"
+      - "Carrier"
+      - "Tracking number (link if known carrier)"
+      - "Status badge"
+      - "Notes"
+      - "Created at/by"
+
+  - path: "apps/frontend/components/warehouse/asns/AsnProgressBar.tsx"
+    description: "Visual progress of received vs expected items"
+    props:
+      - "items: ASNItem[]"
+    displays:
+      - "Progress bar (received / total items)"
+      - "Percentage text"
+      - "Item counts"
+
+  - path: "apps/frontend/components/warehouse/asns/AsnPoSelect.tsx"
+    description: "PO dropdown for ASN creation (filter to valid POs)"
+    props:
+      - "value: string | undefined"
+      - "onChange: (poId: string) => void"
+      - "disabled: boolean"
+    filters:
+      - "status IN ('confirmed', 'receiving')"
+      - "has unreceived lines"
+    displays:
+      - "PO number"
+      - "Supplier name"
+      - "Expected date"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-asns.ts"
+    description: "React Query hooks for ASN operations"
+    exports:
+      - name: "useASNs"
+        description: "List ASNs with filters"
+        returns: "UseQueryResult<PaginatedResult<ASNListItem>>"
+
+      - name: "useASN"
+        description: "Get single ASN with details"
+        params: ["id: string"]
+        returns: "UseQueryResult<ASNWithDetails>"
+
+      - name: "useCreateASN"
+        description: "Create ASN mutation"
+        returns: "UseMutationResult<ASN, Error, CreateASNInput>"
+
+      - name: "useUpdateASN"
+        description: "Update ASN mutation"
+        returns: "UseMutationResult<ASN, Error, { id: string; data: UpdateASNInput }>"
+
+      - name: "useDeleteASN"
+        description: "Delete ASN mutation"
+        returns: "UseMutationResult<void, Error, string>"
+
+      - name: "useCancelASN"
+        description: "Cancel ASN mutation"
+        returns: "UseMutationResult<ASN, Error, string>"
+
+      - name: "useCreateASNFromPO"
+        description: "Create ASN from PO mutation"
+        returns: "UseMutationResult<ASNWithDetails, Error, CreateASNFromPOInput>"
+
+      - name: "useExpectedTodayASNs"
+        description: "Get ASNs expected today"
+        returns: "UseQueryResult<ASN[]>"
+
+      - name: "useInitiateReceiving"
+        description: "Initiate receiving from ASN"
+        returns: "UseMutationResult<{ grn_id: string }, Error, string>"
+
+# UX Patterns (Reference PO patterns from Epic 03.3)
+ux:
+  wireframe_references:
+    - source: "PLAN-004-po-list.md"
+      apply_to: "ASN List page"
+      adaptations:
+        - "Replace PO-specific columns with ASN columns"
+        - "Add Items Count column"
+        - "Status badges: pending (yellow), partial (blue), received (green), cancelled (red)"
+
+    - source: "PLAN-005-po-create-edit-modal.md"
+      apply_to: "ASN Create/Edit page"
+      adaptations:
+        - "PO selection dropdown at top"
+        - "Auto-populate supplier and items from PO"
+        - "Carrier and tracking number fields"
+        - "Items table with expected quantities"
+
+    - source: "PLAN-006-po-detail.md"
+      apply_to: "ASN Detail page"
+      adaptations:
+        - "Progress bar showing received vs expected"
+        - "Tracking number as clickable link"
+        - "Receive button to initiate GRN"
+
+  states:
+    - name: "loading"
+      description: "Skeleton loaders for table and form"
+      component: "ShadCN Skeleton"
+
+    - name: "empty"
+      description: "No ASNs found message with create button"
+      icon: "PackageSearch"
+      message: "No advance shipping notices found"
+      action: "Create your first ASN"
+
+    - name: "error"
+      description: "Error message with retry button"
+      component: "ErrorState"
+
+    - name: "success"
+      description: "Toast notification on create/update/delete"
+      component: "ShadCN Toast"
+
+  patterns:
+    table: "ShadCN DataTable with sorting, filtering, pagination"
+    form: "react-hook-form + Zod + ShadCN Form components"
+    modal: "ShadCN Dialog for confirmations, Sheet for item edit"
+    status_badge: "ShadCN Badge with status-specific colors"
+    progress: "ShadCN Progress component"
+    navigation: "Breadcrumbs: Warehouse > ASNs > [ASN Number]"
+
+# Feature Flag Check
+feature_flag:
+  name: "enable_asn"
+  source: "warehouse_settings.enable_asn"
+  behavior:
+    when_disabled:
+      - "ASN menu item hidden from warehouse navigation"
+      - "ASN pages return 403 with 'Feature disabled' message"
+      - "ASN API endpoints return 403 Forbidden"
+    when_enabled:
+      - "ASN menu item visible"
+      - "All ASN features accessible"
+
+# Navigation
+navigation:
+  menu_item:
+    label: "ASNs"
+    icon: "TruckDelivery"
+    path: "/warehouse/asns"
+    parent: "Warehouse"
+    feature_flag: "enable_asn"
+  breadcrumbs:
+    list: ["Warehouse", "ASNs"]
+    detail: ["Warehouse", "ASNs", "{asn_number}"]
+    create: ["Warehouse", "ASNs", "New ASN"]
+    edit: ["Warehouse", "ASNs", "{asn_number}", "Edit"]

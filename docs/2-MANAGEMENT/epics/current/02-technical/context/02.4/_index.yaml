@@ -1,0 +1,129 @@
+# Story 02.4 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.4"
+  name: "BOMs CRUD + Date Validity"
+  slug: "boms-crud-validity"
+  epic: "02-technical"
+  phase: "MVP"
+  complexity: "M"
+  estimate_days: 3
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, triggers, indexes
+  - api.yaml         # Endpoints, auth, errors, schemas
+  - frontend.yaml    # Pages, components, services, validation
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product-service.ts", "product types"]
+      rationale: "BOM.product_id references products table; product selector depends on product-service"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations table", "users table", "RLS pattern", "org-context-service.ts"]
+      rationale: "BOM table requires org_id for multi-tenancy; RLS policies follow ADR-013 pattern"
+  blocked_by: []
+  blocks:
+    - story: "02.5a"
+      name: "BOM Items CRUD (Inputs)"
+    - story: "02.5b"
+      name: "BOM Items CRUD (Byproducts)"
+    - story: "02.6"
+      name: "BOM Clone/Copy"
+    - story: "02.14"
+      name: "BOM Comparison/Diff View"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections: ["FR-2.20", "FR-2.22", "FR-2.23", "FR-2.32"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections: ["Database Schema - boms", "API Design - BOMs Endpoints", "Business Rules - BOMs"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.4.boms-crud-validity.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-002-bom-snapshot-pattern.md"
+      relevance: "PRIMARY - BOM snapshot pattern for Work Orders; date-based BOM selection logic"
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for boms table"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-005-boms-list.md"
+      relevance: "BOMs list page with search, filters, pagination, CRUD actions"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006-bom-modal.md"
+      relevance: "BOM create/edit page with header fields, date validation"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Database trigger for date overlap prevention (if not exists)"
+  - type: "api"
+    count: 5
+    description: "CRUD endpoints + timeline endpoint: GET/POST/PUT/DELETE /api/v1/technical/boms"
+  - type: "service"
+    count: 1
+    description: "bom-service.ts with CRUD, version auto-increment, date overlap validation"
+  - type: "validation"
+    count: 1
+    description: "Zod schemas for BOM header (create/update)"
+  - type: "page"
+    count: 4
+    description: "List page, create page, detail page, edit page"
+  - type: "component"
+    count: 7
+    description: "DataTable, HeaderForm, ProductSelector, StatusBadge, DeleteDialog, TimelineModal, TimelineBar"
+  - type: "test"
+    count: 3
+    description: "Unit tests + integration tests + date overlap tests"
+
+# Technical notes
+technical_notes:
+  - "Date overlap prevention via database trigger (PostgreSQL daterange)"
+  - "Version auto-increment per product (v1, v2, v3...)"
+  - "Only ONE active BOM per product at any time (status=active)"
+  - "Product field is LOCKED after BOM creation (immutable)"
+  - "effective_to NULL means 'no end date' (ongoing)"
+  - "BOM timeline visualization shows all versions for a product (FR-2.23)"
+  - "Delete blocked if BOM is referenced by Work Orders"
+  - "ADR-002: BOM snapshot pattern - WO captures BOM at creation time"
+
+# PRD Requirements Mapping
+prd_mapping:
+  - fr_id: "FR-2.20"
+    description: "BOM CRUD (version, effective dates)"
+    covered_by: ["API endpoints", "Service layer", "Pages"]
+  - fr_id: "FR-2.22"
+    description: "BOM date validity (from/to, overlap prevention)"
+    covered_by: ["Database trigger", "Zod validation", "Error handling"]
+  - fr_id: "FR-2.23"
+    description: "BOM version timeline visualization"
+    covered_by: ["Timeline endpoint", "TimelineModal component", "TimelineBar component"]
+  - fr_id: "FR-2.32"
+    description: "BOM packaging fields"
+    covered_by: ["units_per_box, boxes_per_pallet in Advanced Settings - Phase 1"]
+
+# Handoff to DEV Agents
+handoff:
+  story: "02.4.boms-crud-validity"
+  story_file: "docs/2-MANAGEMENT/epics/current/02-technical/02.4.boms-crud-validity.md"
+  epic_folder: "docs/2-MANAGEMENT/epics/current/02-technical/"
+  adrs:
+    - "docs/1-BASELINE/architecture/decisions/ADR-002-bom-snapshot-pattern.md"
+    - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  technical_notes: "Follow ADR-002 for BOM selection logic; ADR-013 for RLS pattern"
+  dependencies:
+    - "02.1 Products CRUD must be complete"
+    - "01.1 Org Context + RLS must be complete"
