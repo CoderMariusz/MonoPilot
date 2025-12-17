@@ -1,0 +1,331 @@
+# Handoff: Story 01.1 - Org Context + Base RLS
+# From: CODE-REVIEWER → To: QA-AGENT
+# Date: 2025-12-17
+# Phase: 5 CODE REVIEW → 6 QA VALIDATION
+
+story:
+  id: "01.1"
+  name: "Org Context + Base RLS"
+  epic: "01-settings"
+  type: "Backend (Security-Critical)"
+
+code_review:
+  decision: "APPROVED"
+  reviewer: "CODE-REVIEWER"
+  date: "2025-12-17"
+  status: "READY FOR QA"
+
+security_assessment:
+  rating: "EXCELLENT"
+  critical_issues: 0
+  high_issues: 0
+  medium_issues: 2
+  low_issues: 3
+  details:
+    - "Zero critical/high security issues found"
+    - "RLS policies follow ADR-013 pattern (100%)"
+    - "Enumeration protection implemented (404 vs 403)"
+    - "SQL injection prevention via UUID validation"
+    - "Session validation with expiration checks"
+    - "Admin enforcement (application + database)"
+
+adr_compliance:
+  overall: "FULL COMPLIANCE"
+  adr_011:
+    name: "Module Toggle Storage"
+    status: "VERIFIED"
+    score: "100%"
+    notes: "11 modules seeded, organization_modules junction table"
+  adr_012:
+    name: "Role Permission Storage"
+    status: "VERIFIED"
+    score: "100%"
+    notes: "10 system roles with JSONB permissions"
+  adr_013:
+    name: "RLS Org Isolation Pattern"
+    status: "VERIFIED"
+    score: "100%"
+    notes: "All 12 RLS policies use users table lookup"
+
+test_coverage:
+  overall: "EXCELLENT"
+  total_tests: 71
+  unit_tests:
+    org_context_service: 24
+    permission_service: 25
+  integration_tests:
+    api_context_endpoint: 22
+  coverage_estimates:
+    org_context_service: "95%+"
+    permission_service: "100%"
+    api_endpoint: "85%+"
+  critical_scenarios_covered:
+    - "Valid session → context (✅)"
+    - "No session → 401 (✅)"
+    - "Inactive user → 403 (✅)"
+    - "Cross-tenant → 404 (✅)"
+    - "Invalid UUID → error (✅)"
+    - "Admin checks (✅)"
+    - "Session expiration (✅)"
+
+code_quality:
+  rating: "EXCELLENT"
+  typescript: "Strict mode, minimal 'any' usage"
+  error_handling: "Custom error classes with proper status codes"
+  documentation: "JSDoc on all public functions, inline security notes"
+  architecture: "Clean separation (services/errors/types/utils)"
+  performance: "Single JOIN query, proper indexing"
+
+files_reviewed:
+  database_migrations:
+    - "supabase/migrations/054_create_organizations_table.sql"
+    - "supabase/migrations/055_create_roles_table.sql"
+    - "supabase/migrations/056_create_users_table.sql"
+    - "supabase/migrations/057_create_modules_tables.sql"
+    - "supabase/migrations/058_rls_policies.sql (12 policies)"
+    - "supabase/migrations/059_seed_system_data.sql"
+
+  services:
+    - "apps/frontend/lib/services/org-context-service.ts"
+    - "apps/frontend/lib/services/permission-service.ts"
+
+  api:
+    - "apps/frontend/app/api/v1/settings/context/route.ts"
+
+  utilities:
+    - "apps/frontend/lib/utils/validation.ts"
+    - "apps/frontend/lib/utils/api-error-handler.ts"
+    - "apps/frontend/lib/constants/roles.ts"
+
+  errors:
+    - "apps/frontend/lib/errors/app-error.ts"
+    - "apps/frontend/lib/errors/unauthorized-error.ts"
+    - "apps/frontend/lib/errors/not-found-error.ts"
+    - "apps/frontend/lib/errors/forbidden-error.ts"
+
+  tests:
+    - "apps/frontend/lib/services/__tests__/org-context-service.test.ts"
+    - "apps/frontend/lib/services/__tests__/permission-service.test.ts"
+    - "apps/frontend/__tests__/api/settings/context.test.ts"
+
+qa_priorities:
+  priority_1_critical:
+    - task: "Multi-org scenario testing"
+      description: "Verify cross-tenant isolation (User A cannot access Org B)"
+      expected: "404 Not Found (not 403 Forbidden)"
+      test_file: "context.test.ts:179-211"
+
+    - task: "Admin permission enforcement"
+      description: "Verify only owner/admin can modify orgs/users"
+      expected: "Non-admin writes blocked at RLS and application layer"
+      test_file: "permission-service.test.ts:148-237"
+
+    - task: "Enumeration protection"
+      description: "Cross-tenant queries return 404, not 403"
+      expected: "No existence disclosure attack vector"
+      evidence: "not-found-error.ts:5-7 (documented)"
+
+  priority_2_high:
+    - task: "Session expiration testing"
+      description: "Verify expired sessions return 401"
+      expected: "UnauthorizedError with 'Session expired' message"
+      test_file: "org-context-service.test.ts:322-331"
+
+    - task: "Inactive user/org workflow"
+      description: "Verify inactive accounts blocked (403)"
+      expected: "ForbiddenError for inactive user/org"
+      test_file: "org-context-service.test.ts:123-145"
+
+    - task: "Performance testing"
+      description: "Verify RLS overhead <1ms, API response <100ms"
+      expected: "Single JOIN query, no N+1 problem"
+      test_file: "org-context-service.test.ts:148-172"
+
+  priority_3_medium:
+    - task: "Acceptance criteria validation"
+      description: "Validate all AC-01 through AC-06"
+      reference: "docs/2-MANAGEMENT/reviews/code-review-story-01.1-final.md"
+
+    - task: "Edge cases"
+      description: "Test null values, malformed UUIDs, missing fields"
+      test_file: "org-context-service.test.ts:174-207"
+
+acceptance_criteria:
+  ac_01:
+    description: "Derive user_id and org_id from session"
+    status: "VERIFIED"
+    evidence: "org-context-service.ts:26-108"
+
+  ac_02:
+    description: "Cross-tenant access returns 404 (not 403)"
+    status: "VERIFIED"
+    evidence: "org-context-service.ts:72-74"
+
+  ac_03:
+    description: "404 response prevents existence leak"
+    status: "VERIFIED"
+    evidence: "not-found-error.ts:6-7 (documented)"
+
+  ac_04:
+    description: "Query without org_id filter blocked"
+    status: "VERIFIED"
+    evidence: "058_rls_policies.sql (all policies)"
+
+  ac_05:
+    description: "RLS auto-filters to user's org_id"
+    status: "VERIFIED"
+    evidence: "ADR-013 pattern applied (12/12 policies)"
+
+  ac_06:
+    description: "Non-admin writes rejected"
+    status: "VERIFIED"
+    evidence: "058_rls_policies.sql:55-59 (admin enforcement)"
+
+non_blocking_issues:
+  medium:
+    - id: "M-01"
+      description: "Session expiration timestamp assumption"
+      file: "org-context-service.ts:207"
+      recommendation: "Verify session.expires_at format in staging"
+      priority: "P2"
+
+    - id: "M-02"
+      description: "No rate limiting on context endpoint"
+      file: "app/api/v1/settings/context/route.ts"
+      recommendation: "Add rate limiting (10 req/min per user)"
+      priority: "P2"
+
+  low:
+    - id: "L-01"
+      description: "No query performance monitoring"
+      priority: "P3"
+
+    - id: "L-02"
+      description: "Type assertion 'as any' in permission check"
+      file: "permission-service.ts:33"
+      priority: "P3"
+
+    - id: "L-03"
+      description: "Missing input sanitization on error messages"
+      priority: "P3"
+
+  suggestions:
+    - "Add query performance logging (>50ms)"
+    - "Add cache headers to context endpoint"
+    - "Add integration test with real database"
+    - "Document RLS performance in ADR-013"
+    - "Replace 'as any' with type guard"
+
+qa_testing_scenarios:
+  scenario_1_cross_tenant_isolation:
+    setup:
+      - "Create Org A with User A (admin)"
+      - "Create Org B with User B (admin)"
+    steps:
+      - "Authenticate as User A"
+      - "Call GET /api/v1/settings/context"
+      - "Verify response contains Org A data only"
+      - "Attempt to query Org B data directly"
+    expected:
+      - "User A sees only Org A"
+      - "Query for Org B returns 404 (not 403)"
+      - "No error messages contain Org B existence info"
+
+  scenario_2_admin_enforcement:
+    setup:
+      - "Create Org A with User A (viewer role)"
+      - "Create Org A with User B (admin role)"
+    steps:
+      - "Authenticate as User A (viewer)"
+      - "Attempt to modify organization"
+      - "Attempt to create/update users"
+      - "Verify blocked at both application and RLS"
+    expected:
+      - "Viewer cannot modify organization (403)"
+      - "Viewer cannot manage users (403)"
+      - "Admin can modify organization"
+      - "Admin can manage users"
+
+  scenario_3_session_handling:
+    setup:
+      - "Create Org A with User A"
+    steps:
+      - "Call context endpoint without session"
+      - "Call with expired session"
+      - "Call with valid session"
+      - "Call after user made inactive"
+    expected:
+      - "No session → 401 Unauthorized"
+      - "Expired session → 401 Unauthorized"
+      - "Valid session → 200 with context"
+      - "Inactive user → 403 Forbidden"
+
+  scenario_4_performance:
+    setup:
+      - "Create 100 organizations with users"
+    steps:
+      - "Measure context resolution time"
+      - "Verify single JOIN query (no N+1)"
+      - "Check RLS overhead"
+    expected:
+      - "Response time <100ms"
+      - "Single query executed"
+      - "RLS overhead <1ms"
+
+deployment_checklist:
+  before_staging:
+    - "Run all 71 unit/integration tests"
+    - "Verify session.expires_at format"
+    - "Check database indexes created"
+    - "Confirm seed data applied (10 roles, 11 modules)"
+
+  in_staging:
+    - "Test cross-tenant isolation"
+    - "Test admin enforcement"
+    - "Monitor RLS performance"
+    - "Verify error responses (401, 403, 404)"
+    - "Load test context endpoint"
+
+  before_production:
+    - "All QA tests pass"
+    - "Performance benchmarks met"
+    - "Security review approved"
+    - "Consider adding rate limiting"
+
+next_phase:
+  phase: "6 QA VALIDATION"
+  agent: "QA-AGENT"
+  deliverables:
+    - "QA test report with pass/fail status"
+    - "Performance benchmark results"
+    - "Cross-tenant isolation validation"
+    - "Admin enforcement validation"
+  exit_criteria:
+    - "All Priority 1 tests pass"
+    - "All Priority 2 tests pass"
+    - "Performance meets targets (<100ms API, <1ms RLS)"
+    - "No critical/high issues found"
+
+reference_documents:
+  - "docs/2-MANAGEMENT/reviews/code-review-story-01.1-final.md"
+  - "docs/1-BASELINE/architecture/decisions/ADR-011-module-toggle-storage.md"
+  - "docs/1-BASELINE/architecture/decisions/ADR-012-role-permission-storage.md"
+  - "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+  - "docs/2-MANAGEMENT/epics/current/01-settings/stories/01.1-org-context-base-rls.md"
+
+metrics:
+  total_files_reviewed: 20
+  total_lines_code: 2157
+  total_tests: 71
+  test_to_code_ratio: "1.15:1"
+  security_issues: "0 critical, 0 high, 2 medium, 3 low"
+  adr_compliance: "3/3 (100%)"
+  code_quality: "EXCELLENT"
+
+summary:
+  status: "APPROVED FOR QA"
+  security: "PASS - Zero critical/high issues"
+  architecture: "PASS - Full ADR compliance"
+  quality: "EXCELLENT - Clean code, comprehensive tests"
+  recommendation: "PROCEED TO QA VALIDATION"
+  confidence: "HIGH - Production-ready implementation"

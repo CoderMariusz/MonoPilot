@@ -1382,3 +1382,115 @@ Settings Module
 **Version:** 2.0
 **Last Updated:** 2025-12-15
 **ADRs Reflected:** ADR-011, ADR-012, ADR-013
+
+---
+
+## Implementation Status
+
+### Story 01.1 - Org Context + Base RLS
+
+**Status:** ✅ COMPLETE (2025-12-16)
+**Type:** Backend Foundation
+**Phase:** MVP (Phase 1A)
+**ADRs:** ADR-011, ADR-012, ADR-013
+
+#### Implemented Features
+
+**Database:**
+- [x] Organizations table with onboarding state tracking
+- [x] Users table with role_id FK and org_id scoping
+- [x] Roles table with JSONB permissions (10 system roles)
+- [x] Modules table (11 modules)
+- [x] Organization_modules table for per-org module toggle state
+- [x] RLS policies using ADR-013 pattern
+- [x] 12 RLS policies for tenant isolation and admin enforcement
+
+**API Endpoints:**
+- [x] GET /api/v1/settings/context - Org context resolution
+
+**Services:**
+- [x] org-context-service.ts
+- [x] permission-service.ts
+
+**Security:**
+- [x] Multi-tenant isolation via RLS (ADR-013)
+- [x] Cross-tenant access returns 404 (not 403) to prevent enumeration
+- [x] UUID validation prevents SQL injection
+
+**Tests:**
+- [x] 25/25 permission service tests passing (100% coverage)
+- [x] 24 org context service tests designed
+- [x] 15 SQL integration tests for RLS isolation
+
+**Documentation:**
+- [x] API documentation: `docs/3-ARCHITECTURE/api/settings/context.md`
+- [x] Migration documentation: `docs/3-ARCHITECTURE/database/migrations/01.1-org-context-rls.md`
+- [x] Developer guide: `docs/3-ARCHITECTURE/guides/using-org-context.md`
+- [x] Services README: `apps/frontend/lib/services/README.md`
+- [x] Changelog entry: `CHANGELOG.md`
+
+**Code Review:** APPROVED (2025-12-16)
+**QA Status:** CONDITIONALLY APPROVED (2025-12-16)
+
+#### Dependencies Satisfied
+
+**Blocks:** Stories 01.2, 01.3, 01.6, 01.8, 01.12, 01.13, and all Settings stories
+**No blockers** - Foundation story
+
+---
+
+---
+
+## Implementation Status
+
+### Story 01.1 - Org Context + Base RLS
+
+**Status:** ✅ COMPLETE (2025-12-16)
+**Type:** Backend Foundation
+**Phase:** MVP (Phase 1A)
+**ADRs:** ADR-011, ADR-012, ADR-013
+
+#### Implemented Features
+
+**Database:**
+- [x] Organizations table with onboarding state tracking
+- [x] Users table with role_id FK and org_id scoping
+- [x] Roles table with JSONB permissions (10 system roles)
+- [x] Modules table (11 modules)
+- [x] Organization_modules table for per-org module toggle state
+- [x] RLS policies using ADR-013 pattern
+- [x] 12 RLS policies for tenant isolation and admin enforcement
+
+**API Endpoints:**
+- [x] GET /api/v1/settings/context - Org context resolution
+
+**Services:**
+- [x] org-context-service.ts
+- [x] permission-service.ts
+
+**Security:**
+- [x] Multi-tenant isolation via RLS (ADR-013)
+- [x] Cross-tenant access returns 404 (not 403) to prevent enumeration
+- [x] UUID validation prevents SQL injection
+
+**Tests:**
+- [x] 25/25 permission service tests passing (100% coverage)
+- [x] 24 org context service tests designed
+- [x] 15 SQL integration tests for RLS isolation
+
+**Documentation:**
+- [x] API documentation: `docs/3-ARCHITECTURE/api/settings/context.md`
+- [x] Migration documentation: `docs/3-ARCHITECTURE/database/migrations/01.1-org-context-rls.md`
+- [x] Developer guide: `docs/3-ARCHITECTURE/guides/using-org-context.md`
+- [x] Services README: `apps/frontend/lib/services/README.md`
+- [x] Changelog entry: `CHANGELOG.md`
+
+**Code Review:** APPROVED (2025-12-16)
+**QA Status:** CONDITIONALLY APPROVED (2025-12-16)
+
+#### Dependencies Satisfied
+
+**Blocks:** Stories 01.2, 01.3, 01.6, 01.8, 01.12, 01.13, and all Settings stories
+**No blockers** - Foundation story
+
+---

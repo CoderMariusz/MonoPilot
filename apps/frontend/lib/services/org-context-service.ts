@@ -2,8 +2,13 @@
  * Org Context Service
  * Story: 01.1 - Org Context + Base RLS
  *
- * Provides org context resolution for authenticated users
- * Single source of truth for user's org_id, role, and permissions
+ * Provides org context resolution for authenticated users.
+ * Single source of truth for user's org_id, role, and permissions.
+ *
+ * **Security:** This service is the foundation for multi-tenant isolation.
+ * All Settings API endpoints MUST use this service for tenant isolation (ADR-013).
+ *
+ * @see {@link docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md}
  */
 
 import { createClient } from '@/lib/supabase/client'
@@ -14,14 +19,35 @@ import { ForbiddenError } from '@/lib/errors/forbidden-error'
 import { isValidUUID } from '@/lib/utils/validation'
 
 /**
- * Get org context for authenticated user
- * Returns complete context including org_id, user_id, role, permissions
+ * Retrieves the organization context for the authenticated user.
  *
- * @param userId - User ID from Supabase auth session
- * @returns OrgContext with user and organization details
- * @throws UnauthorizedError if userId is undefined
- * @throws NotFoundError if user not found (404, not 403 for security)
- * @throws ForbiddenError if user or org is inactive
+ * This function performs a single JOIN query to fetch user, organization,
+ * and role data. It follows the ADR-013 RLS pattern for tenant isolation.
+ *
+ * **Security:** This function is the single source of truth for org_id
+ * resolution. All Settings API endpoints must use this for tenant isolation.
+ *
+ * **Performance:** Single query with JOINs - no N+1 problem. Expected
+ * response time: <50ms.
+ *
+ * @param userId - The authenticated user's UUID from Supabase auth session
+ * @returns {Promise<OrgContext>} Organization context with permissions
+ * @throws {UnauthorizedError} If userId is undefined or session invalid
+ * @throws {NotFoundError} If user not found (returns 404, not 403 for security)
+ * @throws {ForbiddenError} If user or organization is inactive
+ *
+ * @example
+ * ```typescript
+ * const userId = await deriveUserIdFromSession();
+ * const context = await getOrgContext(userId);
+ *
+ * console.log(context.org_id); // "123e4567-e89b-12d3-a456-426614174000"
+ * console.log(context.role_code); // "admin"
+ * console.log(context.permissions.settings); // "CRUD"
+ * ```
+ *
+ * @see {@link docs/3-ARCHITECTURE/api/settings/context.md} API documentation
+ * @see {@link docs/3-ARCHITECTURE/guides/using-org-context.md} Developer guide
  */
 export async function getOrgContext(userId: string): Promise<OrgContext> {
   // Validate input
@@ -29,7 +55,7 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
     throw new UnauthorizedError('Unauthorized')
   }
 
-  // Validate UUID format
+  // Validate UUID format (prevents SQL injection)
   if (!isValidUUID(userId)) {
     throw new NotFoundError('Invalid user ID format')
   }
@@ -71,6 +97,7 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
   // Handle errors
   if (error || !data) {
     // Return 404 (not 403) to prevent user enumeration
+    // This is a security best practice to prevent existence disclosure
     throw new NotFoundError('User not found')
   }
 
@@ -108,11 +135,21 @@ export async function getOrgContext(userId: string): Promise<OrgContext> {
 }
 
 /**
- * Validate org context structure
- * Ensures all required fields are present
+ * Validates organization context structure.
+ *
+ * Ensures all required fields are present and properly formatted.
+ * Use this function to validate context before passing to other services.
  *
  * @param context - OrgContext to validate
- * @returns true if valid, false otherwise
+ * @returns {boolean} true if valid, false otherwise
+ *
+ * @example
+ * ```typescript
+ * const context = await getOrgContext(userId);
+ * if (!validateOrgContext(context)) {
+ *   throw new Error('Invalid org context structure');
+ * }
+ * ```
  */
 export function validateOrgContext(context: OrgContext): boolean {
   if (!context) return false
@@ -128,11 +165,30 @@ export function validateOrgContext(context: OrgContext): boolean {
 }
 
 /**
- * Derive user ID from Supabase auth session
- * Used by API routes to get current user
+ * Derives user ID from Supabase auth session.
  *
- * @returns User ID from session
- * @throws UnauthorizedError if no active session
+ * Used by API routes to get the current authenticated user.
+ * Validates session existence and expiration.
+ *
+ * **Security:** Always call this function at the start of API routes
+ * to ensure user is authenticated before proceeding.
+ *
+ * @returns {Promise<string>} User ID from session
+ * @throws {UnauthorizedError} If no active session or session expired
+ *
+ * @example
+ * ```typescript
+ * // In API route
+ * export async function GET(request: Request) {
+ *   try {
+ *     const userId = await deriveUserIdFromSession();
+ *     const context = await getOrgContext(userId);
+ *     // Use context for org-scoped queries
+ *   } catch (error) {
+ *     return handleApiError(error);
+ *   }
+ * }
+ * ```
  */
 export async function deriveUserIdFromSession(): Promise<string> {
   const supabase = createClient()

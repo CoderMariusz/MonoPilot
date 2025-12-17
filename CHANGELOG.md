@@ -1,91 +1,124 @@
 # Changelog
 
-All notable changes to Agent Methodology Pack are documented in this file.
+All notable changes to MonoPilot will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
----
-
-## [1.1.0] - 2025-12-05
-
-### Added
-- **ONBOARDING-GUIDE.md** - Comprehensive onboarding guide for new team members
-  - 300+ line practical guide covering all 14 agents
-  - Hands-on 30-minute tutorial: Fix a bug from start to finish
-  - Agent deep dives with usage examples
-  - Daily workflow guidance
-  - Common task walkthroughs (fix bug, add feature, write docs, review code)
-  - Troubleshooting section
-  - Quick reference card with agent cheat sheet
-  - Token management best practices
-  - File organization tips
-  - Complete escalation paths
-
----
-
-## [1.0.0] - 2025-12-05
+## [Unreleased]
 
 ### Added
-- Initial release of Agent Methodology Pack
-- 14 specialized agents across Planning, Development, and Quality phases
-- ORCHESTRATOR for intelligent task routing
-- 4 comprehensive workflows (Epic, Story, Bug, Sprint)
-- Organized documentation structure
-- State management system (Task Queue, Handoffs, Metrics)
-- 6 development patterns
-- Automation scripts (init-project, validate-docs, token-counter, sprint-transition)
-- Complete documentation (README, INSTALL, QUICK-START)
-- Template files for project initialization
 
-### Planning Agents
-- RESEARCH-AGENT - Market and technical research
-- PM-AGENT - Product requirements and story creation
-- UX-DESIGNER - User experience and interface design
-- ARCHITECT-AGENT - System architecture and technical design
-- PRODUCT-OWNER - Backlog management and prioritization
-- SCRUM-MASTER - Sprint planning and execution
+#### Story 01.1 - Org Context + Base RLS (2025-12-16)
 
-### Development Agents
-- TEST-ENGINEER - Test strategy and TDD implementation
-- BACKEND-DEV - API and backend logic implementation
-- FRONTEND-DEV - UI component implementation
-- SENIOR-DEV - Complex features and integration
+**Database:**
+- Created `organizations` table with onboarding state tracking
+- Created `users` table linked to Supabase Auth with org_id scoping
+- Created `roles` table with JSONB permissions (ADR-012)
+- Created `modules` and `organization_modules` tables (ADR-011)
+- Implemented RLS (Row Level Security) policies on all org-scoped tables using ADR-013 pattern
+- Added 12 RLS policies for tenant isolation and admin enforcement
 
-### Quality Agents
-- QA-AGENT - Quality assurance and testing
-- CODE-REVIEWER - Code review and standards enforcement
-- TECH-WRITER - Documentation and changelog maintenance
+**API:**
+- Added `GET /api/v1/settings/context` endpoint for org context resolution
+- Returns org_id, user_id, role_code, permissions, and organization details
+- Single query with JOINs (no N+1 problem)
+- Expected response time: <50ms
 
-### Workflows
-- EPIC-WORKFLOW.md - End-to-end feature development
-- STORY-WORKFLOW.md - TDD-based story implementation
-- BUG-WORKFLOW.md - Bug reproduction and fixing
-- SPRINT-WORKFLOW.md - Agile sprint management
+**Services:**
+- Created `org-context-service.ts` with org context resolution
+  - `getOrgContext(userId)` - Returns complete org context
+  - `validateOrgContext(context)` - Validates context structure
+  - `deriveUserIdFromSession()` - Gets user ID from Supabase auth session
+- Created `permission-service.ts` with basic permission checks
+  - `hasAdminAccess(roleCode)` - Checks for admin role
+  - `canModifyOrganization(roleCode)` - Checks org modification permission
+  - `canModifyUsers(roleCode)` - Checks user management permission
+  - `isSystemRole(roleCode)` - Checks if role is system-defined
+  - `hasPermission(module, operation, permissions)` - CRUD permission check
 
-### Documentation Structure
-- Organized format (Baseline, Management, Architecture, Development, Archive)
-- Context budget management
-- @reference system for dynamic file loading
+**Security:**
+- Cross-tenant access returns 404 (not 403) to prevent enumeration attacks
+- UUID validation prevents SQL injection
+- Session validation with expiration checking
+- Multi-tenant isolation enforced via RLS (ADR-013)
+- Admin-only write enforcement at both RLS and application layers
+
+**Seed Data:**
+- 10 system roles with JSONB permissions:
+  - Owner (full access)
+  - Administrator (administrative access)
+  - Manager (department management)
+  - Production Supervisor (production oversight)
+  - Production Operator (execute production)
+  - Warehouse Worker (inventory management)
+  - Quality Inspector (quality control)
+  - Shipping Clerk (order fulfillment)
+  - Viewer (read-only access)
+  - Custom Role (placeholder for future custom roles)
+- 11 modules:
+  - Settings (cannot disable)
+  - Technical Data (cannot disable)
+  - Planning, Production, Warehouse, Quality, Shipping (can disable)
+  - NPD, Finance, OEE, Integrations (can disable)
+
+**Types:**
+- Added `Organization` interface
+- Added `OrgContext` interface (primary context type)
+- Added `User` interface
+- Added `Role` interface
+- Added `Module` interface
+- Added `OrganizationModule` interface
+
+**Error Handling:**
+- Created `AppError` base class
+- Created `UnauthorizedError` (401)
+- Created `NotFoundError` (404)
+- Created `ForbiddenError` (403)
+- Created `api-error-handler` utility
+
+**Utilities:**
+- Created `isValidUUID()` validation function
+
+**Migrations:** 054-059 (6 files)
+- 054: Organizations table
+- 055: Roles table
+- 056: Users table
+- 057: Modules and organization_modules tables
+- 058: RLS policies (12 policies)
+- 059: Seed data (10 roles + 11 modules)
+
+**ADRs Implemented:**
+- ADR-011: Module Toggle Storage (modules + organization_modules tables)
+- ADR-012: Role Permission Storage (JSONB permissions in roles table)
+- ADR-013: RLS Org Isolation Pattern (users table lookup pattern)
+
+**Tests:**
+- 25/25 permission service tests passing (100% coverage)
+- 24 org context service tests designed (pending UUID fixture fix)
+- 15 SQL integration tests for RLS isolation (ready to run)
+
+**Documentation:**
+- API documentation: `docs/3-ARCHITECTURE/api/settings/context.md`
+- Migration documentation: `docs/3-ARCHITECTURE/database/migrations/01.1-org-context-rls.md`
+- Developer guide: `docs/3-ARCHITECTURE/guides/using-org-context.md`
+- Code review report: `docs/2-MANAGEMENT/reviews/code-review-story-01.1.md` (APPROVED)
+- QA report: `docs/2-MANAGEMENT/qa/qa-report-story-01.1.md` (CONDITIONALLY APPROVED)
+
+**Dependencies:**
+- This story is the foundation for all Settings module stories
+- Blocks: 01.2, 01.6, 01.8, 01.12, 01.13, and all future stories requiring org context
+
+**Breaking Changes:** None (new feature)
 
 ---
 
-## Future Releases
+## [0.0.0] - 2025-12-16
 
-### Planned for 1.2.0
-- Integration examples for popular frameworks (React, Vue, Angular, Django, Rails)
-- CI/CD integration templates
-- Metrics dashboard templates
-- Advanced patterns for microservices and serverless
-
-### Planned for 1.3.0
-- IDE plugins for VS Code and JetBrains
-- Automated handoff notifications
-- Performance optimization patterns
-- Security scanning integration
-
----
-
-**Note:** This changelog follows semantic versioning:
-- **Major version** (X.0.0) - Breaking changes
-- **Minor version** (0.X.0) - New features, backward compatible
-- **Patch version** (0.0.X) - Bug fixes, backward compatible
+### Initial Setup
+- Project initialization
+- Monorepo structure with pnpm workspaces
+- Next.js 15.5 frontend
+- Supabase backend
+- TypeScript, TailwindCSS, ShadCN UI
+- Vitest testing framework
