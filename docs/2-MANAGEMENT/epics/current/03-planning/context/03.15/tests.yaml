@@ -1,0 +1,463 @@
+# Story 03.15 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/gantt-service.test.ts"
+    type: "unit"
+    description: "Unit tests for Gantt service functions"
+
+  - path: "apps/frontend/lib/validation/__tests__/gantt-schemas.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+
+  - path: "apps/frontend/app/api/planning/work-orders/gantt/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for Gantt API endpoints"
+
+  - path: "apps/frontend/app/(authenticated)/planning/work-orders/gantt/__tests__/GanttWOBar.test.tsx"
+    type: "unit"
+    description: "Unit tests for WO bar positioning and colors"
+
+  - path: "e2e/planning/gantt-chart.spec.ts"
+    type: "e2e"
+    description: "E2E tests for Gantt chart user flows"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    name: "Gantt Chart Page Load"
+    given: "planner navigates to /planning/work-orders/gantt"
+    when: "page loads"
+    then: "Gantt chart displays within 1s for 50 WOs across 5 lines"
+    test_type: "e2e"
+    priority: "P0"
+    fr_ref: "FR-PLAN-024"
+
+  - id: "AC-02"
+    name: "Date Range Filtering"
+    given: "planner on Gantt chart page"
+    when: "planner selects 'This Week' from date range dropdown"
+    then: "Gantt shows WOs scheduled within current week"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "Production Line Filtering"
+    given: "Gantt displays WOs across 5 production lines"
+    when: "planner selects 'Packing Line #1' filter"
+    then: "only Packing Line #1 swimlane displays"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-04"
+    name: "Status Filtering"
+    given: "Gantt displays WOs with mixed statuses"
+    when: "planner selects status filter 'Planned'"
+    then: "only WOs with status = 'planned' display"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-05"
+    name: "WO Bar Status Colors"
+    given: "Gantt displays WOs with various statuses"
+    when: "chart renders"
+    then: "each status displays correct background color per PLAN-016"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-06"
+    name: "Overdue WO Indicator"
+    given: "WO scheduled end time is in the past and status is NOT completed"
+    when: "Gantt chart loads"
+    then: "WO bar shows red background and warning icon"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-07"
+    name: "In-Progress Progress Bar"
+    given: "WO has status 'in_progress' and progress_percent = 65%"
+    when: "Gantt chart loads"
+    then: "WO bar shows progress overlay filling 65% of bar"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-08"
+    name: "Drag-to-Reschedule Horizontal"
+    given: "WO-00156 scheduled for Dec 17, 8:00-16:00"
+    when: "planner drags bar right to Dec 18, 10:00-18:00 and confirms"
+    then: "API /reschedule called, WO bar moves to new position"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-09"
+    name: "Drag-to-Reschedule Vertical (Line Change)"
+    given: "WO-00156 assigned to Packing Line #1"
+    when: "planner drags bar to Baking Line #2 swimlane and confirms"
+    then: "API /reschedule called with new line_id, bar moves to new swimlane"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-10"
+    name: "Scheduling Conflict Detection"
+    given: "Packing Line #1 has WO-00160 scheduled Dec 18, 10:00-14:00"
+    when: "planner drags WO-00156 to Dec 18, 12:00-20:00 (overlaps)"
+    then: "error shows 'Line already scheduled for this time slot' and bar reverts"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    name: "Pre-Drop Availability Check"
+    given: "planner starts dragging WO-00156"
+    when: "planner hovers over Dec 18, 10:00 time slot"
+    then: "API /check-availability called, ghost bar shows green/red border"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-12"
+    name: "Prevent Scheduling in Past"
+    given: "current date is Dec 16"
+    when: "planner drags WO to Dec 15 (past date)"
+    then: "error shows 'Cannot schedule in the past' and bar reverts"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13"
+    name: "WO Detail Quick View"
+    given: "planner on Gantt chart"
+    when: "planner clicks WO-00156 bar"
+    then: "slide-in panel opens with WO details and action buttons"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-14"
+    name: "Zoom Levels"
+    given: "planner on Gantt chart"
+    when: "planner clicks 'Day', 'Week', 'Month' zoom buttons"
+    then: "timeline scale and WO labels adjust accordingly"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-15"
+    name: "Today Indicator"
+    given: "today's date falls within visible date range"
+    when: "Gantt chart loads"
+    then: "vertical red dashed line appears at current date/time"
+    test_type: "unit"
+    priority: "P2"
+
+  - id: "AC-16"
+    name: "Export to PDF"
+    given: "planner on Gantt chart page"
+    when: "planner clicks 'Print' or 'Export PDF' button"
+    then: "PDF generates within 3s and browser downloads file"
+    test_type: "e2e"
+    priority: "P2"
+
+  - id: "AC-17"
+    name: "Search WO"
+    given: "Gantt displays 50 WOs"
+    when: "planner enters 'WO-00156' in search box"
+    then: "only WO-00156 displays and timeline scrolls to its date"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-18"
+    name: "Empty State"
+    given: "no work orders exist in date range"
+    when: "planner views Gantt chart"
+    then: "empty state displays with 'No Work Orders Scheduled' message"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-19"
+    name: "Error State"
+    given: "API returns error"
+    when: "Gantt chart attempts to load"
+    then: "error state displays with retry button"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-20"
+    name: "RLS Org Isolation"
+    given: "User A from Org A, User B from Org B"
+    when: "User A fetches Gantt data"
+    then: "only Org A WOs returned, Org B WOs not visible"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  gantt_service:
+    - name: "getGanttData returns swimlanes grouped by line"
+      setup: "Mock 5 WOs across 3 lines"
+      params: "{ view_by: 'line', from_date, to_date }"
+      expected: "Returns 3 swimlanes with correct WOs nested"
+
+    - name: "getGanttData returns swimlanes grouped by machine"
+      setup: "Mock 5 WOs across 3 machines"
+      params: "{ view_by: 'machine', from_date, to_date }"
+      expected: "Returns 3 swimlanes with correct WOs nested"
+
+    - name: "getGanttData filters by status"
+      setup: "Mock 10 WOs with mixed statuses"
+      params: "{ status: ['planned', 'released'] }"
+      expected: "Returns only planned and released WOs"
+
+    - name: "getGanttData filters by date range"
+      setup: "Mock 20 WOs across 30 days"
+      params: "{ from_date: '2024-12-15', to_date: '2024-12-20' }"
+      expected: "Returns only WOs in date range"
+
+    - name: "checkLineAvailability returns is_available=true when no conflicts"
+      setup: "Mock line with no WOs at time slot"
+      params: "{ line_id, date, start, end }"
+      expected: "{ is_available: true, conflicts: [] }"
+
+    - name: "checkLineAvailability returns conflicts when overlap exists"
+      setup: "Mock line with existing WO 10:00-14:00"
+      params: "{ line_id, date, start: '12:00', end: '18:00' }"
+      expected: "{ is_available: false, conflicts: [conflicting WO] }"
+
+    - name: "rescheduleWO updates WO and returns success"
+      setup: "Mock existing WO with valid status"
+      params: "{ scheduled_date, start, end }"
+      expected: "WO updated, returns success with new schedule"
+
+    - name: "rescheduleWO throws error for completed WO"
+      setup: "Mock WO with status='completed'"
+      params: "{ scheduled_date, start, end }"
+      expected: "Throws WO_STATUS_INVALID error"
+
+  gantt_bar:
+    - name: "getStatusColor returns correct color for each status"
+      test_cases:
+        - { status: "draft", expected: "#F3F4F6" }
+        - { status: "planned", expected: "#DBEAFE" }
+        - { status: "released", expected: "#CFFAFE" }
+        - { status: "in_progress", expected: "#EDE9FE" }
+        - { status: "on_hold", expected: "#FED7AA" }
+        - { status: "completed", expected: "#D1FAE5" }
+
+    - name: "isOverdue returns true when end time passed and not completed"
+      setup: "WO with scheduled_end < now, status = 'planned'"
+      expected: "Returns true"
+
+    - name: "isOverdue returns false for completed WO"
+      setup: "WO with scheduled_end < now, status = 'completed'"
+      expected: "Returns false"
+
+    - name: "calculateBarPosition returns correct X position based on time"
+      setup: "WO scheduled 10:00-14:00, zoom='day', container=800px"
+      expected: "Returns { left: X, width: Y } in pixels"
+
+    - name: "calculateDuration returns hours between start and end"
+      setup: "start='08:00', end='16:00'"
+      expected: "Returns 8"
+
+  validation:
+    - name: "rescheduleWOSchema rejects start >= end time"
+      input: "{ start: '14:00', end: '10:00' }"
+      expected: "Validation fails with 'start must be before end'"
+
+    - name: "rescheduleWOSchema rejects duration < 1 hour"
+      input: "{ start: '10:00', end: '10:30' }"
+      expected: "Validation fails with 'Duration must be at least 1 hour'"
+
+    - name: "getGanttDataSchema accepts valid params"
+      input: "{ view_by: 'line', from_date: '2024-12-15', to_date: '2024-12-20' }"
+      expected: "Validation passes"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /gantt returns swimlanes with WOs"
+      setup: "Create 5 WOs across 3 lines"
+      request: "GET /api/planning/work-orders/gantt?view_by=line&from_date=...&to_date=..."
+      expected: "200 OK with swimlanes array"
+
+    - name: "GET /gantt respects RLS org isolation"
+      setup: "Create WOs in Org A and Org B"
+      request: "GET /gantt as Org A user"
+      expected: "Only Org A WOs returned"
+
+    - name: "POST /reschedule updates WO schedule"
+      setup: "Create WO with status='planned'"
+      request: "POST /work-orders/{id}/reschedule with new date/time"
+      expected: "200 OK, WO updated in database"
+
+    - name: "POST /reschedule returns 409 on line conflict"
+      setup: "Create 2 WOs, one blocking time slot"
+      request: "POST /reschedule to overlapping time"
+      expected: "409 Conflict with conflicting WO details"
+
+    - name: "POST /reschedule returns 400 for past date"
+      setup: "Create WO"
+      request: "POST /reschedule with past date"
+      expected: "400 Bad Request with PAST_DATE error"
+
+    - name: "POST /check-availability returns availability status"
+      setup: "Create line with 1 WO"
+      request: "POST /check-availability for open slot"
+      expected: "200 OK, is_available: true"
+
+    - name: "GET /gantt/export returns PDF"
+      setup: "Create 10 WOs"
+      request: "GET /gantt/export?format=pdf&from_date=...&to_date=..."
+      expected: "200 OK, Content-Type: application/pdf"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Gantt page loads with WO bars"
+    steps:
+      - "Navigate to /planning/work-orders/gantt"
+      - "Wait for loading to complete"
+      - "Assert swimlanes visible"
+      - "Assert WO bars rendered with correct colors"
+
+  - name: "Filter by status updates chart"
+    steps:
+      - "Navigate to Gantt page"
+      - "Click status filter dropdown"
+      - "Select 'Planned' only"
+      - "Assert only planned WOs visible"
+      - "Assert other statuses hidden"
+
+  - name: "Drag WO to reschedule (desktop)"
+    steps:
+      - "Navigate to Gantt page"
+      - "Locate WO bar"
+      - "Drag bar horizontally to new time slot"
+      - "Assert confirmation dialog appears"
+      - "Click Confirm"
+      - "Assert success toast"
+      - "Assert bar in new position"
+
+  - name: "Drag WO to different line (desktop)"
+    steps:
+      - "Navigate to Gantt page"
+      - "Locate WO bar"
+      - "Drag bar vertically to different swimlane"
+      - "Assert confirmation dialog"
+      - "Click Confirm"
+      - "Assert bar in new swimlane"
+
+  - name: "Conflict blocks reschedule"
+    steps:
+      - "Navigate to Gantt page"
+      - "Drag WO to time slot with existing WO"
+      - "Assert error toast with conflict message"
+      - "Assert WO reverts to original position"
+
+  - name: "Click WO opens quick view"
+    steps:
+      - "Navigate to Gantt page"
+      - "Click on WO bar"
+      - "Assert quick view panel slides in"
+      - "Assert WO details displayed"
+      - "Click Close"
+      - "Assert panel closes"
+
+  - name: "Zoom level changes timeline scale"
+    steps:
+      - "Navigate to Gantt page"
+      - "Assert default zoom (Week)"
+      - "Click 'Day' zoom"
+      - "Assert hour markers visible"
+      - "Click 'Month' zoom"
+      - "Assert week markers visible"
+
+  - name: "Empty state when no WOs"
+    steps:
+      - "Navigate to Gantt with date range having no WOs"
+      - "Assert empty state message"
+      - "Assert 'Create First Work Order' button visible"
+
+  - name: "Mobile: List view instead of Gantt"
+    steps:
+      - "Set viewport to mobile (375px)"
+      - "Navigate to Gantt page"
+      - "Assert list-based timeline renders (cards)"
+      - "Assert swimlanes are collapsible sections"
+
+# Definition of Done
+definition_of_done:
+  - "Gantt chart renders within 1s for 50 WOs, 5 lines, 7-day range"
+  - "All 4 API endpoints implemented and tested"
+  - "Swimlanes group by production line (default) and machine (toggle)"
+  - "WO bars display with correct status colors per PLAN-016"
+  - "Drag-to-reschedule (horizontal and vertical) functional"
+  - "Scheduling conflict validation blocks overlapping WOs"
+  - "WO detail quick view panel functional"
+  - "Zoom levels (Day, Week, Month) adjust timeline scale"
+  - "Today indicator displays vertical red line"
+  - "Export to PDF generates valid PDF within 3s"
+  - "Empty and error states implemented"
+  - "Responsive: Desktop Gantt, Mobile list view"
+  - "RLS org isolation enforced on all queries"
+  - "Unit test coverage >= 80%"
+  - "Integration test coverage >= 70%"
+  - "E2E smoke test for critical path passing"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Complex UI component with business logic"
+  integration:
+    target: 70
+    reason: "4 API endpoints with validation"
+  e2e:
+    target: "Critical paths"
+    scenarios:
+      - "Page load with data"
+      - "Drag-drop reschedule"
+      - "Conflict detection"
+      - "Quick view"
+  files:
+    - "lib/services/gantt-service.ts: 85%"
+    - "lib/validation/gantt-schemas.ts: 100%"
+    - "components/GanttWOBar.tsx: 80%"
+    - "API routes: 80%"
+
+# Performance Targets
+performance:
+  - metric: "Gantt load time"
+    target: "<1s"
+    condition: "50 WOs, 5 lines, 7 days"
+
+  - metric: "Drag validation latency"
+    target: "<200ms"
+    condition: "Hover during drag"
+
+  - metric: "Reschedule API response"
+    target: "<800ms"
+    condition: "Update + cache invalidation"
+
+  - metric: "PDF export"
+    target: "<3s"
+    condition: "7-day Gantt, 50 WOs"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Drag-drop library compatibility with React 19"
+    mitigation: "Use react-dnd or dnd-kit with React 19 support"
+    severity: "medium"
+
+  - id: "RISK-02"
+    description: "PDF export on server vs client side"
+    mitigation: "Start with client-side html2canvas + jsPDF; can add server-side later"
+    severity: "low"
+
+  - id: "RISK-03"
+    description: "Performance with large number of WOs (>200)"
+    mitigation: "Virtual scrolling for swimlanes, viewport culling for bars"
+    severity: "medium"
+
+  - id: "RISK-04"
+    description: "Mobile UX without drag-drop"
+    mitigation: "List-based view with modal reschedule; validated in wireframe"
+    severity: "low"

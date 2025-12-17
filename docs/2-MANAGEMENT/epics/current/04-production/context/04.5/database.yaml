@@ -1,0 +1,277 @@
+# Story 04.5 - Database Schema
+# Purpose: Tables, RLS policies, seed data
+# Agent: BACKEND-DEV (database focus)
+
+# Migration file to create
+migrations:
+  - file: "supabase/migrations/XXX_create_production_settings.sql"
+    description: "Create production_settings table with all 15 fields + RLS"
+    priority: 1
+
+# Tables
+tables:
+  - name: "production_settings"
+    description: "Singleton per org - Production module configuration"
+    status: "new"
+    columns:
+      # Primary Key
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) UNIQUE" }
+
+      # WO Execution (Phase 0 - Enforced)
+      - { name: "allow_pause_wo", type: "BOOLEAN", constraints: "DEFAULT false", description: "Enable WO pause/resume functionality" }
+      - { name: "auto_complete_wo", type: "BOOLEAN", constraints: "DEFAULT false", description: "Auto-complete WO when output >= planned" }
+      - { name: "require_operation_sequence", type: "BOOLEAN", constraints: "DEFAULT true", description: "Operations must complete in order" }
+
+      # Material Consumption (Phase 1 - Stored only)
+      - { name: "allow_over_consumption", type: "BOOLEAN", constraints: "DEFAULT false", description: "Allow consumption > BOM requirement" }
+      - { name: "allow_partial_lp_consumption", type: "BOOLEAN", constraints: "DEFAULT true", description: "Allow partial LP consumption" }
+
+      # Output Registration (Phase 1 - Stored only)
+      - { name: "require_qa_on_output", type: "BOOLEAN", constraints: "DEFAULT true", description: "Output requires QA status" }
+      - { name: "auto_create_by_product_lp", type: "BOOLEAN", constraints: "DEFAULT true", description: "Auto-create by-product LPs" }
+
+      # Reservations (Phase 1 - Stored only)
+      - { name: "enable_material_reservations", type: "BOOLEAN", constraints: "DEFAULT true", description: "Reserve materials on WO start" }
+
+      # Dashboard (Phase 0 - Enforced)
+      - { name: "dashboard_refresh_seconds", type: "INTEGER", constraints: "DEFAULT 30 CHECK (dashboard_refresh_seconds >= 5 AND dashboard_refresh_seconds <= 300)", description: "Dashboard auto-refresh interval" }
+      - { name: "show_material_alerts", type: "BOOLEAN", constraints: "DEFAULT true", description: "Show material shortage alerts" }
+      - { name: "show_delay_alerts", type: "BOOLEAN", constraints: "DEFAULT true", description: "Show WO delay alerts" }
+      - { name: "show_quality_alerts", type: "BOOLEAN", constraints: "DEFAULT true", description: "Show quality hold alerts" }
+
+      # OEE (Phase 2 - Stored only)
+      - { name: "enable_oee_tracking", type: "BOOLEAN", constraints: "DEFAULT false", description: "Enable OEE calculation" }
+      - { name: "target_oee_percent", type: "DECIMAL(5,2)", constraints: "DEFAULT 85 CHECK (target_oee_percent >= 0 AND target_oee_percent <= 100)", description: "Target OEE percentage" }
+      - { name: "enable_downtime_tracking", type: "BOOLEAN", constraints: "DEFAULT false", description: "Track machine downtime" }
+
+      # Metadata
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_production_settings_org ON production_settings(org_id)"
+
+# Settings Grouping (for UI organization)
+settings_groups:
+  - group: "wo_execution"
+    label: "WO Execution"
+    phase: "0"
+    enforced: true
+    settings:
+      - "allow_pause_wo"
+      - "auto_complete_wo"
+      - "require_operation_sequence"
+
+  - group: "material_consumption"
+    label: "Material Consumption"
+    phase: "1"
+    enforced: false
+    settings:
+      - "allow_over_consumption"
+      - "allow_partial_lp_consumption"
+
+  - group: "output"
+    label: "Output"
+    phase: "1"
+    enforced: false
+    settings:
+      - "require_qa_on_output"
+      - "auto_create_by_product_lp"
+
+  - group: "reservations"
+    label: "Reservations"
+    phase: "1"
+    enforced: false
+    settings:
+      - "enable_material_reservations"
+
+  - group: "dashboard"
+    label: "Dashboard"
+    phase: "0"
+    enforced: true
+    settings:
+      - "dashboard_refresh_seconds"
+      - "show_material_alerts"
+      - "show_delay_alerts"
+      - "show_quality_alerts"
+
+  - group: "oee"
+    label: "OEE"
+    phase: "2"
+    enforced: false
+    settings:
+      - "enable_oee_tracking"
+      - "target_oee_percent"
+      - "enable_downtime_tracking"
+
+# Default values (used when creating new org settings)
+default_values:
+  allow_pause_wo: false
+  auto_complete_wo: false
+  require_operation_sequence: true
+  allow_over_consumption: false
+  allow_partial_lp_consumption: true
+  require_qa_on_output: true
+  auto_create_by_product_lp: true
+  enable_material_reservations: true
+  dashboard_refresh_seconds: 30
+  show_material_alerts: true
+  show_delay_alerts: true
+  show_quality_alerts: true
+  enable_oee_tracking: false
+  target_oee_percent: 85
+  enable_downtime_tracking: false
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "production_settings"
+      name: "production_settings_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "production_settings"
+      name: "production_settings_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "production_settings"
+      name: "production_settings_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Trigger for updated_at
+triggers:
+  - name: "update_production_settings_updated_at"
+    table: "production_settings"
+    timing: "BEFORE UPDATE"
+    event: "FOR EACH ROW"
+    execute: "update_updated_at_column()"
+
+# SQL for migration
+migration_sql: |
+  -- production_settings table
+  CREATE TABLE production_settings (
+    id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id                          UUID NOT NULL REFERENCES organizations(id) UNIQUE,
+
+    -- WO Execution (Phase 0 - Enforced)
+    allow_pause_wo                  BOOLEAN DEFAULT false,
+    auto_complete_wo                BOOLEAN DEFAULT false,
+    require_operation_sequence      BOOLEAN DEFAULT true,
+
+    -- Material Consumption (Phase 1 - Stored only)
+    allow_over_consumption          BOOLEAN DEFAULT false,
+    allow_partial_lp_consumption    BOOLEAN DEFAULT true,
+
+    -- Output (Phase 1 - Stored only)
+    require_qa_on_output            BOOLEAN DEFAULT true,
+    auto_create_by_product_lp       BOOLEAN DEFAULT true,
+
+    -- Reservations (Phase 1 - Stored only)
+    enable_material_reservations    BOOLEAN DEFAULT true,
+
+    -- Dashboard (Phase 0 - Enforced)
+    dashboard_refresh_seconds       INTEGER DEFAULT 30 CHECK (dashboard_refresh_seconds >= 5 AND dashboard_refresh_seconds <= 300),
+    show_material_alerts            BOOLEAN DEFAULT true,
+    show_delay_alerts               BOOLEAN DEFAULT true,
+    show_quality_alerts             BOOLEAN DEFAULT true,
+
+    -- OEE (Phase 2 - Stored only)
+    enable_oee_tracking             BOOLEAN DEFAULT false,
+    target_oee_percent              DECIMAL(5,2) DEFAULT 85 CHECK (target_oee_percent >= 0 AND target_oee_percent <= 100),
+    enable_downtime_tracking        BOOLEAN DEFAULT false,
+
+    -- Metadata
+    created_at                      TIMESTAMPTZ DEFAULT now(),
+    updated_at                      TIMESTAMPTZ DEFAULT now()
+  );
+
+  -- RLS
+  ALTER TABLE production_settings ENABLE ROW LEVEL SECURITY;
+
+  CREATE POLICY "Users can view their org's production settings"
+    ON production_settings FOR SELECT
+    USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "Users can insert their org's production settings"
+    ON production_settings FOR INSERT
+    WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "Users can update their org's production settings"
+    ON production_settings FOR UPDATE
+    USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()))
+    WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  -- Index
+  CREATE INDEX idx_production_settings_org ON production_settings(org_id);
+
+  -- Trigger for updated_at
+  CREATE TRIGGER update_production_settings_updated_at
+    BEFORE UPDATE ON production_settings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+  -- Comments
+  COMMENT ON TABLE production_settings IS 'Production module configuration - singleton per org';
+  COMMENT ON COLUMN production_settings.allow_pause_wo IS 'Phase 0: Enable WO pause/resume functionality';
+  COMMENT ON COLUMN production_settings.dashboard_refresh_seconds IS 'Phase 0: Dashboard auto-refresh interval (5-300 seconds)';
+  COMMENT ON COLUMN production_settings.allow_over_consumption IS 'Phase 1: Allow material consumption exceeding BOM requirements';
+  COMMENT ON COLUMN production_settings.enable_oee_tracking IS 'Phase 2: Enable OEE calculation and tracking';
+
+# Queries used by this story
+queries:
+  get_production_settings:
+    description: "Fetch production settings for current org"
+    sql: |
+      SELECT *
+      FROM production_settings
+      WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      -- Returns single row due to UNIQUE constraint on org_id
+
+  upsert_production_settings:
+    description: "Create default settings if none exist for org"
+    sql: |
+      INSERT INTO production_settings (org_id)
+      VALUES ((SELECT org_id FROM users WHERE id = auth.uid()))
+      ON CONFLICT (org_id) DO NOTHING
+      RETURNING *
+
+  update_production_settings:
+    description: "Update production settings (partial update)"
+    sql: |
+      UPDATE production_settings
+      SET
+        allow_pause_wo = COALESCE(:allow_pause_wo, allow_pause_wo),
+        auto_complete_wo = COALESCE(:auto_complete_wo, auto_complete_wo),
+        require_operation_sequence = COALESCE(:require_operation_sequence, require_operation_sequence),
+        allow_over_consumption = COALESCE(:allow_over_consumption, allow_over_consumption),
+        allow_partial_lp_consumption = COALESCE(:allow_partial_lp_consumption, allow_partial_lp_consumption),
+        require_qa_on_output = COALESCE(:require_qa_on_output, require_qa_on_output),
+        auto_create_by_product_lp = COALESCE(:auto_create_by_product_lp, auto_create_by_product_lp),
+        enable_material_reservations = COALESCE(:enable_material_reservations, enable_material_reservations),
+        dashboard_refresh_seconds = COALESCE(:dashboard_refresh_seconds, dashboard_refresh_seconds),
+        show_material_alerts = COALESCE(:show_material_alerts, show_material_alerts),
+        show_delay_alerts = COALESCE(:show_delay_alerts, show_delay_alerts),
+        show_quality_alerts = COALESCE(:show_quality_alerts, show_quality_alerts),
+        enable_oee_tracking = COALESCE(:enable_oee_tracking, enable_oee_tracking),
+        target_oee_percent = COALESCE(:target_oee_percent, target_oee_percent),
+        enable_downtime_tracking = COALESCE(:enable_downtime_tracking, enable_downtime_tracking),
+        updated_at = NOW()
+      WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      RETURNING *
+
+# Database constraints verified by this story
+constraints:
+  - "One settings row per org (UNIQUE constraint on org_id)"
+  - "dashboard_refresh_seconds between 5 and 300 (CHECK constraint)"
+  - "target_oee_percent between 0 and 100 (CHECK constraint)"
+  - "org_id isolation enforced by RLS on all queries"
+  - "Foreign key to organizations table"

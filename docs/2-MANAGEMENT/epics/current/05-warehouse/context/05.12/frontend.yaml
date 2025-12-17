@@ -1,0 +1,321 @@
+# Story 05.12 - Frontend Specification
+# Purpose: Components, hooks, pages, UX requirements
+# Agent: FRONTEND-DEV
+
+# This is a full-stack story with significant frontend work
+is_backend_focused: false
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/warehouse/receiving/page.tsx"
+    description: "Receiving dashboard - extend to show pending TOs"
+    action: "EXTEND"
+    features:
+      - "Tab or section for pending TOs"
+      - "Quick action to start TO receipt"
+      - "PendingTOsTable component"
+
+  - path: "apps/frontend/app/(authenticated)/warehouse/receiving/to/[toId]/page.tsx"
+    description: "Receive TO wizard page"
+    action: "CREATE"
+    features:
+      - "Multi-step wizard for TO receipt"
+      - "Step 1: Review TO info"
+      - "Step 2: Enter receipt details per line"
+      - "Step 3: Review and confirm"
+      - "Step 4: Success with LP numbers"
+
+# Components
+components:
+  # Main wizard component
+  - path: "apps/frontend/components/warehouse/receiving/ReceiveTOWizard.tsx"
+    description: "Multi-step wizard for TO receipt"
+    type: "client"
+    state_management: "useState for wizard state, useReducer for form"
+    props:
+      toId: "string"
+      onComplete: "(grn: GRN) => void"
+      onCancel: "() => void"
+    features:
+      - "4-step wizard with progress indicator"
+      - "Form state preserved between steps"
+      - "Validation before step transitions"
+      - "Draft save to localStorage"
+
+  # Step 1: Review TO Info
+  - path: "apps/frontend/components/warehouse/receiving/ReceivingStep1ReviewTO.tsx"
+    description: "Step 1 - Review TO header and lines overview"
+    type: "client"
+    props:
+      to: "TransferOrderForReceipt"
+      settings: "WarehouseReceiptSettings"
+      onNext: "() => void"
+      onCancel: "() => void"
+    features:
+      - "TO header info display (from/to warehouse, dates, status)"
+      - "Transit location indicator"
+      - "Lines summary table (shipped vs received)"
+      - "Quick 'Receive All' button to auto-fill remaining qty"
+
+  # Step 2: Enter receipt details
+  - path: "apps/frontend/components/warehouse/receiving/ReceivingStep2EnterDetails.tsx"
+    description: "Step 2 - Enter receipt details per line"
+    type: "client"
+    props:
+      lines: "TOLineWithReceived[]"
+      settings: "WarehouseReceiptSettings"
+      defaultLocationId: "string"
+      onUpdate: "(items: ReceiptLineInput[]) => void"
+      onNext: "() => void"
+      onBack: "() => void"
+    features:
+      - "Editable table with receipt inputs"
+      - "Checkbox to select lines for receipt"
+      - "Receive qty input (default: remaining)"
+      - "Variance detection and reason input"
+      - "Batch/expiry inputs (if required)"
+      - "Location override per line"
+      - "Real-time validation"
+      - "Inline error messages"
+
+  # Step 3: Review and confirm
+  - path: "apps/frontend/components/warehouse/receiving/ReceivingStep3Confirm.tsx"
+    description: "Step 3 - Review and confirm before submission"
+    type: "client"
+    props:
+      to: "TransferOrderForReceipt"
+      items: "ReceiptLineInput[]"
+      onConfirm: "() => Promise<void>"
+      onBack: "() => void"
+      isSubmitting: "boolean"
+    features:
+      - "Summary of items being received"
+      - "Variance warnings prominently displayed"
+      - "Total qty and LP count preview"
+      - "Confirm button with loading state"
+      - "Edit button to go back"
+
+  # Step 4: Success
+  - path: "apps/frontend/components/warehouse/receiving/ReceivingStep4Success.tsx"
+    description: "Step 4 - Success with GRN and LP details"
+    type: "client"
+    props:
+      grn: "GRN"
+      onViewGRN: "() => void"
+      onPrintLabels: "() => void"
+      onReceiveAnother: "() => void"
+      onClose: "() => void"
+    features:
+      - "Success icon and message"
+      - "GRN number display"
+      - "Created LP numbers list"
+      - "Variance log summary (if any)"
+      - "TO status update notification"
+      - "Action buttons: View GRN, Print Labels, Receive Another, Close"
+
+  # Pending TOs table
+  - path: "apps/frontend/components/warehouse/receiving/PendingTOsTable.tsx"
+    description: "DataTable of TOs available for receipt"
+    type: "client"
+    props:
+      warehouseId: "string | undefined"
+      onSelectTO: "(toId: string) => void"
+    features:
+      - "ShadCN DataTable pattern"
+      - "Columns: TO Number, From Warehouse, To Warehouse, Shipped Date, Items, Status"
+      - "Search by TO number"
+      - "Filter by source warehouse"
+      - "Sort by shipped date (default: desc)"
+      - "Pagination"
+      - "Click row to start receipt"
+
+  # TO Lines table for receipt
+  - path: "apps/frontend/components/warehouse/receiving/TOLinesTable.tsx"
+    description: "Table of TO lines with receipt inputs"
+    type: "client"
+    props:
+      lines: "TOLineWithReceived[]"
+      receiptItems: "ReceiptLineInput[]"
+      settings: "WarehouseReceiptSettings"
+      defaultLocationId: "string"
+      onUpdateItem: "(index: number, item: ReceiptLineInput) => void"
+      onToggleLine: "(index: number, checked: boolean) => void"
+    columns:
+      - { name: "Select", width: "48px", type: "checkbox" }
+      - { name: "#", width: "48px", type: "text" }
+      - { name: "Product", width: "200px", type: "text" }
+      - { name: "Shipped", width: "100px", type: "number" }
+      - { name: "Received", width: "100px", type: "number" }
+      - { name: "Remaining", width: "100px", type: "number" }
+      - { name: "Receive Now", width: "120px", type: "input" }
+      - { name: "Location", width: "140px", type: "dropdown" }
+      - { name: "Variance", width: "100px", type: "indicator" }
+    features:
+      - "Inline editing"
+      - "Variance indicator (yellow warning icon)"
+      - "Expandable row for variance reason, batch, expiry"
+
+  # Single line receipt form
+  - path: "apps/frontend/components/warehouse/receiving/ReceiveTOLineForm.tsx"
+    description: "Expandable form for single TO line receipt details"
+    type: "client"
+    props:
+      line: "TOLineWithReceived"
+      item: "ReceiptLineInput"
+      settings: "WarehouseReceiptSettings"
+      locations: "Location[]"
+      hasVariance: "boolean"
+      onUpdate: "(item: ReceiptLineInput) => void"
+    fields:
+      - { name: "received_qty", type: "number", label: "Receive Qty" }
+      - { name: "variance_reason", type: "select", label: "Variance Reason", conditional: "hasVariance" }
+      - { name: "batch_number", type: "text", label: "Batch Number", conditional: "settings.require_batch_on_receipt" }
+      - { name: "expiry_date", type: "date", label: "Expiry Date", conditional: "settings.require_expiry_on_receipt" }
+      - { name: "manufacture_date", type: "date", label: "Manufacture Date" }
+      - { name: "location_id", type: "select", label: "Location" }
+      - { name: "notes", type: "textarea", label: "Notes" }
+
+  # Variance reason input
+  - path: "apps/frontend/components/warehouse/receiving/VarianceInputs.tsx"
+    description: "Variance reason dropdown with predefined options"
+    type: "client"
+    props:
+      varianceQty: "number"
+      varianceReason: "string | null"
+      onReasonChange: "(reason: string) => void"
+    options:
+      - { value: "damaged", label: "Damaged during transport" }
+      - { value: "shortage", label: "Shortage - less than shipped" }
+      - { value: "overage", label: "Overage - more than shipped" }
+      - { value: "weight_variance", label: "Weight variance (catch weight)" }
+      - { value: "counting_error", label: "Counting error" }
+      - { value: "other", label: "Other (specify in notes)" }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-pending-tos.ts"
+    description: "React Query hook for fetching pending TOs"
+    exports:
+      - name: "usePendingTOs"
+        params:
+          - "warehouseId?: string"
+          - "page?: number"
+          - "limit?: number"
+          - "search?: string"
+        returns: "UseQueryResult<PaginatedResult<PendingTO>>"
+
+  - path: "apps/frontend/lib/hooks/use-to-receipt-lines.ts"
+    description: "React Query hook for fetching TO lines for receipt"
+    exports:
+      - name: "useTOReceiptLines"
+        params:
+          - "toId: string"
+        returns: "UseQueryResult<TOReceiptLinesResponse>"
+
+  - path: "apps/frontend/lib/hooks/use-create-grn-from-to.ts"
+    description: "React Query mutation hook for creating GRN from TO"
+    exports:
+      - name: "useCreateGRNFromTO"
+        returns: "UseMutationResult<GRN, Error, CreateGRNFromTOInput>"
+
+# UX Specifications
+ux:
+  wireframes:
+    - id: "WH-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-005-grn-from-to-modal.md"
+      components:
+        - "ReceiveTOWizard"
+        - "TOLinesTable"
+        - "VarianceInputs"
+        - "PendingTOsTable"
+
+  patterns:
+    table: "ShadCN DataTable with column visibility, sorting, filtering"
+    wizard: "Step indicator at top, Back/Next buttons at bottom"
+    form: "ShadCN Form with react-hook-form + zod validation"
+    modal: "ShadCN Dialog for confirmation dialogs"
+    toast: "ShadCN Toast for success/error notifications"
+
+  states:
+    - loading: "Skeleton placeholders for table and form"
+    - empty: "No pending TOs message with action to create TO"
+    - error: "Error banner with retry button"
+    - success: "Success modal with GRN details and LP numbers"
+    - form_error: "Inline validation errors below fields"
+    - variance_warning: "Yellow warning indicator with tooltip"
+
+  responsive_breakpoints:
+    desktop: ">1024px - Full wizard layout, side-by-side columns"
+    tablet: "768-1024px - Stacked layout, condensed table"
+    mobile: "<768px - Card-based lines, collapsible sections"
+
+  accessibility:
+    touch_targets: "48dp minimum for buttons, checkboxes"
+    contrast: "4.5:1 minimum for text"
+    screen_reader:
+      - "Wizard step announcements"
+      - "Variance warnings announced"
+      - "Form validation errors read"
+      - "Success confirmation announced"
+    keyboard:
+      - "Tab navigation between fields"
+      - "Enter to submit"
+      - "Escape to cancel"
+      - "Arrow keys for dropdowns"
+
+  validation_feedback:
+    realtime: true
+    debounce_ms: 300
+    inline_errors: true
+    summary_errors: "Top of form for form-level errors"
+
+  performance:
+    initial_load: "<300ms for TO lines"
+    submit_response: "<500ms for GRN creation"
+    optimistic_updates: false  # Wait for server confirmation
+    stale_time: "30 seconds for TO lines"
+
+# TypeScript types
+types:
+  - path: "apps/frontend/lib/types/warehouse.ts"
+    description: "Warehouse types - extend for TO receipt"
+    new_types:
+      - name: "ReceiptLineInput"
+        fields:
+          - "toLineId: string"
+          - "selected: boolean"
+          - "receivedQty: number"
+          - "varianceReason: string | null"
+          - "batchNumber: string | null"
+          - "supplierBatchNumber: string | null"
+          - "expiryDate: string | null"
+          - "manufactureDate: string | null"
+          - "locationId: string"
+          - "notes: string | null"
+      - name: "TransferOrderForReceipt"
+        fields:
+          - "id: string"
+          - "toNumber: string"
+          - "status: string"
+          - "fromWarehouse: Warehouse"
+          - "toWarehouse: Warehouse"
+          - "actualShipDate: string | null"
+          - "transitLocationEnabled: boolean"
+          - "transitLocation: Location | null"
+          - "lines: TOLineWithReceived[]"
+      - name: "WarehouseReceiptSettings"
+        fields:
+          - "requireBatchOnReceipt: boolean"
+          - "requireExpiryOnReceipt: boolean"
+          - "defaultQaStatus: string"
+          - "autoGenerateLpNumber: boolean"
+      - name: "PendingTO"
+        fields:
+          - "toId: string"
+          - "toNumber: string"
+          - "fromWarehouse: { id: string; name: string; code: string }"
+          - "toWarehouse: { id: string; name: string; code: string }"
+          - "status: string"
+          - "shippedDate: string"
+          - "itemsCount: number"
+          - "remainingItemsCount: number"

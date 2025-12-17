@@ -1,0 +1,323 @@
+# Story 06.4 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/spec-parameter-service.test.ts"
+    type: "unit"
+    description: "Unit tests for SpecParameterService"
+  - path: "apps/frontend/lib/validation/__tests__/parameter-schemas.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/app/api/quality/specifications/[specId]/parameters/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for parameter API endpoints"
+  - path: "supabase/tests/quality_spec_parameters_rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for parameters table"
+  - path: "e2e/quality/parameter-management.spec.ts"
+    type: "e2e"
+    description: "E2E test for parameter CRUD + reorder lifecycle"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    given: "user opens specification detail page"
+    when: "spec has parameters"
+    then: "parameters display in sequence order with: parameter_name, type badge, min/max values, unit, critical flag, test_method"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "specification is in draft status"
+    when: "viewing parameters list"
+    then: "[+ Add Parameter] button visible, each row has Edit/Delete actions, drag handles visible"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "specification is active/expired/superseded"
+    when: "viewing parameters list"
+    then: "parameters are read-only, no edit/delete/add actions visible"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "user selects parameter_type = 'numeric'"
+    when: "type selected"
+    then: "Min Value and Max Value fields display (at least one required)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    given: "user selects parameter_type = 'range'"
+    when: "type selected"
+    then: "Min Value and Max Value fields display (both required)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "user attempts to save numeric parameter without min or max"
+    when: "validation runs"
+    then: "error message 'Numeric parameters require at least Min or Max value'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "user fills required fields and clicks [Save]"
+    when: "parameter created"
+    then: "parameter added with sequence = max(sequence) + 1, appears at bottom of list"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    given: "draft spec with 5 parameters in sequence 1, 2, 3, 4, 5"
+    when: "user drags parameter 4 to position 2"
+    then: "new sequence becomes: 1, 4, 2, 3, 5, list re-renders in new order"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "user attempts to edit parameter on active spec"
+    when: "edit attempted"
+    then: "API returns 400 error 'Cannot modify parameters on non-draft specifications'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    given: "parameter_type = 'numeric', min_value = 5, max_value = 10"
+    when: "test result entered with value 12"
+    then: "validateValue returns { valid: false, reason: 'Above maximum (10)' }"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "user from Org B"
+    when: "requesting parameters from Org A specification"
+    then: "response is 404 Not Found (RLS blocks access)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-12"
+    given: "parameter has is_critical = true"
+    when: "displaying parameter"
+    then: "red 'Critical' badge displays with tooltip"
+    test_type: "e2e"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  spec_parameter_service:
+    - name: "create auto-generates sequence number"
+      setup: "Mock spec with 3 existing parameters"
+      expected: "New parameter gets sequence = 4"
+
+    - name: "create blocks on active spec"
+      setup: "Mock spec with status = 'active'"
+      expected: "Throws ValidationError('Cannot add parameters to non-draft specifications')"
+
+    - name: "validateValue passes numeric within range"
+      params: ["{ parameter_type: 'numeric', min_value: 5, max_value: 10 }", "7"]
+      expected: "{ valid: true }"
+
+    - name: "validateValue fails numeric below min"
+      params: ["{ parameter_type: 'numeric', min_value: 5, max_value: 10 }", "3"]
+      expected: "{ valid: false, reason: 'Below minimum (5)' }"
+
+    - name: "validateValue fails numeric above max"
+      params: ["{ parameter_type: 'numeric', min_value: 5, max_value: 10 }", "12"]
+      expected: "{ valid: false, reason: 'Above maximum (10)' }"
+
+    - name: "validateValue passes boolean matching target"
+      params: ["{ parameter_type: 'boolean', target_value: 'Yes' }", "'Yes'"]
+      expected: "{ valid: true }"
+
+    - name: "validateValue fails boolean not matching target"
+      params: ["{ parameter_type: 'boolean', target_value: 'Yes' }", "'No'"]
+      expected: "{ valid: false, reason: 'Expected Yes' }"
+
+    - name: "validateValue passes text (always valid - manual eval)"
+      params: ["{ parameter_type: 'text' }", "'any text'"]
+      expected: "{ valid: true }"
+
+    - name: "reorder updates sequences correctly"
+      setup: "Spec with params [A:1, B:2, C:3]"
+      params: ["specId", "[C.id, A.id, B.id]"]
+      expected: "Sequences become [C:1, A:2, B:3]"
+
+    - name: "reorder blocks on active spec"
+      setup: "Mock spec with status = 'active'"
+      expected: "Throws ValidationError"
+
+    - name: "cloneToNewSpec copies all parameters"
+      setup: "Source spec with 5 parameters"
+      expected: "Target spec gets 5 parameters with same data, new IDs"
+
+  parameter_schemas:
+    - name: "createParameterSchema validates required fields"
+      input: "{ parameter_type: 'numeric' }"
+      expected: "Validation error: parameter_name required"
+
+    - name: "createParameterSchema requires min/max for numeric"
+      input: "{ parameter_name: 'Test', parameter_type: 'numeric' }"
+      expected: "Validation error: at least one of min_value or max_value required"
+
+    - name: "createParameterSchema requires both min and max for range"
+      input: "{ parameter_name: 'Test', parameter_type: 'range', min_value: 5 }"
+      expected: "Validation error: Range parameters require both min and max"
+
+    - name: "createParameterSchema validates min < max"
+      input: "{ parameter_name: 'Test', parameter_type: 'numeric', min_value: 10, max_value: 5 }"
+      expected: "Validation error: min_value must be less than max_value"
+
+    - name: "createParameterSchema allows text type without min/max"
+      input: "{ parameter_name: 'Color', parameter_type: 'text' }"
+      expected: "Validation passes"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET parameters returns list ordered by sequence"
+      setup: "Create spec with 3 parameters in sequence 3, 1, 2"
+      action: "GET /api/quality/specifications/:specId/parameters"
+      expected: "Returns parameters in order 1, 2, 3"
+
+    - name: "POST creates parameter with auto-sequence"
+      setup: "Spec with 2 existing parameters"
+      action: "POST new parameter"
+      expected: "New parameter has sequence = 3"
+
+    - name: "POST blocks on active spec"
+      setup: "Spec with status = 'active'"
+      action: "POST new parameter"
+      expected: "400 error: 'Cannot add parameters to non-draft specifications'"
+
+    - name: "PUT updates parameter"
+      setup: "Draft spec with parameter"
+      action: "PUT update parameter_name"
+      expected: "200 with updated parameter, updated_at changed"
+
+    - name: "DELETE removes parameter from draft spec"
+      setup: "Draft spec with parameter"
+      action: "DELETE parameter"
+      expected: "204 No Content, parameter removed"
+
+    - name: "DELETE blocked on active spec"
+      setup: "Active spec with parameter"
+      action: "DELETE parameter"
+      expected: "403 Forbidden (RLS blocks)"
+
+    - name: "PATCH reorder updates sequences"
+      setup: "Draft spec with params [A:1, B:2, C:3]"
+      action: "PATCH reorder with [C.id, A.id, B.id]"
+      expected: "200 with params [C:1, A:2, B:3]"
+
+  rls_isolation:
+    - name: "User can only read parameters from own org specs"
+      setup: |
+        - Create Org A with Spec A and Parameter A
+        - Create Org B with User B
+      action: "User B queries quality_spec_parameters"
+      expected: "Parameter A not visible"
+
+    - name: "User cannot insert parameter to other org spec"
+      setup: |
+        - Create Org A with Spec A
+        - Create Org B with User B
+      action: "User B inserts parameter to Spec A"
+      expected: "RLS blocks insert"
+
+    - name: "Delete RLS restricts to draft specs"
+      setup: |
+        - Create Org A with active Spec A and Parameter
+        - User A (same org)
+      action: "User A deletes parameter"
+      expected: "RLS blocks delete (0 rows affected)"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Complete parameter CRUD + reorder lifecycle"
+    steps:
+      - "1. Create draft specification"
+      - "2. Add 5 parameters (numeric, text, boolean, range, numeric)"
+      - "3. Verify sequence 1-5"
+      - "4. Mark parameter 2 as critical"
+      - "5. Verify critical badge displays"
+      - "6. Drag parameter 4 to position 2"
+      - "7. Verify new sequence: 1, 4, 2, 3, 5"
+      - "8. Edit parameter 3"
+      - "9. Delete parameter 5"
+      - "10. Approve specification"
+      - "11. Verify parameters now read-only"
+      - "12. Verify no edit/delete/add buttons visible"
+
+  - name: "Parameter type conditional fields"
+    steps:
+      - "1. Open add parameter modal"
+      - "2. Select type 'numeric'"
+      - "3. Verify Min/Max/Unit fields visible"
+      - "4. Change type to 'text'"
+      - "5. Verify Min/Max/Unit fields hidden"
+      - "6. Verify Acceptance Criteria field visible"
+      - "7. Change type to 'boolean'"
+      - "8. Verify Target shows Yes/No dropdown"
+      - "9. Change type to 'range'"
+      - "10. Verify both Min and Max required"
+
+# Definition of Done
+definition_of_done:
+  - "Parameter CRUD fully functional for draft specs"
+  - "Drag-to-reorder works with optimistic UI updates"
+  - "Read-only mode enforced for active/expired/superseded specs"
+  - "Type-specific validation working (min/max for numeric/range)"
+  - "Critical parameter badge displays correctly"
+  - "RLS blocks cross-org access (returns 404)"
+  - "Trigger blocks modifications on non-draft specs"
+  - "validateValue function exported for Story 06.6"
+  - "Unit test coverage >= 90%"
+  - "Integration test coverage >= 80%"
+  - "E2E test passes for full lifecycle"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "Core validation and business logic"
+  integration:
+    target: 80
+    reason: "API and RLS policy coverage"
+  e2e:
+    target: 1
+    reason: "At least 1 full lifecycle test"
+  files:
+    - "lib/services/spec-parameter-service.ts: 90%"
+    - "lib/validation/parameter-schemas.ts: 95%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "RLS via FK lookup may have performance impact"
+    mitigation: "FK to quality_specifications is indexed, measured <1ms overhead"
+    severity: "low"
+    test_coverage: "Performance benchmark (optional)"
+
+  - id: "RISK-02"
+    description: "Drag-to-reorder race conditions"
+    mitigation: "Optimistic UI with rollback on error, debounce API calls"
+    severity: "medium"
+    test_coverage: "e2e_tests.parameter_lifecycle"
+
+  - id: "RISK-03"
+    description: "Type change clears incompatible values"
+    mitigation: "Frontend clears min/max when switching to text/boolean"
+    severity: "low"
+    test_coverage: "e2e_tests.type_conditional_fields"
+
+  - id: "RISK-04"
+    description: "Concurrent edits to same spec parameters"
+    mitigation: "updated_at timestamp check, show conflict toast"
+    severity: "low"
+    test_coverage: "Manual testing"

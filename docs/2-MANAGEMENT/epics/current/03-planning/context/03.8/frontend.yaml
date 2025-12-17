@@ -1,0 +1,352 @@
+# Story 03.8 - Frontend Specification
+# Purpose: Pages, components, hooks, UX references
+# Agent: FRONTEND-DEV
+
+# ============================================================================
+# PAGES
+# ============================================================================
+pages:
+  - path: "apps/frontend/app/(authenticated)/planning/transfer-orders/page.tsx"
+    description: "Transfer Order List Page"
+    wireframe: "PLAN-010"
+    route: "/planning/transfer-orders"
+    features:
+      - "KPI summary cards (Open TOs, In Transit, Overdue, This Week)"
+      - "DataTable with sorting, filtering, pagination"
+      - "Search by TO number"
+      - "Filter by status, from warehouse, to warehouse, priority"
+      - "Bulk actions (export, print)"
+      - "Create TO button (permission controlled)"
+    states: ["loading", "empty", "success", "error", "filtered_empty"]
+
+  - path: "apps/frontend/app/(authenticated)/planning/transfer-orders/[id]/page.tsx"
+    description: "Transfer Order Detail Page"
+    wireframe: "PLAN-012"
+    route: "/planning/transfer-orders/:id"
+    features:
+      - "Header info section (TO number, status, warehouses, dates)"
+      - "Tabs: Lines, Shipments (future), History (future)"
+      - "Lines table with shipped/received tracking"
+      - "Add/Edit/Delete line (inline or modal)"
+      - "Action buttons (Release, Cancel, Ship, Receive)"
+      - "Print action"
+    states: ["loading", "success", "error"]
+
+# ============================================================================
+# COMPONENTS
+# ============================================================================
+components:
+  - path: "apps/frontend/components/planning/transfer-orders/TransferOrdersDataTable.tsx"
+    description: "DataTable for TO list with filters, sorting, pagination"
+    wireframe: "PLAN-010"
+    props:
+      - "data: TransferOrder[]"
+      - "loading: boolean"
+      - "onRowClick: (id: string) => void"
+      - "onCreateClick: () => void"
+    dependencies:
+      - "@/components/ui/data-table"
+      - "@/components/ui/input"
+      - "@/components/ui/select"
+      - "@/components/ui/badge"
+
+  - path: "apps/frontend/components/planning/transfer-orders/TransferOrderModal.tsx"
+    description: "Create/Edit TO header modal"
+    wireframe: "PLAN-011"
+    props:
+      - "open: boolean"
+      - "onClose: () => void"
+      - "transferOrder?: TransferOrder"
+      - "onSuccess: () => void"
+    features:
+      - "From/To warehouse dropdowns"
+      - "Planned ship/receive date pickers"
+      - "Priority select"
+      - "Notes textarea"
+      - "Warehouse validation (from != to)"
+      - "Date validation (receive >= ship)"
+
+  - path: "apps/frontend/components/planning/transfer-orders/TransferOrderDetail.tsx"
+    description: "TO detail layout with header and tabs"
+    wireframe: "PLAN-012"
+    props:
+      - "transferOrder: TransferOrderWithLines"
+      - "onRefresh: () => void"
+
+  - path: "apps/frontend/components/planning/transfer-orders/TransferOrderHeader.tsx"
+    description: "TO header summary card"
+    wireframe: "PLAN-012"
+    props:
+      - "transferOrder: TransferOrderWithLines"
+      - "onEdit: () => void"
+      - "onAction: (action: string) => void"
+
+  - path: "apps/frontend/components/planning/transfer-orders/TransferOrderLinesTable.tsx"
+    description: "Editable lines table"
+    wireframe: "PLAN-012"
+    props:
+      - "lines: TransferOrderLine[]"
+      - "editable: boolean"
+      - "onAddLine: () => void"
+      - "onEditLine: (line: TransferOrderLine) => void"
+      - "onDeleteLine: (lineId: string) => void"
+
+  - path: "apps/frontend/components/planning/transfer-orders/AddLineModal.tsx"
+    description: "Add/Edit line modal"
+    wireframe: "PLAN-011"
+    props:
+      - "open: boolean"
+      - "onClose: () => void"
+      - "toId: string"
+      - "existingProductIds: string[]"
+      - "line?: TransferOrderLine"
+      - "onSuccess: () => void"
+    features:
+      - "Product searchable dropdown"
+      - "Quantity input with decimal support"
+      - "UOM auto-filled from product"
+      - "Duplicate product validation"
+
+  - path: "apps/frontend/components/planning/transfer-orders/TransferOrderStatusBadge.tsx"
+    description: "Status badge with color coding"
+    props:
+      - "status: TOStatus"
+    colors:
+      draft: { bg: "#F3F4F6", text: "#374151" }
+      planned: { bg: "#DBEAFE", text: "#1E40AF" }
+      shipped: { bg: "#EDE9FE", text: "#5B21B6" }
+      received: { bg: "#D1FAE5", text: "#065F46" }
+      closed: { bg: "#10B981", text: "#FFFFFF" }
+      cancelled: { bg: "#FEE2E2", text: "#B91C1C" }
+
+  - path: "apps/frontend/components/planning/transfer-orders/TransferOrderPriorityBadge.tsx"
+    description: "Priority badge"
+    props:
+      - "priority: TOPriority"
+    colors:
+      low: { bg: "#F3F4F6", text: "#6B7280" }
+      normal: { bg: "#DBEAFE", text: "#1E40AF" }
+      high: { bg: "#FEF3C7", text: "#92400E" }
+      urgent: { bg: "#FEE2E2", text: "#B91C1C" }
+
+  - path: "apps/frontend/components/planning/transfer-orders/TransferOrderActions.tsx"
+    description: "Actions dropdown menu"
+    props:
+      - "transferOrder: TransferOrder"
+      - "onAction: (action: TOAction) => void"
+    actions:
+      - { action: "edit", label: "Edit", showWhen: "status === 'draft'" }
+      - { action: "release", label: "Release TO", showWhen: "status === 'draft'" }
+      - { action: "ship", label: "Mark as Shipped", showWhen: "status === 'planned'" }
+      - { action: "receive", label: "Mark as Received", showWhen: "status === 'shipped'" }
+      - { action: "cancel", label: "Cancel TO", showWhen: "status in ['draft', 'planned']" }
+      - { action: "duplicate", label: "Duplicate TO", showWhen: "always" }
+      - { action: "print", label: "Print", showWhen: "always" }
+
+  - path: "apps/frontend/components/planning/transfer-orders/ReleaseConfirmDialog.tsx"
+    description: "Confirm release to planned status"
+    props:
+      - "open: boolean"
+      - "onClose: () => void"
+      - "toNumber: string"
+      - "onConfirm: () => void"
+
+  - path: "apps/frontend/components/planning/transfer-orders/CancelConfirmDialog.tsx"
+    description: "Confirm cancellation"
+    props:
+      - "open: boolean"
+      - "onClose: () => void"
+      - "toNumber: string"
+      - "onConfirm: () => void"
+
+  - path: "apps/frontend/components/planning/transfer-orders/TOKPICards.tsx"
+    description: "KPI summary cards for list page"
+    wireframe: "PLAN-010"
+    props:
+      - "summary: TOSummary"
+      - "onCardClick: (filter: string) => void"
+    cards:
+      - { id: "open", label: "Open TOs", icon: "FileText" }
+      - { id: "in_transit", label: "In Transit", icon: "Truck" }
+      - { id: "overdue", label: "Overdue", icon: "AlertTriangle" }
+      - { id: "this_week", label: "This Week", icon: "Calendar" }
+
+  - path: "apps/frontend/components/planning/transfer-orders/DeleteLineDialog.tsx"
+    description: "Confirm line deletion"
+    props:
+      - "open: boolean"
+      - "onClose: () => void"
+      - "lineNumber: number"
+      - "productName: string"
+      - "onConfirm: () => void"
+
+# ============================================================================
+# HOOKS
+# ============================================================================
+hooks:
+  - path: "apps/frontend/lib/hooks/use-transfer-orders.ts"
+    description: "React Query hook for TO list"
+    exports:
+      - name: "useTransferOrders"
+        params: "TOListParams"
+        returns: "UseQueryResult<PaginatedResult<TransferOrder>>"
+
+  - path: "apps/frontend/lib/hooks/use-transfer-order.ts"
+    description: "React Query hook for single TO with lines"
+    exports:
+      - name: "useTransferOrder"
+        params: "id: string"
+        returns: "UseQueryResult<TransferOrderWithLines>"
+
+  - path: "apps/frontend/lib/hooks/use-transfer-order-mutations.ts"
+    description: "React Query mutations for TO CRUD"
+    exports:
+      - name: "useCreateTransferOrder"
+        returns: "UseMutationResult"
+      - name: "useUpdateTransferOrder"
+        returns: "UseMutationResult"
+      - name: "useCancelTransferOrder"
+        returns: "UseMutationResult"
+      - name: "useReleaseTransferOrder"
+        returns: "UseMutationResult"
+      - name: "useAddTOLine"
+        returns: "UseMutationResult"
+      - name: "useUpdateTOLine"
+        returns: "UseMutationResult"
+      - name: "useDeleteTOLine"
+        returns: "UseMutationResult"
+
+  - path: "apps/frontend/lib/hooks/use-to-summary.ts"
+    description: "React Query hook for TO summary KPIs"
+    exports:
+      - name: "useTOSummary"
+        returns: "UseQueryResult<TOSummary>"
+
+# ============================================================================
+# UX REFERENCES
+# ============================================================================
+ux:
+  wireframes:
+    - id: "PLAN-010"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-010-transfer-order-list.md"
+      description: "TO List Page"
+      components:
+        - "TOKPICards"
+        - "TransferOrdersDataTable"
+        - "TransferOrderStatusBadge"
+        - "TransferOrderPriorityBadge"
+        - "TransferOrderActions"
+      states: ["loading", "empty", "success", "error", "filtered_empty"]
+
+    - id: "PLAN-011"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-011-transfer-order-create-edit-modal.md"
+      description: "TO Create/Edit Modal"
+      components:
+        - "TransferOrderModal"
+        - "AddLineModal"
+        - "WarehouseSelect"
+        - "ProductSelect"
+      states: ["loading", "empty_lines", "success", "validation_error", "saving"]
+      dialogs:
+        - "warehouse_change_confirmation"
+        - "duplicate_product_blocked"
+
+    - id: "PLAN-012"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-012-transfer-order-detail.md"
+      description: "TO Detail Page"
+      components:
+        - "TransferOrderDetail"
+        - "TransferOrderHeader"
+        - "TransferOrderLinesTable"
+        - "TransferOrderStatusBadge"
+        - "TransferOrderActions"
+      states: ["loading", "success", "error"]
+      tabs: ["lines", "shipments", "history"]
+
+  patterns:
+    table: "ShadCN DataTable with sorting, filtering, pagination"
+    modal: "ShadCN Dialog with form validation"
+    toast: "Sonner toast notifications"
+    dropdown: "ShadCN DropdownMenu for actions"
+    badge: "ShadCN Badge with custom colors"
+    tabs: "ShadCN Tabs for detail page sections"
+
+  states:
+    loading:
+      description: "Skeleton loaders for cards, table rows"
+      component: "Skeleton from @/components/ui/skeleton"
+    empty:
+      description: "Empty state with icon, message, CTA button"
+      message: "No Transfer Orders Yet"
+      cta: "Create First Transfer Order"
+    error:
+      description: "Error state with icon, message, retry button"
+      message: "Failed to Load Transfer Orders"
+      cta: ["Retry", "Contact Support"]
+    filtered_empty:
+      description: "No results for current filters"
+      message: "No TOs match your filters"
+      cta: "Clear Filters"
+
+# ============================================================================
+# ACCESSIBILITY
+# ============================================================================
+accessibility:
+  touch_targets:
+    buttons: "48x48dp minimum"
+    table_rows: "64px height"
+    checkboxes: "48x48dp click area"
+  contrast:
+    text: "4.5:1 minimum"
+    badges: "WCAG AA compliant"
+  screen_reader:
+    table: "Proper th/td with scope"
+    status: "role='status' aria-label"
+    actions: "aria-haspopup='menu'"
+  keyboard:
+    navigation: "Tab through interactive elements"
+    activation: "Enter/Space to activate"
+    escape: "Close modals/dropdowns"
+    arrows: "Navigate within dropdowns"
+  aria:
+    modal: "role='dialog' aria-modal='true' aria-labelledby"
+    table: "role='table' with proper structure"
+    status: "aria-live='polite' for updates"
+
+# ============================================================================
+# RESPONSIVE BREAKPOINTS
+# ============================================================================
+responsive:
+  desktop:
+    breakpoint: ">1024px"
+    layout: "Full table with all columns, 4 KPI cards in row"
+  tablet:
+    breakpoint: "768-1024px"
+    layout: "Condensed table, 2x2 KPI grid, stacked filters"
+  mobile:
+    breakpoint: "<768px"
+    layout: "Card list, vertical KPI list, collapsible filters, load more pagination"
+
+# ============================================================================
+# PERFORMANCE TARGETS
+# ============================================================================
+performance:
+  initial_load: "<500ms"
+  filter_change: "<300ms"
+  pagination: "<300ms"
+  form_submission: "<1s"
+  export: "<2s for 100 TOs"
+
+# ============================================================================
+# CACHING
+# ============================================================================
+caching:
+  react_query:
+    stale_time: "30 seconds"
+    cache_time: "5 minutes"
+  keys:
+    - "['transfer-orders', { filters }]"
+    - "['transfer-order', id]"
+    - "['to-summary']"
+    - "['warehouses', 'dropdown']"
+    - "['products', 'dropdown']"

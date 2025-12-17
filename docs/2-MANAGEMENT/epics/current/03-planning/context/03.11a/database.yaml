@@ -1,0 +1,247 @@
+# Story 03.11a - Database Schema
+# Purpose: Tables, RLS policies, indexes, constraints
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_wo_materials_table.sql"
+    type: "migration"
+    description: "Create wo_materials table with indexes and RLS"
+    priority: 1
+
+tables:
+  - name: "wo_materials"
+    description: "BOM snapshot for Work Order - immutable after release"
+    source: "bom_items"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "wo_id", type: "UUID", constraints: "NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE" }
+      - { name: "organization_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "material_name", type: "TEXT", constraints: "NOT NULL", notes: "Denormalized from products.name for snapshot" }
+      - { name: "required_qty", type: "DECIMAL(15,6)", constraints: "NOT NULL", notes: "Scaled from BOM" }
+      - { name: "consumed_qty", type: "DECIMAL(15,6)", constraints: "DEFAULT 0", notes: "Updated by Epic 04" }
+      - { name: "reserved_qty", type: "DECIMAL(15,6)", constraints: "DEFAULT 0", notes: "Populated by Story 03.11b" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "sequence", type: "INTEGER", constraints: "DEFAULT 0" }
+      - { name: "consume_whole_lp", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "is_by_product", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "yield_percent", type: "DECIMAL(5,2)", constraints: "", notes: "By-product yield %" }
+      - { name: "scrap_percent", type: "DECIMAL(5,2)", constraints: "DEFAULT 0" }
+      - { name: "condition_flags", type: "JSONB", constraints: "", notes: "Conditional item flags (Phase 1)" }
+      - { name: "bom_item_id", type: "UUID", constraints: "", notes: "Reference to source bom_item for audit" }
+      - { name: "bom_version", type: "INTEGER", constraints: "", notes: "BOM version at snapshot time" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "organization_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_wo_materials_wo ON wo_materials(wo_id)"
+      - "idx_wo_materials_product ON wo_materials(product_id)"
+      - "idx_wo_materials_org ON wo_materials(organization_id)"
+    constraints:
+      - name: "chk_required_qty"
+        definition: "CHECK (required_qty >= 0)"
+      - name: "chk_consumed_qty"
+        definition: "CHECK (consumed_qty >= 0)"
+      - name: "chk_reserved_qty"
+        definition: "CHECK (reserved_qty >= 0)"
+      - name: "chk_scrap_percent"
+        definition: "CHECK (scrap_percent >= 0 AND scrap_percent <= 100)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "wo_materials"
+      name: "wo_materials_org_isolation"
+      operation: "SELECT"
+      using: "organization_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "wo_materials"
+      name: "wo_materials_insert"
+      operation: "INSERT"
+      with_check: |
+        organization_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'planner', 'production_manager')
+        )
+
+    - table: "wo_materials"
+      name: "wo_materials_update"
+      operation: "UPDATE"
+      using: |
+        organization_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'planner', 'production_manager', 'production_operator')
+        )
+      notes: "Operators can update consumed_qty during production"
+
+    - table: "wo_materials"
+      name: "wo_materials_delete"
+      operation: "DELETE"
+      using: |
+        organization_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND EXISTS (
+          SELECT 1 FROM work_orders wo
+          WHERE wo.id = wo_materials.wo_id
+          AND wo.status IN ('draft', 'planned')
+        )
+        AND (
+          (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+          IN ('owner', 'admin', 'planner')
+        )
+      notes: "Can only delete materials when WO is draft or planned"
+
+# Scaling Formula (ADR-002)
+scaling_formula:
+  description: "Calculate required_qty from bom_item for WO quantity"
+  formula: "(wo_planned_qty / bom_output_qty) * bom_item_qty * (1 + scrap_percent / 100)"
+  example:
+    bom_output_qty: 100
+    bom_item_qty: 50
+    wo_planned_qty: 250
+    scrap_percent: 5
+    result: "(250 / 100) * 50 * (1 + 5/100) = 131.25"
+  precision: "DECIMAL(15,6) - 6 decimal places"
+
+# Column mappings (bom_items -> wo_materials)
+column_mappings:
+  - source: "bom_items.product_id"
+    target: "wo_materials.product_id"
+    transform: "direct copy"
+  - source: "products.name (via bom_items.product_id)"
+    target: "wo_materials.material_name"
+    transform: "denormalized copy for snapshot"
+  - source: "bom_items.quantity"
+    target: "wo_materials.required_qty"
+    transform: "scaling formula applied"
+  - source: "bom_items.uom"
+    target: "wo_materials.uom"
+    transform: "direct copy"
+  - source: "bom_items.sequence"
+    target: "wo_materials.sequence"
+    transform: "direct copy"
+  - source: "bom_items.scrap_percent"
+    target: "wo_materials.scrap_percent"
+    transform: "direct copy"
+  - source: "bom_items.consume_whole_lp"
+    target: "wo_materials.consume_whole_lp"
+    transform: "direct copy"
+  - source: "bom_items.is_by_product"
+    target: "wo_materials.is_by_product"
+    transform: "direct copy"
+  - source: "bom_items.yield_percent"
+    target: "wo_materials.yield_percent"
+    transform: "direct copy"
+  - source: "bom_items.condition_flags"
+    target: "wo_materials.condition_flags"
+    transform: "direct copy (for Phase 1)"
+  - source: "bom_items.id"
+    target: "wo_materials.bom_item_id"
+    transform: "audit reference"
+  - source: "boms.version"
+    target: "wo_materials.bom_version"
+    transform: "audit reference"
+
+# By-Product Handling
+by_product_rules:
+  - "By-products have is_by_product = true"
+  - "By-products have required_qty = 0 (not scaled)"
+  - "By-products have yield_percent from bom_item"
+  - "By-products displayed with badge in UI"
+
+# Related Tables (read-only references)
+related_tables:
+  - name: "bom_items"
+    relationship: "Source data for snapshot copy"
+    join: "bom_items.id = wo_materials.bom_item_id"
+  - name: "products"
+    relationship: "Component product details"
+    join: "products.id = wo_materials.product_id"
+  - name: "work_orders"
+    relationship: "Parent work order"
+    join: "work_orders.id = wo_materials.wo_id"
+  - name: "boms"
+    relationship: "Source BOM (for version tracking)"
+    join: "boms.id = work_orders.bom_id"
+
+# Migration SQL Template
+migration_template: |
+  -- wo_materials table (Story 03.11a)
+  CREATE TABLE wo_materials (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    wo_id               UUID NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+    organization_id     UUID NOT NULL REFERENCES organizations(id),
+    product_id          UUID NOT NULL REFERENCES products(id),
+    material_name       TEXT NOT NULL,
+    required_qty        DECIMAL(15,6) NOT NULL,
+    consumed_qty        DECIMAL(15,6) DEFAULT 0,
+    reserved_qty        DECIMAL(15,6) DEFAULT 0,
+    uom                 TEXT NOT NULL,
+    sequence            INTEGER DEFAULT 0,
+    consume_whole_lp    BOOLEAN DEFAULT false,
+    is_by_product       BOOLEAN DEFAULT false,
+    yield_percent       DECIMAL(5,2),
+    scrap_percent       DECIMAL(5,2) DEFAULT 0,
+    condition_flags     JSONB,
+    bom_item_id         UUID,
+    bom_version         INTEGER,
+    notes               TEXT,
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+
+    CONSTRAINT chk_required_qty CHECK (required_qty >= 0),
+    CONSTRAINT chk_consumed_qty CHECK (consumed_qty >= 0),
+    CONSTRAINT chk_reserved_qty CHECK (reserved_qty >= 0),
+    CONSTRAINT chk_scrap_percent CHECK (scrap_percent >= 0 AND scrap_percent <= 100)
+  );
+
+  -- Indexes
+  CREATE INDEX idx_wo_materials_wo ON wo_materials(wo_id);
+  CREATE INDEX idx_wo_materials_product ON wo_materials(product_id);
+  CREATE INDEX idx_wo_materials_org ON wo_materials(organization_id);
+
+  -- RLS
+  ALTER TABLE wo_materials ENABLE ROW LEVEL SECURITY;
+
+  CREATE POLICY "wo_materials_org_isolation" ON wo_materials
+  FOR SELECT TO authenticated
+  USING (organization_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "wo_materials_insert" ON wo_materials
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    organization_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    AND (
+      (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+      IN ('owner', 'admin', 'planner', 'production_manager')
+    )
+  );
+
+  CREATE POLICY "wo_materials_update" ON wo_materials
+  FOR UPDATE TO authenticated
+  USING (
+    organization_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    AND (
+      (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+      IN ('owner', 'admin', 'planner', 'production_manager', 'production_operator')
+    )
+  );
+
+  CREATE POLICY "wo_materials_delete" ON wo_materials
+  FOR DELETE TO authenticated
+  USING (
+    organization_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    AND EXISTS (
+      SELECT 1 FROM work_orders wo
+      WHERE wo.id = wo_materials.wo_id
+      AND wo.status IN ('draft', 'planned')
+    )
+    AND (
+      (SELECT r.code FROM roles r JOIN users u ON u.role_id = r.id WHERE u.id = auth.uid())
+      IN ('owner', 'admin', 'planner')
+    )
+  );

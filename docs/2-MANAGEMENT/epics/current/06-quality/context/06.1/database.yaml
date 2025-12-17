@@ -1,0 +1,187 @@
+# Story 06.1 - Database Schema
+# Purpose: Enum types, tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_quality_status_enum.sql"
+    type: "migration"
+    description: "Create quality_status_type enum and transition/history tables"
+  - path: "supabase/migrations/XXX_update_lp_qa_status_enum.sql"
+    type: "migration"
+    description: "Update license_plates.qa_status to use quality_status_type enum"
+
+# PostgreSQL ENUM Type
+enum_types:
+  - name: "quality_status_type"
+    description: "Quality assurance status types for inventory and batches"
+    values:
+      - { code: "PENDING", description: "Awaiting inspection" }
+      - { code: "PASSED", description: "Meets specifications" }
+      - { code: "FAILED", description: "Does not meet specs" }
+      - { code: "HOLD", description: "Investigation required" }
+      - { code: "RELEASED", description: "Approved for use after hold" }
+      - { code: "QUARANTINED", description: "Isolated pending review" }
+      - { code: "COND_APPROVED", description: "Conditionally approved (limited use)" }
+
+tables:
+  - name: "quality_status_transitions"
+    description: "Valid quality status transitions with business rules (system-wide, no org_id)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "from_status", type: "quality_status_type", constraints: "NOT NULL" }
+      - { name: "to_status", type: "quality_status_type", constraints: "NOT NULL" }
+      - { name: "requires_inspection", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "requires_approval", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "requires_reason", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "is_allowed", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    rls_pattern: "true (read-only for all authenticated users)"
+    indexes:
+      - "idx_status_transitions_from ON quality_status_transitions(from_status)"
+      - "idx_status_transitions_lookup ON quality_status_transitions(from_status, to_status)"
+    constraints:
+      - "UNIQUE(from_status, to_status)"
+
+  - name: "quality_status_history"
+    description: "Audit trail of all quality status changes"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "entity_type", type: "TEXT", constraints: "NOT NULL CHECK (entity_type IN ('lp', 'batch', 'inspection'))" }
+      - { name: "entity_id", type: "UUID", constraints: "NOT NULL" }
+      - { name: "from_status", type: "quality_status_type", constraints: "" }
+      - { name: "to_status", type: "quality_status_type", constraints: "NOT NULL" }
+      - { name: "reason", type: "TEXT", constraints: "" }
+      - { name: "changed_by", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "changed_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "requires_reversal", type: "BOOLEAN", constraints: "DEFAULT false" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_status_history_org ON quality_status_history(org_id)"
+      - "idx_status_history_entity ON quality_status_history(entity_type, entity_id)"
+      - "idx_status_history_date ON quality_status_history(changed_at DESC)"
+    constraints:
+      - "CHECK (from_status IS NULL OR from_status != to_status)"
+
+# RLS Policies
+rls_policies:
+  pattern: "ADR-013 Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "quality_status_transitions"
+      name: "status_transitions_select"
+      operation: "SELECT"
+      using: "true"
+      note: "System-wide lookup table, read-only for all authenticated"
+
+    - table: "quality_status_history"
+      name: "status_history_org_isolation"
+      operation: "ALL"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "Org-isolated audit trail"
+
+# Seed Data - Status Transitions
+seed_data:
+  quality_status_transitions:
+    description: "20+ valid status transitions with business rules"
+    data:
+      # From PENDING
+      - { from_status: "PENDING", to_status: "PASSED", requires_inspection: true, requires_approval: false, requires_reason: true, is_allowed: true, description: "Inspection passed, approved for use" }
+      - { from_status: "PENDING", to_status: "FAILED", requires_inspection: true, requires_approval: false, requires_reason: true, is_allowed: true, description: "Inspection failed, rejected" }
+      - { from_status: "PENDING", to_status: "HOLD", requires_inspection: false, requires_approval: false, requires_reason: true, is_allowed: true, description: "Investigation required before decision" }
+      - { from_status: "PENDING", to_status: "QUARANTINED", requires_inspection: false, requires_approval: true, requires_reason: true, is_allowed: true, description: "Immediate quarantine required" }
+
+      # From PASSED
+      - { from_status: "PASSED", to_status: "HOLD", requires_inspection: false, requires_approval: false, requires_reason: true, is_allowed: true, description: "Post-approval issue identified" }
+      - { from_status: "PASSED", to_status: "QUARANTINED", requires_inspection: false, requires_approval: true, requires_reason: true, is_allowed: true, description: "Critical issue found after approval" }
+      - { from_status: "PASSED", to_status: "FAILED", requires_inspection: false, requires_approval: true, requires_reason: true, is_allowed: true, description: "Revoke approval due to new information" }
+
+      # From FAILED
+      - { from_status: "FAILED", to_status: "HOLD", requires_inspection: false, requires_approval: false, requires_reason: true, is_allowed: true, description: "Further investigation needed" }
+      - { from_status: "FAILED", to_status: "QUARANTINED", requires_inspection: false, requires_approval: false, requires_reason: true, is_allowed: true, description: "Quarantine failed material" }
+
+      # From HOLD
+      - { from_status: "HOLD", to_status: "PASSED", requires_inspection: true, requires_approval: true, requires_reason: true, is_allowed: true, description: "Investigation complete, approved" }
+      - { from_status: "HOLD", to_status: "FAILED", requires_inspection: true, requires_approval: true, requires_reason: true, is_allowed: true, description: "Investigation complete, rejected" }
+      - { from_status: "HOLD", to_status: "RELEASED", requires_inspection: true, requires_approval: true, requires_reason: true, is_allowed: true, description: "Released for use after investigation" }
+      - { from_status: "HOLD", to_status: "COND_APPROVED", requires_inspection: true, requires_approval: true, requires_reason: true, is_allowed: true, description: "Approved with conditions" }
+      - { from_status: "HOLD", to_status: "QUARANTINED", requires_inspection: false, requires_approval: false, requires_reason: true, is_allowed: true, description: "Escalate to quarantine" }
+
+      # From QUARANTINED
+      - { from_status: "QUARANTINED", to_status: "HOLD", requires_inspection: false, requires_approval: true, requires_reason: true, is_allowed: true, description: "Downgrade to hold for investigation" }
+      - { from_status: "QUARANTINED", to_status: "RELEASED", requires_inspection: true, requires_approval: true, requires_reason: true, is_allowed: true, description: "Released after quarantine review" }
+      - { from_status: "QUARANTINED", to_status: "FAILED", requires_inspection: true, requires_approval: true, requires_reason: true, is_allowed: true, description: "Permanently rejected" }
+
+      # From COND_APPROVED
+      - { from_status: "COND_APPROVED", to_status: "PASSED", requires_inspection: true, requires_approval: true, requires_reason: true, is_allowed: true, description: "Conditions met, full approval" }
+      - { from_status: "COND_APPROVED", to_status: "FAILED", requires_inspection: true, requires_approval: true, requires_reason: true, is_allowed: true, description: "Conditions not met, rejected" }
+      - { from_status: "COND_APPROVED", to_status: "HOLD", requires_inspection: false, requires_approval: false, requires_reason: true, is_allowed: true, description: "Additional investigation needed" }
+
+      # From RELEASED
+      - { from_status: "RELEASED", to_status: "HOLD", requires_inspection: false, requires_approval: false, requires_reason: true, is_allowed: true, description: "New issue identified" }
+      - { from_status: "RELEASED", to_status: "QUARANTINED", requires_inspection: false, requires_approval: true, requires_reason: true, is_allowed: true, description: "Critical issue after release" }
+
+# Status Type Configuration (for service/frontend)
+status_config:
+  PENDING:
+    code: "PENDING"
+    name: "Pending"
+    description: "Awaiting inspection"
+    color: "gray"
+    icon: "Clock"
+    allows_shipment: false
+    allows_consumption: false
+  PASSED:
+    code: "PASSED"
+    name: "Passed"
+    description: "Meets specifications"
+    color: "green"
+    icon: "CheckCircle"
+    allows_shipment: true
+    allows_consumption: true
+  FAILED:
+    code: "FAILED"
+    name: "Failed"
+    description: "Does not meet specs"
+    color: "red"
+    icon: "XCircle"
+    allows_shipment: false
+    allows_consumption: false
+  HOLD:
+    code: "HOLD"
+    name: "Hold"
+    description: "Investigation required"
+    color: "orange"
+    icon: "Pause"
+    allows_shipment: false
+    allows_consumption: false
+  RELEASED:
+    code: "RELEASED"
+    name: "Released"
+    description: "Approved for use after hold"
+    color: "blue"
+    icon: "Unlock"
+    allows_shipment: true
+    allows_consumption: true
+  QUARANTINED:
+    code: "QUARANTINED"
+    name: "Quarantined"
+    description: "Isolated pending review"
+    color: "darkRed"
+    icon: "AlertTriangle"
+    allows_shipment: false
+    allows_consumption: false
+  COND_APPROVED:
+    code: "COND_APPROVED"
+    name: "Conditionally Approved"
+    description: "Limited use allowed"
+    color: "yellow"
+    icon: "AlertCircle"
+    allows_shipment: false
+    allows_consumption: true
+ORCH_EOF

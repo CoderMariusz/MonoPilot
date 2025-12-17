@@ -1,0 +1,441 @@
+# Story 05.16 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/stock-move-service.test.ts"
+    type: "unit"
+    description: "Unit tests for stock move service (>80% coverage)"
+
+  - path: "tests/e2e/warehouse/stock-moves.spec.ts"
+    type: "e2e"
+    description: "E2E smoke test for stock moves workflow"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    name: "Stock Moves Table Creation"
+    given: "the warehouse module is being deployed"
+    when: "the stock_moves migration runs"
+    then:
+      - "table created with all fields: id, org_id, move_number, lp_id, move_type, quantity, move_date, status"
+      - "FK references: lp_id -> license_plates, from/to_location_id -> locations"
+      - "Move types enum: transfer, issue, receipt, adjustment, return, quarantine, putaway"
+      - "Default status = 'completed'"
+      - "Unique constraint on (org_id, move_number)"
+      - "Indexes on (lp_id), (move_date), (org_id, move_type)"
+      - "RLS enabled with org isolation policy"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    name: "Move Number Auto-Generation"
+    given: "a stock move is being created"
+    when: "the service calls generateMoveNumber()"
+    then:
+      - "returns unique number in format SM-YYYY-NNNNN"
+      - "SM prefix for Stock Move"
+      - "YYYY = current year"
+      - "NNNNN = zero-padded sequence starting at 00001 per year"
+      - "sequence resets on January 1st"
+      - "operation completes in <100ms"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "Create Transfer Move (Full LP)"
+    given: "an LP with status='available' at location A"
+    when: "user creates a transfer move with destination location B and move_qty = LP.qty"
+    then:
+      - "creates stock_move record with move_type='transfer'"
+      - "sets from_location_id = current LP.location_id"
+      - "sets to_location_id = destination location"
+      - "updates LP.location_id to destination location"
+      - "sets stock_move.status = 'completed'"
+      - "generates move_number (e.g., SM-2025-00123)"
+      - "records created_by = current user"
+      - "completes in <300ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    name: "Create Transfer Move (Partial LP)"
+    given: "an LP with qty=100 at location A"
+    when: "user creates a transfer move with move_qty=30 to location B"
+    then:
+      - "triggers LP split operation (via 05.6)"
+      - "creates new LP with qty=30 at location B"
+      - "updates original LP qty to 70 at location A"
+      - "creates stock_move with move_type='transfer', quantity=30"
+      - "links move to both parent and child LP in genealogy"
+      - "completes in <500ms"
+    test_type: "integration"
+    priority: "P1"
+    depends_on: "05.6"
+
+  - id: "AC-05"
+    name: "Validation - LP Not Available"
+    given: "an LP with status='consumed' or 'blocked'"
+    when: "user attempts to create a transfer move"
+    then:
+      - "returns 400 error: 'LP not available for movement (status: {status})'"
+      - "does not create stock_move record"
+      - "does not update LP"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-06"
+    name: "Validation - Move Quantity Exceeds Available"
+    given: "an LP with qty=50"
+    when: "user attempts to create a move with move_qty=75"
+    then:
+      - "returns 400 error: 'Move quantity exceeds available quantity'"
+      - "does not proceed with move"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    name: "Validation - Destination Location"
+    given: "a transfer move request"
+    when: "destination location is inactive or does not exist"
+    then:
+      - "returns 400 error: 'Destination location not available'"
+      - "does not create move"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-08"
+    name: "Create Adjustment Move"
+    given: "an LP with qty=100"
+    when: "user creates adjustment move with new_qty=95 and reason_code='damage'"
+    then:
+      - "creates stock_move with move_type='adjustment'"
+      - "sets quantity = -5 (delta)"
+      - "records reason_code = 'damage'"
+      - "updates LP.qty to 95"
+      - "does not change LP.location_id"
+      - "sets status='completed'"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-09"
+    name: "Create Receipt Move (from GRN)"
+    given: "a new LP is being created via GRN"
+    when: "the LP is created with qty=100 at receiving location"
+    then:
+      - "creates stock_move with move_type='receipt'"
+      - "sets to_location_id = receiving location"
+      - "sets from_location_id = NULL"
+      - "links to grn_id via reference_id"
+      - "sets reference_type='grn'"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-10"
+    name: "Create Quarantine Move"
+    given: "an LP with qa_status='failed' at location A"
+    when: "user creates quarantine move to quarantine location Q"
+    then:
+      - "creates stock_move with move_type='quarantine'"
+      - "updates LP.location_id to quarantine location"
+      - "updates LP.qa_status to 'quarantine'"
+      - "records reason for quarantine in notes"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-11"
+    name: "Cancel Stock Move"
+    given: "a stock_move with status='completed' created in last 24 hours"
+    when: "manager initiates cancel operation with reason"
+    then:
+      - "updates stock_move.status to 'cancelled'"
+      - "records cancelled_at timestamp and cancelled_by user"
+      - "records cancellation reason in notes"
+      - "DOES NOT reverse LP changes"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-12"
+    name: "List Stock Moves with Filters"
+    given: "user is on movements page"
+    when: "page loads with filters: date_range, move_type, lp_number, location"
+    then:
+      - "displays paginated list (50 per page)"
+      - "columns: move_number, move_date, LP number, move_type, from/to locations, quantity, status"
+      - "default sort: move_date DESC"
+      - "filter controls for all criteria"
+      - "query completes in <500ms for 10K moves"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-13"
+    name: "View Movement History by LP"
+    given: "user viewing LP detail page"
+    when: "'Movement History' tab is selected"
+    then:
+      - "displays all stock_moves for LP ordered by move_date DESC"
+      - "each move shows: date, type, from->to locations, quantity, user, status"
+      - "visual timeline representation"
+      - "query completes in <200ms"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-14"
+    name: "RLS Policy Enforcement"
+    given: "a stock_move belongs to org_id=A"
+    when: "a user from org_id=B attempts to query stock_moves"
+    then:
+      - "returns empty result set"
+      - "does not throw error"
+      - "RLS policy blocks cross-org access"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-15"
+    name: "Performance - Movement History Query"
+    given: "an LP with 500+ movement records"
+    when: "user views movement history"
+    then:
+      - "returns first 50 records in <200ms"
+      - "supports pagination for remaining records"
+      - "uses index on (lp_id, move_date DESC)"
+    test_type: "performance"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  stock_move_service:
+    - name: "generateMoveNumber returns correct format"
+      setup: "Mock current year as 2025"
+      expected: "Returns SM-2025-NNNNN format"
+
+    - name: "generateMoveNumber increments sequence"
+      setup: "Create 3 moves in same year"
+      expected: "Returns SM-2025-00001, SM-2025-00002, SM-2025-00003"
+
+    - name: "createStockMove validates LP status"
+      setup: "LP with status='consumed'"
+      expected: "Throws 'LP not available for movement'"
+
+    - name: "createStockMove validates move quantity"
+      setup: "LP with qty=50, move_qty=75"
+      expected: "Throws 'Move quantity exceeds available quantity'"
+
+    - name: "createStockMove validates destination for transfer"
+      setup: "move_type='transfer', no to_location_id"
+      expected: "Throws 'Destination location required'"
+
+    - name: "createStockMove validates reason_code for adjustment"
+      setup: "move_type='adjustment', no reason_code"
+      expected: "Throws 'Reason code required for adjustments'"
+
+    - name: "createStockMove updates LP location on transfer"
+      setup: "LP at location A, move to location B"
+      expected: "LP.location_id updated to B"
+
+    - name: "createStockMove updates LP qa_status on quarantine"
+      setup: "LP with qa_status='failed'"
+      expected: "LP.qa_status='quarantine', LP.status='blocked'"
+
+    - name: "cancelStockMove validates time window"
+      setup: "Move created 25 hours ago"
+      expected: "Throws 'Cannot cancel moves older than 24 hours'"
+
+    - name: "cancelStockMove records cancellation details"
+      setup: "Valid move within 24 hours"
+      expected: "status='cancelled', cancelled_at set, cancelled_by set, notes set"
+
+    - name: "listStockMoves applies all filters correctly"
+      setup: "Multiple moves with different types, dates, locations"
+      expected: "Filtered results match criteria"
+
+    - name: "getLPMovementHistory returns moves in DESC order"
+      setup: "LP with 5 moves at different times"
+      expected: "Moves ordered by move_date DESC"
+
+# Integration Test Cases
+integration_tests:
+  stock_moves_table:
+    - name: "Table created with all columns"
+      action: "Run migration"
+      expected: "All columns exist with correct types"
+
+    - name: "Unique constraint on move_number"
+      action: "Insert two moves with same move_number in same org"
+      expected: "Second insert fails with unique violation"
+
+    - name: "FK constraint on lp_id"
+      action: "Insert move with non-existent lp_id"
+      expected: "Insert fails with FK violation"
+
+    - name: "Check constraint on move_type"
+      action: "Insert move with invalid move_type"
+      expected: "Insert fails with check violation"
+
+    - name: "Check constraint on location validity"
+      action: "Insert transfer move with from_location_id NULL"
+      expected: "Insert fails with check violation"
+
+  rls_policies:
+    - name: "User can only see own org moves"
+      setup: "Create moves in Org A and Org B"
+      action: "User A queries stock_moves"
+      expected: "Only Org A moves returned"
+
+    - name: "User cannot modify other org moves"
+      setup: "Create move in Org A"
+      action: "User B attempts to update move"
+      expected: "Update affects 0 rows"
+
+  api_endpoints:
+    - name: "GET /api/warehouse/stock-moves returns paginated list"
+      setup: "Create 100 moves"
+      action: "GET with page=1, limit=50"
+      expected: "Returns 50 moves, pagination shows total=100"
+
+    - name: "POST /api/warehouse/stock-moves creates move"
+      setup: "LP at location A"
+      action: "POST with lp_id, to_location_id, move_type='transfer'"
+      expected: "Returns 201 with created move"
+
+    - name: "POST /api/warehouse/stock-moves/:id/cancel cancels move"
+      setup: "Completed move within 24 hours"
+      action: "POST with reason"
+      expected: "Returns 200 with cancelled move"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Stock moves list page loads with data"
+    steps:
+      - "Navigate to /warehouse/movements"
+      - "Wait for page load"
+    expected:
+      - "KPI cards display counts"
+      - "Table shows movements"
+      - "Filters are visible"
+
+  - name: "Filter by date range"
+    steps:
+      - "Navigate to /warehouse/movements"
+      - "Select 'Today' quick filter"
+    expected:
+      - "Table shows only today's moves"
+      - "Filter indicator shows active filter"
+
+  - name: "Filter by move type"
+    steps:
+      - "Navigate to /warehouse/movements"
+      - "Select 'Transfer' from move type filter"
+    expected:
+      - "Table shows only transfer moves"
+      - "All displayed moves have transfer badge"
+
+  - name: "Create transfer move"
+    steps:
+      - "Navigate to /warehouse/movements"
+      - "Click 'Create Movement' button"
+      - "Search and select LP"
+      - "Select destination location"
+      - "Verify quantity"
+      - "Click 'Complete Move'"
+    expected:
+      - "Success message displayed"
+      - "Move appears in list"
+      - "LP location updated"
+
+  - name: "Cancel move within 24 hours"
+    steps:
+      - "Navigate to /warehouse/movements"
+      - "Find recent move"
+      - "Click actions menu"
+      - "Click 'Cancel'"
+      - "Enter reason"
+      - "Confirm cancellation"
+    expected:
+      - "Move status changes to 'cancelled'"
+      - "Cancelled badge displayed"
+
+  - name: "View LP movement history"
+    steps:
+      - "Navigate to LP detail page"
+      - "Click 'Movement History' tab"
+    expected:
+      - "Timeline of movements displayed"
+      - "Each entry shows date, type, locations"
+      - "Query completes quickly"
+
+  - name: "Export movements to CSV"
+    steps:
+      - "Navigate to /warehouse/movements"
+      - "Apply some filters"
+      - "Click 'Export CSV' button"
+    expected:
+      - "CSV file downloads"
+      - "File contains filtered data"
+
+# Performance Test Cases
+performance_tests:
+  - name: "List query with 10K moves"
+    setup: "Seed 10,000 stock moves"
+    action: "GET /api/warehouse/stock-moves?page=1&limit=50"
+    expected: "Response in <500ms"
+
+  - name: "LP history query with 500 moves"
+    setup: "Create LP with 500 movements"
+    action: "GET /api/warehouse/stock-moves?lp_id={id}"
+    expected: "Response in <200ms"
+
+  - name: "Move creation time"
+    setup: "LP with available status"
+    action: "POST /api/warehouse/stock-moves"
+    expected: "Response in <300ms"
+
+# Definition of Done
+definition_of_done:
+  - "stock_moves table created with all fields, indexes, constraints"
+  - "RLS policy 'Stock moves org isolation' created and tested"
+  - "Move number generation service with year-based sequence"
+  - "API endpoints: GET list, GET detail, POST create, POST cancel implemented"
+  - "Service layer: createStockMove, listStockMoves, getStockMove, cancelStockMove, getLPMovementHistory"
+  - "Zod validation schemas for all API operations"
+  - "Desktop movements list page with filters (date, type, LP, location)"
+  - "Movement detail page with full context"
+  - "Movement history component for LP detail view (timeline)"
+  - "Automatic LP.location_id update on transfer/putaway/quarantine/return moves"
+  - "Integration with LP split for partial moves (05.6 dependency)"
+  - "Unit tests for service layer (>80% coverage)"
+  - "RLS policy tested for multi-tenant isolation"
+  - "E2E smoke test: Create transfer move -> verify LP location updated -> view in movements list"
+  - "Performance validation: List query <500ms, LP history <200ms"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Service layer with business logic"
+  integration:
+    target: 70
+    reason: "API and RLS coverage"
+  files:
+    - "lib/services/stock-move-service.ts: 80%"
+    - "lib/validation/stock-move-schema.ts: 90%"
+    - "RLS policies: 100% policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Partial moves depend on LP split (05.6)"
+    mitigation: "Return error for partial moves until 05.6 implemented"
+    severity: "medium"
+
+  - id: "RISK-02"
+    description: "Cancellation does not reverse LP changes"
+    mitigation: "Clear warning in UI, documented behavior"
+    severity: "low"
+
+  - id: "RISK-03"
+    description: "Performance with large move history"
+    mitigation: "Indexes on (lp_id, move_date), pagination"
+    severity: "medium"

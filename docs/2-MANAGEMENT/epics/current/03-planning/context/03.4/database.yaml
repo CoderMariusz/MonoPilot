@@ -1,0 +1,192 @@
+# Story 03.4 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+# Note: This story primarily REUSES tables from 03.3. Optional template table for Phase 2.
+
+# No new migrations required for MVP
+# Reuses: purchase_orders, purchase_order_lines, suppliers, supplier_products
+migrations: []
+
+# Tables to REUSE (from Story 03.3)
+tables_reused:
+  - name: "purchase_orders"
+    from_story: "03.3"
+    usage: "Bulk creation target - creates multiple PO headers"
+
+  - name: "purchase_order_lines"
+    from_story: "03.3"
+    usage: "Bulk creation target - creates lines for each PO"
+
+  - name: "suppliers"
+    from_story: "03.1"
+    usage: "Grouping logic - group import rows by supplier"
+
+  - name: "supplier_products"
+    from_story: "03.2"
+    usage: "Auto-fill pricing, lead time, MOQ from supplier-specific overrides"
+
+# Optional table (Phase 2 - NOT IN MVP)
+optional_tables:
+  - name: "po_templates"
+    phase: "2"
+    description: "Reusable PO templates for quick bulk creation"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "supplier_id", type: "UUID", constraints: "REFERENCES suppliers(id)" }
+      - { name: "warehouse_id", type: "UUID", constraints: "REFERENCES warehouses(id)" }
+      - { name: "payment_terms", type: "TEXT", constraints: "" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_po_templates_org ON po_templates(org_id)"
+      - "idx_po_templates_supplier ON po_templates(supplier_id)"
+
+  - name: "po_template_lines"
+    phase: "2"
+    description: "Template line items (products with quantities)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "template_id", type: "UUID", constraints: "NOT NULL REFERENCES po_templates(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "default_quantity", type: "DECIMAL(15,4)", constraints: "DEFAULT 1" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "display_order", type: "INTEGER", constraints: "DEFAULT 0" }
+    rls: true
+    rls_pattern: |
+      EXISTS (
+        SELECT 1 FROM po_templates t
+        WHERE t.id = po_template_lines.template_id
+          AND t.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+      )
+    indexes:
+      - "idx_po_template_lines_template ON po_template_lines(template_id)"
+
+# Bulk Import Query Patterns
+query_patterns:
+  group_by_supplier: |
+    -- Group imported rows by default supplier
+    SELECT
+      sp.supplier_id,
+      s.name AS supplier_name,
+      s.currency,
+      s.default_tax_code_id,
+      s.lead_time_days AS supplier_lead_time,
+      s.payment_terms,
+      ARRAY_AGG(
+        JSON_BUILD_OBJECT(
+          'product_id', p.id,
+          'product_code', p.code,
+          'product_name', p.name,
+          'quantity', import.quantity,
+          'unit_price', COALESCE(sp.unit_price, p.std_price),
+          'uom', p.base_uom,
+          'lead_time_days', COALESCE(sp.lead_time_days, p.supplier_lead_time_days),
+          'moq', COALESCE(sp.moq, p.moq)
+        )
+      ) AS lines
+    FROM import_rows import
+    JOIN products p ON p.code = import.product_code
+    LEFT JOIN supplier_products sp ON sp.product_id = p.id AND sp.is_default = true
+    LEFT JOIN suppliers s ON s.id = sp.supplier_id
+    WHERE p.org_id = :org_id
+    GROUP BY sp.supplier_id, s.name, s.currency, s.default_tax_code_id, s.lead_time_days, s.payment_terms
+
+  validate_products: |
+    -- Validate product codes exist
+    SELECT
+      import.product_code,
+      CASE
+        WHEN p.id IS NULL THEN 'PRODUCT_NOT_FOUND'
+        WHEN sp.id IS NULL THEN 'NO_DEFAULT_SUPPLIER'
+        ELSE 'VALID'
+      END AS validation_status,
+      p.id AS product_id,
+      sp.supplier_id
+    FROM import_rows import
+    LEFT JOIN products p ON p.code = import.product_code AND p.org_id = :org_id
+    LEFT JOIN supplier_products sp ON sp.product_id = p.id AND sp.is_default = true
+
+  expected_date_calculation: |
+    -- Calculate expected delivery date based on lead time
+    SELECT
+      GREATEST(
+        CURRENT_DATE + COALESCE(sp.lead_time_days, p.supplier_lead_time_days, s.lead_time_days, 7),
+        MAX(import.expected_date)
+      ) AS expected_delivery_date
+    FROM import_rows import
+    LEFT JOIN supplier_products sp ON ...
+    LEFT JOIN products p ON ...
+    LEFT JOIN suppliers s ON ...
+
+# Bulk Insert Pattern (Transaction)
+bulk_insert_pattern:
+  description: "Create multiple POs in parallel transactions with partial failure handling"
+  steps:
+    - step: 1
+      description: "Group import rows by supplier"
+      sql: "See group_by_supplier query above"
+
+    - step: 2
+      description: "For each group, start transaction"
+      sql: "BEGIN;"
+
+    - step: 3
+      description: "Insert PO header"
+      sql: |
+        INSERT INTO purchase_orders (
+          org_id, po_number, supplier_id, currency, tax_code_id,
+          expected_delivery_date, warehouse_id, status, payment_terms,
+          created_by
+        )
+        VALUES (:org_id, generate_po_number(:org_id), :supplier_id, :currency, :tax_code_id,
+                :expected_date, :warehouse_id, 'draft', :payment_terms, :user_id)
+        RETURNING id;
+
+    - step: 4
+      description: "Insert PO lines"
+      sql: |
+        INSERT INTO purchase_order_lines (
+          po_id, line_number, product_id, quantity, uom, unit_price,
+          expected_delivery_date, notes
+        )
+        SELECT
+          :po_id,
+          ROW_NUMBER() OVER (),
+          line->>'product_id',
+          (line->>'quantity')::DECIMAL,
+          line->>'uom',
+          (line->>'unit_price')::DECIMAL,
+          :expected_date,
+          line->>'notes'
+        FROM JSONB_ARRAY_ELEMENTS(:lines_json) AS line;
+
+    - step: 5
+      description: "Commit or rollback per PO"
+      sql: "COMMIT; -- Or ROLLBACK on error"
+
+# Data Integrity Rules
+data_integrity:
+  - rule: "Products must exist in catalog"
+    check: "JOIN products ON code, validate org_id"
+
+  - rule: "Suppliers must exist and be active"
+    check: "JOIN suppliers ON id, WHERE is_active = true"
+
+  - rule: "MOQ validation (warning only)"
+    check: "quantity >= COALESCE(supplier_products.moq, products.moq, 0)"
+
+  - rule: "Order multiple validation (warning only)"
+    check: "quantity % COALESCE(supplier_products.order_multiple, 1) = 0"
+
+  - rule: "Price validation"
+    check: "unit_price >= 0"
+
+  - rule: "Quantity validation"
+    check: "quantity > 0"

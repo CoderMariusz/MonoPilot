@@ -1,0 +1,202 @@
+# Story 02.8 - Database Schema
+# Purpose: Tables, RLS policies, indexes, migration notes
+# Agent: BACKEND-DEV (database focus)
+
+# Migration notes
+migrations:
+  existing:
+    - path: "supabase/migrations/044_add_routing_fields.sql"
+      type: "migration"
+      description: "Added routing.code, is_reusable, routing_operations.cleanup_time, instructions"
+      status: "applied"
+    - path: "supabase/migrations/050_enable_parallel_operations.sql"
+      type: "migration"
+      description: "CRITICAL: Removed UNIQUE(routing_id, sequence) constraint for parallel operations"
+      status: "applied"
+      impact: |
+        - Sequence numbers can now be duplicated within a routing
+        - Operations with same sequence = run in parallel
+        - UI must detect and display "(Parallel)" indicator
+
+  new_required:
+    - path: "supabase/migrations/05X_create_operation_attachments.sql"
+      type: "migration"
+      description: "Create operation_attachments table and storage bucket (FR-2.45)"
+      sql: |
+        -- Operation attachments for work instructions (FR-2.45)
+        CREATE TABLE operation_attachments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          operation_id UUID NOT NULL REFERENCES routing_operations(id) ON DELETE CASCADE,
+          file_name TEXT NOT NULL,
+          file_type TEXT NOT NULL CHECK (file_type IN ('pdf', 'png', 'jpg', 'jpeg', 'docx')),
+          file_size INTEGER NOT NULL CHECK (file_size > 0 AND file_size <= 10485760), -- 10MB max
+          storage_path TEXT NOT NULL,
+          uploaded_by UUID REFERENCES users(id),
+          uploaded_at TIMESTAMPTZ DEFAULT NOW(),
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        -- Indexes
+        CREATE INDEX idx_operation_attachments_operation ON operation_attachments(operation_id);
+        CREATE INDEX idx_operation_attachments_org ON operation_attachments(org_id);
+
+        -- RLS Policy (ADR-013 pattern)
+        ALTER TABLE operation_attachments ENABLE ROW LEVEL SECURITY;
+
+        CREATE POLICY "operation_attachments_org_isolation"
+        ON operation_attachments FOR ALL
+        USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+        -- Attachment limit trigger (max 5 per operation)
+        CREATE OR REPLACE FUNCTION check_operation_attachment_limit()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          IF (SELECT COUNT(*) FROM operation_attachments WHERE operation_id = NEW.operation_id) >= 5 THEN
+            RAISE EXCEPTION 'Maximum 5 attachments per operation';
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE TRIGGER operation_attachment_limit_check
+        BEFORE INSERT ON operation_attachments
+        FOR EACH ROW EXECUTE FUNCTION check_operation_attachment_limit();
+
+        -- Storage bucket (run in Supabase dashboard or via CLI)
+        -- INSERT INTO storage.buckets (id, name, public)
+        -- VALUES ('operation-attachments', 'operation-attachments', false);
+
+# Tables
+tables:
+  - name: "routing_operations"
+    description: "Production operation steps within a routing (existing table)"
+    status: "exists"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "routing_id", type: "UUID", constraints: "NOT NULL REFERENCES routings(id) ON DELETE CASCADE" }
+      - { name: "sequence", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "machine_id", type: "UUID", constraints: "REFERENCES machines(id)", nullable: true, note: "NULLABLE - operations work without machines" }
+      - { name: "setup_time", type: "INTEGER", constraints: "DEFAULT 0", note: "minutes" }
+      - { name: "duration", type: "INTEGER", constraints: "NOT NULL", note: "run time in minutes (required)" }
+      - { name: "cleanup_time", type: "INTEGER", constraints: "DEFAULT 0", note: "minutes - added in migration 044" }
+      - { name: "labor_cost_per_hour", type: "DECIMAL(15,4)", constraints: "DEFAULT 0" }
+      - { name: "instructions", type: "TEXT", constraints: "", note: "max 2000 chars - added in migration 044" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_policy: |
+      -- RLS via parent routing table (ADR-013 pattern)
+      CREATE POLICY "routing_operations_org_isolation"
+      ON routing_operations FOR ALL
+      USING (
+        routing_id IN (
+          SELECT id FROM routings
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+      );
+    indexes:
+      - "idx_routing_operations_routing ON routing_operations(routing_id)"
+      - "idx_routing_operations_sequence ON routing_operations(routing_id, sequence)"
+      - "idx_routing_operations_machine ON routing_operations(machine_id)"
+    constraints:
+      note: "UNIQUE(routing_id, sequence) was REMOVED in migration 050 to allow parallel operations"
+
+  - name: "operation_attachments"
+    description: "File attachments for operation work instructions (FR-2.45)"
+    status: "new"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "operation_id", type: "UUID", constraints: "NOT NULL REFERENCES routing_operations(id) ON DELETE CASCADE" }
+      - { name: "file_name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "file_type", type: "TEXT", constraints: "NOT NULL CHECK (file_type IN ('pdf', 'png', 'jpg', 'jpeg', 'docx'))" }
+      - { name: "file_size", type: "INTEGER", constraints: "NOT NULL CHECK (file_size > 0 AND file_size <= 10485760)" }
+      - { name: "storage_path", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "uploaded_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "uploaded_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_operation_attachments_operation ON operation_attachments(operation_id)"
+      - "idx_operation_attachments_org ON operation_attachments(org_id)"
+    constraints:
+      - "Max 5 attachments per operation (enforced by trigger)"
+      - "Max file size 10MB"
+      - "Allowed types: pdf, png, jpg, jpeg, docx"
+    triggers:
+      - name: "operation_attachment_limit_check"
+        event: "BEFORE INSERT"
+        action: "Raise exception if operation has >= 5 attachments"
+
+# RLS Policies
+rls_policies:
+  pattern: "Parent Table Lookup (ADR-013 variant)"
+  policies:
+    - table: "routing_operations"
+      name: "routing_operations_org_isolation"
+      operation: "ALL"
+      using: "routing_id IN (SELECT id FROM routings WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+      note: "Inherit org_id from parent routings table"
+
+    - table: "operation_attachments"
+      name: "operation_attachments_org_isolation"
+      operation: "ALL"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "Direct org_id on table for efficiency"
+
+# Storage Configuration (Supabase)
+storage:
+  bucket:
+    name: "operation-attachments"
+    public: false
+    file_size_limit: 10485760  # 10MB
+    allowed_mime_types:
+      - "application/pdf"
+      - "image/png"
+      - "image/jpeg"
+      - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+  path_pattern: "{org_id}/{routing_id}/{operation_id}/{timestamp}_{sanitized_filename}"
+
+  rls_policy: |
+    -- Storage bucket RLS
+    CREATE POLICY "operation_attachments_storage_policy"
+    ON storage.objects FOR ALL
+    USING (
+      bucket_id = 'operation-attachments'
+      AND (storage.foldername(name))[1] = (SELECT org_id::text FROM users WHERE id = auth.uid())
+    );
+
+# Key Business Rules
+business_rules:
+  sequence:
+    - "Sequence numbers CAN be duplicated (parallel operations - FR-2.48)"
+    - "Operations with same sequence number run simultaneously"
+    - "Migration 050 removed UNIQUE constraint on (routing_id, sequence)"
+
+  machine_assignment:
+    - "machine_id is NULLABLE - operations work without machine assignment"
+    - "If machine_id provided, must exist in machines table (FK constraint)"
+    - "UI shows empty state if machines table is empty"
+
+  time_fields:
+    - "Total operation time = setup_time + duration + cleanup_time"
+    - "duration is REQUIRED (run time in minutes)"
+    - "setup_time defaults to 0"
+    - "cleanup_time defaults to 0 (added migration 044)"
+
+  instructions:
+    - "Max 2000 characters"
+    - "Optional field for operator instructions"
+    - "Added in migration 044"
+
+  attachments:
+    - "Max 5 files per operation"
+    - "Max 10MB per file"
+    - "Allowed types: PDF, PNG, JPG/JPEG, DOCX"
+    - "Deleted when parent operation is deleted (CASCADE)"
+    - "Storage cleanup required on attachment delete"

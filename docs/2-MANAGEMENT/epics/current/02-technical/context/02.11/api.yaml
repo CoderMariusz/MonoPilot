@@ -1,0 +1,489 @@
+# Story 02.11 - API Specification
+# Purpose: Endpoints, request/response schemas, service integration
+# Agent: BACKEND-DEV (API focus)
+
+# Existing service to extend
+existing_service:
+  path: "apps/frontend/lib/services/shelf-life-service.ts"
+  status: "EXISTS - EXTEND"
+  current_exports:
+    - "ShelfLifeCalculation"
+    - "calculateProductShelfLife"
+    - "overrideProductShelfLife"
+    - "clearShelfLifeOverride"
+  new_exports:
+    - "ShelfLifeConfig"
+    - "ShelfLifeConfigResponse"
+    - "CalculateShelfLifeResponse"
+    - "UpdateShelfLifeRequest"
+    - "IngredientShelfLife"
+    - "UpdateIngredientShelfLifeRequest"
+    - "ShipmentEligibility"
+    - "getShelfLifeConfig"
+    - "updateShelfLifeConfig"
+    - "calculateShelfLife"
+    - "bulkRecalculate"
+    - "getRecalculationQueue"
+    - "calculateBestBeforeDate"
+    - "checkShipmentEligibility"
+    - "getIngredientShelfLife"
+    - "updateIngredientShelfLife"
+    - "getAuditLog"
+
+endpoints:
+  # Product Shelf Life Configuration
+  - method: "GET"
+    path: "/api/technical/shelf-life/products/:id"
+    description: "Get shelf life configuration for a product"
+    file: "apps/frontend/app/api/technical/shelf-life/products/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      params:
+        id: "UUID - Product ID"
+      headers:
+        Authorization: "Bearer <jwt_token>"
+    response:
+      status: 200
+      type: "ShelfLifeConfigResponse"
+      schema:
+        product_id: "UUID"
+        product_code: "string"
+        product_name: "string"
+        bom_version: "string | null"
+        bom_effective_date: "string | null"
+        calculated_days: "number | null"
+        calculation_method: "'min_ingredient' | 'manual_testing' | 'regulatory'"
+        shortest_ingredient_id: "string | null"
+        shortest_ingredient_name: "string | null"
+        shortest_ingredient_days: "number | null"
+        processing_impact_days: "number"
+        safety_buffer_percent: "number"
+        safety_buffer_days: "number"
+        override_days: "number | null"
+        override_reason: "string | null"
+        final_days: "number"
+        storage_temp_min: "number"
+        storage_temp_max: "number"
+        storage_humidity_min: "number | null"
+        storage_humidity_max: "number | null"
+        storage_conditions: "string[]"
+        storage_instructions: "string | null"
+        shelf_life_mode: "'fixed' | 'rolling'"
+        label_format: "'best_before_day' | 'best_before_month' | 'use_by'"
+        picking_strategy: "'FIFO' | 'FEFO'"
+        min_remaining_for_shipment: "number | null"
+        enforcement_level: "'suggest' | 'warn' | 'block'"
+        expiry_warning_days: "number"
+        expiry_critical_days: "number"
+        needs_recalculation: "boolean"
+        calculated_at: "string | null"
+        updated_at: "string"
+        updated_by: "string"
+        ingredients: "IngredientShelfLife[]"
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+
+  - method: "POST"
+    path: "/api/technical/shelf-life/products/:id/calculate"
+    description: "Calculate shelf life from BOM ingredients"
+    file: "apps/frontend/app/api/technical/shelf-life/products/[id]/calculate/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "quality_manager"]
+    request:
+      params:
+        id: "UUID - Product ID"
+      body:
+        force_recalculate: "boolean (optional) - Ignore cached calculation"
+    response:
+      status: 200
+      type: "CalculateShelfLifeResponse"
+      schema:
+        calculated_days: "number"
+        shortest_ingredient_id: "string"
+        shortest_ingredient_name: "string"
+        shortest_ingredient_days: "number"
+        processing_impact_days: "number"
+        safety_buffer_percent: "number"
+        safety_buffer_days: "number"
+        ingredients_analyzed: "number"
+        missing_shelf_life: "string[]"
+        calculation_timestamp: "string"
+    errors:
+      - status: 400
+        code: "NO_ACTIVE_BOM"
+        message: "No active BOM found. Set shelf life manually or create BOM first."
+      - status: 400
+        code: "MISSING_INGREDIENT_SHELF_LIFE"
+        message: "Missing shelf life for ingredient: {name}"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+
+  - method: "PUT"
+    path: "/api/technical/shelf-life/products/:id"
+    description: "Update shelf life configuration (including override)"
+    file: "apps/frontend/app/api/technical/shelf-life/products/[id]/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "quality_manager"]
+    request:
+      params:
+        id: "UUID - Product ID"
+      body:
+        use_override: "boolean"
+        override_days: "number (optional)"
+        override_reason: "string (required if use_override=true)"
+        processing_impact_days: "number (optional)"
+        safety_buffer_percent: "number (optional)"
+        storage_temp_min: "number (optional)"
+        storage_temp_max: "number (optional)"
+        storage_humidity_min: "number | null (optional)"
+        storage_humidity_max: "number | null (optional)"
+        storage_conditions: "string[] (optional)"
+        storage_instructions: "string | null (optional)"
+        shelf_life_mode: "'fixed' | 'rolling' (optional)"
+        label_format: "'best_before_day' | 'best_before_month' | 'use_by' (optional)"
+        picking_strategy: "'FIFO' | 'FEFO' (optional)"
+        min_remaining_for_shipment: "number | null (optional)"
+        enforcement_level: "'suggest' | 'warn' | 'block' (optional)"
+        expiry_warning_days: "number (optional)"
+        expiry_critical_days: "number (optional)"
+    response:
+      status: 200
+      type: "ShelfLifeConfigResponse"
+    errors:
+      - status: 400
+        code: "OVERRIDE_REASON_REQUIRED"
+        message: "Override reason is required for audit trail"
+      - status: 400
+        code: "INVALID_TEMP_RANGE"
+        message: "Minimum temperature cannot exceed maximum"
+      - status: 400
+        code: "INVALID_HUMIDITY_RANGE"
+        message: "Minimum humidity cannot exceed maximum"
+      - status: 400
+        code: "INVALID_EXPIRY_THRESHOLD"
+        message: "Critical threshold must be less than or equal to warning threshold"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+
+  # Ingredient Shelf Life
+  - method: "GET"
+    path: "/api/technical/shelf-life/ingredients/:id"
+    description: "Get shelf life configuration for an ingredient"
+    file: "apps/frontend/app/api/technical/shelf-life/ingredients/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      params:
+        id: "UUID - Ingredient (Product) ID"
+    response:
+      status: 200
+      type: "IngredientShelfLife"
+      schema:
+        ingredient_id: "string"
+        ingredient_code: "string"
+        ingredient_name: "string"
+        shelf_life_days: "number | null"
+        shelf_life_source: "'supplier' | 'internal_testing' | 'regulatory' | 'industry_standard' | null"
+        supplier_name: "string | null"
+        specification_reference: "string | null"
+        storage_temp_min: "number | null"
+        storage_temp_max: "number | null"
+        storage_humidity_min: "number | null"
+        storage_humidity_max: "number | null"
+        storage_conditions: "string[]"
+        min_acceptable_on_receipt: "number | null"
+        quarantine_required: "boolean"
+        quarantine_duration_days: "number | null"
+        notes: "string | null"
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "INGREDIENT_NOT_FOUND"
+        message: "Ingredient not found"
+
+  - method: "POST"
+    path: "/api/technical/shelf-life/ingredients/:id"
+    description: "Update ingredient shelf life (triggers recalculation)"
+    file: "apps/frontend/app/api/technical/shelf-life/ingredients/[id]/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "quality_manager"]
+    request:
+      params:
+        id: "UUID - Ingredient (Product) ID"
+      body:
+        shelf_life_days: "number (required)"
+        shelf_life_source: "'supplier' | 'internal_testing' | 'regulatory' | 'industry_standard' (required)"
+        supplier_name: "string | null (optional)"
+        specification_reference: "string | null (optional)"
+        storage_temp_min: "number (required)"
+        storage_temp_max: "number (required)"
+        storage_humidity_min: "number | null (optional)"
+        storage_humidity_max: "number | null (optional)"
+        storage_conditions: "string[] (optional)"
+        min_acceptable_on_receipt: "number (optional)"
+        quarantine_required: "boolean (optional)"
+        quarantine_duration_days: "number (required if quarantine_required=true)"
+    response:
+      status: 200
+      type: "IngredientShelfLife"
+    errors:
+      - status: 400
+        code: "QUARANTINE_DURATION_REQUIRED"
+        message: "Quarantine duration required when quarantine is enabled"
+      - status: 400
+        code: "INVALID_TEMP_RANGE"
+        message: "Minimum temperature cannot exceed maximum"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "INGREDIENT_NOT_FOUND"
+        message: "Ingredient not found"
+
+  # Bulk Operations
+  - method: "POST"
+    path: "/api/technical/shelf-life/bulk-recalculate"
+    description: "Recalculate shelf life for multiple products"
+    file: "apps/frontend/app/api/technical/shelf-life/bulk-recalculate/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager"]
+    request:
+      body:
+        product_ids: "string[] (optional) - If empty, recalculates all flagged products"
+    response:
+      status: 200
+      schema:
+        total_processed: "number"
+        successful: "number"
+        failed: "number"
+        results: "Array<{ product_id, product_name, old_days, new_days, success, error? }>"
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+
+  - method: "GET"
+    path: "/api/technical/shelf-life/recalculation-queue"
+    description: "Get products needing shelf life recalculation"
+    file: "apps/frontend/app/api/technical/shelf-life/recalculation-queue/route.ts"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      schema:
+        count: "number"
+        products: "Array<{ product_id, product_code, product_name, current_days, last_calculated_at }>"
+
+  # Audit Log
+  - method: "GET"
+    path: "/api/technical/shelf-life/products/:id/audit"
+    description: "Get audit log for shelf life changes"
+    file: "apps/frontend/app/api/technical/shelf-life/products/[id]/audit/route.ts"
+    auth: "required"
+    roles: ["admin", "production_manager", "quality_manager"]
+    request:
+      params:
+        id: "UUID - Product ID"
+      query:
+        limit: "number (optional, default 50)"
+        offset: "number (optional, default 0)"
+    response:
+      status: 200
+      schema:
+        total: "number"
+        entries: "Array<{ id, action_type, old_value, new_value, change_reason, changed_at, changed_by_name }>"
+
+# Types to create/extend
+types:
+  - path: "apps/frontend/lib/types/shelf-life.ts"
+    description: "Shelf life TypeScript interfaces"
+    exports:
+      - "ShelfLifeConfig"
+      - "ShelfLifeConfigResponse"
+      - "CalculateShelfLifeRequest"
+      - "CalculateShelfLifeResponse"
+      - "UpdateShelfLifeRequest"
+      - "IngredientShelfLife"
+      - "UpdateIngredientShelfLifeRequest"
+      - "ShipmentEligibility"
+      - "ShelfLifeAuditEntry"
+      - "BulkRecalculationResult"
+
+# Service methods to implement/extend
+service_methods:
+  - name: "getShelfLifeConfig"
+    params: ["productId: string"]
+    returns: "Promise<ShelfLifeConfigResponse | null>"
+    description: "Get full shelf life configuration with ingredient reference"
+
+  - name: "updateShelfLifeConfig"
+    params: ["productId: string", "config: UpdateShelfLifeRequest"]
+    returns: "Promise<ShelfLifeConfigResponse>"
+    description: "Update shelf life configuration with audit logging"
+
+  - name: "calculateShelfLife"
+    params: ["productId: string", "force?: boolean"]
+    returns: "Promise<CalculateShelfLifeResponse>"
+    description: "Calculate shelf life from BOM ingredients (MIN rule)"
+
+  - name: "bulkRecalculate"
+    params: ["productIds?: string[]"]
+    returns: "Promise<BulkRecalculationResult>"
+    description: "Recalculate for multiple products or all flagged"
+
+  - name: "getRecalculationQueue"
+    params: []
+    returns: "Promise<ProductNeedsRecalculation[]>"
+    description: "Get products flagged for recalculation"
+
+  - name: "calculateBestBeforeDate"
+    params: ["productionDate: Date", "productId: string", "ingredientExpiries?: Date[]"]
+    returns: "Promise<Date>"
+    description: "Calculate best before date based on mode (fixed/rolling)"
+
+  - name: "checkShipmentEligibility"
+    params: ["lotId: string", "shipDate?: Date"]
+    returns: "Promise<ShipmentEligibility>"
+    description: "Check if lot can be shipped based on remaining shelf life"
+
+  - name: "getIngredientShelfLife"
+    params: ["ingredientId: string"]
+    returns: "Promise<IngredientShelfLife | null>"
+    description: "Get ingredient shelf life configuration"
+
+  - name: "updateIngredientShelfLife"
+    params: ["ingredientId: string", "data: UpdateIngredientShelfLifeRequest"]
+    returns: "Promise<IngredientShelfLife>"
+    description: "Update ingredient shelf life (triggers recalc)"
+
+  - name: "getAuditLog"
+    params: ["productId: string", "limit?: number", "offset?: number"]
+    returns: "Promise<ShelfLifeAuditEntry[]>"
+    description: "Get audit trail for shelf life changes"
+
+# Implementation patterns
+patterns:
+  calculation_logic: |
+    // Calculation formula from PRD Section 5.8
+    // Rule: MIN(ingredient shelf lives) - processing_impact - safety_buffer
+
+    async function calculateShelfLife(productId: string): Promise<CalculateShelfLifeResponse> {
+      // 1. Get active BOM for product
+      const activeBom = await getBomForProduct(productId, { status: 'Active' });
+      if (!activeBom) {
+        throw new Error('No active BOM found. Set shelf life manually or create BOM first.');
+      }
+
+      // 2. Get all BOM ingredients (exclude FG type)
+      const ingredients = await getBomIngredients(activeBom.id);
+
+      // 3. Get shelf life for each ingredient
+      const ingredientShelfLives = await Promise.all(
+        ingredients.map(async (ing) => ({
+          ingredient_id: ing.component_id,
+          ingredient_name: ing.component_name,
+          shelf_life_days: ing.component.shelf_life_days,
+        }))
+      );
+
+      // 4. Check for missing shelf life
+      const missingShelfLife = ingredientShelfLives
+        .filter(i => i.shelf_life_days === null)
+        .map(i => i.ingredient_name);
+
+      if (missingShelfLife.length > 0) {
+        throw new Error(`Missing shelf life for: ${missingShelfLife.join(', ')}`);
+      }
+
+      // 5. Find shortest (minimum rule)
+      const validIngredients = ingredientShelfLives.filter(i => i.shelf_life_days !== null);
+      const shortest = validIngredients.reduce((min, ing) =>
+        ing.shelf_life_days! < min.shelf_life_days! ? ing : min
+      );
+
+      // 6. Get config for processing impact and safety buffer
+      const config = await getShelfLifeConfig(productId);
+      const processingImpactDays = config?.processing_impact_days ?? 0;
+      const safetyBufferPercent = config?.safety_buffer_percent ?? 20;
+
+      // 7. Calculate final
+      const shortestDays = shortest.shelf_life_days!;
+      const safetyBufferDays = Math.ceil(shortestDays * (safetyBufferPercent / 100));
+      const calculatedDays = Math.max(1, shortestDays - processingImpactDays - safetyBufferDays);
+
+      return {
+        calculated_days: calculatedDays,
+        shortest_ingredient_id: shortest.ingredient_id,
+        shortest_ingredient_name: shortest.ingredient_name,
+        shortest_ingredient_days: shortestDays,
+        processing_impact_days: processingImpactDays,
+        safety_buffer_percent: safetyBufferPercent,
+        safety_buffer_days: safetyBufferDays,
+        ingredients_analyzed: validIngredients.length,
+        missing_shelf_life: missingShelfLife,
+        calculation_timestamp: new Date().toISOString(),
+      };
+    }
+
+  audit_logging: |
+    // Log all shelf life changes
+    async function logShelfLifeChange(
+      productId: string,
+      actionType: 'calculate' | 'override' | 'update_config' | 'recalculate' | 'clear_override',
+      oldValue: object | null,
+      newValue: object,
+      reason?: string
+    ): Promise<void> {
+      const userInfo = await getCurrentUserOrgId();
+      if (!userInfo) throw new Error('Unauthorized');
+
+      await supabaseAdmin.from('shelf_life_audit_log').insert({
+        org_id: userInfo.orgId,
+        product_id: productId,
+        action_type: actionType,
+        old_value: oldValue,
+        new_value: newValue,
+        change_reason: reason,
+        changed_by: userInfo.userId,
+      });
+    }
+
+  shipment_eligibility: |
+    // Check if lot can be shipped based on remaining shelf life
+    function checkShipmentEligibility(
+      expiryDate: Date,
+      minRemainingDays: number,
+      enforcementLevel: 'suggest' | 'warn' | 'block'
+    ): ShipmentEligibility {
+      const today = new Date();
+      const remainingDays = Math.floor((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const canShip = remainingDays >= minRemainingDays;
+
+      return {
+        eligible: canShip || enforcementLevel === 'suggest',
+        remaining_days: remainingDays,
+        min_required_days: minRemainingDays,
+        enforcement_level: enforcementLevel,
+        message: canShip
+          ? null
+          : `Lot has ${remainingDays} days remaining (minimum: ${minRemainingDays} days)`,
+        requires_confirmation: !canShip && enforcementLevel === 'warn',
+        blocked: !canShip && enforcementLevel === 'block',
+      };
+    }

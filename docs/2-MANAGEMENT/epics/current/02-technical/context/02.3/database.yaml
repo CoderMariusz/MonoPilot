@@ -1,0 +1,204 @@
+# Story 02.3 - Database Schema
+# Purpose: Tables, RLS policies, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+# CRITICAL NOTE: This story creates product_allergens junction table
+# The allergens master table is created by Settings story 01.12
+
+migrations:
+  - path: "supabase/migrations/XXX_create_product_allergens.sql"
+    type: "migration"
+    description: "Product allergens junction table with source tracking"
+    depends_on: ["allergens table (01.12)", "products table (02.1)"]
+
+tables:
+  # Allergens table - PROVIDED BY STORY 01.12 (NOT CREATED HERE)
+  - name: "allergens"
+    provided_by: "Story 01.12 (Allergens Management)"
+    description: "Global allergen reference data (EU 14) - NOT org-scoped"
+    note: "DO NOT CREATE - this table exists from Settings module"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "code", type: "VARCHAR(10)", constraints: "UNIQUE NOT NULL", example: "A01-A14" }
+      - { name: "name_en", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "name_pl", type: "VARCHAR(100)", constraints: "NOT NULL" }
+      - { name: "name_de", type: "VARCHAR(100)", constraints: "" }
+      - { name: "name_fr", type: "VARCHAR(100)", constraints: "" }
+      - { name: "icon_url", type: "TEXT", constraints: "" }
+      - { name: "is_eu_mandatory", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+      - { name: "display_order", type: "INTEGER", constraints: "NOT NULL DEFAULT 0" }
+
+  # Product Allergens - CREATED BY THIS STORY
+  - name: "product_allergens"
+    description: "Junction table linking products to allergens"
+    created_by: "Story 02.3"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id) ON DELETE CASCADE" }
+      - { name: "allergen_id", type: "UUID", constraints: "NOT NULL REFERENCES allergens(id)" }
+      - { name: "relation_type", type: "TEXT", constraints: "NOT NULL CHECK (relation_type IN ('contains', 'may_contain'))" }
+      - { name: "source", type: "TEXT", constraints: "NOT NULL DEFAULT 'manual' CHECK (source IN ('auto', 'manual'))" }
+      - { name: "reason", type: "TEXT", constraints: "", description: "Required for may_contain, explains cross-contamination source" }
+      - { name: "source_product_ids", type: "UUID[]", constraints: "", description: "For auto-inherited: IDs of ingredients contributing this allergen" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_product_allergens_org_product ON product_allergens(org_id, product_id)"
+      - "idx_product_allergens_allergen ON product_allergens(allergen_id)"
+      - "idx_product_allergens_source ON product_allergens(source)"
+      - "idx_product_allergens_relation ON product_allergens(product_id, relation_type)"
+    constraints:
+      - "UNIQUE(product_id, allergen_id, relation_type)"
+      - "reason field required when relation_type = 'may_contain' (enforced at API level)"
+
+# RLS Policies
+rls_policies:
+  pattern: "Users Table Lookup (ADR-013)"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    # product_allergens policies
+    - table: "product_allergens"
+      name: "product_allergens_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "product_allergens"
+      name: "product_allergens_org_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "product_allergens"
+      name: "product_allergens_org_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "product_allergens"
+      name: "product_allergens_org_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    # allergens table (from 01.12) - read-only global access
+    - table: "allergens"
+      name: "allergens_select_authenticated"
+      operation: "SELECT"
+      using: "is_active = true"
+      note: "Global reference data - no org filter needed"
+
+# Seed Data - EU 14 Allergens (PROVIDED BY STORY 01.12)
+seed_data:
+  allergens:
+    description: "14 EU mandatory allergens per Regulation (EU) No 1169/2011"
+    provided_by: "Story 01.12 (Allergens Management)"
+    note: "DO NOT SEED IN THIS MIGRATION - allergens seeded by Settings module"
+    reference_data:
+      - { code: "A01", name_en: "Gluten", name_pl: "Gluten", icon: "wheat" }
+      - { code: "A02", name_en: "Crustaceans", name_pl: "Skorupiaki", icon: "shrimp" }
+      - { code: "A03", name_en: "Eggs", name_pl: "Jaja", icon: "egg" }
+      - { code: "A04", name_en: "Fish", name_pl: "Ryby", icon: "fish" }
+      - { code: "A05", name_en: "Peanuts", name_pl: "Orzeszki ziemne", icon: "peanut" }
+      - { code: "A06", name_en: "Soybeans", name_pl: "Soja", icon: "soy" }
+      - { code: "A07", name_en: "Milk", name_pl: "Mleko", icon: "milk" }
+      - { code: "A08", name_en: "Nuts", name_pl: "Orzechy", icon: "tree-nut" }
+      - { code: "A09", name_en: "Celery", name_pl: "Seler", icon: "celery" }
+      - { code: "A10", name_en: "Mustard", name_pl: "Gorczyca", icon: "mustard" }
+      - { code: "A11", name_en: "Sesame", name_pl: "Sezam", icon: "sesame" }
+      - { code: "A12", name_en: "Sulphites", name_pl: "Siarczyny", icon: "sulfite" }
+      - { code: "A13", name_en: "Lupin", name_pl: "Lubin", icon: "lupin" }
+      - { code: "A14", name_en: "Molluscs", name_pl: "Mieczaki", icon: "mollusk" }
+
+# Migration SQL Template
+migration_sql: |
+  -- Migration: create_product_allergens.sql
+  -- Story: 02.3 Product Allergens Declaration
+  -- Depends on: allergens table (01.12), products table (02.1)
+
+  -- Product allergens junction table
+  CREATE TABLE IF NOT EXISTS product_allergens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    allergen_id UUID NOT NULL REFERENCES allergens(id),
+    relation_type TEXT NOT NULL CHECK (relation_type IN ('contains', 'may_contain')),
+    source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('auto', 'manual')),
+    reason TEXT,
+    source_product_ids UUID[],
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    created_by UUID REFERENCES auth.users(id),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    -- Allow same allergen with different relation types (contains AND may_contain)
+    UNIQUE(product_id, allergen_id, relation_type)
+  );
+
+  -- Indexes for performance
+  CREATE INDEX IF NOT EXISTS idx_product_allergens_org_product
+    ON product_allergens(org_id, product_id);
+  CREATE INDEX IF NOT EXISTS idx_product_allergens_allergen
+    ON product_allergens(allergen_id);
+  CREATE INDEX IF NOT EXISTS idx_product_allergens_source
+    ON product_allergens(source);
+  CREATE INDEX IF NOT EXISTS idx_product_allergens_relation
+    ON product_allergens(product_id, relation_type);
+
+  -- Enable RLS
+  ALTER TABLE product_allergens ENABLE ROW LEVEL SECURITY;
+
+  -- RLS Policies (ADR-013 pattern)
+  CREATE POLICY "product_allergens_select" ON product_allergens
+    FOR SELECT USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "product_allergens_insert" ON product_allergens
+    FOR INSERT WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "product_allergens_update" ON product_allergens
+    FOR UPDATE USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "product_allergens_delete" ON product_allergens
+    FOR DELETE USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  -- Trigger to update updated_at timestamp
+  CREATE OR REPLACE FUNCTION update_product_allergens_updated_at()
+  RETURNS TRIGGER AS $$
+  BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql;
+
+  CREATE TRIGGER product_allergens_updated_at
+    BEFORE UPDATE ON product_allergens
+    FOR EACH ROW
+    EXECUTE FUNCTION update_product_allergens_updated_at();
+
+# Data model relationships
+relationships:
+  - from: "product_allergens"
+    to: "products"
+    type: "many-to-one"
+    fk: "product_id"
+  - from: "product_allergens"
+    to: "allergens"
+    type: "many-to-one"
+    fk: "allergen_id"
+  - from: "product_allergens"
+    to: "organizations"
+    type: "many-to-one"
+    fk: "org_id"
+  - from: "product_allergens"
+    to: "users"
+    type: "many-to-one"
+    fk: "created_by"
+
+# Business Rules
+business_rules:
+  - "Allergens table is global (not org-scoped) - contains EU 14 reference data"
+  - "product_allergens is org-scoped (multi-tenant)"
+  - "Same allergen can be declared as both 'contains' AND 'may_contain' for same product"
+  - "Cannot declare same allergen twice with same relation_type (unique constraint)"
+  - "reason field required for may_contain (enforced at API level)"
+  - "source='auto' for BOM-inherited allergens, source='manual' for user-declared"
+  - "source_product_ids tracks which BOM ingredients contributed auto-inherited allergens"
+  - "Allergen cascades: deleting product deletes its allergen declarations"

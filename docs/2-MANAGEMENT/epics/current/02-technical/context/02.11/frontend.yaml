@@ -1,0 +1,444 @@
+# Story 02.11 - Frontend Specification
+# Purpose: Components, hooks, services, validation schemas
+# Agent: FRONTEND-DEV
+
+# UX Reference
+ux:
+  wireframes:
+    - id: "TEC-014"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-014-shelf-life-config.md"
+      description: "Primary - Shelf life configuration modal"
+      components:
+        - "ShelfLifeConfigModal"
+        - "CalculatedShelfLifeSection"
+        - "OverrideSection"
+        - "StorageConditionsSection"
+        - "BestBeforeSection"
+        - "FEFOSettingsSection"
+        - "IngredientShelfLifeTable"
+  patterns:
+    modal: "ShadCN Dialog"
+    form: "react-hook-form + Zod"
+    table: "ShadCN DataTable"
+    inputs: "ShadCN Input, Select, RadioGroup, Checkbox"
+    toast: "ShadCN Sonner"
+  states:
+    - "loading"
+    - "empty"
+    - "error"
+    - "success"
+
+# Components to create
+components:
+  - path: "apps/frontend/components/technical/shelf-life/ShelfLifeConfigModal.tsx"
+    description: "Main shelf life configuration modal dialog"
+    type: "modal"
+    props:
+      - "productId: string"
+      - "productCode: string"
+      - "productName: string"
+      - "open: boolean"
+      - "onOpenChange: (open: boolean) => void"
+      - "onSave?: () => void"
+    features:
+      - "Fetches shelf life config on open"
+      - "Contains all section components"
+      - "Handles save with validation"
+      - "Shows loading, empty, error states"
+      - "Toast notifications on success/error"
+    shadcn:
+      - "Dialog"
+      - "DialogContent"
+      - "DialogHeader"
+      - "DialogTitle"
+      - "DialogDescription"
+      - "DialogFooter"
+      - "Button"
+      - "ScrollArea"
+
+  - path: "apps/frontend/components/technical/shelf-life/CalculatedShelfLifeSection.tsx"
+    description: "Displays calculated shelf life with breakdown"
+    type: "section"
+    props:
+      - "calculatedDays: number | null"
+      - "calculationMethod: string"
+      - "shortestIngredient: { id, name, days } | null"
+      - "processingImpactDays: number"
+      - "safetyBufferPercent: number"
+      - "safetyBufferDays: number"
+      - "needsRecalculation: boolean"
+      - "onRecalculate: () => void"
+      - "isRecalculating: boolean"
+    features:
+      - "Shows calculation breakdown"
+      - "Highlights shortest ingredient"
+      - "Recalculate button with loading state"
+      - "Yellow highlight on value change"
+      - "Badge for 'needs recalculation'"
+    shadcn:
+      - "Card"
+      - "Badge"
+      - "Button"
+      - "Separator"
+
+  - path: "apps/frontend/components/technical/shelf-life/OverrideSection.tsx"
+    description: "Manual override form with reason field"
+    type: "section"
+    props:
+      - "useOverride: boolean"
+      - "calculatedDays: number | null"
+      - "overrideDays: number | null"
+      - "overrideReason: string | null"
+      - "onChange: (field, value) => void"
+      - "errors: { override_days?, override_reason? }"
+    features:
+      - "Radio group: Use Calculated vs Manual Override"
+      - "Conditional override_days input"
+      - "Required override_reason textarea"
+      - "Warning if override differs significantly"
+      - "Validation error display"
+    shadcn:
+      - "Card"
+      - "RadioGroup"
+      - "RadioGroupItem"
+      - "Input"
+      - "Textarea"
+      - "Label"
+      - "Alert"
+
+  - path: "apps/frontend/components/technical/shelf-life/StorageConditionsSection.tsx"
+    description: "Storage conditions configuration form"
+    type: "section"
+    props:
+      - "tempMin: number | null"
+      - "tempMax: number | null"
+      - "humidityMin: number | null"
+      - "humidityMax: number | null"
+      - "conditions: string[]"
+      - "instructions: string | null"
+      - "onChange: (field, value) => void"
+      - "errors: { storage_temp_min?, storage_temp_max?, etc. }"
+    features:
+      - "Temperature min/max inputs with unit"
+      - "Humidity min/max inputs (optional)"
+      - "Multi-select checkboxes for conditions"
+      - "Storage instructions textarea"
+      - "Validation for min <= max"
+    shadcn:
+      - "Card"
+      - "Input"
+      - "Checkbox"
+      - "Textarea"
+      - "Label"
+    storage_conditions:
+      - "original_packaging"
+      - "protect_sunlight"
+      - "refrigeration_required"
+      - "freezing_allowed"
+      - "controlled_atmosphere"
+
+  - path: "apps/frontend/components/technical/shelf-life/BestBeforeSection.tsx"
+    description: "Best before calculation settings"
+    type: "section"
+    props:
+      - "shelfLifeMode: 'fixed' | 'rolling'"
+      - "labelFormat: 'best_before_day' | 'best_before_month' | 'use_by'"
+      - "finalDays: number"
+      - "onChange: (field, value) => void"
+    features:
+      - "Radio group for shelf life mode"
+      - "Radio group for label format"
+      - "Example calculation preview"
+    shadcn:
+      - "Card"
+      - "RadioGroup"
+      - "RadioGroupItem"
+      - "Label"
+
+  - path: "apps/frontend/components/technical/shelf-life/FEFOSettingsSection.tsx"
+    description: "FIFO/FEFO picking and shipment settings"
+    type: "section"
+    props:
+      - "pickingStrategy: 'FIFO' | 'FEFO'"
+      - "minRemainingForShipment: number | null"
+      - "enforcementLevel: 'suggest' | 'warn' | 'block'"
+      - "expiryWarningDays: number"
+      - "expiryCriticalDays: number"
+      - "finalDays: number"
+      - "onChange: (field, value) => void"
+      - "errors: { expiry_critical_days? }"
+    features:
+      - "Radio group for picking strategy"
+      - "Min remaining days input with percentage display"
+      - "Enforcement level radio group"
+      - "Warning/critical threshold inputs"
+      - "Validation: critical <= warning"
+    shadcn:
+      - "Card"
+      - "RadioGroup"
+      - "RadioGroupItem"
+      - "Input"
+      - "Label"
+      - "Alert"
+
+  - path: "apps/frontend/components/technical/shelf-life/IngredientShelfLifeTable.tsx"
+    description: "Read-only reference table of ingredient shelf lives"
+    type: "table"
+    props:
+      - "ingredients: IngredientShelfLife[]"
+      - "shortestIngredientId: string | null"
+      - "onIngredientClick?: (ingredientId: string) => void"
+    features:
+      - "Columns: Ingredient, Days, Storage Temp, Notes"
+      - "Highlight shortest ingredient row"
+      - "Click to navigate/edit ingredient"
+      - "Shows 'Missing' badge for null shelf life"
+    shadcn:
+      - "Card"
+      - "Table"
+      - "TableHeader"
+      - "TableBody"
+      - "TableRow"
+      - "TableCell"
+      - "Badge"
+
+  - path: "apps/frontend/components/technical/products/ShelfLifeSummaryCard.tsx"
+    description: "Shelf life summary card for product detail page"
+    type: "card"
+    props:
+      - "productId: string"
+      - "shelfLifeDays: number | null"
+      - "isOverride: boolean"
+      - "needsRecalculation: boolean"
+      - "onConfigureClick: () => void"
+    features:
+      - "Compact display of shelf life"
+      - "Override indicator"
+      - "Recalculation needed badge"
+      - "Configure button to open modal"
+    shadcn:
+      - "Card"
+      - "CardHeader"
+      - "CardTitle"
+      - "CardContent"
+      - "Badge"
+      - "Button"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-shelf-life-config.ts"
+    description: "React Query hook for shelf life configuration"
+    exports:
+      - name: "useShelfLifeConfig"
+        params: ["productId: string"]
+        returns: "UseQueryResult<ShelfLifeConfigResponse | null>"
+      - name: "useUpdateShelfLifeConfig"
+        returns: "UseMutationResult"
+      - name: "useCalculateShelfLife"
+        returns: "UseMutationResult"
+      - name: "useRecalculationQueue"
+        returns: "UseQueryResult"
+      - name: "useBulkRecalculate"
+        returns: "UseMutationResult"
+      - name: "useShelfLifeAuditLog"
+        params: ["productId: string"]
+        returns: "UseQueryResult"
+    pattern: |
+      import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+      import {
+        getShelfLifeConfig,
+        updateShelfLifeConfig,
+        calculateShelfLife,
+        getRecalculationQueue,
+        bulkRecalculate,
+        getAuditLog,
+      } from '@/lib/services/shelf-life-service';
+
+      export function useShelfLifeConfig(productId: string) {
+        return useQuery({
+          queryKey: ['shelf-life-config', productId],
+          queryFn: () => getShelfLifeConfig(productId),
+          enabled: !!productId,
+          staleTime: 5 * 60 * 1000, // 5 minutes
+        });
+      }
+
+      export function useUpdateShelfLifeConfig(productId: string) {
+        const queryClient = useQueryClient();
+        return useMutation({
+          mutationFn: (config: UpdateShelfLifeRequest) =>
+            updateShelfLifeConfig(productId, config),
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['shelf-life-config', productId] });
+            queryClient.invalidateQueries({ queryKey: ['product', productId] });
+          },
+        });
+      }
+
+      export function useCalculateShelfLife(productId: string) {
+        const queryClient = useQueryClient();
+        return useMutation({
+          mutationFn: (force?: boolean) => calculateShelfLife(productId, force),
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['shelf-life-config', productId] });
+          },
+        });
+      }
+
+# Validation Schemas
+validation:
+  path: "apps/frontend/lib/validation/shelf-life.ts"
+  description: "Zod schemas for shelf life configuration"
+  schemas:
+    - name: "shelfLifeConfigSchema"
+      fields:
+        use_override: "z.boolean()"
+        override_days: "z.number().int().positive().max(3650).optional()"
+        override_reason: "z.string().min(10).max(500).optional()"
+        processing_impact_days: "z.number().int().min(-30).max(30).default(0)"
+        safety_buffer_percent: "z.number().min(0).max(50).default(20)"
+        storage_temp_min: "z.number().min(-40).max(100).optional()"
+        storage_temp_max: "z.number().min(-40).max(100).optional()"
+        storage_humidity_min: "z.number().min(0).max(100).optional().nullable()"
+        storage_humidity_max: "z.number().min(0).max(100).optional().nullable()"
+        storage_conditions: "z.array(storageConditionEnum).default([])"
+        storage_instructions: "z.string().max(500).optional().nullable()"
+        shelf_life_mode: "z.enum(['fixed', 'rolling']).default('fixed')"
+        label_format: "z.enum(['best_before_day', 'best_before_month', 'use_by']).default('best_before_day')"
+        picking_strategy: "z.enum(['FIFO', 'FEFO']).default('FEFO')"
+        min_remaining_for_shipment: "z.number().int().positive().max(365).optional().nullable()"
+        enforcement_level: "z.enum(['suggest', 'warn', 'block']).default('warn')"
+        expiry_warning_days: "z.number().int().positive().max(90).default(7)"
+        expiry_critical_days: "z.number().int().positive().max(30).default(3)"
+      refinements:
+        - description: "Override reason required when override enabled"
+          check: "if use_override && override_days && !override_reason return false"
+          message: "Override reason is required when using manual override"
+          path: "['override_reason']"
+        - description: "Temperature min <= max"
+          check: "storage_temp_min <= storage_temp_max"
+          message: "Minimum temperature cannot exceed maximum"
+          path: "['storage_temp_min']"
+        - description: "Humidity min <= max"
+          check: "storage_humidity_min <= storage_humidity_max"
+          message: "Minimum humidity cannot exceed maximum"
+          path: "['storage_humidity_min']"
+        - description: "Critical <= warning"
+          check: "expiry_critical_days <= expiry_warning_days"
+          message: "Critical threshold must be less than or equal to warning threshold"
+          path: "['expiry_critical_days']"
+
+    - name: "ingredientShelfLifeSchema"
+      fields:
+        shelf_life_days: "z.number().int().positive().max(3650)"
+        shelf_life_source: "z.enum(['supplier', 'internal_testing', 'regulatory', 'industry_standard'])"
+        supplier_name: "z.string().max(100).optional().nullable()"
+        specification_reference: "z.string().max(100).optional().nullable()"
+        storage_temp_min: "z.number().min(-40).max(100)"
+        storage_temp_max: "z.number().min(-40).max(100)"
+        storage_humidity_min: "z.number().min(0).max(100).optional().nullable()"
+        storage_humidity_max: "z.number().min(0).max(100).optional().nullable()"
+        storage_conditions: "z.array(z.string()).default([])"
+        min_acceptable_on_receipt: "z.number().int().positive().optional()"
+        quarantine_required: "z.boolean().default(false)"
+        quarantine_duration_days: "z.number().int().positive().max(30).optional()"
+      refinements:
+        - description: "Temperature validation"
+          check: "storage_temp_min <= storage_temp_max"
+          message: "Minimum temperature cannot exceed maximum"
+        - description: "Quarantine duration required"
+          check: "if quarantine_required && !quarantine_duration_days return false"
+          message: "Quarantine duration required when quarantine is enabled"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/shelf-life.ts"
+    exports:
+      - name: "ShelfLifeConfig"
+        description: "Shelf life configuration interface"
+      - name: "ShelfLifeConfigResponse"
+        description: "API response with full config + ingredients"
+      - name: "CalculateShelfLifeResponse"
+        description: "Calculation result from MIN ingredient rule"
+      - name: "UpdateShelfLifeRequest"
+        description: "Request body for updating config"
+      - name: "IngredientShelfLife"
+        description: "Ingredient shelf life data"
+      - name: "UpdateIngredientShelfLifeRequest"
+        description: "Request body for updating ingredient"
+      - name: "ShipmentEligibility"
+        description: "Result of shipment eligibility check"
+      - name: "ShelfLifeAuditEntry"
+        description: "Audit log entry"
+      - name: "StorageCondition"
+        description: "Storage condition enum type"
+
+# Service methods to add to shelf-life-service.ts
+service_extensions:
+  path: "apps/frontend/lib/services/shelf-life-service.ts"
+  new_methods:
+    - name: "getShelfLifeConfig"
+      description: "Fetch full shelf life configuration"
+      implementation: |
+        export async function getShelfLifeConfig(productId: string): Promise<ShelfLifeConfigResponse | null> {
+          const response = await fetch(`/api/technical/shelf-life/products/${productId}`);
+          if (!response.ok) {
+            if (response.status === 404) return null;
+            throw new Error('Failed to fetch shelf life config');
+          }
+          return response.json();
+        }
+
+    - name: "updateShelfLifeConfig"
+      description: "Update shelf life configuration"
+      implementation: |
+        export async function updateShelfLifeConfig(
+          productId: string,
+          config: UpdateShelfLifeRequest
+        ): Promise<ShelfLifeConfigResponse> {
+          const response = await fetch(`/api/technical/shelf-life/products/${productId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+          });
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to update shelf life config');
+          }
+          return response.json();
+        }
+
+    - name: "getAuditLog"
+      description: "Fetch audit log for shelf life changes"
+      implementation: |
+        export async function getAuditLog(
+          productId: string,
+          limit: number = 50,
+          offset: number = 0
+        ): Promise<{ total: number; entries: ShelfLifeAuditEntry[] }> {
+          const response = await fetch(
+            `/api/technical/shelf-life/products/${productId}/audit?limit=${limit}&offset=${offset}`
+          );
+          if (!response.ok) throw new Error('Failed to fetch audit log');
+          return response.json();
+        }
+
+# Accessibility requirements
+accessibility:
+  touch_targets: "All inputs, checkboxes, radio buttons >= 48x48dp"
+  contrast: "Warning (#F59E0B), Error (#DC2626) pass WCAG AA"
+  screen_reader:
+    - "Modal announces 'Shelf Life Configuration Modal'"
+    - "Field labels read correctly"
+    - "Validation errors announced"
+  keyboard:
+    - "Tab navigation through all fields"
+    - "Escape closes modal"
+    - "Enter submits form"
+  focus:
+    - "Auto-focus on first input"
+    - "Focus trap in modal"
+  aria:
+    - "Radio groups properly labeled"
+    - "Validation messages associated with fields"
+    - "Required fields marked with aria-required"

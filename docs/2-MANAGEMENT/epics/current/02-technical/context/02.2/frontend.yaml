@@ -1,0 +1,456 @@
+# Story 02.2 - Frontend Specification
+# Purpose: Components, hooks, services, validation
+# Agent: FRONTEND-DEV
+
+# UX Reference
+ux:
+  wireframes:
+    - id: "TEC-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-002-product-modal.md"
+      relevance: "Product edit modal with version display and history panel"
+      sections:
+        - "Success State (Edit Mode) - Version display in header"
+        - "Version History Panel - Side panel wireframe"
+      components:
+        - "Version badge: 'Version: v4' in modal header"
+        - "Save button: '[Save Changes (v4 -> v5)]'"
+        - "Warning banner: Version increment notice"
+        - "View Version History link"
+        - "Version history side panel (400px)"
+  patterns:
+    panel: "ShadCN Sheet component (slide from right)"
+    badge: "ShadCN Badge component"
+    alert: "ShadCN Alert component (warning variant)"
+    timeline: "Custom vertical timeline with icons"
+  states:
+    - "loading"
+    - "empty (no history)"
+    - "success (history loaded)"
+    - "error (fetch failed)"
+
+# Components to create
+components:
+  - name: "VersionBadge"
+    path: "apps/frontend/components/technical/version-badge.tsx"
+    description: "Displays version number in 'v{N}' format"
+    props:
+      - { name: "version", type: "number", required: true }
+      - { name: "size", type: "'sm' | 'md' | 'lg'", default: "'md'" }
+      - { name: "className", type: "string", required: false }
+    usage: |
+      // In product list table column
+      <VersionBadge version={product.version} size="sm" />
+
+      // In modal header
+      <VersionBadge version={product.version} size="md" />
+    pattern: |
+      import { Badge } from '@/components/ui/badge';
+      import { cn } from '@/lib/utils';
+
+      interface VersionBadgeProps {
+        version: number;
+        size?: 'sm' | 'md' | 'lg';
+        className?: string;
+      }
+
+      export function VersionBadge({ version, size = 'md', className }: VersionBadgeProps) {
+        const sizeClasses = {
+          sm: 'text-xs px-1.5 py-0.5',
+          md: 'text-sm px-2 py-1',
+          lg: 'text-base px-3 py-1.5',
+        };
+
+        return (
+          <Badge
+            variant="secondary"
+            className={cn(sizeClasses[size], className)}
+          >
+            v{version}
+          </Badge>
+        );
+      }
+
+  - name: "VersionWarningBanner"
+    path: "apps/frontend/components/technical/version-warning-banner.tsx"
+    description: "Yellow alert showing version increment notice in edit modal"
+    props:
+      - { name: "currentVersion", type: "number", required: true }
+      - { name: "onViewHistory", type: "() => void", required: false }
+    pattern: |
+      import { Alert, AlertDescription } from '@/components/ui/alert';
+      import { AlertTriangle } from 'lucide-react';
+      import { Button } from '@/components/ui/button';
+
+      interface VersionWarningBannerProps {
+        currentVersion: number;
+        onViewHistory?: () => void;
+      }
+
+      export function VersionWarningBanner({
+        currentVersion,
+        onViewHistory,
+      }: VersionWarningBannerProps) {
+        return (
+          <Alert variant="warning" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                Editing this product will create version v{currentVersion + 1}.
+                Changes will not affect existing BOMs or Work Orders.
+              </span>
+              {onViewHistory && (
+                <Button variant="link" size="sm" onClick={onViewHistory}>
+                  View Version History
+                </Button>
+              )}
+            </AlertDescription>
+          </Alert>
+        );
+      }
+
+  - name: "VersionHistoryPanel"
+    path: "apps/frontend/components/technical/version-history-panel.tsx"
+    description: "Slide-in side panel (400px) showing version timeline"
+    props:
+      - { name: "productId", type: "string", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+    dependencies:
+      - "@/components/ui/sheet"
+      - "@/lib/services/product-history-service"
+    pattern: |
+      import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+      import { useQuery } from '@tanstack/react-query';
+      import { ProductHistoryService } from '@/lib/services/product-history-service';
+      import { VersionHistoryItem } from './version-history-item';
+      import { Loader2 } from 'lucide-react';
+
+      interface VersionHistoryPanelProps {
+        productId: string;
+        open: boolean;
+        onClose: () => void;
+      }
+
+      export function VersionHistoryPanel({
+        productId,
+        open,
+        onClose,
+      }: VersionHistoryPanelProps) {
+        const { data, isLoading, error } = useQuery({
+          queryKey: ['product-history', productId],
+          queryFn: () => ProductHistoryService.getVersionHistory(productId, { limit: 50 }),
+          enabled: open,
+        });
+
+        return (
+          <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+            <SheetContent side="right" className="w-[400px] sm:w-[400px]">
+              <SheetHeader>
+                <SheetTitle>Version History</SheetTitle>
+              </SheetHeader>
+
+              <div className="mt-6 space-y-4 overflow-y-auto max-h-[calc(100vh-120px)]">
+                {isLoading && (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                )}
+
+                {error && (
+                  <div className="text-destructive text-center py-8">
+                    Failed to load version history
+                  </div>
+                )}
+
+                {data?.history.length === 0 && (
+                  <div className="text-muted-foreground text-center py-8">
+                    No version history available
+                  </div>
+                )}
+
+                {data?.history.map((item, index) => (
+                  <VersionHistoryItem
+                    key={item.id}
+                    item={item}
+                    isLatest={index === 0}
+                  />
+                ))}
+              </div>
+            </SheetContent>
+          </Sheet>
+        );
+      }
+
+  - name: "VersionHistoryItem"
+    path: "apps/frontend/components/technical/version-history-item.tsx"
+    description: "Single history entry with expandable details"
+    props:
+      - { name: "item", type: "VersionHistoryItem", required: true }
+      - { name: "isLatest", type: "boolean", default: false }
+    pattern: |
+      import { useState } from 'react';
+      import { Button } from '@/components/ui/button';
+      import { Card, CardContent, CardHeader } from '@/components/ui/card';
+      import { ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+      import { VersionDiff } from './version-diff';
+      import type { VersionHistoryItem as HistoryItemType } from '@/lib/types/product-history';
+      import { formatDistanceToNow } from 'date-fns';
+
+      interface VersionHistoryItemProps {
+        item: HistoryItemType;
+        isLatest?: boolean;
+      }
+
+      export function VersionHistoryItem({ item, isLatest }: VersionHistoryItemProps) {
+        const [expanded, setExpanded] = useState(false);
+
+        return (
+          <Card className={isLatest ? 'border-primary' : ''}>
+            <CardHeader className="py-3 px-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">v{item.version}</span>
+                  {isLatest && (
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                      Current
+                    </span>
+                  )}
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {formatDistanceToNow(new Date(item.changed_at), { addSuffix: true })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                <Pencil className="h-3 w-3" />
+                <span>{item.changed_by.name}</span>
+              </div>
+            </CardHeader>
+
+            <CardContent className="py-2 px-4">
+              {item.is_initial ? (
+                <span className="text-sm text-muted-foreground">Initial creation</span>
+              ) : (
+                <>
+                  <div className="text-sm">
+                    Changed: {Object.keys(item.changed_fields).join(', ')}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setExpanded(!expanded)}
+                    className="mt-2 p-0 h-auto"
+                  >
+                    {expanded ? (
+                      <>
+                        <ChevronUp className="h-4 w-4 mr-1" />
+                        Hide Details
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4 mr-1" />
+                        View Details
+                      </>
+                    )}
+                  </Button>
+
+                  {expanded && (
+                    <VersionDiff changedFields={item.changed_fields} />
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        );
+      }
+
+  - name: "VersionDiff"
+    path: "apps/frontend/components/technical/version-diff.tsx"
+    description: "Renders field changes (old -> new format)"
+    props:
+      - { name: "changedFields", type: "ChangedFields", required: true }
+    pattern: |
+      import type { ChangedFields } from '@/lib/types/product-history';
+      import { ArrowRight } from 'lucide-react';
+
+      interface VersionDiffProps {
+        changedFields: ChangedFields;
+      }
+
+      export function VersionDiff({ changedFields }: VersionDiffProps) {
+        const formatValue = (value: unknown): string => {
+          if (value === null || value === undefined) return '(empty)';
+          if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+          if (typeof value === 'object') return JSON.stringify(value);
+          return String(value);
+        };
+
+        return (
+          <div className="mt-3 space-y-2 pl-4 border-l-2 border-muted">
+            {Object.entries(changedFields).map(([field, change]) => (
+              <div key={field} className="text-sm">
+                <span className="font-medium">{field}:</span>
+                <div className="flex items-center gap-2 mt-0.5 text-muted-foreground">
+                  <span className="line-through text-destructive/70">
+                    {formatValue(change.old)}
+                  </span>
+                  <ArrowRight className="h-3 w-3" />
+                  <span className="text-primary">
+                    {formatValue(change.new)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+# Hooks
+hooks:
+  - name: "useProductHistory"
+    path: "apps/frontend/lib/hooks/use-product-history.ts"
+    description: "React Query hook for fetching product version history"
+    exports:
+      - name: "useProductHistory"
+        params:
+          - "productId: string"
+          - "pagination?: PaginationParams"
+          - "filters?: HistoryFilters"
+          - "enabled?: boolean"
+        returns: "UseQueryResult<HistoryResponse>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { ProductHistoryService } from '@/lib/services/product-history-service';
+      import type { HistoryFilters } from '@/lib/types/product-history';
+
+      interface PaginationParams {
+        page?: number;
+        limit?: number;
+      }
+
+      export function useProductHistory(
+        productId: string,
+        pagination: PaginationParams = {},
+        filters?: HistoryFilters,
+        enabled: boolean = true
+      ) {
+        return useQuery({
+          queryKey: ['product-history', productId, pagination, filters],
+          queryFn: () => ProductHistoryService.getVersionHistory(productId, pagination, filters),
+          enabled: enabled && !!productId,
+          staleTime: 30 * 1000, // 30 seconds
+        });
+      }
+
+  - name: "useProductVersions"
+    path: "apps/frontend/lib/hooks/use-product-versions.ts"
+    description: "React Query hook for fetching product versions list"
+    exports:
+      - name: "useProductVersions"
+        params:
+          - "productId: string"
+          - "pagination?: PaginationParams"
+          - "enabled?: boolean"
+        returns: "UseQueryResult<VersionsListResponse>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { ProductHistoryService } from '@/lib/services/product-history-service';
+
+      interface PaginationParams {
+        page?: number;
+        limit?: number;
+      }
+
+      export function useProductVersions(
+        productId: string,
+        pagination: PaginationParams = {},
+        enabled: boolean = true
+      ) {
+        return useQuery({
+          queryKey: ['product-versions', productId, pagination],
+          queryFn: () => ProductHistoryService.getVersionsList(productId, pagination),
+          enabled: enabled && !!productId,
+          staleTime: 30 * 1000, // 30 seconds
+        });
+      }
+
+# Integration with Product Edit Modal
+integration:
+  product_modal:
+    description: "Integration points with TEC-002 Product Edit Modal"
+    modifications:
+      - file: "apps/frontend/components/technical/product-modal.tsx"
+        changes:
+          - "Add VersionBadge to modal header (edit mode only)"
+          - "Add VersionWarningBanner below header (edit mode only)"
+          - "Add 'View Version History' link triggering VersionHistoryPanel"
+          - "Update save button text to show version transition"
+    example: |
+      // In ProductModal component (edit mode)
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          Edit Product - {product.code} ({product.name})
+          <VersionBadge version={product.version} />
+        </DialogTitle>
+      </DialogHeader>
+
+      {isEditMode && (
+        <VersionWarningBanner
+          currentVersion={product.version}
+          onViewHistory={() => setHistoryPanelOpen(true)}
+        />
+      )}
+
+      {/* ... form fields ... */}
+
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button type="submit">
+          {isEditMode ? `Save Changes (v${product.version} -> v${product.version + 1})` : 'Create Product'}
+        </Button>
+      </DialogFooter>
+
+      <VersionHistoryPanel
+        productId={product.id}
+        open={historyPanelOpen}
+        onClose={() => setHistoryPanelOpen(false)}
+      />
+
+  product_list:
+    description: "Integration with TEC-001 Product List"
+    modifications:
+      - file: "apps/frontend/app/(authenticated)/technical/products/page.tsx"
+        changes:
+          - "Add version column to product table"
+          - "Display VersionBadge in version column"
+    example: |
+      // In columns definition
+      {
+        accessorKey: 'version',
+        header: 'Version',
+        cell: ({ row }) => <VersionBadge version={row.original.version} size="sm" />,
+      }
+
+# Validation (client-side)
+validation:
+  - name: "versionBadgeProps"
+    schema: |
+      const versionBadgePropsSchema = z.object({
+        version: z.number().int().min(1),
+        size: z.enum(['sm', 'md', 'lg']).optional(),
+        className: z.string().optional(),
+      });
+
+# Accessibility
+accessibility:
+  version_badge:
+    - "aria-label with full text 'Version {N}'"
+    - "Sufficient color contrast for badge"
+  version_history_panel:
+    - "Focus trap within panel when open"
+    - "Escape key to close panel"
+    - "aria-labelledby for panel title"
+    - "Role='region' for history list"
+  version_history_item:
+    - "aria-expanded for expandable details"
+    - "aria-controls linking button to details"
+    - "Keyboard navigation for expand/collapse"

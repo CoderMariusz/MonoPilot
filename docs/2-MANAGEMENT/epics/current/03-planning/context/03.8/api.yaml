@@ -1,0 +1,503 @@
+# Story 03.8 - API Specification
+# Purpose: Endpoints, request/response schemas, validation, error handling
+# Agent: BACKEND-DEV (API focus)
+
+# ============================================================================
+# TRANSFER ORDERS ENDPOINTS
+# ============================================================================
+endpoints:
+  # LIST TRANSFER ORDERS
+  - method: "GET"
+    path: "/api/planning/transfer-orders"
+    description: "List transfer orders with pagination, filtering, sorting"
+    file: "apps/frontend/app/api/planning/transfer-orders/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users can read
+    wireframe: "PLAN-010"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        search: { type: "string", description: "Filter by TO number (min 2 chars)" }
+        status: { type: "string[]", description: "Filter by status(es)" }
+        from_warehouse_id: { type: "uuid", description: "Filter by source warehouse" }
+        to_warehouse_id: { type: "uuid", description: "Filter by destination warehouse" }
+        priority: { type: "string", description: "Filter by priority" }
+        sort: { type: "string", default: "created_at", options: ["to_number", "planned_ship_date", "status", "created_at"] }
+        order: { type: "string", default: "desc", options: ["asc", "desc"] }
+        page: { type: "integer", default: 1, min: 1 }
+        limit: { type: "integer", default: 20, max: 100 }
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          - id: "uuid"
+            to_number: "TO-2024-00042"
+            from_warehouse: { id: "uuid", code: "WH-MAIN", name: "Main Warehouse" }
+            to_warehouse: { id: "uuid", code: "WH-BRANCH-A", name: "Branch-A" }
+            planned_ship_date: "2024-12-20"
+            planned_receive_date: "2024-12-22"
+            status: "draft"
+            priority: "normal"
+            lines_count: 3
+            created_at: "2024-12-14T10:00:00Z"
+        meta:
+          total: 18
+          page: 1
+          limit: 20
+          pages: 1
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 500, code: "TO_LIST_FETCH_FAILED", message: "Failed to load transfer orders" }
+
+  # CREATE TRANSFER ORDER
+  - method: "POST"
+    path: "/api/planning/transfer-orders"
+    description: "Create new transfer order with optional lines"
+    file: "apps/frontend/app/api/planning/transfer-orders/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager"]
+    wireframe: "PLAN-011"
+
+    request:
+      body:
+        from_warehouse_id: { type: "uuid", required: true }
+        to_warehouse_id: { type: "uuid", required: true }
+        planned_ship_date: { type: "date", required: true }
+        planned_receive_date: { type: "date", required: true }
+        priority: { type: "string", default: "normal" }
+        notes: { type: "string", max_length: 1000 }
+        lines:
+          - product_id: { type: "uuid", required: true }
+            quantity: { type: "number", required: true, min: 0.0001 }
+            notes: { type: "string", max_length: 500 }
+
+    response:
+      status: 201
+      schema:
+        success: true
+        data:
+          id: "uuid"
+          to_number: "TO-2024-00043"
+          status: "draft"
+          from_warehouse: { id: "uuid", name: "Main Warehouse" }
+          to_warehouse: { id: "uuid", name: "Branch-A" }
+          lines_count: 3
+          created_at: "2024-12-17T10:00:00Z"
+
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed", details: [] }
+      - { status: 400, code: "SAME_WAREHOUSE", message: "From Warehouse and To Warehouse must be different" }
+      - { status: 400, code: "INVALID_DATE_RANGE", message: "Planned Receive Date must be on or after Planned Ship Date" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Permission denied" }
+
+  # GET TRANSFER ORDER DETAIL
+  - method: "GET"
+    path: "/api/planning/transfer-orders/:id"
+    description: "Get transfer order with lines"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    wireframe: "PLAN-012"
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          id: "uuid"
+          to_number: "TO-2024-00042"
+          org_id: "uuid"
+          from_warehouse: { id: "uuid", code: "WH-MAIN", name: "Main Warehouse" }
+          to_warehouse: { id: "uuid", code: "WH-BRANCH-A", name: "Branch-A" }
+          planned_ship_date: "2024-12-20"
+          planned_receive_date: "2024-12-22"
+          actual_ship_date: null
+          actual_receive_date: null
+          status: "draft"
+          priority: "normal"
+          notes: "Priority transfer"
+          shipped_by: null
+          received_by: null
+          created_at: "2024-12-14T10:00:00Z"
+          updated_at: "2024-12-14T10:00:00Z"
+          created_by: { id: "uuid", first_name: "John", last_name: "Smith" }
+          lines:
+            - id: "uuid"
+              line_number: 1
+              product: { id: "uuid", code: "RM-FLOUR-001", name: "Flour Type A" }
+              quantity: 500
+              uom: "kg"
+              shipped_qty: 0
+              received_qty: 0
+              notes: null
+
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "TO_NOT_FOUND", message: "Transfer order not found" }
+
+  # UPDATE TRANSFER ORDER
+  - method: "PUT"
+    path: "/api/planning/transfer-orders/:id"
+    description: "Update transfer order header"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager"]
+    wireframe: "PLAN-011"
+
+    request:
+      body:
+        from_warehouse_id: { type: "uuid" }
+        to_warehouse_id: { type: "uuid" }
+        planned_ship_date: { type: "date" }
+        planned_receive_date: { type: "date" }
+        priority: { type: "string" }
+        notes: { type: "string" }
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          id: "uuid"
+          to_number: "TO-2024-00042"
+          status: "draft"
+          updated_at: "2024-12-17T11:00:00Z"
+
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed" }
+      - { status: 400, code: "SAME_WAREHOUSE", message: "From Warehouse and To Warehouse must be different" }
+      - { status: 400, code: "CANNOT_EDIT_STATUS", message: "Cannot edit TO after shipment" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Permission denied" }
+      - { status: 404, code: "TO_NOT_FOUND", message: "Transfer order not found" }
+
+  # DELETE TRANSFER ORDER (Cancel)
+  - method: "DELETE"
+    path: "/api/planning/transfer-orders/:id"
+    description: "Cancel transfer order (soft delete via status)"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin"]
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          id: "uuid"
+          status: "cancelled"
+
+    errors:
+      - { status: 400, code: "CANNOT_CANCEL", message: "Cannot cancel TO that has been shipped or received" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Permission denied" }
+      - { status: 404, code: "TO_NOT_FOUND", message: "Transfer order not found" }
+
+# ============================================================================
+# TRANSFER ORDER LINES ENDPOINTS
+# ============================================================================
+
+  # ADD LINE TO TO
+  - method: "POST"
+    path: "/api/planning/transfer-orders/:id/lines"
+    description: "Add line to transfer order"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager"]
+    wireframe: "PLAN-011"
+
+    request:
+      body:
+        product_id: { type: "uuid", required: true }
+        quantity: { type: "number", required: true, min: 0.0001 }
+        notes: { type: "string", max_length: 500 }
+
+    response:
+      status: 201
+      schema:
+        success: true
+        data:
+          id: "uuid"
+          line_number: 4
+          product: { id: "uuid", code: "RM-SALT-001", name: "Salt Industrial" }
+          quantity: 100
+          uom: "kg"
+          shipped_qty: 0
+          received_qty: 0
+
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed" }
+      - { status: 400, code: "DUPLICATE_PRODUCT", message: "Product already exists on this TO. Update the existing line instead." }
+      - { status: 400, code: "CANNOT_ADD_LINE", message: "Cannot add lines after shipment" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Permission denied" }
+      - { status: 404, code: "TO_NOT_FOUND", message: "Transfer order not found" }
+      - { status: 404, code: "PRODUCT_NOT_FOUND", message: "Product not found" }
+
+  # UPDATE LINE
+  - method: "PUT"
+    path: "/api/planning/transfer-orders/:id/lines/:lineId"
+    description: "Update transfer order line (quantity, notes only)"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager"]
+
+    request:
+      body:
+        quantity: { type: "number", min: 0.0001 }
+        notes: { type: "string", max_length: 500 }
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          id: "uuid"
+          quantity: 600
+          notes: "Updated notes"
+          updated_at: "2024-12-17T11:30:00Z"
+
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Validation failed" }
+      - { status: 400, code: "CANNOT_EDIT_LINE", message: "Cannot edit line that has been shipped" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Permission denied" }
+      - { status: 404, code: "LINE_NOT_FOUND", message: "Line not found" }
+
+  # DELETE LINE
+  - method: "DELETE"
+    path: "/api/planning/transfer-orders/:id/lines/:lineId"
+    description: "Delete transfer order line"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/[lineId]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager"]
+
+    response:
+      status: 200
+      schema:
+        success: true
+        message: "Line deleted"
+
+    errors:
+      - { status: 400, code: "CANNOT_DELETE_LINE", message: "Cannot delete line that has been partially or fully shipped" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Permission denied" }
+      - { status: 404, code: "LINE_NOT_FOUND", message: "Line not found" }
+
+# ============================================================================
+# TRANSFER ORDER ACTIONS ENDPOINTS
+# ============================================================================
+
+  # RELEASE TO
+  - method: "POST"
+    path: "/api/planning/transfer-orders/:id/release"
+    description: "Release TO: draft -> planned"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/release/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager"]
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          id: "uuid"
+          status: "planned"
+          message: "Transfer Order released successfully"
+
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "TO must be in draft status to release" }
+      - { status: 400, code: "NO_LINES", message: "Cannot release TO with no lines. Add at least one line." }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Permission denied" }
+      - { status: 404, code: "TO_NOT_FOUND", message: "Transfer order not found" }
+
+  # CANCEL TO
+  - method: "POST"
+    path: "/api/planning/transfer-orders/:id/cancel"
+    description: "Cancel TO"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/cancel/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager"]
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          id: "uuid"
+          status: "cancelled"
+
+    errors:
+      - { status: 400, code: "CANNOT_CANCEL", message: "Cannot cancel TO that has been shipped or received" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Permission denied" }
+      - { status: 404, code: "TO_NOT_FOUND", message: "Transfer order not found" }
+
+  # SHIP TO (Stub for Epic 05)
+  - method: "POST"
+    path: "/api/planning/transfer-orders/:id/ship"
+    description: "Ship TO: planned -> shipped (stub for Epic 05)"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/ship/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator"]
+    note: "MVP stub - full implementation in Epic 05"
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          id: "uuid"
+          status: "shipped"
+          actual_ship_date: "2024-12-18"
+          shipped_by: { id: "uuid", name: "Jane Doe" }
+
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "TO must be in planned status to ship" }
+
+  # RECEIVE TO (Stub for Epic 05)
+  - method: "POST"
+    path: "/api/planning/transfer-orders/:id/receive"
+    description: "Receive TO: shipped -> received (stub for Epic 05)"
+    file: "apps/frontend/app/api/planning/transfer-orders/[id]/receive/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator"]
+    note: "MVP stub - full implementation in Epic 05"
+
+    response:
+      status: 200
+      schema:
+        success: true
+        data:
+          id: "uuid"
+          status: "received"
+          actual_receive_date: "2024-12-20"
+          received_by: { id: "uuid", name: "Bob Smith" }
+
+    errors:
+      - { status: 400, code: "INVALID_STATUS", message: "TO must be in shipped status to receive" }
+
+# ============================================================================
+# SERVICES
+# ============================================================================
+services:
+  - path: "apps/frontend/lib/services/transfer-order-service.ts"
+    description: "Transfer Order business logic service"
+    exports:
+      - name: "TransferOrderService"
+        type: "class"
+        methods:
+          - { name: "list", params: "TOListParams", returns: "Promise<PaginatedResult<TransferOrder>>" }
+          - { name: "getById", params: "id: string", returns: "Promise<TransferOrderWithLines | null>" }
+          - { name: "create", params: "CreateTOInput", returns: "Promise<TransferOrder>" }
+          - { name: "update", params: "id: string, data: UpdateTOInput", returns: "Promise<TransferOrder>" }
+          - { name: "cancel", params: "id: string", returns: "Promise<TransferOrder>" }
+          - { name: "addLine", params: "toId: string, line: CreateTOLineInput", returns: "Promise<TransferOrderLine>" }
+          - { name: "updateLine", params: "toId: string, lineId: string, data: UpdateTOLineInput", returns: "Promise<TransferOrderLine>" }
+          - { name: "deleteLine", params: "toId: string, lineId: string", returns: "Promise<void>" }
+          - { name: "release", params: "id: string", returns: "Promise<TransferOrder>" }
+          - { name: "ship", params: "id: string", returns: "Promise<TransferOrder>" }
+          - { name: "receive", params: "id: string", returns: "Promise<TransferOrder>" }
+          - { name: "validateWarehouses", params: "fromId: string, toId: string", returns: "Promise<ValidationResult>" }
+          - { name: "canEditTO", params: "id: string", returns: "Promise<EditPermission>" }
+          - { name: "canDeleteLine", params: "lineId: string", returns: "Promise<DeletePermission>" }
+
+# ============================================================================
+# VALIDATION (ZOD SCHEMAS)
+# ============================================================================
+validation:
+  path: "apps/frontend/lib/validation/transfer-order.ts"
+  schemas:
+    - name: "toStatusEnum"
+      definition: "z.enum(['draft', 'planned', 'shipped', 'received', 'closed', 'cancelled'])"
+
+    - name: "toPriorityEnum"
+      definition: "z.enum(['low', 'normal', 'high', 'urgent'])"
+
+    - name: "createTransferOrderSchema"
+      fields:
+        from_warehouse_id: "z.string().uuid()"
+        to_warehouse_id: "z.string().uuid()"
+        planned_ship_date: "z.string().refine(isValidDate)"
+        planned_receive_date: "z.string().refine(isValidDate)"
+        priority: "toPriorityEnum.default('normal')"
+        notes: "z.string().max(1000).nullable().optional()"
+      refinements:
+        - check: "from_warehouse_id !== to_warehouse_id"
+          message: "From Warehouse and To Warehouse must be different"
+          path: ["to_warehouse_id"]
+        - check: "planned_receive_date >= planned_ship_date"
+          message: "Planned Receive Date must be on or after Planned Ship Date"
+          path: ["planned_receive_date"]
+
+    - name: "updateTransferOrderSchema"
+      definition: "createTransferOrderSchema.partial()"
+
+    - name: "createTOLineSchema"
+      fields:
+        product_id: "z.string().uuid()"
+        quantity: "z.number().positive()"
+        notes: "z.string().max(500).nullable().optional()"
+
+    - name: "updateTOLineSchema"
+      fields:
+        quantity: "z.number().positive().optional()"
+        notes: "z.string().max(500).nullable().optional()"
+
+# ============================================================================
+# TYPES
+# ============================================================================
+types:
+  - path: "apps/frontend/lib/types/transfer-order.ts"
+    exports:
+      - name: "TOStatus"
+        definition: "'draft' | 'planned' | 'shipped' | 'received' | 'closed' | 'cancelled'"
+      - name: "TOPriority"
+        definition: "'low' | 'normal' | 'high' | 'urgent'"
+      - name: "TransferOrder"
+        fields:
+          - "id: string"
+          - "org_id: string"
+          - "to_number: string"
+          - "from_warehouse_id: string"
+          - "to_warehouse_id: string"
+          - "planned_ship_date: string"
+          - "planned_receive_date: string"
+          - "actual_ship_date: string | null"
+          - "actual_receive_date: string | null"
+          - "status: TOStatus"
+          - "priority: TOPriority"
+          - "notes: string | null"
+          - "shipped_by: string | null"
+          - "received_by: string | null"
+          - "created_at: string"
+          - "updated_at: string"
+          - "created_by: string"
+          - "updated_by: string | null"
+      - name: "TransferOrderLine"
+        fields:
+          - "id: string"
+          - "to_id: string"
+          - "line_number: number"
+          - "product_id: string"
+          - "quantity: number"
+          - "uom: string"
+          - "shipped_qty: number"
+          - "received_qty: number"
+          - "notes: string | null"
+          - "created_at: string"
+          - "updated_at: string"
+      - name: "TransferOrderWithLines"
+        extends: "TransferOrder"
+        fields:
+          - "lines: TransferOrderLine[]"
+          - "from_warehouse: Warehouse"
+          - "to_warehouse: Warehouse"
+          - "created_by_user: User"

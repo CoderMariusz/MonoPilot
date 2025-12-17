@@ -1,0 +1,153 @@
+# Story 04.5 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "04.5"
+  name: "Production Settings (Module Configuration)"
+  slug: "production-settings"
+  epic: "04-production"
+  phase: "0"
+  complexity: "S"
+  estimate_days: 2
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # production_settings table, scrap_reasons, pause_reasons, RLS
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, services, UI patterns
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns", "permission-service"]
+    - story: "01.10"
+      name: "Machines CRUD"
+      provides: ["machines table", "machine reference for read-only view"]
+    - story: "01.11"
+      name: "Production Lines CRUD"
+      provides: ["production_lines table", "line reference for read-only view"]
+  soft: []
+  blocked_by: []
+  blocks:
+    - story: "04.1"
+      name: "Production Dashboard"
+      reason: "Dashboard reads settings for refresh interval, alert visibility"
+    - story: "04.2a"
+      name: "WO Start"
+      reason: "Reads enable_material_reservations setting"
+    - story: "04.2b"
+      name: "WO Pause/Resume"
+      reason: "Reads allow_pause_wo setting"
+    - story: "04.2c"
+      name: "WO Complete"
+      reason: "Reads auto_complete_wo setting"
+    - story: "04.3"
+      name: "Operation Start/Complete"
+      reason: "Reads require_operation_sequence setting"
+    - story: "04.6a"
+      name: "Material Consumption (Desktop)"
+      reason: "Reads allow_over_consumption, allow_partial_lp_consumption"
+    - story: "04.7a"
+      name: "Output Registration (Desktop)"
+      reason: "Reads require_qa_on_output, auto_create_by_product_lp"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections: ["FR-PROD-017"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/production.md"
+    sections: ["Settings Table", "Settings Endpoints"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/04.5.production-settings.md"
+  wireframe:
+    path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-007-production-settings.md"
+    sections: ["All sections - full settings page"]
+  phase_breakdown:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/PHASE-BREAKDOWN.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for production_settings"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "production_settings table + RLS + indexes + defaults"
+  - type: "api"
+    count: 2
+    description: "GET /api/production/settings, PUT /api/production/settings"
+  - type: "service"
+    count: 1
+    description: "production-settings-service.ts with CRUD + helper functions"
+  - type: "validation"
+    count: 2
+    description: "productionSettingsSchema, updateProductionSettingsSchema"
+  - type: "component"
+    count: 5
+    description: "ProductionSettingsForm, SettingToggle, SettingNumberInput, SettingsSection, etc."
+  - type: "page"
+    count: 1
+    description: "/settings/production page"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Phase 0 scope: Module configuration for Phase 0 features"
+  - "Singleton pattern: Each org has exactly ONE production_settings row (UNIQUE constraint)"
+  - "Upsert on first GET: Creates default settings row if none exists"
+  - "Phase 0 settings ENFORCED: allow_pause_wo, auto_complete_wo, require_operation_sequence, dashboard_*"
+  - "Phase 1 settings STORED but NOT enforced: allow_over_consumption, allow_partial_lp_consumption, require_qa_on_output, etc."
+  - "Phase 2 settings STORED but NOT enforced: enable_oee_tracking, target_oee_percent, enable_downtime_tracking"
+  - "Settings changes apply immediately (no page reload required)"
+  - "Form has unsaved changes warning on navigation"
+  - "Return 404 (not 403) for cross-tenant access per ADR-013"
+
+# MVP Scope Clarification
+mvp_scope:
+  in_scope:
+    - "Production settings page at /settings/production"
+    - "production_settings table with all 15 fields"
+    - "Settings sections: WO Execution, Material Consumption, Output, Reservations, Dashboard, OEE"
+    - "GET /api/production/settings (with upsert for new orgs)"
+    - "PUT /api/production/settings (partial updates)"
+    - "Zod validation for all fields"
+    - "Form with unsaved changes warning"
+    - "Success/error toast notifications"
+    - "Phase 1/2 settings show info tooltip indicating future availability"
+    - "RLS policies for org_id isolation"
+  out_of_scope:
+    - "Enforcing Phase 1 LP-related settings (Stories 04.6-04.8)"
+    - "Enforcing Phase 2 OEE settings (Stories 04.9a-d)"
+    - "Audit log for settings changes (Phase 3)"
+    - "Settings versioning/history (Phase 3)"
+    - "Role-based settings permissions (Phase 3)"
+    - "Settings export/import (Phase 3)"
+    - "Settings templates (Phase 3)"
+
+# FR-PROD-017 Mapping
+prd_mapping:
+  fr: "FR-PROD-017"
+  title: "Production Settings"
+  ac_count: 9
+  covered:
+    - "AC #1: Page loads with all 15 settings"
+    - "AC #2: Toggle allow_pause_wo -> WO detail shows Pause button"
+    - "AC #3: Enter dashboard_refresh_seconds = 15 -> dashboard refreshes every 15s"
+    - "AC #4: Enter 0 -> validation error 'must be at least 5 seconds'"
+    - "AC #5: Enter 5 -> saves successfully"
+    - "AC #6: Enter target_oee_percent = 110 -> validation error 'must be between 0 and 100'"
+    - "AC #7: Enter 85 -> OEE dashboard shows 85% target line"
+    - "AC #8: Change setting + Save -> success toast 'Settings saved'"
+    - "AC #9: Unsaved changes + navigate -> confirmation modal"

@@ -1,0 +1,529 @@
+# Story 02.10b - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+# Status: DEFERRED - requires Epic 05 tables
+
+endpoints:
+  # Forward Trace (Where Used)
+  - method: "POST"
+    path: "/api/v1/technical/tracing/forward"
+    description: "Forward trace: Find all descendants of a lot (where was it used)"
+    file: "apps/frontend/app/api/v1/technical/tracing/forward/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+    status: "deferred"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        lp_id: "UUID (optional if batch_number provided)"
+        batch_number: "string (optional if lp_id provided)"
+        max_depth: "integer (default 20, max 50)"
+        include_shipped: "boolean (default true)"
+        include_consumed: "boolean (default true)"
+
+    response:
+      status: 200
+      type: "TraceResult"
+      schema:
+        root_lp:
+          id: "UUID"
+          lp_number: "string"
+          product_id: "UUID"
+          product_code: "string"
+          product_name: "string"
+          quantity: "number"
+          uom: "string"
+          status: "string"
+          lot_number: "string"
+          manufacturing_date: "string (ISO date)"
+          expiry_date: "string (ISO date)"
+        trace_tree: "TraceNode[]"
+        summary:
+          total_descendants: "number"
+          total_work_orders: "number"
+          total_customers: "number | null"
+          max_depth: "number"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Either lp_id or batch_number must be provided"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License plate not found"
+      - status: 422
+        code: "MAX_DEPTH_EXCEEDED"
+        message: "Max depth cannot exceed 50"
+
+  # Backward Trace (What Consumed)
+  - method: "POST"
+    path: "/api/v1/technical/tracing/backward"
+    description: "Backward trace: Find all ancestors of a lot (what was consumed to make it)"
+    file: "apps/frontend/app/api/v1/technical/tracing/backward/route.ts"
+    auth: "required"
+    roles: ["*"]
+    status: "deferred"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        lp_id: "UUID (optional if batch_number provided)"
+        batch_number: "string (optional if lp_id provided)"
+        max_depth: "integer (default 20, max 50)"
+
+    response:
+      status: 200
+      type: "TraceResult"
+      schema:
+        root_lp: "LicensePlate"
+        trace_tree: "TraceNode[]"
+        summary:
+          total_ancestors: "number"
+          total_work_orders: "number"
+          max_depth: "number"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Either lp_id or batch_number must be provided"
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License plate not found"
+
+  # Recall Simulation
+  - method: "POST"
+    path: "/api/v1/technical/tracing/recall"
+    description: "Run recall simulation with impact assessment"
+    file: "apps/frontend/app/api/v1/technical/tracing/recall/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN", "QUALITY_MANAGER"]
+    status: "deferred"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        lp_id: "UUID (optional if batch_number provided)"
+        batch_number: "string (optional if lp_id provided)"
+        max_depth: "integer (default 50)"
+        include_shipped: "boolean (default true)"
+        include_notifications: "boolean (default false) - generate customer notification drafts"
+
+    response:
+      status: 200
+      type: "RecallSimulationResult"
+      schema:
+        simulation_id: "UUID"
+        root_lp: "LicensePlate"
+        forward_trace: "TraceNode[]"
+        backward_trace: "TraceNode[]"
+        summary:
+          total_affected_lps: "number"
+          total_quantity: "number"
+          total_estimated_value: "number"
+          status_breakdown:
+            available: "number"
+            in_production: "number"
+            shipped: "number"
+            consumed: "number"
+            quarantine: "number"
+          affected_warehouses: "number"
+          affected_customers: "number"
+        locations: "LocationAnalysis[]"
+        customers: "CustomerImpact[]"
+        financial:
+          product_value: "number"
+          retrieval_cost: "number"
+          disposal_cost: "number"
+          lost_revenue: "number"
+          total_estimated_cost: "number"
+          confidence_interval: "string"
+        regulatory:
+          reportable_to_fda: "boolean"
+          report_due_date: "string (ISO date) | null"
+          report_status: "'draft' | 'not_filed' | 'filed'"
+          affected_product_types: "string[]"
+        execution_time_ms: "number"
+        created_at: "string (ISO datetime)"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Either lp_id or batch_number must be provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Only Admin, Quality Manager can run recall simulations"
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License plate not found"
+      - status: 504
+        code: "TIMEOUT"
+        message: "Recall simulation timed out. Try reducing max_depth or contact support."
+
+  # Genealogy Tree
+  - method: "GET"
+    path: "/api/v1/technical/tracing/genealogy/:lpId"
+    description: "Get genealogy tree data for visualization"
+    file: "apps/frontend/app/api/v1/technical/tracing/genealogy/[lpId]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    status: "deferred"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        lpId: "UUID"
+      query:
+        direction: "'forward' | 'backward' (default 'forward')"
+        depth: "integer (default 10, max 20)"
+
+    response:
+      status: 200
+      type: "TraceNode[]"
+      schema:
+        - lp:
+            id: "UUID"
+            lp_number: "string"
+            product_id: "UUID"
+            quantity: "number"
+            uom: "string"
+            status: "string"
+          product_code: "string"
+          product_name: "string"
+          relationship_type: "'split' | 'combine' | 'transform' | null"
+          quantity_from_parent: "number | null"
+          children: "TraceNode[]"
+          depth: "number"
+
+    errors:
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License plate not found"
+
+  # Export Recall Report
+  - method: "GET"
+    path: "/api/v1/technical/tracing/recall/:id/export"
+    description: "Export recall simulation report"
+    file: "apps/frontend/app/api/v1/technical/tracing/recall/[id]/export/route.ts"
+    auth: "required"
+    roles: ["ADMIN", "SUPER_ADMIN", "QUALITY_MANAGER"]
+    status: "deferred"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID (simulation_id)"
+      query:
+        format: "'pdf' | 'json' | 'xml' | 'fda_json' | 'fda_xml'"
+
+    response:
+      status: 200
+      type: "File download"
+      content_type:
+        pdf: "application/pdf"
+        json: "application/json"
+        xml: "application/xml"
+        fda_json: "application/json"
+        fda_xml: "application/xml"
+      filename: "recall_simulation_{id}_{timestamp}.{format}"
+
+    errors:
+      - status: 404
+        code: "SIMULATION_NOT_FOUND"
+        message: "Recall simulation not found"
+      - status: 400
+        code: "INVALID_FORMAT"
+        message: "Invalid export format"
+
+  # Export Traceability Matrix
+  - method: "GET"
+    path: "/api/v1/technical/tracing/matrix/:lpId/export"
+    description: "Export traceability matrix in tabular format"
+    file: "apps/frontend/app/api/v1/technical/tracing/matrix/[lpId]/export/route.ts"
+    auth: "required"
+    roles: ["*"]
+    status: "deferred"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        lpId: "UUID"
+      query:
+        format: "'csv' | 'excel' | 'pdf'"
+        direction: "'forward' | 'backward' | 'both'"
+        max_depth: "integer (default 20)"
+
+    response:
+      status: 200
+      type: "File download"
+      content_type:
+        csv: "text/csv"
+        excel: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        pdf: "application/pdf"
+      filename: "traceability_matrix_{lpId}_{direction}_{timestamp}.{format}"
+
+    errors:
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License plate not found"
+      - status: 400
+        code: "INVALID_FORMAT"
+        message: "Invalid export format"
+
+# Type Definitions
+types:
+  - name: "TraceNode"
+    description: "Node in the traceability tree"
+    fields:
+      - "lp: LicensePlate"
+      - "product_code: string"
+      - "product_name: string"
+      - "relationship_type: 'split' | 'combine' | 'transform' | null"
+      - "quantity_from_parent: number | null"
+      - "work_order_id: string | null"
+      - "children: TraceNode[]"
+      - "depth: number"
+
+  - name: "TraceResult"
+    description: "Result of forward/backward trace"
+    fields:
+      - "root_lp: LicensePlate"
+      - "trace_tree: TraceNode[]"
+      - "summary: TraceSummary"
+
+  - name: "TraceSummary"
+    description: "Summary statistics for trace result"
+    fields:
+      - "total_descendants?: number"
+      - "total_ancestors?: number"
+      - "total_work_orders: number"
+      - "total_customers?: number"
+      - "max_depth: number"
+
+  - name: "RecallSimulationResult"
+    description: "Full recall simulation result"
+    fields:
+      - "simulation_id: string"
+      - "root_lp: LicensePlate"
+      - "forward_trace: TraceNode[]"
+      - "backward_trace: TraceNode[]"
+      - "summary: RecallSummary"
+      - "locations: LocationAnalysis[]"
+      - "customers: CustomerImpact[]"
+      - "financial: FinancialImpact"
+      - "regulatory: RegulatoryInfo"
+      - "execution_time_ms: number"
+      - "created_at: string"
+
+  - name: "LocationAnalysis"
+    description: "Warehouse location breakdown"
+    fields:
+      - "warehouse_id: string"
+      - "warehouse_name: string"
+      - "affected_lps: number"
+      - "total_quantity: number"
+      - "zones: string[]"
+
+  - name: "CustomerImpact"
+    description: "Affected customer details"
+    fields:
+      - "customer_id: string"
+      - "customer_name: string"
+      - "contact_email: string | null"
+      - "shipped_quantity: number"
+      - "ship_date: string"
+      - "notification_status: 'draft' | 'pending' | 'sent'"
+
+  - name: "FinancialImpact"
+    description: "Financial impact assessment"
+    fields:
+      - "product_value: number"
+      - "retrieval_cost: number"
+      - "disposal_cost: number"
+      - "lost_revenue: number"
+      - "total_estimated_cost: number"
+      - "confidence_interval: string"
+
+  - name: "RegulatoryInfo"
+    description: "Regulatory compliance information"
+    fields:
+      - "reportable_to_fda: boolean"
+      - "report_due_date: string | null"
+      - "report_status: 'draft' | 'not_filed' | 'filed'"
+      - "affected_product_types: string[]"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/traceability-service.ts"
+    description: "Extended traceability service (builds on 02.10a)"
+    status: "deferred"
+    exports:
+      - name: "traceForward"
+        type: "async function"
+        params:
+          - "request: TraceRequest"
+        returns: "Promise<TraceResult>"
+        description: "Run forward trace query"
+      - name: "traceBackward"
+        type: "async function"
+        params:
+          - "request: TraceRequest"
+        returns: "Promise<TraceResult>"
+        description: "Run backward trace query"
+      - name: "runRecallSimulation"
+        type: "async function"
+        params:
+          - "request: TraceRequest"
+        returns: "Promise<RecallSimulationResult>"
+        description: "Run full recall simulation"
+      - name: "getGenealogyTree"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "direction?: 'forward' | 'backward'"
+          - "maxDepth?: number"
+        returns: "Promise<TraceNode[]>"
+        description: "Get genealogy tree for visualization"
+      - name: "exportMatrix"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "format: 'csv' | 'excel' | 'pdf'"
+          - "direction: 'forward' | 'backward' | 'both'"
+        returns: "Promise<Blob>"
+        description: "Export traceability matrix"
+      - name: "exportRecallReport"
+        type: "async function"
+        params:
+          - "simulationId: string"
+          - "format: 'pdf' | 'json' | 'xml'"
+        returns: "Promise<Blob>"
+        description: "Export recall simulation report"
+
+  - path: "apps/frontend/lib/services/recall-simulation-service.ts"
+    description: "Recall simulation business logic"
+    status: "deferred"
+    exports:
+      - name: "calculateFinancialImpact"
+        type: "function"
+        params:
+          - "affectedLPs: LicensePlate[]"
+          - "productCosts: Map<string, number>"
+        returns: "FinancialImpact"
+        description: "Calculate financial impact of recall"
+      - name: "determineRegulatoryStatus"
+        type: "function"
+        params:
+          - "summary: RecallSummary"
+          - "customers: CustomerImpact[]"
+        returns: "RegulatoryInfo"
+        description: "Determine FDA reporting requirements"
+      - name: "generateCustomerNotifications"
+        type: "async function"
+        params:
+          - "simulationId: string"
+          - "customers: CustomerImpact[]"
+        returns: "Promise<void>"
+        description: "Generate draft customer notification emails"
+
+# Zod Validation Schemas
+validation:
+  path: "apps/frontend/lib/validation/tracing.ts"
+  status: "deferred"
+  schemas:
+    - name: "traceSearchSchema"
+      description: "Validation for trace search requests"
+      definition: |
+        z.object({
+          lp_id: z.string().uuid().optional(),
+          batch_number: z.string().min(3).optional(),
+          max_depth: z.number().int().min(1).max(50).default(20),
+          include_shipped: z.boolean().default(true),
+          include_consumed: z.boolean().default(true),
+        }).refine(
+          (data) => data.lp_id || data.batch_number,
+          { message: "Either lp_id or batch_number must be provided" }
+        )
+
+    - name: "recallRequestSchema"
+      description: "Validation for recall simulation requests"
+      definition: |
+        z.object({
+          lp_id: z.string().uuid().optional(),
+          batch_number: z.string().min(3).optional(),
+          max_depth: z.number().int().min(1).max(100).default(50),
+          include_shipped: z.boolean().default(true),
+          include_notifications: z.boolean().default(false),
+        }).refine(
+          (data) => data.lp_id || data.batch_number,
+          { message: "Either lp_id or batch_number must be provided" }
+        )
+
+    - name: "exportFormatSchema"
+      description: "Validation for export format"
+      definition: |
+        z.object({
+          format: z.enum(['csv', 'excel', 'pdf', 'json', 'xml', 'fda_json', 'fda_xml']),
+          direction: z.enum(['forward', 'backward', 'both']).optional(),
+        })
+
+# Implementation patterns
+patterns:
+  api_route_forward: |
+    // apps/frontend/app/api/v1/technical/tracing/forward/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { traceSearchSchema } from '@/lib/validation/tracing';
+
+    export async function POST(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const body = await request.json();
+      const validation = traceSearchSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json({ error: validation.error.errors }, { status: 400 });
+      }
+
+      const { lp_id, batch_number, max_depth, include_shipped } = validation.data;
+
+      // Get org_id from user
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id')
+        .eq('id', user.id)
+        .single();
+
+      // Run forward trace using recursive CTE
+      const { data: traceData, error: traceError } = await supabase
+        .rpc('trace_forward', {
+          p_lp_id: lp_id,
+          p_org_id: userData.org_id,
+          p_max_depth: max_depth
+        });
+
+      if (traceError) {
+        return NextResponse.json({ error: traceError.message }, { status: 500 });
+      }
+
+      // Build response
+      const result = buildTraceResult(traceData, include_shipped);
+      return NextResponse.json(result);
+    }

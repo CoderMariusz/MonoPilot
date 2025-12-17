@@ -1,0 +1,157 @@
+# Story 06.3 - Database Schema
+# Purpose: Tables, RLS policies, indexes, functions
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_quality_specifications.sql"
+    type: "migration"
+    description: "Quality specifications table with versioning and approval workflow"
+  - path: "supabase/migrations/XXX_create_quality_spec_parameters.sql"
+    type: "migration"
+    description: "Specification parameters table (1:N relationship)"
+
+tables:
+  - name: "quality_specifications"
+    description: "Product specifications with versioning, approval workflow, review tracking"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "spec_number", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "version", type: "INTEGER", constraints: "NOT NULL DEFAULT 1" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "description", type: "TEXT", constraints: "" }
+      - { name: "effective_date", type: "DATE", constraints: "NOT NULL" }
+      - { name: "expiry_date", type: "DATE", constraints: "" }
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'expired', 'superseded'))" }
+      - { name: "approved_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "approved_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "superseded_by", type: "UUID", constraints: "REFERENCES quality_specifications(id)" }
+      - { name: "superseded_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "review_frequency_days", type: "INTEGER", constraints: "DEFAULT 365" }
+      - { name: "next_review_date", type: "DATE", constraints: "" }
+      - { name: "last_review_date", type: "DATE", constraints: "" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_quality_specs_org_id ON quality_specifications(org_id)"
+      - "idx_quality_specs_product ON quality_specifications(product_id)"
+      - "idx_quality_specs_status ON quality_specifications(org_id, status)"
+      - "idx_quality_specs_effective ON quality_specifications(org_id, effective_date, expiry_date)"
+      - "idx_quality_specs_review ON quality_specifications(org_id, next_review_date) WHERE status = 'active'"
+      - "idx_quality_specs_number ON quality_specifications(org_id, spec_number)"
+    constraints:
+      - "UNIQUE(org_id, spec_number, version)"
+
+  - name: "quality_spec_parameters"
+    description: "Test parameters linked to specifications (1:N)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "spec_id", type: "UUID", constraints: "NOT NULL REFERENCES quality_specifications(id) ON DELETE CASCADE" }
+      - { name: "sequence", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "parameter_name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "parameter_type", type: "TEXT", constraints: "NOT NULL CHECK (parameter_type IN ('measurement', 'visual', 'attribute'))" }
+      - { name: "target_value", type: "TEXT", constraints: "" }
+      - { name: "min_value", type: "DECIMAL(15,6)", constraints: "" }
+      - { name: "max_value", type: "DECIMAL(15,6)", constraints: "" }
+      - { name: "unit", type: "TEXT", constraints: "" }
+      - { name: "test_method", type: "TEXT", constraints: "" }
+      - { name: "is_critical", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    rls_pattern: "Inherits from parent specification via EXISTS subquery"
+    indexes:
+      - "idx_spec_params_spec_id ON quality_spec_parameters(spec_id)"
+      - "idx_spec_params_sequence ON quality_spec_parameters(spec_id, sequence)"
+    constraints:
+      - "UNIQUE(spec_id, sequence)"
+      - "CHECK(min_value IS NULL OR max_value IS NULL OR min_value < max_value)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Single source of truth (users table)"
+    - "Consistent with ADR-013 pattern"
+    - "Delete restricted to draft status only"
+
+  policies:
+    - table: "quality_specifications"
+      name: "quality_specifications_select"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "quality_specifications"
+      name: "quality_specifications_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "quality_specifications"
+      name: "quality_specifications_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "quality_specifications"
+      name: "quality_specifications_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND status = 'draft'"
+    - table: "quality_spec_parameters"
+      name: "quality_spec_parameters_select"
+      operation: "SELECT"
+      using: "EXISTS (SELECT 1 FROM quality_specifications WHERE id = quality_spec_parameters.spec_id AND org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    - table: "quality_spec_parameters"
+      name: "quality_spec_parameters_insert"
+      operation: "INSERT"
+      with_check: "EXISTS (SELECT 1 FROM quality_specifications WHERE id = quality_spec_parameters.spec_id AND org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    - table: "quality_spec_parameters"
+      name: "quality_spec_parameters_update"
+      operation: "UPDATE"
+      using: "EXISTS (SELECT 1 FROM quality_specifications WHERE id = quality_spec_parameters.spec_id AND org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    - table: "quality_spec_parameters"
+      name: "quality_spec_parameters_delete"
+      operation: "DELETE"
+      using: "EXISTS (SELECT 1 FROM quality_specifications qs WHERE qs.id = quality_spec_parameters.spec_id AND qs.org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND qs.status = 'draft')"
+
+# Database Functions
+functions:
+  - name: "get_active_specification"
+    description: "Resolve active specification for a product as of a given date"
+    params:
+      - { name: "p_org_id", type: "UUID" }
+      - { name: "p_product_id", type: "UUID" }
+      - { name: "p_as_of_date", type: "DATE", default: "CURRENT_DATE" }
+    returns: "UUID"
+    security: "DEFINER"
+    body: |
+      SELECT id FROM quality_specifications
+      WHERE org_id = p_org_id
+        AND product_id = p_product_id
+        AND status = 'active'
+        AND effective_date <= p_as_of_date
+        AND (expiry_date IS NULL OR expiry_date >= p_as_of_date)
+      ORDER BY effective_date DESC, version DESC
+      LIMIT 1
+
+  - name: "supersede_previous_spec"
+    description: "Trigger function to supersede previous active specs on activation"
+    trigger_on: "BEFORE UPDATE ON quality_specifications"
+    security: "DEFINER"
+    logic: |
+      - If NEW.status = 'active' AND OLD.status != 'active':
+        - UPDATE all other active specs for same product to 'superseded'
+        - Set superseded_by = NEW.id, superseded_at = now()
+        - Calculate next_review_date from effective_date + review_frequency_days
+
+# Triggers
+triggers:
+  - name: "update_quality_specifications_updated_at"
+    table: "quality_specifications"
+    timing: "BEFORE UPDATE"
+    action: "EXECUTE FUNCTION update_updated_at_column()"
+  - name: "trigger_supersede_spec"
+    table: "quality_specifications"
+    timing: "BEFORE UPDATE"
+    action: "EXECUTE FUNCTION supersede_previous_spec()"

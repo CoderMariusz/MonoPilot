@@ -1,0 +1,473 @@
+# Story 03.4 - Frontend Specification
+# Purpose: Components, hooks, types, UX patterns
+# Agent: FRONTEND-DEV
+
+# Component hierarchy
+components:
+  # Main modal component (4-step wizard)
+  - path: "apps/frontend/components/planning/purchase-orders/BulkPOImportModal.tsx"
+    description: "Main 4-step wizard modal for bulk PO import"
+    props:
+      - "isOpen: boolean"
+      - "onClose: () => void"
+      - "onSuccess: (result: BulkCreateResult) => void"
+      - "defaultWarehouseId?: string"
+    state:
+      - "currentStep: 1 | 2 | 3 | 4"
+      - "file: File | null"
+      - "parsedGroups: POGroup[]"
+      - "validationResult: ValidationResult | null"
+      - "createResult: BulkCreateResult | null"
+      - "isLoading: boolean"
+      - "error: string | null"
+    children:
+      - "ImportWizardStepper"
+      - "Step1Upload"
+      - "Step2Preview"
+      - "Step3Validate"
+      - "Step4Create"
+
+  # Step 1: File Upload
+  - path: "apps/frontend/components/planning/purchase-orders/bulk-import/Step1Upload.tsx"
+    description: "File upload step with drag-and-drop"
+    props:
+      - "onFileSelected: (file: File) => void"
+      - "onBack: () => void"
+      - "isLoading: boolean"
+      - "error: string | null"
+    uses:
+      - "CSVUploader"
+      - "FileDropzone"
+    pattern: |
+      <Card className="p-8">
+        <FileDropzone
+          accept={{ 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'], 'application/vnd.ms-excel': ['.xls'] }}
+          maxSize={5 * 1024 * 1024}
+          onDrop={handleFileDrop}
+        >
+          <Upload className="h-12 w-12 text-muted-foreground" />
+          <p>Drag & drop Excel file here or click to browse</p>
+          <p className="text-sm text-muted-foreground">Supported: .xlsx, .xls | Max size: 5 MB</p>
+        </FileDropzone>
+        <Button variant="link" onClick={downloadTemplate}>
+          Download Template
+        </Button>
+      </Card>
+
+  # CSV/Excel Uploader
+  - path: "apps/frontend/components/planning/purchase-orders/bulk-import/CSVUploader.tsx"
+    description: "Reusable file uploader with Excel parsing"
+    props:
+      - "onParsed: (rows: ImportRow[]) => void"
+      - "onError: (error: string) => void"
+      - "accept: string[]"
+      - "maxSize: number"
+      - "maxRows: number"
+    uses:
+      - "xlsx (SheetJS library)"
+    notes:
+      - "Client-side parsing using SheetJS"
+      - "Validates column headers"
+      - "Returns parsed rows as typed objects"
+
+  # Step 2: Preview Groups
+  - path: "apps/frontend/components/planning/purchase-orders/bulk-import/Step2Preview.tsx"
+    description: "Preview parsed data grouped by supplier"
+    props:
+      - "groups: POGroup[]"
+      - "onGroupEdit: (index: number) => void"
+      - "onBack: () => void"
+      - "onNext: () => void"
+    uses:
+      - "POGroupPreview"
+      - "POGroupCard"
+    pattern: |
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <p>File: {fileName} ({totalRows} rows parsed)</p>
+          <Button variant="link" onClick={onChangeFile}>Change File</Button>
+        </div>
+
+        <ScrollArea className="h-[400px]">
+          {groups.map((group, idx) => (
+            <POGroupCard
+              key={idx}
+              group={group}
+              onEdit={() => onGroupEdit(idx)}
+            />
+          ))}
+        </ScrollArea>
+
+        <div className="flex justify-between">
+          <p>Summary: {groups.length} POs will be created | {totalLines} line items | Total: {formatCurrency(totalValue)}</p>
+        </div>
+      </div>
+
+  # PO Group Preview Card
+  - path: "apps/frontend/components/planning/purchase-orders/bulk-import/POGroupCard.tsx"
+    description: "Card showing single PO group (supplier + lines)"
+    props:
+      - "group: POGroup"
+      - "onEdit: () => void"
+      - "expanded?: boolean"
+    pattern: |
+      <Card>
+        <CardHeader className="flex justify-between">
+          <div>
+            <CardTitle>{group.supplier.name} ({group.supplier.code})</CardTitle>
+            <CardDescription>
+              Expected Delivery: {formatDate(group.expected_date)} (based on lead time: {group.supplier.lead_time_days} days)
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={onEdit}>Edit Group</Button>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>Qty</TableHead>
+                <TableHead>Unit Price</TableHead>
+                <TableHead>Subtotal</TableHead>
+                <TableHead>Notes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {group.lines.map(line => (
+                <TableRow key={line.row_number}>
+                  <TableCell>{line.product_name}</TableCell>
+                  <TableCell>{line.quantity} {line.uom}</TableCell>
+                  <TableCell>{formatCurrency(line.unit_price)}</TableCell>
+                  <TableCell>{formatCurrency(line.line_total)}</TableCell>
+                  <TableCell>{line.notes || '-'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <div className="mt-4 text-right">
+            Subtotal: {formatCurrency(group.subtotal)} {group.supplier.currency}
+          </div>
+        </CardContent>
+      </Card>
+
+  # Edit Group Modal
+  - path: "apps/frontend/components/planning/purchase-orders/bulk-import/EditGroupModal.tsx"
+    description: "Modal to edit PO group before creation"
+    props:
+      - "group: POGroup"
+      - "isOpen: boolean"
+      - "onClose: () => void"
+      - "onSave: (group: POGroup) => void"
+    fields:
+      - "supplier: SupplierSelect (changeable)"
+      - "warehouse: WarehouseSelect"
+      - "expected_date: DatePicker"
+      - "payment_terms: Select"
+      - "tax_code: TaxCodeSelect"
+      - "notes: Textarea"
+      - "lines: EditableTable"
+
+  # Step 3: Validation Results
+  - path: "apps/frontend/components/planning/purchase-orders/bulk-import/Step3Validate.tsx"
+    description: "Display validation results with error resolution"
+    props:
+      - "result: ValidationResult"
+      - "onResolve: (row: number, action: string) => void"
+      - "onBack: () => void"
+      - "onNext: () => void"
+      - "canProceed: boolean"
+    uses:
+      - "ValidationIssueCard"
+      - "ValidationSummary"
+    pattern: |
+      <div className="space-y-4">
+        <Alert variant={hasErrors ? 'destructive' : 'warning'}>
+          <AlertTitle>{issueCount} Issues Found ({errorCount} Errors, {warningCount} Warnings)</AlertTitle>
+          <div className="flex gap-2 mt-2">
+            <Button size="sm" onClick={fixAll}>Fix All</Button>
+            <Button size="sm" variant="outline" onClick={skipAll}>Skip All</Button>
+          </div>
+        </Alert>
+
+        {errors.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>ERRORS (must fix to continue)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {errors.map(issue => (
+                <ValidationIssueCard
+                  key={issue.row_number}
+                  issue={issue}
+                  onResolve={onResolve}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {warnings.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>WARNINGS (review recommended)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {warnings.map(issue => (
+                <ValidationIssueCard
+                  key={issue.row_number}
+                  issue={issue}
+                  onResolve={onResolve}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>VALID ROWS</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>{validCount} of {totalRows} rows validated successfully</p>
+          </CardContent>
+        </Card>
+      </div>
+
+  # Validation Issue Card
+  - path: "apps/frontend/components/planning/purchase-orders/bulk-import/ValidationIssueCard.tsx"
+    description: "Single validation issue with resolution actions"
+    props:
+      - "issue: ValidationIssue"
+      - "onResolve: (row: number, action: string) => void"
+    pattern: |
+      <div className="p-4 border rounded-lg">
+        <div className="flex justify-between">
+          <div>
+            <p className="font-medium">Row {issue.row_number}: {issue.code.replace('_', ' ')}</p>
+            <p className="text-sm text-muted-foreground">{issue.message}</p>
+          </div>
+          <Badge variant={issue.type === 'error' ? 'destructive' : 'secondary'}>
+            {issue.type}
+          </Badge>
+        </div>
+        <div className="mt-2 flex gap-2">
+          {issue.resolutions.map(res => (
+            <Button
+              key={res.action}
+              size="sm"
+              variant="outline"
+              onClick={() => onResolve(issue.row_number, res.action)}
+            >
+              {res.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+  # Step 4: Create Progress/Results
+  - path: "apps/frontend/components/planning/purchase-orders/bulk-import/Step4Create.tsx"
+    description: "PO creation progress and results"
+    props:
+      - "groups: POGroup[]"
+      - "result: BulkCreateResult | null"
+      - "isCreating: boolean"
+      - "onRetry: (failedIndexes: number[]) => void"
+      - "onClose: () => void"
+      - "onViewList: () => void"
+      - "onImportMore: () => void"
+    states:
+      - "creating: Progress bar with per-PO status"
+      - "complete_success: Success message with actions"
+      - "complete_partial: Success/failure breakdown with retry"
+    pattern: |
+      {isCreating ? (
+        <div className="text-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto" />
+          <p>Creating Purchase Orders...</p>
+          <Progress value={(createdCount / totalCount) * 100} />
+          <p>{createdCount} of {totalCount} POs</p>
+        </div>
+      ) : result?.failed_count === 0 ? (
+        <div className="text-center space-y-4">
+          <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
+          <p className="text-xl font-semibold">Import Completed Successfully!</p>
+          <p>{result.created_count} Purchase Orders created ({result.total_lines} line items)</p>
+          <div className="flex justify-center gap-2">
+            <Button onClick={submitAll}>Submit All POs</Button>
+            <Button variant="outline" onClick={onViewList}>View PO List</Button>
+            <Button variant="outline" onClick={onImportMore}>Import More</Button>
+          </div>
+        </div>
+      ) : (
+        <PartialFailureView result={result} onRetry={onRetry} />
+      )}
+
+  # Partial Failure View
+  - path: "apps/frontend/components/planning/purchase-orders/bulk-import/PartialFailureView.tsx"
+    description: "Display when some POs failed to create"
+    props:
+      - "result: BulkCreateResult"
+      - "onRetry: (failedIndexes: number[]) => void"
+      - "onEditGroup: (index: number) => void"
+
+  # Wizard Stepper
+  - path: "apps/frontend/components/planning/purchase-orders/bulk-import/ImportWizardStepper.tsx"
+    description: "4-step progress stepper"
+    props:
+      - "currentStep: 1 | 2 | 3 | 4"
+      - "steps: StepInfo[]"
+    steps:
+      - { number: 1, name: "Upload", description: "Upload Excel file" }
+      - { number: 2, name: "Preview", description: "Review parsed data" }
+      - { number: 3, name: "Validate", description: "Fix errors, review warnings" }
+      - { number: 4, name: "Create", description: "Create purchase orders" }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-bulk-po-import.ts"
+    description: "React Query hook for bulk PO import operations"
+    exports:
+      - name: "useBulkPOImport"
+        returns: |
+          {
+            parseFile: (file: File) => Promise<ParsedImportResult>,
+            validateGroups: (groups: POGroup[]) => Promise<ValidationResult>,
+            createPOs: (groups: POGroup[]) => Promise<BulkCreateResult>,
+            submitPOs: (poIds: string[]) => Promise<BulkSubmitResult>,
+            isParsing: boolean,
+            isValidating: boolean,
+            isCreating: boolean,
+            isSubmitting: boolean,
+            error: Error | null
+          }
+
+  - path: "apps/frontend/lib/hooks/use-excel-parser.ts"
+    description: "Hook for client-side Excel parsing"
+    exports:
+      - name: "useExcelParser"
+        returns: |
+          {
+            parseFile: (file: File) => Promise<ImportRow[]>,
+            isParsing: boolean,
+            error: string | null
+          }
+
+# UX References
+ux:
+  wireframes:
+    - id: "PLAN-007"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-007-po-bulk-import.md"
+      components:
+        - "BulkPOImportModal"
+        - "Step1Upload"
+        - "Step2Preview"
+        - "Step3Validate"
+        - "Step4Create"
+        - "EditGroupModal"
+        - "ValidationIssueCard"
+        - "PartialFailureView"
+
+  patterns:
+    modal: "ShadCN Dialog with max-w-4xl"
+    stepper: "Horizontal stepper with numbered circles"
+    file_upload: "Drag-drop zone with react-dropzone"
+    table: "ShadCN DataTable pattern"
+    progress: "ShadCN Progress with percentage"
+    alerts: "ShadCN Alert for errors/warnings"
+
+  states:
+    - "step1_empty: Upload zone visible"
+    - "step1_uploading: Progress indicator"
+    - "step1_parse_error: Error message with retry"
+    - "step2_preview: Grouped PO cards"
+    - "step3_validating: Loading spinner"
+    - "step3_has_errors: Error list, Next disabled"
+    - "step3_warnings_only: Warning list, Next enabled"
+    - "step3_all_valid: Success message"
+    - "step4_creating: Progress bar"
+    - "step4_complete: Success with actions"
+    - "step4_partial_failure: Error breakdown with retry"
+
+  responsive:
+    desktop: ">1024px - Modal max-width 900px, table layout"
+    tablet: "768-1024px - Full width, condensed tables"
+    mobile: "<768px - Full-screen, card layout, stacked buttons"
+
+# Validation (Zod schemas)
+validation:
+  - path: "apps/frontend/lib/validation/bulk-po-import.ts"
+    schemas:
+      - name: "importRowSchema"
+        content: |
+          z.object({
+            product_code: z.string().min(1, 'Product code is required'),
+            quantity: z.number().positive('Quantity must be greater than 0'),
+            unit_price: z.number().min(0, 'Price cannot be negative').optional().nullable(),
+            supplier_code: z.string().optional().nullable(),
+            expected_date: z.string().date().optional().nullable().refine(
+              (date) => !date || new Date(date) >= new Date(),
+              'Expected date must be in the future'
+            ),
+            notes: z.string().max(500, 'Notes too long').optional().nullable(),
+          })
+
+      - name: "poGroupSchema"
+        content: |
+          z.object({
+            supplier_id: z.string().uuid(),
+            warehouse_id: z.string().uuid(),
+            expected_delivery_date: z.string().date(),
+            currency: z.enum(['PLN', 'EUR', 'USD', 'GBP']),
+            tax_code_id: z.string().uuid().optional().nullable(),
+            payment_terms: z.string().max(50).optional().nullable(),
+            notes: z.string().max(2000).optional().nullable(),
+            lines: z.array(poGroupLineSchema).min(1, 'At least one line required'),
+          })
+
+      - name: "poGroupLineSchema"
+        content: |
+          z.object({
+            product_id: z.string().uuid(),
+            quantity: z.number().positive(),
+            unit_price: z.number().min(0),
+            uom: z.string(),
+            tax_code_id: z.string().uuid().optional().nullable(),
+            notes: z.string().max(500).optional().nullable(),
+          })
+
+# Dependencies (npm packages)
+dependencies:
+  - name: "xlsx"
+    version: "^0.18.5"
+    usage: "Client-side Excel parsing"
+
+  - name: "react-dropzone"
+    version: "^14.2.3"
+    usage: "File drag-and-drop"
+
+  - name: "@tanstack/react-query"
+    version: "^5.0.0"
+    usage: "Data fetching and caching"
+
+# Performance targets
+performance:
+  file_upload: "<2s for 5MB file"
+  file_parse: "<3s for 1000 rows"
+  validation: "<5s for 1000 rows"
+  po_creation: "<10s for 50 POs"
+  edit_modal_open: "<200ms"
+
+# Accessibility
+accessibility:
+  touch_targets: "48dp minimum for all buttons"
+  contrast: "4.5:1 minimum for text"
+  keyboard:
+    - "Tab: Navigate between steps, fields, buttons"
+    - "Enter: Activate buttons, submit forms"
+    - "Escape: Close modal"
+    - "Arrow keys: Navigate validation issues"
+  screen_reader:
+    - "Steps announced: 'Step 2 of 4: Preview Data'"
+    - "File upload: 'File upload zone, drag and drop or click to browse'"
+    - "Validation: '2 issues found, 1 error, 1 warning'"
+    - "Progress: 'Creating purchase orders, 67 percent complete'"

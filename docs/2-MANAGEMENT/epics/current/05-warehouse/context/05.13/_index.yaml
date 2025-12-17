@@ -1,0 +1,84 @@
+# Story 05.13 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.13"
+  name: "Over-Receipt Control"
+  slug: "over-receipt-control"
+  epic: "05-warehouse"
+  phase: "1"
+  complexity: "S"
+  estimate_days: 2
+  type: "backend"
+  state: "ready"
+  model: "SONNET"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, columns, constraints
+  - api.yaml         # Endpoints, service methods
+  - frontend.yaml    # Types, minimal UI integration
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.11"
+      name: "GRN from PO"
+      provides: ["grns table", "grn_items table", "GRNService"]
+      type: "HARD"
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings.allow_over_receipt", "warehouse_settings.over_receipt_tolerance_pct"]
+      type: "HARD"
+  blocked_by:
+    - story: "05.11"
+      reason: "Extends GRN validation logic"
+  blocks:
+    - story: "05.17"
+      name: "Scanner Receive"
+      reason: "Uses same over-receipt validation logic"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-029"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections: ["grns", "grn_items", "warehouse_settings"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.13.over-receipt-control.md"
+  related_stories:
+    - path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.11.grn-from-po.md"
+      relevance: "GRN infrastructure and existing validation"
+    - path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.0.warehouse-settings.md"
+      relevance: "Over-receipt settings fields"
+
+# High-level deliverables
+deliverables:
+  - type: "service"
+    count: 2
+    description: "GRNService.validateOverReceipt(), GRNService.calculateOverReceiptPercentage()"
+  - type: "api-enhancement"
+    count: 1
+    description: "Enhanced POST /api/warehouse/grns/from-po/:poId with over-receipt validation"
+  - type: "validation"
+    count: 1
+    description: "Over-receipt validation rules in grn-validation.ts"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + edge case tests"
+
+# Technical notes
+technical_notes:
+  - "This story ENHANCES existing 05.11 GRN validation - does NOT create new endpoints"
+  - "Over-receipt validation is backend-only; UI warnings handled by 05.11 wizard"
+  - "grn_items.over_receipt_flag and over_receipt_percentage columns already exist from 05.11"
+  - "Read warehouse_settings for allow_over_receipt and over_receipt_tolerance_pct"
+  - "Under-receipt is ALWAYS allowed regardless of settings"
+  - "Cumulative calculation: total_received = previous_received + current_receiving"
+  - "Zero tolerance (0%) means exact quantity only when allow_over_receipt=true"
+  - "Atomic validation: ALL lines must pass before ANY line is committed"

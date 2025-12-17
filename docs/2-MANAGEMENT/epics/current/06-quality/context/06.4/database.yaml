@@ -1,0 +1,165 @@
+# Story 06.4 - Database Schema
+# Purpose: Tables, RLS policies, indexes, functions
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_quality_spec_parameters.sql"
+    type: "migration"
+    description: "Parameters table with 4 types, RLS, functions, trigger"
+
+tables:
+  - name: "quality_spec_parameters"
+    description: "Test parameters for quality specifications"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "spec_id", type: "UUID", constraints: "NOT NULL REFERENCES quality_specifications(id) ON DELETE CASCADE" }
+      - { name: "sequence", type: "INTEGER", constraints: "NOT NULL" }
+      - { name: "parameter_name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "parameter_type", type: "TEXT", constraints: "NOT NULL CHECK (parameter_type IN ('numeric', 'text', 'boolean', 'range'))" }
+      - { name: "target_value", type: "TEXT", constraints: "" }
+      - { name: "min_value", type: "DECIMAL(15,6)", constraints: "" }
+      - { name: "max_value", type: "DECIMAL(15,6)", constraints: "" }
+      - { name: "unit", type: "TEXT", constraints: "" }
+      - { name: "test_method", type: "TEXT", constraints: "" }
+      - { name: "instrument_required", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "instrument_id", type: "UUID", constraints: "REFERENCES machines(id)" }
+      - { name: "is_critical", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "acceptance_criteria", type: "TEXT", constraints: "" }
+      - { name: "sampling_instructions", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "spec_id IN (SELECT id FROM quality_specifications WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    indexes:
+      - "idx_spec_parameters_spec ON quality_spec_parameters(spec_id)"
+      - "idx_spec_parameters_sequence ON quality_spec_parameters(spec_id, sequence)"
+      - "idx_spec_parameters_critical ON quality_spec_parameters(spec_id, is_critical) WHERE is_critical = true"
+    constraints:
+      - "UNIQUE(spec_id, sequence)"
+      - "CHECK (parameter_type NOT IN ('numeric', 'range') OR (min_value IS NOT NULL OR max_value IS NOT NULL))"
+
+# RLS Policies (via spec_id FK lookup)
+rls_policies:
+  pattern: "Specification FK Lookup"
+  pattern_sql: "spec_id IN (SELECT id FROM quality_specifications WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+  rationale:
+    - "Parameters inherit org isolation from parent specification"
+    - "No org_id column needed - FK to quality_specifications provides isolation"
+    - "Delete RLS restricts to draft specs only"
+
+  policies:
+    - table: "quality_spec_parameters"
+      name: "quality_spec_parameters_select"
+      operation: "SELECT"
+      using: "spec_id IN (SELECT id FROM quality_specifications WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+
+    - table: "quality_spec_parameters"
+      name: "quality_spec_parameters_insert"
+      operation: "INSERT"
+      with_check: "spec_id IN (SELECT id FROM quality_specifications WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+
+    - table: "quality_spec_parameters"
+      name: "quality_spec_parameters_update"
+      operation: "UPDATE"
+      using: "spec_id IN (SELECT id FROM quality_specifications WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+
+    - table: "quality_spec_parameters"
+      name: "quality_spec_parameters_delete"
+      operation: "DELETE"
+      using: "spec_id IN (SELECT id FROM quality_specifications WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()) AND status = 'draft')"
+
+# Database Functions
+functions:
+  - name: "reorder_spec_parameters"
+    description: "Reorder parameters by updating sequence values"
+    params:
+      - { name: "p_spec_id", type: "UUID" }
+      - { name: "p_parameter_ids", type: "UUID[]" }
+    returns: "void"
+    security: "DEFINER"
+    body: |
+      DECLARE
+        v_id UUID;
+        v_seq INTEGER := 1;
+      BEGIN
+        FOREACH v_id IN ARRAY p_parameter_ids LOOP
+          UPDATE quality_spec_parameters
+          SET sequence = v_seq, updated_at = now()
+          WHERE id = v_id AND spec_id = p_spec_id;
+          v_seq := v_seq + 1;
+        END LOOP;
+      END;
+
+  - name: "get_next_parameter_sequence"
+    description: "Get next available sequence number for a specification"
+    params:
+      - { name: "p_spec_id", type: "UUID" }
+    returns: "INTEGER"
+    security: "DEFINER"
+    body: |
+      DECLARE
+        v_max_seq INTEGER;
+      BEGIN
+        SELECT COALESCE(MAX(sequence), 0) INTO v_max_seq
+        FROM quality_spec_parameters
+        WHERE spec_id = p_spec_id;
+        RETURN v_max_seq + 1;
+      END;
+
+  - name: "check_spec_draft_status"
+    description: "Trigger function to enforce draft-only modifications"
+    returns: "TRIGGER"
+    body: |
+      DECLARE
+        v_status TEXT;
+      BEGIN
+        SELECT status INTO v_status
+        FROM quality_specifications
+        WHERE id = NEW.spec_id;
+        IF v_status != 'draft' THEN
+          RAISE EXCEPTION 'Cannot modify parameters on non-draft specifications';
+        END IF;
+        RETURN NEW;
+      END;
+
+# Triggers
+triggers:
+  - name: "enforce_draft_spec_for_parameters"
+    table: "quality_spec_parameters"
+    timing: "BEFORE INSERT OR UPDATE"
+    for_each: "ROW"
+    function: "check_spec_draft_status()"
+
+  - name: "update_quality_spec_parameters_updated_at"
+    table: "quality_spec_parameters"
+    timing: "BEFORE UPDATE"
+    for_each: "ROW"
+    function: "update_updated_at_column()"
+
+# Parameter Type Definitions
+parameter_types:
+  - type: "numeric"
+    description: "Single numeric value with min/max bounds"
+    required_fields: ["min_value OR max_value"]
+    optional_fields: ["target_value", "unit"]
+    validation: "min_value <= measured <= max_value"
+
+  - type: "text"
+    description: "Free text value with acceptance criteria"
+    required_fields: []
+    optional_fields: ["target_value", "acceptance_criteria"]
+    validation: "Manual evaluation by inspector"
+
+  - type: "boolean"
+    description: "Yes/No value with expected target"
+    required_fields: []
+    optional_fields: ["target_value (Yes/No)"]
+    validation: "measured == target_value"
+
+  - type: "range"
+    description: "Numeric value requiring both min and max"
+    required_fields: ["min_value", "max_value"]
+    optional_fields: ["target_value", "unit"]
+    validation: "min_value <= measured <= max_value"

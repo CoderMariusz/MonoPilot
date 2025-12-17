@@ -1,0 +1,90 @@
+# Story 06.1 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "06.1"
+  name: "Quality Status Types"
+  slug: "quality-status-types"
+  epic: "06-quality"
+  phase: "1A"
+  complexity: "S"
+  estimate_days: 1
+  type: "backend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "roles", "RLS patterns"]
+    - story: "05.1"
+      name: "License Plates CRUD"
+      provides: ["license_plates table", "LP service"]
+    - story: "05.7"
+      name: "LP QA Status Management"
+      provides: ["LP qa_status workflow"]
+  blocked_by: []
+  blocks:
+    - story: "06.2"
+      name: "Quality Holds Management"
+    - story: "06.3"
+      name: "Product Specifications"
+    - story: "06.5"
+      name: "Incoming Inspection"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/quality.md"
+    sections: ["FR-QA-001", "Section 11. Quality Status Types"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/quality.md"
+    sections: ["Database Schema", "API Design", "Security"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/06-quality/06.1.quality-status-types.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/QA-001-dashboard.md"
+      relevance: "Status badge display, dashboard KPIs"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for quality_status_history"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "quality_status_type enum, quality_status_transitions, quality_status_history tables"
+  - type: "service"
+    count: 1
+    description: "quality-status-service.ts"
+  - type: "api"
+    count: 5
+    description: "Status types, transitions, validation, change, history endpoints"
+  - type: "component"
+    count: 2
+    description: "StatusBadge, StatusTransitionModal"
+  - type: "validation"
+    count: 1
+    description: "quality-status-validation.ts"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + e2e tests"
+
+# Technical notes
+technical_notes:
+  - "First story in Epic 06 Phase 1A - foundational for all quality features"
+  - "Use PostgreSQL ENUM type for 7 QA statuses"
+  - "Status transitions table is system-wide (no org_id), RLS = read-only for authenticated"
+  - "Status history table has org_id, uses ADR-013 RLS pattern"
+  - "Integrate with license_plates.qa_status column from Epic 05"
+  - "Return 501 Not Implemented for Phase 1B+ features (custom statuses)"

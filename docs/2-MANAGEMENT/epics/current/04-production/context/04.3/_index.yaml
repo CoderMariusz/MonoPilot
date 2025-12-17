@@ -1,0 +1,142 @@
+# Story 04.3 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "04.3"
+  name: "Operation Start/Complete"
+  slug: "operation-start-complete"
+  epic: "04-production"
+  phase: "0"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+  priority: "P0"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, triggers, indexes
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, services, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id context", "RLS patterns"]
+    - story: "03.10"
+      name: "WO CRUD"
+      provides: ["work_orders table"]
+    - story: "03.12"
+      name: "WO Operations"
+      provides: ["wo_operations table", "status field"]
+    - story: "04.2a"
+      name: "WO Start"
+      provides: ["WO in_progress status prerequisite"]
+  soft:
+    - story: "01.10"
+      name: "Machines CRUD"
+      provides: ["Machine assignment validation"]
+    - story: "01.11"
+      name: "Production Lines CRUD"
+      provides: ["Line assignment validation"]
+    - story: "04.5"
+      name: "Production Settings"
+      provides: ["require_operation_sequence setting"]
+  blocked_by: []
+  blocks:
+    - story: "04.2c"
+      name: "WO Complete"
+      reason: "Cannot complete WO until all operations completed"
+    - story: "04.4"
+      name: "Yield Tracking"
+      reason: "Uses operation yield data"
+    - story: "04.9a"
+      name: "OEE Calculation"
+      reason: "Uses operation timestamps and durations"
+    - story: "04.10c"
+      name: "Yield Analysis Report"
+      reason: "Aggregates operation yields"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/production.md"
+    sections: ["FR-PROD-004"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/production.md"
+    sections: ["Database Schema", "API Design", "Operation Endpoints"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/04.3.operation-start-complete.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-002-wo-execution-detail.md"
+      sections: ["Operations Timeline", "Complete Operation Modal"]
+      relevance: "Operations timeline UI, start/complete buttons"
+  phase_breakdown:
+    path: "docs/2-MANAGEMENT/epics/current/04-production/PHASE-BREAKDOWN.md"
+    sections: ["Phase 0", "04.3"]
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for operation_logs table"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 2
+    description: "operation_logs table + RLS + trigger for auto-logging"
+  - type: "api"
+    count: 3
+    description: "POST /operations/:id/start, POST /operations/:id/complete, GET /operations/:id/logs"
+  - type: "service"
+    count: 1
+    description: "operation-service.ts with start/complete/validate/logs methods"
+  - type: "validation"
+    count: 1
+    description: "operation-execution.ts Zod schemas"
+  - type: "component"
+    count: 10
+    description: "OperationsTimeline, OperationCard, CompleteOperationModal, etc."
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Phase 0 scope: Operation tracking WITHOUT LP consumption/output"
+  - "Status transitions: pending -> in_progress -> completed (or skipped)"
+  - "WO must be 'in_progress' status before any operation can start"
+  - "Sequence enforcement: Optional based on require_operation_sequence setting"
+  - "Duration auto-calculated: completed_at - started_at in minutes"
+  - "Yield required on complete (0-100% range)"
+  - "operation_logs auto-created via database trigger on status change"
+  - "Cross-tenant access returns 404 (not 403) per ADR-013"
+  - "Skipped operations don't block sequence (completed or skipped allows next)"
+
+# LP Dependency Status
+lp_dependency:
+  required: false
+  rationale: "This story only updates wo_operations table fields. No License Plate transactions involved."
+
+# Scope clarifications
+scope:
+  in_scope:
+    - "Start operation: pending -> in_progress"
+    - "Complete operation: in_progress -> completed"
+    - "Timestamp tracking (started_at, completed_at, started_by, completed_by)"
+    - "Duration calculation (actual_duration_minutes)"
+    - "Yield capture on complete (actual_yield_percent)"
+    - "Sequence enforcement (if setting enabled)"
+    - "operation_logs audit trail"
+    - "UI: Operation cards with Start/Complete buttons"
+    - "UI: Timeline view showing operation progress"
+  out_of_scope:
+    - "Material consumption per operation (Phase 2)"
+    - "Operation skip/reset actions (Story 04.3b Phase 1)"
+    - "Labor cost tracking per operation (Epic 09)"
+    - "Quality checks per operation (Epic 06)"
+    - "Operation pause/resume (Phase 2)"
+    - "Multiple operators per operation (Phase 2)"

@@ -1,0 +1,247 @@
+# Story 02.6 - Database Schema
+# Purpose: Tables, RLS policies, constraints, indexes
+# Agent: BACKEND-DEV (database focus)
+
+# Note: bom_alternatives table exists in PRD schema
+# This story uses existing table, may add constraints
+
+migrations:
+  - path: "supabase/migrations/XXX_add_bom_alternatives_constraints.sql"
+    type: "migration"
+    description: "Add preference_order constraint and unique constraint to bom_alternatives"
+    required: true
+    content: |
+      -- Add constraint: preference_order must be >= 2 (1 is reserved for primary)
+      ALTER TABLE bom_alternatives
+      ADD CONSTRAINT bom_alt_preference_order_check
+      CHECK (preference_order >= 2);
+
+      -- Add constraint: unique alternative per item (no duplicate alternatives)
+      ALTER TABLE bom_alternatives
+      ADD CONSTRAINT bom_alt_unique_per_item
+      UNIQUE (bom_item_id, alternative_product_id);
+
+      -- Add index for faster lookups
+      CREATE INDEX IF NOT EXISTS idx_bom_alternatives_bom_item_id
+      ON bom_alternatives(bom_item_id);
+
+      CREATE INDEX IF NOT EXISTS idx_bom_alternatives_preference
+      ON bom_alternatives(bom_item_id, preference_order);
+
+tables:
+  - name: "bom_alternatives"
+    description: "Alternative ingredients for BOM items with preference ordering"
+    exists: true  # Table exists per PRD schema
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "bom_item_id", type: "UUID", constraints: "NOT NULL REFERENCES bom_items(id) ON DELETE CASCADE" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "alternative_product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "quantity", type: "DECIMAL(15,6)", constraints: "NOT NULL CHECK (quantity > 0)" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "preference_order", type: "INTEGER", constraints: "NOT NULL DEFAULT 2 CHECK (preference_order >= 2)" }
+      - { name: "notes", type: "TEXT", constraints: "MAX 500 chars" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_bom_alternatives_bom_item_id ON bom_alternatives(bom_item_id)"
+      - "idx_bom_alternatives_preference ON bom_alternatives(bom_item_id, preference_order)"
+      - "idx_bom_alternatives_org_id ON bom_alternatives(org_id)"
+    constraints:
+      - "UNIQUE(bom_item_id, alternative_product_id)"
+      - "CHECK(preference_order >= 2)"
+      - "CHECK(quantity > 0)"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "bom_alternatives"
+      name: "bom_alternatives_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "bom_alternatives"
+      name: "bom_alternatives_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "bom_alternatives"
+      name: "bom_alternatives_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "bom_alternatives"
+      name: "bom_alternatives_delete"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Clone Operation SQL
+clone_operation:
+  description: "Clone BOM with all items in a transaction"
+  sql: |
+    -- Clone BOM header + items in transaction
+    BEGIN;
+
+    -- 1. Create new BOM header
+    INSERT INTO boms (
+      org_id, product_id, version, status, routing_id,
+      effective_from, effective_to, output_qty, output_uom,
+      units_per_box, boxes_per_pallet, notes, created_by
+    )
+    SELECT
+      org_id,
+      :target_product_id,
+      (SELECT COALESCE(MAX(version), 0) + 1
+       FROM boms
+       WHERE product_id = :target_product_id
+       AND org_id = :org_id),
+      'draft',  -- Always draft for cloned BOM
+      routing_id,
+      :effective_from,  -- User-specified or today
+      :effective_to,
+      output_qty,
+      output_uom,
+      units_per_box,
+      boxes_per_pallet,
+      CASE
+        WHEN :notes IS NOT NULL THEN :notes
+        ELSE CONCAT('Cloned from BOM-', id::text)
+      END,
+      :user_id
+    FROM boms
+    WHERE id = :source_bom_id
+    RETURNING id AS new_bom_id;
+
+    -- 2. Clone BOM items (MVP: basic items only, no alternatives/byproducts)
+    INSERT INTO bom_items (
+      bom_id, product_id, quantity, uom, sequence,
+      operation_seq, scrap_percent, consume_whole_lp, notes
+    )
+    SELECT
+      :new_bom_id,
+      product_id,
+      quantity,
+      uom,
+      sequence,
+      operation_seq,
+      scrap_percent,
+      consume_whole_lp,
+      notes
+    FROM bom_items
+    WHERE bom_id = :source_bom_id
+      AND is_by_product = false;  -- MVP: skip byproducts
+
+    COMMIT;
+
+# Validation Functions
+validation_functions:
+  - name: "validate_alternative_same_type"
+    description: "Ensure alternative product has same type as primary"
+    logic: |
+      -- Check product types match
+      SELECT
+        CASE
+          WHEN p_primary.product_type_id = p_alt.product_type_id THEN true
+          ELSE false
+        END AS is_valid
+      FROM bom_items bi
+      JOIN products p_primary ON bi.product_id = p_primary.id
+      CROSS JOIN products p_alt
+      WHERE bi.id = :bom_item_id
+        AND p_alt.id = :alternative_product_id
+
+  - name: "validate_not_same_as_primary"
+    description: "Ensure alternative is not same product as primary"
+    logic: |
+      SELECT
+        CASE
+          WHEN bi.product_id = :alternative_product_id THEN false
+          ELSE true
+        END AS is_valid
+      FROM bom_items bi
+      WHERE bi.id = :bom_item_id
+
+  - name: "validate_not_bom_product"
+    description: "Ensure alternative is not the BOM output product (circular reference)"
+    logic: |
+      SELECT
+        CASE
+          WHEN b.product_id = :alternative_product_id THEN false
+          ELSE true
+        END AS is_valid
+      FROM bom_items bi
+      JOIN boms b ON bi.bom_id = b.id
+      WHERE bi.id = :bom_item_id
+
+  - name: "get_next_version"
+    description: "Get next available version for a product"
+    logic: |
+      SELECT COALESCE(MAX(version), 0) + 1 AS next_version
+      FROM boms
+      WHERE product_id = :product_id
+        AND org_id = :org_id
+
+# Data Relationships
+relationships:
+  - from: "bom_alternatives"
+    to: "bom_items"
+    type: "many-to-one"
+    fk: "bom_item_id"
+    description: "Each alternative belongs to one BOM item"
+
+  - from: "bom_alternatives"
+    to: "products"
+    type: "many-to-one"
+    fk: "alternative_product_id"
+    description: "Each alternative references a product"
+
+  - from: "bom_alternatives"
+    to: "organizations"
+    type: "many-to-one"
+    fk: "org_id"
+    description: "Each alternative belongs to one organization"
+
+# Performance Indexes
+indexes:
+  - name: "idx_bom_alternatives_bom_item_id"
+    table: "bom_alternatives"
+    columns: ["bom_item_id"]
+    purpose: "Fast lookup of alternatives for an item"
+
+  - name: "idx_bom_alternatives_preference"
+    table: "bom_alternatives"
+    columns: ["bom_item_id", "preference_order"]
+    purpose: "Ordered retrieval of alternatives by preference"
+
+  - name: "idx_bom_alternatives_org_id"
+    table: "bom_alternatives"
+    columns: ["org_id"]
+    purpose: "RLS policy performance"
+
+# ERD Snippet
+erd: |
+  +------------------+     +------------------+     +------------------+
+  |      boms        |     |    bom_items     |     | bom_alternatives |
+  +------------------+     +------------------+     +------------------+
+  | id (PK)          |<---1| id (PK)          |<---N| id (PK)          |
+  | org_id (FK)      |     | bom_id (FK)      |     | bom_item_id (FK) |
+  | product_id (FK)  |     | product_id (FK)  |     | org_id (FK)      |
+  | version          |     | quantity         |     | alt_product_id   |
+  | status           |     | uom              |     | quantity         |
+  | routing_id (FK)  |     | sequence         |     | uom              |
+  | effective_from   |     | operation_seq    |     | preference_order |
+  | effective_to     |     | scrap_percent    |     | notes            |
+  +------------------+     | notes            |     | created_at       |
+                           +------------------+     +------------------+
+                                  |
+                                  v
+                           +------------------+
+                           |    products      |
+                           +------------------+
+                           | id (PK)          |
+                           | code             |
+                           | name             |
+                           | product_type_id  |
+                           | base_uom         |
+                           +------------------+

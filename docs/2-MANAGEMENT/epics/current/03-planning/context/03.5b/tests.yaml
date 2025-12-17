@@ -1,0 +1,461 @@
+# Story 03.5b - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/purchase-order-service.approval.test.ts"
+    type: "unit"
+    description: "Unit tests for approval workflow methods"
+
+  - path: "apps/frontend/lib/services/__tests__/notification-service.test.ts"
+    type: "unit"
+    description: "Unit tests for approval notification service"
+
+  - path: "apps/frontend/__tests__/api/planning/purchase-orders/approval.test.ts"
+    type: "integration"
+    description: "Integration tests for approval API endpoints"
+
+  - path: "apps/frontend/__tests__/e2e/planning/po-approval-workflow.spec.ts"
+    type: "e2e"
+    description: "E2E tests for full approval workflow"
+
+  - path: "supabase/tests/po-approval-history-rls.test.sql"
+    type: "integration"
+    description: "RLS tests for po_approval_history table"
+
+# Acceptance Criteria
+acceptance_criteria:
+  - id: "AC-01"
+    name: "Submit PO below threshold"
+    given: "Approval enabled with threshold $10,000 AND PO total is $5,000 AND PO status is 'draft'"
+    when: "Planner clicks 'Submit PO'"
+    then: "PO status changes to 'submitted' (skips approval) AND no approval notification is sent"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    name: "Submit PO above threshold"
+    given: "Approval enabled with threshold $10,000 AND PO total is $15,000 AND PO status is 'draft' AND approval roles are ['admin', 'manager']"
+    when: "Planner clicks 'Submit for Approval'"
+    then: "PO status changes to 'pending_approval' AND email notification sent to all approvers AND approval history record created with action 'submitted'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "Submit PO when approval disabled"
+    given: "Approval is disabled in settings AND PO total is $15,000 AND PO status is 'draft'"
+    when: "Planner clicks 'Submit PO'"
+    then: "PO status changes to 'submitted' AND no approval notification is sent"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    name: "Cannot submit PO without lines"
+    given: "PO has no lines added"
+    when: "Planner clicks 'Submit for Approval'"
+    then: "Error message displays: 'Cannot submit PO: Purchase order must have at least one line item' AND PO status remains 'draft'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    name: "Manager approves PO successfully"
+    given: "PO status is 'pending_approval' AND current user has role 'manager'"
+    when: "Manager enters approval notes and clicks 'Approve'"
+    then: "PO status changes to 'approved' AND approval_status set to 'approved' AND approval history record created AND email notification sent to PO creator"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    name: "Non-approver cannot approve PO"
+    given: "PO status is 'pending_approval' AND current user has role 'planner' (not in approval roles)"
+    when: "User attempts to approve"
+    then: "Error message displays: 'Access denied: You do not have permission to approve purchase orders' AND PO status remains unchanged"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-07"
+    name: "Manager rejects PO with reason"
+    given: "PO status is 'pending_approval' AND current user has role 'admin'"
+    when: "Admin enters rejection reason and clicks 'Reject'"
+    then: "PO status changes to 'rejected' AND approval history record created AND email notification sent to PO creator"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    name: "Rejection reason is required"
+    given: "PO status is 'pending_approval' AND manager opens approval modal"
+    when: "Manager leaves rejection reason empty AND clicks 'Reject'"
+    then: "Error message displays: 'Rejection reason is required' AND form submission is blocked"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-09"
+    name: "Rejection reason minimum length"
+    given: "Manager enters rejection reason with less than 10 characters"
+    when: "Manager clicks 'Reject'"
+    then: "Error message displays: 'Rejection reason must be at least 10 characters'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-10"
+    name: "Approval history displays correctly"
+    given: "PO has been submitted, rejected, resubmitted, and approved"
+    when: "Planner views PO detail page"
+    then: "Approval history panel displays entries in descending order with timestamp, user name, role, action, and notes"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-11"
+    name: "State machine - valid transitions"
+    given: "Approval is enabled"
+    when: "Status transition is attempted"
+    then: "Only valid transitions are allowed: draft->pending_approval, pending_approval->approved/rejected, rejected->draft, approved->confirmed"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-12"
+    name: "Cross-tenant access blocked"
+    given: "User from Org A"
+    when: "User attempts to approve PO from Org B"
+    then: "404 Not Found returned (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  purchase_order_service:
+    - name: "submitPO - submits directly if approval disabled"
+      setup: "Mock planning_settings with po_require_approval=false"
+      expected: "PO status changes to 'submitted', no notification sent"
+
+    - name: "submitPO - submits directly if total below threshold"
+      setup: "Mock planning_settings with threshold=10000, PO total=5000"
+      expected: "PO status changes to 'submitted', no notification sent"
+
+    - name: "submitPO - requires approval if total >= threshold"
+      setup: "Mock planning_settings with threshold=10000, PO total=15000"
+      expected: "PO status changes to 'pending_approval', notification queued"
+
+    - name: "submitPO - requires approval for all POs if threshold is null"
+      setup: "Mock planning_settings with threshold=null"
+      expected: "PO status changes to 'pending_approval'"
+
+    - name: "submitPO - throws error if PO not in draft status"
+      setup: "PO with status='submitted'"
+      expected: "Error: Cannot submit: PO must be in draft status"
+
+    - name: "submitPO - throws error if PO has no lines"
+      setup: "PO with empty lines array"
+      expected: "Error: Cannot submit PO without line items"
+
+    - name: "submitPO - creates approval history record on submission"
+      setup: "Valid PO in draft status"
+      expected: "History record created with action='submitted'"
+
+    - name: "approvePO - approves PO and updates status"
+      setup: "PO in 'pending_approval' status, user has approval role"
+      expected: "PO status changes to 'approved', approval fields populated"
+
+    - name: "approvePO - saves approval notes"
+      setup: "User provides approval notes"
+      expected: "Notes saved to approval_notes field"
+
+    - name: "approvePO - creates approval history record"
+      setup: "Valid approval action"
+      expected: "History record created with action='approved' and user details"
+
+    - name: "approvePO - throws error if user lacks permission"
+      setup: "User role not in po_approval_roles"
+      expected: "Error: Access denied"
+
+    - name: "approvePO - throws error if PO not in pending_approval status"
+      setup: "PO with status='draft'"
+      expected: "Error: Cannot approve: PO must be in pending approval status"
+
+    - name: "rejectPO - rejects PO and updates status"
+      setup: "PO in 'pending_approval' status, user has approval role"
+      expected: "PO status changes to 'rejected', rejection reason saved"
+
+    - name: "rejectPO - requires rejection reason"
+      setup: "No rejection reason provided"
+      expected: "Error: Rejection reason is required"
+
+    - name: "rejectPO - validates rejection reason minimum length"
+      setup: "Rejection reason with 5 characters"
+      expected: "Error: Rejection reason must be at least 10 characters"
+
+    - name: "rejectPO - throws error if user lacks permission"
+      setup: "User role not in po_approval_roles"
+      expected: "Error: Access denied"
+
+    - name: "validateStatusTransition - allows draft to pending_approval"
+      setup: "currentStatus='draft', nextStatus='pending_approval', approvalEnabled=true"
+      expected: "No error thrown"
+
+    - name: "validateStatusTransition - blocks draft to submitted when approval enabled"
+      setup: "currentStatus='draft', nextStatus='submitted', approvalEnabled=true"
+      expected: "Error: Approval is enabled. PO must go through pending_approval."
+
+    - name: "validateStatusTransition - blocks invalid transitions"
+      setup: "currentStatus='pending_approval', nextStatus='receiving'"
+      expected: "Error: Invalid status transition"
+
+    - name: "canUserApprove - returns true if user role in approval_roles"
+      setup: "User with role='admin', approval_roles=['admin','manager']"
+      expected: "Returns true"
+
+    - name: "canUserApprove - returns false if user role not in approval_roles"
+      setup: "User with role='planner', approval_roles=['admin','manager']"
+      expected: "Returns false"
+
+  notification_service:
+    - name: "notifyApprovers - sends email to all users with approval roles"
+      setup: "5 users with approval roles"
+      expected: "5 emails queued"
+
+    - name: "notifyApprovers - includes PO details and CTA links in email"
+      setup: "Valid PO submission"
+      expected: "Email contains PO number, total, supplier, action links"
+
+    - name: "notifyApprovers - handles SendGrid failures gracefully"
+      setup: "Mock SendGrid to fail"
+      expected: "Error logged but no exception thrown"
+
+    - name: "notifyPOCreator - sends approval notification"
+      setup: "PO approved"
+      expected: "Email sent to creator with approval details"
+
+    - name: "notifyPOCreator - sends rejection notification"
+      setup: "PO rejected"
+      expected: "Email sent to creator with rejection reason"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "POST /purchase-orders/:id/submit - submits PO below threshold"
+      request: "{ }"
+      setup: "PO with total below threshold"
+      expected: "200, status='submitted'"
+
+    - name: "POST /purchase-orders/:id/submit - submits PO to pending_approval"
+      request: "{ }"
+      setup: "PO with total above threshold"
+      expected: "200, status='pending_approval', notification_sent=true"
+
+    - name: "POST /purchase-orders/:id/submit - returns 400 if not draft"
+      request: "{ }"
+      setup: "PO with status='submitted'"
+      expected: "400, error='Cannot submit: PO must be in draft status'"
+
+    - name: "POST /purchase-orders/:id/submit - returns 400 if no lines"
+      request: "{ }"
+      setup: "PO with empty lines"
+      expected: "400, error='Cannot submit PO without line items'"
+
+    - name: "POST /purchase-orders/:id/approve - approves PO"
+      request: "{ notes: 'Approved by finance' }"
+      setup: "PO in pending_approval, user has approval role"
+      expected: "200, status='approved'"
+
+    - name: "POST /purchase-orders/:id/approve - returns 403 if not approver"
+      request: "{ }"
+      setup: "User role not in approval_roles"
+      expected: "403, error='Access denied'"
+
+    - name: "POST /purchase-orders/:id/approve - returns 400 if not pending"
+      request: "{ }"
+      setup: "PO with status='draft'"
+      expected: "400, error='Cannot approve: PO must be in pending approval status'"
+
+    - name: "POST /purchase-orders/:id/reject - rejects PO with reason"
+      request: "{ rejection_reason: 'Exceeds quarterly budget. Please reduce quantity.' }"
+      setup: "PO in pending_approval, user has approval role"
+      expected: "200, status='rejected'"
+
+    - name: "POST /purchase-orders/:id/reject - returns 400 if no reason"
+      request: "{ }"
+      setup: "Valid PO and user"
+      expected: "400, error='Rejection reason is required'"
+
+    - name: "POST /purchase-orders/:id/reject - returns 400 if reason too short"
+      request: "{ rejection_reason: 'No' }"
+      setup: "Valid PO and user"
+      expected: "400, error='Rejection reason must be at least 10 characters'"
+
+    - name: "GET /purchase-orders/:id/approval-history - returns history"
+      setup: "PO with 5 history entries"
+      expected: "200, history array sorted by created_at DESC"
+
+    - name: "GET /purchase-orders/:id/approval-history - returns empty array"
+      setup: "PO with no history"
+      expected: "200, history=[]"
+
+    - name: "Cross-tenant access returns 404"
+      setup: "User from Org A, PO from Org B"
+      expected: "404 for all endpoints"
+
+  rls_tests:
+    - name: "User can only read own org's approval history"
+      setup: "Two orgs with approval history"
+      expected: "User A sees only Org A history"
+
+    - name: "Approval history append-only - UPDATE blocked"
+      setup: "Existing history record"
+      action: "Attempt UPDATE"
+      expected: "RLS blocks update"
+
+    - name: "Approval history append-only - DELETE blocked"
+      setup: "Existing history record"
+      action: "Attempt DELETE"
+      expected: "RLS blocks delete"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Full approval workflow: submit -> approve -> confirm"
+    steps:
+      - "Create PO as planner with total above threshold"
+      - "Submit PO for approval"
+      - "Verify status changed to pending_approval"
+      - "Log in as manager"
+      - "Open approval modal"
+      - "Approve PO with notes"
+      - "Verify status changed to approved"
+      - "Log back in as planner"
+      - "Confirm PO"
+      - "Verify status changed to confirmed"
+    priority: "P0"
+
+  - name: "Rejection workflow: submit -> reject -> edit -> resubmit"
+    steps:
+      - "Create and submit PO as planner"
+      - "Log in as manager"
+      - "Reject PO with reason"
+      - "Log back in as planner"
+      - "Verify PO status is rejected (editable)"
+      - "Edit PO"
+      - "Resubmit for approval"
+      - "Verify new pending_approval status"
+    priority: "P0"
+
+  - name: "Below threshold: submit without approval"
+    steps:
+      - "Create PO with total below threshold"
+      - "Submit PO"
+      - "Verify status is submitted (not pending_approval)"
+    priority: "P1"
+
+  - name: "Permission denied: non-approver cannot approve"
+    steps:
+      - "PO in pending_approval status"
+      - "Log in as planner (not approver)"
+      - "Attempt to approve"
+      - "Verify error message displays"
+      - "Verify PO status unchanged"
+    priority: "P0"
+
+  - name: "Approval history displays correctly"
+    steps:
+      - "PO with multiple approval actions"
+      - "Open PO detail page"
+      - "Verify approval history timeline displays"
+      - "Verify entries sorted correctly"
+      - "Verify user names, roles, timestamps display"
+    priority: "P1"
+
+  - name: "Mobile responsive approval modal"
+    steps:
+      - "Open approval modal on mobile viewport"
+      - "Verify full-screen layout"
+      - "Verify all content accessible"
+      - "Complete approval action"
+    priority: "P2"
+
+# Definition of Done
+definition_of_done:
+  - "Database migration creates po_approval_history table with RLS"
+  - "All API endpoints implemented (submit, approve, reject, approval-history)"
+  - "Service layer methods pass all unit tests"
+  - "Zod validation schemas validate inputs correctly"
+  - "Notification service queues emails asynchronously"
+  - "POApprovalModal component renders approve/reject modes"
+  - "POApprovalHistory component displays timeline correctly"
+  - "POStatusBadge updated with approval state styling"
+  - "Role-based permission checks enforced in API and UI"
+  - "State machine validation blocks invalid transitions"
+  - "Cross-tenant access returns 404 (not 403)"
+  - "Unit tests >= 80% coverage for approval workflow"
+  - "Integration tests pass for all endpoints"
+  - "E2E smoke test passes for critical path"
+  - "Performance: approval action < 500ms (P95)"
+  - "Email notifications send without blocking API"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business-critical workflow code"
+    files:
+      - "purchase-order-service.ts (approval methods): 85%"
+      - "notification-service.ts: 80%"
+      - "purchase-order-validation.ts (approval schemas): 95%"
+  integration:
+    target: 80
+    reason: "API endpoints must be thoroughly tested"
+  e2e:
+    target: 100
+    reason: "Critical paths must have full coverage"
+    critical_paths:
+      - "Submit -> Approve flow"
+      - "Submit -> Reject flow"
+      - "Permission denied flow"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Concurrent approval race condition"
+    mitigation: "Use optimistic locking or check status before update"
+    severity: "medium"
+    test_coverage: "Integration test for concurrent approval"
+
+  - id: "RISK-02"
+    description: "Email notification failures blocking workflow"
+    mitigation: "Queue emails async, log failures, don't block API"
+    severity: "medium"
+    test_coverage: "Unit test for graceful SendGrid failure handling"
+
+  - id: "RISK-03"
+    description: "State machine bypass through direct database access"
+    mitigation: "All status changes through service layer, RLS on table"
+    severity: "high"
+    test_coverage: "Integration tests for invalid transitions"
+
+  - id: "RISK-04"
+    description: "Approval history data inconsistency"
+    mitigation: "Denormalize user name/role at write time, append-only"
+    severity: "low"
+    test_coverage: "Unit test for history record creation"
+
+# Performance Targets
+performance_targets:
+  - metric: "Submit PO API response time"
+    target: "< 300ms (P95)"
+    measurement: "Load testing with 50 concurrent requests"
+
+  - metric: "Approve/Reject PO API response time"
+    target: "< 500ms (P95)"
+    measurement: "Load testing with 20 concurrent requests"
+
+  - metric: "Approval history load time"
+    target: "< 200ms"
+    measurement: "Page load with 20 history entries"
+
+  - metric: "Email notification queuing"
+    target: "< 100ms"
+    measurement: "Time to queue (not send)"
+
+  - metric: "State machine validation"
+    target: "< 10ms"
+    measurement: "Unit test execution"

@@ -1,0 +1,167 @@
+# Story 03.6 - Database Schema
+# Purpose: Tables used, no new migrations needed
+# Agent: BACKEND-DEV (database focus)
+
+# No new migrations - uses existing tables from 03.3
+migrations: []
+
+# Tables USED (not created) by this story
+tables_used:
+  - name: "purchase_orders"
+    source_story: "03.3"
+    operations: ["INSERT", "SELECT", "UPDATE"]
+    description: "PO headers - bulk create writes here"
+    bulk_columns_used:
+      - "id"
+      - "org_id"
+      - "po_number"
+      - "supplier_id"
+      - "currency"
+      - "tax_code_id"
+      - "expected_delivery_date"
+      - "warehouse_id"
+      - "status"
+      - "payment_terms"
+      - "notes"
+      - "subtotal"
+      - "tax_amount"
+      - "total"
+      - "created_by"
+
+  - name: "purchase_order_lines"
+    source_story: "03.3"
+    operations: ["INSERT", "SELECT"]
+    description: "PO lines - bulk create writes here"
+    bulk_columns_used:
+      - "id"
+      - "po_id"
+      - "product_id"
+      - "quantity"
+      - "uom"
+      - "unit_price"
+      - "discount_percent"
+      - "line_total"
+      - "notes"
+
+  - name: "products"
+    source_story: "02.1"
+    operations: ["SELECT"]
+    description: "Product lookup by code for import validation"
+    lookup_columns:
+      - "id"
+      - "org_id"
+      - "code"
+      - "name"
+      - "base_uom"
+      - "std_price"
+
+  - name: "suppliers"
+    source_story: "03.1"
+    operations: ["SELECT"]
+    description: "Supplier defaults for auto-fill"
+    lookup_columns:
+      - "id"
+      - "org_id"
+      - "code"
+      - "name"
+      - "currency"
+      - "tax_code_id"
+      - "payment_terms"
+
+  - name: "supplier_products"
+    source_story: "03.2"
+    operations: ["SELECT"]
+    description: "Default supplier lookup and pricing"
+    lookup_columns:
+      - "supplier_id"
+      - "product_id"
+      - "is_default"
+      - "unit_price"
+      - "lead_time_days"
+
+  - name: "warehouses"
+    source_story: "01.8"
+    operations: ["SELECT"]
+    description: "Warehouse validation"
+    lookup_columns:
+      - "id"
+      - "org_id"
+      - "code"
+      - "name"
+      - "is_active"
+
+  - name: "tax_codes"
+    source_story: "01.13"
+    operations: ["SELECT"]
+    description: "Tax calculation"
+    lookup_columns:
+      - "id"
+      - "org_id"
+      - "code"
+      - "rate"
+
+# Batch processing strategy
+batch_processing:
+  strategy: "transaction_per_supplier_group"
+  description: |
+    Each supplier group (PO + its lines) is ONE database transaction.
+    If any line in group fails, entire PO group rolls back.
+    Other supplier groups proceed independently.
+    Partial success is allowed across supplier groups.
+
+  example_sql: |
+    -- Create POs in transaction per supplier group
+    BEGIN;
+      INSERT INTO purchase_orders (org_id, supplier_id, po_number, ...)
+        VALUES (...) RETURNING id;
+      INSERT INTO purchase_order_lines (po_id, product_id, quantity, ...)
+        SELECT ... FROM unnest($1::uuid[], $2::decimal[], ...);
+    COMMIT;
+
+  batch_size: 50
+  timeout_seconds: 60
+
+# Performance indexes (existing from 03.3, used by bulk ops)
+indexes_used:
+  - index: "idx_products_org_code"
+    table: "products"
+    columns: ["org_id", "code"]
+    purpose: "Product lookup by code during import"
+  - index: "idx_supplier_products_product_default"
+    table: "supplier_products"
+    columns: ["product_id", "is_default"]
+    purpose: "Default supplier lookup for auto-grouping"
+  - index: "idx_purchase_orders_org_status"
+    table: "purchase_orders"
+    columns: ["org_id", "status"]
+    purpose: "Bulk status update filtering"
+
+# RLS policies (existing from 03.3)
+rls_policies:
+  note: "All existing RLS policies from 03.3 apply"
+  pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+  bulk_considerations:
+    - "Bulk insert respects RLS - org_id auto-set from context"
+    - "Bulk status update only affects POs in user's org"
+    - "Export only returns POs in user's org"
+
+# Validation rules (applied before DB insert)
+validation_rules:
+  product_code:
+    rule: "Must exist in products table for user's org"
+    error: "Product not found: {code}"
+  quantity:
+    rule: "Positive number, max 999999.99"
+    error: "Quantity must be positive"
+  expected_delivery:
+    rule: "Optional, if provided must be valid ISO date"
+    error: "Invalid date format"
+  unit_price:
+    rule: "Optional, if provided must be non-negative"
+    error: "Unit price cannot be negative"
+  default_supplier:
+    rule: "Product must have default supplier in supplier_products"
+    error: "Product {code} has no default supplier assigned"
+  warehouse:
+    rule: "If provided, must exist and be active in user's org"
+    error: "Warehouse not found or inactive"

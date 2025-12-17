@@ -1,0 +1,581 @@
+# Story 02.14 - Frontend Specification
+# Purpose: Components, hooks, services, UI integration
+# Agent: FRONTEND-DEV
+
+# Story type
+is_frontend_focused: true
+
+# ==========================================================================
+# Components to Create
+# ==========================================================================
+components:
+  # --------------------------------------------------------------------------
+  # BOM Version Comparison Modal (FR-2.25)
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/technical/bom/BOMComparisonModal.tsx"
+    description: "Side-by-side BOM version comparison with diff highlighting"
+    props:
+      bomId1: "string - First BOM ID"
+      bomId2: "string - Second BOM ID"
+      isOpen: "boolean"
+      onClose: "() => void"
+    features:
+      - "Version selector dropdowns (switch versions)"
+      - "Side-by-side table layout"
+      - "Diff highlighting (green=added, red=removed, yellow=modified)"
+      - "Summary stats (total changes, weight difference)"
+      - "Export to CSV/PDF"
+    state:
+      - "selectedBomId1: string"
+      - "selectedBomId2: string"
+      - "comparison: BomComparisonResponse | null"
+      - "isLoading: boolean"
+      - "error: string | null"
+    ui_elements:
+      header:
+        - "Title: 'Compare BOM Versions'"
+        - "Version 1 selector dropdown"
+        - "Version 2 selector dropdown"
+        - "Close (X) button"
+      content:
+        - "Summary cards (added, removed, modified counts)"
+        - "Side-by-side comparison table"
+        - "Change details accordion"
+      footer:
+        - "Export Comparison button"
+        - "Close button"
+    shadcn_components:
+      - "Dialog"
+      - "Select"
+      - "Table"
+      - "Badge"
+      - "Accordion"
+      - "Button"
+
+  # --------------------------------------------------------------------------
+  # BOM Version Selector
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/technical/bom/BOMVersionSelector.tsx"
+    description: "Dropdown to select BOM version for comparison"
+    props:
+      productId: "string - Filter versions by product"
+      selectedBomId: "string"
+      onChange: "(bomId: string) => void"
+      excludeBomId: "string | null - Exclude from options (can't compare to self)"
+    features:
+      - "Fetches available versions for product"
+      - "Shows version number, status, effective date"
+      - "Excludes current BOM from options"
+    api_call: "GET /api/technical/boms?product_id={productId}"
+
+  # --------------------------------------------------------------------------
+  # Diff Highlighter Component
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/technical/bom/DiffHighlighter.tsx"
+    description: "Visual diff highlighting for comparison rows"
+    props:
+      type: "'added' | 'removed' | 'modified' | 'unchanged'"
+      value: "React.ReactNode"
+      oldValue: "string | number | null - For modified items"
+    features:
+      - "Green background for added rows"
+      - "Red background for removed rows"
+      - "Yellow background for modified cells"
+      - "Strike-through for old values"
+      - "Percentage change indicator"
+    css_classes:
+      added: "bg-green-50 border-l-4 border-green-500"
+      removed: "bg-red-50 border-l-4 border-red-500 line-through opacity-70"
+      modified: "bg-yellow-50"
+      unchanged: ""
+
+  # --------------------------------------------------------------------------
+  # Multi-Level Explosion Tree (FR-2.29)
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/technical/bom/MultiLevelExplosion.tsx"
+    description: "Hierarchical tree view of BOM explosion"
+    props:
+      bomId: "string"
+      maxDepth: "number (default 10)"
+    features:
+      - "Collapsible tree structure"
+      - "Level indentation with visual guides"
+      - "Cumulative quantity calculation"
+      - "Highlight raw materials at leaf nodes"
+      - "Raw materials summary at bottom"
+    state:
+      - "explosion: BomExplosionResponse | null"
+      - "expandedNodes: Set<string>"
+      - "isLoading: boolean"
+    ui_elements:
+      - "Tree structure with expand/collapse"
+      - "Level badges (L1, L2, L3...)"
+      - "Component type icons"
+      - "Quantity columns (direct, cumulative)"
+      - "Raw materials summary panel"
+    shadcn_components:
+      - "Card"
+      - "Collapsible"
+      - "Badge"
+      - "Skeleton"
+      - "Table"
+
+  # --------------------------------------------------------------------------
+  # BOM Scale Modal (FR-2.35)
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/technical/bom/BOMScaleModal.tsx"
+    description: "Batch size scaling tool with preview"
+    props:
+      bomId: "string"
+      currentBatchSize: "number"
+      currentUom: "string"
+      isOpen: "boolean"
+      onClose: "() => void"
+      onApply: "(result: ScaleBomResponse) => void"
+    features:
+      - "Input for new batch size OR multiplier"
+      - "Real-time preview of scaled quantities"
+      - "Rounding warning indicators"
+      - "Preview vs Apply toggle"
+    state:
+      - "targetBatchSize: number"
+      - "scaleFactor: number | null"
+      - "previewOnly: boolean (default true)"
+      - "roundDecimals: number (default 3)"
+      - "preview: ScaleBomResponse | null"
+      - "isLoading: boolean"
+    ui_elements:
+      header:
+        - "Title: 'Scale BOM Quantities'"
+        - "Current batch size display"
+      content:
+        - "Input mode toggle (Target Size / Multiplier)"
+        - "Target batch size input with UoM"
+        - "OR Multiplier input"
+        - "Preview table with original vs scaled"
+        - "Rounding warnings list"
+      footer:
+        - "Preview Only checkbox"
+        - "Cancel button"
+        - "Apply Scaling button (disabled if preview only)"
+    shadcn_components:
+      - "Dialog"
+      - "Input"
+      - "Select"
+      - "Table"
+      - "Checkbox"
+      - "Alert"
+      - "Button"
+
+  # --------------------------------------------------------------------------
+  # Scale Preview Table
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/technical/bom/ScalePreviewTable.tsx"
+    description: "Shows scaled quantities in comparison format"
+    props:
+      items: "ScaledItem[]"
+      originalBatchSize: "number"
+      newBatchSize: "number"
+      scaleFactor: "number"
+    features:
+      - "Original vs New quantity columns"
+      - "Highlight rounded values"
+      - "Show scale factor applied"
+
+  # --------------------------------------------------------------------------
+  # Yield Analysis Panel (FR-2.34)
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/technical/bom/YieldAnalysisPanel.tsx"
+    description: "Yield metrics display on BOM detail page"
+    props:
+      bomId: "string"
+    features:
+      - "Theoretical yield calculation"
+      - "Expected vs actual comparison (Phase 1)"
+      - "Variance warning indicator"
+      - "Configure yield button"
+    state:
+      - "yieldData: BomYieldResponse | null"
+      - "isLoading: boolean"
+      - "showConfig: boolean"
+    ui_elements:
+      - "Yield percentage gauge/progress"
+      - "Input vs Output summary"
+      - "Loss factors breakdown (Phase 1)"
+      - "Configure Yield button"
+      - "Variance warning badge"
+    shadcn_components:
+      - "Card"
+      - "Progress"
+      - "Badge"
+      - "Button"
+      - "Skeleton"
+
+  # --------------------------------------------------------------------------
+  # Yield Configuration Modal
+  # --------------------------------------------------------------------------
+  - path: "apps/frontend/components/technical/bom/YieldConfigModal.tsx"
+    description: "Modal to configure yield settings"
+    props:
+      bomId: "string"
+      currentYield: "number | null"
+      isOpen: "boolean"
+      onClose: "() => void"
+      onSave: "(yieldData: BomYieldResponse) => void"
+    features:
+      - "Expected yield input (0-100%)"
+      - "Variance threshold input"
+      - "Loss factors management (Phase 1 - hidden for MVP)"
+    form_fields:
+      - "expected_yield_percent: number (0-100)"
+      - "variance_threshold_percent: number (default 5)"
+
+# ==========================================================================
+# Service Extensions
+# ==========================================================================
+services:
+  - path: "apps/frontend/lib/services/bom-service.ts"
+    description: "Extend existing BOM service"
+    existing_exports:
+      - "scaleBOM"
+      - "calculateBOMYield"
+      - "getBOMById"
+      - "getBOMs"
+    new_exports:
+      - name: "compareBOMVersions"
+        signature: |
+          export async function compareBOMVersions(
+            bomId1: string,
+            bomId2: string
+          ): Promise<BomComparisonResponse>
+        implementation_notes:
+          - "GET /api/technical/boms/{bomId1}/compare/{bomId2}"
+          - "Handle 400 errors for same version / different product"
+
+      - name: "explodeBOM"
+        signature: |
+          export async function explodeBOM(
+            bomId: string,
+            maxDepth: number = 10
+          ): Promise<BomExplosionResponse>
+        implementation_notes:
+          - "GET /api/technical/boms/{bomId}/explosion?maxDepth={maxDepth}"
+          - "Handle circular reference error"
+
+      - name: "applyBOMScaling"
+        signature: |
+          export async function applyBOMScaling(
+            bomId: string,
+            request: ScaleBomRequest
+          ): Promise<ScaleBomResponse>
+        implementation_notes:
+          - "POST /api/technical/boms/{bomId}/scale"
+          - "Uses existing scaleBOM for preview"
+          - "This endpoint can actually apply changes"
+
+      - name: "getBOMYield"
+        signature: |
+          export async function getBOMYield(
+            bomId: string
+          ): Promise<BomYieldResponse>
+        implementation_notes:
+          - "GET /api/technical/boms/{bomId}/yield"
+
+      - name: "updateBOMYield"
+        signature: |
+          export async function updateBOMYield(
+            bomId: string,
+            request: UpdateYieldRequest
+          ): Promise<BomYieldResponse>
+        implementation_notes:
+          - "PUT /api/technical/boms/{bomId}/yield"
+
+      - name: "getBOMVersionsForProduct"
+        signature: |
+          export async function getBOMVersionsForProduct(
+            productId: string
+          ): Promise<BOMSummary[]>
+        implementation_notes:
+          - "GET /api/technical/boms?product_id={productId}"
+          - "Used by version selector dropdown"
+
+# ==========================================================================
+# Hooks
+# ==========================================================================
+hooks:
+  - path: "apps/frontend/lib/hooks/use-bom-comparison.ts"
+    description: "React Query hook for BOM comparison"
+    exports:
+      - name: "useBOMComparison"
+        params: "bomId1: string, bomId2: string, enabled?: boolean"
+        returns: "UseQueryResult<BomComparisonResponse>"
+    pattern: |
+      export function useBOMComparison(
+        bomId1: string,
+        bomId2: string,
+        enabled: boolean = true
+      ) {
+        return useQuery({
+          queryKey: ['bom-comparison', bomId1, bomId2],
+          queryFn: () => compareBOMVersions(bomId1, bomId2),
+          enabled: enabled && !!bomId1 && !!bomId2 && bomId1 !== bomId2,
+          staleTime: 60 * 1000, // 1 minute
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-bom-explosion.ts"
+    description: "React Query hook for BOM explosion"
+    exports:
+      - name: "useBOMExplosion"
+        params: "bomId: string, maxDepth?: number"
+        returns: "UseQueryResult<BomExplosionResponse>"
+    pattern: |
+      export function useBOMExplosion(bomId: string, maxDepth: number = 10) {
+        return useQuery({
+          queryKey: ['bom-explosion', bomId, maxDepth],
+          queryFn: () => explodeBOM(bomId, maxDepth),
+          enabled: !!bomId,
+          staleTime: 5 * 60 * 1000, // 5 minutes
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-bom-yield.ts"
+    description: "React Query hook for BOM yield"
+    exports:
+      - name: "useBOMYield"
+        params: "bomId: string"
+        returns: "UseQueryResult<BomYieldResponse>"
+    pattern: |
+      export function useBOMYield(bomId: string) {
+        return useQuery({
+          queryKey: ['bom-yield', bomId],
+          queryFn: () => getBOMYield(bomId),
+          enabled: !!bomId,
+          staleTime: 60 * 1000, // 1 minute
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-bom-scale.ts"
+    description: "React Query mutation hook for BOM scaling"
+    exports:
+      - name: "useBOMScale"
+        returns: "UseMutationResult<ScaleBomResponse, Error, ScaleParams>"
+    pattern: |
+      export function useBOMScale() {
+        const queryClient = useQueryClient();
+        return useMutation({
+          mutationFn: ({ bomId, request }: ScaleParams) =>
+            applyBOMScaling(bomId, request),
+          onSuccess: (data, { bomId }) => {
+            if (data.applied) {
+              queryClient.invalidateQueries(['bom', bomId]);
+              queryClient.invalidateQueries(['bom-items', bomId]);
+            }
+          },
+        });
+      }
+
+# ==========================================================================
+# TypeScript Types
+# ==========================================================================
+types:
+  - path: "apps/frontend/lib/types/bom-advanced.ts"
+    content: |
+      export interface BomComparisonResponse {
+        bom_1: BomSummary;
+        bom_2: BomSummary;
+        differences: {
+          added: BomItemSummary[];
+          removed: BomItemSummary[];
+          modified: ModifiedItem[];
+        };
+        summary: ComparisonSummary;
+      }
+
+      export interface BomSummary {
+        id: string;
+        version: string;
+        effective_from: string;
+        effective_to: string | null;
+        output_qty: number;
+        output_uom: string;
+        status: string;
+        items: BomItemSummary[];
+      }
+
+      export interface BomItemSummary {
+        id: string;
+        component_id: string;
+        component_code: string;
+        component_name: string;
+        quantity: number;
+        uom: string;
+        sequence: number;
+        operation_seq: number | null;
+        scrap_percent: number;
+        is_output: boolean;
+      }
+
+      export interface ModifiedItem {
+        item_id: string;
+        component_id: string;
+        component_code: string;
+        component_name: string;
+        field: 'quantity' | 'uom' | 'scrap_percent' | 'sequence' | 'operation_seq';
+        old_value: string | number;
+        new_value: string | number;
+        change_percent: number | null;
+      }
+
+      export interface ComparisonSummary {
+        total_items_v1: number;
+        total_items_v2: number;
+        total_added: number;
+        total_removed: number;
+        total_modified: number;
+        weight_change_kg: number;
+        weight_change_percent: number;
+      }
+
+      export interface BomExplosionResponse {
+        bom_id: string;
+        product_code: string;
+        product_name: string;
+        output_qty: number;
+        output_uom: string;
+        levels: ExplosionLevel[];
+        total_levels: number;
+        total_items: number;
+        raw_materials_summary: RawMaterialSummary[];
+      }
+
+      export interface ExplosionLevel {
+        level: number;
+        items: ExplosionItem[];
+      }
+
+      export interface ExplosionItem {
+        item_id: string;
+        component_id: string;
+        component_code: string;
+        component_name: string;
+        component_type: string;
+        quantity: number;
+        cumulative_qty: number;
+        uom: string;
+        scrap_percent: number;
+        has_sub_bom: boolean;
+        path: string[];
+      }
+
+      export interface RawMaterialSummary {
+        component_id: string;
+        component_code: string;
+        component_name: string;
+        total_qty: number;
+        uom: string;
+      }
+
+      export interface ScaleBomRequest {
+        target_batch_size?: number;
+        target_uom?: string;
+        scale_factor?: number;
+        preview_only?: boolean;
+        round_decimals?: number;
+      }
+
+      export interface ScaleBomResponse {
+        original_batch_size: number;
+        new_batch_size: number;
+        scale_factor: number;
+        items: ScaledItem[];
+        warnings: string[];
+        applied: boolean;
+      }
+
+      export interface ScaledItem {
+        id: string;
+        component_code: string;
+        component_name: string;
+        original_quantity: number;
+        new_quantity: number;
+        uom: string;
+        rounded: boolean;
+      }
+
+      export interface BomYieldResponse {
+        bom_id: string;
+        theoretical_yield_percent: number;
+        expected_yield_percent: number | null;
+        input_total_kg: number;
+        output_qty_kg: number;
+        loss_factors: LossFactor[];
+        actual_yield_avg: number | null;
+        variance_from_expected: number | null;
+        variance_warning: boolean;
+      }
+
+      export interface LossFactor {
+        type: 'moisture' | 'trim' | 'process' | 'custom';
+        description: string;
+        loss_percent: number;
+      }
+
+      export interface UpdateYieldRequest {
+        expected_yield_percent: number;
+        variance_threshold_percent?: number;
+      }
+
+# ==========================================================================
+# Page Integration
+# ==========================================================================
+page_integration:
+  bom_list_page:
+    path: "apps/frontend/app/(authenticated)/technical/boms/page.tsx"
+    changes:
+      - "Add 'Compare' button to row actions (opens BOMComparisonModal)"
+      - "Button only enabled when multiple versions exist for same product"
+
+  bom_detail_page:
+    path: "apps/frontend/app/(authenticated)/technical/boms/[id]/page.tsx"
+    changes:
+      - "Add 'Compare Versions' button in header actions"
+      - "Add 'Scale Batch' button in header actions"
+      - "Add 'View Explosion' button/tab"
+      - "Add YieldAnalysisPanel component to detail view"
+    new_tabs:
+      - "Items (existing)"
+      - "Explosion (multi-level tree view)"
+      - "Yield Analysis"
+
+  bom_modal:
+    path: "apps/frontend/components/technical/bom/BOMFormModal.tsx"
+    changes:
+      - "Add 'Scale' button in toolbar (when editing existing BOM)"
+
+# ==========================================================================
+# UX Wireframe References
+# ==========================================================================
+ux:
+  wireframes:
+    - id: "TEC-005"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-005-boms-list.md"
+      relevance: "Compare button location in row actions"
+    - id: "TEC-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-006-bom-modal.md"
+      relevance: "Scale modal design, yield display"
+  patterns:
+    modal: "ShadCN Dialog pattern"
+    table: "ShadCN DataTable with sorting"
+    tree: "Collapsible tree with indentation"
+    diff: "Side-by-side with color highlighting"
+  states:
+    - "loading"
+    - "empty"
+    - "error"
+    - "success"
+  accessibility:
+    - "Keyboard navigation for tree collapse/expand"
+    - "Screen reader announcements for diff changes"
+    - "Color + icon indicators (not color alone)"
+    - "Focus management in modals"

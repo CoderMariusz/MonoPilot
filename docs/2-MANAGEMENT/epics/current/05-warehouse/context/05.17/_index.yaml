@@ -1,0 +1,107 @@
+# Story 05.17 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "05.17"
+  name: "LP Split Workflow"
+  slug: "lp-split-workflow"
+  epic: "05-warehouse"
+  phase: "2"
+  complexity: "M"
+  estimate_days: 3-4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Database function, no new tables
+  - api.yaml         # Endpoints, request/response schemas
+  - frontend.yaml    # Components, UI states
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "05.0"
+      name: "Warehouse Settings"
+      provides: ["warehouse_settings.enable_split_merge"]
+    - story: "05.1"
+      name: "LP Table + CRUD"
+      provides: ["license_plates", "lp_number_sequences", "generate_lp_number()"]
+    - story: "05.2"
+      name: "LP Genealogy"
+      provides: ["lp_genealogy", "linkSplit()"]
+  soft:
+    - story: "01.1"
+      name: "Org Context + RLS"
+      provides: ["org_id patterns", "RLS"]
+    - story: "01.8"
+      name: "Warehouses CRUD"
+      provides: ["warehouses table"]
+    - story: "01.9"
+      name: "Locations CRUD"
+      provides: ["locations table"]
+  blocked_by: []
+  blocks:
+    - story: "05.18"
+      name: "LP Merge Workflow"
+    - story: "05.20"
+      name: "Scanner Split"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/warehouse.md"
+    sections: ["WH-FR-006"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/warehouse.md"
+    sections: ["LP Operations", "Genealogy"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/05-warehouse/05.17.lp-split-workflow.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/WH-008-lp-split-modal.md"
+      id: "WH-008"
+  patterns:
+    - path: "apps/frontend/lib/services/license-plate-service.ts"
+      relevance: "LP service pattern"
+    - path: "apps/frontend/lib/services/lp-genealogy-service.ts"
+      relevance: "linkSplit() method"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "Database function: split_license_plate()"
+  - type: "api"
+    count: 1
+    description: "POST /api/warehouse/license-plates/:id/split"
+  - type: "service"
+    count: 1
+    description: "lp-split-service.ts"
+  - type: "validation"
+    count: 1
+    description: "lp-split-schemas.ts"
+  - type: "component"
+    count: 4
+    description: "LPSplitModal, LPSplitPreview, LPSplitQuantityInput, LPLocationSelector"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Split creates new LP, reduces source LP quantity, creates genealogy record"
+  - "Transaction must be atomic - all or nothing (use database function)"
+  - "New LP inherits: product_id, uom, batch_number, expiry_date, qa_status from source"
+  - "New LP does NOT inherit: catch_weight_kg (null), po_number, grn_id, wo_id"
+  - "Check warehouse_settings.enable_split_merge before allowing operation"
+  - "Source LP must have status='available' to allow split"
+  - "split_qty MUST be less than source LP quantity (not equal, not greater)"
+  - "Destination location can be same or different from source location"
+  - "Auto-generate LP number using generate_lp_number() function"
+  - "Performance target: <300ms for split operation"

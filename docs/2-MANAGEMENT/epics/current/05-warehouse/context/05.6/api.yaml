@@ -1,0 +1,432 @@
+# Story 05.6 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # ============================================================================
+  # GET LP Detail (Enhanced)
+  # ============================================================================
+  - method: "GET"
+    path: "/api/warehouse/license-plates/:id"
+    description: "Get LP detail with all joined relationships"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with warehouse read permission
+
+    request:
+      params:
+        id: "UUID - LP identifier"
+
+    response:
+      status: 200
+      type: "LPDetailView"
+      schema:
+        id: "UUID"
+        org_id: "UUID"
+        lp_number: "string"
+        product_id: "UUID"
+        quantity: "number"
+        uom: "string"
+        location_id: "UUID"
+        warehouse_id: "UUID"
+        status: "enum: available | reserved | consumed | blocked"
+        qa_status: "enum: pending | passed | failed | quarantine"
+        batch_number: "string | null"
+        supplier_batch_number: "string | null"
+        expiry_date: "string | null (ISO date)"
+        manufacture_date: "string | null (ISO date)"
+        source: "enum: manual | receipt | production | return | adjustment | split"
+        po_number: "string | null"
+        grn_id: "UUID | null"
+        wo_id: "UUID | null"
+        consumed_by_wo_id: "UUID | null"
+        parent_lp_id: "UUID | null"
+        catch_weight_kg: "number | null"
+        gtin: "string | null"
+        sscc: "string | null"
+        pallet_id: "UUID | null"
+        created_at: "string (ISO datetime)"
+        created_by: "UUID | null"
+        updated_at: "string (ISO datetime)"
+        product:
+          id: "UUID"
+          name: "string"
+          code: "string"
+        warehouse:
+          id: "UUID"
+          name: "string"
+          code: "string"
+        location:
+          id: "UUID"
+          full_path: "string"
+        created_by_user:
+          name: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License Plate not found"
+        when: "LP doesn't exist or belongs to different org (RLS)"
+      - status: 500
+        code: "INTERNAL_ERROR"
+        message: "Internal server error"
+        when: "Database or server error"
+
+  # ============================================================================
+  # GET LP Transactions (History)
+  # ============================================================================
+  - method: "GET"
+    path: "/api/warehouse/license-plates/:id/transactions"
+    description: "Get transaction history for LP"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/transactions/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      params:
+        id: "UUID - LP identifier"
+      query:
+        page: "number (default: 1)"
+        limit: "number (default: 50, max: 100)"
+
+    response:
+      status: 200
+      type: "PaginatedResult<LPTransaction>"
+      schema:
+        data:
+          - id: "UUID"
+            lp_id: "UUID"
+            transaction_type: "enum: status_change | qa_change | block | unblock | quantity_change | location_change"
+            old_value: "string | null"
+            new_value: "string | null"
+            reason: "string | null"
+            reference_type: "enum: wo | grn | stock_move | manual | null"
+            reference_id: "UUID | null"
+            performed_by: "UUID | null"
+            performed_at: "string (ISO datetime)"
+            notes: "string | null"
+            performed_by_user:
+              name: "string"
+        pagination:
+          page: "number"
+          limit: "number"
+          total: "number"
+          total_pages: "number"
+
+    errors:
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License Plate not found"
+        when: "LP doesn't exist or RLS blocks access"
+
+  # ============================================================================
+  # PUT Block LP
+  # ============================================================================
+  - method: "PUT"
+    path: "/api/warehouse/license-plates/:id/block"
+    description: "Block LP with reason"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/block/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "warehouse_manager", "quality_manager"]
+
+    request:
+      params:
+        id: "UUID - LP identifier"
+      body:
+        reason: "string (required, max 500 chars)"
+
+    response:
+      status: 200
+      schema:
+        id: "UUID"
+        lp_number: "string"
+        status: "blocked"
+        updated_at: "string (ISO datetime)"
+        message: "LP blocked successfully"
+
+    errors:
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "LP cannot be blocked (current status: {status})"
+        when: "LP status is not 'available'"
+      - status: 400
+        code: "REASON_REQUIRED"
+        message: "Block reason is required"
+        when: "Reason not provided or empty"
+      - status: 400
+        code: "REASON_TOO_LONG"
+        message: "Block reason must be 500 characters or less"
+        when: "Reason exceeds max length"
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License Plate not found"
+        when: "LP doesn't exist"
+
+  # ============================================================================
+  # PUT Unblock LP
+  # ============================================================================
+  - method: "PUT"
+    path: "/api/warehouse/license-plates/:id/unblock"
+    description: "Unblock LP"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/unblock/route.ts"
+    auth: "required"
+    roles: ["admin", "owner", "warehouse_manager", "quality_manager"]
+
+    request:
+      params:
+        id: "UUID - LP identifier"
+
+    response:
+      status: 200
+      schema:
+        id: "UUID"
+        lp_number: "string"
+        status: "available"
+        updated_at: "string (ISO datetime)"
+        message: "LP unblocked successfully"
+
+    errors:
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "LP cannot be unblocked (current status: {status})"
+        when: "LP status is not 'blocked'"
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License Plate not found"
+        when: "LP doesn't exist"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/license-plate-service.ts"
+    description: "Extended LP service with detail view methods"
+    exports:
+      - name: "getLPDetail"
+        type: "async function"
+        params:
+          - "id: string"
+        returns: "Promise<LPDetailView | null>"
+        description: "Get LP with all joined fields for detail view"
+
+      - name: "getLPTransactions"
+        type: "async function"
+        params:
+          - "lpId: string"
+          - "params?: { page?: number; limit?: number }"
+        returns: "Promise<PaginatedResult<LPTransaction>>"
+        description: "Get transaction history for LP"
+
+      - name: "blockLP"
+        type: "async function"
+        params:
+          - "id: string"
+          - "reason: string"
+        returns: "Promise<LicensePlate>"
+        description: "Block LP and log transaction"
+
+      - name: "unblockLP"
+        type: "async function"
+        params:
+          - "id: string"
+        returns: "Promise<LicensePlate>"
+        description: "Unblock LP and log transaction"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/license-plate.ts"
+    description: "Extended LP types for detail view"
+    exports:
+      - name: "LPDetailView"
+        description: "LP with all joined relationships"
+        fields:
+          - "// All LicensePlate fields plus:"
+          - "product: { id: string; name: string; code: string }"
+          - "warehouse: { id: string; name: string; code: string }"
+          - "location: { id: string; full_path: string }"
+          - "created_by_user?: { name: string }"
+
+      - name: "LPTransaction"
+        description: "LP audit log entry"
+        fields:
+          - "id: string"
+          - "lp_id: string"
+          - "transaction_type: LPTransactionType"
+          - "old_value: string | null"
+          - "new_value: string | null"
+          - "reason: string | null"
+          - "reference_type: 'wo' | 'grn' | 'stock_move' | 'manual' | null"
+          - "reference_id: string | null"
+          - "performed_by: string | null"
+          - "performed_at: string"
+          - "notes: string | null"
+          - "performed_by_user?: { name: string }"
+
+      - name: "LPTransactionType"
+        type: "type"
+        value: "'status_change' | 'qa_change' | 'block' | 'unblock' | 'quantity_change' | 'location_change'"
+
+# Validation schemas
+validation:
+  - path: "apps/frontend/lib/validation/license-plate.ts"
+    schemas:
+      - name: "blockLPSchema"
+        fields:
+          reason:
+            type: "z.string()"
+            constraints: ".min(1, 'Reason is required').max(500, 'Reason must be 500 characters or less')"
+
+      - name: "lpTransactionsQuerySchema"
+        fields:
+          page:
+            type: "z.coerce.number()"
+            constraints: ".int().positive().default(1)"
+          limit:
+            type: "z.coerce.number()"
+            constraints: ".int().min(1).max(100).default(50)"
+
+# Implementation patterns
+patterns:
+  get_lp_detail: |
+    // apps/frontend/app/api/warehouse/license-plates/[id]/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+
+    export async function GET(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: lp, error } = await supabase
+        .from('license_plates')
+        .select(`
+          *,
+          product:products(id, name, code),
+          warehouse:warehouses(id, name, code),
+          location:locations(id, full_path),
+          created_by_user:users!created_by(first_name, last_name)
+        `)
+        .eq('id', params.id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return NextResponse.json(
+            { error: 'License Plate not found' },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+
+      // Transform created_by_user to name field
+      const response = {
+        ...lp,
+        created_by_user: lp.created_by_user
+          ? { name: `${lp.created_by_user.first_name} ${lp.created_by_user.last_name}` }
+          : null
+      };
+
+      return NextResponse.json(response);
+    }
+
+  block_lp: |
+    // apps/frontend/app/api/warehouse/license-plates/[id]/block/route.ts
+    export async function PUT(
+      request: Request,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+      const body = await request.json();
+
+      // Validate reason
+      const result = blockLPSchema.safeParse(body);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error.errors[0].message },
+          { status: 400 }
+        );
+      }
+
+      // Get current LP status
+      const { data: currentLP, error: fetchError } = await supabase
+        .from('license_plates')
+        .select('id, status, lp_number')
+        .eq('id', params.id)
+        .single();
+
+      if (fetchError || !currentLP) {
+        return NextResponse.json(
+          { error: 'License Plate not found' },
+          { status: 404 }
+        );
+      }
+
+      if (currentLP.status !== 'available') {
+        return NextResponse.json(
+          { error: `LP cannot be blocked (current status: ${currentLP.status})` },
+          { status: 400 }
+        );
+      }
+
+      // Update status to blocked
+      const { data: updatedLP, error: updateError } = await supabase
+        .from('license_plates')
+        .update({ status: 'blocked' })
+        .eq('id', params.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return NextResponse.json(
+          { error: 'Failed to block LP' },
+          { status: 500 }
+        );
+      }
+
+      // Log transaction
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('lp_transactions').insert({
+        org_id: updatedLP.org_id,
+        lp_id: updatedLP.id,
+        transaction_type: 'block',
+        old_value: 'available',
+        new_value: 'blocked',
+        reason: result.data.reason,
+        reference_type: 'manual',
+        performed_by: user?.id
+      });
+
+      return NextResponse.json({
+        id: updatedLP.id,
+        lp_number: updatedLP.lp_number,
+        status: updatedLP.status,
+        updated_at: updatedLP.updated_at,
+        message: 'LP blocked successfully'
+      });
+    }
+
+# Performance requirements
+performance:
+  - endpoint: "GET /api/warehouse/license-plates/:id"
+    target: "<200ms"
+    notes: "Single query with JOINs"
+
+  - endpoint: "GET /api/warehouse/license-plates/:id/transactions"
+    target: "<300ms"
+    notes: "Paginated, indexed on lp_id"
+
+  - endpoint: "PUT /api/warehouse/license-plates/:id/block"
+    target: "<300ms"
+    notes: "Update + insert transaction"
+
+  - endpoint: "PUT /api/warehouse/license-plates/:id/unblock"
+    target: "<300ms"
+    notes: "Update + insert transaction"

@@ -1,0 +1,409 @@
+# Story 05.3 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/lp-reservation-service.test.ts"
+    type: "unit"
+    description: "Unit tests for reservation CRUD operations"
+  - path: "apps/frontend/lib/services/__tests__/fifo-fefo-service.test.ts"
+    type: "unit"
+    description: "Unit tests for FIFO/FEFO algorithms"
+  - path: "apps/frontend/app/api/warehouse/reservations/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for reservation API endpoints"
+  - path: "apps/frontend/app/api/warehouse/picking/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for picking suggestion endpoints"
+  - path: "supabase/tests/lp-reservations-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for lp_reservations table"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    title: "Reservation Creation"
+    prd_ref: "WH-FR-027"
+    given: "LP-001 with status='available' AND qa_status='passed' AND quantity=100"
+    and: "no active reservations exist for LP-001"
+    when: "reservation created for WO-001 with reserved_qty=50"
+    then:
+      - "lp_reservations record created with lp_id=LP-001.id, wo_id=WO-001.id, reserved_qty=50, status='active'"
+      - "reserved_at=NOW(), reserved_by=current user"
+      - "LP-001.status remains 'available' (not fully reserved)"
+      - "operation completes in <200ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    title: "Full LP Reservation Updates LP Status"
+    given: "LP-001 with quantity=100 AND status='available'"
+    when: "reservation created for full quantity (reserved_qty=100)"
+    then:
+      - "LP-001.status updates to 'reserved'"
+      - "LP displays as 'Reserved for WO-001' in UI"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    title: "Partial Reservation - Available Calculation"
+    given: "LP-001 with quantity=100 AND active reservation with reserved_qty=40"
+    when: "getAvailableQuantity(LP-001.id) called"
+    then: "returns 60 (100 - 40 = 60 available)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04"
+    title: "Reservation Blocked for Unavailable LP"
+    prd_ref: "WH-FR-027"
+    given: "LP-001 with status='consumed' OR status='blocked'"
+    when: "reservation attempted"
+    then:
+      - "system returns 400 error 'LP not available for reservation (status: {status})'"
+      - "no reservation record created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    title: "Cannot Over-Reserve LP"
+    given: "LP-001 with quantity=100 AND active reservation with reserved_qty=40"
+    when: "reservation attempted with reserved_qty=70"
+    then: "system returns 400 error 'Insufficient available quantity (requested: 70, available: 60)'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    title: "Reservation Released on WO Cancel"
+    prd_ref: "WH-FR-027"
+    given: "active reservation for LP-001 with reserved_qty=50"
+    when: "releaseReservation() called"
+    then:
+      - "reservation.status updates to 'released'"
+      - "reservation.released_at=NOW()"
+      - "LP-001.status updates to 'available' (if was fully reserved)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    title: "FIFO Algorithm"
+    prd_ref: "WH-FR-019"
+    given:
+      - "warehouse_settings.enable_fifo=true, enable_fefo=false"
+      - "3 LPs for Product A: LP-001 (created 2025-12-01), LP-002 (created 2025-12-05), LP-003 (created 2025-12-10)"
+    when: "findAvailableLPs('Product A', null, 'fifo') called"
+    then:
+      - "LPs returned in order: [LP-001, LP-002, LP-003]"
+      - "LP-001 highlighted as 'Suggested (FIFO: oldest)'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-08"
+    title: "FEFO Algorithm"
+    prd_ref: "WH-FR-020"
+    given:
+      - "warehouse_settings.enable_fefo=true"
+      - "3 LPs: LP-001 (expiry 2026-06-01), LP-002 (expiry 2026-03-01), LP-003 (expiry 2026-09-01)"
+    when: "findAvailableLPs('Product A', null, 'fefo') called"
+    then:
+      - "LPs returned in order: [LP-002, LP-001, LP-003] (by expiry ASC)"
+      - "LP-002 highlighted as 'Suggested (FEFO: expires 2026-03-01)'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-09"
+    title: "FEFO Takes Precedence Over FIFO"
+    given: "warehouse_settings.enable_fifo=true AND enable_fefo=true"
+    when: "findAvailableLPs() called"
+    then: "LPs sorted by expiry_date ASC, created_at ASC (FEFO primary)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-10"
+    title: "NULL Expiry Dates in FEFO"
+    given: "3 LPs: LP-001 (expiry NULL, created 2025-12-01), LP-002 (expiry 2026-03-01), LP-003 (expiry NULL, created 2025-12-10)"
+    when: "FEFO sorting applied"
+    then: "LPs returned in order: [LP-002, LP-001, LP-003] (expiry first, then NULLs by created_at)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-11"
+    title: "Expired LPs Excluded"
+    prd_ref: "WH-FR-020"
+    given: "LP-001 with expiry_date < CURRENT_DATE"
+    when: "findAvailableLPs() called"
+    then:
+      - "LP-001 NOT included in results"
+      - "log entry created: 'Excluded expired LP: LP-001'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-12"
+    title: "QA Status Filter"
+    given: "LP-001 (qa_status='pending'), LP-002 (qa_status='passed'), LP-003 (qa_status='failed')"
+    when: "findAvailableLPs() called"
+    then: "only LP-002 returned in results"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-13"
+    title: "Multi-LP Allocation"
+    given:
+      - "WO requires 100 units of Product A"
+      - "Available LPs (FIFO order): LP-001 (40), LP-002 (50), LP-003 (60)"
+    when: "reserveLPs(woId, materialId, productId, 100) called"
+    then:
+      - "creates reservations: LP-001 (40), LP-002 (50), LP-003 (10)"
+      - "AllocationResult.total_reserved=100, shortfall=0, success=true"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-14"
+    title: "Partial Allocation with Shortfall"
+    given:
+      - "WO requires 100 units of Product A"
+      - "total available quantity=70 (across all LPs)"
+    when: "reserveLPs(woId, materialId, productId, 100) called"
+    then:
+      - "creates reservations for all available qty (70 total)"
+      - "AllocationResult.total_reserved=70, shortfall=30, success=true"
+      - "AllocationResult.warning='Partial allocation: 30 units short'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15"
+    title: "FIFO/FEFO Violation Warning"
+    given: "FIFO enabled, LP-001 is oldest (suggested), LP-002 is newer"
+    when: "user manually reserves LP-002 instead of LP-001"
+    then:
+      - "warning displayed: 'FIFO violation: LP-002 is newer than suggested LP-001'"
+      - "reservation allowed (warning only, not blocking)"
+      - "audit log entry created with fifo_violation_flag=true"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-16"
+    title: "Get Reservations with LP Details"
+    given: "WO-001 has 3 active reservations"
+    when: "getReservations('WO-001') called"
+    then:
+      - "returns list with reservation fields (id, reserved_qty, status)"
+      - "includes LP details (lp_number, product_name, batch, expiry, location)"
+      - "includes consumed_qty and remaining_qty=reserved_qty-consumed_qty"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-17"
+    title: "Desktop UI - Reservations Panel"
+    given: "user navigates to WO detail page AND WO has 3 material reservations"
+    when: "reservations panel loads"
+    then:
+      - "displays table with columns: Material, LP Number, Reserved Qty, Consumed Qty, Remaining Qty, Status, Expiry, Location"
+      - "'Release' button visible for each active reservation (Manager role)"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-18"
+    title: "Release Reservation from UI"
+    given: "Manager views active reservation on WO"
+    when: "clicks 'Release' button"
+    then:
+      - "confirmation modal: 'Release reservation of 50 units from LP-001?'"
+      - "when confirmed: reservation.status='released', LP available for other WOs"
+      - "success toast: 'Reservation released'"
+    test_type: "e2e"
+    priority: "P1"
+
+# Unit Test Cases - FIFO/FEFO
+fifo_fefo_tests:
+  - name: "FIFO basic - returns oldest first"
+    setup: "3 LPs with different created_at"
+    expected: "Oldest first (by created_at ASC)"
+
+  - name: "FEFO basic - returns soonest expiry first"
+    setup: "3 LPs with different expiry_date"
+    expected: "Soonest expiry first (by expiry_date ASC)"
+
+  - name: "FEFO NULL expiry - NULLs last"
+    setup: "2 LPs with NULL expiry, 1 with expiry"
+    expected: "Expiry first, then NULLs by created_at"
+
+  - name: "FEFO same expiry - secondary sort by FIFO"
+    setup: "3 LPs with same expiry, different created_at"
+    expected: "Same expiry grouped, then FIFO within group"
+
+  - name: "Both enabled - FEFO takes precedence"
+    setup: "enable_fifo=true, enable_fefo=true"
+    expected: "FEFO sorting applied"
+
+  - name: "Neither enabled - no sorting"
+    setup: "enable_fifo=false, enable_fefo=false"
+    expected: "Default order (no specific sorting)"
+
+  - name: "Expired LP excluded"
+    setup: "LP with expiry < today"
+    expected: "LP excluded from results"
+
+  - name: "Only QA passed included"
+    setup: "LPs with various qa_status"
+    expected: "Only qa_status='passed' included"
+
+# Unit Test Cases - Reservations
+reservation_tests:
+  - name: "Create reservation - success"
+    setup: "LP with 100 qty, reserve 50"
+    expected: "Reservation created, LP status unchanged"
+
+  - name: "Full reservation - LP status changes"
+    setup: "LP with 100 qty, reserve 100"
+    expected: "LP status='reserved'"
+
+  - name: "Over-reserve - blocked"
+    setup: "LP with 100 qty (60 available), reserve 70"
+    expected: "Error: insufficient qty"
+
+  - name: "Release reservation - success"
+    setup: "Active reservation"
+    expected: "Status='released', LP available"
+
+  - name: "Multi-LP allocation - full"
+    setup: "Need 100, LP-1=40, LP-2=50, LP-3=60"
+    expected: "3 reservations (40+50+10), shortfall=0"
+
+  - name: "Multi-LP allocation - partial"
+    setup: "Need 100, total available 70"
+    expected: "70 reserved, shortfall=30"
+
+  - name: "QA filter - pending excluded"
+    setup: "LP with qa_status='pending'"
+    expected: "Not included in available"
+
+  - name: "Consumed exceeds reserved - blocked"
+    setup: "Try to consume 60 when reserved 50"
+    expected: "Error: consumed > reserved"
+
+  - name: "Available qty calculation"
+    setup: "LP qty=100, active reservation=40"
+    expected: "available_qty=60"
+
+  - name: "Release all for WO"
+    setup: "WO with 3 active reservations"
+    expected: "All 3 released, count=3 returned"
+
+# Integration Test Cases - RLS
+rls_tests:
+  - name: "User can only read own org reservations"
+    setup: "Org A with reservations, Org B with reservations"
+    action: "User A queries lp_reservations"
+    expected: "Only Org A reservations returned"
+
+  - name: "Cross-tenant write blocked"
+    setup: "Org A user tries to create reservation for Org B LP"
+    expected: "RLS blocks, returns error"
+
+  - name: "Manager can release reservation"
+    setup: "Manager role user"
+    action: "Release active reservation"
+    expected: "Success"
+
+  - name: "Operator cannot release reservation"
+    setup: "Warehouse operator role user"
+    action: "Release active reservation"
+    expected: "Permission denied"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "View reservations list page"
+    steps:
+      - "Navigate to /warehouse/reservations"
+      - "Verify table loads with columns"
+      - "Verify filters work (status, WO)"
+      - "Verify pagination"
+
+  - name: "View WO reservations panel"
+    steps:
+      - "Navigate to WO detail page"
+      - "Verify reservations panel visible"
+      - "Verify reservation data correct"
+
+  - name: "Release reservation from panel"
+    steps:
+      - "Click Release button on reservation"
+      - "Confirm in modal"
+      - "Verify status updates to released"
+      - "Verify toast message"
+
+  - name: "Reserve LPs via modal"
+    steps:
+      - "Open Reserve LPs modal"
+      - "Verify FIFO/FEFO suggestions shown"
+      - "Select LPs and quantities"
+      - "Confirm reservation"
+      - "Verify reservations created"
+
+# Definition of Done
+definition_of_done:
+  - "lp_reservations table created with all columns"
+  - "RLS policy enforces org_id isolation"
+  - "FIFO algorithm: ORDER BY created_at ASC"
+  - "FEFO algorithm: ORDER BY expiry_date ASC, created_at ASC"
+  - "NULL expiry dates sort last in FEFO"
+  - "Expired LPs excluded from suggestions"
+  - "Only qa_status='passed' LPs suggested"
+  - "Multi-LP allocation works correctly"
+  - "Partial allocation with shortfall reporting"
+  - "Available quantity calculation accurate"
+  - "LP status updates when fully reserved"
+  - "Release reservation restores LP availability"
+  - "API endpoints functional with <200ms response"
+  - "Desktop UI shows reservations per WO"
+  - "Release modal with confirmation"
+  - "Unit tests >80% coverage"
+  - "Edge case tests for NULL expiry, partial allocation"
+  - "Integration tests for reservation lifecycle"
+  - "Service methods match interface contract for Epic 04.8"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/lp-reservation-service.ts: 80%"
+      - "lib/services/fifo-fefo-service.ts: 90%"
+  integration:
+    target: 70
+    files:
+      - "API endpoints: 70%"
+      - "RLS policies: 100% of policy rules tested"
+  e2e:
+    target: 60
+    critical_flows:
+      - "Reservation creation"
+      - "Release reservation"
+      - "FIFO/FEFO suggestions"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "FIFO/FEFO algorithm miscalculation could cause wrong LP selection"
+    mitigation: "Comprehensive algorithm unit tests with edge cases"
+    severity: "high"
+    test_coverage: "fifo_fefo_tests"
+
+  - id: "RISK-02"
+    description: "Race condition on concurrent reservations"
+    mitigation: "Use database transactions, test concurrent scenarios"
+    severity: "medium"
+    test_coverage: "integration_tests"
+
+  - id: "RISK-03"
+    description: "Available qty calculation wrong with partial reservations"
+    mitigation: "Unit tests for available qty edge cases"
+    severity: "high"
+    test_coverage: "reservation_tests"
+
+  - id: "RISK-04"
+    description: "Epic 04.8 integration fails due to interface mismatch"
+    mitigation: "Interface contract defined and tested"
+    severity: "high"
+    test_coverage: "Contract tests in integration suite"

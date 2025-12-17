@@ -1,0 +1,233 @@
+# Story 06.3 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/quality/specifications"
+    description: "List specifications with filters, pagination, sorting"
+    file: "apps/frontend/app/api/quality/specifications/route.ts"
+    auth: "required"
+    roles: ["*"]
+    request:
+      query_params:
+        - { name: "status", type: "string", required: false, description: "Filter by status (draft|active|expired|superseded)" }
+        - { name: "product_id", type: "uuid", required: false, description: "Filter by product" }
+        - { name: "search", type: "string", required: false, description: "Search by spec_number, name, product name" }
+        - { name: "page", type: "integer", default: 1 }
+        - { name: "limit", type: "integer", default: 20 }
+        - { name: "sort_by", type: "string", default: "created_at" }
+        - { name: "sort_order", type: "string", default: "desc" }
+    response:
+      status: 200
+      schema:
+        specifications: "QualitySpecification[]"
+        pagination:
+          total: "number"
+          page: "number"
+          limit: "number"
+          pages: "number"
+
+  - method: "GET"
+    path: "/api/quality/specifications/:id"
+    description: "Get specification detail with version history"
+    file: "apps/frontend/app/api/quality/specifications/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      schema:
+        specification: "QualitySpecification"
+        version_history:
+          - id: "uuid"
+            version: "number"
+            status: "string"
+            effective_date: "string"
+            approved_by_name: "string | null"
+        parameters_count: "number"
+
+  - method: "POST"
+    path: "/api/quality/specifications"
+    description: "Create new specification as draft"
+    file: "apps/frontend/app/api/quality/specifications/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "qa_inspector", "quality_director", "admin", "owner"]
+    request:
+      body:
+        product_id: "uuid (required)"
+        name: "string (required, 3-200 chars)"
+        description: "string (optional, max 2000)"
+        effective_date: "string (required, ISO date)"
+        expiry_date: "string (optional, ISO date, must be > effective_date)"
+        review_frequency_days: "number (optional, default 365)"
+        notes: "string (optional)"
+    response:
+      status: 201
+      schema:
+        specification: "QualitySpecification"
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Invalid request body" }
+      - { status: 404, code: "PRODUCT_NOT_FOUND", message: "Product not found" }
+
+  - method: "PUT"
+    path: "/api/quality/specifications/:id"
+    description: "Update draft specification"
+    file: "apps/frontend/app/api/quality/specifications/[id]/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "qa_inspector", "quality_director", "admin", "owner"]
+    request:
+      body:
+        name: "string (optional)"
+        description: "string (optional)"
+        effective_date: "string (optional)"
+        expiry_date: "string (optional)"
+        review_frequency_days: "number (optional)"
+        notes: "string (optional)"
+    response:
+      status: 200
+      schema:
+        specification: "QualitySpecification"
+    errors:
+      - { status: 400, code: "NOT_DRAFT", message: "Only draft specifications can be updated" }
+      - { status: 404, code: "NOT_FOUND", message: "Specification not found" }
+
+  - method: "DELETE"
+    path: "/api/quality/specifications/:id"
+    description: "Delete draft specification"
+    file: "apps/frontend/app/api/quality/specifications/[id]/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+    response:
+      status: 200
+      schema:
+        deleted: "boolean"
+    errors:
+      - { status: 400, code: "NOT_DRAFT", message: "Only draft specifications can be deleted" }
+      - { status: 404, code: "NOT_FOUND", message: "Specification not found" }
+
+  - method: "POST"
+    path: "/api/quality/specifications/:id/approve"
+    description: "Approve specification (activates and supersedes previous)"
+    file: "apps/frontend/app/api/quality/specifications/[id]/approve/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+    request:
+      body:
+        approval_notes: "string (optional, max 500)"
+    response:
+      status: 200
+      schema:
+        specification: "QualitySpecification"
+        superseded_specs:
+          - id: "uuid"
+            spec_number: "string"
+            version: "number"
+    errors:
+      - { status: 400, code: "NOT_DRAFT", message: "Only draft specifications can be approved" }
+      - { status: 403, code: "FORBIDDEN", message: "QA Manager role required for approval" }
+      - { status: 404, code: "NOT_FOUND", message: "Specification not found" }
+
+  - method: "POST"
+    path: "/api/quality/specifications/:id/clone"
+    description: "Clone specification as new version"
+    file: "apps/frontend/app/api/quality/specifications/[id]/clone/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "qa_inspector", "quality_director", "admin", "owner"]
+    response:
+      status: 201
+      schema:
+        specification: "QualitySpecification"
+    errors:
+      - { status: 404, code: "NOT_FOUND", message: "Specification not found" }
+
+  - method: "GET"
+    path: "/api/quality/specifications/product/:productId"
+    description: "Get all specifications for a product"
+    file: "apps/frontend/app/api/quality/specifications/product/[productId]/route.ts"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      schema:
+        specifications: "QualitySpecification[]"
+        active_spec_id: "uuid | null"
+
+  - method: "GET"
+    path: "/api/quality/specifications/product/:productId/active"
+    description: "Resolve active specification for a product"
+    file: "apps/frontend/app/api/quality/specifications/product/[productId]/active/route.ts"
+    auth: "required"
+    roles: ["*"]
+    response:
+      status: 200
+      schema:
+        specification: "QualitySpecification"
+    errors:
+      - { status: 404, code: "NO_ACTIVE_SPEC", message: "No active specification found for this product" }
+
+  - method: "POST"
+    path: "/api/quality/specifications/:id/complete-review"
+    description: "Complete review cycle for active specification"
+    file: "apps/frontend/app/api/quality/specifications/[id]/complete-review/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+    request:
+      body:
+        review_notes: "string (optional, max 1000)"
+    response:
+      status: 200
+      schema:
+        specification: "QualitySpecification"
+        previous_review_date: "string | null"
+        next_review_date: "string"
+    errors:
+      - { status: 400, code: "NOT_ACTIVE", message: "Only active specifications can be reviewed" }
+      - { status: 404, code: "NOT_FOUND", message: "Specification not found" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/specification-service.ts"
+    description: "Specification business logic service"
+    exports:
+      - name: "SpecificationService"
+        type: "class"
+        methods:
+          - { name: "list", params: ["filters", "pagination"], returns: "Promise<PaginatedResult<QualitySpecification>>" }
+          - { name: "getById", params: ["id"], returns: "Promise<QualitySpecification | null>" }
+          - { name: "getByProduct", params: ["productId"], returns: "Promise<QualitySpecification[]>" }
+          - { name: "getActiveForProduct", params: ["orgId", "productId", "asOfDate?"], returns: "Promise<QualitySpecification | null>" }
+          - { name: "create", params: ["data", "userId"], returns: "Promise<QualitySpecification>" }
+          - { name: "update", params: ["id", "data", "userId"], returns: "Promise<QualitySpecification>" }
+          - { name: "delete", params: ["id"], returns: "Promise<void>" }
+          - { name: "approve", params: ["specId", "userId", "notes?"], returns: "Promise<ApprovalResult>" }
+          - { name: "cloneAsNewVersion", params: ["specId", "userId"], returns: "Promise<QualitySpecification>" }
+          - { name: "completeReview", params: ["specId", "userId", "notes?"], returns: "Promise<QualitySpecification>" }
+          - { name: "generateSpecNumber", params: ["orgId"], returns: "Promise<string>" }
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/quality-specification.ts"
+    description: "Quality specification TypeScript interfaces"
+    exports:
+      - "QualitySpecification"
+      - "QualitySpecParameter"
+      - "SpecificationStatus"
+      - "CreateSpecificationRequest"
+      - "UpdateSpecificationRequest"
+      - "ApproveSpecificationRequest"
+      - "ApprovalResult"
+
+# Common errors
+errors:
+  - status: 401
+    code: "UNAUTHORIZED"
+    message: "Unauthorized"
+  - status: 403
+    code: "FORBIDDEN"
+    message: "Insufficient permissions"
+  - status: 404
+    code: "NOT_FOUND"
+    message: "Resource not found"
+  - status: 400
+    code: "VALIDATION_ERROR"
+    message: "Request validation failed"

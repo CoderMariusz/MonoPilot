@@ -1,0 +1,528 @@
+# Story 04.5 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/validation/__tests__/production-settings.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "apps/frontend/lib/services/__tests__/production-settings-service.test.ts"
+    type: "unit"
+    description: "Unit tests for service functions"
+  - path: "apps/frontend/app/api/production/settings/__tests__/route.test.ts"
+    type: "integration"
+    description: "API integration tests for GET/PUT endpoints"
+  - path: "supabase/tests/production-settings-rls.test.sql"
+    type: "integration"
+    description: "RLS policy isolation tests"
+  - path: "apps/frontend/e2e/production-settings.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for settings page"
+
+# Acceptance Criteria (from story 04.5.production-settings.md)
+acceptance_criteria:
+  - id: "AC-01"
+    title: "Settings Page Load with All Fields"
+    given: "user is logged in as production manager"
+    when: "user navigates to /settings/production"
+    then:
+      - "All 15 settings display with current values"
+      - "Settings are grouped into 6 sections: WO Execution, Material Consumption, Output, Reservations, Dashboard, OEE"
+      - "Phase 1 fields have info tooltip: 'Available in Phase 1 after Epic 05'"
+      - "Phase 2 fields have info tooltip: 'Available in Phase 2 - OEE Module'"
+      - "All toggles show correct ON/OFF state"
+      - "Number inputs show numeric values"
+      - "No console errors logged"
+      - "Page loads within 1.5 seconds"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    title: "Toggle allow_pause_wo (Phase 0 - Enforced)"
+    given: "user is on /settings/production"
+    when: "user toggles allow_pause_wo from OFF to ON and clicks 'Save'"
+    then:
+      - "Success toast 'Settings saved successfully' displays"
+      - "Setting persists in database (allow_pause_wo = true)"
+      - "WO detail pages immediately show 'Pause' button (verified in Story 04.2b)"
+      - "No page reload required"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    title: "Toggle allow_pause_wo OFF Hides Pause Button (Phase 0 - Enforced)"
+    given: "allow_pause_wo = true and WO detail page shows 'Pause' button"
+    when: "user sets allow_pause_wo = false and saves"
+    then:
+      - "'Pause' button disappears from all WO detail pages"
+      - "Existing paused WOs can still be resumed (Resume button visible)"
+      - "No new WOs can be paused"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    title: "Number Input Validation - dashboard_refresh_seconds Invalid (Zero)"
+    given: "user is editing dashboard_refresh_seconds"
+    when: "user enters value '0' and clicks 'Save'"
+    then:
+      - "Validation error displays: 'Refresh interval must be at least 5 seconds'"
+      - "Settings are NOT saved"
+      - "Form field highlights in red"
+      - "Save button remains disabled until valid value entered"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    title: "Number Input Validation - dashboard_refresh_seconds Valid Range"
+    given: "user is editing dashboard_refresh_seconds"
+    when: "user enters value '15' and clicks 'Save'"
+    then:
+      - "Settings save successfully"
+      - "Success toast displays"
+      - "Dashboard auto-refresh updates to 15 seconds (verified in Story 04.1)"
+      - "Valid range: 5 to 300 seconds"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    title: "Number Input Validation - target_oee_percent Invalid (>100)"
+    given: "user is editing target_oee_percent"
+    when: "user enters value '110' and clicks 'Save'"
+    then:
+      - "Validation error displays: 'Target OEE must be between 0 and 100'"
+      - "Settings are NOT saved"
+      - "Form field highlights in red"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    title: "Number Input Validation - target_oee_percent Valid"
+    given: "user is editing target_oee_percent"
+    when: "user enters value '85' and clicks 'Save'"
+    then:
+      - "Settings save successfully"
+      - "Success toast displays"
+      - "Value stored for future use in Story 04.9a (OEE Calculation)"
+      - "Valid range: 0 to 100"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08"
+    title: "Toggle Phase 1 Setting (Stored but Not Enforced)"
+    given: "user is on /settings/production"
+    when: "user toggles allow_over_consumption from OFF to ON and clicks 'Save'"
+    then:
+      - "Success toast 'Settings saved successfully' displays"
+      - "Setting persists in database (allow_over_consumption = true)"
+      - "Info tooltip shows: 'Available in Phase 1 after Epic 05'"
+      - "Setting has NO effect on application behavior until Story 04.6e implements it"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-09"
+    title: "Multiple Settings Changed at Once"
+    given: "user is on /settings/production"
+    when: |
+      user changes 3 settings:
+      - allow_pause_wo OFF -> ON
+      - dashboard_refresh_seconds 30 -> 15
+      - show_material_alerts ON -> OFF
+      And clicks 'Save'
+    then:
+      - "All 3 settings save successfully in single transaction"
+      - "Success toast displays once"
+      - "All changes persist in database"
+      - "All changes take effect immediately for Phase 0 settings"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    title: "Unsaved Changes Warning"
+    given: "user has changed allow_pause_wo but NOT saved"
+    when: "user attempts to navigate away from /settings/production"
+    then:
+      - "Browser confirmation dialog displays: 'You have unsaved changes. Leave this page?'"
+      - "If user clicks 'Cancel', they remain on settings page with changes preserved"
+      - "If user clicks 'Leave', they navigate away and changes are lost"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-11"
+    title: "Unsaved Changes Warning - After Save"
+    given: "user has changed and saved settings"
+    when: "user navigates away from /settings/production"
+    then:
+      - "NO confirmation dialog displays"
+      - "Navigation proceeds immediately"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-12"
+    title: "GET API - Retrieve Settings for Org"
+    given: "organization has production settings configured"
+    when: "API call GET /api/production/settings is made"
+    then:
+      - "Response status 200 OK"
+      - "Response body contains all 15 settings fields"
+      - "Response includes only settings for authenticated user's org_id"
+      - "Response time < 200ms"
+      - "RLS policy enforces org_id isolation"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13"
+    title: "GET API - Default Settings for New Org"
+    given: "organization has NO production settings configured yet"
+    when: "API call GET /api/production/settings is made"
+    then:
+      - "Response status 200 OK"
+      - "Response body contains all 15 settings with default values"
+      - "Settings row created in database on first GET (upsert pattern)"
+    test_type: "integration"
+    priority: "P0"
+    default_values:
+      allow_pause_wo: false
+      auto_complete_wo: false
+      require_operation_sequence: true
+      allow_over_consumption: false
+      allow_partial_lp_consumption: true
+      require_qa_on_output: true
+      auto_create_by_product_lp: true
+      enable_material_reservations: true
+      dashboard_refresh_seconds: 30
+      show_material_alerts: true
+      show_delay_alerts: true
+      show_quality_alerts: true
+      enable_oee_tracking: false
+      target_oee_percent: 85
+      enable_downtime_tracking: false
+
+  - id: "AC-14"
+    title: "PUT API - Update Settings"
+    given: "organization has existing production settings"
+    when: "API call PUT /api/production/settings with body { allow_pause_wo: true, dashboard_refresh_seconds: 15 }"
+    then:
+      - "Response status 200 OK"
+      - "Only specified fields are updated in database"
+      - "Unspecified fields remain unchanged"
+      - "Response body contains full updated settings object"
+      - "updated_at timestamp is set to current time"
+      - "RLS policy enforces org_id isolation"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15"
+    title: "PUT API - Validation Error"
+    given: "user attempts to update settings"
+    when: "API call PUT /api/production/settings with body { dashboard_refresh_seconds: 3 }"
+    then:
+      - "Response status 400 Bad Request"
+      - "Response body contains validation error"
+      - "Settings are NOT updated in database"
+      - "No partial updates occur (transaction rollback)"
+    test_type: "integration"
+    priority: "P0"
+    expected_error:
+      error: "Validation failed"
+      details:
+        dashboard_refresh_seconds: "Refresh interval must be at least 5 seconds"
+
+  - id: "AC-16"
+    title: "PUT API - Validation Error - target_oee_percent"
+    given: "user attempts to update OEE target"
+    when: "API call PUT /api/production/settings with body { target_oee_percent: 105 }"
+    then:
+      - "Response status 400 Bad Request"
+      - "Response body contains validation error"
+      - "Settings are NOT updated in database"
+    test_type: "integration"
+    priority: "P0"
+    expected_error:
+      error: "Validation failed"
+      details:
+        target_oee_percent: "Target OEE cannot exceed 100"
+
+  - id: "AC-17"
+    title: "RLS Policy - Org Isolation"
+    given: "Org A has settings { allow_pause_wo: true } and Org B has settings { allow_pause_wo: false }"
+    when: "user from Org A calls GET /api/production/settings"
+    then:
+      - "Response contains only Org A's settings (allow_pause_wo = true)"
+      - "User CANNOT see or modify Org B's settings"
+      - "RLS policy blocks cross-org access at database level"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-18"
+    title: "Form Reset Button"
+    given: "user has changed 2 settings but NOT saved"
+    when: "user clicks 'Reset' button"
+    then:
+      - "All form fields revert to last saved values"
+      - "Unsaved changes are discarded"
+      - "No API call is made"
+      - "Success/error toast does NOT display"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-19"
+    title: "Settings Apply Immediately to Active Features (Phase 0 Only)"
+    given: "dashboard_refresh_seconds = 30 and dashboard is auto-refreshing every 30 seconds"
+    when: "user changes dashboard_refresh_seconds = 10 and saves"
+    then:
+      - "Dashboard immediately updates to 10-second auto-refresh"
+      - "No page reload required"
+      - "Change applies to all open dashboard instances for the org"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-20"
+    title: "Phase 1/2 Settings Have No Effect Until Implemented"
+    given: "user sets allow_over_consumption = true (Phase 1 setting)"
+    when: "user attempts to consume materials (if Phase 1 stories not yet implemented)"
+    then:
+      - "Setting is stored in database"
+      - "Setting has NO effect on application behavior"
+      - "Info tooltip on setting indicates: 'Available in Phase 1 after Epic 05'"
+    test_type: "integration"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  validation_schema:
+    - name: "productionSettingsSchema accepts valid settings"
+      setup: "Valid settings object with all defaults"
+      expected: "Validation passes"
+
+    - name: "productionSettingsSchema rejects dashboard_refresh_seconds < 5"
+      setup: "{ dashboard_refresh_seconds: 4 }"
+      expected: "Validation error: 'Refresh interval must be at least 5 seconds'"
+
+    - name: "productionSettingsSchema rejects dashboard_refresh_seconds > 300"
+      setup: "{ dashboard_refresh_seconds: 301 }"
+      expected: "Validation error: 'Refresh interval cannot exceed 300 seconds'"
+
+    - name: "productionSettingsSchema accepts dashboard_refresh_seconds = 5 (edge case)"
+      setup: "{ dashboard_refresh_seconds: 5 }"
+      expected: "Validation passes"
+
+    - name: "productionSettingsSchema accepts dashboard_refresh_seconds = 300 (edge case)"
+      setup: "{ dashboard_refresh_seconds: 300 }"
+      expected: "Validation passes"
+
+    - name: "productionSettingsSchema rejects target_oee_percent < 0"
+      setup: "{ target_oee_percent: -1 }"
+      expected: "Validation error: 'Target OEE must be at least 0'"
+
+    - name: "productionSettingsSchema rejects target_oee_percent > 100"
+      setup: "{ target_oee_percent: 101 }"
+      expected: "Validation error: 'Target OEE cannot exceed 100'"
+
+    - name: "productionSettingsSchema accepts target_oee_percent = 0 (edge case)"
+      setup: "{ target_oee_percent: 0 }"
+      expected: "Validation passes"
+
+    - name: "productionSettingsSchema accepts target_oee_percent = 100 (edge case)"
+      setup: "{ target_oee_percent: 100 }"
+      expected: "Validation passes"
+
+    - name: "updateProductionSettingsSchema accepts partial updates"
+      setup: "{ allow_pause_wo: true }"
+      expected: "Validation passes (only one field)"
+
+    - name: "updateProductionSettingsSchema accepts empty object"
+      setup: "{}"
+      expected: "Validation passes (no updates)"
+
+  service_functions:
+    - name: "getProductionSettings returns settings for authenticated user"
+      setup: "Mock successful API response with settings object"
+      expected: "Returns ProductionSettings object"
+
+    - name: "getProductionSettings throws on API error"
+      setup: "Mock 500 response"
+      expected: "Throws Error with message"
+
+    - name: "updateProductionSettings sends partial update"
+      setup: "Mock successful API response"
+      params: "{ allow_pause_wo: true }"
+      expected: "Returns updated ProductionSettings object"
+
+    - name: "updateProductionSettings throws on validation error"
+      setup: "Mock 400 response with validation error"
+      expected: "Throws Error with validation message"
+
+    - name: "getDefaultSettings returns correct defaults"
+      expected: "Returns object with all 15 default values"
+
+    - name: "isWoPauseAllowed returns boolean from settings"
+      setup: "Mock settings with allow_pause_wo: true"
+      expected: "Returns true"
+
+    - name: "getDashboardRefreshInterval returns number from settings"
+      setup: "Mock settings with dashboard_refresh_seconds: 30"
+      expected: "Returns 30"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/production/settings returns settings for authenticated user"
+      setup: "Create Org A with settings, authenticate as User A"
+      action: "GET /api/production/settings"
+      expected: "200 OK with Org A settings"
+
+    - name: "GET /api/production/settings creates defaults for new org"
+      setup: "Create Org B without settings, authenticate as User B"
+      action: "GET /api/production/settings"
+      expected: "200 OK with default values, settings row created in DB"
+
+    - name: "PUT /api/production/settings updates specified fields only"
+      setup: "Create Org A with default settings"
+      action: "PUT /api/production/settings { allow_pause_wo: true }"
+      expected: "200 OK, allow_pause_wo = true, other fields unchanged"
+
+    - name: "PUT /api/production/settings returns 400 for invalid values"
+      setup: "Authenticate as User A"
+      action: "PUT /api/production/settings { dashboard_refresh_seconds: 2 }"
+      expected: "400 Bad Request with validation error"
+
+    - name: "PUT /api/production/settings returns 401 for unauthenticated"
+      setup: "No authentication"
+      action: "PUT /api/production/settings"
+      expected: "401 Unauthorized"
+
+  rls_isolation:
+    - name: "User can only read own org's production settings"
+      setup: |
+        - Create Org A with settings (allow_pause_wo: true)
+        - Create Org B with settings (allow_pause_wo: false)
+      action: "User A queries production_settings table"
+      expected: "Only Org A settings returned, Org B not visible"
+
+    - name: "User cannot update another org's production settings"
+      setup: |
+        - Create Org A with Admin A
+        - Create Org B with settings
+      action: "Admin A attempts to update Org B settings"
+      expected: "RLS blocks update, 0 rows affected"
+
+    - name: "Cross-tenant access returns 404 not 403"
+      setup: |
+        - Create Org A with settings
+        - Authenticate as User B (different org)
+      action: "Direct query with Org A settings ID"
+      expected: "404 Not Found (not 403 Forbidden)"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Settings page loads with all 15 settings"
+    steps:
+      - "Navigate to /settings/production"
+      - "Wait for page load"
+      - "Verify all 6 sections visible"
+      - "Verify 15 settings displayed with correct values"
+    expected: "Page loads within 1.5 seconds, all settings visible"
+
+  - name: "Toggle setting and save"
+    steps:
+      - "Navigate to /settings/production"
+      - "Toggle allow_pause_wo from OFF to ON"
+      - "Click Save Changes button"
+      - "Verify success toast"
+      - "Refresh page"
+      - "Verify setting persists"
+    expected: "Setting saved and persisted"
+
+  - name: "Number input validation displays error"
+    steps:
+      - "Navigate to /settings/production"
+      - "Clear dashboard_refresh_seconds input"
+      - "Enter value '2'"
+      - "Blur input"
+      - "Verify error message displayed"
+      - "Verify Save button disabled"
+    expected: "Inline validation error shown"
+
+  - name: "Unsaved changes warning on navigation"
+    steps:
+      - "Navigate to /settings/production"
+      - "Toggle any setting"
+      - "Click browser back button"
+      - "Verify confirmation dialog"
+      - "Click Cancel"
+      - "Verify still on settings page"
+    expected: "Navigation blocked, user warned about unsaved changes"
+
+  - name: "Reset button reverts changes"
+    steps:
+      - "Navigate to /settings/production"
+      - "Note current value of allow_pause_wo"
+      - "Toggle allow_pause_wo"
+      - "Click Reset button"
+      - "Verify allow_pause_wo reverted to original value"
+    expected: "Form reset to last saved state"
+
+# Definition of Done
+definition_of_done:
+  - "Database migration creates production_settings table with all 15 fields"
+  - "RLS policies enforce org_id isolation (tested with multi-org scenarios)"
+  - "GET /api/production/settings returns settings for authenticated org"
+  - "GET /api/production/settings upserts defaults for new orgs"
+  - "PUT /api/production/settings updates specified fields only"
+  - "PUT /api/production/settings validates all inputs with Zod"
+  - "PUT /api/production/settings returns 400 for invalid inputs"
+  - "Settings page displays all 15 settings grouped into 6 sections"
+  - "Phase 1/2 settings have info tooltips indicating future availability"
+  - "Toggle components correctly display and update boolean fields"
+  - "Number inputs validate min/max ranges (5-300 for refresh, 0-100 for OEE target)"
+  - "Form shows unsaved changes warning when navigating away"
+  - "Form resets to last saved values on 'Reset' button click"
+  - "Success toast displays on successful save"
+  - "Error toast displays on failed save with validation details"
+  - "API tests passing (>80% coverage)"
+  - "Unit tests passing for Zod schemas (all validation rules tested)"
+  - "E2E smoke test: Navigate to settings, change 3 settings, save, verify persistence"
+  - "Performance: Page loads within 1.5 seconds"
+  - "Performance: PUT /api/production/settings responds within 300ms"
+  - "No console errors on settings page"
+  - "Code review approved"
+  - "PR merged to main"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "Settings affect entire module behavior - high coverage required"
+  integration:
+    target: 80
+    reason: "API and RLS policies must be thoroughly tested"
+  e2e:
+    target: 70
+    reason: "Key user flows covered"
+  files:
+    - "lib/validation/production-settings.ts: 100%"
+    - "lib/services/production-settings-service.ts: 90%"
+    - "app/api/production/settings/route.ts: 85%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Settings changes not applying immediately to active sessions"
+    mitigation: "Use React Query cache invalidation, verify with E2E test"
+    severity: "medium"
+    test_coverage: "e2e_tests.settings_apply_immediately"
+
+  - id: "RISK-02"
+    description: "RLS policy misconfiguration could expose settings cross-tenant"
+    mitigation: "Comprehensive RLS integration tests with multi-org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"
+
+  - id: "RISK-03"
+    description: "Validation bypassed on client side"
+    mitigation: "Server-side Zod validation on all API requests"
+    severity: "medium"
+    test_coverage: "integration_tests.api_endpoints"

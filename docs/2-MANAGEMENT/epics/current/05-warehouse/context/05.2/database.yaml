@@ -1,0 +1,393 @@
+# Story 05.2 - Database Schema
+# Purpose: Tables, RLS policies, indexes, recursive CTE functions
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_lp_genealogy.sql"
+    type: "migration"
+    description: "LP genealogy table with all columns, indexes, constraints, and RLS"
+  - path: "supabase/migrations/XXX_create_genealogy_functions.sql"
+    type: "migration"
+    description: "Recursive CTE functions for forward/backward trace"
+
+# =============================================================================
+# lp_genealogy Table
+# =============================================================================
+tables:
+  - name: "lp_genealogy"
+    description: "Parent-child LP relationships for traceability (split/merge/consume/output)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "parent_lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id)" }
+      - { name: "child_lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id)" }
+      - { name: "operation_type", type: "TEXT", constraints: "NOT NULL CHECK (operation_type IN ('consume', 'output', 'split', 'merge'))" }
+      - { name: "quantity", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "operation_date", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "wo_id", type: "UUID", constraints: "REFERENCES work_orders(id)" }
+      - { name: "operation_id", type: "UUID", constraints: "" }  # Reference to wo_operations if applicable
+      - { name: "is_reversed", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "reversed_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "reversed_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_genealogy_org ON lp_genealogy(org_id)"
+      - "idx_genealogy_parent ON lp_genealogy(parent_lp_id)"
+      - "idx_genealogy_child ON lp_genealogy(child_lp_id)"
+      - "idx_genealogy_wo ON lp_genealogy(wo_id) WHERE wo_id IS NOT NULL"
+      - "idx_genealogy_operation ON lp_genealogy(org_id, operation_type)"
+      - "idx_genealogy_date ON lp_genealogy(operation_date)"
+      - "idx_genealogy_active ON lp_genealogy(org_id, is_reversed) WHERE is_reversed = false"
+    constraints:
+      - "CONSTRAINT no_self_reference CHECK (parent_lp_id != child_lp_id)"
+      - "CONSTRAINT unique_genealogy_link UNIQUE (parent_lp_id, child_lp_id, operation_type) WHERE (is_reversed = false)"
+
+# =============================================================================
+# SQL Schema
+# =============================================================================
+schema_sql: |
+  -- =============================================================================
+  -- LP Genealogy Table - Parent-child LP relationships for traceability
+  -- =============================================================================
+
+  CREATE TABLE lp_genealogy (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    parent_lp_id UUID NOT NULL REFERENCES license_plates(id),
+    child_lp_id UUID NOT NULL REFERENCES license_plates(id),
+    operation_type TEXT NOT NULL CHECK (operation_type IN ('consume', 'output', 'split', 'merge')),
+    quantity DECIMAL(15,4) NOT NULL,
+    operation_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    wo_id UUID REFERENCES work_orders(id),
+    operation_id UUID,  -- Reference to wo_operations if applicable
+    is_reversed BOOLEAN DEFAULT false,
+    reversed_at TIMESTAMPTZ,
+    reversed_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    created_by UUID REFERENCES users(id),
+
+    -- Prevent self-reference
+    CONSTRAINT no_self_reference CHECK (parent_lp_id != child_lp_id)
+  );
+
+  -- Partial unique index for non-reversed links
+  CREATE UNIQUE INDEX idx_genealogy_unique_link
+  ON lp_genealogy(parent_lp_id, child_lp_id, operation_type)
+  WHERE is_reversed = false;
+
+  -- =============================================================================
+  -- Indexes for Performance
+  -- =============================================================================
+
+  CREATE INDEX idx_genealogy_org ON lp_genealogy(org_id);
+  CREATE INDEX idx_genealogy_parent ON lp_genealogy(parent_lp_id);
+  CREATE INDEX idx_genealogy_child ON lp_genealogy(child_lp_id);
+  CREATE INDEX idx_genealogy_wo ON lp_genealogy(wo_id) WHERE wo_id IS NOT NULL;
+  CREATE INDEX idx_genealogy_operation ON lp_genealogy(org_id, operation_type);
+  CREATE INDEX idx_genealogy_date ON lp_genealogy(operation_date);
+  CREATE INDEX idx_genealogy_active ON lp_genealogy(org_id, is_reversed) WHERE is_reversed = false;
+
+# =============================================================================
+# RLS Policies (ADR-013)
+# =============================================================================
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Genealogy records inherit org_id from license_plates"
+    - "Cross-tenant access returns empty results (not 403)"
+    - "RLS applies to all operations including RPC functions"
+
+  policies:
+    - table: "lp_genealogy"
+      name: "genealogy_select_org"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "lp_genealogy"
+      name: "genealogy_insert_org"
+      operation: "INSERT"
+      with_check: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND parent_lp_id IN (
+          SELECT id FROM license_plates
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+        AND child_lp_id IN (
+          SELECT id FROM license_plates
+          WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        )
+
+    - table: "lp_genealogy"
+      name: "genealogy_update_org"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "lp_genealogy"
+      name: "genealogy_delete_org"
+      operation: "DELETE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+rls_sql: |
+  -- =============================================================================
+  -- RLS Policies
+  -- =============================================================================
+
+  ALTER TABLE lp_genealogy ENABLE ROW LEVEL SECURITY;
+
+  -- Select: Org isolation
+  CREATE POLICY "genealogy_select_org" ON lp_genealogy
+  FOR SELECT TO authenticated
+  USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  -- Insert: Org isolation + valid LP references
+  CREATE POLICY "genealogy_insert_org" ON lp_genealogy
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    AND parent_lp_id IN (
+      SELECT id FROM license_plates
+      WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    )
+    AND child_lp_id IN (
+      SELECT id FROM license_plates
+      WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    )
+  );
+
+  -- Update: Org isolation (only is_reversed, reversed_at, reversed_by can change)
+  CREATE POLICY "genealogy_update_org" ON lp_genealogy
+  FOR UPDATE TO authenticated
+  USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()))
+  WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  -- Delete: Org isolation (soft delete preferred via is_reversed)
+  CREATE POLICY "genealogy_delete_org" ON lp_genealogy
+  FOR DELETE TO authenticated
+  USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+# =============================================================================
+# Database Functions (Recursive CTEs)
+# =============================================================================
+functions:
+  - name: "get_lp_forward_trace"
+    description: "Get all descendants of an LP using recursive CTE"
+    params:
+      - { name: "p_lp_id", type: "UUID" }
+      - { name: "p_org_id", type: "UUID" }
+      - { name: "p_max_depth", type: "INTEGER", default: 10 }
+      - { name: "p_include_reversed", type: "BOOLEAN", default: false }
+    returns: "TABLE(lp_id UUID, lp_number TEXT, product_name TEXT, operation_type TEXT, quantity DECIMAL, operation_date TIMESTAMPTZ, depth INTEGER)"
+    sql: |
+      CREATE OR REPLACE FUNCTION get_lp_forward_trace(
+        p_lp_id UUID,
+        p_org_id UUID,
+        p_max_depth INTEGER DEFAULT 10,
+        p_include_reversed BOOLEAN DEFAULT false
+      )
+      RETURNS TABLE(
+        lp_id UUID,
+        lp_number TEXT,
+        product_name TEXT,
+        operation_type TEXT,
+        quantity DECIMAL(15,4),
+        operation_date TIMESTAMPTZ,
+        depth INTEGER
+      )
+      LANGUAGE sql
+      STABLE
+      SECURITY DEFINER
+      AS $$
+        WITH RECURSIVE descendants AS (
+          -- Base case: direct children
+          SELECT
+            g.child_lp_id AS lp_id,
+            lp.lp_number,
+            p.name AS product_name,
+            g.operation_type,
+            g.quantity,
+            g.operation_date,
+            1 AS depth,
+            ARRAY[g.parent_lp_id] AS path
+          FROM lp_genealogy g
+          JOIN license_plates lp ON g.child_lp_id = lp.id
+          JOIN products p ON lp.product_id = p.id
+          WHERE g.parent_lp_id = p_lp_id
+            AND g.org_id = p_org_id
+            AND (p_include_reversed OR g.is_reversed = false)
+
+          UNION ALL
+
+          -- Recursive case: children of children
+          SELECT
+            g.child_lp_id AS lp_id,
+            lp.lp_number,
+            p.name AS product_name,
+            g.operation_type,
+            g.quantity,
+            g.operation_date,
+            d.depth + 1 AS depth,
+            d.path || g.parent_lp_id
+          FROM lp_genealogy g
+          JOIN descendants d ON g.parent_lp_id = d.lp_id
+          JOIN license_plates lp ON g.child_lp_id = lp.id
+          JOIN products p ON lp.product_id = p.id
+          WHERE g.org_id = p_org_id
+            AND (p_include_reversed OR g.is_reversed = false)
+            AND d.depth < p_max_depth
+            AND NOT (g.child_lp_id = ANY(d.path))  -- Cycle detection
+        )
+        SELECT DISTINCT ON (descendants.lp_id)
+          descendants.lp_id,
+          descendants.lp_number,
+          descendants.product_name,
+          descendants.operation_type,
+          descendants.quantity,
+          descendants.operation_date,
+          descendants.depth
+        FROM descendants
+        ORDER BY descendants.lp_id, descendants.depth;
+      $$;
+
+  - name: "get_lp_backward_trace"
+    description: "Get all ancestors of an LP using recursive CTE"
+    params:
+      - { name: "p_lp_id", type: "UUID" }
+      - { name: "p_org_id", type: "UUID" }
+      - { name: "p_max_depth", type: "INTEGER", default: 10 }
+      - { name: "p_include_reversed", type: "BOOLEAN", default: false }
+    returns: "TABLE(lp_id UUID, lp_number TEXT, product_name TEXT, operation_type TEXT, quantity DECIMAL, operation_date TIMESTAMPTZ, depth INTEGER)"
+    sql: |
+      CREATE OR REPLACE FUNCTION get_lp_backward_trace(
+        p_lp_id UUID,
+        p_org_id UUID,
+        p_max_depth INTEGER DEFAULT 10,
+        p_include_reversed BOOLEAN DEFAULT false
+      )
+      RETURNS TABLE(
+        lp_id UUID,
+        lp_number TEXT,
+        product_name TEXT,
+        operation_type TEXT,
+        quantity DECIMAL(15,4),
+        operation_date TIMESTAMPTZ,
+        depth INTEGER
+      )
+      LANGUAGE sql
+      STABLE
+      SECURITY DEFINER
+      AS $$
+        WITH RECURSIVE ancestors AS (
+          -- Base case: direct parents
+          SELECT
+            g.parent_lp_id AS lp_id,
+            lp.lp_number,
+            p.name AS product_name,
+            g.operation_type,
+            g.quantity,
+            g.operation_date,
+            1 AS depth,
+            ARRAY[g.child_lp_id] AS path
+          FROM lp_genealogy g
+          JOIN license_plates lp ON g.parent_lp_id = lp.id
+          JOIN products p ON lp.product_id = p.id
+          WHERE g.child_lp_id = p_lp_id
+            AND g.org_id = p_org_id
+            AND (p_include_reversed OR g.is_reversed = false)
+
+          UNION ALL
+
+          -- Recursive case: parents of parents
+          SELECT
+            g.parent_lp_id AS lp_id,
+            lp.lp_number,
+            p.name AS product_name,
+            g.operation_type,
+            g.quantity,
+            g.operation_date,
+            a.depth + 1 AS depth,
+            a.path || g.child_lp_id
+          FROM lp_genealogy g
+          JOIN ancestors a ON g.child_lp_id = a.lp_id
+          JOIN license_plates lp ON g.parent_lp_id = lp.id
+          JOIN products p ON lp.product_id = p.id
+          WHERE g.org_id = p_org_id
+            AND (p_include_reversed OR g.is_reversed = false)
+            AND a.depth < p_max_depth
+            AND NOT (g.parent_lp_id = ANY(a.path))  -- Cycle detection
+        )
+        SELECT DISTINCT ON (ancestors.lp_id)
+          ancestors.lp_id,
+          ancestors.lp_number,
+          ancestors.product_name,
+          ancestors.operation_type,
+          ancestors.quantity,
+          ancestors.operation_date,
+          ancestors.depth
+        FROM ancestors
+        ORDER BY ancestors.lp_id, ancestors.depth;
+      $$;
+
+# =============================================================================
+# Operation Types
+# =============================================================================
+operation_types:
+  - code: "consume"
+    description: "LP consumed as material in production"
+    direction: "parent -> child"
+    requires_wo: true
+    example: "Raw material LP -> WIP/Output LP"
+
+  - code: "output"
+    description: "Links consumed LPs to the output LP"
+    direction: "parent -> child"
+    requires_wo: true
+    example: "Multiple consumed LPs -> Single output LP"
+
+  - code: "split"
+    description: "LP split into smaller LP"
+    direction: "parent -> new child"
+    requires_wo: false
+    example: "Full pallet LP -> Partial pallet LP"
+
+  - code: "merge"
+    description: "Multiple LPs merged into one"
+    direction: "parents -> child"
+    requires_wo: false
+    example: "Partial LPs -> Combined LP"
+
+# =============================================================================
+# Business Rules
+# =============================================================================
+business_rules:
+  - rule: "Genealogy records are immutable"
+    description: "Records are never deleted, only marked is_reversed=true"
+    enforcement: "Service layer prevents hard deletes"
+
+  - rule: "Self-reference prevention"
+    description: "parent_lp_id cannot equal child_lp_id"
+    enforcement: "CHECK constraint in database"
+
+  - rule: "Depth limit"
+    description: "Recursive queries limited to 10 levels"
+    enforcement: "Function parameter with max(10) limit"
+
+  - rule: "Cycle detection"
+    description: "CTEs detect and prevent infinite loops"
+    enforcement: "Path array tracking in recursive CTE"
+
+  - rule: "Org isolation"
+    description: "All LPs must belong to same organization"
+    enforcement: "RLS policy + service validation"
+
+  - rule: "WO reference for production operations"
+    description: "consume/output operations require wo_id"
+    enforcement: "Service layer validation"
+
+  - rule: "Reversal audit trail"
+    description: "Reversed records track reversed_at and reversed_by"
+    enforcement: "Service layer sets fields on reversal"

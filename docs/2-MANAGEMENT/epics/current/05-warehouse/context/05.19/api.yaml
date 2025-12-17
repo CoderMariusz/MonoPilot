@@ -1,0 +1,443 @@
+# Story 05.19 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # 1. Process Receipt
+  - method: "POST"
+    path: "/api/warehouse/scanner/receive"
+    description: "Process scanner receipt - creates GRN + LP, updates PO"
+    file: "apps/frontend/app/api/warehouse/scanner/receive/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+    performance_target: "<500ms"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body:
+        type: "ScannerReceiveRequest"
+        schema:
+          po_id: { type: "UUID", required: true, description: "PO UUID" }
+          po_line_id: { type: "UUID", required: true, description: "PO line UUID" }
+          warehouse_id: { type: "UUID", required: true, description: "Receiving warehouse" }
+          location_id: { type: "UUID", required: true, description: "Destination location" }
+          received_qty: { type: "number", required: true, min: 0.0001, max: 999999999 }
+          batch_number: { type: "string", required: false, maxLength: 100 }
+          supplier_batch_number: { type: "string", required: false, maxLength: 100 }
+          expiry_date: { type: "string", required: false, pattern: "YYYY-MM-DD" }
+          manufacture_date: { type: "string", required: false, pattern: "YYYY-MM-DD" }
+          notes: { type: "string", required: false, maxLength: 500 }
+
+    response:
+      status: 201
+      type: "ScannerReceiveResponse"
+      schema:
+        grn:
+          id: "UUID"
+          grn_number: "string"
+          receipt_date: "ISO timestamp"
+          status: "'completed'"
+        lp:
+          id: "UUID"
+          lp_number: "string"
+          product_name: "string"
+          quantity: "number"
+          uom: "string"
+          batch_number: "string | null"
+          expiry_date: "string | null"
+          location_path: "string"
+        po_line_status: "'partial' | 'complete'"
+        po_status: "'partial' | 'closed'"
+        print_job_id: "string | null"
+        over_receipt:
+          ordered_qty: "number"
+          total_received: "number"
+          over_receipt_pct: "number"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Batch number required for receipt"
+        when: "require_batch_on_receipt = true and batch_number missing"
+      - status: 400
+        code: "OVER_RECEIPT_BLOCKED"
+        message: "Over-receipt exceeds allowed tolerance"
+        when: "qty exceeds ordered + tolerance_pct"
+      - status: 404
+        code: "PO_NOT_FOUND"
+        message: "Purchase Order not found"
+        when: "PO doesn't exist or cross-tenant access"
+      - status: 404
+        code: "LOCATION_NOT_FOUND"
+        message: "Location not found or inactive"
+        when: "Location doesn't exist or not active"
+
+  # 2. Pending Receipts List
+  - method: "GET"
+    path: "/api/warehouse/scanner/pending-receipts"
+    description: "List POs pending receipt for user's warehouse"
+    file: "apps/frontend/app/api/warehouse/scanner/pending-receipts/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+    performance_target: "<500ms"
+
+    request:
+      query_params:
+        warehouse_id: { type: "UUID", required: false, description: "Filter by warehouse" }
+        search: { type: "string", required: false, description: "Search PO number or supplier" }
+        limit: { type: "number", required: false, default: 50, min: 1, max: 100 }
+
+    response:
+      status: 200
+      type: "PendingReceiptsResponse"
+      schema:
+        data:
+          type: "array"
+          items:
+            id: "UUID"
+            po_number: "string"
+            supplier_name: "string"
+            expected_date: "ISO date"
+            lines_total: "number"
+            lines_pending: "number"
+            total_qty_ordered: "number"
+            total_qty_received: "number"
+        total: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+
+  # 3. Pre-Validate Receipt
+  - method: "POST"
+    path: "/api/warehouse/scanner/validate-receipt"
+    description: "Pre-validate receipt data without creating records"
+    file: "apps/frontend/app/api/warehouse/scanner/validate-receipt/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+    performance_target: "<500ms"
+
+    request:
+      body:
+        type: "ValidateReceiptRequest"
+        schema:
+          po_id: { type: "UUID", required: true }
+          po_line_id: { type: "UUID", required: true }
+          received_qty: { type: "number", required: true }
+          batch_number: { type: "string", required: false }
+          expiry_date: { type: "string", required: false }
+
+    response:
+      status: 200
+      type: "ValidateReceiptResponse"
+      schema:
+        valid: "boolean"
+        errors: "array of { field: string, message: string }"
+        warnings: "array of { field: string, message: string }"
+
+  # 4. Lookup PO by Barcode
+  - method: "GET"
+    path: "/api/warehouse/scanner/lookup/po/:barcode"
+    description: "Find PO by po_number barcode"
+    file: "apps/frontend/app/api/warehouse/scanner/lookup/po/[barcode]/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+    performance_target: "<200ms"
+
+    request:
+      params:
+        barcode: { type: "string", required: true }
+
+    response:
+      status: 200
+      type: "POLookupResponse"
+      schema:
+        id: "UUID"
+        po_number: "string"
+        supplier_name: "string"
+        expected_date: "ISO date"
+        status: "string"
+        lines:
+          type: "array"
+          items:
+            id: "UUID"
+            product_code: "string"
+            product_name: "string"
+            ordered_qty: "number"
+            received_qty: "number"
+            remaining_qty: "number"
+            uom: "string"
+
+    errors:
+      - status: 404
+        code: "PO_NOT_FOUND"
+        message: "PO not found"
+
+  # 5. Lookup Product by Barcode
+  - method: "GET"
+    path: "/api/warehouse/scanner/lookup/product/:barcode"
+    description: "Find product by code or GTIN"
+    file: "apps/frontend/app/api/warehouse/scanner/lookup/product/[barcode]/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+    performance_target: "<200ms"
+
+    request:
+      params:
+        barcode: { type: "string", required: true }
+
+    response:
+      status: 200
+      type: "ProductLookupResponse"
+      schema:
+        id: "UUID"
+        code: "string"
+        name: "string"
+        gtin: "string | null"
+        uom: "string"
+        is_batch_tracked: "boolean"
+        is_expiry_tracked: "boolean"
+        is_catch_weight: "boolean"
+
+    errors:
+      - status: 404
+        code: "PRODUCT_NOT_FOUND"
+        message: "Product not found"
+
+  # 6. Lookup Location by Barcode
+  - method: "GET"
+    path: "/api/warehouse/scanner/lookup/location/:barcode"
+    description: "Find active location by code"
+    file: "apps/frontend/app/api/warehouse/scanner/lookup/location/[barcode]/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+    performance_target: "<100ms"
+
+    request:
+      params:
+        barcode: { type: "string", required: true }
+
+    response:
+      status: 200
+      type: "LocationLookupResponse"
+      schema:
+        id: "UUID"
+        code: "string"
+        name: "string"
+        warehouse_id: "UUID"
+        warehouse_name: "string"
+        zone_id: "UUID | null"
+        zone_name: "string | null"
+        full_path: "string"
+
+    errors:
+      - status: 404
+        code: "LOCATION_NOT_FOUND"
+        message: "Location not found or inactive"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/scanner-receive-service.ts"
+    description: "Scanner receive business logic"
+    class: "ScannerReceiveService"
+    methods:
+      - name: "processReceipt"
+        signature: "static async processReceipt(input: ScannerReceiveInput): Promise<ScannerReceiveResult>"
+        description: |
+          Main transaction handler:
+          - Validates all inputs
+          - Creates GRN via GRNService
+          - Creates LP via LicensePlateService
+          - Updates PO line and status
+          - Queues label print job
+          - All in single transaction
+
+      - name: "validateReceipt"
+        signature: "static async validateReceipt(input: ScannerReceiveInput): Promise<ValidationResult>"
+        description: "Pre-validate receipt data, return errors/warnings without creating records"
+
+      - name: "getPendingReceipts"
+        signature: "static async getPendingReceipts(warehouseId?: string): Promise<PendingReceiptSummary[]>"
+        description: "Get POs with status in [approved, confirmed, partial] filtered by warehouse"
+
+      - name: "lookupPO"
+        signature: "static async lookupPO(barcode: string): Promise<PurchaseOrder | null>"
+        description: "Find PO by po_number barcode"
+
+      - name: "lookupProduct"
+        signature: "static async lookupProduct(barcode: string): Promise<Product | null>"
+        description: "Find product by code or GTIN"
+
+      - name: "lookupLocation"
+        signature: "static async lookupLocation(barcode: string): Promise<Location | null>"
+        description: "Find active location by code"
+
+      - name: "queueLabelPrint"
+        signature: "static async queueLabelPrint(lpId: string, copies?: number): Promise<string | null>"
+        description: "Queue label print job for LP"
+
+# Validation Schemas (Zod)
+validation:
+  path: "apps/frontend/lib/validation/scanner-receive.ts"
+  schemas:
+    - name: "scannerReceiveSchema"
+      description: "Receipt request validation"
+      fields:
+        po_id: "z.string().uuid('Invalid PO ID')"
+        po_line_id: "z.string().uuid('Invalid PO line ID')"
+        warehouse_id: "z.string().uuid('Invalid warehouse ID')"
+        location_id: "z.string().uuid('Invalid location ID')"
+        received_qty: "z.number().positive('Quantity must be positive').max(999999999, 'Quantity too large')"
+        batch_number: "z.string().max(100).optional().nullable()"
+        supplier_batch_number: "z.string().max(100).optional().nullable()"
+        expiry_date: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, 'Invalid date format').optional().nullable()"
+        manufacture_date: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, 'Invalid date format').optional().nullable()"
+        notes: "z.string().max(500).optional().nullable()"
+
+    - name: "validateReceiptSchema"
+      description: "Pre-validation request"
+      extends: "scannerReceiveSchema partial fields"
+
+    - name: "barcodeLookupSchema"
+      description: "Barcode lookup validation"
+      fields:
+        barcode: "z.string().min(1, 'Barcode required').max(100, 'Barcode too long')"
+        type: "z.enum(['po', 'product', 'location']).optional()"
+
+    - name: "pendingReceiptsQuerySchema"
+      description: "Query params validation"
+      fields:
+        warehouse_id: "z.string().uuid().optional()"
+        search: "z.string().optional()"
+        limit: "z.coerce.number().int().min(1).max(100).default(50)"
+
+# TypeScript Types
+types:
+  path: "apps/frontend/lib/types/scanner-receive.ts"
+  interfaces:
+    - name: "ScannerReceiveInput"
+      fields:
+        - "poId: string"
+        - "poLineId: string"
+        - "warehouseId: string"
+        - "locationId: string"
+        - "receivedQty: number"
+        - "batchNumber?: string"
+        - "supplierBatchNumber?: string"
+        - "expiryDate?: string"
+        - "manufactureDate?: string"
+        - "notes?: string"
+
+    - name: "ScannerReceiveResult"
+      fields:
+        - "grn: GRN"
+        - "lp: LicensePlate"
+        - "poLineStatus: 'partial' | 'complete'"
+        - "poStatus: 'partial' | 'closed'"
+        - "printJobId: string | null"
+
+    - name: "PendingReceiptSummary"
+      fields:
+        - "id: string"
+        - "po_number: string"
+        - "supplier_name: string"
+        - "expected_date: string"
+        - "lines_total: number"
+        - "lines_pending: number"
+        - "total_qty_ordered: number"
+        - "total_qty_received: number"
+
+    - name: "BarcodeLookupResult"
+      fields:
+        - "type: 'po' | 'product' | 'location'"
+        - "found: boolean"
+        - "data?: PurchaseOrder | Product | Location"
+        - "error?: string"
+
+# Error Handling
+error_handling:
+  patterns:
+    - "Return 404 (not 403) for cross-tenant access to prevent existence leak"
+    - "Include specific field errors for validation failures"
+    - "Log all errors for debugging without exposing internals"
+    - "Use consistent error response format: { success: false, error: { code, message, details? } }"
+
+  error_codes:
+    - { code: "VALIDATION_ERROR", status: 400, description: "Input validation failed" }
+    - { code: "BATCH_REQUIRED", status: 400, description: "Batch number required" }
+    - { code: "EXPIRY_REQUIRED", status: 400, description: "Expiry date required" }
+    - { code: "OVER_RECEIPT_BLOCKED", status: 400, description: "Over-receipt exceeds tolerance" }
+    - { code: "PO_NOT_FOUND", status: 404, description: "PO not found" }
+    - { code: "PO_LINE_NOT_FOUND", status: 404, description: "PO line not found" }
+    - { code: "PRODUCT_NOT_FOUND", status: 404, description: "Product not found" }
+    - { code: "LOCATION_NOT_FOUND", status: 404, description: "Location not found" }
+    - { code: "PO_NOT_RECEIVABLE", status: 400, description: "PO status doesn't allow receiving" }
+    - { code: "LOCATION_INACTIVE", status: 400, description: "Location is inactive" }
+
+# API Route Implementation Patterns
+patterns:
+  receive_endpoint: |
+    // apps/frontend/app/api/warehouse/scanner/receive/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { scannerReceiveSchema } from '@/lib/validation/scanner-receive';
+    import { ScannerReceiveService } from '@/lib/services/scanner-receive-service';
+
+    export async function POST(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      try {
+        const body = await request.json();
+        const validated = scannerReceiveSchema.parse(body);
+
+        const result = await ScannerReceiveService.processReceipt({
+          poId: validated.po_id,
+          poLineId: validated.po_line_id,
+          warehouseId: validated.warehouse_id,
+          locationId: validated.location_id,
+          receivedQty: validated.received_qty,
+          batchNumber: validated.batch_number ?? undefined,
+          supplierBatchNumber: validated.supplier_batch_number ?? undefined,
+          expiryDate: validated.expiry_date ?? undefined,
+          manufactureDate: validated.manufacture_date ?? undefined,
+          notes: validated.notes ?? undefined,
+        });
+
+        return NextResponse.json(result, { status: 201 });
+      } catch (error) {
+        // Handle Zod errors, business errors, etc.
+        // Return appropriate error response
+      }
+    }
+
+  barcode_lookup: |
+    // apps/frontend/app/api/warehouse/scanner/lookup/po/[barcode]/route.ts
+    export async function GET(
+      request: Request,
+      { params }: { params: { barcode: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const po = await ScannerReceiveService.lookupPO(params.barcode);
+      if (!po) {
+        return NextResponse.json(
+          { success: false, error: { code: 'PO_NOT_FOUND', message: 'PO not found' } },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({ success: true, data: po });
+    }

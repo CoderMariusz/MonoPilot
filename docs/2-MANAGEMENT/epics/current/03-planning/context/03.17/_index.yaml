@@ -1,0 +1,139 @@
+# Story 03.17 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.17"
+  name: "Planning Settings (Module Configuration)"
+  slug: "planning-settings"
+  epic: "03-planning"
+  phase: "1A"
+  complexity: "S"
+  estimate_days: 2
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, seed data
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, hooks, types
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["org_id scoping", "RLS pattern", "OrgContext service"]
+  optional:
+    - story: "01.14"
+      name: "Settings Infrastructure"
+      provides: ["unified settings pattern"]
+  parallel:
+    - story: "03.5a"
+      name: "PO Approval Setup"
+      notes: "Partial overlap on approval settings - can proceed in parallel"
+  blocked_by: []
+  blocks:
+    - story: "03.3"
+      name: "PO CRUD"
+      uses: ["po_require_approval", "po_auto_number_prefix", "po_auto_number_format", "po_default_payment_terms", "po_default_currency"]
+    - story: "03.5b"
+      name: "PO Approval Workflow"
+      uses: ["po_approval_threshold", "po_approval_roles"]
+    - story: "03.8"
+      name: "TO CRUD"
+      uses: ["to_allow_partial_shipments", "to_auto_number_prefix", "to_auto_number_format"]
+    - story: "03.9a"
+      name: "TO Partial Shipments"
+      uses: ["to_allow_partial_shipments"]
+    - story: "03.10"
+      name: "WO CRUD"
+      uses: ["wo_auto_select_bom", "wo_require_bom", "wo_auto_number_prefix", "wo_auto_number_format"]
+    - story: "03.11a"
+      name: "WO Materials"
+      uses: ["wo_material_check"]
+    - story: "03.12"
+      name: "WO Operations"
+      uses: ["wo_copy_routing"]
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections: ["Section 6: Planning Settings", "Lines 947-1041"]
+    requirements: ["FR-PLAN-023"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections: ["planning_settings table"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.17.planning-settings.md"
+  wireframes:
+    - id: "PLAN-024"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-024-planning-settings.md"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for org_id isolation"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "Reference pattern for settings context files"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "planning_settings table + RLS + defaults"
+  - type: "api"
+    count: 2
+    description: "GET/PATCH /api/settings/planning"
+  - type: "service"
+    count: 1
+    description: "planning-settings-service.ts"
+  - type: "validation"
+    count: 1
+    description: "planning-settings-schemas.ts"
+  - type: "page"
+    count: 1
+    description: "/settings/planning page"
+  - type: "components"
+    count: 5
+    description: "Form + 3 section components + CollapsibleSection"
+  - type: "tests"
+    count: 4
+    description: "Unit + API + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Singleton per org - one planning_settings record per organization (UNIQUE constraint on org_id)"
+  - "Auto-initialize on first GET - create record with defaults if missing"
+  - "Use ADR-013 RLS pattern: (SELECT org_id FROM users WHERE id = auth.uid())"
+  - "Status configuration (drag-drop, custom statuses) is Phase 2 - NOT in MVP scope"
+  - "Dependent field logic: po_approval_threshold only enforced when po_require_approval=true"
+  - "Dependent field logic: wo_overproduction_limit only enforced when wo_allow_overproduction=true"
+  - "Auto-number format must contain both YYYY and NNNNN placeholders"
+  - "Collapse state persists in localStorage"
+  - "Unsaved changes warning via beforeunload event"
+
+# MVP vs Phase 2 scope
+scope:
+  mvp:
+    - "Planning Settings page at /settings/planning"
+    - "PO Settings section (7 fields)"
+    - "TO Settings section (5 fields)"
+    - "WO Settings section (9 fields)"
+    - "GET/PATCH API endpoints"
+    - "Auto-initialization with defaults"
+    - "Validation with Zod schemas"
+    - "Collapsible sections with state persistence"
+    - "Unsaved changes warning"
+    - "RLS enforcement"
+  phase_2:
+    - "Status configuration UI (drag-drop reorder)"
+    - "Custom status add/edit/delete"
+    - "Status lifecycle visualization"
+    - "Field visibility configuration"
+    - "MRP/Forecasting settings"
+    - "Settings audit log"
+    - "Import/Export settings"

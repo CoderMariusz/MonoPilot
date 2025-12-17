@@ -1,0 +1,196 @@
+# Story 04.2c - Database Schema
+# Purpose: Table updates, RLS policies, indexes
+# Agent: BACKEND-DEV (database focus)
+
+# Note: This story does NOT create new tables - it updates existing work_orders table
+
+migrations:
+  - path: "supabase/migrations/XXX_add_wo_completion_fields.sql"
+    type: "migration"
+    description: "Add completion fields to work_orders if missing"
+    note: "Check Epic 03 migrations first - fields may already exist"
+
+# Tables Modified (not created)
+tables_modified:
+  - name: "work_orders"
+    description: "Work order table - fields updated on completion"
+    existing_table: true
+    source: "Epic 03 - Planning Module"
+    updated_columns:
+      - name: "status"
+        type: "TEXT"
+        constraints: "NOT NULL"
+        description: "Status changes to 'completed'"
+        valid_values: ["draft", "released", "in_progress", "paused", "completed", "cancelled"]
+      - name: "completed_at"
+        type: "TIMESTAMPTZ"
+        constraints: ""
+        description: "Timestamp when WO was completed"
+      - name: "completed_by"
+        type: "UUID"
+        constraints: "REFERENCES users(id)"
+        description: "User who completed the WO"
+      - name: "actual_yield_percent"
+        type: "DECIMAL(5,2)"
+        constraints: ""
+        description: "Calculated yield percentage on completion"
+      - name: "produced_qty"
+        type: "DECIMAL(15,4)"
+        constraints: ""
+        description: "Actual quantity produced (manual entry in Phase 0)"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_work_orders_status ON work_orders(org_id, status)"
+      - "idx_work_orders_completed ON work_orders(org_id, completed_at)"
+
+  - name: "wo_operations"
+    description: "Operations table - read to validate completion"
+    existing_table: true
+    source: "Epic 03 - Planning Module"
+    read_columns:
+      - name: "status"
+        type: "TEXT"
+        description: "Check all operations = 'completed' if sequence required"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - name: "production_settings"
+    description: "Settings table - read for completion rules"
+    existing_table: true
+    source: "Story 04.5 - Production Settings"
+    read_columns:
+      - name: "auto_complete_wo"
+        type: "BOOLEAN"
+        default: "false"
+        description: "Auto-complete when produced_qty >= planned_qty"
+      - name: "require_operation_sequence"
+        type: "BOOLEAN"
+        default: "true"
+        description: "Require all operations completed before WO completion"
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Migration SQL (if columns missing)
+migration_sql: |
+  -- Check if columns exist before adding (idempotent)
+  -- Run only if Epic 03 migrations don't include these fields
+
+  DO $$
+  BEGIN
+    -- Add completed_at if missing
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'work_orders' AND column_name = 'completed_at'
+    ) THEN
+      ALTER TABLE work_orders ADD COLUMN completed_at TIMESTAMPTZ;
+    END IF;
+
+    -- Add completed_by if missing
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'work_orders' AND column_name = 'completed_by'
+    ) THEN
+      ALTER TABLE work_orders ADD COLUMN completed_by UUID REFERENCES users(id);
+    END IF;
+
+    -- Add actual_yield_percent if missing
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'work_orders' AND column_name = 'actual_yield_percent'
+    ) THEN
+      ALTER TABLE work_orders ADD COLUMN actual_yield_percent DECIMAL(5,2);
+    END IF;
+
+    -- Add produced_qty if missing
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'work_orders' AND column_name = 'produced_qty'
+    ) THEN
+      ALTER TABLE work_orders ADD COLUMN produced_qty DECIMAL(15,4) DEFAULT 0;
+    END IF;
+  END $$;
+
+  -- Add index for completion queries
+  CREATE INDEX IF NOT EXISTS idx_work_orders_completed
+    ON work_orders(org_id, completed_at)
+    WHERE completed_at IS NOT NULL;
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Single source of truth (users table)"
+    - "User org reassignment takes effect immediately"
+    - "No custom JWT claim configuration required"
+    - "Performance overhead <1ms per query"
+
+  policies:
+    - table: "work_orders"
+      name: "wo_update_complete"
+      operation: "UPDATE"
+      using: |
+        org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+        AND EXISTS (
+          SELECT 1 FROM users u
+          JOIN roles r ON r.id = u.role_id
+          WHERE u.id = auth.uid()
+          AND r.permissions->>'production' LIKE '%U%'
+        )
+      note: "Users with production update permission can complete WOs"
+
+# Data Queries
+queries:
+  get_wo_for_completion: |
+    SELECT
+      wo.id,
+      wo.wo_number,
+      wo.status,
+      wo.planned_qty,
+      wo.produced_qty,
+      wo.started_at,
+      p.name as product_name
+    FROM work_orders wo
+    JOIN products p ON p.id = wo.product_id
+    WHERE wo.id = :wo_id
+    AND wo.org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+
+  check_operations_complete: |
+    SELECT
+      COUNT(*) as total,
+      COUNT(*) FILTER (WHERE status = 'completed') as completed
+    FROM wo_operations
+    WHERE wo_id = :wo_id
+    AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+
+  get_production_settings: |
+    SELECT
+      auto_complete_wo,
+      require_operation_sequence
+    FROM production_settings
+    WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+
+  complete_work_order: |
+    UPDATE work_orders
+    SET
+      status = 'completed',
+      completed_at = NOW(),
+      completed_by = auth.uid(),
+      actual_yield_percent = (produced_qty / planned_qty * 100)::DECIMAL(5,2),
+      updated_at = NOW()
+    WHERE id = :wo_id
+    AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    AND status = 'in_progress'
+    RETURNING *
+
+# Yield Calculation
+yield_calculation:
+  formula: "(produced_qty / planned_qty) * 100"
+  precision: "DECIMAL(5,2)"
+  thresholds:
+    low_yield_warning: 80
+    critical_yield: 50
+  example: |
+    -- Example: planned_qty = 1000, produced_qty = 950
+    -- actual_yield_percent = (950 / 1000) * 100 = 95.00

@@ -1,0 +1,157 @@
+# Story 04.4 - Database Schema
+# Purpose: Tables, RLS policies, indexes, constraints
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_yield_logs_table.sql"
+    type: "migration"
+    description: "Create yield_logs table for tracking manual yield entries"
+
+tables:
+  # New table for yield history tracking
+  - name: "yield_logs"
+    description: "Tracks all manual yield entries with audit trail"
+    is_new: true
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "wo_id", type: "UUID", constraints: "NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE" }
+      - { name: "old_quantity", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "new_quantity", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "old_yield_percent", type: "DECIMAL(5,2)", constraints: "NOT NULL" }
+      - { name: "new_yield_percent", type: "DECIMAL(5,2)", constraints: "NOT NULL" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_yield_logs_wo_id ON yield_logs(wo_id)"
+      - "idx_yield_logs_created_at ON yield_logs(created_at DESC)"
+      - "idx_yield_logs_org_id ON yield_logs(org_id)"
+
+  # Existing table - document required fields
+  - name: "work_orders"
+    description: "Work orders table - requires yield-related fields"
+    is_new: false
+    required_fields:
+      - { name: "planned_quantity", type: "DECIMAL(15,4)", constraints: "NOT NULL", existing: true }
+      - { name: "produced_quantity", type: "DECIMAL(15,4)", constraints: "DEFAULT 0", existing: true }
+      - { name: "yield_percent", type: "DECIMAL(5,2)", constraints: "", existing: true, note: "Calculated field" }
+    notes:
+      - "These fields should exist from Epic 03.10 (WO Generation)"
+      - "yield_percent is a calculated convenience field"
+
+  # Existing settings table
+  - name: "production_settings"
+    description: "Production settings - requires overproduction flag"
+    is_new: false
+    required_fields:
+      - { name: "allow_overproduction", type: "BOOLEAN", constraints: "DEFAULT false", existing: false, note: "Add if not exists" }
+
+# RLS Policies (ADR-013 pattern)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Multi-tenant isolation for yield_logs"
+    - "Consistent with existing production tables"
+    - "Operators can read/write their org's yield data"
+
+  policies:
+    - table: "yield_logs"
+      name: "yield_logs_tenant_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "yield_logs"
+      name: "yield_logs_insert"
+      operation: "INSERT"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+    - table: "yield_logs"
+      name: "yield_logs_update"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      note: "Allow correction of notes only, not quantities"
+
+# Migration SQL
+migration_sql: |
+  -- Migration: Create yield_logs table
+  -- Story: 04.4 Yield Tracking (Manual Entry)
+
+  CREATE TABLE yield_logs (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id              UUID NOT NULL REFERENCES organizations(id),
+    wo_id               UUID NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+    old_quantity        DECIMAL(15,4) NOT NULL,
+    new_quantity        DECIMAL(15,4) NOT NULL,
+    old_yield_percent   DECIMAL(5,2) NOT NULL,
+    new_yield_percent   DECIMAL(5,2) NOT NULL,
+    notes               TEXT,
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+    created_by          UUID REFERENCES users(id)
+  );
+
+  -- Indexes
+  CREATE INDEX idx_yield_logs_wo_id ON yield_logs(wo_id);
+  CREATE INDEX idx_yield_logs_created_at ON yield_logs(created_at DESC);
+  CREATE INDEX idx_yield_logs_org_id ON yield_logs(org_id);
+
+  -- Enable RLS
+  ALTER TABLE yield_logs ENABLE ROW LEVEL SECURITY;
+
+  -- RLS Policies
+  CREATE POLICY "yield_logs_tenant_isolation"
+    ON yield_logs FOR SELECT
+    USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "yield_logs_insert"
+    ON yield_logs FOR INSERT
+    WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  CREATE POLICY "yield_logs_update"
+    ON yield_logs FOR UPDATE
+    USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+
+  -- Add allow_overproduction to production_settings if not exists
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'production_settings'
+      AND column_name = 'allow_overproduction'
+    ) THEN
+      ALTER TABLE production_settings
+      ADD COLUMN allow_overproduction BOOLEAN DEFAULT false;
+    END IF;
+  END $$;
+
+  COMMENT ON TABLE yield_logs IS 'Tracks manual yield entries with audit trail (Story 04.4)';
+  COMMENT ON COLUMN yield_logs.old_quantity IS 'Previous produced_quantity before update';
+  COMMENT ON COLUMN yield_logs.new_quantity IS 'New produced_quantity after update';
+  COMMENT ON COLUMN yield_logs.old_yield_percent IS 'Yield % before update';
+  COMMENT ON COLUMN yield_logs.new_yield_percent IS 'Yield % after update';
+
+# Constraints
+constraints:
+  - name: "yield_logs_org_id_fkey"
+    table: "yield_logs"
+    type: "FOREIGN KEY"
+    definition: "FOREIGN KEY (org_id) REFERENCES organizations(id)"
+  - name: "yield_logs_wo_id_fkey"
+    table: "yield_logs"
+    type: "FOREIGN KEY"
+    definition: "FOREIGN KEY (wo_id) REFERENCES work_orders(id) ON DELETE CASCADE"
+
+# Data validation at database level
+database_validation:
+  - field: "old_quantity"
+    rule: "Must be >= 0"
+    note: "Enforced at application layer (Zod)"
+  - field: "new_quantity"
+    rule: "Must be >= 0"
+    note: "Enforced at application layer (Zod)"
+  - field: "yield_percent"
+    rule: "Between 0 and 10000 (allows >100% for overproduction)"
+    note: "Enforced at application layer (Zod)"

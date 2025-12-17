@@ -1,0 +1,153 @@
+# Story 02.3 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "02.3"
+  name: "Product Allergens Declaration"
+  slug: "product-allergens"
+  epic: "02-technical"
+  phase: "1A"
+  complexity: "M"
+  estimate_days: 3
+  type: "backend + frontend"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables (product_allergens junction), columns, RLS
+  - api.yaml         # Endpoints, request/response schemas
+  - frontend.yaml    # Pages, components, services
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# Dependencies
+dependencies:
+  required:
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product-service.ts"]
+      reason: "Product allergens link to products table"
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "RLS pattern"]
+      reason: "Multi-tenant isolation for product_allergens"
+    - story: "01.12"
+      name: "Allergens Management"
+      provides: ["allergens table", "EU 14 seed data", "allergen-service.ts"]
+      reason: "Product allergens reference allergens master data"
+  blocked_by: []
+  blocks:
+    - story: "02.5b"
+      name: "BOM Items Advanced (Allergen Inheritance)"
+      reason: "Multi-level allergen inheritance requires product allergens"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/technical.md"
+    sections: ["FR-2.4", "FR-2.28"]
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/technical.md"
+    sections: ["Database Schema", "API Design", "product_allergens"]
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/02-technical/02.3.product-allergens.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-010-allergen-management.md"
+      id: "TEC-010"
+      description: "Allergen Management (Product Detail - Allergens Tab)"
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-012-allergen-warnings.md"
+      id: "TEC-012"
+      description: "Allergen Warning Label Generation"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for product_allergens"
+  related_stories:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/01.12.allergens-management.md"
+      relevance: "Creates allergens table (dependency)"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "product_allergens junction table + columns (source, reason, source_product_ids)"
+  - type: "api"
+    count: 5
+    description: "GET/POST/DELETE product allergens + recalculate + allergens list"
+  - type: "service"
+    count: 2
+    description: "product-allergen-service.ts, extend allergen-service.ts"
+  - type: "component"
+    count: 5
+    description: "ProductAllergenSection, AllergenList, AddAllergenModal, AllergenBadge, InheritanceBanner"
+  - type: "validation"
+    count: 1
+    description: "product-allergen-schema.ts"
+  - type: "test"
+    count: 3
+    description: "Unit + integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Uses allergens table from story 01.12 (NOT created in this story)"
+  - "product_allergens is org-scoped (multi-tenant)"
+  - "Allergen inheritance from BOM is implemented but full multi-level handled in 02.5b"
+  - "Contains vs May Contain relation types require different UI handling"
+  - "reason field required for may_contain declarations"
+  - "source field tracks auto (from BOM) vs manual declarations"
+  - "Duplicate prevention: same allergen + same relation_type blocked"
+  - "Cross-tenant access returns 404 (not 403) per ADR-013"
+
+# Wireframe references
+ux:
+  wireframes:
+    - id: "TEC-010"
+      name: "Allergen Management"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-010-allergen-management.md"
+      components:
+        - "ProductAllergenSection"
+        - "AllergenList"
+        - "AddAllergenModal"
+        - "InheritanceBanner"
+        - "AllergenBadge"
+    - id: "TEC-012"
+      name: "Allergen Warnings"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/TEC-012-allergen-warnings.md"
+      components:
+        - "AllergenLabelPreview"
+        - "LabelFormatSelector"
+  patterns:
+    table: "ShadCN DataTable for allergen list"
+    modal: "ShadCN Dialog for add/edit allergen"
+    badge: "ShadCN Badge for allergen badges"
+    tabs: "ShadCN Tabs for product detail sections"
+  states:
+    - "loading"
+    - "empty (no allergens declared)"
+    - "empty (no BOM for raw materials)"
+    - "error (missing ingredient allergen data)"
+    - "success"
+
+# MVP scope
+mvp_scope:
+  included:
+    - "EU 14 allergens from Settings (01.12)"
+    - "Product allergen declaration (multi-select)"
+    - "Contains vs May Contain relation types"
+    - "Manual allergen add/remove"
+    - "Basic allergen inheritance from BOM (single level)"
+    - "Allergen badges in product list"
+    - "Allergen tab in product detail"
+  deferred_to_phase_1:
+    - "Custom allergens (org-specific)"
+    - "Allergen thresholds (ppm/mg)"
+    - "Cross-contamination tracking"
+    - "Allergen audit trail"
+  deferred_to_phase_2:
+    - "Multi-region allergen standards (US FDA, Canada)"
+    - "Allergen matrix reports"
+    - "Allergen label generation"
+  deferred_to_other_modules:
+    - "BOM allergen inheritance (multi-level) - 02.5b"
+    - "Allergen label printing - Shipping (Epic 07)"
+    - "Allergen testing results - Quality (Epic 06)"

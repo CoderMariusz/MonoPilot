@@ -1,0 +1,491 @@
+# Story 02.3 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/product-allergen-service.test.ts"
+    type: "unit"
+    description: "Unit tests for product allergen CRUD operations"
+  - path: "apps/frontend/lib/services/__tests__/allergen-inheritance.test.ts"
+    type: "unit"
+    description: "Unit tests for BOM allergen inheritance algorithm"
+  - path: "apps/frontend/app/api/v1/technical/products/[id]/allergens/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for product allergen API endpoints"
+  - path: "supabase/tests/product-allergens-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for product_allergens table"
+  - path: "apps/frontend/e2e/technical/product-allergens.spec.ts"
+    type: "e2e"
+    description: "E2E tests for allergen management flow"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # Allergen List Display
+  - id: "AC-01"
+    given: "User navigates to Product Detail and clicks 'Allergens' tab"
+    when: "Tab loads"
+    then: "Allergen declarations display within 500ms showing relation type, allergen name, and source"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    given: "Product has BOM with ingredients declaring allergens"
+    when: "Allergens tab loads"
+    then: "Auto-inherited allergens display with 'AUTO' badge and source ingredient names"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    given: "Product has manually added allergens"
+    when: "Allergens tab loads"
+    then: "Manual allergens display with 'MANUAL' badge"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    given: "Product has no allergens declared"
+    when: "Allergens tab loads"
+    then: "Empty state shows 'No Allergens Declared' with [+ Add Allergen] CTA"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Add Allergen (Manual)
+  - id: "AC-05"
+    given: "User clicks [+ Add Allergen]"
+    when: "Modal opens"
+    then: "Dropdown shows EU 14 allergens from Settings module"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-06"
+    given: "User selects allergen 'Gluten' and relation type 'Contains'"
+    when: "[Add] clicked"
+    then: "Allergen saved with relation_type='contains' and source='manual'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-07"
+    given: "User selects allergen 'Peanuts' and relation type 'May Contain'"
+    when: "Modal displays"
+    then: "Reason field appears (required for may_contain)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-08"
+    given: "User adds 'May Contain' allergen without reason"
+    when: "[Add] clicked"
+    then: "Validation error 'Reason is required for May Contain declarations' displays"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-09"
+    given: "Allergen already declared with same relation type"
+    when: "User tries to add duplicate"
+    then: "Error 'Allergen already declared as Contains/May Contain' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  # Remove Allergen
+  - id: "AC-10"
+    given: "User clicks [Remove] on manually added allergen"
+    when: "Confirmation accepted"
+    then: "Allergen removed from product_allergens table"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    given: "User clicks [Remove] on auto-inherited allergen"
+    when: "Action triggered"
+    then: "Warning displays: 'This allergen is inherited from BOM ingredient {name}. It will reappear on next recalculation.'"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Allergen Inheritance from BOM
+  - id: "AC-12"
+    given: "Product has active BOM with 3 ingredients"
+    when: "[Recalculate] button clicked"
+    then: "System fetches allergens from all BOM ingredients"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13"
+    given: "Ingredient 'Wheat Flour' has allergen 'Gluten' (contains)"
+    when: "Inheritance runs"
+    then: "Parent product inherits 'Gluten' (contains) with source='auto'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-14"
+    given: "Product has manual 'May Contain' declarations"
+    when: "[Recalculate] runs"
+    then: "Manual declarations are preserved (not overwritten)"
+    test_type: "integration"
+    priority: "P0"
+
+  # Allergen Badges in Product List
+  - id: "AC-15"
+    given: "Product has allergens declared"
+    when: "Product List renders"
+    then: "Allergen badges display next to product name"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-16"
+    given: "Product has 'Contains' allergens"
+    when: "Badge renders"
+    then: "Red badge with count shows (e.g., '3 allergens')"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-17"
+    given: "Product has only 'May Contain' allergens"
+    when: "Badge renders"
+    then: "Orange badge displays"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Allergens Table Dependency (from 01.12)
+  - id: "AC-18"
+    given: "Story 01.12 is implemented"
+    when: "Allergens table is queried"
+    then: "14 EU allergens (A01-A14) exist globally"
+    test_type: "integration"
+    priority: "P0"
+    dependency: "01.12"
+
+  - id: "AC-19"
+    given: "Allergens are global (not org-scoped)"
+    when: "Any user queries allergens"
+    then: "All 14 EU allergens are visible"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-20"
+    given: "Allergens table populated by 01.12"
+    when: "Add Allergen modal loads"
+    then: "Dropdown shows all EU 14 allergens"
+    test_type: "e2e"
+    priority: "P0"
+
+  # Permission Enforcement
+  - id: "AC-21"
+    given: "User with VIEWER role"
+    when: "Allergens tab loads"
+    then: "[+ Add Allergen] and [Remove] buttons hidden"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-22"
+    given: "User without Technical write permission"
+    when: "Attempting to modify allergens via API"
+    then: "API returns 403 Forbidden"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Cross-tenant isolation
+  - id: "AC-23"
+    given: "User from Org A"
+    when: "Requesting product allergens from Org B"
+    then: "API returns 404 Not Found (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Phase 1+ Features Hidden
+  - id: "AC-24"
+    given: "User is editing product allergens"
+    when: "MVP is active (Phase 0)"
+    then: "Phase 1+ features are hidden: Custom Allergen, Thresholds, Cross-Contamination section"
+    test_type: "e2e"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  product_allergen_service:
+    - name: "getProductAllergens returns allergens for product"
+      setup: "Mock successful API response with 3 allergens"
+      expected: "Returns ProductAllergensResponse with 3 items"
+
+    - name: "getProductAllergens returns empty array for product with no allergens"
+      setup: "Mock empty API response"
+      expected: "Returns { allergens: [], inheritance_status: {...} }"
+
+    - name: "addProductAllergen validates reason required for may_contain"
+      setup: "Attempt to add may_contain without reason"
+      expected: "Throws validation error"
+
+    - name: "addProductAllergen succeeds with valid contains data"
+      setup: "Valid allergen_id and relation_type='contains'"
+      expected: "Returns created ProductAllergen"
+
+    - name: "addProductAllergen succeeds with valid may_contain data and reason"
+      setup: "Valid allergen_id, relation_type='may_contain', reason='Shared line'"
+      expected: "Returns created ProductAllergen"
+
+    - name: "removeProductAllergen calls correct endpoint"
+      setup: "Mock DELETE endpoint"
+      expected: "Calls DELETE /api/v1/technical/products/:id/allergens/:allergenId"
+
+  allergen_inheritance:
+    - name: "calculateAllergenInheritance aggregates allergens from BOM items"
+      setup: |
+        BOM with 3 items:
+        - Item 1: Wheat Flour (has Gluten)
+        - Item 2: Milk Powder (has Milk)
+        - Item 3: Salt (no allergens)
+      expected: "Returns 2 inherited allergens: Gluten, Milk"
+
+    - name: "calculateAllergenInheritance tracks source products"
+      setup: |
+        BOM with 2 items both containing Gluten:
+        - Item 1: Wheat Flour (has Gluten)
+        - Item 2: Oat Fiber (has Gluten)
+      expected: "Returns 1 Gluten allergen with source_product_ids containing both"
+
+    - name: "calculateAllergenInheritance preserves manual allergens"
+      setup: |
+        Product has manual may_contain Peanuts
+        BOM ingredients have Gluten only
+      expected: "Returns inherited Gluten AND preserves manual Peanuts"
+
+    - name: "calculateAllergenInheritance removes stale auto allergens"
+      setup: |
+        Product has auto-inherited Milk (from removed ingredient)
+        BOM now has only Gluten
+      expected: "Removes Milk, keeps Gluten"
+
+    - name: "calculateAllergenInheritance only inherits contains (not may_contain)"
+      setup: |
+        BOM item has both contains Gluten and may_contain Peanuts
+      expected: "Only inherits Gluten to parent product"
+
+  validation_schemas:
+    - name: "addProductAllergenSchema accepts valid contains request"
+      input: '{ allergen_id: "uuid", relation_type: "contains" }'
+      expected: "Validation passes"
+
+    - name: "addProductAllergenSchema accepts valid may_contain with reason"
+      input: '{ allergen_id: "uuid", relation_type: "may_contain", reason: "Shared production line" }'
+      expected: "Validation passes"
+
+    - name: "addProductAllergenSchema rejects may_contain without reason"
+      input: '{ allergen_id: "uuid", relation_type: "may_contain" }'
+      expected: "Validation fails with reason required error"
+
+    - name: "addProductAllergenSchema rejects reason under 10 chars"
+      input: '{ allergen_id: "uuid", relation_type: "may_contain", reason: "short" }'
+      expected: "Validation fails with min length error"
+
+    - name: "addProductAllergenSchema rejects invalid allergen_id"
+      input: '{ allergen_id: "not-a-uuid", relation_type: "contains" }'
+      expected: "Validation fails with invalid UUID error"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/v1/allergens returns 14 EU allergens"
+      setup: "Authenticated user"
+      action: "GET /api/v1/allergens"
+      expected: "200 with 14 allergens sorted by display_order"
+
+    - name: "GET /api/v1/allergens requires authentication"
+      setup: "No auth token"
+      action: "GET /api/v1/allergens"
+      expected: "401 Unauthorized"
+
+    - name: "GET /api/v1/technical/products/:id/allergens returns allergens"
+      setup: "Product with 2 allergens declared"
+      action: "GET /api/v1/technical/products/:id/allergens"
+      expected: "200 with 2 allergens"
+
+    - name: "GET /api/v1/technical/products/:id/allergens returns 404 for invalid product"
+      setup: "Non-existent product ID"
+      action: "GET /api/v1/technical/products/:id/allergens"
+      expected: "404 Not Found"
+
+    - name: "POST /api/v1/technical/products/:id/allergens creates allergen"
+      setup: "Valid allergen_id and relation_type"
+      action: "POST with body { allergen_id, relation_type: 'contains' }"
+      expected: "201 with created allergen"
+
+    - name: "POST /api/v1/technical/products/:id/allergens returns 409 for duplicate"
+      setup: "Allergen already declared with same relation_type"
+      action: "POST with same allergen_id and relation_type"
+      expected: "409 Conflict"
+
+    - name: "POST /api/v1/technical/products/:id/allergens requires permission"
+      setup: "User with VIEWER role (no write permission)"
+      action: "POST allergen"
+      expected: "403 Forbidden"
+
+    - name: "DELETE /api/v1/technical/products/:id/allergens/:allergenId removes allergen"
+      setup: "Existing allergen declaration"
+      action: "DELETE"
+      expected: "204 No Content"
+
+    - name: "POST /api/v1/technical/boms/:id/allergens recalculates inheritance"
+      setup: "BOM with 3 ingredients, each having different allergens"
+      action: "POST to recalculate"
+      expected: "200 with inherited_allergens array"
+
+  rls_policies:
+    - name: "product_allergens select only returns own org data"
+      setup: |
+        - Create Org A with Product A and allergen declaration
+        - Create Org B with Product B and allergen declaration
+      action: "User A queries product_allergens"
+      expected: "Only Org A allergens returned"
+
+    - name: "product_allergens insert blocked for different org"
+      setup: "User A tries to insert allergen for Org B product"
+      action: "INSERT into product_allergens"
+      expected: "RLS blocks insert"
+
+    - name: "allergens table readable by all authenticated users"
+      setup: "User from any org"
+      action: "SELECT from allergens"
+      expected: "Returns all 14 EU allergens"
+
+    - name: "allergens table not writeable"
+      setup: "User attempts INSERT/UPDATE/DELETE on allergens"
+      action: "Write operation"
+      expected: "RLS blocks write"
+
+# E2E Test Cases
+e2e_tests:
+  allergen_management:
+    - name: "Navigate to product allergens tab"
+      steps:
+        - "Login as ADMIN"
+        - "Navigate to /technical/products/:id"
+        - "Click 'Allergens' tab"
+      expected: "Allergens tab content displays"
+
+    - name: "Add contains allergen to product"
+      steps:
+        - "Navigate to product allergens tab"
+        - "Click [+ Add Allergen]"
+        - "Select 'A01 - Gluten' from dropdown"
+        - "Select 'Contains' relation type"
+        - "Click [Add Allergen]"
+      expected: "Gluten appears in Contains section with MANUAL badge"
+
+    - name: "Add may_contain allergen with reason"
+      steps:
+        - "Navigate to product allergens tab"
+        - "Click [+ Add Allergen]"
+        - "Select 'A05 - Peanuts'"
+        - "Select 'May Contain'"
+        - "Enter reason: 'Shared production line with peanut products'"
+        - "Click [Add Allergen]"
+      expected: "Peanuts appears in May Contain section with reason displayed"
+
+    - name: "Validation error for missing reason"
+      steps:
+        - "Click [+ Add Allergen]"
+        - "Select allergen"
+        - "Select 'May Contain'"
+        - "Leave reason empty"
+        - "Click [Add Allergen]"
+      expected: "Error message: 'Reason is required for May Contain declarations'"
+
+    - name: "Remove manually added allergen"
+      steps:
+        - "Add allergen manually"
+        - "Click [Remove] on the allergen"
+        - "Confirm removal"
+      expected: "Allergen removed from list"
+
+    - name: "Recalculate allergens from BOM"
+      steps:
+        - "Navigate to product with BOM containing ingredients with allergens"
+        - "Click [Recalculate] in inheritance banner"
+      expected: "Auto-inherited allergens appear with AUTO badge and source ingredient names"
+
+    - name: "Empty state for raw material"
+      steps:
+        - "Navigate to raw material product (no BOM)"
+        - "Click 'Allergens' tab"
+      expected: "Empty state shows 'No Allergens Auto-Detected' with manual add option"
+
+    - name: "Allergen badges in product list"
+      steps:
+        - "Add 3 allergens to a product"
+        - "Navigate to product list /technical/products"
+      expected: "Product row shows badge '3 allergens' in red"
+
+    - name: "Viewer cannot add allergens"
+      steps:
+        - "Login as VIEWER role"
+        - "Navigate to product allergens tab"
+      expected: "[+ Add Allergen] button not visible"
+
+# Definition of Done
+definition_of_done:
+  - "Allergens table exists (dependency on 01.12)"
+  - "GET /api/v1/allergens returns 14 EU allergens"
+  - "product_allergens table created with RLS policies"
+  - "All API endpoints return correct responses"
+  - "Allergen tab displays within 500ms"
+  - "Manual allergen add/remove works end-to-end"
+  - "Reason field required for 'May Contain' declarations"
+  - "Basic allergen inheritance from BOM (single level) works"
+  - "Manual allergens preserved during recalculation"
+  - "Allergen badges display correctly in Product List"
+  - "Duplicate allergen prevention works (same relation type)"
+  - "Permission checks hide/show UI elements correctly"
+  - "API returns 403 for unauthorized users"
+  - "API returns 404 (not 403) for cross-tenant access"
+  - "All 14 EU allergens selectable in dropdown"
+  - "Phase 1+ features hidden per Epic 02.0 guidance"
+  - "Unit tests cover inheritance algorithm (>90% coverage)"
+  - "Integration tests cover all API endpoints"
+  - "E2E tests cover critical user flows"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "Allergen inheritance algorithm is critical for food safety compliance"
+    files:
+      - "lib/services/product-allergen-service.ts: 90%"
+      - "lib/services/allergen-service.ts: 85%"
+      - "lib/validation/product-allergen-schema.ts: 95%"
+  integration:
+    target: 80
+    reason: "API endpoints and RLS must be thoroughly tested"
+    files:
+      - "API routes: 80%"
+      - "RLS policies: 100% of policy rules tested"
+  e2e:
+    target: 8
+    description: "8 critical user flows covered"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Allergen inheritance algorithm incorrectly aggregates allergens"
+    mitigation: "Comprehensive unit tests with multi-ingredient scenarios"
+    severity: "high"
+    test_coverage: "unit_tests.allergen_inheritance"
+
+  - id: "RISK-02"
+    description: "Manual allergens overwritten during recalculation"
+    mitigation: "Explicit test case for preserving manual may_contain"
+    severity: "high"
+    test_coverage: "AC-14"
+
+  - id: "RISK-03"
+    description: "Missing EU 14 allergens in dropdown (01.12 dependency)"
+    mitigation: "Integration test verifying 14 allergens exist"
+    severity: "high"
+    test_coverage: "AC-18, AC-19, AC-20"
+
+  - id: "RISK-04"
+    description: "Cross-tenant allergen data leakage"
+    mitigation: "RLS tests with multi-org fixtures"
+    severity: "critical"
+    test_coverage: "integration_tests.rls_policies"

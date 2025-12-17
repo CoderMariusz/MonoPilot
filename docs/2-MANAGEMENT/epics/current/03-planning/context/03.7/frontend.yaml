@@ -1,0 +1,242 @@
+# Story 03.7 - Frontend Specification
+# Purpose: Components, hooks, pages, UX patterns
+# Agent: FRONTEND-DEV
+
+# Pages
+pages:
+  - path: "apps/frontend/app/(authenticated)/settings/planning/po-statuses/page.tsx"
+    description: "PO Status configuration page (admin only)"
+    route: "/settings/planning/po-statuses"
+    auth: "required"
+    roles: ["owner", "admin"]
+    states:
+      - loading
+      - success
+      - empty
+      - error
+
+# Components
+components:
+  # Settings/Config Components
+  - path: "apps/frontend/components/settings/planning/POStatusList.tsx"
+    description: "DataTable of statuses with drag-to-reorder"
+    props:
+      - "statuses: POStatus[]"
+      - "onReorder: (ids: string[]) => void"
+      - "onEdit: (status: POStatus) => void"
+      - "onDelete: (status: POStatus) => void"
+      - "onConfigureTransitions: (status: POStatus) => void"
+    features:
+      - "Drag-and-drop reorder via @dnd-kit"
+      - "Columns: Name, Code, Color, Order, In Use Count, Actions"
+      - "System status badge indicator"
+      - "Delete disabled for system/in-use statuses"
+
+  - path: "apps/frontend/components/settings/planning/POStatusModal.tsx"
+    description: "Add/Edit status modal"
+    props:
+      - "open: boolean"
+      - "onOpenChange: (open: boolean) => void"
+      - "status?: POStatus (edit mode)"
+      - "onSave: (data: CreateStatusInput | UpdateStatusInput) => void"
+    features:
+      - "Form fields: name, code (add only), color, description"
+      - "Code field disabled in edit mode"
+      - "System status warning message"
+      - "Validation feedback"
+
+  - path: "apps/frontend/components/settings/planning/POStatusDeleteDialog.tsx"
+    description: "Delete confirmation with usage check"
+    props:
+      - "open: boolean"
+      - "onOpenChange: (open: boolean) => void"
+      - "status: POStatus"
+      - "usageCount: number"
+      - "onConfirm: () => void"
+    features:
+      - "Warning if status in use"
+      - "Blocked if system status"
+      - "Count of POs using status"
+
+  - path: "apps/frontend/components/settings/planning/POTransitionRulesModal.tsx"
+    description: "Configure allowed transitions"
+    props:
+      - "open: boolean"
+      - "onOpenChange: (open: boolean) => void"
+      - "fromStatus: POStatus"
+      - "allStatuses: POStatus[]"
+      - "currentTransitions: POStatusTransition[]"
+      - "onSave: (allowedIds: string[]) => void"
+    features:
+      - "Checkbox list of target statuses"
+      - "System transitions disabled (cannot uncheck)"
+      - "Visual indicator for system-required"
+
+  - path: "apps/frontend/components/settings/planning/POStatusColorPicker.tsx"
+    description: "Color selector component"
+    props:
+      - "value: StatusColor"
+      - "onChange: (color: StatusColor) => void"
+    features:
+      - "Grid of 11 color swatches"
+      - "TailwindCSS color names"
+      - "Preview of selected color"
+
+  # PO Detail Components
+  - path: "apps/frontend/components/planning/purchase-orders/POStatusBadge.tsx"
+    description: "Status badge with dynamic color"
+    props:
+      - "status: string"
+      - "color: StatusColor"
+      - "size?: 'sm' | 'md' | 'lg'"
+      - "showIcon?: boolean"
+    features:
+      - "Dynamic TailwindCSS classes by color"
+      - "Optional icon per status"
+      - "Consistent sizing"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POStatusDropdown.tsx"
+    description: "Status selector filtered by allowed transitions"
+    props:
+      - "currentStatus: string"
+      - "availableStatuses: POStatus[]"
+      - "onStatusChange: (status: string, notes?: string) => void"
+      - "disabled?: boolean"
+    features:
+      - "Only shows valid next statuses"
+      - "Current status highlighted"
+      - "Confirmation dialog for critical transitions"
+      - "Notes input for transition"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POStatusTimeline.tsx"
+    description: "Status history timeline component"
+    props:
+      - "history: POStatusHistory[]"
+      - "onEntryClick?: (entry: POStatusHistory) => void"
+    features:
+      - "Vertical timeline layout"
+      - "Status badges for from/to"
+      - "User avatar and name"
+      - "Timestamp formatting"
+      - "Expandable entry details"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POStatusTimelineItem.tsx"
+    description: "Single timeline entry"
+    props:
+      - "entry: POStatusHistory"
+      - "expanded?: boolean"
+      - "onExpand?: () => void"
+
+  - path: "apps/frontend/components/planning/purchase-orders/POStatusTransitionDialog.tsx"
+    description: "Confirmation dialog for status change"
+    props:
+      - "open: boolean"
+      - "onOpenChange: (open: boolean) => void"
+      - "fromStatus: string"
+      - "toStatus: string"
+      - "requiresReason?: boolean"
+      - "onConfirm: (notes?: string) => void"
+    features:
+      - "Warning message for critical transitions (cancel)"
+      - "Required notes input when configured"
+      - "Confirm/Cancel buttons"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-po-statuses.ts"
+    description: "React Query hook for PO statuses"
+    exports:
+      - name: "usePOStatuses"
+        params: []
+        returns: "UseQueryResult<POStatus[]>"
+      - name: "usePOStatus"
+        params: ["id: string"]
+        returns: "UseQueryResult<POStatus>"
+      - name: "useCreatePOStatus"
+        returns: "UseMutationResult"
+      - name: "useUpdatePOStatus"
+        returns: "UseMutationResult"
+      - name: "useDeletePOStatus"
+        returns: "UseMutationResult"
+      - name: "useReorderPOStatuses"
+        returns: "UseMutationResult"
+
+  - path: "apps/frontend/lib/hooks/use-po-status-transitions.ts"
+    description: "React Query hook for status transitions"
+    exports:
+      - name: "usePOStatusTransitions"
+        params: ["statusId: string"]
+        returns: "UseQueryResult<POStatusTransition[]>"
+      - name: "useUpdatePOStatusTransitions"
+        returns: "UseMutationResult"
+      - name: "useAvailableTransitions"
+        params: ["poId: string"]
+        returns: "UseQueryResult<POStatus[]>"
+      - name: "useTransitionPOStatus"
+        returns: "UseMutationResult"
+
+  - path: "apps/frontend/lib/hooks/use-po-status-history.ts"
+    description: "React Query hook for status history"
+    exports:
+      - name: "usePOStatusHistory"
+        params: ["poId: string"]
+        returns: "UseQueryResult<POStatusHistory[]>"
+
+# UX Specifications
+ux:
+  wireframes:
+    - id: "PLAN-006"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-006-po-detail.md"
+      sections:
+        - "Status Badge Color Mapping"
+        - "History Tab View"
+        - "Status Transition Rules"
+        - "Invalid Status Transition Error"
+
+  patterns:
+    table: "ShadCN DataTable with drag-reorder"
+    modal: "ShadCN Dialog with form"
+    dropdown: "ShadCN Select with custom rendering"
+    badge: "Custom Badge component with dynamic colors"
+    timeline: "Custom Timeline component"
+    confirmation: "ShadCN AlertDialog"
+
+  states:
+    - name: "loading"
+      description: "Skeleton loaders for status list"
+    - name: "empty"
+      description: "Empty state with 'Add Status' CTA"
+    - name: "error"
+      description: "Error message with retry"
+    - name: "success"
+      description: "Full status configuration view"
+
+  accessibility:
+    - "Drag-reorder keyboard accessible (arrow keys)"
+    - "Color picker with text labels"
+    - "Status badges with aria-label"
+    - "Timeline entries focusable"
+    - "Delete confirmation via dialog"
+    - "Touch targets 48px minimum"
+
+# Status Badge Color Classes (TailwindCSS)
+status_color_classes:
+  gray: "bg-gray-100 text-gray-800 border-gray-300"
+  blue: "bg-blue-100 text-blue-800 border-blue-300"
+  yellow: "bg-yellow-100 text-yellow-800 border-yellow-300"
+  green: "bg-green-100 text-green-800 border-green-300"
+  purple: "bg-purple-100 text-purple-800 border-purple-300"
+  emerald: "bg-emerald-100 text-emerald-800 border-emerald-300"
+  red: "bg-red-100 text-red-800 border-red-300"
+  orange: "bg-orange-100 text-orange-800 border-orange-300"
+  amber: "bg-amber-100 text-amber-800 border-amber-300"
+  teal: "bg-teal-100 text-teal-800 border-teal-300"
+  indigo: "bg-indigo-100 text-indigo-800 border-indigo-300"
+
+# Dependencies (npm packages)
+dependencies:
+  - "@dnd-kit/core"        # Drag and drop
+  - "@dnd-kit/sortable"    # Sortable lists
+  - "@tanstack/react-query" # Data fetching
+  - "zod"                   # Validation
+  - "lucide-react"          # Icons

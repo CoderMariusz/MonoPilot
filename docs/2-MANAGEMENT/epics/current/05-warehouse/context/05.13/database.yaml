@@ -1,0 +1,119 @@
+# Story 05.13 - Database Schema
+# Purpose: Tables, columns, constraints (enhancement to existing schema)
+# Agent: BACKEND-DEV (database focus)
+
+# NOTE: This story does NOT create new tables - it USES existing tables from 05.0 and 05.11
+
+tables_used:
+  - name: "warehouse_settings"
+    source_story: "05.0"
+    columns_read:
+      - name: "allow_over_receipt"
+        type: "BOOLEAN"
+        default: "false"
+        description: "Enable/disable over-receipt functionality"
+      - name: "over_receipt_tolerance_pct"
+        type: "DECIMAL(5,2)"
+        default: "0.00"
+        description: "Maximum allowed over-receipt percentage (0-100)"
+
+  - name: "grn_items"
+    source_story: "05.11"
+    columns_written:
+      - name: "over_receipt_flag"
+        type: "BOOLEAN"
+        default: "false"
+        description: "True if this line received more than ordered"
+      - name: "over_receipt_percentage"
+        type: "DECIMAL(5,2)"
+        default: null
+        description: "Calculated over-receipt percentage (can be negative for under-receipt)"
+
+  - name: "po_lines"
+    source_story: "03.3"
+    columns_read:
+      - name: "ordered_qty"
+        type: "DECIMAL(15,4)"
+        description: "Original ordered quantity"
+      - name: "received_qty"
+        type: "DECIMAL(15,4)"
+        description: "Cumulative quantity already received"
+
+# No new migrations for this story
+migrations: []
+
+# Database functions (no new functions - validation in service layer)
+functions: []
+
+# RLS policies (no new policies - uses existing 05.11 policies)
+rls_policies: []
+
+# Indexes (no new indexes needed)
+indexes: []
+
+# Validation logic (implemented in service layer)
+validation_logic:
+  over_receipt_calculation:
+    description: "Calculate over-receipt percentage"
+    formula: "((total_received - ordered_qty) / ordered_qty) * 100"
+    variables:
+      total_received: "previous_received_qty + current_receiving_qty"
+      ordered_qty: "po_lines.ordered_qty"
+    notes:
+      - "Result can be negative (under-receipt)"
+      - "Division by zero: if ordered_qty = 0, return 0"
+
+  validation_rules:
+    - rule: "under_receipt_always_allowed"
+      condition: "total_received <= ordered_qty"
+      action: "ALLOW"
+      flag: "over_receipt_flag = false"
+
+    - rule: "over_receipt_disabled"
+      condition: "allow_over_receipt = false AND total_received > ordered_qty"
+      action: "BLOCK"
+      error: "Over-receipt not allowed. Ordered: {ordered_qty}, Attempting: {total_received}"
+
+    - rule: "over_receipt_within_tolerance"
+      condition: "allow_over_receipt = true AND percentage <= tolerance"
+      action: "ALLOW with WARNING"
+      flag: "over_receipt_flag = true"
+      warning: "Over-receipt within tolerance ({percentage}% of {tolerance}%)"
+
+    - rule: "over_receipt_exceeds_tolerance"
+      condition: "allow_over_receipt = true AND percentage > tolerance"
+      action: "BLOCK"
+      error: "Over-receipt exceeds tolerance ({percentage}% > {tolerance}%). Maximum remaining: {max_remaining} units"
+
+    - rule: "zero_tolerance"
+      condition: "allow_over_receipt = true AND tolerance = 0 AND total_received > ordered_qty"
+      action: "BLOCK"
+      error: "Over-receipt exceeds tolerance ({percentage}% > 0.0%). Only exact quantity allowed."
+
+# Query patterns
+query_patterns:
+  get_warehouse_settings:
+    sql: |
+      SELECT allow_over_receipt, over_receipt_tolerance_pct
+      FROM warehouse_settings
+      WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    purpose: "Fetch over-receipt settings for validation"
+
+  get_po_line_quantities:
+    sql: |
+      SELECT ordered_qty, received_qty
+      FROM po_lines
+      WHERE id = $1
+        AND org_id = (SELECT org_id FROM users WHERE id = auth.uid())
+    purpose: "Get ordered and already received quantities for calculation"
+
+  update_grn_item_over_receipt:
+    sql: |
+      UPDATE grn_items
+      SET over_receipt_flag = $1,
+          over_receipt_percentage = $2
+      WHERE id = $3
+    purpose: "Record over-receipt audit data on GRN item"
+
+# Seed data (none for this story)
+seed_data: []

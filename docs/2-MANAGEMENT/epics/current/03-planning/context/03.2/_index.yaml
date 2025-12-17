@@ -1,0 +1,131 @@
+# Story 03.2 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.2"
+  name: "Supplier-Product Assignment"
+  slug: "supplier-products"
+  epic: "03-planning"
+  phase: "1A"
+  complexity: "S"
+  estimate_days: 2
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, indexes
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, types, services
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# PRD Traceability
+prd_coverage:
+  - id: "FR-PLAN-002"
+    name: "Supplier-Product Assignment"
+    description: "Link products to suppliers with optional overrides"
+    status: "implementing"
+  - id: "FR-PLAN-003"
+    name: "Default Supplier per Product"
+    description: "Automatically select supplier when adding product to PO"
+    status: "implementing"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "roles", "RLS patterns"]
+    - story: "02.1"
+      name: "Products CRUD"
+      provides: ["products table", "product_id FK"]
+    - story: "03.1"
+      name: "Suppliers CRUD"
+      provides: ["suppliers table", "supplier_id FK"]
+  blocked_by: []
+  blocks:
+    - story: "03.3"
+      name: "PO CRUD"
+      reason: "PO lines need supplier products for default pricing and lead times"
+    - story: "03.4"
+      name: "Bulk PO Creation"
+      reason: "Bulk PO groups products by default supplier"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections:
+      - "FR-PLAN-002"
+      - "FR-PLAN-003"
+      - "FR-PLAN-004"
+      - "Section 4.3: Supplier-Product Assignments"
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections:
+      - "Database Schema"
+      - "API Design"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.2.supplier-products.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-003-supplier-detail.md"
+      sections:
+        - "Products Tab"
+        - "Products Table Columns"
+        - "Product Assignment Actions"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for supplier_products"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "YAML context structure pattern"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "supplier_products table with RLS and indexes"
+  - type: "api"
+    count: 5
+    description: "CRUD endpoints for supplier-product assignments"
+  - type: "service"
+    count: 1
+    description: "supplier-product-service.ts"
+  - type: "validation"
+    count: 1
+    description: "supplier-product-validation.ts (Zod schemas)"
+  - type: "component"
+    count: 4
+    description: "SupplierProductsTable, AssignProductModal, SupplierProductForm, ProductSelectorCombobox"
+  - type: "test"
+    count: 3
+    description: "Unit + API integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Junction table with UNIQUE(supplier_id, product_id) constraint"
+  - "Only ONE is_default=true per product_id (enforced in service layer)"
+  - "RLS via supplier FK: supplier_id IN (SELECT id FROM suppliers WHERE org_id = ...)"
+  - "Lead time resolution: supplierProduct.lead_time_days ?? product.supplier_lead_time_days"
+  - "ON DELETE CASCADE for both supplier_id and product_id"
+  - "Products tab lazy loads on supplier detail page"
+
+# Business rules
+business_rules:
+  - rule: "Single Default per Product"
+    description: "Only one supplier_products record per product can have is_default = true"
+    enforcement: "Service layer with transaction"
+  - rule: "No Duplicate Assignments"
+    description: "UNIQUE(supplier_id, product_id) prevents duplicate pairs"
+    enforcement: "Database constraint"
+  - rule: "Lead Time Resolution"
+    description: "Use supplier-product lead_time_days if set, else product.supplier_lead_time_days"
+    enforcement: "Application logic"
+  - rule: "Currency Fallback"
+    description: "If supplier_products.currency is NULL, use suppliers.currency"
+    enforcement: "Application logic"
+  - rule: "Cascade Delete"
+    description: "Deleting supplier or product removes supplier_products records"
+    enforcement: "FK ON DELETE CASCADE"

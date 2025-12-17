@@ -1,0 +1,385 @@
+# Story 03.6 - API Specification
+# Purpose: Endpoints for bulk PO operations
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # 1. Bulk PO creation from product list
+  - method: "POST"
+    path: "/api/planning/purchase-orders/bulk-create"
+    file: "apps/frontend/app/api/planning/purchase-orders/bulk-create/route.ts"
+    description: "Create multiple POs grouped by default supplier"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    permission: "planning:C"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "BulkCreatePORequest"
+        schema:
+          products:
+            type: "array"
+            items:
+              product_code: "string (required, max 50)"
+              quantity: "number (required, positive, max 999999.99)"
+              expected_delivery: "string (optional, ISO date)"
+              unit_price: "number (optional, non-negative)"
+              notes: "string (optional, max 500)"
+            min_items: 1
+            max_items: 500
+          default_warehouse_id: "uuid (optional)"
+          default_expected_delivery: "string (optional, ISO date)"
+
+    response:
+      status: 200
+      type: "BulkCreatePOResult"
+      schema:
+        success: "boolean"
+        pos_created:
+          type: "array"
+          items:
+            po_id: "uuid"
+            po_number: "string"
+            supplier_id: "uuid"
+            supplier_name: "string"
+            line_count: "number"
+            total: "number"
+        errors:
+          type: "array"
+          items:
+            product_code: "string"
+            error: "string"
+        total_lines: "number"
+        total_value: "number"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid request body"
+        when: "Zod validation fails"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Permission denied"
+        when: "User lacks planning:C permission"
+
+  # 2. Import validation (parse & validate without creating)
+  - method: "POST"
+    path: "/api/planning/purchase-orders/import/validate"
+    file: "apps/frontend/app/api/planning/purchase-orders/import/validate/route.ts"
+    description: "Parse and validate import file without creating POs"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    permission: "planning:C"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "multipart/form-data"
+      body:
+        type: "FormData"
+        fields:
+          file: "File (.xlsx or .csv, max 5MB)"
+
+    response:
+      status: 200
+      type: "ImportValidationResult"
+      schema:
+        valid_rows: "number"
+        error_rows: "number"
+        preview:
+          type: "array"
+          max_items: 50
+          items:
+            row_number: "number"
+            product_code: "string"
+            product_name: "string (if found)"
+            quantity: "number"
+            supplier_name: "string (if found)"
+            expected_delivery: "string"
+            unit_price: "number"
+            errors: "string[] (optional)"
+            warnings: "string[] (optional)"
+
+    errors:
+      - status: 400
+        code: "INVALID_FILE_FORMAT"
+        message: "Invalid file format. Please upload .xlsx or .csv file."
+        when: "Unsupported file type"
+      - status: 400
+        code: "FILE_TOO_LARGE"
+        message: "File exceeds 5MB limit"
+        when: "File size > 5MB"
+      - status: 400
+        code: "MISSING_COLUMNS"
+        message: "Missing required column: {column_name}"
+        when: "Required columns not present"
+
+  # 3. Import execution (create POs from validated data)
+  - method: "POST"
+    path: "/api/planning/purchase-orders/import/execute"
+    file: "apps/frontend/app/api/planning/purchase-orders/import/execute/route.ts"
+    description: "Create POs from validated import data"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    permission: "planning:C"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "ImportExecuteRequest"
+        schema:
+          rows:
+            type: "array"
+            items:
+              product_code: "string"
+              quantity: "number"
+              expected_delivery: "string (optional)"
+              unit_price: "number (optional)"
+              notes: "string (optional)"
+            max_items: 500
+          default_warehouse_id: "uuid (optional)"
+
+    response:
+      status: 200
+      type: "BulkCreatePOResult"
+      schema: "Same as bulk-create response"
+
+    errors:
+      - status: 408
+        code: "IMPORT_TIMEOUT"
+        message: "Import timed out. Please split file into smaller batches (<500 rows)."
+        when: "Operation exceeds 60 seconds"
+
+  # 4. Export POs to Excel
+  - method: "POST"
+    path: "/api/planning/purchase-orders/export"
+    file: "apps/frontend/app/api/planning/purchase-orders/export/route.ts"
+    description: "Export POs to Excel with 3 sheets"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager", "viewer"]
+    permission: "planning:R"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "POExportRequest"
+        schema:
+          po_ids:
+            type: "array (optional)"
+            items: "uuid"
+            description: "If empty, export all (with filters)"
+          filters:
+            type: "object (optional)"
+            properties:
+              status: "string (optional)"
+              supplier_id: "uuid (optional)"
+              date_from: "string (optional, ISO date)"
+              date_to: "string (optional, ISO date)"
+
+    response:
+      status: 200
+      type: "File"
+      headers:
+        Content-Type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        Content-Disposition: "attachment; filename=POs_Export_YYYY-MM-DD_HHMMSS.xlsx"
+      description: "Excel file with 3 sheets: Summary, Lines, Metadata"
+
+    errors:
+      - status: 400
+        code: "EXPORT_LIMIT_EXCEEDED"
+        message: "Export limited to 1000 POs. Please refine your selection."
+        when: "Selection exceeds 1000 POs"
+
+  # 5. Bulk status update
+  - method: "POST"
+    path: "/api/planning/purchase-orders/bulk-status-update"
+    file: "apps/frontend/app/api/planning/purchase-orders/bulk-status-update/route.ts"
+    description: "Update status of multiple POs"
+    auth: "required"
+    roles: ["owner", "admin", "planner", "production_manager"]
+    permission_varies: true
+    permission_notes: "approve/reject requires planning:U + approval permission"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "BulkStatusUpdateRequest"
+        schema:
+          po_ids:
+            type: "array"
+            items: "uuid"
+            min_items: 1
+            max_items: 100
+          action:
+            type: "enum"
+            values: ["approve", "reject", "cancel", "confirm"]
+          reason: "string (optional, max 500)"
+
+    response:
+      status: 200
+      type: "BulkStatusUpdateResult"
+      schema:
+        success_count: "number"
+        error_count: "number"
+        results:
+          type: "array"
+          items:
+            po_id: "uuid"
+            po_number: "string"
+            status: "string (new status if success)"
+            error: "string (if failed)"
+
+    errors:
+      - status: 403
+        code: "PERMISSION_DENIED"
+        message: "You do not have permission to {action} POs"
+        when: "User lacks required permission for action"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/po-bulk-service.ts"
+    description: "Bulk PO operations service"
+    exports:
+      - name: "POBulkService"
+        type: "class"
+        methods:
+          - name: "bulkCreatePOs"
+            params: ["data: BulkCreatePOInput"]
+            returns: "Promise<BulkCreatePOResult>"
+            description: "Group products by supplier and create draft POs"
+          - name: "parseImportFile"
+            params: ["file: File"]
+            returns: "Promise<ParsedImportData>"
+            description: "Parse Excel/CSV file into row data"
+          - name: "validateImportData"
+            params: ["rows: ImportRow[]"]
+            returns: "Promise<ValidationResult>"
+            description: "Validate all rows, return valid/error split"
+          - name: "executeImport"
+            params: ["rows: ImportRow[]", "options: ImportOptions"]
+            returns: "Promise<BulkCreatePOResult>"
+            description: "Create POs from validated rows"
+          - name: "exportPOsToExcel"
+            params: ["poIds: string[]", "filters?: POFilters"]
+            returns: "Promise<Blob>"
+            description: "Generate 3-sheet Excel workbook"
+          - name: "bulkUpdateStatus"
+            params: ["poIds: string[]", "action: BulkAction", "reason?: string"]
+            returns: "Promise<BulkUpdateResult>"
+            description: "Update status of multiple POs"
+          - name: "validateBulkStatusChange"
+            params: ["poIds: string[]", "action: BulkAction"]
+            returns: "Promise<ValidationResult>"
+            description: "Check which POs can transition to target status"
+
+  - path: "apps/frontend/lib/services/excel-service.ts"
+    description: "Excel file parsing and generation"
+    exports:
+      - name: "ExcelService"
+        type: "class"
+        methods:
+          - name: "parseFile"
+            params: ["file: File"]
+            returns: "Promise<any[][]>"
+            description: "Parse .xlsx or .csv file to rows"
+          - name: "createWorkbook"
+            params: []
+            returns: "Workbook"
+            description: "Create new Excel workbook"
+          - name: "addSheet"
+            params: ["workbook: Workbook", "name: string", "data: any[][]"]
+            returns: "WorkSheet"
+            description: "Add sheet to workbook"
+          - name: "downloadWorkbook"
+            params: ["workbook: Workbook", "filename: string"]
+            returns: "void"
+            description: "Trigger file download"
+
+# Validation schemas
+validation:
+  path: "apps/frontend/lib/validation/po-bulk-schemas.ts"
+  schemas:
+    - name: "BulkPOImportRowSchema"
+      description: "Single import row validation"
+      fields:
+        product_code: "z.string().min(1).max(50)"
+        quantity: "z.number().positive().max(999999.99)"
+        expected_delivery: "z.string().datetime().optional()"
+        unit_price: "z.number().nonnegative().optional()"
+        notes: "z.string().max(500).optional()"
+        warehouse_code: "z.string().max(20).optional()"
+
+    - name: "BulkCreatePORequestSchema"
+      description: "Bulk create API request"
+      fields:
+        products: "z.array(BulkPOImportRowSchema).min(1).max(500)"
+        default_warehouse_id: "z.string().uuid().optional()"
+        default_expected_delivery: "z.string().datetime().optional()"
+
+    - name: "BulkStatusUpdateSchema"
+      description: "Bulk status update request"
+      fields:
+        po_ids: "z.array(z.string().uuid()).min(1).max(100)"
+        action: "z.enum(['approve', 'reject', 'cancel', 'confirm'])"
+        reason: "z.string().max(500).optional()"
+
+    - name: "POExportRequestSchema"
+      description: "Export request"
+      fields:
+        po_ids: "z.array(z.string().uuid()).optional()"
+        filters: "z.object({...}).optional()"
+
+# Business rules
+business_rules:
+  auto_grouping:
+    description: "Products grouped by default supplier"
+    rule: "Each product MUST have exactly one default supplier (supplier_products.is_default = true)"
+    error: "Product {code} has no default supplier assigned"
+
+  pricing_cascade:
+    description: "Unit price defaulting priority"
+    order:
+      - "Import file unit_price (if provided)"
+      - "supplier_products.unit_price (for default supplier)"
+      - "products.std_price"
+    error: "No price available for product {code}"
+
+  supplier_defaults:
+    description: "PO inherits supplier defaults"
+    fields: ["currency", "tax_code_id", "payment_terms"]
+
+  transaction_safety:
+    description: "Each supplier group is one transaction"
+    behavior: "If any line fails, entire PO group rolls back. Other groups proceed."
+
+  bulk_status_rules:
+    approve:
+      valid_from: ["pending_approval", "submitted"]
+      permission: "purchase_orders.approve"
+    reject:
+      valid_from: ["pending_approval", "submitted"]
+      permission: "purchase_orders.approve"
+    cancel:
+      valid_from: ["draft", "submitted", "pending_approval", "approved", "confirmed"]
+      blocked_when: "has_receipts (cannot cancel if receiving started)"
+    confirm:
+      valid_from: ["approved"]
+
+  limits:
+    import_rows: 500
+    import_file_size_mb: 5
+    export_pos: 1000
+    bulk_status_update: 100
+    timeout_seconds: 60

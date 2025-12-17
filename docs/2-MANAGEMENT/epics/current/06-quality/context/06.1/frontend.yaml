@@ -1,0 +1,187 @@
+# Story 06.1 - Frontend Specification
+# Purpose: Components, services, types, validation
+# Agent: FRONTEND-DEV
+
+# TypeScript Types to Create
+types:
+  - path: "apps/frontend/lib/types/quality-status.ts"
+    content: |
+      export type QualityStatusCode =
+        | 'PENDING'
+        | 'PASSED'
+        | 'FAILED'
+        | 'HOLD'
+        | 'RELEASED'
+        | 'QUARANTINED'
+        | 'COND_APPROVED';
+
+      export interface QualityStatusType {
+        code: QualityStatusCode;
+        name: string;
+        description: string;
+        color: string;
+        icon: string;
+        allows_shipment: boolean;
+        allows_consumption: boolean;
+      }
+
+      export interface StatusTransition {
+        to_status: QualityStatusCode;
+        requires_inspection: boolean;
+        requires_approval: boolean;
+        requires_reason: boolean;
+        description: string;
+      }
+
+      export interface ValidateTransitionRequest {
+        entity_type: 'lp' | 'batch' | 'inspection';
+        entity_id: string;
+        from_status: QualityStatusCode;
+        to_status: QualityStatusCode;
+        reason?: string;
+      }
+
+      export interface ValidateTransitionResponse {
+        is_valid: boolean;
+        errors?: string[];
+        warnings?: string[];
+        required_actions?: {
+          inspection_required?: boolean;
+          approval_required?: boolean;
+          reason_required?: boolean;
+        };
+      }
+
+      export interface ChangeStatusRequest {
+        entity_type: 'lp' | 'batch' | 'inspection';
+        entity_id: string;
+        to_status: QualityStatusCode;
+        reason: string;
+        inspection_id?: string;
+      }
+
+      export interface ChangeStatusResponse {
+        success: boolean;
+        new_status: QualityStatusCode;
+        history_id: string;
+        warnings?: string[];
+      }
+
+      export interface StatusHistoryEntry {
+        id: string;
+        from_status: QualityStatusCode | null;
+        to_status: QualityStatusCode;
+        reason: string;
+        changed_by: string;
+        changed_by_name: string;
+        changed_at: string;
+      }
+
+# Zod Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/quality-status-validation.ts"
+    content: |
+      import { z } from 'zod';
+
+      export const qualityStatusEnum = z.enum([
+        'PENDING',
+        'PASSED',
+        'FAILED',
+        'HOLD',
+        'RELEASED',
+        'QUARANTINED',
+        'COND_APPROVED',
+      ]);
+
+      export const entityTypeEnum = z.enum(['lp', 'batch', 'inspection']);
+
+      export const validateTransitionSchema = z.object({
+        entity_type: entityTypeEnum,
+        entity_id: z.string().uuid('Invalid entity ID'),
+        from_status: qualityStatusEnum,
+        to_status: qualityStatusEnum,
+        reason: z.string().min(10, 'Reason must be at least 10 characters').max(500).optional(),
+      }).refine(
+        (data) => data.from_status !== data.to_status,
+        { message: 'From and to status cannot be the same', path: ['to_status'] }
+      );
+
+      export const changeStatusSchema = z.object({
+        entity_type: entityTypeEnum,
+        entity_id: z.string().uuid('Invalid entity ID'),
+        to_status: qualityStatusEnum,
+        reason: z.string().min(10, 'Reason must be at least 10 characters').max(500),
+        inspection_id: z.string().uuid().optional(),
+      });
+
+# Components
+components:
+  - path: "apps/frontend/components/quality/StatusBadge.tsx"
+    description: "Status badge with color coding and icon"
+    props:
+      - { name: "status", type: "QualityStatusCode", required: true }
+      - { name: "size", type: "'sm' | 'md' | 'lg'", required: false, default: "md" }
+      - { name: "showIcon", type: "boolean", required: false, default: true }
+
+  - path: "apps/frontend/components/quality/StatusTransitionModal.tsx"
+    description: "Modal for changing quality status with validation"
+    props:
+      - { name: "entityType", type: "'lp' | 'batch' | 'inspection'", required: true }
+      - { name: "entityId", type: "string", required: true }
+      - { name: "currentStatus", type: "QualityStatusCode", required: true }
+      - { name: "onSuccess", type: "() => void", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onOpenChange", type: "(open: boolean) => void", required: true }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-quality-status.ts"
+    description: "React Query hooks for quality status operations"
+    exports:
+      - name: "useStatusTypes"
+        returns: "UseQueryResult<QualityStatusType[]>"
+      - name: "useValidTransitions"
+        params: ["currentStatus: string"]
+        returns: "UseQueryResult<StatusTransition[]>"
+      - name: "useStatusHistory"
+        params: ["entityType: string", "entityId: string"]
+        returns: "UseQueryResult<StatusHistoryEntry[]>"
+      - name: "useChangeStatus"
+        returns: "UseMutationResult"
+
+# UX Notes
+ux:
+  wireframes:
+    - id: "QA-001"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/QA-001-dashboard.md"
+      relevance: "Status badge colors, KPI cards display status counts"
+      components: ["StatusBadge"]
+
+  patterns:
+    badge: "ShadCN Badge component with custom colors per status"
+    modal: "ShadCN Dialog for status transition with form validation"
+    toast: "ShadCN Toast for success/error feedback"
+
+  states:
+    - loading: "Skeleton while fetching transitions"
+    - empty: "No valid transitions available (show message)"
+    - error: "Error toast on API failure"
+    - success: "Success toast on status change"
+
+  accessibility:
+    - "Status badge uses color + icon + text for accessibility"
+    - "Modal has proper focus management"
+    - "Form validation messages are accessible"
+    - "Keyboard navigation for select dropdowns"
+
+# Pages (optional - may be part of other stories)
+pages: []
+
+# Integration with Epic 05 (License Plates)
+integration:
+  - description: "StatusBadge used in LP list table and detail pages"
+    files:
+      - "apps/frontend/app/(authenticated)/warehouse/license-plates/page.tsx"
+      - "apps/frontend/app/(authenticated)/warehouse/license-plates/[id]/page.tsx"
+  - description: "StatusTransitionModal can be opened from LP detail page"
+    trigger: "Change Status button on LP detail page"

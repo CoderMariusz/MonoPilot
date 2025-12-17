@@ -1,0 +1,519 @@
+# Story 02.5a - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/bom-items-service.test.ts"
+    type: "unit"
+    description: "Unit tests for BOM items service functions"
+
+  - path: "apps/frontend/lib/validation/__tests__/bom-items.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+
+  - path: "apps/frontend/app/api/v1/technical/boms/[id]/items/__tests__/route.test.ts"
+    type: "integration"
+    description: "API route integration tests"
+
+  - path: "apps/frontend/components/technical/bom/__tests__/BOMItemsTable.test.tsx"
+    type: "component"
+    description: "Component tests for BOM items table"
+
+  - path: "apps/frontend/components/technical/bom/__tests__/BOMItemModal.test.tsx"
+    type: "component"
+    description: "Component tests for BOM item modal"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # AC-1: BOM Items List
+  - id: "AC-01"
+    name: "BOM Items List Display"
+    given: "user navigates to BOM detail /technical/boms/:id"
+    when: "items section loads"
+    then: "BOM items display in sequence order within 500ms for up to 100 items"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-01-b"
+    name: "BOM Items Row Display"
+    given: "BOM has 50 items"
+    when: "items table renders"
+    then: "each row shows: sequence, component code+name, type badge, quantity, UoM, operation assignment, scrap%, actions menu"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-01-c"
+    name: "Scrap Display"
+    given: "BOM item has scrap_percent > 0"
+    when: "row renders"
+    then: "scrap percentage displays (e.g., 'Scrap: 2.0%')"
+    test_type: "component"
+    priority: "P1"
+
+  # AC-2: Add BOM Item
+  - id: "AC-02-a"
+    name: "Add Item Modal Opens"
+    given: "user clicks '[+ Add Item]'"
+    when: "modal opens"
+    then: "form displays: component selector, quantity, UoM, sequence (auto-filled with max+10), scrap%, operation assignment, notes"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-02-b"
+    name: "Valid Item Creation"
+    given: "user selects component RM-001 (base_uom: kg), enters quantity 50 with uom 'kg'"
+    when: "save attempted"
+    then: "validation passes and item created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02-c"
+    name: "Invalid Quantity Zero"
+    given: "user enters quantity 0 or negative"
+    when: "save attempted"
+    then: "error 'Quantity must be greater than 0' displays inline"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-02-d"
+    name: "Successful Save"
+    given: "valid item data with operation_seq=10"
+    when: "'Save Item' clicked"
+    then: "item created, modal closes, items table refreshes, success toast shows"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02-e"
+    name: "Save & Add Another"
+    given: "user clicks 'Save & Add Another'"
+    when: "save completes"
+    then: "modal stays open with cleared form (except sequence incremented)"
+    test_type: "component"
+    priority: "P1"
+
+  # AC-3: Edit BOM Item
+  - id: "AC-03-a"
+    name: "Edit Modal Pre-Population"
+    given: "user clicks 'Edit' on existing item"
+    when: "modal opens"
+    then: "form pre-populates with current item data"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-03-b"
+    name: "Quantity Update"
+    given: "user changes quantity from 50 to 75"
+    when: "save completes"
+    then: "updated quantity displays immediately in items table"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03-c"
+    name: "Operation Assignment Update"
+    given: "user assigns operation_seq from 'None' to 'Op 1: Mixing'"
+    when: "save completes"
+    then: "operation column shows 'Op 1: Mixing'"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-4: Delete BOM Item
+  - id: "AC-04-a"
+    name: "Delete Confirmation"
+    given: "user clicks 'Delete' on item"
+    when: "confirmation dialog accepted"
+    then: "item removed from table within 500ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04-b"
+    name: "Delete Cancellation"
+    given: "user cancels delete confirmation"
+    when: "dialog dismissed"
+    then: "item remains unchanged"
+    test_type: "component"
+    priority: "P1"
+
+  # AC-5: Operation Assignment (FR-2.31)
+  - id: "AC-05-a"
+    name: "Operation Dropdown With Routing"
+    given: "BOM has routing_id assigned"
+    when: "adding/editing item"
+    then: "operation dropdown shows all operations from routing ('Op 1: Mixing', 'Op 2: Proofing', etc.)"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-05-b"
+    name: "Operation Dropdown Without Routing"
+    given: "BOM has no routing assigned"
+    when: "adding/editing item"
+    then: "operation dropdown disabled with message 'Assign routing to BOM first'"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-05-c"
+    name: "Operation Display"
+    given: "item assigned to operation_seq=10"
+    when: "that operation displays"
+    then: "operation name shows (e.g., 'Op 10: Mixing')"
+    test_type: "component"
+    priority: "P0"
+
+  # AC-6: UoM Validation (FR-2.38)
+  - id: "AC-06-a"
+    name: "UoM Match - No Warning"
+    given: "component RM-001 has base_uom 'kg'"
+    when: "user enters 'kg' for item UoM"
+    then: "no warning shown"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-06-b"
+    name: "UoM Mismatch - Warning Shown"
+    given: "component RM-001 has base_uom 'kg'"
+    when: "user enters 'L' for item UoM"
+    then: "warning banner shows 'UoM mismatch: component base UoM is kg, you entered L. Unit conversion may be required.'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06-c"
+    name: "UoM Mismatch - Save Succeeds"
+    given: "UoM mismatch warning shown"
+    when: "user proceeds with save"
+    then: "server trigger logs WARNING (not error) and save succeeds"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-7: Quantity Validation (FR-2.39)
+  - id: "AC-07-a"
+    name: "Valid Decimal Precision"
+    given: "user enters quantity '50.123456'"
+    when: "validation runs"
+    then: "passes (6 decimal places allowed)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07-b"
+    name: "Invalid Decimal Precision"
+    given: "user enters quantity '50.1234567'"
+    when: "validation runs"
+    then: "error 'Maximum 6 decimal places allowed'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07-c"
+    name: "Invalid Quantity Zero/Negative"
+    given: "user enters quantity '0' or '-5'"
+    when: "save attempted"
+    then: "error 'Quantity must be greater than 0'"
+    test_type: "unit"
+    priority: "P0"
+
+  # AC-8: Sequence Management
+  - id: "AC-08-a"
+    name: "Sequence Auto-Increment"
+    given: "BOM has items with sequences 10, 20, 30"
+    when: "new item added"
+    then: "sequence defaults to 40 (max + 10)"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-08-b"
+    name: "Sequence Reorder"
+    given: "user edits item sequence from 20 to 15"
+    when: "save completes"
+    then: "items reorder in table by sequence"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-08-c"
+    name: "Duplicate Sequence Warning"
+    given: "duplicate sequence entered"
+    when: "save attempted"
+    then: "warning 'Duplicate sequence. Items may appear in unexpected order.' (warning, not error)"
+    test_type: "unit"
+    priority: "P2"
+
+  # AC-9: Permission Enforcement
+  - id: "AC-09-a"
+    name: "Read-Only Without Write Permission"
+    given: "user without technical write permission"
+    when: "BOM items page loaded"
+    then: "'[+ Add Item]' button hidden, Edit/Delete actions hidden"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-09-b"
+    name: "View-Only Mode"
+    given: "user with technical read-only permission"
+    when: "items displayed"
+    then: "view-only mode (no edit controls)"
+    test_type: "component"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  bom_items_service:
+    - name: "getBOMItems returns items for valid BOM ID"
+      setup: "Mock successful API response with 5 items"
+      expected: "Returns BOMItemsListResponse with 5 items"
+
+    - name: "getBOMItems throws error for invalid BOM"
+      setup: "Mock 404 API response"
+      expected: "Throws error 'BOM not found'"
+
+    - name: "createBOMItem sends correct payload"
+      setup: "Mock successful API response"
+      params: ["bomId: 'uuid'", "data: CreateBOMItemRequest"]
+      expected: "POST request with correct body"
+
+    - name: "createBOMItem returns warnings for UoM mismatch"
+      setup: "Mock response with warnings array"
+      expected: "Returns BOMItemResponse with warnings"
+
+    - name: "updateBOMItem sends correct payload"
+      setup: "Mock successful API response"
+      params: ["bomId: 'uuid'", "itemId: 'uuid'", "data: UpdateBOMItemRequest"]
+      expected: "PUT request with correct body"
+
+    - name: "deleteBOMItem removes item"
+      setup: "Mock successful API response"
+      expected: "DELETE request sent, returns success"
+
+    - name: "getNextSequence returns max + 10"
+      setup: "Mock response with next_sequence: 40"
+      expected: "Returns 40"
+
+  validation_schemas:
+    - name: "bomItemFormSchema validates positive quantity"
+      input: "{ quantity: 50 }"
+      expected: "Passes validation"
+
+    - name: "bomItemFormSchema rejects zero quantity"
+      input: "{ quantity: 0 }"
+      expected: "Error: Quantity must be greater than 0"
+
+    - name: "bomItemFormSchema rejects negative quantity"
+      input: "{ quantity: -5 }"
+      expected: "Error: Quantity must be greater than 0"
+
+    - name: "bomItemFormSchema validates 6 decimal places"
+      input: "{ quantity: 50.123456 }"
+      expected: "Passes validation"
+
+    - name: "bomItemFormSchema rejects 7 decimal places"
+      input: "{ quantity: 50.1234567 }"
+      expected: "Error: Maximum 6 decimal places allowed"
+
+    - name: "bomItemFormSchema validates scrap percent range"
+      input: "{ scrap_percent: 50 }"
+      expected: "Passes validation"
+
+    - name: "bomItemFormSchema rejects scrap > 100"
+      input: "{ scrap_percent: 101 }"
+      expected: "Error: Scrap % cannot exceed 100%"
+
+    - name: "bomItemFormSchema validates notes max length"
+      input: "{ notes: 'x'.repeat(500) }"
+      expected: "Passes validation"
+
+    - name: "bomItemFormSchema rejects notes > 500 chars"
+      input: "{ notes: 'x'.repeat(501) }"
+      expected: "Error: Notes must be less than 500 characters"
+
+# Integration Test Cases (API)
+integration_tests:
+  api_endpoints:
+    - name: "GET /api/v1/technical/boms/:id/items returns items"
+      setup: |
+        - Create BOM with 3 items
+        - Create operations in routing
+      action: "GET /api/v1/technical/boms/{bomId}/items"
+      expected: |
+        - Status 200
+        - 3 items returned in sequence order
+        - Each item has product details joined
+
+    - name: "GET /api/v1/technical/boms/:id/items returns 404 for invalid BOM"
+      setup: "No BOM exists"
+      action: "GET /api/v1/technical/boms/{invalidId}/items"
+      expected: |
+        - Status 404
+        - Error: BOM not found
+
+    - name: "POST /api/v1/technical/boms/:id/items creates item"
+      setup: |
+        - Create BOM
+        - Create product (RM type)
+      action: "POST with valid CreateBOMItemRequest"
+      expected: |
+        - Status 201
+        - Item created with auto-sequence
+        - Returns BOMItemResponse
+
+    - name: "POST /api/v1/technical/boms/:id/items returns UoM mismatch warning"
+      setup: |
+        - Create BOM
+        - Create product with base_uom 'kg'
+      action: "POST with uom: 'L' (mismatched)"
+      expected: |
+        - Status 201 (save succeeds)
+        - Response includes warnings array with UOM_MISMATCH
+
+    - name: "POST /api/v1/technical/boms/:id/items rejects zero quantity"
+      setup: "Create BOM"
+      action: "POST with quantity: 0"
+      expected: |
+        - Status 400
+        - Error: Quantity must be greater than 0
+
+    - name: "POST /api/v1/technical/boms/:id/items validates operation exists"
+      setup: |
+        - Create BOM with routing
+        - Routing has operations 10, 20, 30
+      action: "POST with operation_seq: 99 (non-existent)"
+      expected: |
+        - Status 400
+        - Error: Operation does not exist in assigned routing
+
+    - name: "POST /api/v1/technical/boms/:id/items rejects operation without routing"
+      setup: "Create BOM without routing_id"
+      action: "POST with operation_seq: 10"
+      expected: |
+        - Status 400
+        - Error: Cannot assign operation: BOM has no routing assigned
+
+    - name: "PUT /api/v1/technical/boms/:id/items/:itemId updates item"
+      setup: |
+        - Create BOM with item
+      action: "PUT with updated quantity"
+      expected: |
+        - Status 200
+        - Item updated
+        - Returns updated item
+
+    - name: "DELETE /api/v1/technical/boms/:id/items/:itemId removes item"
+      setup: "Create BOM with item"
+      action: "DELETE item"
+      expected: |
+        - Status 200
+        - Item removed from database
+
+    - name: "RLS blocks cross-tenant item access"
+      setup: |
+        - Create Org A with BOM and items
+        - Create Org B user
+      action: "Org B user queries Org A BOM items"
+      expected: |
+        - Status 404 (not 403)
+        - No items visible
+
+# Component Test Cases
+component_tests:
+  BOMItemsTable:
+    - name: "renders all items in sequence order"
+      props: "items: [seq 30, seq 10, seq 20]"
+      expected: "Items displayed as 10, 20, 30"
+
+    - name: "displays type badge with correct variant"
+      props: "items with types RM, ING, PKG"
+      expected: "Each type has distinct badge color"
+
+    - name: "shows scrap percentage when > 0"
+      props: "item with scrap_percent: 2.5"
+      expected: "Shows 'Scrap: 2.5%'"
+
+    - name: "hides actions when canEdit is false"
+      props: "canEdit: false"
+      expected: "No Edit/Delete buttons visible"
+
+    - name: "calculates total input in footer"
+      props: "3 items totaling 100 kg"
+      expected: "Footer shows 'Total Input: 100 kg'"
+
+  BOMItemModal:
+    - name: "opens in create mode with empty form"
+      props: "item: null, defaultSequence: 40"
+      expected: "Empty form, sequence pre-filled with 40"
+
+    - name: "opens in edit mode with pre-populated data"
+      props: "item: { quantity: 50, ... }"
+      expected: "Form populated with item data"
+
+    - name: "auto-fills UoM when product selected"
+      action: "Select product with base_uom 'kg'"
+      expected: "UoM field shows 'kg' (read-only)"
+
+    - name: "disables operation dropdown when no routing"
+      props: "routingId: null"
+      expected: "Dropdown disabled, shows 'Assign routing to BOM first'"
+
+    - name: "shows validation errors inline"
+      action: "Submit with quantity: 0"
+      expected: "Error message under quantity field"
+
+    - name: "resets form for Save & Add Another"
+      action: "Click 'Save & Add Another', save succeeds"
+      expected: "Form cleared, sequence incremented, modal stays open"
+
+# Definition of Done
+definition_of_done:
+  - "BOM items table displays within 500ms for 100 items"
+  - "Add item with MVP fields works end-to-end"
+  - "Edit item updates immediately in UI"
+  - "Delete item with confirmation works"
+  - "Operation assignment dropdown populates from routing"
+  - "UoM mismatch shows warning (not blocking error)"
+  - "Quantity validation enforces > 0 and 6 decimal limit"
+  - "Sequence auto-increments by 10"
+  - "Permission checks hide unauthorized actions"
+  - "All API endpoints have integration tests"
+  - "Unit tests cover bom-items-service (>80% coverage)"
+  - "TEC-006a wireframe implemented (MVP subset)"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Business logic must be thoroughly tested"
+  integration:
+    target: 80
+    reason: "API endpoints need comprehensive testing"
+  component:
+    target: 70
+    reason: "UI components need basic coverage"
+  files:
+    - "lib/services/bom-items-service.ts: 80%"
+    - "lib/validation/bom-items.ts: 95%"
+    - "components/technical/bom/BOMItemsTable.tsx: 70%"
+    - "components/technical/bom/BOMItemModal.tsx: 70%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "UoM mismatch warning might confuse users"
+    mitigation: "Clear warning message explaining the issue and allowing save"
+    severity: "medium"
+    test_coverage: "AC-06 tests"
+
+  - id: "RISK-02"
+    description: "Performance with 100+ items"
+    mitigation: "Pagination or virtualization if needed"
+    severity: "low"
+    test_coverage: "AC-01 performance test"
+
+  - id: "RISK-03"
+    description: "Operation validation requires routing lookup"
+    mitigation: "Validate on server, cache routing operations on client"
+    severity: "low"
+    test_coverage: "AC-05 tests"
+
+# Output Artifacts
+output_artifacts:
+  - "API routes: GET/POST/PUT/DELETE /api/v1/technical/boms/:id/items/*"
+  - "BOMItemsTable component (MVP version)"
+  - "BOMItemModal component (MVP fields only)"
+  - "bom-items-service.ts"
+  - "Zod validation schemas"
+  - "Integration tests for all API endpoints"
+  - "Unit tests for bom-items-service (>80% coverage)"

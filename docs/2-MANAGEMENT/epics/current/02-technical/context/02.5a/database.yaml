@@ -1,0 +1,185 @@
+# Story 02.5a - Database Schema
+# Purpose: Tables, RLS policies, indexes, triggers, constraints
+# Agent: BACKEND-DEV (database focus)
+
+# Note: Migration 049 already deployed - no new migrations needed
+migrations:
+  - path: "supabase/migrations/049_add_uom_validation.sql"
+    type: "migration"
+    description: "BOM item UoM validation trigger and quantity check (DEPLOYED)"
+    status: "deployed"
+
+# Tables
+tables:
+  - name: "bom_items"
+    description: "BOM line items - components/ingredients for a Bill of Materials"
+    status: "exists"  # Table already exists, this story implements API/UI
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "bom_id", type: "UUID", constraints: "NOT NULL REFERENCES boms(id) ON DELETE CASCADE" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "operation_seq", type: "INTEGER", constraints: "NULL" }  # FK to routing_operations.sequence
+      - { name: "is_output", type: "BOOLEAN", constraints: "DEFAULT false" }  # For byproducts (Phase 1+)
+      - { name: "quantity", type: "DECIMAL(15,6)", constraints: "NOT NULL CHECK (quantity > 0)" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "sequence", type: "INTEGER", constraints: "DEFAULT 0" }  # For ordering (10, 20, 30...)
+      - { name: "line_ids", type: "UUID[]", constraints: "" }  # Line-specific (Phase 1+)
+      - { name: "scrap_percent", type: "DECIMAL(5,2)", constraints: "DEFAULT 0" }
+      - { name: "consume_whole_lp", type: "BOOLEAN", constraints: "DEFAULT false" }
+      - { name: "is_by_product", type: "BOOLEAN", constraints: "DEFAULT false" }  # Phase 1+
+      - { name: "yield_percent", type: "DECIMAL(5,2)", constraints: "" }  # Phase 1+
+      - { name: "condition_flags", type: "JSONB", constraints: "" }  # Phase 1+
+      - { name: "notes", type: "TEXT", constraints: "CHECK (char_length(notes) <= 500)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "bom_id IN (SELECT id FROM boms WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    indexes:
+      - "idx_bom_items_bom ON bom_items(bom_id)"
+      - "idx_bom_items_product ON bom_items(product_id)"
+      - "idx_bom_items_sequence ON bom_items(bom_id, sequence)"
+    constraints:
+      - "CHECK (quantity > 0)"
+      - "CHECK (scrap_percent >= 0 AND scrap_percent <= 100)"
+      - "CHECK (notes IS NULL OR char_length(notes) <= 500)"
+
+# MVP Fields (used in this story)
+mvp_fields:
+  - { name: "product_id", required: true, description: "Component product FK" }
+  - { name: "quantity", required: true, description: "Amount needed per batch" }
+  - { name: "uom", required: true, description: "Unit of measure" }
+  - { name: "sequence", required: false, description: "Order (default: max+10)" }
+  - { name: "operation_seq", required: false, description: "Routing operation assignment" }
+  - { name: "scrap_percent", required: false, description: "Expected material loss %" }
+  - { name: "notes", required: false, description: "Production notes (max 500 chars)" }
+
+# Phase 1+ Fields (hidden in MVP UI)
+deferred_fields:
+  - { name: "is_output", phase: "1+", story: "02.5b" }
+  - { name: "line_ids", phase: "1+", story: "02.5b" }
+  - { name: "is_by_product", phase: "1+", story: "02.5b" }
+  - { name: "yield_percent", phase: "1+", story: "02.5b" }
+  - { name: "condition_flags", phase: "1+", story: "02.5b" }
+  - { name: "consume_whole_lp", phase: "1+", story: "02.5b" }
+
+# Triggers (from Migration 049)
+triggers:
+  - name: "validate_bom_item_uom"
+    table: "bom_items"
+    event: "BEFORE INSERT OR UPDATE"
+    description: "Validates UoM matches component base UoM (WARNING, not error)"
+    status: "deployed"
+    sql: |
+      CREATE OR REPLACE FUNCTION validate_bom_item_uom()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        component_base_uom TEXT;
+      BEGIN
+        SELECT base_uom INTO component_base_uom
+        FROM products WHERE id = NEW.product_id;
+
+        IF NEW.uom != component_base_uom THEN
+          RAISE WARNING 'BOM item UoM (%) does not match component base UoM (%)',
+            NEW.uom, component_base_uom;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER bom_item_uom_validation
+        BEFORE INSERT OR UPDATE ON bom_items
+        FOR EACH ROW
+        EXECUTE FUNCTION validate_bom_item_uom();
+
+# Constraints (from Migration 049)
+constraints:
+  - name: "bom_item_quantity_positive"
+    table: "bom_items"
+    type: "CHECK"
+    expression: "quantity > 0"
+    status: "deployed"
+    description: "Quantity must be greater than 0 (FR-2.39)"
+
+# RLS Policies
+rls_policies:
+  pattern: "BOM items inherit RLS from parent boms table"
+  pattern_sql: "bom_id IN (SELECT id FROM boms WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+  rationale:
+    - "Items belong to BOMs, which have org_id"
+    - "Lookup through boms table for org isolation"
+    - "Consistent with ADR-013 pattern"
+
+  policies:
+    - name: "bom_items_select_own_org"
+      table: "bom_items"
+      operation: "SELECT"
+      using: "bom_id IN (SELECT id FROM boms WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    - name: "bom_items_insert_own_org"
+      table: "bom_items"
+      operation: "INSERT"
+      with_check: "bom_id IN (SELECT id FROM boms WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    - name: "bom_items_update_own_org"
+      table: "bom_items"
+      operation: "UPDATE"
+      using: "bom_id IN (SELECT id FROM boms WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+    - name: "bom_items_delete_own_org"
+      table: "bom_items"
+      operation: "DELETE"
+      using: "bom_id IN (SELECT id FROM boms WHERE org_id = (SELECT org_id FROM users WHERE id = auth.uid()))"
+
+# Related Tables (FK lookups)
+related_tables:
+  - name: "boms"
+    relationship: "parent"
+    description: "BOM header (FK: bom_id)"
+    fields_needed: ["id", "org_id", "product_id", "routing_id", "output_qty", "output_uom"]
+
+  - name: "products"
+    relationship: "lookup"
+    description: "Component product (FK: product_id)"
+    fields_needed: ["id", "code", "name", "product_type_id", "base_uom", "cost_per_unit"]
+    filter: "product_type IN ('RM', 'ING', 'PKG', 'WIP')"
+
+  - name: "routing_operations"
+    relationship: "lookup"
+    description: "Operation assignment (FK: operation_seq via bom.routing_id)"
+    fields_needed: ["sequence", "name"]
+    filter: "routing_id = bom.routing_id"
+
+# Business Rules
+business_rules:
+  - rule: "Quantity must be > 0"
+    enforcement: "Database constraint (migration 049)"
+    error_type: "blocking"
+
+  - rule: "Quantity max 6 decimal places"
+    enforcement: "Zod schema validation"
+    error_type: "blocking"
+
+  - rule: "UoM should match component base_uom"
+    enforcement: "Database trigger WARNING (migration 049)"
+    error_type: "warning"
+    action: "Log warning, allow save"
+
+  - rule: "Sequence auto-increment by 10"
+    enforcement: "Service layer"
+    error_type: "none"
+    action: "Default to max(sequence) + 10"
+
+  - rule: "Duplicate sequence warning"
+    enforcement: "Frontend validation"
+    error_type: "warning"
+    action: "Show warning, allow save"
+
+  - rule: "Operation must exist in BOM's routing"
+    enforcement: "API validation"
+    error_type: "blocking"
+    condition: "If routing_id is set"
+
+  - rule: "Notes max 500 characters"
+    enforcement: "Database constraint + Zod"
+    error_type: "blocking"
+
+  - rule: "Scrap percent 0-100"
+    enforcement: "Database constraint + Zod"
+    error_type: "blocking"

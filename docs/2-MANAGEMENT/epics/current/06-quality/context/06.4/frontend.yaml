@@ -1,0 +1,257 @@
+# Story 06.4 - Frontend Specification
+# Purpose: Components, hooks, UX patterns
+# Agent: FRONTEND-DEV
+
+# Note: This is a full-stack story with significant frontend work
+is_backend_focused: false
+
+# UX References
+ux:
+  wireframes:
+    - id: "QA-004"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/QA-004-test-templates.md"
+      sections:
+        - "Add/Edit Parameter Modal"
+        - "Test Parameters table"
+        - "Clone Template Modal"
+      components:
+        - "ParameterTable"
+        - "ParameterForm"
+        - "CriticalBadge"
+        - "TypeBadge"
+  patterns:
+    table: "ShadCN DataTable with drag-to-reorder"
+    modal: "ShadCN Dialog for Add/Edit Parameter"
+    form: "React Hook Form + Zod validation"
+    dnd: "@dnd-kit/core or react-dnd for drag-to-reorder"
+  states:
+    - "loading"
+    - "empty"
+    - "error"
+    - "success"
+    - "read-only (active specs)"
+
+# Components to Create
+components:
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/components/ParameterEditor.tsx"
+    description: "Main parameter editor - integrates into Specification Detail page"
+    props:
+      specId: "string"
+      specStatus: "'draft' | 'active' | 'expired' | 'superseded'"
+    features:
+      - "Shows parameter list or empty state"
+      - "Header with count: 'X parameters (Y critical)'"
+      - "Add parameter button (draft only)"
+      - "Type breakdown summary"
+      - "Passes spec status to children for read-only mode"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/components/ParameterTable.tsx"
+    description: "Draggable parameter list with columns"
+    props:
+      parameters: "QualitySpecParameter[]"
+      isDraft: "boolean"
+      onReorder: "(ids: string[]) => void"
+      onEdit: "(id: string) => void"
+      onDelete: "(id: string) => void"
+    features:
+      - "Uses @dnd-kit/sortable for drag-to-reorder"
+      - "Columns: Drag Handle, Sequence, Name, Type, Target/Range, Unit, Test Method, Critical, Actions"
+      - "Drag handles visible only for draft specs"
+      - "Optimistic UI update on drop"
+      - "Responsive: mobile shows simplified view"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/components/ParameterForm.tsx"
+    description: "Add/Edit parameter form modal"
+    props:
+      specId: "string"
+      parameter: "QualitySpecParameter | null"
+      open: "boolean"
+      onOpenChange: "(open: boolean) => void"
+      onSuccess: "() => void"
+    features:
+      - "Parameter Name input (required)"
+      - "Type selector with conditional fields"
+      - "Min/Max/Target/Unit fields (type-dependent)"
+      - "Test Method autocomplete"
+      - "Critical toggle"
+      - "Instrument Required toggle + dropdown"
+      - "Acceptance Criteria textarea"
+      - "Sampling Instructions textarea"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/components/ParameterRow.tsx"
+    description: "Individual parameter row in table"
+    props:
+      parameter: "QualitySpecParameter"
+      isDraft: "boolean"
+      isDragging: "boolean"
+    features:
+      - "Drag handle (if draft)"
+      - "Sequence badge"
+      - "Parameter name (bold if critical)"
+      - "Type badge (color-coded)"
+      - "Value display based on type"
+      - "Test method (truncated with tooltip)"
+      - "Critical badge"
+      - "Edit/Delete actions (draft only)"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/components/ParameterTypeSelector.tsx"
+    description: "Type dropdown with conditional field visibility"
+    props:
+      value: "ParameterType"
+      onChange: "(type: ParameterType) => void"
+    features:
+      - "4 type options with descriptions"
+      - "Emits type change to parent form"
+      - "Icons per type"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/components/TestMethodAutocomplete.tsx"
+    description: "Autocomplete for common test methods"
+    props:
+      value: "string"
+      onChange: "(method: string) => void"
+    features:
+      - "Combobox with common methods"
+      - "Grouped by category (AOAC, ISO, Visual, Equipment)"
+      - "Allows custom entry"
+      - "Shows recently used"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/components/UnitSelector.tsx"
+    description: "Unit dropdown with common units"
+    props:
+      value: "string"
+      onChange: "(unit: string) => void"
+    features:
+      - "Common units grouped by category"
+      - "Allows custom entry"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/components/CriticalBadge.tsx"
+    description: "Visual indicator for critical parameters"
+    props:
+      isCritical: "boolean"
+    features:
+      - "Red badge with 'Critical' text"
+      - "Tooltip: 'Critical parameter - must pass for overall inspection pass'"
+      - "AlertCircle icon"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/components/ParameterTypeBadge.tsx"
+    description: "Type badge with color coding"
+    props:
+      type: "ParameterType"
+    features:
+      - "numeric: blue"
+      - "text: green"
+      - "boolean: purple"
+      - "range: orange"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/components/DeleteParameterDialog.tsx"
+    description: "Confirmation dialog for parameter deletion"
+    props:
+      parameterName: "string"
+      open: "boolean"
+      onOpenChange: "(open: boolean) => void"
+      onConfirm: "() => void"
+      isDeleting: "boolean"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/quality-parameter.ts"
+    content: |
+      export type ParameterType = 'numeric' | 'text' | 'boolean' | 'range';
+
+      export interface QualitySpecParameter {
+        id: string;
+        spec_id: string;
+        sequence: number;
+        parameter_name: string;
+        parameter_type: ParameterType;
+        target_value: string | null;
+        min_value: number | null;
+        max_value: number | null;
+        unit: string | null;
+        test_method: string | null;
+        instrument_required: boolean;
+        instrument_id: string | null;
+        instrument_name?: string | null;
+        is_critical: boolean;
+        acceptance_criteria: string | null;
+        sampling_instructions: string | null;
+        created_at: string;
+        created_by: string;
+        updated_at: string;
+        updated_by: string | null;
+      }
+
+      export interface CreateParameterRequest {
+        parameter_name: string;
+        parameter_type: ParameterType;
+        target_value?: string;
+        min_value?: number;
+        max_value?: number;
+        unit?: string;
+        test_method?: string;
+        instrument_required?: boolean;
+        instrument_id?: string | null;
+        is_critical?: boolean;
+        acceptance_criteria?: string;
+        sampling_instructions?: string;
+      }
+
+      export interface UpdateParameterRequest extends Partial<CreateParameterRequest> {}
+
+      export interface ReorderParametersRequest {
+        parameter_ids: string[];
+      }
+
+      export interface ParameterValidationResult {
+        valid: boolean;
+        reason?: string;
+      }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-spec-parameters.ts"
+    description: "React Query hook for fetching spec parameters"
+    exports:
+      - name: "useSpecParameters"
+        params: ["specId: string"]
+        returns: "UseQueryResult<QualitySpecParameter[]>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { SpecParameterService } from '@/lib/services/spec-parameter-service';
+
+      export function useSpecParameters(specId: string) {
+        return useQuery({
+          queryKey: ['spec-parameters', specId],
+          queryFn: () => SpecParameterService.getBySpecId(specId),
+          enabled: !!specId,
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-parameter-mutations.ts"
+    description: "React Query mutations for parameter CRUD"
+    exports:
+      - name: "useCreateParameter"
+        returns: "UseMutationResult"
+      - name: "useUpdateParameter"
+        returns: "UseMutationResult"
+      - name: "useDeleteParameter"
+        returns: "UseMutationResult"
+      - name: "useReorderParameters"
+        returns: "UseMutationResult"
+
+# State Management
+state:
+  - description: "Local state for drag-to-reorder"
+    fields:
+      - "activeId: string | null - currently dragging parameter"
+      - "items: QualitySpecParameter[] - local copy for optimistic updates"
+
+# Accessibility
+accessibility:
+  - "Touch targets >= 48x48dp on all interactive elements"
+  - "Drag handles have aria-label='Reorder parameter'"
+  - "Type badges pass WCAG AA contrast (4.5:1)"
+  - "Screen reader announces row as 'Parameter: {name}, Type: {type}, Critical: {yes/no}'"
+  - "Keyboard navigation: Tab through form fields, Enter to submit"
+  - "Focus trapped in modal until closed"
+  - "Error messages announced via aria-live"

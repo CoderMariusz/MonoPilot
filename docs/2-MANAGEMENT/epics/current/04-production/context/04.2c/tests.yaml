@@ -1,0 +1,356 @@
+# Story 04.2c - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/work-order-service.test.ts"
+    type: "unit"
+    description: "Unit tests for completeWorkOrder and checkAutoComplete"
+  - path: "apps/frontend/app/api/production/work-orders/[id]/complete/__tests__/route.test.ts"
+    type: "integration"
+    description: "API route integration tests"
+  - path: "tests/e2e/production/wo-complete.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for WO completion flow"
+  - path: "supabase/tests/production-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for work_orders completion"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    title: "Basic WO Completion"
+    given: "WO status = 'In Progress' AND user has production role"
+    when: "user clicks 'Complete WO' and confirms"
+    then: "WO status changes to 'Completed' within 1 second AND completed_at timestamp is set to current time (+/- 1 second) AND completed_by is set to current user's ID"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    title: "Invalid Status Prevention"
+    given: "WO status = 'Draft' OR 'Released' OR 'Paused' OR 'Completed' OR 'Cancelled'"
+    when: "user attempts to complete WO"
+    then: "error message 'WO must be In Progress to complete' displays AND WO status remains unchanged"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    title: "Completed WO Button State"
+    given: "WO status = 'Completed'"
+    when: "user views WO detail page"
+    then: "'Complete WO' button is disabled AND displays 'Already Completed'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-04"
+    title: "Operation Sequence Validation (Enabled)"
+    given: "production_settings.require_operation_sequence = true AND WO has 3 operations AND Operation 2 status = 'Not Started'"
+    when: "user clicks 'Complete WO'"
+    then: "error message 'All operations must be completed before closing the WO' displays AND WO status remains 'In Progress'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-05"
+    title: "Operation Sequence Validation (Disabled)"
+    given: "production_settings.require_operation_sequence = false AND WO has operations with status 'Not Started'"
+    when: "user clicks 'Complete WO'"
+    then: "WO completes successfully (no operation validation)"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-06"
+    title: "Yield Calculation"
+    given: "WO planned_qty = 1000 AND produced_qty = 950"
+    when: "WO is completed"
+    then: "yield_percent is calculated as (950 / 1000 * 100) = 95.0 AND stored in work_orders.actual_yield_percent"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    title: "Auto-Complete Enabled"
+    given: "production_settings.auto_complete_wo = true AND WO planned_qty = 1000 AND produced_qty = 1000"
+    when: "produced_qty reaches planned_qty"
+    then: "WO auto-completes without user action AND status changes to 'Completed' AND completed_at is set"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-08"
+    title: "Auto-Complete Disabled"
+    given: "production_settings.auto_complete_wo = false AND WO planned_qty = 1000 AND produced_qty = 1000"
+    when: "produced_qty reaches planned_qty"
+    then: "WO remains 'In Progress' (no auto-complete) AND user must manually complete"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-09"
+    title: "Timestamp Accuracy"
+    given: "WO is being completed"
+    when: "completion is recorded"
+    then: "completed_at timestamp is set to current server time within +/- 1 second of API call"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    title: "Permission Validation"
+    given: "user has role 'Viewer' (no production.wo.complete permission)"
+    when: "user attempts to complete WO"
+    then: "error message 'You do not have permission to complete work orders' displays AND WO status remains unchanged"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-11"
+    title: "Material Reservations Release Placeholder"
+    given: "WO has material reservations (future Phase 1 feature)"
+    when: "WO is completed"
+    then: "backend logs 'Material reservation release skipped - Epic 05 required' AND no error occurs (graceful degradation)"
+    test_type: "integration"
+    priority: "P2"
+
+  - id: "AC-12"
+    title: "Completion Confirmation Modal"
+    given: "WO status = 'In Progress' AND all operations completed"
+    when: "user clicks 'Complete WO' button"
+    then: "confirmation modal displays with: WO Number, Product Name, Planned Qty vs Produced Qty, Calculated Yield %, Warning if yield < 80%, 'Confirm Completion' button, 'Cancel' button"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-13"
+    title: "Low Yield Warning"
+    given: "WO yield_percent < 80%"
+    when: "user views completion confirmation modal"
+    then: "warning message 'Low yield detected (XX%). Please verify before completing.' displays in yellow"
+    test_type: "e2e"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  work_order_service:
+    - name: "completeWorkOrder succeeds for in_progress WO"
+      setup: "Mock WO with status='in_progress', planned_qty=1000, produced_qty=950"
+      expected: "Returns completion result with status='completed', yield=95%"
+
+    - name: "completeWorkOrder rejects draft WO"
+      setup: "Mock WO with status='draft'"
+      expected: "Throws error with code='INVALID_STATUS'"
+
+    - name: "completeWorkOrder rejects released WO"
+      setup: "Mock WO with status='released'"
+      expected: "Throws error with code='INVALID_STATUS'"
+
+    - name: "completeWorkOrder rejects paused WO"
+      setup: "Mock WO with status='paused'"
+      expected: "Throws error with code='INVALID_STATUS'"
+
+    - name: "completeWorkOrder rejects already completed WO"
+      setup: "Mock WO with status='completed'"
+      expected: "Throws error with code='INVALID_STATUS'"
+
+    - name: "completeWorkOrder validates operations when sequence required"
+      setup: "Mock settings with require_operation_sequence=true, incomplete operations"
+      expected: "Throws error with code='OPERATIONS_INCOMPLETE'"
+
+    - name: "completeWorkOrder skips operation validation when sequence not required"
+      setup: "Mock settings with require_operation_sequence=false, incomplete operations"
+      expected: "Returns completion result successfully"
+
+    - name: "calculateYield returns correct percentage"
+      params: ["950", "1000"]
+      expected: "Returns { yieldPercent: 95.0, variancePct: -5.0 }"
+
+    - name: "calculateYield handles zero planned qty"
+      params: ["100", "0"]
+      expected: "Returns { yieldPercent: 0, variancePct: 0 } or handles gracefully"
+
+    - name: "checkAutoComplete triggers completion when conditions met"
+      setup: "Mock auto_complete_wo=true, produced_qty >= planned_qty"
+      expected: "Calls completeWorkOrder and returns true"
+
+    - name: "checkAutoComplete does nothing when disabled"
+      setup: "Mock auto_complete_wo=false, produced_qty >= planned_qty"
+      expected: "Returns false, does not call completeWorkOrder"
+
+    - name: "checkAutoComplete does nothing when below target"
+      setup: "Mock auto_complete_wo=true, produced_qty < planned_qty"
+      expected: "Returns false, does not call completeWorkOrder"
+
+  components:
+    - name: "CompleteWorkOrderButton renders enabled for in_progress WO"
+      setup: "Mock WO with status='in_progress', user with permission"
+      expected: "Button is enabled, shows 'Complete WO'"
+
+    - name: "CompleteWorkOrderButton renders disabled for completed WO"
+      setup: "Mock WO with status='completed'"
+      expected: "Button is disabled, shows 'Already Completed'"
+
+    - name: "CompleteWorkOrderButton hidden for user without permission"
+      setup: "Mock WO with status='in_progress', user with viewer role"
+      expected: "Button is disabled or hidden"
+
+    - name: "WorkOrderYieldBadge shows green for yield >= 95%"
+      setup: "yield=98"
+      expected: "Badge has success variant (green)"
+
+    - name: "WorkOrderYieldBadge shows yellow for yield 50-80%"
+      setup: "yield=65"
+      expected: "Badge has warning variant (yellow)"
+
+    - name: "WorkOrderYieldBadge shows red for yield < 50%"
+      setup: "yield=35"
+      expected: "Badge has destructive variant (red)"
+
+# Integration Test Cases
+integration_tests:
+  api_route:
+    - name: "POST /complete returns 200 for valid completion"
+      setup: "Create WO with status='in_progress'"
+      action: "POST /api/production/work-orders/{id}/complete"
+      expected: "Status 200, body contains completion result"
+
+    - name: "POST /complete returns 400 for invalid status"
+      setup: "Create WO with status='draft'"
+      action: "POST /api/production/work-orders/{id}/complete"
+      expected: "Status 400, error='WO must be In Progress to complete'"
+
+    - name: "POST /complete returns 400 for incomplete operations"
+      setup: "Create WO with incomplete operations, require_operation_sequence=true"
+      action: "POST /api/production/work-orders/{id}/complete"
+      expected: "Status 400, error='All operations must be completed'"
+
+    - name: "POST /complete returns 403 for unauthorized user"
+      setup: "Create WO, authenticate as viewer role"
+      action: "POST /api/production/work-orders/{id}/complete"
+      expected: "Status 403, error='You do not have permission'"
+
+    - name: "POST /complete returns 404 for non-existent WO"
+      setup: "Authenticate as production manager"
+      action: "POST /api/production/work-orders/{random-uuid}/complete"
+      expected: "Status 404, error='Work order not found'"
+
+    - name: "POST /complete returns 404 for cross-tenant WO"
+      setup: "Create WO in Org A, authenticate as user in Org B"
+      action: "POST /api/production/work-orders/{org_a_wo_id}/complete"
+      expected: "Status 404, error='Work order not found' (RLS blocks)"
+
+  rls_isolation:
+    - name: "User cannot complete WO from another org"
+      setup: "Create Org A with WO, Create Org B with user"
+      action: "User B attempts to complete Org A's WO"
+      expected: "RLS blocks, returns 0 rows affected"
+
+    - name: "Production operator can complete own org's WO"
+      setup: "Create Org with production operator and WO"
+      action: "Operator completes WO"
+      expected: "Completion succeeds"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Complete WO happy path"
+    steps:
+      - "Navigate to production execution page"
+      - "Select an in_progress WO"
+      - "Click 'Complete WO' button"
+      - "Verify modal shows WO summary"
+      - "Click 'Confirm Completion'"
+      - "Verify success toast appears"
+      - "Verify WO status changed to 'Completed'"
+      - "Verify button shows 'Already Completed'"
+
+  - name: "Complete WO with low yield warning"
+    steps:
+      - "Navigate to WO with produced_qty < 80% of planned_qty"
+      - "Click 'Complete WO' button"
+      - "Verify yellow warning message appears in modal"
+      - "Verify message includes actual yield percentage"
+      - "Click 'Confirm Completion'"
+      - "Verify completion succeeds despite warning"
+
+  - name: "Auto-complete when produced reaches planned"
+    steps:
+      - "Enable auto_complete_wo in settings"
+      - "Navigate to in_progress WO"
+      - "Update produced_qty to equal planned_qty"
+      - "Verify WO automatically completes"
+      - "Verify status changed to 'Completed'"
+
+  - name: "Cannot complete WO with incomplete operations"
+    steps:
+      - "Enable require_operation_sequence in settings"
+      - "Navigate to WO with incomplete operations"
+      - "Click 'Complete WO' button"
+      - "Verify error message about incomplete operations"
+      - "Verify WO remains in_progress"
+
+  - name: "Viewer cannot complete WO"
+    steps:
+      - "Login as viewer role"
+      - "Navigate to in_progress WO"
+      - "Verify 'Complete WO' button is disabled or hidden"
+
+# Definition of Done
+definition_of_done:
+  - "API endpoint POST /api/production/work-orders/:id/complete implemented"
+  - "Status transition validation (must be 'in_progress')"
+  - "Timestamp tracking (completed_at, completed_by) working"
+  - "Yield calculation correct (produced_qty / planned_qty * 100)"
+  - "Operation sequence validation respects require_operation_sequence setting"
+  - "Auto-complete logic working when auto_complete_wo = true"
+  - "Material reservation release placeholder logs message (no error)"
+  - "CompleteWorkOrderButton renders with permission check"
+  - "CompleteWorkOrderModal displays WO summary and yield"
+  - "Low yield warning (<80%) displays in yellow"
+  - "Permission validation enforced (production.wo.complete)"
+  - "RLS policies ensure org_id isolation"
+  - "API tests passing (>80% coverage)"
+  - "E2E smoke test for complete WO flow passing"
+  - "Performance: Completion request completes within 1 second"
+  - "Documentation: API endpoint documented in code comments"
+  - "Code review completed"
+  - "QA sign-off obtained"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Core business logic requires solid coverage"
+  integration:
+    target: 80
+    reason: "API and RLS policies must be thoroughly tested"
+  e2e:
+    target: 4
+    reason: "4 smoke tests covering happy path and key scenarios"
+  files:
+    - "lib/services/work-order-service.ts: 80%"
+    - "app/api/production/work-orders/[id]/complete/route.ts: 80%"
+    - "components/CompleteWorkOrderButton.tsx: 80%"
+    - "components/CompleteWorkOrderModal.tsx: 80%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Yield calculation edge case with zero planned quantity"
+    mitigation: "Add validation to handle division by zero gracefully"
+    severity: "medium"
+    test_coverage: "unit_tests.work_order_service.calculateYield"
+
+  - id: "RISK-02"
+    description: "Race condition with auto-complete and manual complete"
+    mitigation: "Use database transaction with row-level locking"
+    severity: "medium"
+    test_coverage: "integration_tests.api_route"
+
+  - id: "RISK-03"
+    description: "Cross-tenant data access through WO completion"
+    mitigation: "RLS policies + integration tests with multi-org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"
+
+# Performance Requirements
+performance:
+  - metric: "Completion API response time"
+    target: "< 1 second"
+    measurement: "P95 latency"
+  - metric: "Yield calculation"
+    target: "< 10ms"
+    measurement: "In-memory calculation"

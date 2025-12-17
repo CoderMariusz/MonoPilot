@@ -1,0 +1,200 @@
+# Story 06.3 - Frontend Specification
+# Purpose: Pages, components, validation, UX patterns
+# Agent: FRONTEND-DEV
+
+# Page structure
+pages:
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/page.tsx"
+    description: "Specifications list page with filters, search, pagination"
+    components:
+      - "SpecificationTable"
+      - "SpecificationFilters"
+      - "ReviewStatusBadge"
+    states: ["loading", "empty", "error", "success"]
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/[id]/page.tsx"
+    description: "Specification detail page with version history"
+    components:
+      - "SpecificationDetail"
+      - "VersionHistory"
+      - "ApproveModal"
+      - "CloneVersionDialog"
+    states: ["loading", "error", "success"]
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/new/page.tsx"
+    description: "Create specification page"
+    components:
+      - "SpecificationForm"
+    states: ["loading", "error", "success"]
+
+# Components
+components:
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/components/SpecificationTable.tsx"
+    description: "DataTable with specifications, filters, sorting, pagination"
+    pattern: "ShadCN DataTable"
+    columns:
+      - { field: "spec_number", label: "Spec Number", sortable: true }
+      - { field: "name", label: "Name", sortable: true }
+      - { field: "product_name", label: "Product", sortable: true }
+      - { field: "version", label: "Version", sortable: true }
+      - { field: "status", label: "Status", component: "StatusBadge" }
+      - { field: "effective_date", label: "Effective Date", sortable: true }
+      - { field: "next_review_date", label: "Review Due", component: "ReviewStatusBadge" }
+      - { field: "actions", label: "Actions", component: "RowActions" }
+    row_actions:
+      - { action: "view", label: "View", icon: "Eye" }
+      - { action: "edit", label: "Edit", icon: "Pencil", condition: "status === 'draft'" }
+      - { action: "approve", label: "Approve", icon: "Check", condition: "status === 'draft'" }
+      - { action: "clone", label: "Clone as New Version", icon: "Copy" }
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/components/SpecificationForm.tsx"
+    description: "Create/Edit form for specifications"
+    pattern: "React Hook Form + Zod"
+    fields:
+      - { name: "product_id", type: "combobox", label: "Product", required: true, searchable: true }
+      - { name: "name", type: "input", label: "Name", required: true, maxLength: 200 }
+      - { name: "description", type: "textarea", label: "Description", maxLength: 2000 }
+      - { name: "effective_date", type: "date", label: "Effective Date", required: true }
+      - { name: "expiry_date", type: "date", label: "Expiry Date" }
+      - { name: "review_frequency_days", type: "number", label: "Review Frequency (days)", default: 365 }
+      - { name: "notes", type: "textarea", label: "Notes" }
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/components/SpecificationDetail.tsx"
+    description: "Read-only detail view with all specification data"
+    sections:
+      - { name: "header", content: "Spec number, version badge, status badge" }
+      - { name: "product", content: "Product link" }
+      - { name: "dates", content: "Effective date, expiry date, review dates" }
+      - { name: "approval", content: "Approved by, approved at" }
+      - { name: "notes", content: "Description and notes" }
+    actions:
+      - { button: "Edit", condition: "status === 'draft'" }
+      - { button: "Approve", condition: "status === 'draft' && hasRole('qa_manager')" }
+      - { button: "Clone as New Version", condition: "always" }
+      - { button: "Complete Review", condition: "status === 'active'" }
+      - { button: "Delete", condition: "status === 'draft'" }
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/components/ApproveModal.tsx"
+    description: "Confirmation dialog for approval with supersede warning"
+    pattern: "ShadCN AlertDialog"
+    content:
+      - "Confirmation message with product name"
+      - "Warning about superseding existing active specs"
+      - "Optional approval notes textarea"
+      - "Approve / Cancel buttons"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/components/VersionHistory.tsx"
+    description: "List of all versions for a spec_number"
+    pattern: "Timeline or Table"
+    fields:
+      - { field: "version", label: "Version" }
+      - { field: "status", label: "Status" }
+      - { field: "effective_date", label: "Effective Date" }
+      - { field: "approved_by_name", label: "Approved By" }
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/components/ReviewStatusBadge.tsx"
+    description: "Badge showing review status with color coding"
+    variants:
+      - { status: "ok", color: "green", label: "Review OK", condition: "days_until_review > 30" }
+      - { status: "due_soon", color: "yellow", label: "Due in X days", condition: "0 < days_until_review <= 30" }
+      - { status: "overdue", color: "red", label: "Overdue by X days", condition: "days_until_review <= 0" }
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/components/CloneVersionDialog.tsx"
+    description: "Confirmation dialog for cloning to new version"
+    pattern: "ShadCN Dialog"
+
+  - path: "apps/frontend/app/(authenticated)/quality/specifications/components/SpecificationFilters.tsx"
+    description: "Filter bar for list page"
+    filters:
+      - { name: "search", type: "input", placeholder: "Search product/parameters..." }
+      - { name: "status", type: "select", options: ["All", "Draft", "Active", "Expired", "Superseded"] }
+      - { name: "product_id", type: "combobox", placeholder: "Filter by product" }
+
+# Validation schemas
+validation:
+  - path: "apps/frontend/lib/validation/specification-schemas.ts"
+    description: "Zod validation schemas for specification forms"
+    schemas:
+      - name: "createSpecificationSchema"
+        fields:
+          product_id: "z.string().uuid('Invalid product ID')"
+          name: "z.string().min(3).max(200)"
+          description: "z.string().max(2000).optional()"
+          effective_date: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/)"
+          expiry_date: "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional().nullable()"
+          review_frequency_days: "z.number().int().min(1).max(3650).default(365)"
+          notes: "z.string().max(2000).optional()"
+        refinements:
+          - "expiry_date > effective_date if both provided"
+
+      - name: "updateSpecificationSchema"
+        base: "createSpecificationSchema.partial().omit({ product_id: true })"
+
+      - name: "approveSpecificationSchema"
+        fields:
+          approval_notes: "z.string().max(500).optional()"
+
+      - name: "completeReviewSchema"
+        fields:
+          review_notes: "z.string().max(1000).optional()"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-specifications.ts"
+    exports:
+      - name: "useSpecifications"
+        description: "List specifications with filters"
+        returns: "UseQueryResult<PaginatedResult<QualitySpecification>>"
+      - name: "useSpecification"
+        description: "Single specification by ID"
+        returns: "UseQueryResult<SpecificationDetail>"
+      - name: "useActiveSpecification"
+        description: "Active specification for product"
+        returns: "UseQueryResult<QualitySpecification | null>"
+      - name: "useCreateSpecification"
+        description: "Create mutation"
+        returns: "UseMutationResult"
+      - name: "useUpdateSpecification"
+        description: "Update mutation"
+        returns: "UseMutationResult"
+      - name: "useApproveSpecification"
+        description: "Approve mutation"
+        returns: "UseMutationResult"
+      - name: "useCloneSpecification"
+        description: "Clone mutation"
+        returns: "UseMutationResult"
+
+# UX References
+ux:
+  wireframes:
+    - id: "QA-003-specifications-list"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/QA-003-specifications-list.md"
+      components:
+        - "SpecificationTable"
+        - "SpecificationFilters"
+        - "ReviewStatusBadge"
+        - "VersionHistory"
+        - "ApproveModal"
+    - id: "QA-003-specification-modal"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/QA-003-specification-modal.md"
+      components:
+        - "SpecificationForm"
+        - "AddParameterModal"
+        - "ImportParametersModal"
+  patterns:
+    table: "ShadCN DataTable with row actions dropdown"
+    form: "React Hook Form + Zod validation"
+    modal: "ShadCN Dialog for create/edit"
+    confirmation: "ShadCN AlertDialog for approve/delete"
+  states:
+    - "loading: Skeleton rows with shimmer"
+    - "empty: No specifications message with CTA"
+    - "error: Error message with retry button"
+    - "success: Table with data"
+
+# Performance targets (from wireframe)
+performance:
+  list_load: "<500ms for 100 specifications"
+  detail_load: "<300ms including version history"
+  approval: "<500ms (transaction)"
+  search: "<300ms debounced"

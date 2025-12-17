@@ -1,0 +1,526 @@
+# Story 02.7 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # List Routings
+  - method: "GET"
+    path: "/api/v1/technical/routings"
+    description: "List all routings with pagination, search, and filters"
+    file: "apps/frontend/app/api/v1/technical/routings/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        page: { type: "number", default: 1 }
+        limit: { type: "number", default: 50 }
+        search: { type: "string", optional: true, description: "Search by name or description" }
+        is_active: { type: "string", enum: ["true", "false", "all"], default: "all" }
+        sortBy: { type: "string", default: "name" }
+        sortOrder: { type: "string", enum: ["asc", "desc"], default: "asc" }
+
+    response:
+      status: 200
+      type: "RoutingsListResponse"
+      schema:
+        routings:
+          type: "array"
+          items:
+            id: "string (UUID)"
+            org_id: "string (UUID)"
+            code: "string"
+            name: "string"
+            description: "string | null"
+            version: "number"
+            is_active: "boolean"
+            is_reusable: "boolean"
+            setup_cost: "number"
+            working_cost_per_unit: "number"
+            overhead_percent: "number"
+            currency: "string"
+            operations_count: "number"
+            created_at: "string (ISO 8601)"
+            updated_at: "string (ISO 8601)"
+            created_by: "string (UUID)"
+        total: "number"
+        page: "number"
+        limit: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+
+  # Get Single Routing
+  - method: "GET"
+    path: "/api/v1/technical/routings/:id"
+    description: "Get routing detail with BOM count"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "RoutingDetailResponse"
+      schema:
+        routing:
+          id: "string (UUID)"
+          org_id: "string (UUID)"
+          code: "string"
+          name: "string"
+          description: "string | null"
+          version: "number"
+          is_active: "boolean"
+          is_reusable: "boolean"
+          setup_cost: "number"
+          working_cost_per_unit: "number"
+          overhead_percent: "number"
+          currency: "string"
+          operations_count: "number"
+          created_at: "string (ISO 8601)"
+          updated_at: "string (ISO 8601)"
+          created_by: "string (UUID)"
+        boms_count: "number"
+        related_boms:
+          type: "array"
+          items:
+            id: "string (UUID)"
+            product_code: "string"
+            product_name: "string"
+            version: "string"
+
+    errors:
+      - status: 404
+        code: "ROUTING_NOT_FOUND"
+        message: "Routing not found"
+
+  # Create Routing
+  - method: "POST"
+    path: "/api/v1/technical/routings"
+    description: "Create new routing (optionally clone from existing)"
+    file: "apps/frontend/app/api/v1/technical/routings/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      body:
+        code: { type: "string", required: true, description: "Unique code (uppercase alphanumeric + hyphens)" }
+        name: { type: "string", required: true, description: "Routing name (3-100 chars)" }
+        description: { type: "string", required: false, description: "Optional description (max 500 chars)" }
+        is_active: { type: "boolean", default: true }
+        is_reusable: { type: "boolean", default: true }
+        setup_cost: { type: "number", default: 0, description: "ADR-009: Fixed cost per run" }
+        working_cost_per_unit: { type: "number", default: 0, description: "ADR-009: Variable cost per unit" }
+        overhead_percent: { type: "number", default: 0, description: "ADR-009: Overhead % (0-100)" }
+        currency: { type: "string", default: "PLN", enum: ["PLN", "EUR", "USD", "GBP"] }
+        cloneFrom: { type: "string", required: false, description: "Source routing ID for clone" }
+
+    response:
+      status: 201
+      type: "CreateRoutingResponse"
+      schema:
+        routing:
+          id: "string (UUID)"
+          code: "string"
+          name: "string"
+          # ... all routing fields
+        operationsCount: "number"  # Only present if cloned
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid request body"
+      - status: 409
+        code: "DUPLICATE_CODE"
+        message: "Code '[code]' already exists in your organization"
+      - status: 403
+        code: "PERMISSION_DENIED"
+        message: "You do not have permission to create routings"
+
+  # Update Routing
+  - method: "PUT"
+    path: "/api/v1/technical/routings/:id"
+    description: "Update routing header (version auto-increments)"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      body:
+        code: { type: "string", required: false }
+        name: { type: "string", required: false }
+        description: { type: "string", required: false }
+        is_active: { type: "boolean", required: false }
+        is_reusable: { type: "boolean", required: false }
+        setup_cost: { type: "number", required: false }
+        working_cost_per_unit: { type: "number", required: false }
+        overhead_percent: { type: "number", required: false }
+        currency: { type: "string", required: false }
+
+    response:
+      status: 200
+      schema:
+        routing: "Routing"
+
+    errors:
+      - status: 404
+        code: "ROUTING_NOT_FOUND"
+        message: "Routing not found"
+      - status: 409
+        code: "DUPLICATE_CODE"
+        message: "Code already exists"
+
+  # Patch Routing (Partial Update)
+  - method: "PATCH"
+    path: "/api/v1/technical/routings/:id"
+    description: "Partial update (e.g., Make Inactive action)"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      body:
+        is_active: { type: "boolean", required: false }
+
+    response:
+      status: 200
+      schema:
+        routing: "Routing"
+
+  # Delete Routing
+  - method: "DELETE"
+    path: "/api/v1/technical/routings/:id"
+    description: "Delete routing (unassigns from BOMs, deletes operations)"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN"]
+
+    response:
+      status: 200
+      schema:
+        success: "boolean"
+        affected_boms: "number"
+
+    errors:
+      - status: 404
+        code: "ROUTING_NOT_FOUND"
+        message: "Routing not found"
+
+  # Check BOM Usage
+  - method: "GET"
+    path: "/api/v1/technical/routings/:id/boms"
+    description: "Get BOMs using this routing (for delete warning)"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/boms/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    response:
+      status: 200
+      type: "RoutingBOMUsageResponse"
+      schema:
+        boms:
+          type: "array"
+          items:
+            id: "string (UUID)"
+            code: "string"
+            product_name: "string"
+            status: "string"
+        count: "number"
+
+  # Clone Routing
+  - method: "POST"
+    path: "/api/v1/technical/routings/:id/clone"
+    description: "Clone routing with all operations"
+    file: "apps/frontend/app/api/v1/technical/routings/[id]/clone/route.ts"
+    auth: "required"
+    roles: ["SUPER_ADMIN", "ADMIN", "PRODUCTION_MANAGER"]
+
+    request:
+      body:
+        name: { type: "string", required: true, description: "New routing name" }
+        code: { type: "string", required: false, description: "New code (defaults to source-COPY)" }
+        description: { type: "string", required: false }
+        is_active: { type: "boolean", default: true }
+
+    response:
+      status: 201
+      schema:
+        success: "boolean"
+        routing: "Routing"
+        operationsCount: "number"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/routing-service.ts"
+    description: "Routing CRUD operations"
+    exports:
+      - name: "listRoutings"
+        type: "async function"
+        params: ["filters: RoutingFilters"]
+        returns: "Promise<RoutingsListResponse>"
+        description: "Get paginated list with operations count"
+
+      - name: "getRouting"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<RoutingDetailResponse>"
+        description: "Get single routing with BOM count"
+
+      - name: "createRouting"
+        type: "async function"
+        params: ["data: CreateRoutingInput"]
+        returns: "Promise<Routing>"
+        description: "Create with code uniqueness check"
+
+      - name: "updateRouting"
+        type: "async function"
+        params: ["id: string", "data: UpdateRoutingInput"]
+        returns: "Promise<Routing>"
+        description: "Update header fields (version auto-increments)"
+
+      - name: "deleteRouting"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<DeleteRoutingResponse>"
+        description: "Delete with BOM unassignment"
+
+      - name: "cloneRouting"
+        type: "async function"
+        params: ["id: string", "newData: CloneRoutingInput"]
+        returns: "Promise<CloneRoutingResponse>"
+        description: "Clone routing with all operations"
+
+      - name: "checkCodeUnique"
+        type: "async function"
+        params: ["code: string", "excludeId?: string"]
+        returns: "Promise<boolean>"
+        description: "Validate code uniqueness"
+
+      - name: "getRoutingBOMUsage"
+        type: "async function"
+        params: ["id: string"]
+        returns: "Promise<RoutingBOMUsageResponse>"
+        description: "Get BOMs using this routing"
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/routing.ts"
+    exports:
+      - name: "Routing"
+        fields:
+          - "id: string"
+          - "org_id: string"
+          - "code: string"
+          - "name: string"
+          - "description: string | null"
+          - "version: number"
+          - "is_active: boolean"
+          - "is_reusable: boolean"
+          - "setup_cost: number"
+          - "working_cost_per_unit: number"
+          - "overhead_percent: number"
+          - "currency: string"
+          - "operations_count: number"
+          - "created_at: string"
+          - "updated_at: string"
+          - "created_by: string"
+
+      - name: "RoutingWithCount"
+        extends: "Routing"
+        description: "Routing with operations_count aggregate"
+
+      - name: "CreateRoutingInput"
+        fields:
+          - "code: string"
+          - "name: string"
+          - "description?: string | null"
+          - "is_active?: boolean"
+          - "is_reusable?: boolean"
+          - "setup_cost?: number"
+          - "working_cost_per_unit?: number"
+          - "overhead_percent?: number"
+          - "currency?: string"
+          - "cloneFrom?: string"
+
+      - name: "UpdateRoutingInput"
+        description: "Partial<CreateRoutingInput>"
+
+# Validation Schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/routing-schema.ts"
+    schemas:
+      - name: "createRoutingSchema"
+        content: |
+          const createRoutingSchema = z.object({
+            code: z.string()
+              .min(2, "Code must be at least 2 characters")
+              .max(50, "Code must be less than 50 characters")
+              .regex(/^[A-Z0-9-]+$/, "Code can only contain uppercase letters, numbers, and hyphens")
+              .transform(val => val.toUpperCase()),
+            name: z.string()
+              .min(3, "Name must be at least 3 characters")
+              .max(100, "Name must be less than 100 characters"),
+            description: z.string()
+              .max(500, "Description must be less than 500 characters")
+              .nullable()
+              .optional(),
+            is_active: z.boolean().default(true),
+            is_reusable: z.boolean().default(true),
+            setup_cost: z.number()
+              .min(0, "Setup cost cannot be negative")
+              .default(0),
+            working_cost_per_unit: z.number()
+              .min(0, "Working cost per unit cannot be negative")
+              .default(0),
+            overhead_percent: z.number()
+              .min(0, "Overhead percentage cannot be negative")
+              .max(100, "Overhead percentage cannot exceed 100%")
+              .default(0),
+            currency: z.enum(['PLN', 'EUR', 'USD', 'GBP']).default('PLN'),
+            cloneFrom: z.string().uuid().optional(),
+          })
+
+      - name: "updateRoutingSchema"
+        content: "const updateRoutingSchema = createRoutingSchema.partial()"
+
+      - name: "cloneRoutingSchema"
+        content: |
+          const cloneRoutingSchema = z.object({
+            name: z.string()
+              .min(3, "Name must be at least 3 characters")
+              .max(100, "Name must be less than 100 characters"),
+            code: z.string()
+              .min(2, "Code must be at least 2 characters")
+              .max(50, "Code must be less than 50 characters")
+              .regex(/^[A-Z0-9-]+$/, "Code can only contain uppercase letters, numbers, and hyphens")
+              .transform(val => val.toUpperCase())
+              .optional(),
+            description: z.string()
+              .max(500, "Description must be less than 500 characters")
+              .nullable()
+              .optional(),
+            is_active: z.boolean().default(true),
+          })
+
+# Error Handling
+error_handling:
+  duplicate_code:
+    http_status: 409
+    code: "DUPLICATE_CODE"
+    message_template: "Code '{code}' already exists in your organization"
+    frontend_display: "Inline error on code field"
+
+  routing_not_found:
+    http_status: 404
+    code: "ROUTING_NOT_FOUND"
+    message: "Routing not found"
+    frontend_display: "Toast notification"
+
+  validation_error:
+    http_status: 400
+    code: "VALIDATION_ERROR"
+    message_template: "Validation failed: {errors}"
+    frontend_display: "Inline errors on form fields"
+
+  permission_denied:
+    http_status: 403
+    code: "PERMISSION_DENIED"
+    message: "You do not have permission to perform this action"
+    frontend_display: "Toast notification"
+
+# Implementation Patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/v1/technical/routings/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { createRoutingSchema } from '@/lib/validation/routing-schema';
+
+    export async function POST(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Check auth
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Get org context
+      const { data: userData } = await supabase
+        .from('users')
+        .select('org_id, role:roles(code)')
+        .eq('id', user.id)
+        .single();
+
+      // Check permission
+      if (!['SUPER_ADMIN', 'ADMIN', 'PRODUCTION_MANAGER'].includes(userData.role.code)) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+      }
+
+      // Validate request body
+      const body = await request.json();
+      const parsed = createRoutingSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error.errors }, { status: 400 });
+      }
+
+      // Check code uniqueness
+      const { data: existing } = await supabase
+        .from('routings')
+        .select('id')
+        .eq('org_id', userData.org_id)
+        .eq('code', parsed.data.code)
+        .single();
+
+      if (existing) {
+        return NextResponse.json(
+          { error: `Code '${parsed.data.code}' already exists in your organization` },
+          { status: 409 }
+        );
+      }
+
+      // Create routing
+      const { data: routing, error } = await supabase
+        .from('routings')
+        .insert({
+          ...parsed.data,
+          org_id: userData.org_id,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      // If cloneFrom provided, copy operations
+      let operationsCount = 0;
+      if (parsed.data.cloneFrom) {
+        const { data: sourceOps } = await supabase
+          .from('routing_operations')
+          .select('*')
+          .eq('routing_id', parsed.data.cloneFrom);
+
+        if (sourceOps && sourceOps.length > 0) {
+          const newOps = sourceOps.map(op => ({
+            ...op,
+            id: undefined,
+            routing_id: routing.id,
+            created_at: undefined,
+          }));
+
+          await supabase.from('routing_operations').insert(newOps);
+          operationsCount = newOps.length;
+        }
+      }
+
+      return NextResponse.json(
+        { routing, operationsCount },
+        { status: 201 }
+      );
+    }

@@ -1,0 +1,442 @@
+# Story 05.9 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/asn-receive-service.test.ts"
+    type: "unit"
+    description: "Unit tests for ASN receive service methods"
+  - path: "apps/frontend/app/api/warehouse/asns/[id]/receive/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for ASN receive API endpoints"
+  - path: "apps/frontend/components/warehouse/asns/__tests__/ReceiveModal.test.tsx"
+    type: "component"
+    description: "Component tests for ReceiveModal"
+  - path: "tests/e2e/warehouse/asn-receive.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for ASN receive workflow"
+
+# Acceptance Criteria mapped to tests
+acceptance_criteria:
+  - id: "AC-1"
+    title: "ASN Receive Preview"
+    prd_ref: "WH-FR-015"
+    given: "ASN exists with status='pending' and 3 items with expected quantities"
+    when: "GET /api/warehouse/asns/:id/receive is called"
+    then:
+      - "Response contains asn_number, status, expected_date"
+      - "Response contains items array with product_name, expected_qty, received_qty, uom"
+      - "Response time is < 300ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2"
+    title: "Initiate ASN Receive"
+    prd_ref: "WH-FR-015"
+    given: "ASN with id='asn-123' and status='pending' has items with expected quantities"
+    when: "POST /api/warehouse/asns/:id/receive with valid request body"
+    then:
+      - "GRN record created with source_type='asn'"
+      - "GRN linked to ASN via grn.asn_id"
+      - "LP created for each received item"
+      - "Response contains grn_number, status='completed', lps_created count"
+      - "Response time < 500ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-3"
+    title: "Variance Calculation - Under Receipt"
+    prd_ref: "WH-FR-015"
+    given: "ASN item with expected_qty = 100"
+    when: "received_qty = 95"
+    then:
+      - "asn_item.received_qty updates to 95"
+      - "variance = -5 (under-received by 5 units)"
+      - "variance_percent = -5.0%"
+      - "variance_indicator = 'under'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-4"
+    title: "Variance Calculation - Over Receipt within Tolerance"
+    prd_ref: "WH-FR-029"
+    given: "ASN item with expected_qty = 100, allow_over_receipt = true, tolerance = 10%"
+    when: "received_qty = 105"
+    then:
+      - "asn_item.received_qty updates to 105"
+      - "variance = +5"
+      - "variance_percent = +5.0%"
+      - "variance_indicator = 'over'"
+      - "Receipt allowed (within tolerance)"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-5"
+    title: "Block Over-Receipt Beyond Tolerance"
+    prd_ref: "WH-FR-029"
+    given: "ASN item with expected_qty = 100, allow_over_receipt = true, tolerance = 10%"
+    when: "received_qty = 115"
+    then:
+      - "System returns 400 error"
+      - "Error message = 'Over-receipt exceeds tolerance (max: 110 units)'"
+      - "Receipt blocked"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-6"
+    title: "Partial ASN Receipt"
+    prd_ref: "WH-FR-015"
+    given: "ASN with 3 items: item[0].expected=100, item[1].expected=50, item[2].expected=200"
+    when: "Receive: item[0]=100 (full), item[1]=30 (partial), item[2]=0 (not received)"
+    then:
+      - "asn.status updates to 'partial'"
+      - "asn_item[0].received_qty = 100 (complete)"
+      - "asn_item[1].received_qty = 30 (can receive more)"
+      - "asn_item[2].received_qty = 0 (pending)"
+      - "GRN created for 2 items"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-7"
+    title: "Full ASN Receipt"
+    prd_ref: "WH-FR-015"
+    given: "ASN with status='partial' and all items have received_qty >= expected_qty"
+    when: "Final receive completes"
+    then:
+      - "asn.status updates to 'received'"
+      - "asn.actual_date set to current date"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-8"
+    title: "Variance Reason Tracking"
+    prd_ref: "WH-FR-015"
+    given: "ASN item with expected_qty = 100, received_qty = 95"
+    when: "variance_reason = 'damaged', variance_notes = '5 units damaged in transit'"
+    then:
+      - "asn_item.variance_reason = 'damaged'"
+      - "asn_item.variance_notes = '5 units damaged in transit'"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-9"
+    title: "GRN Pre-populated with ASN Data"
+    prd_ref: "WH-FR-015"
+    given: "ASN item with product_id, expected_qty=100, supplier_batch='SB-001', gtin, expiry"
+    when: "Receive workflow initiated"
+    then:
+      - "GRN item pre-populated with product_id from ASN"
+      - "received_qty defaults to expected_qty (user can edit)"
+      - "batch_number from supplier_batch_number"
+      - "gtin and expiry_date from ASN item"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-10"
+    title: "Multiple Receive Sessions (Cumulative)"
+    prd_ref: "WH-FR-015"
+    given: "ASN with expected_qty = 100 for product A"
+    when: "Session 1: received=40, Session 2: received=35, Session 3: received=25"
+    then:
+      - "After Session 1: asn_item.received_qty = 40, status = 'partial'"
+      - "After Session 2: asn_item.received_qty = 75, status = 'partial'"
+      - "After Session 3: asn_item.received_qty = 100, status = 'received'"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-11"
+    title: "Required Fields Enforcement"
+    prd_ref: "WH-FR-003, WH-FR-009, WH-FR-010"
+    given: "warehouse_settings.require_batch_on_receipt = true, require_expiry_on_receipt = true"
+    when: "Receive submitted without batch_number or expiry_date"
+    then:
+      - "400 error if batch_number missing: 'Batch number required'"
+      - "400 error if expiry_date missing: 'Expiry date required'"
+      - "LP created only when all required fields provided"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-12"
+    title: "Performance Requirements"
+    prd_ref: "WH-NFR"
+    given: "ASN with 50 items"
+    when: "Receive workflow initiated and submitted"
+    then:
+      - "Preview loads in < 300ms"
+      - "GRN + LPs created in < 2 seconds"
+    test_type: "performance"
+    priority: "P1"
+
+# Unit Test Cases
+unit_tests:
+  asn_receive_service:
+    - name: "calculateASNVariance returns correct under-receipt variance"
+      input: { expected_qty: 100, received_qty: 95 }
+      expected: { variance: -5, variance_percent: -5.0, indicator: "under" }
+
+    - name: "calculateASNVariance returns correct over-receipt variance"
+      input: { expected_qty: 100, received_qty: 110 }
+      expected: { variance: 10, variance_percent: 10.0, indicator: "over" }
+
+    - name: "calculateASNVariance returns exact match"
+      input: { expected_qty: 100, received_qty: 100 }
+      expected: { variance: 0, variance_percent: 0, indicator: "exact" }
+
+    - name: "validateOverReceipt allows within tolerance"
+      setup: "warehouse_settings.over_receipt_tolerance_pct = 10"
+      input: { expected_qty: 100, total_received: 105 }
+      expected: { allowed: true }
+
+    - name: "validateOverReceipt blocks beyond tolerance"
+      setup: "warehouse_settings.over_receipt_tolerance_pct = 10"
+      input: { expected_qty: 100, total_received: 115 }
+      expected: { allowed: false, maxAllowed: 110 }
+
+    - name: "validateOverReceipt blocks all over-receipt when disabled"
+      setup: "warehouse_settings.allow_over_receipt = false"
+      input: { expected_qty: 100, total_received: 101 }
+      expected: { allowed: false, maxAllowed: 100 }
+
+    - name: "getASNReceivePreview calculates remaining_qty correctly"
+      setup: "ASN item: expected=100, received=30"
+      expected: { remaining_qty: 70 }
+
+    - name: "updateASNStatus sets 'partial' when some items received"
+      setup: "ASN with 3 items, 1 fully received, 2 pending"
+      expected: { status: "partial" }
+
+    - name: "updateASNStatus sets 'received' when all items complete"
+      setup: "ASN with 3 items, all received_qty >= expected_qty"
+      expected: { status: "received", actual_date: "set to today" }
+
+# Integration Test Cases
+integration_tests:
+  asn_receive_endpoints:
+    - name: "GET /asns/:id/receive returns preview for valid ASN"
+      setup: "Create ASN with 3 items"
+      request: "GET /api/warehouse/asns/{id}/receive"
+      expected:
+        status: 200
+        body: "Contains asn object and items array"
+
+    - name: "GET /asns/:id/receive returns 404 for non-existent ASN"
+      request: "GET /api/warehouse/asns/invalid-uuid/receive"
+      expected:
+        status: 404
+        body: "{ error: 'ASN not found' }"
+
+    - name: "GET /asns/:id/receive returns 400 for received ASN"
+      setup: "Create ASN with status='received'"
+      request: "GET /api/warehouse/asns/{id}/receive"
+      expected:
+        status: 400
+        body: "{ error: 'ASN already completed or cancelled' }"
+
+    - name: "POST /asns/:id/receive creates GRN and LPs"
+      setup: "Create ASN with 2 items"
+      request:
+        method: "POST"
+        path: "/api/warehouse/asns/{id}/receive"
+        body:
+          warehouse_id: "{valid_uuid}"
+          location_id: "{valid_uuid}"
+          items:
+            - asn_item_id: "{item1_uuid}"
+              received_qty: 50
+            - asn_item_id: "{item2_uuid}"
+              received_qty: 75
+      expected:
+        status: 201
+        body: "Contains grn_id, grn_number, lps_created=2"
+
+    - name: "POST /asns/:id/receive validates over-receipt"
+      setup: "Create ASN item with expected=100, tolerance=10%"
+      request:
+        body:
+          items:
+            - asn_item_id: "{item_uuid}"
+              received_qty: 120
+      expected:
+        status: 400
+        body: "{ error: 'Over-receipt exceeds tolerance' }"
+
+    - name: "POST /asns/:id/receive enforces batch requirement"
+      setup: "warehouse_settings.require_batch_on_receipt = true"
+      request:
+        body:
+          items:
+            - asn_item_id: "{item_uuid}"
+              received_qty: 50
+              # batch_number omitted
+      expected:
+        status: 400
+        body: "{ error: 'Batch number required' }"
+
+    - name: "POST /asns/:id/receive updates ASN status to partial"
+      setup: "Create ASN with 3 items, receive only 2"
+      expected: "ASN status = 'partial'"
+
+    - name: "POST /asns/:id/receive updates ASN status to received"
+      setup: "Create ASN with 2 items, receive all"
+      expected: "ASN status = 'received', actual_date set"
+
+    - name: "Cross-tenant access returns 404"
+      setup: "Create ASN in Org A"
+      request: "User from Org B requests GET /api/warehouse/asns/{orgA_asn_id}/receive"
+      expected:
+        status: 404
+        body: "{ error: 'ASN not found' }"
+
+# Component Test Cases
+component_tests:
+  ReceiveModal:
+    - name: "renders loading skeleton while fetching preview"
+      setup: "Mock API to delay response"
+      action: "Open modal"
+      expected: "Skeleton elements visible"
+
+    - name: "displays ASN header info after loading"
+      setup: "Mock successful API response"
+      action: "Wait for load"
+      expected: "ASN number, supplier, expected date visible"
+
+    - name: "displays items table with editable received_qty"
+      setup: "Mock ASN with 3 items"
+      expected: "3 rows with input fields for received_qty"
+
+    - name: "calculates and displays variance badge"
+      setup: "Item with expected=100"
+      action: "Enter received_qty=90"
+      expected: "Red 'under' badge showing '-10 units'"
+
+    - name: "shows variance reason dropdown when variance exists"
+      action: "Enter received_qty different from expected"
+      expected: "Variance reason select appears"
+
+    - name: "disables submit button when submitting"
+      action: "Click submit"
+      expected: "Button disabled with spinner"
+
+    - name: "displays success summary after receive completes"
+      setup: "Mock successful POST response"
+      action: "Submit form"
+      expected: "ReceiveSummary component shown with GRN number"
+
+    - name: "displays error alert on API failure"
+      setup: "Mock 400 error response"
+      action: "Submit form"
+      expected: "Error alert visible with message"
+
+  VarianceBadge:
+    - name: "displays green badge for exact match"
+      props: { variance: 0, expectedQty: 100 }
+      expected: "Green badge with 'Exact match'"
+
+    - name: "displays red badge for under-receipt"
+      props: { variance: -5, expectedQty: 100 }
+      expected: "Red badge with '-5 units (-5%)'"
+
+    - name: "displays yellow badge for over-receipt"
+      props: { variance: 10, expectedQty: 100 }
+      expected: "Yellow badge with '+10 units (+10%)'"
+
+# E2E Test Cases
+e2e_tests:
+  asn_receive_workflow:
+    - name: "Complete ASN receive workflow"
+      steps:
+        - "Navigate to /warehouse/asns"
+        - "Click on pending ASN"
+        - "Click 'Receive' button"
+        - "Verify modal opens with items list"
+        - "Select warehouse and location"
+        - "Enter received quantities for each item"
+        - "Click 'Confirm Receive'"
+        - "Verify success summary shows GRN number"
+        - "Verify ASN status updated to 'received'"
+        - "Verify LPs created (check LP list)"
+
+    - name: "Partial ASN receive workflow"
+      steps:
+        - "Create ASN with 3 items"
+        - "Receive only 2 items"
+        - "Verify ASN status = 'partial'"
+        - "Open receive modal again"
+        - "Verify remaining item shows with full expected qty"
+        - "Receive remaining item"
+        - "Verify ASN status = 'received'"
+
+    - name: "ASN receive with variance tracking"
+      steps:
+        - "Create ASN with item expected_qty = 100"
+        - "Open receive modal"
+        - "Enter received_qty = 95"
+        - "Verify variance badge shows '-5 units'"
+        - "Select variance_reason = 'damaged'"
+        - "Enter variance_notes"
+        - "Submit"
+        - "Verify ASN item has variance_reason saved"
+
+    - name: "Over-receipt blocked"
+      steps:
+        - "Set warehouse over_receipt_tolerance = 10%"
+        - "Create ASN with item expected_qty = 100"
+        - "Enter received_qty = 120"
+        - "Click submit"
+        - "Verify error message shows"
+        - "Verify form not submitted"
+
+# Definition of Done checklist
+definition_of_done:
+  - "All 12 Acceptance Criteria passing"
+  - "API routes implemented with Zod validation"
+  - "Service layer methods tested (>80% coverage)"
+  - "Variance calculation accuracy verified"
+  - "Over-receipt control tested (allow/block scenarios)"
+  - "Desktop UI functional (receive modal, variance indicators)"
+  - "RLS policies verified for asn_items updates"
+  - "E2E smoke test: Receive ASN with under/over variances"
+  - "Performance: Receive 50-item ASN in < 2 seconds"
+  - "Error handling: Graceful failure with user messages"
+  - "Audit trail: All receives logged with user + timestamp"
+  - "Code review completed"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    files:
+      - "lib/services/asn-receive-service.ts: 80%"
+      - "lib/validation/asn-receive.ts: 90%"
+  integration:
+    target: 80
+    files:
+      - "API endpoints: 100% of routes tested"
+  e2e:
+    target: "Critical flows"
+    flows:
+      - "Full receive workflow"
+      - "Partial receive workflow"
+      - "Variance tracking"
+      - "Over-receipt validation"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Transaction failure leaves inconsistent state"
+    severity: "high"
+    mitigation: "Database transaction with rollback, idempotency checks"
+    test_coverage: "integration_tests.transaction_rollback"
+
+  - id: "RISK-02"
+    description: "Performance degradation with large ASNs"
+    severity: "medium"
+    mitigation: "Batch LP creation, test with 50+ items"
+    test_coverage: "acceptance_criteria.AC-12"
+
+  - id: "RISK-03"
+    description: "RLS bypass on asn_items update"
+    severity: "high"
+    mitigation: "Cross-tenant test case"
+    test_coverage: "integration_tests.cross_tenant_access"

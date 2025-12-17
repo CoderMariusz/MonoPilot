@@ -1,0 +1,155 @@
+# Story 04.2a - Database Schema
+# Purpose: Tables updates, RLS policies (no new tables required)
+# Agent: BACKEND-DEV (database focus)
+
+# No new migrations required - work_orders table exists from Story 03.10
+migrations: []
+
+# Tables (EXISTING - updates only)
+tables:
+  - name: "work_orders"
+    description: "Work Orders table (from Epic 03.10) - fields used/updated by this story"
+    status: "existing"
+    columns_used:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "wo_number", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "status", type: "TEXT", constraints: "NOT NULL DEFAULT 'draft'" }
+      - { name: "production_line_id", type: "UUID", constraints: "REFERENCES production_lines(id)" }
+      - { name: "machine_id", type: "UUID", constraints: "REFERENCES machines(id)" }
+      - { name: "started_at", type: "TIMESTAMPTZ", constraints: "" }
+      - { name: "started_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+      - { name: "updated_by", type: "UUID", constraints: "REFERENCES users(id)" }
+    status_enum:
+      values: ["draft", "released", "in_progress", "paused", "completed", "cancelled"]
+      transitions:
+        released: ["in_progress"]  # This story handles Released -> In Progress
+        in_progress: ["paused", "completed", "cancelled"]
+        paused: ["in_progress", "cancelled"]
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_work_orders_org_status ON work_orders(org_id, status)"
+      - "idx_work_orders_line ON work_orders(production_line_id)"
+
+  - name: "wo_materials"
+    description: "WO materials table (from Epic 03.11a) - read-only for availability check"
+    status: "existing"
+    columns_used:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "wo_id", type: "UUID", constraints: "REFERENCES work_orders(id)" }
+      - { name: "product_id", type: "UUID", constraints: "REFERENCES products(id)" }
+      - { name: "required_qty", type: "DECIMAL", constraints: "NOT NULL" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+  - name: "production_lines"
+    description: "Production lines table (from Epic 01.11) - for line validation"
+    status: "existing"
+    columns_used:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "name", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "is_active", type: "BOOLEAN", constraints: "DEFAULT true" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+  rationale:
+    - "Single source of truth (users table)"
+    - "User org reassignment takes effect immediately"
+    - "No custom JWT claim configuration required"
+    - "Performance overhead <1ms per query"
+
+  # Existing policies on work_orders (from 03.10) - document for context
+  existing_policies:
+    - table: "work_orders"
+      name: "work_orders_org_isolation"
+      operation: "SELECT"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    - table: "work_orders"
+      name: "work_orders_write"
+      operation: "UPDATE"
+      using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      with_check: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# No new tables for Phase 0
+new_tables_phase_1:
+  - name: "material_reservations"
+    description: "Created in Story 04.8 (Phase 1) after Epic 05 License Plates"
+    note: "NOT part of this story - documented for context"
+
+# Queries used by this story
+queries:
+  get_work_order_for_start:
+    description: "Fetch WO with related data for start validation"
+    sql: |
+      SELECT
+        wo.id,
+        wo.wo_number,
+        wo.status,
+        wo.production_line_id,
+        wo.machine_id,
+        wo.planned_qty,
+        p.name as product_name,
+        pl.name as line_name
+      FROM work_orders wo
+      LEFT JOIN products p ON wo.product_id = p.id
+      LEFT JOIN production_lines pl ON wo.production_line_id = pl.id
+      WHERE wo.id = :wo_id
+      -- RLS automatically filters by org_id
+
+  update_work_order_start:
+    description: "Update WO status to in_progress with timestamps"
+    sql: |
+      UPDATE work_orders
+      SET
+        status = 'in_progress',
+        started_at = NOW(),
+        started_by = auth.uid(),
+        production_line_id = COALESCE(:line_id, production_line_id),
+        machine_id = COALESCE(:machine_id, machine_id),
+        updated_at = NOW(),
+        updated_by = auth.uid()
+      WHERE id = :wo_id
+        AND status = 'released'
+      RETURNING *
+      -- RLS automatically filters by org_id
+
+  check_line_availability:
+    description: "Check if production line has active WO"
+    sql: |
+      SELECT wo_number
+      FROM work_orders
+      WHERE production_line_id = :line_id
+        AND status = 'in_progress'
+      LIMIT 1
+      -- RLS automatically filters by org_id
+
+  get_wo_materials_availability:
+    description: "Get materials for WO with mock availability (Phase 0)"
+    sql: |
+      SELECT
+        wm.id,
+        wm.product_id,
+        p.name as product_name,
+        wm.required_qty,
+        wm.uom,
+        wm.required_qty as available_qty,  -- Mock: assume 100% available in Phase 0
+        100 as availability_percent         -- Mock: 100% for Phase 0
+      FROM wo_materials wm
+      JOIN products p ON wm.product_id = p.id
+      WHERE wm.wo_id = :wo_id
+      -- RLS automatically filters by org_id
+
+# Database constraints verified by this story
+constraints:
+  - "Status must be 'released' to start (application-level validation)"
+  - "started_at and started_by must be set atomically with status change"
+  - "org_id isolation enforced by RLS on all queries"
+  - "Line/machine references must exist and belong to same org"

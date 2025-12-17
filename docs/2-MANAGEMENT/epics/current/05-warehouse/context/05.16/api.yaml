@@ -1,0 +1,423 @@
+# Story 05.16 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # GET /api/warehouse/stock-moves - List stock moves
+  - method: "GET"
+    path: "/api/warehouse/stock-moves"
+    description: "List stock moves with pagination and filters"
+    file: "apps/frontend/app/api/warehouse/stock-moves/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator", "production_manager", "viewer"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        page: { type: "number", default: 1, description: "Page number" }
+        limit: { type: "number", default: 50, max: 200, description: "Items per page" }
+        move_type: { type: "enum", values: ["transfer", "issue", "receipt", "adjustment", "return", "quarantine", "putaway"], description: "Filter by move type" }
+        lp_id: { type: "uuid", description: "Filter by specific LP" }
+        location_id: { type: "uuid", description: "Filter by from OR to location" }
+        date_from: { type: "datetime", description: "Filter moves from date" }
+        date_to: { type: "datetime", description: "Filter moves to date" }
+        status: { type: "enum", values: ["completed", "cancelled"], description: "Filter by status" }
+
+    response:
+      status: 200
+      schema:
+        data:
+          type: "array"
+          items:
+            id: "UUID"
+            org_id: "UUID"
+            move_number: "string"
+            lp_id: "UUID"
+            move_type: "string"
+            from_location_id: "UUID | null"
+            to_location_id: "UUID | null"
+            quantity: "number"
+            status: "string"
+            move_date: "string (ISO datetime)"
+            reason: "string | null"
+            reason_code: "string | null"
+            wo_id: "UUID | null"
+            reference_id: "UUID | null"
+            reference_type: "string | null"
+            created_at: "string"
+            created_by: "UUID"
+            cancelled_at: "string | null"
+            cancelled_by: "UUID | null"
+            notes: "string | null"
+            # Expanded relations
+            license_plate:
+              lp_number: "string"
+              product_id: "UUID"
+            from_location:
+              location_code: "string"
+              name: "string"
+            to_location:
+              location_code: "string"
+              name: "string"
+            created_by_user:
+              name: "string"
+              email: "string"
+        pagination:
+          page: "number"
+          limit: "number"
+          total: "number"
+          totalPages: "number"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 400
+        code: "INVALID_FILTERS"
+        message: "Invalid filter parameters"
+
+  # GET /api/warehouse/stock-moves/:id - Get stock move detail
+  - method: "GET"
+    path: "/api/warehouse/stock-moves/:id"
+    description: "Get stock move by ID with expanded details"
+    file: "apps/frontend/app/api/warehouse/stock-moves/[id]/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator", "production_manager", "viewer"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: { type: "uuid", required: true }
+
+    response:
+      status: 200
+      schema:
+        data:
+          id: "UUID"
+          move_number: "string"
+          # ... full stock move with expanded LP, locations, users, product
+
+    errors:
+      - status: 404
+        code: "MOVE_NOT_FOUND"
+        message: "Stock move not found"
+
+  # POST /api/warehouse/stock-moves - Create stock move
+  - method: "POST"
+    path: "/api/warehouse/stock-moves"
+    description: "Create a new stock move and update LP location"
+    file: "apps/frontend/app/api/warehouse/stock-moves/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        lp_id: { type: "uuid", required: true, description: "License plate to move" }
+        move_type: { type: "enum", required: true, values: ["transfer", "issue", "receipt", "adjustment", "return", "quarantine", "putaway"] }
+        to_location_id: { type: "uuid", required: "conditional", description: "Required for transfer/putaway/quarantine/return" }
+        quantity: { type: "number", required: false, description: "Defaults to full LP qty" }
+        reason: { type: "string", max_length: 500, required: false }
+        reason_code: { type: "enum", required: "conditional", values: ["damage", "theft", "counting_error", "quality_issue", "expired", "other"], description: "Required for adjustments" }
+        wo_id: { type: "uuid", required: false, description: "Link to work order" }
+        reference_id: { type: "uuid", required: false }
+        reference_type: { type: "string", required: false }
+
+    response:
+      status: 201
+      schema:
+        data:
+          id: "UUID"
+          move_number: "string"
+          lp_id: "UUID"
+          move_type: "string"
+          quantity: "number"
+          status: "completed"
+          # ... full stock move
+
+    errors:
+      - status: 400
+        code: "LP_NOT_AVAILABLE"
+        message: "LP not available for movement (status: {status})"
+        when: "LP status is not 'available'"
+      - status: 400
+        code: "QUANTITY_EXCEEDS_AVAILABLE"
+        message: "Move quantity exceeds available quantity"
+        when: "move_qty > LP.qty"
+      - status: 400
+        code: "DESTINATION_REQUIRED"
+        message: "Destination location required for this move type"
+        when: "transfer/putaway/quarantine/return without to_location_id"
+      - status: 400
+        code: "DESTINATION_NOT_AVAILABLE"
+        message: "Destination location not available"
+        when: "Location inactive or not found"
+      - status: 400
+        code: "REASON_CODE_REQUIRED"
+        message: "Reason code required for adjustments"
+        when: "move_type='adjustment' without reason_code"
+      - status: 400
+        code: "PARTIAL_MOVE_REQUIRES_SPLIT"
+        message: "Partial moves require LP split functionality"
+        when: "move_qty < LP.qty and 05.6 not implemented"
+
+  # POST /api/warehouse/stock-moves/:id/cancel - Cancel stock move
+  - method: "POST"
+    path: "/api/warehouse/stock-moves/:id/cancel"
+    description: "Cancel a stock move (does NOT reverse LP changes)"
+    file: "apps/frontend/app/api/warehouse/stock-moves/[id]/cancel/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      params:
+        id: { type: "uuid", required: true }
+      body:
+        reason: { type: "string", min_length: 10, required: true, description: "Cancellation reason" }
+
+    response:
+      status: 200
+      schema:
+        data:
+          id: "UUID"
+          move_number: "string"
+          status: "cancelled"
+          cancelled_at: "string"
+          cancelled_by: "UUID"
+          notes: "string"
+
+    errors:
+      - status: 404
+        code: "MOVE_NOT_FOUND"
+        message: "Stock move not found"
+      - status: 400
+        code: "ALREADY_CANCELLED"
+        message: "Move already cancelled"
+      - status: 400
+        code: "CANCEL_TIME_EXCEEDED"
+        message: "Cannot cancel moves older than 24 hours"
+
+  # POST /api/warehouse/license-plates/:id/move - Direct LP move endpoint
+  - method: "POST"
+    path: "/api/warehouse/license-plates/:id/move"
+    description: "Alternative endpoint: move LP to new location"
+    file: "apps/frontend/app/api/warehouse/license-plates/[id]/move/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      params:
+        id: { type: "uuid", required: true, description: "LP ID" }
+      body:
+        to_location_id: { type: "uuid", required: true }
+        quantity: { type: "number", required: false, description: "Defaults to full LP qty" }
+        move_type: { type: "enum", default: "manual", values: ["manual", "transfer", "putaway", "quarantine", "return"] }
+        reason: { type: "string", required: false }
+
+    response:
+      status: 200
+      schema:
+        data:
+          stock_move:
+            id: "UUID"
+            move_number: "string"
+          lp:
+            id: "UUID"
+            lp_number: "string"
+            location_id: "UUID (updated)"
+
+    errors:
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License plate not found"
+      - status: 400
+        code: "LP_NOT_AVAILABLE"
+        message: "LP not available for movement"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/stock-move-service.ts"
+    description: "Stock move business logic"
+    exports:
+      - name: "generateMoveNumber"
+        type: "async function"
+        params:
+          - "orgId: string"
+        returns: "Promise<string>"
+        description: "Generate next move number (SM-YYYY-NNNNN)"
+
+      - name: "createStockMove"
+        type: "async function"
+        params:
+          - "params: CreateStockMoveParams"
+        returns: "Promise<StockMove>"
+        description: "Create stock move and update LP location"
+
+      - name: "listStockMoves"
+        type: "async function"
+        params:
+          - "filters: ListStockMovesFilters"
+        returns: "Promise<{ data: StockMove[], pagination: Pagination }>"
+        description: "List stock moves with filters and pagination"
+
+      - name: "getStockMove"
+        type: "async function"
+        params:
+          - "id: string"
+        returns: "Promise<StockMove>"
+        description: "Get stock move by ID with expanded relations"
+
+      - name: "cancelStockMove"
+        type: "async function"
+        params:
+          - "id: string"
+          - "reason: string"
+        returns: "Promise<StockMove>"
+        description: "Cancel stock move (does not reverse LP changes)"
+
+      - name: "getLPMovementHistory"
+        type: "async function"
+        params:
+          - "lpId: string"
+        returns: "Promise<StockMove[]>"
+        description: "Get all movements for an LP"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/stock-move.ts"
+    content: |
+      export type MoveType =
+        | 'transfer'
+        | 'issue'
+        | 'receipt'
+        | 'adjustment'
+        | 'return'
+        | 'quarantine'
+        | 'putaway';
+
+      export type MoveStatus = 'completed' | 'cancelled';
+
+      export type ReasonCode =
+        | 'damage'
+        | 'theft'
+        | 'counting_error'
+        | 'quality_issue'
+        | 'expired'
+        | 'other';
+
+      export interface StockMove {
+        id: string;
+        orgId: string;
+        moveNumber: string;
+        lpId: string;
+        moveType: MoveType;
+        fromLocationId: string | null;
+        toLocationId: string | null;
+        quantity: number;
+        status: MoveStatus;
+        moveDate: string;
+        reason: string | null;
+        reasonCode: ReasonCode | null;
+        woId: string | null;
+        referenceId: string | null;
+        referenceType: string | null;
+        createdAt: string;
+        createdBy: string;
+        cancelledAt: string | null;
+        cancelledBy: string | null;
+        notes: string | null;
+      }
+
+      export interface CreateStockMoveParams {
+        lpId: string;
+        moveType: MoveType;
+        toLocationId?: string;
+        quantity?: number;
+        reason?: string;
+        reasonCode?: ReasonCode;
+        woId?: string;
+        referenceId?: string;
+        referenceType?: string;
+      }
+
+      export interface ListStockMovesFilters {
+        page?: number;
+        limit?: number;
+        moveType?: MoveType;
+        lpId?: string;
+        locationId?: string;
+        dateFrom?: string;
+        dateTo?: string;
+        status?: MoveStatus;
+      }
+
+# Implementation Patterns
+patterns:
+  api_route_get_list: |
+    // apps/frontend/app/api/warehouse/stock-moves/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { listStockMoves } from '@/lib/services/stock-move-service';
+    import { listStockMovesSchema } from '@/lib/validation/stock-move-schema';
+
+    export async function GET(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const { searchParams } = new URL(request.url);
+      const filters = listStockMovesSchema.parse(Object.fromEntries(searchParams));
+
+      const result = await listStockMoves(filters);
+      return NextResponse.json(result);
+    }
+
+  api_route_post_create: |
+    // apps/frontend/app/api/warehouse/stock-moves/route.ts (POST handler)
+    export async function POST(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const body = await request.json();
+      const params = createStockMoveSchema.parse(body);
+
+      try {
+        const move = await createStockMove(params);
+        return NextResponse.json({ data: move }, { status: 201 });
+      } catch (error) {
+        if (error.message.includes('not available')) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        throw error;
+      }
+    }
+
+  service_create_move: |
+    // See story file for full implementation
+    // Key steps:
+    // 1. Validate LP status (must be 'available')
+    // 2. Validate move quantity (<= LP.qty)
+    // 3. Validate destination location (active, exists)
+    // 4. Handle partial move (triggers LP split if qty < LP.qty)
+    // 5. Generate move number
+    // 6. Create stock_move record
+    // 7. Update LP.location_id if transfer/putaway/quarantine/return
+    // 8. Update LP.qa_status and LP.status if quarantine

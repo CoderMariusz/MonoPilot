@@ -1,0 +1,407 @@
+# Story 04.2a - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/production/work-orders/:id/start"
+    description: "Start a Released Work Order, transitioning to In Progress"
+    file: "apps/frontend/app/api/production/work-orders/[id]/start/route.ts"
+    auth: "required"
+    roles: ["production_operator", "production_manager", "admin", "owner"]
+
+    params:
+      id: "UUID - Work Order ID"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+        Content-Type: "application/json"
+      body:
+        type: "StartWorkOrderInput"
+        schema:
+          line_id:
+            type: "string (UUID)"
+            required: false
+            description: "Override line assignment"
+          machine_id:
+            type: "string (UUID)"
+            required: false
+            description: "Override machine assignment"
+          force:
+            type: "boolean"
+            required: false
+            default: false
+            description: "Bypass line availability check (warning override)"
+
+    response:
+      status: 200
+      type: "WorkOrder"
+      schema:
+        id: "UUID"
+        wo_number: "string"
+        status: "'in_progress'"
+        started_at: "ISO timestamp"
+        started_by: "UUID"
+        production_line_id: "UUID"
+        machine_id: "UUID | null"
+        product_name: "string"
+        planned_qty: "number"
+        line_name: "string"
+
+    errors:
+      - status: 400
+        code: "INVALID_STATUS"
+        message: "WO must be Released to start"
+        when: "WO status is not 'released'"
+        body:
+          error: "WO must be Released to start"
+          current_status: "string (current status)"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 403
+        code: "FORBIDDEN"
+        message: "Insufficient permissions"
+        when: "User lacks production permission"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Work Order not found"
+        when: "WO doesn't exist or cross-tenant access"
+      - status: 409
+        code: "LINE_IN_USE"
+        message: "Line already in use by WO-XXX"
+        when: "Line has active WO and force=false"
+        body:
+          error: "Line already in use by WO-XXX"
+          current_wo: "string"
+          warning: true
+
+  - method: "GET"
+    path: "/api/production/work-orders/:id/material-availability"
+    description: "Check material availability for a Work Order (warning info)"
+    file: "apps/frontend/app/api/production/work-orders/[id]/material-availability/route.ts"
+    auth: "required"
+    roles: ["production_operator", "production_manager", "admin", "owner", "viewer"]
+
+    params:
+      id: "UUID - Work Order ID"
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "MaterialAvailability"
+      schema:
+        wo_id: "UUID"
+        overall_availability_percent: "number (0-100)"
+        materials:
+          type: "array"
+          items:
+            wo_material_id: "UUID"
+            product_id: "UUID"
+            product_name: "string"
+            required_qty: "number"
+            available_qty: "number"
+            availability_percent: "number (0-100)"
+            uom: "string"
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token provided"
+      - status: 404
+        code: "NOT_FOUND"
+        message: "Work Order not found"
+        when: "WO doesn't exist or cross-tenant access"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/production-execution-service.ts"
+    description: "WO execution lifecycle service"
+    exports:
+      - name: "startWorkOrder"
+        type: "async function"
+        params:
+          - "woId: string"
+          - "options?: StartWorkOrderOptions"
+        returns: "Promise<WorkOrder>"
+        description: "Start a Released WO, transition to In Progress"
+
+      - name: "canStartWorkOrder"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<ValidationResult>"
+        description: "Check if WO can be started (status, permissions)"
+
+      - name: "checkMaterialAvailability"
+        type: "async function"
+        params:
+          - "woId: string"
+        returns: "Promise<MaterialAvailability>"
+        description: "Get material availability for WO (Phase 0: mock 100%)"
+
+      - name: "checkLineAvailability"
+        type: "async function"
+        params:
+          - "lineId: string"
+        returns: "Promise<{ available: boolean; current_wo?: string }>"
+        description: "Check if production line has active WO"
+
+      - name: "StartWorkOrderOptions"
+        type: "interface"
+        fields:
+          - "line_id?: string"
+          - "machine_id?: string"
+          - "force?: boolean"
+
+      - name: "ValidationResult"
+        type: "interface"
+        fields:
+          - "allowed: boolean"
+          - "reason?: string"
+          - "warnings?: string[]"
+
+      - name: "MaterialAvailability"
+        type: "interface"
+        fields:
+          - "overall_percent: number"
+          - "materials: MaterialAvailabilityItem[]"
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/production-execution.ts"
+    description: "Zod schemas for production execution"
+    exports:
+      - name: "startWorkOrderSchema"
+        type: "z.object"
+        schema: |
+          export const startWorkOrderSchema = z.object({
+            line_id: z.string().uuid().optional(),
+            machine_id: z.string().uuid().optional(),
+            force: z.boolean().optional().default(false),
+          });
+
+      - name: "StartWorkOrderInput"
+        type: "type"
+        definition: "z.infer<typeof startWorkOrderSchema>"
+
+      - name: "woStatusEnum"
+        type: "z.enum"
+        schema: |
+          export const woStatusEnum = z.enum([
+            'draft',
+            'released',
+            'in_progress',
+            'paused',
+            'completed',
+            'cancelled'
+          ]);
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/work-order.ts"
+    description: "Work Order TypeScript interfaces (extends existing)"
+    exports:
+      - "WorkOrder"
+      - "WorkOrderStatus"
+
+  - path: "apps/frontend/lib/types/production-execution.ts"
+    description: "Production execution TypeScript interfaces"
+    exports:
+      - "StartWorkOrderOptions"
+      - "StartWorkOrderResponse"
+      - "ValidationResult"
+      - "MaterialAvailability"
+      - "MaterialAvailabilityItem"
+
+# Implementation patterns
+patterns:
+  api_route_start: |
+    // apps/frontend/app/api/production/work-orders/[id]/start/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextRequest, NextResponse } from 'next/server';
+    import { startWorkOrderSchema } from '@/lib/validation/production-execution';
+    import { hasPermission } from '@/lib/services/permission-service';
+
+    export async function POST(
+      request: NextRequest,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // 1. Verify authentication
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // 2. Parse and validate request body
+      const body = await request.json().catch(() => ({}));
+      const parsed = startWorkOrderSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error.message }, { status: 400 });
+      }
+
+      const { line_id, machine_id, force } = parsed.data;
+
+      // 3. Fetch WO (RLS filters by org_id)
+      const { data: wo, error: woError } = await supabase
+        .from('work_orders')
+        .select('id, wo_number, status, production_line_id, machine_id')
+        .eq('id', params.id)
+        .single();
+
+      if (woError || !wo) {
+        return NextResponse.json({ error: 'Work Order not found' }, { status: 404 });
+      }
+
+      // 4. Validate status
+      if (wo.status !== 'released') {
+        return NextResponse.json({
+          error: 'WO must be Released to start',
+          current_status: wo.status
+        }, { status: 400 });
+      }
+
+      // 5. Check line availability (if line_id provided and not forcing)
+      const targetLineId = line_id || wo.production_line_id;
+      if (targetLineId && !force) {
+        const { data: activeWO } = await supabase
+          .from('work_orders')
+          .select('wo_number')
+          .eq('production_line_id', targetLineId)
+          .eq('status', 'in_progress')
+          .single();
+
+        if (activeWO) {
+          return NextResponse.json({
+            error: `Line already in use by ${activeWO.wo_number}`,
+            current_wo: activeWO.wo_number,
+            warning: true
+          }, { status: 409 });
+        }
+      }
+
+      // 6. Update WO status
+      const { data: updated, error: updateError } = await supabase
+        .from('work_orders')
+        .update({
+          status: 'in_progress',
+          started_at: new Date().toISOString(),
+          started_by: user.id,
+          production_line_id: line_id || wo.production_line_id,
+          machine_id: machine_id || wo.machine_id,
+          updated_at: new Date().toISOString(),
+          updated_by: user.id,
+        })
+        .eq('id', params.id)
+        .select(`
+          *,
+          product:products(name),
+          line:production_lines(name)
+        `)
+        .single();
+
+      if (updateError) {
+        return NextResponse.json({ error: 'Failed to start WO' }, { status: 500 });
+      }
+
+      // 7. NO material reservations in Phase 0
+      // (Story 04.8 will add this)
+
+      return NextResponse.json(updated);
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/production-execution-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+    export interface StartWorkOrderOptions {
+      line_id?: string;
+      machine_id?: string;
+      force?: boolean;
+    }
+
+    export interface ValidationResult {
+      allowed: boolean;
+      reason?: string;
+      warnings?: string[];
+    }
+
+    export interface MaterialAvailability {
+      overall_percent: number;
+      materials: {
+        wo_material_id: string;
+        product_id: string;
+        product_name: string;
+        required_qty: number;
+        available_qty: number;
+        availability_percent: number;
+        uom: string;
+      }[];
+    }
+
+    export async function startWorkOrder(
+      woId: string,
+      options: StartWorkOrderOptions = {}
+    ): Promise<any> {
+      const response = await fetch(`/api/production/work-orders/${woId}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(options),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to start work order');
+      }
+
+      return response.json();
+    }
+
+    export async function checkMaterialAvailability(
+      woId: string
+    ): Promise<MaterialAvailability> {
+      const response = await fetch(
+        `/api/production/work-orders/${woId}/material-availability`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to check material availability');
+      }
+
+      return response.json();
+    }
+
+    export async function checkLineAvailability(
+      lineId: string
+    ): Promise<{ available: boolean; current_wo?: string }> {
+      const supabase = createClientComponentClient();
+
+      const { data: activeWO } = await supabase
+        .from('work_orders')
+        .select('wo_number')
+        .eq('production_line_id', lineId)
+        .eq('status', 'in_progress')
+        .single();
+
+      if (activeWO) {
+        return { available: false, current_wo: activeWO.wo_number };
+      }
+
+      return { available: true };
+    }
+
+# Error handling approach
+error_handling:
+  cross_tenant: "Return 404 (not 403) per ADR-013 to prevent existence leak"
+  validation: "Return 400 with descriptive error message"
+  conflict: "Return 409 for line in use (optional warning, can be bypassed)"
+  server_error: "Return 500 with generic message, log details server-side"

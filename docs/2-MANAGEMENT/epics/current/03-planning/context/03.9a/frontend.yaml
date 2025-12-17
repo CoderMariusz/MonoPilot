@@ -1,0 +1,256 @@
+# Story 03.9a - Frontend Specification
+# Purpose: Components, modals, UX patterns
+# Agent: FRONTEND-DEV (components focus)
+
+# UX References
+ux:
+  wireframes:
+    - id: "PLAN-012"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-012-transfer-order-detail.md"
+      components: ["TO Detail Page", "Ship Modal", "Receive Modal", "Progress Indicators"]
+  patterns:
+    modal: "ShadCN Dialog with form"
+    table: "ShadCN DataTable with inline progress bars"
+    progress: "ShadCN Progress component"
+    toast: "ShadCN toast for success/error messages"
+  states: ["loading", "empty", "error", "success"]
+
+# Components to create/update
+components:
+  - path: "apps/frontend/components/planning/transfer-orders/ShipTOModal.tsx"
+    status: "new"
+    description: "Ship Transfer Order modal with line-by-line quantity inputs"
+    props:
+      transferOrder: "TransferOrder"
+      lines: "TOLine[]"
+      onClose: "() => void"
+      onSuccess: "() => void"
+    features:
+      - "Modal title: Ship Transfer Order {to_number}"
+      - "Table: Product, Ordered Qty, Previously Shipped, Remaining, Ship Now"
+      - "Ship Now inputs: numeric, defaulted to remaining qty"
+      - "Shipment Date picker (default today)"
+      - "Notes textarea (optional)"
+      - "Ship All + Cancel buttons"
+      - "Validation: ship_qty <= remaining"
+      - "Loading state during API call"
+      - "Error handling with inline messages"
+    pattern: |
+      interface ShipLineInput {
+        line_id: string;
+        ship_qty: number;
+        remaining_qty: number;
+      }
+
+      export function ShipTOModal({ transferOrder, lines, onClose, onSuccess }: Props) {
+        const [shipDate, setShipDate] = useState(new Date().toISOString().split('T')[0]);
+        const [lineInputs, setLineInputs] = useState<ShipLineInput[]>(
+          lines.map(line => ({
+            line_id: line.id,
+            ship_qty: line.quantity - line.shipped_qty, // Default to remaining
+            remaining_qty: line.quantity - line.shipped_qty,
+          }))
+        );
+
+        const handleShip = async () => {
+          const response = await fetch(`/api/planning/transfer-orders/${transferOrder.id}/ship`, {
+            method: 'POST',
+            body: JSON.stringify({
+              shipment_date: shipDate,
+              lines: lineInputs.filter(l => l.ship_qty > 0).map(l => ({
+                line_id: l.line_id,
+                ship_qty: l.ship_qty,
+              })),
+            }),
+          });
+          // Handle response...
+        };
+      }
+
+  - path: "apps/frontend/components/planning/transfer-orders/ReceiveTOModal.tsx"
+    status: "new"
+    description: "Receive Transfer Order modal with line-by-line quantity inputs"
+    props:
+      transferOrder: "TransferOrder"
+      lines: "TOLine[]"
+      onClose: "() => void"
+      onSuccess: "() => void"
+    features:
+      - "Modal title: Receive Transfer Order {to_number}"
+      - "Table: Product, Shipped Qty, Previously Received, Remaining, Receive Now"
+      - "Receive Now inputs: numeric, defaulted to remaining qty"
+      - "Receipt Date picker (default today)"
+      - "Notes textarea (optional)"
+      - "Receive All + Cancel buttons"
+      - "Validation: receive_qty <= shipped - received"
+      - "Disable inputs for lines with remaining = 0"
+
+  - path: "apps/frontend/components/planning/transfer-orders/TOLineProgressBar.tsx"
+    status: "new"
+    description: "Progress indicator component for TO lines"
+    props:
+      shipped: "number"
+      received: "number"
+      total: "number"
+      type: "'ship' | 'receive'"
+    features:
+      - "Displays X / Y with progress bar"
+      - "Green checkmark when 100%"
+      - "Yellow bar for partial"
+      - "Gray for 0%"
+    pattern: |
+      export function TOLineProgressBar({ shipped, received, total, type }: Props) {
+        const current = type === 'ship' ? shipped : received;
+        const max = type === 'ship' ? total : shipped;
+        const percent = max > 0 ? (current / max) * 100 : 0;
+
+        return (
+          <div className="flex items-center gap-2">
+            <Progress value={percent} className="w-20 h-2" />
+            <span className="text-sm">
+              {current} / {max}
+              {percent === 100 && <CheckIcon className="w-4 h-4 text-green-500 ml-1" />}
+            </span>
+          </div>
+        );
+      }
+
+  - path: "apps/frontend/components/planning/transfer-orders/TOActionsMenu.tsx"
+    status: "update"
+    description: "Actions dropdown - add Ship/Receive actions"
+    changes:
+      - "Add Ship TO action (visible when status = planned, partially_shipped)"
+      - "Add Receive TO action (visible when status = shipped, partially_shipped, partially_received)"
+      - "Status-based visibility per business rules"
+    visibility_rules:
+      ship:
+        visible_when: "status IN (planned, partially_shipped)"
+        hidden_when: "status IN (draft, shipped, received, closed, cancelled)"
+      receive:
+        visible_when: "status IN (shipped, partially_shipped, partially_received)"
+        hidden_when: "status IN (draft, planned, received, closed, cancelled)"
+
+  - path: "apps/frontend/app/(authenticated)/planning/transfer-orders/[id]/page.tsx"
+    status: "update"
+    description: "TO Detail page - add progress indicators and actions"
+    changes:
+      - "Add Ship TO button based on status"
+      - "Add Receive TO button based on status"
+      - "Add progress columns to lines table (Shipped X/Y, Received X/Y)"
+      - "Status badge colors for partially_shipped/partially_received"
+      - "Open ShipTOModal/ReceiveTOModal on button click"
+
+# Status badge colors
+status_badges:
+  draft: { color: "gray", label: "Draft" }
+  planned: { color: "blue", label: "Planned" }
+  partially_shipped: { color: "orange", label: "Partially Shipped" }
+  shipped: { color: "green", label: "Shipped" }
+  partially_received: { color: "cyan", label: "Partially Received" }
+  received: { color: "emerald", label: "Received" }
+  closed: { color: "slate", label: "Closed" }
+  cancelled: { color: "red", label: "Cancelled" }
+
+# Action button visibility matrix
+action_visibility:
+  - status: "draft"
+    ship_visible: false
+    receive_visible: false
+  - status: "planned"
+    ship_visible: true
+    receive_visible: false
+  - status: "partially_shipped"
+    ship_visible: true
+    receive_visible: true
+  - status: "shipped"
+    ship_visible: false
+    receive_visible: true
+  - status: "partially_received"
+    ship_visible: false
+    receive_visible: true
+  - status: "received"
+    ship_visible: false
+    receive_visible: false
+  - status: "closed"
+    ship_visible: false
+    receive_visible: false
+  - status: "cancelled"
+    ship_visible: false
+    receive_visible: false
+
+# TypeScript types (extend existing)
+types:
+  - path: "apps/frontend/lib/types/transfer-order.ts"
+    status: "update"
+    additions: |
+      export interface ShipTORequest {
+        shipment_date: string;
+        lines: Array<{ line_id: string; ship_qty: number }>;
+        notes?: string;
+      }
+
+      export interface ReceiveTORequest {
+        receipt_date: string;
+        lines: Array<{ line_id: string; receive_qty: number }>;
+        notes?: string;
+      }
+
+      export interface LineProgress {
+        shipped: number;
+        received: number;
+        total: number;
+        ship_percent: number;
+        receive_percent: number;
+        ship_remaining: number;
+        receive_remaining: number;
+      }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-transfer-order.ts"
+    status: "update"
+    additions:
+      - name: "useShipTO"
+        description: "Mutation hook for ship action"
+        pattern: |
+          export function useShipTO(toId: string) {
+            const queryClient = useQueryClient();
+            return useMutation({
+              mutationFn: (data: ShipTORequest) =>
+                fetch(`/api/planning/transfer-orders/${toId}/ship`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(data),
+                }).then(res => res.json()),
+              onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: ['transfer-order', toId] });
+                toast.success('Transfer Order shipped successfully');
+              },
+              onError: (error) => {
+                toast.error(error.message || 'Failed to ship Transfer Order');
+              },
+            });
+          }
+
+      - name: "useReceiveTO"
+        description: "Mutation hook for receive action"
+
+# Accessibility
+accessibility:
+  modal:
+    - "Focus trap within modal"
+    - "Escape key closes modal"
+    - "Tab navigation between inputs"
+    - "ARIA labels on all inputs"
+  progress:
+    - "aria-valuenow, aria-valuemin, aria-valuemax on progress bars"
+    - "Screen reader text: 'X of Y units shipped'"
+  buttons:
+    - "Disabled state with aria-disabled"
+    - "Loading state with aria-busy"
+
+# Performance
+performance:
+  - target: "Ship/receive modal open < 100ms"
+  - target: "Ship/receive API response < 500ms"
+  - target: "Progress indicators render inline with table"

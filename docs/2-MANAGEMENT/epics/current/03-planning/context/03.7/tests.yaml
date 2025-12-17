@@ -1,0 +1,454 @@
+# Story 03.7 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test Files
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/po-status-service.test.ts"
+    type: "unit"
+    description: "Unit tests for PO status service and state machine"
+  - path: "apps/frontend/lib/validation/__tests__/po-status.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+  - path: "__tests__/integration/api/settings/planning/po-statuses.test.ts"
+    type: "integration"
+    description: "Integration tests for status configuration API"
+  - path: "__tests__/integration/api/planning/purchase-orders/status.test.ts"
+    type: "integration"
+    description: "Integration tests for PO status operations API"
+  - path: "__tests__/e2e/settings/planning/po-statuses.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for status management flows"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # AC-1: Default Status Configuration
+  - id: "AC-01"
+    fr_ref: "FR-PLAN-011"
+    given: "a new organization is created"
+    when: "system runs organization setup"
+    then: "7 default PO statuses are created with correct colors and order"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-2: Add Custom Status
+  - id: "AC-02"
+    fr_ref: "FR-PLAN-011"
+    given: "admin on PO status config page"
+    when: "clicks 'Add Status' and fills form"
+    then: "custom status is created and appears in list"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-03"
+    fr_ref: "FR-PLAN-011"
+    given: "status with code 'confirmed' exists"
+    when: "admin attempts to create status with code 'confirmed'"
+    then: "error 'Status code must be unique' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-3: Edit Status
+  - id: "AC-04"
+    fr_ref: "FR-PLAN-011"
+    given: "system status 'draft' selected for edit"
+    when: "admin opens edit modal"
+    then: "name and code fields are disabled"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-4: Delete Status
+  - id: "AC-05"
+    fr_ref: "FR-PLAN-011"
+    given: "custom status with 5 POs using it"
+    when: "admin attempts to delete"
+    then: "error 'Cannot delete. 5 POs use this status.' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    fr_ref: "FR-PLAN-011"
+    given: "system status 'draft'"
+    when: "admin hovers over delete icon"
+    then: "delete is disabled with tooltip 'System statuses cannot be deleted'"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-5: Reorder Statuses
+  - id: "AC-07"
+    fr_ref: "FR-PLAN-011"
+    given: "admin on status config page"
+    when: "drags status to new position"
+    then: "status order updates and persists"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-6: Status Transition Rules
+  - id: "AC-08"
+    fr_ref: "FR-PLAN-007"
+    given: "configuring transitions for 'submitted'"
+    when: "admin adds 'pending_approval' and saves"
+    then: "submitted -> pending_approval is now valid"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    fr_ref: "FR-PLAN-007"
+    given: "system transition 'receiving -> closed'"
+    when: "admin attempts to uncheck"
+    then: "checkbox is disabled"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-7: Status Transition Validation
+  - id: "AC-10"
+    fr_ref: "FR-PLAN-007"
+    given: "PO in 'draft' status"
+    when: "planner clicks 'Submit'"
+    then: "status changes to 'submitted' and history recorded"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    fr_ref: "FR-PLAN-007"
+    given: "PO in 'confirmed' status with no allowed transition to 'draft'"
+    when: "planner attempts to change status to 'draft'"
+    then: "error 'Invalid status transition: confirmed -> draft' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-12"
+    fr_ref: "FR-PLAN-007"
+    given: "PO in 'draft' status with 0 line items"
+    when: "planner attempts 'Submit'"
+    then: "error 'Cannot submit PO without line items' displays"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-8: Status History Timeline
+  - id: "AC-13"
+    fr_ref: "FR-PLAN-007"
+    given: "PO with 4 status history entries"
+    when: "viewing PO detail page"
+    then: "Status History section displays 4 entries in reverse chronological order"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-9: Status Badge Component
+  - id: "AC-14"
+    given: "PO has status 'confirmed'"
+    when: "rendering status badge"
+    then: "badge shows 'Confirmed' with green background"
+    test_type: "unit"
+    priority: "P1"
+
+  # AC-10: Status Dropdown
+  - id: "AC-15"
+    given: "editing PO with status 'submitted'"
+    when: "clicks status dropdown"
+    then: "dropdown shows only allowed transitions"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-11: Multi-tenancy
+  - id: "AC-16"
+    given: "Org A has custom status 'awaiting_vendor'"
+    when: "User B from Org B views PO statuses"
+    then: "'awaiting_vendor' is NOT visible"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-17"
+    given: "user has PLANNER role (not ADMIN)"
+    when: "navigating to /settings/planning/po-statuses"
+    then: "403 Forbidden or redirect to dashboard"
+    test_type: "integration"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  po_status_service:
+    - name: "listStatuses returns org-specific statuses"
+      setup: "Mock Supabase response with org filter"
+      expected: "Returns only statuses for current org_id"
+
+    - name: "createStatus validates unique code"
+      setup: "Status with code 'draft' already exists"
+      expected: "Throws error with code DUPLICATE_CODE"
+
+    - name: "createStatus auto-assigns display_order"
+      setup: "3 statuses exist with orders 1, 2, 3"
+      expected: "New status gets order 4"
+
+    - name: "updateStatus prevents code change on system status"
+      setup: "System status 'draft' with is_system=true"
+      expected: "Throws error if trying to change code"
+
+    - name: "deleteStatus blocked if status in use"
+      setup: "Status referenced by 5 POs"
+      expected: "Throws error with count of POs"
+
+    - name: "deleteStatus blocked for system status"
+      setup: "System status 'draft'"
+      expected: "Throws error CANNOT_DELETE_SYSTEM"
+
+    - name: "reorderStatuses updates display_order"
+      setup: "3 statuses"
+      expected: "Orders updated to match provided sequence"
+
+    - name: "getAvailableTransitions returns allowed next statuses"
+      setup: "PO with status 'submitted', transitions to pending/confirmed/cancelled"
+      expected: "Returns 3 status options"
+
+    - name: "validateTransition checks transition rules"
+      setup: "No transition rule for confirmed -> draft"
+      expected: "Returns { valid: false, reason: 'Invalid transition' }"
+
+    - name: "validateTransition checks business conditions"
+      setup: "PO with 0 lines, transition draft -> submitted"
+      expected: "Returns { valid: false, reason: 'Cannot submit PO without line items' }"
+
+    - name: "transitionStatus creates history record"
+      setup: "Valid transition with user ID"
+      expected: "Status updated AND history record created"
+
+    - name: "transitionStatus updates PO status"
+      setup: "PO with status 'draft'"
+      expected: "PO.status updated to new value"
+
+    - name: "getStatusHistory returns chronological order"
+      setup: "4 history entries"
+      expected: "Returns entries sorted by changed_at DESC"
+
+    - name: "canDeleteStatus calculates usage count"
+      setup: "Status used by 3 POs"
+      expected: "Returns { allowed: false, poCount: 3 }"
+
+    - name: "createDefaultStatuses creates 7 defaults"
+      setup: "New org_id"
+      expected: "7 statuses created with correct codes"
+
+  validation_schemas:
+    - name: "createPOStatusSchema validates code format"
+      input: "{ code: 'Invalid Code!' }"
+      expected: "Validation error: lowercase letters and underscores only"
+
+    - name: "createPOStatusSchema validates required fields"
+      input: "{ color: 'blue' }"
+      expected: "Validation error: name and code required"
+
+    - name: "transitionStatusSchema validates to_status"
+      input: "{ to_status: '' }"
+      expected: "Validation error: status code required"
+
+# Integration Test Cases
+integration_tests:
+  status_configuration_api:
+    - name: "GET /po-statuses returns org statuses only"
+      setup: "2 orgs with different statuses"
+      action: "GET /api/v1/settings/planning/po-statuses"
+      expected: "Only current org's statuses returned"
+
+    - name: "POST /po-statuses creates custom status"
+      setup: "Valid status data"
+      action: "POST /api/v1/settings/planning/po-statuses"
+      expected: "201 Created with status object"
+
+    - name: "POST /po-statuses duplicate code returns 400"
+      setup: "Status 'draft' exists"
+      action: "POST with code 'draft'"
+      expected: "400 DUPLICATE_CODE"
+
+    - name: "PUT /po-statuses/:id updates name and color"
+      setup: "Custom status exists"
+      action: "PUT with new name and color"
+      expected: "200 OK with updated status"
+
+    - name: "PUT /po-statuses/:id cannot change system code"
+      setup: "System status 'draft'"
+      action: "PUT with new name"
+      expected: "400 CANNOT_MODIFY_SYSTEM"
+
+    - name: "DELETE /po-statuses/:id deletes unused status"
+      setup: "Custom status with 0 POs"
+      action: "DELETE"
+      expected: "204 No Content"
+
+    - name: "DELETE /po-statuses/:id in use returns 400"
+      setup: "Custom status with 5 POs"
+      action: "DELETE"
+      expected: "400 STATUS_IN_USE with count"
+
+    - name: "DELETE /po-statuses/:id system status returns 400"
+      setup: "System status 'draft'"
+      action: "DELETE"
+      expected: "400 CANNOT_DELETE_SYSTEM"
+
+    - name: "GET /po-statuses/:id/transitions returns rules"
+      setup: "Status with 3 allowed transitions"
+      action: "GET"
+      expected: "Array of 3 transition objects"
+
+    - name: "PUT /po-statuses/:id/transitions updates rules"
+      setup: "Status with current transitions"
+      action: "PUT with new allowed IDs"
+      expected: "200 OK, transitions updated"
+
+  status_operations_api:
+    - name: "POST /purchase-orders/:id/status valid transition"
+      setup: "PO in 'draft', transition to 'submitted' allowed"
+      action: "POST with to_status: 'submitted'"
+      expected: "200 OK, status changed"
+
+    - name: "POST /purchase-orders/:id/status invalid returns 400"
+      setup: "PO in 'confirmed', no transition to 'draft'"
+      action: "POST with to_status: 'draft'"
+      expected: "400 INVALID_TRANSITION"
+
+    - name: "GET /purchase-orders/:id/status/history returns timeline"
+      setup: "PO with 4 status changes"
+      action: "GET"
+      expected: "Array of 4 history entries"
+
+    - name: "Non-admin access to config returns 403"
+      setup: "User with 'planner' role"
+      action: "POST /api/v1/settings/planning/po-statuses"
+      expected: "403 Forbidden"
+
+    - name: "Cross-org access returns 404"
+      setup: "User from Org A, PO from Org B"
+      action: "POST /purchase-orders/:id/status"
+      expected: "404 Not Found"
+
+# E2E Test Cases (Playwright)
+e2e_tests:
+  - name: "Add custom status flow"
+    steps:
+      - "Navigate to /settings/planning/po-statuses"
+      - "Click 'Add Status'"
+      - "Fill name, code, color"
+      - "Click Save"
+    expected: "Status appears in list with correct color"
+
+  - name: "Edit status name and color"
+    steps:
+      - "Click edit on custom status"
+      - "Change name and color"
+      - "Click Save"
+    expected: "List updates with new values"
+
+  - name: "Reorder statuses via drag"
+    steps:
+      - "Drag status from position 3 to position 2"
+      - "Release"
+    expected: "Order changes and persists on refresh"
+
+  - name: "Configure transition rules"
+    steps:
+      - "Click 'Configure Transitions' on status"
+      - "Check/uncheck target statuses"
+      - "Click Save"
+    expected: "Transitions updated"
+
+  - name: "Delete unused status"
+    steps:
+      - "Click delete on unused custom status"
+      - "Confirm in dialog"
+    expected: "Status removed from list"
+
+  - name: "Cannot delete status in use"
+    steps:
+      - "Click delete on status with POs"
+    expected: "Error message with count displays"
+
+  - name: "Change PO status via dropdown"
+    steps:
+      - "Open PO detail page"
+      - "Click status dropdown"
+      - "Select new status"
+      - "Confirm in dialog"
+    expected: "Status updated, history entry added"
+
+  - name: "View status history timeline"
+    steps:
+      - "Open PO with multiple status changes"
+      - "View History tab"
+    expected: "Timeline shows all entries with user info"
+
+  - name: "Admin-only access"
+    steps:
+      - "Login as planner"
+      - "Navigate to /settings/planning/po-statuses"
+    expected: "Redirect or 403 error"
+
+  - name: "Status color reflects in badges"
+    steps:
+      - "Change status color in config"
+      - "View PO list"
+    expected: "Badges show new color"
+
+# Definition of Done
+definition_of_done:
+  - "Database migration creates po_statuses and po_status_transitions tables"
+  - "All constraints, indexes, and FK relationships in place"
+  - "create_default_po_statuses() function working and tested"
+  - "RLS policies enforce org isolation and admin-only config"
+  - "All 11 API endpoints implemented and documented"
+  - "Zod schemas validate all inputs"
+  - "po-status-service.ts implements all methods"
+  - "Status CRUD operations working"
+  - "Transition rules configuration working"
+  - "Status dropdown filters by allowed transitions"
+  - "Status badge displays with configured colors"
+  - "Status timeline shows complete history"
+  - "Drag-to-reorder statuses working"
+  - "Cannot delete system statuses"
+  - "Cannot delete statuses in use"
+  - "Invalid transitions blocked with clear error"
+  - "Status history records all changes"
+  - "Default statuses created on org setup"
+  - "Multi-tenancy isolation verified"
+  - "Admin permission checks working"
+  - "Unit tests >= 80% coverage"
+  - "Integration tests for all endpoints"
+  - "E2E tests for critical flows"
+  - "Loading, empty, error states implemented"
+  - "Toast notifications on success/error"
+  - "Accessibility: keyboard nav, ARIA labels"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "State machine logic requires thorough testing"
+  integration:
+    target: 80
+    reason: "API contracts must be validated"
+  e2e:
+    target: "5+ critical flows"
+    reason: "Full user journeys verified"
+  files:
+    - "lib/services/po-status-service.ts: 80%"
+    - "lib/validation/po-status.ts: 90%"
+    - "RLS policies: 100% of rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Invalid transition could corrupt PO workflow"
+    mitigation: "State machine with strict validation, no bypass"
+    severity: "high"
+    test_coverage: "unit_tests.po_status_service.validateTransition"
+
+  - id: "RISK-02"
+    description: "Deleting status could orphan POs"
+    mitigation: "In-use check prevents deletion, RLS prevents cross-org"
+    severity: "high"
+    test_coverage: "integration_tests.status_configuration_api.DELETE"
+
+  - id: "RISK-03"
+    description: "System status modification could break workflow"
+    mitigation: "is_system flag prevents rename/delete"
+    severity: "medium"
+    test_coverage: "unit_tests.po_status_service.updateStatus"

@@ -1,0 +1,221 @@
+# Story 05.19 - Database Schema
+# Purpose: Tables, RLS policies, queries (uses existing tables)
+# Agent: BACKEND-DEV (database focus)
+
+# Note: No new tables required - uses existing schema from dependencies
+uses_existing_tables: true
+
+# Tables Used (from dependencies)
+tables:
+  - name: "grns"
+    from_story: "05.10"
+    description: "Goods Receipt Notes created on scanner receive"
+    used_for:
+      - "Create GRN record on successful receipt"
+      - "Link to PO and warehouse context"
+
+  - name: "grn_items"
+    from_story: "05.10"
+    description: "GRN line items"
+    used_for:
+      - "Create GRN item with received qty, batch, expiry"
+      - "Link to LP created"
+
+  - name: "license_plates"
+    from_story: "05.1"
+    description: "License plates created on receipt"
+    columns_used:
+      - "id, org_id, lp_number, product_id, quantity, uom"
+      - "location_id, warehouse_id, status, qa_status"
+      - "batch_number, supplier_batch_number, expiry_date, manufacture_date"
+      - "grn_id, po_number, created_at, created_by"
+    used_for:
+      - "Create LP on receipt completion"
+      - "Auto-generate lp_number using warehouse settings"
+
+  - name: "warehouse_settings"
+    from_story: "05.0"
+    description: "Scanner and receipt settings"
+    columns_used:
+      - "require_batch_on_receipt, require_expiry_on_receipt"
+      - "allow_over_receipt, over_receipt_tolerance_pct"
+      - "scanner_sound_feedback, scanner_idle_timeout_sec"
+      - "print_label_on_receipt, label_copies_default"
+      - "default_qa_status, default_receiving_location_id"
+      - "lp_number_prefix, lp_number_sequence_length"
+
+  - name: "purchase_orders"
+    from_story: "03.3"
+    description: "PO header for barcode lookup"
+    columns_used:
+      - "id, org_id, po_number, supplier_id, status"
+      - "expected_delivery_date, warehouse_id"
+    queries:
+      - type: "lookup"
+        description: "Find PO by po_number barcode"
+        where: "po_number = :barcode AND org_id = :org_id"
+
+  - name: "po_lines"
+    from_story: "03.3"
+    description: "PO lines for receiving"
+    columns_used:
+      - "id, po_id, product_id, quantity, received_qty, uom"
+    queries:
+      - type: "select"
+        description: "Get pending lines for PO"
+        where: "po_id = :po_id AND received_qty < quantity"
+      - type: "update"
+        description: "Update received_qty after receipt"
+        set: "received_qty = received_qty + :received"
+
+  - name: "products"
+    from_story: "02.1"
+    description: "Product lookup for barcode scanning"
+    columns_used:
+      - "id, org_id, code, name, gtin, uom"
+      - "is_batch_tracked, is_expiry_tracked, is_catch_weight"
+    queries:
+      - type: "lookup"
+        description: "Find product by code or GTIN"
+        where: "(code = :barcode OR gtin = :barcode) AND org_id = :org_id"
+
+  - name: "locations"
+    from_story: "01.9"
+    description: "Location lookup for destination"
+    columns_used:
+      - "id, org_id, warehouse_id, code, name, active"
+      - "zone_id, aisle, rack, bin"
+    queries:
+      - type: "lookup"
+        description: "Find location by code barcode"
+        where: "code = :barcode AND org_id = :org_id AND active = true"
+
+  - name: "warehouses"
+    from_story: "01.8"
+    description: "Warehouse context for filtering"
+    columns_used:
+      - "id, org_id, name, code"
+
+  - name: "suppliers"
+    from_story: "02.6"
+    description: "Supplier info for PO display"
+    columns_used:
+      - "id, org_id, name"
+
+  - name: "print_jobs"
+    from_story: "05.14"
+    description: "Label print queue"
+    used_for:
+      - "Queue LP label print on receipt completion"
+
+# Key Queries
+queries:
+  pending_receipts:
+    description: "Get POs pending receipt for user's warehouse"
+    sql: |
+      SELECT
+        po.id,
+        po.po_number,
+        s.name AS supplier_name,
+        po.expected_delivery_date,
+        COUNT(pol.id) AS lines_total,
+        COUNT(pol.id) FILTER (WHERE pol.received_qty < pol.quantity) AS lines_pending,
+        SUM(pol.quantity) AS total_qty_ordered,
+        SUM(pol.received_qty) AS total_qty_received
+      FROM purchase_orders po
+      JOIN suppliers s ON po.supplier_id = s.id
+      JOIN po_lines pol ON po.id = pol.po_id
+      WHERE po.org_id = :org_id
+        AND po.status IN ('approved', 'confirmed', 'partial')
+        AND (po.warehouse_id = :warehouse_id OR :warehouse_id IS NULL)
+      GROUP BY po.id, s.name
+      HAVING COUNT(pol.id) FILTER (WHERE pol.received_qty < pol.quantity) > 0
+      ORDER BY po.expected_delivery_date ASC
+      LIMIT :limit
+
+  po_lines_for_receive:
+    description: "Get PO lines with pending qty for receiving"
+    sql: |
+      SELECT
+        pol.id,
+        pol.product_id,
+        p.code AS product_code,
+        p.name AS product_name,
+        p.gtin,
+        p.is_batch_tracked,
+        p.is_expiry_tracked,
+        pol.quantity AS ordered_qty,
+        pol.received_qty,
+        (pol.quantity - pol.received_qty) AS remaining_qty,
+        pol.uom
+      FROM po_lines pol
+      JOIN products p ON pol.product_id = p.id
+      WHERE pol.po_id = :po_id
+      ORDER BY pol.line_number ASC
+
+  product_lookup:
+    description: "Find product by barcode (code or GTIN)"
+    sql: |
+      SELECT
+        id, code, name, gtin, uom,
+        is_batch_tracked, is_expiry_tracked, is_catch_weight
+      FROM products
+      WHERE org_id = :org_id
+        AND (code = :barcode OR gtin = :barcode)
+      LIMIT 1
+
+  location_lookup:
+    description: "Find active location by barcode"
+    sql: |
+      SELECT
+        l.id, l.code, l.name, l.warehouse_id, l.zone_id,
+        l.aisle, l.rack, l.bin,
+        w.name AS warehouse_name,
+        z.name AS zone_name
+      FROM locations l
+      JOIN warehouses w ON l.warehouse_id = w.id
+      LEFT JOIN zones z ON l.zone_id = z.id
+      WHERE l.org_id = :org_id
+        AND l.code = :barcode
+        AND l.active = true
+      LIMIT 1
+
+# RLS Policies (using existing from dependencies)
+rls_policies:
+  note: "All tables already have RLS policies from dependency stories"
+  patterns_used:
+    - "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+  scanner_specific:
+    - "Scanner endpoints validate warehouse assignment"
+    - "POs filtered by user's assigned warehouse"
+    - "404 returned for cross-tenant access (not 403)"
+
+# Indexes (already exist on tables)
+indexes:
+  critical_for_performance:
+    - "idx_po_org_status ON purchase_orders(org_id, status)"
+    - "idx_po_warehouse ON purchase_orders(warehouse_id)"
+    - "idx_pol_po ON po_lines(po_id)"
+    - "idx_products_code ON products(code)"
+    - "idx_products_gtin ON products(gtin)"
+    - "idx_locations_code ON locations(code)"
+    - "idx_grns_org ON grns(org_id)"
+    - "idx_lp_org ON license_plates(org_id)"
+
+# Transaction Pattern
+transactions:
+  scanner_receive:
+    description: "Atomic transaction for scanner receipt"
+    steps:
+      - "1. Validate PO and line exist, status valid"
+      - "2. Validate over-receipt within tolerance"
+      - "3. Create GRN record"
+      - "4. Create GRN item record"
+      - "5. Create LP record (auto-generate number)"
+      - "6. Update PO line received_qty"
+      - "7. Update PO status if fully received"
+      - "8. Queue label print job (if enabled)"
+      - "9. Commit transaction"
+    rollback_on:
+      - "Any step failure rolls back entire transaction"
+      - "LP number sequence not incremented on failure"

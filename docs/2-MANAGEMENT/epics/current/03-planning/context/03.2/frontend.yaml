@@ -1,0 +1,382 @@
+# Story 03.2 - Frontend Specification
+# Purpose: Components, hooks, types, UX requirements
+# Agent: FRONTEND-DEV
+
+# UX References
+ux:
+  wireframes:
+    - id: "PLAN-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-003-supplier-detail.md"
+      sections:
+        - "Products Tab"
+        - "Empty State (No Products Assigned)"
+      components:
+        - "SupplierProductsTable"
+        - "AssignProductModal"
+
+  patterns:
+    table: "ShadCN DataTable with search, sort, pagination"
+    modal: "ShadCN Dialog with form validation"
+    combobox: "ShadCN Combobox with search"
+    toast: "ShadCN Toast for success/error notifications"
+
+  states:
+    - "loading"
+    - "empty"
+    - "success"
+    - "error"
+
+# Components to Create
+components:
+  - path: "apps/frontend/components/planning/supplier-products-table.tsx"
+    name: "SupplierProductsTable"
+    description: "DataTable showing products assigned to a supplier"
+    props:
+      supplierId: "string"
+      onEdit: "(product: SupplierProductWithProduct) => void"
+      onRemove: "(productId: string) => void"
+    features:
+      - "Search by product code or name"
+      - "Sort by code, name, price, default"
+      - "Default supplier indicator (checkbox icon)"
+      - "Lead time shows '(Override)' if different from product default"
+      - "Actions: Edit, Remove"
+    columns:
+      - { key: "product.code", label: "Product", width: "200px", sortable: true }
+      - { key: "supplier_product_code", label: "Supplier Code", width: "120px" }
+      - { key: "unit_price", label: "Unit Price", width: "100px", format: "currency" }
+      - { key: "lead_time_days", label: "Lead Time", width: "100px", format: "days" }
+      - { key: "moq", label: "MOQ", width: "100px" }
+      - { key: "is_default", label: "Default", width: "60px", type: "checkbox" }
+      - { key: "actions", label: "", width: "80px" }
+
+  - path: "apps/frontend/components/planning/assign-product-modal.tsx"
+    name: "AssignProductModal"
+    description: "Modal dialog to assign a product to a supplier"
+    props:
+      supplierId: "string"
+      open: "boolean"
+      onOpenChange: "(open: boolean) => void"
+      onSuccess: "() => void"
+      excludeProductIds: "string[]"  # Products already assigned
+    features:
+      - "Product selector combobox (searchable)"
+      - "Form fields for overrides (all optional)"
+      - "Default supplier toggle"
+      - "Validation feedback"
+      - "Loading state during submit"
+    form_fields:
+      - { name: "product_id", type: "combobox", label: "Product", required: true }
+      - { name: "is_default", type: "switch", label: "Set as Default Supplier" }
+      - { name: "supplier_product_code", type: "input", label: "Supplier Product Code", placeholder: "e.g., MILL-FL-A" }
+      - { name: "unit_price", type: "number", label: "Unit Price", step: 0.01 }
+      - { name: "currency", type: "select", label: "Currency", options: ["PLN", "EUR", "USD", "GBP"] }
+      - { name: "lead_time_days", type: "number", label: "Lead Time (days)" }
+      - { name: "moq", type: "number", label: "Minimum Order Quantity" }
+      - { name: "order_multiple", type: "number", label: "Order Multiple" }
+      - { name: "notes", type: "textarea", label: "Notes", maxLength: 1000 }
+
+  - path: "apps/frontend/components/planning/supplier-product-form.tsx"
+    name: "SupplierProductForm"
+    description: "Reusable form for creating/editing supplier-product assignments"
+    props:
+      initialData: "SupplierProductWithProduct | null"
+      onSubmit: "(data: AssignProductInput | UpdateSupplierProductInput) => Promise<void>"
+      isLoading: "boolean"
+      showProductSelector: "boolean"
+      excludeProductIds: "string[]"
+    features:
+      - "Shared between AssignProductModal and edit mode"
+      - "Zod validation integration"
+      - "Error display per field"
+
+  - path: "apps/frontend/components/planning/product-selector-combobox.tsx"
+    name: "ProductSelectorCombobox"
+    description: "Searchable product dropdown with type-ahead"
+    props:
+      value: "string | null"
+      onChange: "(productId: string) => void"
+      excludeIds: "string[]"
+      disabled: "boolean"
+    features:
+      - "Search products by code or name"
+      - "Shows product code, name, and UoM"
+      - "Excludes already-assigned products"
+      - "Empty state if no products available"
+      - "Loading state during search"
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-supplier-products.ts"
+    name: "useSupplierProducts"
+    description: "React Query hook for fetching supplier products"
+    exports:
+      - name: "useSupplierProducts"
+        params:
+          - "supplierId: string"
+          - "options?: { search?: string; enabled?: boolean }"
+        returns: "UseQueryResult<SupplierProductWithProduct[]>"
+    pattern: |
+      import { useQuery } from '@tanstack/react-query';
+      import { getSupplierProducts } from '@/lib/services/supplier-product-service';
+
+      export function useSupplierProducts(
+        supplierId: string,
+        options?: { search?: string; enabled?: boolean }
+      ) {
+        return useQuery({
+          queryKey: ['supplier-products', supplierId, options?.search],
+          queryFn: () => getSupplierProducts(supplierId, { search: options?.search }),
+          enabled: options?.enabled !== false && !!supplierId,
+          staleTime: 2 * 60 * 1000, // 2 minutes
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-assign-product.ts"
+    name: "useAssignProduct"
+    description: "React Query mutation for assigning product to supplier"
+    exports:
+      - name: "useAssignProduct"
+        params:
+          - "supplierId: string"
+        returns: "UseMutationResult<SupplierProduct, Error, AssignProductInput>"
+    pattern: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+      import { assignProductToSupplier } from '@/lib/services/supplier-product-service';
+
+      export function useAssignProduct(supplierId: string) {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: (data: AssignProductInput) =>
+            assignProductToSupplier(supplierId, data),
+          onSuccess: () => {
+            queryClient.invalidateQueries(['supplier-products', supplierId]);
+          },
+        });
+      }
+
+  - path: "apps/frontend/lib/hooks/use-update-supplier-product.ts"
+    name: "useUpdateSupplierProduct"
+    description: "React Query mutation for updating supplier-product"
+    exports:
+      - name: "useUpdateSupplierProduct"
+        params:
+          - "supplierId: string"
+        returns: "UseMutationResult<SupplierProduct, Error, { productId: string; data: UpdateSupplierProductInput }>"
+
+  - path: "apps/frontend/lib/hooks/use-remove-supplier-product.ts"
+    name: "useRemoveSupplierProduct"
+    description: "React Query mutation for removing supplier-product"
+    exports:
+      - name: "useRemoveSupplierProduct"
+        params:
+          - "supplierId: string"
+        returns: "UseMutationResult<void, Error, string>"
+
+  - path: "apps/frontend/lib/hooks/use-default-supplier.ts"
+    name: "useDefaultSupplier"
+    description: "React Query hook for fetching default supplier for a product"
+    exports:
+      - name: "useDefaultSupplier"
+        params:
+          - "productId: string"
+          - "options?: { enabled?: boolean }"
+        returns: "UseQueryResult<SupplierProductWithSupplier | null>"
+
+# Types
+types:
+  path: "apps/frontend/lib/types/supplier-product.ts"
+  content: |
+    export interface SupplierProduct {
+      id: string;
+      supplier_id: string;
+      product_id: string;
+      is_default: boolean;
+      supplier_product_code: string | null;
+      unit_price: number | null;
+      currency: string | null;
+      lead_time_days: number | null;
+      moq: number | null;
+      order_multiple: number | null;
+      last_purchase_date: string | null;
+      last_purchase_price: number | null;
+      notes: string | null;
+      created_at: string;
+      updated_at: string;
+    }
+
+    export interface ProductSummary {
+      id: string;
+      code: string;
+      name: string;
+      uom: string;
+      supplier_lead_time_days: number | null;
+    }
+
+    export interface SupplierSummary {
+      id: string;
+      code: string;
+      name: string;
+      currency: string;
+    }
+
+    export interface SupplierProductWithProduct extends SupplierProduct {
+      product: ProductSummary;
+    }
+
+    export interface SupplierProductWithSupplier extends SupplierProduct {
+      supplier: SupplierSummary;
+    }
+
+    export interface AssignProductInput {
+      product_id: string;
+      is_default?: boolean;
+      supplier_product_code?: string | null;
+      unit_price?: number | null;
+      currency?: string | null;
+      lead_time_days?: number | null;
+      moq?: number | null;
+      order_multiple?: number | null;
+      notes?: string | null;
+    }
+
+    export interface UpdateSupplierProductInput {
+      is_default?: boolean;
+      supplier_product_code?: string | null;
+      unit_price?: number | null;
+      currency?: string | null;
+      lead_time_days?: number | null;
+      moq?: number | null;
+      order_multiple?: number | null;
+      notes?: string | null;
+    }
+
+# Page Integration
+pages:
+  - path: "apps/frontend/app/(authenticated)/planning/suppliers/[id]/page.tsx"
+    description: "Supplier detail page - add Products tab"
+    changes:
+      - "Add Products tab to tab navigation"
+      - "Import SupplierProductsTable component"
+      - "Lazy load products on tab select"
+      - "Add '+ Add Product' button in tab header"
+    wireframe_reference: "PLAN-003"
+
+# Validation
+validation:
+  path: "apps/frontend/lib/validation/supplier-product-validation.ts"
+  content: |
+    import { z } from 'zod';
+
+    export const assignProductSchema = z.object({
+      product_id: z.string().uuid('Product ID must be a valid UUID'),
+      is_default: z.boolean().default(false),
+      supplier_product_code: z.string().max(50, 'Max 50 characters').optional().nullable(),
+      unit_price: z
+        .number()
+        .positive('Price must be positive')
+        .optional()
+        .nullable(),
+      currency: z
+        .enum(['PLN', 'EUR', 'USD', 'GBP'], {
+          errorMap: () => ({ message: 'Invalid currency' }),
+        })
+        .optional()
+        .nullable(),
+      lead_time_days: z
+        .number()
+        .int('Must be a whole number')
+        .nonnegative('Cannot be negative')
+        .optional()
+        .nullable(),
+      moq: z
+        .number()
+        .positive('MOQ must be positive')
+        .optional()
+        .nullable(),
+      order_multiple: z
+        .number()
+        .positive('Order multiple must be positive')
+        .optional()
+        .nullable(),
+      notes: z.string().max(1000, 'Max 1000 characters').optional().nullable(),
+    });
+
+    export const updateSupplierProductSchema = assignProductSchema
+      .partial()
+      .omit({ product_id: true });
+
+    export type AssignProductInput = z.infer<typeof assignProductSchema>;
+    export type UpdateSupplierProductInput = z.infer<typeof updateSupplierProductSchema>;
+
+# Accessibility Requirements
+accessibility:
+  touch_targets:
+    - "All buttons: 48x48dp minimum"
+    - "Table row actions: 48x48dp minimum"
+    - "Checkbox targets: 48x48dp minimum"
+
+  contrast:
+    - "Text: 4.5:1 minimum"
+    - "Active/default indicators: 4.5:1 minimum"
+
+  screen_reader:
+    - "Table has proper th/td with scope"
+    - "Default checkbox: 'Default supplier for [Product Name]'"
+    - "Lead time override: 'Lead time: X days, overrides product default'"
+    - "Modal: Focus trap, aria-labelledby"
+    - "Combobox: aria-expanded, aria-activedescendant"
+
+  keyboard:
+    - "Tab: Navigate between form fields"
+    - "Enter: Submit form, select combobox option"
+    - "Escape: Close modal"
+    - "Arrow keys: Navigate combobox options"
+
+# Responsive Design
+responsive:
+  breakpoints:
+    desktop: ">1024px"
+    tablet: "768-1024px"
+    mobile: "<768px"
+
+  desktop:
+    - "Full table with all columns visible"
+    - "Modal width: 600px"
+
+  tablet:
+    - "Table scrolls horizontally"
+    - "Modal width: 90%"
+
+  mobile:
+    - "Card-based product list instead of table"
+    - "Modal fullscreen (sheet from bottom)"
+    - "Stacked form fields"
+
+# Empty State
+empty_state:
+  icon: "Package (from Lucide)"
+  title: "No Products Assigned Yet"
+  description: "This supplier doesn't have any products assigned. Add products to enable purchase order creation."
+  action:
+    label: "+ Add Product"
+    onClick: "openAssignProductModal"
+
+# Loading State
+loading_state:
+  table: "Skeleton rows (5 rows)"
+  modal: "Spinner on submit button, disabled fields"
+
+# Error Handling
+error_handling:
+  duplicate_assignment:
+    toast: "error"
+    message: "This product is already assigned to this supplier"
+  validation_error:
+    display: "inline"
+    location: "below each field"
+  network_error:
+    toast: "error"
+    message: "Failed to save. Please try again."
+    action: "Retry"

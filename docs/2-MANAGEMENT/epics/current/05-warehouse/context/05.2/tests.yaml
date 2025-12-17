@@ -1,0 +1,699 @@
+# Story 05.2 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# =============================================================================
+# Test Files to Create
+# =============================================================================
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/lp-genealogy-service.test.ts"
+    type: "unit"
+    description: "Unit tests for genealogy service methods"
+
+  - path: "apps/frontend/lib/validation/__tests__/lp-genealogy-schemas.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+
+  - path: "apps/frontend/__tests__/integration/api/warehouse/genealogy.test.ts"
+    type: "integration"
+    description: "Integration tests for all genealogy API endpoints"
+
+  - path: "supabase/tests/genealogy-recursive-queries.test.sql"
+    type: "integration"
+    description: "Database tests for recursive CTE functions"
+
+  - path: "apps/frontend/__tests__/e2e/warehouse/genealogy-panel.spec.ts"
+    type: "e2e"
+    description: "E2E tests for genealogy panel UI"
+
+# =============================================================================
+# Acceptance Criteria
+# =============================================================================
+acceptance_criteria:
+  # ---------------------------------------------------------------------------
+  # AC-1 to AC-7: Database & Table
+  # ---------------------------------------------------------------------------
+  - id: "AC-01"
+    title: "Genealogy Table Creation"
+    given: "database migration for lp_genealogy table"
+    when: "migration is applied"
+    then:
+      - "Table lp_genealogy exists with all required columns"
+      - "id, org_id, parent_lp_id, child_lp_id, operation_type, quantity columns present"
+      - "operation_date, wo_id, operation_id, is_reversed columns present"
+      - "reversed_at, reversed_by, created_at, created_by columns present"
+      - "Foreign key constraints to license_plates and work_orders tables"
+      - "Indexes created on parent_lp_id, child_lp_id, wo_id"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    title: "RLS Policy Enforcement"
+    given: "user belongs to org_id = 'org-abc'"
+    when: "user queries lp_genealogy table"
+    then:
+      - "Only records with org_id = 'org-abc' are returned"
+      - "Attempting to insert record with different org_id fails"
+      - "API returns 404 (not 403) if org_id mismatch detected"
+      - "Direct SQL queries also filtered by RLS"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # ---------------------------------------------------------------------------
+  # AC-3 to AC-7: Link Operations
+  # ---------------------------------------------------------------------------
+  - id: "AC-03"
+    title: "Link Consumption Operation"
+    given: "parent LP (LP-001, qty: 100) and output LP (LP-002) in work order WO-001"
+    when: "linkConsumption(LP-001, LP-002, WO-001, 50) is called"
+    then:
+      - "New lp_genealogy record created"
+      - "parent_lp_id = LP-001"
+      - "child_lp_id = LP-002"
+      - "operation_type = 'consume'"
+      - "quantity = 50"
+      - "wo_id = WO-001"
+      - "is_reversed = false"
+      - "operation_date = current timestamp"
+      - "Operation completes in <200ms"
+      - "Returns created genealogy record ID"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-04"
+    title: "Link Output Operation (Multiple Consumed LPs)"
+    given: "three consumed LPs (LP-001, LP-002, LP-003) and new output LP (LP-004) from WO-001"
+    when: "linkOutput([LP-001, LP-002, LP-003], LP-004, WO-001) is called"
+    then:
+      - "Three lp_genealogy records created"
+      - "LP-001 -> LP-004 (output)"
+      - "LP-002 -> LP-004 (output)"
+      - "LP-003 -> LP-004 (output)"
+      - "All records share same wo_id = WO-001"
+      - "All records have operation_type = 'output'"
+      - "Operation completes in <500ms (batch insert)"
+      - "Returns array of created genealogy record IDs"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-05"
+    title: "Link Split Operation"
+    given: "source LP (LP-001, qty: 100) and split creates new LP (LP-005)"
+    when: "linkSplit(LP-001, LP-005, 30) is called"
+    then:
+      - "New lp_genealogy record created"
+      - "parent_lp_id = LP-001"
+      - "child_lp_id = LP-005"
+      - "operation_type = 'split'"
+      - "quantity = 30"
+      - "wo_id = null (split is not a production operation)"
+      - "Operation completes in <200ms"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-06"
+    title: "Link Merge Operation"
+    given: "three source LPs (LP-001, LP-002, LP-003) merge into LP-001 (primary)"
+    when: "linkMerge([LP-002, LP-003], LP-001) is called"
+    then:
+      - "Two lp_genealogy records created"
+      - "LP-002 -> LP-001 (merge)"
+      - "LP-003 -> LP-001 (merge)"
+      - "operation_type = 'merge' for all records"
+      - "Quantities from each source LP captured"
+      - "Operation completes in <300ms"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    title: "Reverse Genealogy Link"
+    given: "existing genealogy record (ID: gen-001) for consumption"
+    when: "reverseLink('gen-001') is called (consumption correction)"
+    then:
+      - "Record gen-001 updated: is_reversed = true"
+      - "reversed_at timestamp set to current time"
+      - "reversed_by set to current user ID"
+      - "Original record preserved (not deleted) for audit"
+      - "Operation completes in <100ms"
+    test_type: "unit"
+    priority: "P0"
+
+  # ---------------------------------------------------------------------------
+  # AC-8 to AC-15: Trace Queries
+  # ---------------------------------------------------------------------------
+  - id: "AC-08"
+    title: "Forward Trace Query (Single Level)"
+    given: "LP-001 was consumed to create LP-002, which was consumed to create LP-003"
+    when: "getForwardTrace(LP-001, maxDepth: 1) is called"
+    then:
+      - "Returns array with LP-002 at depth 1"
+      - "Only direct children returned"
+      - "Response time <200ms"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    title: "Forward Trace Query (Multi-Level)"
+    given: "LP-001 -> LP-002 -> LP-003 -> LP-004 -> LP-005 (5-level chain)"
+    when: "getForwardTrace(LP-001, maxDepth: 10) is called"
+    then:
+      - "Returns array with all 4 descendants: LP-002, LP-003, LP-004, LP-005"
+      - "Each result includes: lp_id, lp_number, product_name, operation_type, quantity, depth, operation_date"
+      - "Results ordered by depth ASC (closest first)"
+      - "Response time <500ms for up to 10 levels"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-10"
+    title: "Backward Trace Query (Multi-Level)"
+    given: "LP-005 is the end product, with ancestors: LP-004 -> LP-003 -> LP-002 -> LP-001"
+    when: "getBackwardTrace(LP-005, maxDepth: 10) is called"
+    then:
+      - "Returns array with all 4 ancestors: LP-004, LP-003, LP-002, LP-001"
+      - "Each result includes: lp_id, lp_number, product_name, operation_type, quantity, depth, operation_date"
+      - "Results ordered by depth ASC (closest ancestors first)"
+      - "Response time <500ms for up to 10 levels"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-11"
+    title: "Forward Trace - Complex Tree (Multiple Children)"
+    given: "LP-001 was split into LP-002 and LP-003, LP-002 consumed to LP-004, LP-003 consumed to LP-005"
+    when: "getForwardTrace(LP-001, maxDepth: 5) is called"
+    then:
+      - "Returns all descendants: [LP-002, LP-003, LP-004, LP-005]"
+      - "Tree structure preserved (LP-002 and LP-003 at depth 1, LP-004 and LP-005 at depth 2)"
+      - "No duplicates in result set"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-12"
+    title: "Backward Trace - Complex Tree (Multiple Parents)"
+    given: "LP-005 was created from consuming LP-001 and LP-002 and LP-003 (multiple inputs)"
+    when: "getBackwardTrace(LP-005, maxDepth: 5) is called"
+    then:
+      - "Returns all ancestors: [LP-001, LP-002, LP-003]"
+      - "All at depth 1 (direct parents)"
+      - "If ancestors have their own parents, those are included at depth 2+"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13"
+    title: "Depth Limit Enforcement"
+    given: "genealogy chain of 15 levels: LP-001 -> LP-002 -> ... -> LP-015"
+    when: "getForwardTrace(LP-001, maxDepth: 10) is called"
+    then:
+      - "Returns only first 10 levels (LP-002 through LP-011)"
+      - "LP-012 through LP-015 excluded due to depth limit"
+      - "Warning flag in response: hasMoreLevels = true"
+      - "Performance stays under 1 second"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-14"
+    title: "Reversed Links Excluded by Default"
+    given: "LP-001 -> LP-002 genealogy link exists but is_reversed = true"
+    when: "getForwardTrace(LP-001) is called without includeReversed flag"
+    then:
+      - "LP-002 NOT included in results (reversed links skipped)"
+      - "Results only show active genealogy links"
+      - "Can pass includeReversed: true to see all links"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15"
+    title: "Get Genealogy by Work Order"
+    given: "WO-001 has 3 consumption links and 1 output link"
+    when: "getGenealogyByWO('WO-001') is called"
+    then:
+      - "Returns all 4 genealogy records for WO-001"
+      - "Results grouped by operation_type: { consume: [...], output: [...] }"
+      - "Response time <300ms"
+    test_type: "integration"
+    priority: "P0"
+
+  # ---------------------------------------------------------------------------
+  # AC-16 to AC-18: Desktop UI
+  # ---------------------------------------------------------------------------
+  - id: "AC-16"
+    title: "Desktop UI - Genealogy Panel in LP Detail"
+    given: "user views LP detail page for LP-001 which has genealogy history"
+    when: "Genealogy tab is clicked"
+    then:
+      - "Genealogy tab/panel visible"
+      - "Shows 'Ancestors' section with backward trace"
+      - "Shows 'Descendants' section with forward trace"
+      - "Each item displays: LP number, product name, operation type badge, quantity, date"
+      - "Clicking an LP navigates to that LP's detail page"
+      - "Expand/collapse for each level of the tree"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-17"
+    title: "Desktop UI - Empty Genealogy State"
+    given: "user views LP detail page for newly created LP (no genealogy)"
+    when: "Genealogy tab is clicked"
+    then:
+      - "Genealogy panel shows: 'No genealogy history for this LP'"
+      - "Message explains: 'Genealogy links are created when LP is consumed in production, split, or merged'"
+      - "Panel still visible but with empty state"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-18"
+    title: "Desktop UI - Genealogy Loading State"
+    given: "user views LP detail page with complex genealogy (many levels)"
+    when: "Genealogy tab is loading"
+    then:
+      - "Skeleton loader displays while query executes"
+      - "'Loading genealogy...' text shown"
+      - "Panel becomes interactive within 2 seconds"
+      - "Error state displayed if query fails with retry button"
+    test_type: "e2e"
+    priority: "P1"
+
+  # ---------------------------------------------------------------------------
+  # AC-19 to AC-22: Validation
+  # ---------------------------------------------------------------------------
+  - id: "AC-19"
+    title: "API Validation - Invalid LP IDs"
+    given: "API call to link genealogy with non-existent LP IDs"
+    when: "linkConsumption('invalid-id', 'LP-002', 'WO-001', 50) is called"
+    then:
+      - "API returns 404 error: 'Parent LP not found'"
+      - "No genealogy record created"
+      - "Same validation for child_lp_id and wo_id"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-20"
+    title: "API Validation - Self-Reference Prevention"
+    given: "attempt to create genealogy link where parent and child are same LP"
+    when: "linkConsumption('LP-001', 'LP-001', 'WO-001', 50) is called"
+    then:
+      - "API returns 400 error: 'Cannot create self-referencing genealogy link'"
+      - "No genealogy record created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-21"
+    title: "API Validation - Duplicate Link Prevention"
+    given: "genealogy link LP-001 -> LP-002 (consume) already exists"
+    when: "linkConsumption('LP-001', 'LP-002', 'WO-001', 50) is called again"
+    then:
+      - "API returns 409 Conflict: 'Genealogy link already exists between these LPs for this operation'"
+      - "Duplicate record not created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-22"
+    title: "API Validation - Operation Type Enum"
+    given: "attempt to create genealogy with invalid operation_type"
+    when: "API receives operation_type: 'invalid'"
+    then:
+      - "API returns 400 error: 'Invalid operation type. Must be one of: consume, output, split, merge'"
+      - "Zod schema validates operation_type enum"
+    test_type: "unit"
+    priority: "P0"
+
+  # ---------------------------------------------------------------------------
+  # AC-23 to AC-25: Performance & Edge Cases
+  # ---------------------------------------------------------------------------
+  - id: "AC-23"
+    title: "Performance - Large Genealogy Tree"
+    given: "LP with genealogy tree of 100+ nodes across 10 levels"
+    when: "getFullTree(lpId, 'both') is called"
+    then:
+      - "Complete tree returned within 1 second"
+      - "Memory usage stays below 50MB"
+      - "Recursive CTE uses proper indexes"
+      - "Results paginated if >100 nodes (with hasMore flag)"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-24"
+    title: "Audit Trail - Genealogy Creation Logging"
+    given: "any genealogy link creation"
+    when: "link is created"
+    then:
+      - "created_at timestamp automatically set"
+      - "created_by set to current user ID"
+      - "Audit log entry records: operation, user, timestamp, LP IDs involved"
+      - "Audit log queryable for compliance reporting"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-25"
+    title: "Recursive CTE - Cycle Detection"
+    given: "accidental circular reference attempt (LP-001 -> LP-002 -> LP-001)"
+    when: "genealogy query runs"
+    then:
+      - "CTE detects cycle and terminates safely"
+      - "Error logged: 'Circular reference detected in genealogy'"
+      - "Partial results returned up to cycle point"
+      - "System does not hang or crash"
+    test_type: "integration"
+    priority: "P0"
+
+# =============================================================================
+# Unit Test Cases
+# =============================================================================
+unit_tests:
+  lp_genealogy_service:
+    - name: "linkConsumption creates single genealogy record"
+      setup: "Mock supabase insert to return success"
+      expected: "Returns GenealogyLink with operation_type='consume'"
+
+    - name: "linkConsumption validates parent LP exists"
+      setup: "Mock getLicensePlate to return null for parent"
+      expected: "Throws NotFoundError('Parent LP not found')"
+
+    - name: "linkConsumption validates child LP exists"
+      setup: "Mock getLicensePlate to return null for child"
+      expected: "Throws NotFoundError('Child LP not found')"
+
+    - name: "linkConsumption rejects self-reference"
+      setup: "Call with parentLpId === childLpId"
+      expected: "Throws ValidationError('Cannot create self-referencing genealogy link')"
+
+    - name: "linkConsumption rejects cross-org LPs"
+      setup: "Mock LPs with different org_ids"
+      expected: "Throws ForbiddenError('LPs belong to different organizations')"
+
+    - name: "linkConsumption rejects duplicate link"
+      setup: "Mock existing link with same parent, child, operation"
+      expected: "Throws ConflictError('Genealogy link already exists')"
+
+    - name: "linkOutput creates batch of genealogy records"
+      setup: "Mock supabase batch insert"
+      expected: "Returns array of GenealogyLinks, one per consumed LP"
+
+    - name: "linkOutput validates output LP exists"
+      setup: "Mock getLicensePlate to return null for output"
+      expected: "Throws NotFoundError('Output LP not found')"
+
+    - name: "linkSplit creates genealogy with operation_type='split'"
+      setup: "Mock successful insert"
+      expected: "Returns GenealogyLink with wo_id=null"
+
+    - name: "linkMerge creates multiple genealogy records"
+      setup: "Mock source LPs with quantities"
+      expected: "Returns array of GenealogyLinks with quantities from source LPs"
+
+    - name: "reverseLink sets is_reversed=true"
+      setup: "Mock existing genealogy record"
+      expected: "Updates record with is_reversed=true, reversed_at, reversed_by"
+
+    - name: "reverseLink rejects already reversed link"
+      setup: "Mock record with is_reversed=true"
+      expected: "Throws ValidationError('Genealogy record already reversed')"
+
+    - name: "getForwardTrace returns descendants ordered by depth"
+      setup: "Mock RPC function response with multiple levels"
+      expected: "Returns nodes ordered by depth ASC"
+
+    - name: "getBackwardTrace returns ancestors ordered by depth"
+      setup: "Mock RPC function response with multiple levels"
+      expected: "Returns nodes ordered by depth ASC"
+
+    - name: "getFullTree returns both directions"
+      setup: "Mock both forward and backward traces"
+      expected: "Returns ancestors and descendants arrays"
+
+    - name: "getGenealogyByWO groups by operation_type"
+      setup: "Mock records with consume and output types"
+      expected: "Returns { consume: [...], output: [...] }"
+
+  validation_schemas:
+    - name: "LinkConsumptionSchema accepts valid input"
+      input: { parentLpId: "valid-uuid", childLpId: "valid-uuid", woId: "valid-uuid", quantity: 100 }
+      expected: "Passes validation"
+
+    - name: "LinkConsumptionSchema rejects self-reference"
+      input: { parentLpId: "same-uuid", childLpId: "same-uuid", woId: "valid-uuid", quantity: 100 }
+      expected: "Fails with 'Parent and child LP cannot be the same'"
+
+    - name: "LinkConsumptionSchema rejects negative quantity"
+      input: { parentLpId: "uuid-1", childLpId: "uuid-2", woId: "uuid-3", quantity: -10 }
+      expected: "Fails with 'Quantity must be positive'"
+
+    - name: "LinkOutputSchema requires at least one consumed LP"
+      input: { consumedLpIds: [], outputLpId: "valid-uuid", woId: "valid-uuid" }
+      expected: "Fails with 'At least one consumed LP required'"
+
+    - name: "TraceQuerySchema enforces maxDepth between 1-10"
+      input: { maxDepth: 15 }
+      expected: "Coerced to 10 or fails validation"
+
+# =============================================================================
+# Integration Test Cases
+# =============================================================================
+integration_tests:
+  api_endpoints:
+    - name: "POST /genealogy/link-consumption creates record"
+      setup: "Create parent LP, child LP, and WO"
+      action: "POST with valid body"
+      expected: "201 status, returns created genealogy"
+
+    - name: "POST /genealogy/link-consumption returns 404 for missing LP"
+      setup: "Create WO only"
+      action: "POST with non-existent LP IDs"
+      expected: "404 status with error message"
+
+    - name: "POST /genealogy/link-consumption returns 409 for duplicate"
+      setup: "Create existing genealogy link"
+      action: "POST with same parent/child/operation"
+      expected: "409 status with conflict error"
+
+    - name: "POST /genealogy/link-output creates batch records"
+      setup: "Create 3 consumed LPs and 1 output LP"
+      action: "POST with array of consumed IDs"
+      expected: "201 status, returns 3 created IDs"
+
+    - name: "GET /genealogy/forward-trace/:lpId returns descendants"
+      setup: "Create 5-level genealogy chain"
+      action: "GET with LP ID at root"
+      expected: "200 status, returns 4 descendants with correct depths"
+
+    - name: "GET /genealogy/forward-trace/:lpId respects maxDepth"
+      setup: "Create 15-level genealogy chain"
+      action: "GET with maxDepth=10"
+      expected: "Returns 10 levels only, hasMoreLevels=true"
+
+    - name: "GET /genealogy/backward-trace/:lpId returns ancestors"
+      setup: "Create 5-level genealogy chain"
+      action: "GET with LP ID at leaf"
+      expected: "200 status, returns 4 ancestors with correct depths"
+
+    - name: "GET /genealogy/full-tree/:lpId returns both directions"
+      setup: "Create LP with ancestors and descendants"
+      action: "GET with direction=both"
+      expected: "Returns ancestors and descendants arrays"
+
+    - name: "GET /genealogy/by-wo/:woId returns WO genealogy"
+      setup: "Create WO with consumption and output links"
+      action: "GET with WO ID"
+      expected: "Returns grouped by consume and output"
+
+    - name: "POST /genealogy/:id/reverse marks as reversed"
+      setup: "Create genealogy record"
+      action: "POST to reverse endpoint"
+      expected: "200 status, is_reversed=true"
+
+    - name: "Cross-org access returns 404"
+      setup: "Create genealogy in Org A, user in Org B"
+      action: "GET genealogy from Org B user"
+      expected: "404 status (not 403)"
+
+  rls_policies:
+    - name: "User can only see own org genealogy"
+      setup: "Create genealogy in Org A and Org B"
+      action: "User A queries lp_genealogy"
+      expected: "Only Org A records returned"
+
+    - name: "User cannot insert with different org_id"
+      setup: "Create LPs in Org A"
+      action: "User B attempts to create genealogy"
+      expected: "RLS blocks insert"
+
+    - name: "User cannot update cross-org genealogy"
+      setup: "Create genealogy in Org B"
+      action: "User A attempts to reverse"
+      expected: "RLS blocks update"
+
+  recursive_cte:
+    - name: "Forward trace handles complex tree"
+      setup: "Create tree with splits and merges"
+      action: "Run get_lp_forward_trace RPC"
+      expected: "All descendants returned without duplicates"
+
+    - name: "Backward trace handles multiple parents"
+      setup: "Create LP with 3 consumed parent LPs"
+      action: "Run get_lp_backward_trace RPC"
+      expected: "All 3 parents returned at depth 1"
+
+    - name: "Cycle detection prevents infinite loop"
+      setup: "Attempt to create circular reference"
+      action: "Run recursive trace"
+      expected: "Query terminates, partial results returned"
+
+    - name: "Performance under 500ms for 10 levels"
+      setup: "Create 10-level deep genealogy"
+      action: "Time forward trace query"
+      expected: "Completes in <500ms"
+
+# =============================================================================
+# E2E Test Cases
+# =============================================================================
+e2e_tests:
+  genealogy_panel:
+    - name: "Genealogy tab loads and displays tree"
+      steps:
+        - "Navigate to LP detail page"
+        - "Click Genealogy tab"
+        - "Wait for loading to complete"
+      expected:
+        - "Loading skeleton shown initially"
+        - "Tree structure renders with ancestors and descendants"
+        - "Operation badges have correct colors"
+
+    - name: "Empty genealogy shows empty state"
+      steps:
+        - "Navigate to LP with no genealogy"
+        - "Click Genealogy tab"
+      expected:
+        - "Empty state message displayed"
+        - "Explanation text visible"
+        - "No tree structure shown"
+
+    - name: "Click LP node navigates to detail"
+      steps:
+        - "Navigate to LP with genealogy"
+        - "Click on descendant LP node"
+      expected:
+        - "Navigates to clicked LP's detail page"
+        - "New LP's genealogy loads"
+
+    - name: "Expand/Collapse controls work"
+      steps:
+        - "View genealogy with multiple levels"
+        - "Click Collapse All"
+        - "Click Expand All"
+      expected:
+        - "Collapse All hides nested levels"
+        - "Expand All reveals all levels"
+
+    - name: "Error state shows retry button"
+      steps:
+        - "Navigate to LP detail"
+        - "Simulate API failure"
+      expected:
+        - "Error message displayed"
+        - "Retry button visible"
+        - "Clicking retry refetches data"
+
+# =============================================================================
+# Definition of Done
+# =============================================================================
+definition_of_done:
+  database:
+    - "lp_genealogy table created with all columns and constraints"
+    - "RLS policies verified (org_id isolation)"
+    - "All indexes created for performance"
+    - "Recursive CTE functions (get_lp_forward_trace, get_lp_backward_trace) working"
+    - "Cycle detection verified in CTEs"
+
+  api:
+    - "All 10 endpoints implemented and returning correct responses"
+    - "Validation errors return 400 with clear messages"
+    - "Cross-tenant access returns 404 (not 403)"
+    - "Response times meet requirements"
+
+  service:
+    - "linkConsumption() works for Epic 04.6"
+    - "linkOutput() works for Epic 04.7"
+    - "linkSplit() works for 05.6"
+    - "linkMerge() works for 05.6"
+    - "reverseLink() preserves audit trail"
+    - "getForwardTrace() returns correct descendants"
+    - "getBackwardTrace() returns correct ancestors"
+    - "getFullTree() combines both directions"
+    - "getGenealogyByWO() groups correctly"
+
+  frontend:
+    - "LPGenealogyPanel renders in LP detail"
+    - "GenealogyTree displays hierarchical structure"
+    - "Operation badges show correct colors"
+    - "Empty state displays when no genealogy"
+    - "Loading skeleton shows during fetch"
+    - "Error state shows with retry"
+    - "LP node click navigates correctly"
+    - "Expand/Collapse controls work"
+
+  testing:
+    - "Unit tests: >80% coverage on service and validation"
+    - "Integration tests: All endpoints and RLS policies"
+    - "E2E tests: Genealogy panel critical flows"
+    - "Cycle detection test passes"
+    - "Performance test: <500ms for 10 levels"
+
+  epic_04_contract:
+    - "linkConsumption() verified with Epic 04.6 integration test"
+    - "linkOutput() verified with Epic 04.7 integration test"
+    - "Methods complete in required time (<200ms single, <500ms batch)"
+
+# =============================================================================
+# Coverage Requirements
+# =============================================================================
+coverage:
+  unit:
+    target: 80
+    reason: "Service and validation logic must be well-tested"
+    critical_files:
+      - "lib/services/lp-genealogy-service.ts: 85%"
+      - "lib/validation/lp-genealogy-schemas.ts: 90%"
+
+  integration:
+    target: 80
+    reason: "API endpoints and database functions must be verified"
+    critical_areas:
+      - "All 10 API endpoints tested"
+      - "All RLS policies tested"
+      - "Recursive CTE edge cases tested"
+
+  e2e:
+    target: 70
+    reason: "UI functionality must be verified in browser"
+    critical_flows:
+      - "View genealogy with data"
+      - "View empty genealogy state"
+      - "Navigate via LP node click"
+
+# =============================================================================
+# Risks
+# =============================================================================
+risks:
+  - id: "RISK-01"
+    description: "Recursive CTE performance degrades with deep genealogy"
+    mitigation: "Depth limit of 10, proper indexes, query performance testing"
+    severity: "medium"
+    test_coverage: "AC-23, integration_tests.performance"
+
+  - id: "RISK-02"
+    description: "Circular reference in genealogy causes infinite loop"
+    mitigation: "Path array tracking in CTE, database constraint review"
+    severity: "high"
+    test_coverage: "AC-25, integration_tests.recursive_cte.cycle_detection"
+
+  - id: "RISK-03"
+    description: "RLS policy allows cross-tenant data access"
+    mitigation: "Comprehensive RLS tests with multi-org fixtures"
+    severity: "high"
+    test_coverage: "AC-02, integration_tests.rls_policies"
+
+  - id: "RISK-04"
+    description: "Epic 04 integration fails due to service contract mismatch"
+    mitigation: "Early integration testing with Epic 04.6/04.7 stubs"
+    severity: "critical"
+    test_coverage: "AC-03, AC-04, epic_04_contract verification"

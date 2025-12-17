@@ -1,0 +1,408 @@
+# Story 05.2 - Frontend Specification
+# Purpose: Components, pages, UX patterns for genealogy UI
+# Agent: FRONTEND-DEV
+
+# =============================================================================
+# UX References
+# =============================================================================
+ux:
+  wireframes:
+    - id: "WH-003"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/WH-003-license-plate-detail.md"
+      sections: ["Genealogy Tab View", "Genealogy Tab View (Empty)"]
+      components:
+        - "GenealogyTree"
+        - "GenealogyNode"
+        - "GenealogyEmptyState"
+        - "GenealogyLegend"
+
+  patterns:
+    tree_visualization: "Hierarchical tree with expand/collapse"
+    loading: "Skeleton loader for genealogy panel"
+    empty_state: "Illustrated empty state with explanation"
+    navigation: "Click LP node to navigate to LP detail"
+
+  states:
+    - loading: "Skeleton placeholders while fetching"
+    - success: "Full genealogy tree displayed"
+    - empty: "No genealogy history message"
+    - error: "Error with retry button"
+
+# =============================================================================
+# Pages
+# =============================================================================
+pages:
+  - path: "app/(authenticated)/warehouse/license-plates/[id]/page.tsx"
+    description: "LP detail page - genealogy is a tab"
+    already_exists: true
+    modifications:
+      - "Add Genealogy tab to tab navigation"
+      - "Load genealogy data when tab selected (lazy)"
+      - "Pass genealogy data to LPGenealogyPanel"
+
+# =============================================================================
+# Components
+# =============================================================================
+components:
+  - path: "components/warehouse/license-plates/LPGenealogyPanel.tsx"
+    description: "Main genealogy panel/tab content"
+    type: "client"
+    props:
+      lpId: "string"
+    state:
+      - "genealogy data from API"
+      - "loading state"
+      - "error state"
+      - "expand/collapse state"
+    features:
+      - "Shows ancestors section (backward trace)"
+      - "Shows descendants section (forward trace)"
+      - "Expand All / Collapse All buttons"
+      - "Legend for operation types"
+      - "Loading skeleton"
+      - "Empty state when no genealogy"
+      - "Error state with retry"
+
+  - path: "components/warehouse/license-plates/GenealogyTree.tsx"
+    description: "Tree visualization component"
+    type: "client"
+    props:
+      nodes: "GenealogyNode[]"
+      direction: "'ancestors' | 'descendants'"
+      onNodeClick: "(lpId: string) => void"
+    features:
+      - "Renders hierarchical tree structure"
+      - "Groups by depth level"
+      - "Connecting lines between levels"
+      - "Supports expand/collapse per level"
+
+  - path: "components/warehouse/license-plates/GenealogyAncestors.tsx"
+    description: "Ancestors section with backward trace"
+    type: "client"
+    props:
+      lpId: "string"
+      ancestors: "GenealogyNode[]"
+      hasMoreLevels: "boolean"
+    features:
+      - "Section header 'Ancestors (Where materials came from)'"
+      - "Tree visualization going upward"
+      - "Warning if hasMoreLevels (depth exceeded)"
+
+  - path: "components/warehouse/license-plates/GenealogyDescendants.tsx"
+    description: "Descendants section with forward trace"
+    type: "client"
+    props:
+      lpId: "string"
+      descendants: "GenealogyNode[]"
+      hasMoreLevels: "boolean"
+    features:
+      - "Section header 'Descendants (Where LP went)'"
+      - "Tree visualization going downward"
+      - "Warning if hasMoreLevels (depth exceeded)"
+
+  - path: "components/warehouse/license-plates/GenealogyNode.tsx"
+    description: "Single node in genealogy tree"
+    type: "client"
+    props:
+      node: "GenealogyNode"
+      onClick: "(lpId: string) => void"
+      isCurrentLp: "boolean"
+    features:
+      - "LP number as clickable link"
+      - "Product name"
+      - "Operation type badge"
+      - "Quantity with UoM"
+      - "Operation date"
+      - "Highlighted if current LP"
+      - "Visual connection lines"
+
+  - path: "components/warehouse/license-plates/GenealogyOperationBadge.tsx"
+    description: "Badge for operation type"
+    type: "client"
+    props:
+      operationType: "'consume' | 'output' | 'split' | 'merge'"
+    colors:
+      consume: "bg-blue-100 text-blue-800"
+      output: "bg-green-100 text-green-800"
+      split: "bg-purple-100 text-purple-800"
+      merge: "bg-orange-100 text-orange-800"
+    icons:
+      consume: "ArrowRight"
+      output: "Package"
+      split: "Split"
+      merge: "Merge"
+
+  - path: "components/warehouse/license-plates/GenealogyEmptyState.tsx"
+    description: "Empty state when LP has no genealogy"
+    type: "client"
+    props:
+      lpNumber: "string"
+    content:
+      title: "No Genealogy History"
+      description: "This license plate has no split, merge, or consumption history yet."
+      secondary: "Genealogy links are created when LP is consumed in production, split, or merged."
+      icon: "GitBranch or similar tree icon"
+
+  - path: "components/warehouse/license-plates/GenealogyLoadingSkeleton.tsx"
+    description: "Loading skeleton for genealogy panel"
+    type: "client"
+    features:
+      - "Skeleton lines for tree structure"
+      - "Animated pulse"
+      - "Mimics tree hierarchy shape"
+
+  - path: "components/warehouse/license-plates/GenealogyLegend.tsx"
+    description: "Legend explaining operation types"
+    type: "client"
+    content:
+      items:
+        - { label: "SPLIT", description: "LP split operation", color: "purple" }
+        - { label: "MERGE", description: "LP merge operation", color: "orange" }
+        - { label: "CONSUMED", description: "Used in production", color: "blue" }
+        - { label: "OUTPUT", description: "Created from production", color: "green" }
+
+# =============================================================================
+# Hooks
+# =============================================================================
+hooks:
+  - path: "lib/hooks/use-lp-genealogy.ts"
+    description: "React Query hook for fetching LP genealogy"
+    exports:
+      - name: "useLPGenealogy"
+        params: ["lpId: string"]
+        returns: "UseQueryResult<GenealogyFullTree>"
+        options:
+          enabled: "!!lpId"
+          staleTime: "60 * 1000"  # 1 minute
+          refetchOnWindowFocus: false
+        pattern: |
+          import { useQuery } from '@tanstack/react-query';
+
+          export function useLPGenealogy(lpId: string) {
+            return useQuery({
+              queryKey: ['lp-genealogy', lpId],
+              queryFn: async () => {
+                const response = await fetch(`/api/warehouse/license-plates/${lpId}/genealogy`);
+                if (!response.ok) throw new Error('Failed to fetch genealogy');
+                return response.json();
+              },
+              enabled: !!lpId,
+              staleTime: 60 * 1000,
+              refetchOnWindowFocus: false,
+            });
+          }
+
+  - path: "lib/hooks/use-genealogy-trace.ts"
+    description: "Hook for full trace queries"
+    exports:
+      - name: "useForwardTrace"
+        params: ["lpId: string", "options?: { maxDepth?: number; includeReversed?: boolean }"]
+        returns: "UseQueryResult<GenealogyTraceResult>"
+
+      - name: "useBackwardTrace"
+        params: ["lpId: string", "options?: { maxDepth?: number; includeReversed?: boolean }"]
+        returns: "UseQueryResult<GenealogyTraceResult>"
+
+# =============================================================================
+# TypeScript Types (Frontend)
+# =============================================================================
+types:
+  - path: "lib/types/genealogy.ts"
+    content: |
+      export type OperationType = 'consume' | 'output' | 'split' | 'merge';
+
+      export interface GenealogyNode {
+        lpId: string;
+        lpNumber: string;
+        productName: string;
+        operationType: OperationType;
+        quantity: number;
+        operationDate: string;
+        depth: number;
+      }
+
+      export interface GenealogyTraceResult {
+        lpId: string;
+        nodes: GenealogyNode[];
+        hasMoreLevels: boolean;
+        totalCount: number;
+      }
+
+      export interface GenealogyFullTree {
+        lpId: string;
+        ancestors: GenealogyNode[];
+        descendants: GenealogyNode[];
+        hasMoreLevels: {
+          ancestors: boolean;
+          descendants: boolean;
+        };
+      }
+
+      export interface GenealogyLink {
+        id: string;
+        orgId: string;
+        parentLpId: string;
+        childLpId: string;
+        operationType: OperationType;
+        quantity: number;
+        operationDate: string;
+        woId?: string;
+        operationId?: string;
+        isReversed: boolean;
+        reversedAt?: string;
+        reversedBy?: string;
+        createdAt: string;
+        createdBy?: string;
+      }
+
+# =============================================================================
+# UI Specifications
+# =============================================================================
+ui_specs:
+  genealogy_panel:
+    layout: "vertical stack with sections"
+    sections:
+      - header: "License Plate Genealogy Tree"
+        actions: ["Expand All", "Collapse All"]
+      - ancestors_section:
+          title: "Ancestors (Where materials came from)"
+          empty_message: "No parent LPs"
+      - descendants_section:
+          title: "Descendants (Where LP went)"
+          empty_message: "No child LPs"
+      - legend: "Bottom of panel"
+
+  genealogy_tree:
+    node_height: "64px"
+    indent_per_level: "32px"
+    connecting_line_color: "border-gray-300"
+    connecting_line_style: "solid 1px"
+    max_visible_levels: 2  # Initially expanded
+    expand_icon: "ChevronRight"
+    collapse_icon: "ChevronDown"
+
+  genealogy_node:
+    layout: "horizontal flex"
+    elements:
+      - connection_line: "vertical line from parent"
+      - operation_badge: "left side with icon"
+      - content:
+          - lp_number: "font-medium text-blue-600 hover:underline cursor-pointer"
+          - product_name: "text-sm text-gray-600"
+          - quantity: "text-sm text-gray-500"
+          - date: "text-xs text-gray-400"
+    hover_state: "bg-gray-50 rounded"
+    current_lp_highlight: "bg-blue-50 border-l-4 border-blue-500"
+
+  operation_badges:
+    size: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+    variants:
+      consume:
+        bg: "bg-blue-100"
+        text: "text-blue-800"
+        label: "CONSUMED"
+      output:
+        bg: "bg-green-100"
+        text: "text-green-800"
+        label: "OUTPUT"
+      split:
+        bg: "bg-purple-100"
+        text: "text-purple-800"
+        label: "SPLIT"
+      merge:
+        bg: "bg-orange-100"
+        text: "text-orange-800"
+        label: "MERGE"
+
+  empty_state:
+    icon_size: "64px"
+    icon_color: "text-gray-400"
+    title_size: "text-lg font-medium text-gray-900"
+    description_size: "text-sm text-gray-500"
+    centered: true
+    padding: "py-12"
+
+  loading_skeleton:
+    animation: "animate-pulse"
+    lines:
+      - width: "w-48"
+      - width: "w-64"
+      - width: "w-56"
+      - width: "w-40"
+    spacing: "space-y-4"
+    tree_indent: "ml-8 for children"
+
+# =============================================================================
+# Accessibility
+# =============================================================================
+accessibility:
+  tree_navigation:
+    - "Arrow keys to navigate between nodes"
+    - "Enter to expand/collapse or follow link"
+    - "Tab to move between interactive elements"
+
+  screen_reader:
+    panel_announcement: "Genealogy panel with {n} ancestors and {m} descendants"
+    node_announcement: "{operation_type} operation: LP {lp_number}, {product_name}, {quantity}, {date}"
+    empty_announcement: "No genealogy history. This license plate has not been split, merged, or consumed."
+    expand_announcement: "Expanded {n} child nodes"
+    collapse_announcement: "Collapsed to parent node"
+
+  focus_management:
+    - "Focus on first node when panel opens"
+    - "Focus moves to child nodes on expand"
+    - "Focus returns to parent on collapse"
+    - "Clear focus indicators (ring-2 ring-blue-500)"
+
+  aria_labels:
+    expand_button: "Expand genealogy tree"
+    collapse_button: "Collapse genealogy tree"
+    node_link: "View LP {lp_number} details"
+    ancestors_section: "Ancestors section showing where materials came from"
+    descendants_section: "Descendants section showing where LP went"
+
+# =============================================================================
+# Responsive Design
+# =============================================================================
+responsive:
+  desktop:
+    tree_max_width: "100%"
+    node_layout: "horizontal"
+    indent: "32px per level"
+    actions_position: "top-right of panel"
+
+  tablet:
+    tree_max_width: "100%"
+    node_layout: "horizontal"
+    indent: "24px per level"
+    actions_position: "top-right of panel"
+
+  mobile:
+    tree_max_width: "100%"
+    node_layout: "vertical stack"
+    indent: "16px per level"
+    actions_position: "below header"
+    simplified_view: true
+    notes: "Consider linear list view instead of tree on mobile"
+
+# =============================================================================
+# Performance
+# =============================================================================
+performance:
+  initial_load:
+    strategy: "Lazy load on tab click"
+    target: "<500ms"
+
+  tree_render:
+    strategy: "Virtual scrolling for large trees (>100 nodes)"
+    target: "<200ms"
+    optimization: "Memoize nodes with useMemo"
+
+  navigation:
+    strategy: "Prefetch LP detail on hover"
+    prefetch_delay: "200ms"
+
+  caching:
+    key_pattern: "['lp-genealogy', lpId]"
+    stale_time: "60000ms (1 minute)"
+    invalidate_on: ["split", "merge", "consume", "output", "reverse"]

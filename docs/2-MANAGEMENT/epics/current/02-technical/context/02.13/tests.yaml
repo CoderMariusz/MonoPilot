@@ -1,0 +1,565 @@
+# Story 02.13 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/nutrition-service.test.ts"
+    type: "unit"
+    description: "Unit tests for nutrition calculation engine"
+  - path: "apps/frontend/lib/services/__tests__/serving-calculator-service.test.ts"
+    type: "unit"
+    description: "Unit tests for serving size calculations"
+  - path: "apps/frontend/lib/services/__tests__/label-export-service.test.ts"
+    type: "unit"
+    description: "Unit tests for label generation"
+  - path: "apps/frontend/app/api/technical/nutrition/__tests__/calculate.test.ts"
+    type: "integration"
+    description: "Integration tests for nutrition calculation API"
+  - path: "apps/frontend/app/api/technical/nutrition/__tests__/override.test.ts"
+    type: "integration"
+    description: "Integration tests for nutrition override API"
+  - path: "supabase/tests/nutrition-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for nutrition tables"
+  - path: "apps/frontend/e2e/nutrition-panel.spec.ts"
+    type: "e2e"
+    description: "E2E tests for nutrition panel workflow"
+
+# Acceptance Criteria (from story file)
+acceptance_criteria:
+  # Auto-Calculation from BOM (FR-2.80)
+  - id: "AC-13.1"
+    category: "Auto-Calculation"
+    given: "product has active BOM with 8 ingredients"
+    when: "user opens nutrition panel"
+    then: "system attempts auto-calculation"
+    test_type: "integration"
+    priority: "P0"
+    fr_ref: "FR-2.80"
+
+  - id: "AC-13.2"
+    category: "Auto-Calculation"
+    given: "all BOM ingredients have nutrition data"
+    when: "calculation runs"
+    then: "nutrition facts display within 2 seconds"
+    test_type: "performance"
+    priority: "P0"
+    fr_ref: "FR-2.80"
+
+  - id: "AC-13.3"
+    category: "Auto-Calculation"
+    given: "ingredient 'Wheat Flour' has 340 kcal/100g and 300kg in BOM"
+    when: "calculated"
+    then: "energy contribution is 1,020,000 kcal (340 * 3000)"
+    test_type: "unit"
+    priority: "P0"
+    fr_ref: "FR-2.80"
+
+  - id: "AC-13.4"
+    category: "Auto-Calculation"
+    given: "BOM has 500kg input and 475kg output (95% yield)"
+    when: "calculated"
+    then: "concentration factor 1.053 is applied (500/475)"
+    test_type: "unit"
+    priority: "P0"
+    fr_ref: "FR-2.80"
+
+  - id: "AC-13.5"
+    category: "Auto-Calculation"
+    given: "calculation complete"
+    when: "per-100g values display"
+    then: "all macros (energy, protein, fat, carbs) show correctly"
+    test_type: "unit"
+    priority: "P0"
+    fr_ref: "FR-2.80"
+
+  # Missing Ingredient Nutrition
+  - id: "AC-13.6"
+    category: "Missing Data"
+    given: "BOM has ingredient 'Sunflower Oil' without nutrition data"
+    when: "calculation attempted"
+    then: "error state shows with list of missing ingredients"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13.7"
+    category: "Missing Data"
+    given: "error state displayed"
+    when: "user clicks 'Add Data' for Sunflower Oil"
+    then: "ingredient nutrition entry form opens"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-13.8"
+    category: "Missing Data"
+    given: "error state displayed"
+    when: "user clicks 'Skip and Use Partial Data'"
+    then: "calculation proceeds with missing ingredients as zero (with warning)"
+    test_type: "integration"
+    priority: "P1"
+
+  # Manual Override
+  - id: "AC-13.9"
+    category: "Manual Override"
+    given: "user is on nutrition panel"
+    when: "user clicks 'Override'"
+    then: "confirmation dialog shows 'Auto-calculation will be disabled'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-13.10"
+    category: "Manual Override"
+    given: "manual override mode active"
+    when: "user enters energy=304, protein=0.3, fat=0.0, carbs=82.4"
+    then: "values save successfully"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13.11"
+    category: "Manual Override"
+    given: "manual override saved"
+    when: "override is saved"
+    then: "metadata includes source, reference, notes, user, timestamp"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13.12"
+    category: "Manual Override"
+    given: "manual override active"
+    when: "panel displays"
+    then: "yellow warning banner shows 'Manual Override Active' with reason"
+    test_type: "e2e"
+    priority: "P1"
+
+  # Serving Size Calculator (FR-2.82)
+  - id: "AC-13.13"
+    category: "Serving Calculator"
+    given: "nutrition panel open"
+    when: "user clicks 'Serving Helper' button"
+    then: "serving size calculator modal opens"
+    test_type: "e2e"
+    priority: "P0"
+    fr_ref: "FR-2.82"
+
+  - id: "AC-13.14"
+    category: "Serving Calculator"
+    given: "calculator open with 'By Piece Dimensions' selected"
+    when: "user enters total weight=500g, number of pieces=10"
+    then: "serving size calculates as 50g"
+    test_type: "unit"
+    priority: "P0"
+    fr_ref: "FR-2.82"
+
+  - id: "AC-13.15"
+    category: "Serving Calculator"
+    given: "calculator open"
+    when: "user selects product category 'Bread'"
+    then: "FDA RACC reference shows 50g recommended"
+    test_type: "integration"
+    priority: "P1"
+    fr_ref: "FR-2.82"
+
+  - id: "AC-13.16"
+    category: "Serving Calculator"
+    given: "calculated serving=50g and RACC=50g"
+    when: "validation runs"
+    then: "checkmark shows 'Your serving matches FDA RACC'"
+    test_type: "unit"
+    priority: "P1"
+
+  - id: "AC-13.17"
+    category: "Serving Calculator"
+    given: "calculated serving=80g and RACC=50g (>20% variance)"
+    when: "validation runs"
+    then: "warning shows 'Differs from RACC by 60%'"
+    test_type: "unit"
+    priority: "P1"
+
+  # FDA Label Preview (FR-2.81)
+  - id: "AC-13.18"
+    category: "FDA Label"
+    given: "nutrition data complete with serving size"
+    when: "user clicks 'Preview Label'"
+    then: "FDA 2016 format label displays"
+    test_type: "e2e"
+    priority: "P0"
+    fr_ref: "FR-2.81"
+
+  - id: "AC-13.19"
+    category: "FDA Label"
+    given: "FDA label preview open"
+    when: "typography displays"
+    then: "title is 18pt Bold CAPS, calories 16pt Bold, nutrients 8pt"
+    test_type: "visual"
+    priority: "P1"
+    fr_ref: "FR-2.81"
+
+  - id: "AC-13.20"
+    category: "FDA Label"
+    given: "FDA label preview open"
+    when: "% Daily Value shows for Sodium 240mg"
+    then: "DV shows 10% (based on 2,300mg daily value)"
+    test_type: "unit"
+    priority: "P0"
+    fr_ref: "FR-2.81"
+
+  - id: "AC-13.21"
+    category: "FDA Label"
+    given: "FDA label preview open"
+    when: "required nutrients display"
+    then: "Vitamin D, Calcium, Iron, Potassium appear (not A, C)"
+    test_type: "unit"
+    priority: "P0"
+    fr_ref: "FR-2.81"
+
+  # Label Export
+  - id: "AC-13.22"
+    category: "Label Export"
+    given: "nutrition panel with complete data"
+    when: "user clicks 'Export PDF'"
+    then: "PDF downloads as '{product_code}_nutrition_label.pdf'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-13.23"
+    category: "Label Export"
+    given: "nutrition panel with complete data"
+    when: "user clicks 'Export SVG'"
+    then: "SVG downloads for professional printing"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-13.24"
+    category: "Label Export"
+    given: "serving size not entered"
+    when: "export attempted"
+    then: "validation error shows 'Serving size required for label'"
+    test_type: "integration"
+    priority: "P0"
+
+  # Allergen Label Generation (FR-2.84)
+  - id: "AC-13.25"
+    category: "Allergen Label"
+    given: "product has allergens Gluten (contains), Dairy (may contain)"
+    when: "allergen label generates"
+    then: "warning shows 'Contains: Gluten. May Contain: Dairy.'"
+    test_type: "integration"
+    priority: "P0"
+    fr_ref: "FR-2.84"
+
+  - id: "AC-13.26"
+    category: "Allergen Label"
+    given: "product has no allergens declared"
+    when: "allergen label generates"
+    then: "empty allergen section or 'Allergen Free' badge displays"
+    test_type: "integration"
+    priority: "P1"
+    fr_ref: "FR-2.84"
+
+  # Ingredient Nutrition Entry
+  - id: "AC-13.27"
+    category: "Ingredient Entry"
+    given: "raw material 'Sugar' selected"
+    when: "nutrition entry form opens"
+    then: "all fields available (energy, protein, fat, carbs, fiber, sodium, etc.)"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-13.28"
+    category: "Ingredient Entry"
+    given: "user enters nutrition data for Sugar"
+    when: "source is 'Supplier CoA'"
+    then: "reference field becomes required"
+    test_type: "unit"
+    priority: "P0"
+
+  # Loading/Empty/Error States
+  - id: "AC-13.29"
+    category: "UI States"
+    given: "user opens nutrition panel"
+    when: "calculation runs"
+    then: "loading state shows spinner with 'Calculating nutrition from BOM...'"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-13.30"
+    category: "UI States"
+    given: "product is raw material (no BOM)"
+    when: "nutrition panel opens"
+    then: "empty state shows 'No BOM - Enter Nutrition Manually' with CTA"
+    test_type: "e2e"
+    priority: "P1"
+
+  # RLS/Security
+  - id: "AC-13.31"
+    category: "Security"
+    given: "user from Org B"
+    when: "requesting nutrition for Org A product"
+    then: "response is 404 Not Found"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  nutrition_service:
+    - name: "calculateFromBOM returns correct totals for simple BOM"
+      setup: |
+        BOM with 2 ingredients:
+        - Flour: 1000g, energy=340kcal/100g, protein=12g/100g
+        - Water: 500g, energy=0, protein=0
+      expected: |
+        total_per_batch.energy_kcal = 3400
+        total_per_batch.protein_g = 120
+        per_100g.energy_kcal = 226.67 (3400/1500*100)
+
+    - name: "calculateFromBOM applies yield factor correctly"
+      setup: |
+        BOM: expected 1000g, actual 900g (10% water loss)
+        Flour: 1000g, energy=340kcal/100g
+      expected: |
+        yield.factor = 1.111 (1000/900)
+        per_100g.energy_kcal = 377.78 (340 * 1.111)
+
+    - name: "calculateFromBOM identifies missing ingredient nutrition"
+      setup: "BOM with 3 ingredients, 1 missing nutrition data"
+      expected: "Returns missing_ingredients array with 1 item"
+
+    - name: "calculateFromBOM handles partial calculation when allowed"
+      setup: "allow_partial=true, 1 of 3 ingredients missing"
+      expected: "Calculates with available data, adds warning"
+
+  serving_calculator_service:
+    - name: "calculateByWeight divides correctly"
+      params: { totalWeightG: 500, numServings: 10 }
+      expected: { serving_size_g: 50, servings_per_container: 10 }
+
+    - name: "calculateByDimensions calculates from piece count"
+      params: { totalWeightG: 500, numPieces: 10 }
+      expected: { serving_size_g: 50, servings_per_container: 10 }
+
+    - name: "validateAgainstRACC returns match for exact value"
+      params: { servingSizeG: 50, raccG: 50 }
+      expected: { matches: true, variance_percent: 0 }
+
+    - name: "validateAgainstRACC returns warning for >20% variance"
+      params: { servingSizeG: 80, raccG: 50 }
+      expected: { matches: false, variance_percent: 60, warning: "Differs from RACC by 60%" }
+
+  percent_dv_calculation:
+    - name: "calculatePercentDV returns correct % for sodium"
+      params: { nutrient: "sodium_mg", amount: 230 }
+      expected: 10  # 230/2300 * 100
+
+    - name: "calculatePercentDV rounds to whole number"
+      params: { nutrient: "fat_g", amount: 2 }
+      expected: 3  # 2/78 * 100 = 2.56 -> 3
+
+  allergen_label:
+    - name: "formatAllergenLabel groups by relation type"
+      setup: |
+        allergens: [
+          { name: 'Gluten', relation_type: 'contains' },
+          { name: 'Dairy', relation_type: 'may_contain' }
+        ]
+      expected: "Contains: Gluten. May Contain: Dairy."
+
+    - name: "formatAllergenLabel returns empty for no allergens"
+      setup: "allergens: []"
+      expected: "" or "Allergen Free"
+
+# Integration Test Cases
+integration_tests:
+  calculate_api:
+    - name: "POST /calculate returns nutrition for product with complete BOM"
+      setup: |
+        - Create product with active BOM
+        - Add nutrition data for all BOM ingredients
+      action: "POST /api/technical/nutrition/products/:id/calculate"
+      expected: |
+        - Status 200
+        - Response has per_100g values
+        - missing_ingredients is empty
+
+    - name: "POST /calculate returns error for product without BOM"
+      setup: "Create product without BOM"
+      action: "POST /api/technical/nutrition/products/:id/calculate"
+      expected: |
+        - Status 400
+        - Error code: NO_ACTIVE_BOM
+
+    - name: "POST /calculate returns missing ingredients list"
+      setup: |
+        - Create product with BOM
+        - Only 2 of 3 ingredients have nutrition data
+      action: "POST /api/technical/nutrition/products/:id/calculate"
+      expected: |
+        - Status 400
+        - Error code: MISSING_INGREDIENT_NUTRITION
+        - missing array has 1 item
+
+  override_api:
+    - name: "PUT /override saves manual nutrition with audit trail"
+      setup: "Create product"
+      action: |
+        PUT /api/technical/nutrition/products/:id/override
+        Body: { serving_size: 50, energy_kcal: 200, source: 'lab_test', reference: 'CoA-001' }
+      expected: |
+        - Status 200
+        - is_manual_override = true
+        - override_by = current user
+        - override_at = timestamp
+
+    - name: "PUT /override requires reference for lab_test source"
+      action: |
+        PUT /api/technical/nutrition/products/:id/override
+        Body: { serving_size: 50, energy_kcal: 200, source: 'lab_test' }
+      expected: |
+        - Status 400
+        - Error: Reference is required
+
+  label_api:
+    - name: "GET /label returns HTML preview by default"
+      setup: "Product with nutrition data"
+      action: "GET /api/technical/nutrition/products/:id/label"
+      expected: |
+        - Status 200
+        - html_content is present
+        - format = 'fda'
+
+    - name: "GET /label returns error without serving size"
+      setup: "Product with nutrition but no serving_size"
+      action: "GET /api/technical/nutrition/products/:id/label"
+      expected: |
+        - Status 400
+        - Error: Serving size required
+
+  rls_isolation:
+    - name: "User can only read own org nutrition data"
+      setup: |
+        - Create Org A with Product A + nutrition
+        - Create Org B with User B
+      action: "User B queries product_nutrition for Product A"
+      expected: "No rows returned"
+
+    - name: "User can only write to own org nutrition data"
+      setup: |
+        - Create Org A with Product A
+        - Create Org B with Admin B
+      action: "Admin B attempts to insert nutrition for Product A"
+      expected: "Insert fails or inserts with Org B ID"
+
+# E2E Test Cases
+e2e_tests:
+  nutrition_panel_workflow:
+    - name: "Full calculation workflow"
+      steps:
+        - "Open product detail page"
+        - "Click 'Nutrition Facts' button"
+        - "Wait for calculation to complete"
+        - "Verify nutrition values displayed"
+        - "Click 'Preview Label'"
+        - "Verify FDA label format"
+        - "Click 'Export PDF'"
+        - "Verify PDF downloads"
+
+    - name: "Manual override workflow"
+      steps:
+        - "Open nutrition panel"
+        - "Click 'Override'"
+        - "Confirm override dialog"
+        - "Fill in nutrition values"
+        - "Select source: Lab Test"
+        - "Enter reference: CoA-001"
+        - "Click 'Save Manual Override'"
+        - "Verify yellow override banner appears"
+
+    - name: "Serving calculator workflow"
+      steps:
+        - "Open nutrition panel"
+        - "Click 'Serving Helper'"
+        - "Select 'By Piece Dimensions'"
+        - "Enter total weight: 500g"
+        - "Enter number of pieces: 10"
+        - "Verify serving size shows 50g"
+        - "Select category: Bread"
+        - "Verify RACC match indicator"
+        - "Click 'Apply Serving Size'"
+        - "Verify nutrition panel updated"
+
+# Performance Tests
+performance_tests:
+  - name: "Nutrition calculation under 2 seconds"
+    setup: "BOM with 20 ingredients"
+    action: "POST /calculate"
+    expected: "Response time < 2000ms"
+
+  - name: "Label generation under 1 second"
+    setup: "Complete nutrition data"
+    action: "GET /label?output=pdf"
+    expected: "Response time < 1000ms"
+
+# Definition of Done
+definition_of_done:
+  - "Nutrition calculation from BOM completes within 2 seconds"
+  - "Missing ingredient handling shows clear error with add data CTAs"
+  - "Manual override saves with audit trail (user, timestamp, source, reference)"
+  - "Serving size calculator calculates correctly by weight/dimensions/volume"
+  - "FDA RACC validation shows warning when serving differs >20%"
+  - "FDA 2016 label format matches specification (typography, spacing)"
+  - "PDF export generates print-ready 4x6 inch label"
+  - "SVG export works for professional printing"
+  - "Allergen labels show Contains/May Contain from product allergens"
+  - "Ingredient nutrition entry saves and is used in calculations"
+  - "Cache invalidation works when BOM changes"
+  - "All API endpoints have integration tests"
+  - "Nutrition service has >80% unit test coverage"
+  - "Yield adjustment correctly concentrates nutrients"
+  - "RLS policies enforce org isolation"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Core calculation logic needs high coverage"
+    files:
+      - "lib/services/nutrition-service.ts: 85%"
+      - "lib/services/serving-calculator-service.ts: 90%"
+      - "lib/services/label-export-service.ts: 75%"
+  integration:
+    target: 80
+    reason: "API endpoints must be thoroughly tested"
+    files:
+      - "API /calculate endpoint: 90%"
+      - "API /override endpoint: 90%"
+      - "API /label endpoint: 80%"
+  e2e:
+    target: 70
+    reason: "Critical user workflows"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Calculation accuracy affects regulatory compliance"
+    mitigation: "Comprehensive unit tests with known inputs/outputs"
+    severity: "high"
+    test_coverage: "unit_tests.nutrition_service"
+
+  - id: "RISK-02"
+    description: "FDA label format must match specifications exactly"
+    mitigation: "Visual regression tests, manual QA review"
+    severity: "high"
+    test_coverage: "e2e_tests, visual tests"
+
+  - id: "RISK-03"
+    description: "Missing ingredient data could block calculation"
+    mitigation: "Clear error messages with CTAs to add data, partial calculation option"
+    severity: "medium"
+    test_coverage: "integration_tests.calculate_api"
+
+  - id: "RISK-04"
+    description: "RLS bypass could expose nutrition data cross-tenant"
+    mitigation: "Integration tests for RLS isolation"
+    severity: "high"
+    test_coverage: "integration_tests.rls_isolation"

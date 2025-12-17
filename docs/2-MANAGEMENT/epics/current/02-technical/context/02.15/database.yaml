@@ -1,0 +1,137 @@
+# Story 02.15 - Database Schema
+# Purpose: Tables, RLS policies, indexes
+# Agent: BACKEND-DEV (database focus)
+
+# Note: product_costs table already exists from Story 02.9
+# This story USES the existing table - no new migrations needed
+
+migrations: []
+
+# Existing tables used (from Story 02.9)
+tables:
+  - name: "product_costs"
+    status: "existing"
+    description: "Historical cost records - created by BOM cost calculations (Story 02.9)"
+    schema_reference: "docs/1-BASELINE/product/modules/technical.md#3.3-Costing-Tables"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "cost_type", type: "TEXT", constraints: "NOT NULL CHECK (cost_type IN ('standard', 'actual', 'planned'))" }
+      - { name: "material_cost", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "labor_cost", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "overhead_cost", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "total_cost", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "cost_per_unit", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "currency", type: "TEXT", constraints: "DEFAULT 'PLN'" }
+      - { name: "effective_from", type: "DATE", constraints: "NOT NULL" }
+      - { name: "effective_to", type: "DATE", constraints: "" }
+      - { name: "bom_id", type: "UUID", constraints: "REFERENCES boms(id)" }
+      - { name: "bom_version", type: "INTEGER", constraints: "" }
+      - { name: "routing_id", type: "UUID", constraints: "REFERENCES routings(id)" }
+      - { name: "calculation_method", type: "TEXT", constraints: "" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_product_costs_org_product ON product_costs(org_id, product_id)"
+      - "idx_product_costs_history ON product_costs(org_id, product_id, effective_from DESC)"
+      - "idx_product_costs_type ON product_costs(org_id, cost_type)"
+
+  - name: "cost_variances"
+    status: "existing"
+    description: "Cost variance records from production (created by Production module - Epic 04)"
+    schema_reference: "docs/1-BASELINE/product/modules/technical.md#3.3-Costing-Tables"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "work_order_id", type: "UUID", constraints: "NOT NULL REFERENCES work_orders(id)" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "standard_material", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "actual_material", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "standard_labor", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "actual_labor", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "standard_overhead", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "actual_overhead", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "standard_total", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "actual_total", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "variance_total", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "variance_percent", type: "DECIMAL(5,2)", constraints: "" }
+      - { name: "analyzed_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+    rls: true
+    rls_pattern: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    indexes:
+      - "idx_cost_variances_product ON cost_variances(org_id, product_id, analyzed_at DESC)"
+      - "idx_cost_variances_work_order ON cost_variances(work_order_id)"
+
+# RLS Policies (use existing from Story 02.9)
+rls_policies:
+  pattern: "Users Table Lookup (ADR-013)"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - { table: "product_costs", name: "product_costs_org_isolation", operation: "SELECT", using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())" }
+    - { table: "cost_variances", name: "cost_variances_org_isolation", operation: "SELECT", using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())" }
+
+# Indexes for Cost History queries (verify these exist)
+required_indexes:
+  - name: "idx_product_costs_history"
+    table: "product_costs"
+    columns: ["org_id", "product_id", "effective_from DESC"]
+    purpose: "Fast retrieval of cost history by product, ordered by date"
+
+# Query Patterns
+query_patterns:
+  cost_history:
+    description: "Get cost history for a product within date range"
+    sql: |
+      SELECT id, cost_type, material_cost, labor_cost, overhead_cost,
+             total_cost, cost_per_unit, effective_from, effective_to,
+             bom_version, created_at, created_by
+      FROM product_costs
+      WHERE org_id = :org_id
+        AND product_id = :product_id
+        AND effective_from >= :from_date
+        AND effective_from <= :to_date
+      ORDER BY effective_from DESC
+      LIMIT :limit OFFSET :offset
+
+  variance_report:
+    description: "Get variance data for a product within period"
+    sql: |
+      SELECT id, work_order_id,
+             standard_material, actual_material,
+             standard_labor, actual_labor,
+             standard_overhead, actual_overhead,
+             standard_total, actual_total,
+             variance_total, variance_percent,
+             analyzed_at
+      FROM cost_variances
+      WHERE org_id = :org_id
+        AND product_id = :product_id
+        AND analyzed_at >= NOW() - INTERVAL ':period_days days'
+      ORDER BY analyzed_at DESC
+
+  trend_calculation:
+    description: "Get costs for trend calculation"
+    sql: |
+      SELECT total_cost, effective_from
+      FROM product_costs
+      WHERE org_id = :org_id
+        AND product_id = :product_id
+        AND cost_type = 'standard'
+        AND effective_from >= :cutoff_date
+      ORDER BY effective_from ASC
+
+# Notes on data model
+data_model_notes:
+  - "product_costs records created automatically by POST /api/technical/boms/:id/recalculate-cost"
+  - "Each recalculation creates a new record - provides full history"
+  - "cost_variances records created by Production module when work order completes"
+  - "If no cost_variances exist yet, show 'No production data' message"
+  - "Retention: 5 years minimum per regulatory requirements"

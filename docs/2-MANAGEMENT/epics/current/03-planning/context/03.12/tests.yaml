@@ -1,0 +1,462 @@
+# Story 03.12 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/wo-operations-service.test.ts"
+    type: "unit"
+    description: "Unit tests for WO operations service"
+  - path: "apps/frontend/app/api/planning/work-orders/[wo_id]/operations/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for WO operations API"
+  - path: "supabase/tests/wo-operations-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for wo_operations table"
+  - path: "__tests__/e2e/planning/wo-operations.spec.ts"
+    type: "e2e"
+    description: "E2E tests for WO operations timeline"
+
+# Acceptance Criteria
+acceptance_criteria:
+  # AC-1: Routing Copy on WO Release
+  - id: "AC-01"
+    name: "Copy routing operations on WO release"
+    given: "WO exists with status 'planned' and routing_id assigned"
+    when: "planner releases WO"
+    then: "wo_operations records created matching routing_operations"
+    test_type: "integration"
+    priority: "P0"
+    gherkin: |
+      Scenario: Copy routing operations on WO release
+        Given WO exists with status "planned"
+        And WO has routing_id assigned (from BOM or manual)
+        And routing has 3 operations: Mixing (seq 1), Baking (seq 2), Cooling (seq 3)
+        And setting wo_copy_routing = true
+        When planner releases WO
+        Then 3 wo_operations records created
+        And sequences match routing: 1, 2, 3
+        And operation names copied: Mixing, Baking, Cooling
+        And machine_id copied from routing operations
+        And line_id copied from routing operations
+        And expected_duration_minutes = routing.duration + routing.setup_time + routing.cleanup_time
+        And all operations start with status "pending"
+
+  - id: "AC-02"
+    name: "No routing copy when routing_id is null"
+    given: "WO exists with routing_id = null"
+    when: "planner releases WO"
+    then: "no wo_operations created, WO releases successfully"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "Routing copy disabled in settings"
+    given: "setting wo_copy_routing = false"
+    when: "planner releases WO with routing"
+    then: "no wo_operations created, WO releases successfully"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-04"
+    name: "Prevent duplicate copy on re-release"
+    given: "WO was previously released and wo_operations exist"
+    when: "planner releases WO again"
+    then: "existing wo_operations preserved, no duplicates created"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-2: Data Mapping
+  - id: "AC-05"
+    name: "Operation name and description copy"
+    given: "routing operation has name and description"
+    when: "routing copied to WO"
+    then: "wo_operation has matching name and description"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-06"
+    name: "Expected duration calculation"
+    given: "routing operation has duration=60, setup_time=15, cleanup_time=10"
+    when: "routing copied to WO"
+    then: "wo_operation.expected_duration_minutes = 85"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    name: "Null values handling"
+    given: "routing operation has machine_id = null and line_id = null"
+    when: "routing copied to WO"
+    then: "wo_operation has null values, no errors raised"
+    test_type: "unit"
+    priority: "P1"
+
+  # AC-3: Status Lifecycle
+  - id: "AC-08"
+    name: "Initial status on copy"
+    given: "routing operations copied to WO"
+    when: "wo_operations created"
+    then: "all operations have status = 'pending'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-09"
+    name: "Actual duration auto-calculation"
+    given: "wo_operation status changes to 'completed'"
+    when: "completed_at is set"
+    then: "actual_duration_minutes calculated from started_at to completed_at"
+    test_type: "integration"
+    priority: "P1"
+
+  # AC-4: Operations Timeline UI
+  - id: "AC-10"
+    name: "Operations timeline display on WO detail"
+    given: "WO has wo_operations"
+    when: "planner views WO detail page"
+    then: "operations timeline component displays with all operations in sequence order"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-11"
+    name: "Operation status visual indicators"
+    given: "wo_operations with different statuses"
+    when: "viewing timeline"
+    then: "correct color badges displayed for each status"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-12"
+    name: "Empty state when no operations"
+    given: "WO has no wo_operations"
+    when: "viewing WO detail"
+    then: "empty state message displayed"
+    test_type: "e2e"
+    priority: "P1"
+
+  # AC-5: API Endpoints
+  - id: "AC-13"
+    name: "GET operations list returns ordered data"
+    given: "WO has 5 wo_operations"
+    when: "calling GET /api/planning/work-orders/:wo_id/operations"
+    then: "returns array of 5 operations ordered by sequence ASC"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-14"
+    name: "Cross-org access returns 404"
+    given: "User A from Org A"
+    when: "requesting wo_operation from Org B"
+    then: "404 Not Found returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-15"
+    name: "Manual copy trigger admin only"
+    given: "user has OPERATOR role"
+    when: "calling POST /api/planning/work-orders/:id/copy-routing"
+    then: "403 Forbidden returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  wo_operations_service:
+    - name: "copyRoutingToWO creates operations"
+      setup: "Mock WO with routing_id, routing has 3 operations"
+      expected: "3 wo_operations created, returns count 3"
+
+    - name: "copyRoutingToWO calculates expected duration"
+      setup: "Routing operation with duration=60, setup=15, cleanup=10"
+      expected: "wo_operation.expected_duration_minutes = 85"
+
+    - name: "copyRoutingToWO handles null routing_id"
+      setup: "WO with routing_id = null"
+      expected: "Returns 0 operations, no error"
+
+    - name: "copyRoutingToWO idempotency check"
+      setup: "WO already has wo_operations"
+      expected: "Returns existing count, no duplicates"
+
+    - name: "copyRoutingToWO preserves sequence order"
+      setup: "Routing has sequences: 10, 20, 30"
+      expected: "wo_operations have sequences: 10, 20, 30"
+
+    - name: "copyRoutingToWO copies machine/line assignments"
+      setup: "Routing operations have machine_id and line_id"
+      expected: "wo_operations have matching FKs"
+
+    - name: "copyRoutingToWO handles empty routing"
+      setup: "Routing exists but has 0 operations"
+      expected: "Returns 0, no error"
+
+    - name: "copyRoutingToWO respects wo_copy_routing setting"
+      setup: "Setting wo_copy_routing = false"
+      expected: "Returns 0, no copy attempted"
+
+    - name: "getOperationsForWO returns ordered list"
+      setup: "WO with 4 operations"
+      expected: "Returns array ordered by sequence ASC"
+
+    - name: "getOperationsForWO includes machine/line data"
+      setup: "Operations with machine and line assignments"
+      expected: "Returns operations with joined machine/line names"
+
+    - name: "calculateExpectedDuration sums times correctly"
+      setup: "Routing op with duration=30, setup=5, cleanup=5"
+      expected: "Returns 40"
+
+    - name: "calculateExpectedDuration handles nulls"
+      setup: "Routing op with duration=30, setup=null, cleanup=null"
+      expected: "Returns 30"
+
+    - name: "validateOperationSequence detects duplicates"
+      setup: "Operations with duplicate sequence 10"
+      expected: "Returns false"
+
+    - name: "validateOperationSequence passes unique sequences"
+      setup: "Operations with sequences 1, 2, 3"
+      expected: "Returns true"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "GET /work-orders/:wo_id/operations returns list"
+      setup: "WO with 3 operations"
+      action: "GET /api/planning/work-orders/:wo_id/operations"
+      expected: "Status 200, array of 3 operations ordered by sequence"
+
+    - name: "GET /work-orders/:wo_id/operations empty state"
+      setup: "WO with no operations"
+      action: "GET /api/planning/work-orders/:wo_id/operations"
+      expected: "Status 200, empty array"
+
+    - name: "GET /work-orders/:wo_id/operations/:op_id returns detail"
+      setup: "WO with operation"
+      action: "GET /api/planning/work-orders/:wo_id/operations/:op_id"
+      expected: "Status 200, full operation detail with variances"
+
+    - name: "GET /work-orders/:wo_id/operations/:op_id 404 on invalid"
+      setup: "Invalid op_id"
+      action: "GET /api/planning/work-orders/:wo_id/operations/:invalid"
+      expected: "Status 404"
+
+    - name: "POST /work-orders/:wo_id/copy-routing creates operations"
+      setup: "Admin user, WO with routing, no existing operations"
+      action: "POST /api/planning/work-orders/:wo_id/copy-routing"
+      expected: "Status 200, operations_created > 0"
+
+    - name: "POST /work-orders/:wo_id/copy-routing admin only"
+      setup: "Non-admin user"
+      action: "POST /api/planning/work-orders/:wo_id/copy-routing"
+      expected: "Status 403"
+
+    - name: "POST /work-orders/:wo_id/copy-routing idempotent"
+      setup: "WO already has operations"
+      action: "POST /api/planning/work-orders/:wo_id/copy-routing twice"
+      expected: "No duplicates created"
+
+    - name: "Cross-org access returns 404"
+      setup: "User A from Org A, WO from Org B"
+      action: "GET /api/planning/work-orders/:wo_id_org_b/operations"
+      expected: "Status 404"
+
+    - name: "Invalid WO ID returns 404"
+      setup: "Non-existent WO ID"
+      action: "GET /api/planning/work-orders/:invalid/operations"
+      expected: "Status 404"
+
+  rls_policies:
+    - name: "User can only read own org operations"
+      setup: "Create Org A with User A and WO A, Org B with WO B"
+      action: "User A queries wo_operations"
+      expected: "Only WO A operations visible"
+
+    - name: "Planner can insert operations"
+      setup: "User with PLANNER role"
+      action: "Insert wo_operation"
+      expected: "Insert succeeds"
+
+    - name: "Operator can update operations"
+      setup: "User with OPERATOR role"
+      action: "Update wo_operation status"
+      expected: "Update succeeds"
+
+    - name: "Operator cannot delete operations"
+      setup: "User with OPERATOR role"
+      action: "Delete wo_operation"
+      expected: "Delete blocked by RLS"
+
+    - name: "Admin can delete operations"
+      setup: "User with ADMIN role"
+      action: "Delete wo_operation"
+      expected: "Delete succeeds"
+
+  database_functions:
+    - name: "copy_routing_to_wo creates correct records"
+      setup: "WO with routing having 3 operations"
+      action: "SELECT copy_routing_to_wo(wo_id, org_id)"
+      expected: "Returns 3, wo_operations table has 3 new rows"
+
+    - name: "copy_routing_to_wo idempotent"
+      setup: "WO already has operations"
+      action: "SELECT copy_routing_to_wo(wo_id, org_id) twice"
+      expected: "Second call returns existing count, no duplicates"
+
+    - name: "copy_routing_to_wo respects setting"
+      setup: "planning_settings.wo_copy_routing = false"
+      action: "SELECT copy_routing_to_wo(wo_id, org_id)"
+      expected: "Returns 0"
+
+    - name: "update trigger sets updated_at"
+      setup: "Existing wo_operation"
+      action: "UPDATE wo_operations SET notes = 'test'"
+      expected: "updated_at is refreshed"
+
+    - name: "duration trigger calculates actual"
+      setup: "wo_operation with started_at = NOW() - interval '30 minutes'"
+      action: "UPDATE wo_operations SET status = 'completed', completed_at = NOW()"
+      expected: "actual_duration_minutes ~ 30"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Release WO copies routing operations"
+    steps:
+      - "Create WO with routing"
+      - "Plan WO"
+      - "Release WO"
+    expected: "Operations tab appears, shows routing operations"
+
+  - name: "View operations timeline on WO detail"
+    steps:
+      - "Navigate to WO detail page"
+      - "Click Operations tab"
+    expected: "Operations timeline displays with all operations in sequence"
+
+  - name: "Operations timeline shows correct data"
+    steps:
+      - "View WO detail with operations"
+      - "Inspect operation cards"
+    expected: "Each card shows sequence, name, machine/line, expected duration, status badge"
+
+  - name: "Operations timeline empty state"
+    steps:
+      - "Create WO without routing"
+      - "View WO detail"
+    expected: "Empty state message: 'No routing operations defined'"
+
+  - name: "Click operation opens detail panel"
+    steps:
+      - "View WO with operations"
+      - "Click on operation card"
+    expected: "Detail panel slides open with full operation info"
+
+  - name: "Operation detail shows full info"
+    steps:
+      - "Open operation detail panel"
+      - "Inspect content"
+    expected: "Shows description, instructions, times, machine, line, user info"
+
+  - name: "Status badges display correctly"
+    steps:
+      - "View operations with different statuses"
+    expected: "Pending=gray, In Progress=yellow, Completed=green, Skipped=red"
+
+  - name: "Progress bar shows completion percentage"
+    steps:
+      - "View WO with 3 operations, 1 completed"
+    expected: "Progress bar shows '1/3 (33%)'"
+
+# Definition of Done
+definition_of_done:
+  - "Database migration creates wo_operations table with all fields"
+  - "All constraints, indexes, and unique constraints created"
+  - "copy_routing_to_wo() function implemented and tested"
+  - "Trigger for auto-duration calculation on completion"
+  - "Trigger for timestamp updates"
+  - "RLS policies enforce org isolation and role permissions"
+  - "API endpoint GET /work-orders/:wo_id/operations implemented"
+  - "API endpoint GET /work-orders/:wo_id/operations/:op_id implemented"
+  - "API endpoint POST /work-orders/:wo_id/copy-routing implemented (admin)"
+  - "Zod schemas validate all inputs"
+  - "wo-operations-service.ts implements all methods"
+  - "Integration with WO release action in story 03.10"
+  - "Setting wo_copy_routing added to planning_settings"
+  - "WOOperationsTimeline component implemented"
+  - "WOOperationCard component with status badges"
+  - "WOOperationDetailPanel component"
+  - "WOOperationProgressBar component"
+  - "Empty state component"
+  - "Status badge colors correct"
+  - "Multi-tenancy: cross-org returns 404"
+  - "Permission matrix implemented"
+  - "Unit tests >= 80% coverage"
+  - "Integration tests for all endpoints"
+  - "E2E tests for critical flows"
+  - "Routing copy idempotency tested"
+  - "Edge cases tested (null routing, empty routing, duplicate sequences)"
+  - "Loading, empty, error states implemented"
+  - "Toast notifications on success/error"
+  - "Accessibility: keyboard nav, ARIA labels"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Core business logic coverage"
+    files:
+      - "lib/services/wo-operations-service.ts: 80%"
+      - "lib/validation/wo-operations.ts: 90%"
+  integration:
+    target: 80
+    reason: "API endpoints and RLS must be thoroughly tested"
+    files:
+      - "API routes: 100% of endpoints tested"
+      - "RLS policies: 100% of policy rules tested"
+      - "Database functions: 100% of functions tested"
+  e2e:
+    target: 70
+    reason: "Critical user flows covered"
+    flows:
+      - "Release WO with routing copy"
+      - "View operations timeline"
+      - "Operation detail panel"
+
+# Performance Requirements
+performance:
+  - metric: "Routing copy on WO release"
+    target: "< 500ms"
+    for: "Routing with 10 operations"
+  - metric: "GET operations list"
+    target: "< 200ms"
+  - metric: "GET operation detail"
+    target: "< 150ms"
+  - metric: "Operations timeline render"
+    target: "< 300ms"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Routing copy could fail during WO release"
+    mitigation: "Copy is non-blocking; release succeeds even if copy fails with warning logged"
+    severity: "medium"
+    test_coverage: "AC-01, integration tests"
+
+  - id: "RISK-02"
+    description: "Duplicate operations if idempotency fails"
+    mitigation: "Database function checks existing count before insert"
+    severity: "high"
+    test_coverage: "AC-04, unit tests"
+
+  - id: "RISK-03"
+    description: "Cross-tenant data leak"
+    mitigation: "RLS policies on wo_operations, organization_id column"
+    severity: "critical"
+    test_coverage: "AC-14, RLS integration tests"
+
+  - id: "RISK-04"
+    description: "Performance degradation with many operations"
+    mitigation: "Indexes on wo_id, sequence, status columns"
+    severity: "low"
+    test_coverage: "Performance benchmarks"

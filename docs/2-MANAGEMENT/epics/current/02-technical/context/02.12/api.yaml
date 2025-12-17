@@ -1,0 +1,454 @@
+# Story 02.12 - API Specification
+# Purpose: Dashboard endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  # 1. Stats Cards Endpoint
+  - method: "GET"
+    path: "/api/technical/dashboard/stats"
+    description: "Returns product, BOM, routing counts and average cost with trend"
+    file: "apps/frontend/app/api/technical/dashboard/stats/route.ts"
+    auth: "required"
+    roles: ["*"]  # All authenticated users with technical module access
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+
+    response:
+      status: 200
+      type: "DashboardStatsResponse"
+      schema:
+        products:
+          total: "number"
+          active: "number"
+          inactive: "number"
+        boms:
+          total: "number"
+          active: "number"
+          phased: "number"
+        routings:
+          total: "number"
+          reusable: "number"
+        avg_cost:
+          value: "number"
+          currency: "string"
+          trend_percent: "number"
+          trend_direction: "'up' | 'down' | 'neutral'"
+
+    example_response: |
+      {
+        "products": { "total": 247, "active": 215, "inactive": 32 },
+        "boms": { "total": 183, "active": 156, "phased": 27 },
+        "routings": { "total": 45, "reusable": 32 },
+        "avg_cost": { "value": 125.50, "currency": "PLN", "trend_percent": 5.2, "trend_direction": "up" }
+      }
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 500
+        code: "STATS_FETCH_FAILED"
+        message: "Failed to fetch dashboard statistics"
+
+    cache:
+      key: "org:{orgId}:dashboard:stats"
+      ttl: 60
+
+  # 2. Allergen Matrix Endpoint
+  - method: "GET"
+    path: "/api/technical/dashboard/allergen-matrix"
+    description: "Returns products x allergens heatmap data"
+    file: "apps/frontend/app/api/technical/dashboard/allergen-matrix/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        - name: "product_type"
+          type: "string"
+          required: false
+          description: "Filter by product type ID"
+
+    response:
+      status: 200
+      type: "AllergenMatrixResponse"
+      schema:
+        allergens:
+          - id: "string"
+            code: "string"
+            name: "string"
+        products:
+          - id: "string"
+            code: "string"
+            name: "string"
+            allergen_relations: "Record<string, 'contains' | 'may_contain' | null>"
+
+    example_response: |
+      {
+        "allergens": [
+          { "id": "uuid-1", "code": "gluten", "name": "Gluten" },
+          { "id": "uuid-2", "code": "dairy", "name": "Dairy" }
+        ],
+        "products": [
+          {
+            "id": "uuid-p1",
+            "code": "SKU-001",
+            "name": "Wheat Flour",
+            "allergen_relations": {
+              "uuid-1": "contains",
+              "uuid-2": null
+            }
+          }
+        ]
+      }
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 400
+        code: "INVALID_PRODUCT_TYPE"
+        message: "Invalid product type filter"
+      - status: 500
+        code: "ALLERGEN_MATRIX_FETCH_FAILED"
+        message: "Failed to fetch allergen matrix"
+
+    cache:
+      key: "org:{orgId}:dashboard:allergen-matrix"
+      ttl: 600
+
+  # 3. BOM Timeline Endpoint
+  - method: "GET"
+    path: "/api/technical/dashboard/bom-timeline"
+    description: "Returns BOM version changes over time"
+    file: "apps/frontend/app/api/technical/dashboard/bom-timeline/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        - name: "product_id"
+          type: "string"
+          required: false
+          description: "Filter by product ID"
+        - name: "months"
+          type: "number"
+          required: false
+          default: 6
+          description: "Number of months to look back (1-12)"
+        - name: "limit"
+          type: "number"
+          required: false
+          default: 50
+          description: "Maximum number of timeline entries (1-100)"
+
+    response:
+      status: 200
+      type: "BomTimelineResponse"
+      schema:
+        timeline:
+          - bom_id: "string"
+            product_id: "string"
+            product_code: "string"
+            product_name: "string"
+            version: "number"
+            effective_from: "string (ISO date)"
+            changed_by: "string"
+            changed_by_name: "string"
+            changed_at: "string (ISO timestamp)"
+        limit_reached: "boolean"
+
+    example_response: |
+      {
+        "timeline": [
+          {
+            "bom_id": "uuid-1",
+            "product_id": "uuid-p1",
+            "product_code": "SKU-002",
+            "product_name": "Wheat Bread",
+            "version": 5,
+            "effective_from": "2025-03-15",
+            "changed_by": "uuid-u1",
+            "changed_by_name": "John Doe",
+            "changed_at": "2025-03-15T10:30:00Z"
+          }
+        ],
+        "limit_reached": false
+      }
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 400
+        code: "INVALID_MONTHS"
+        message: "Months must be between 1 and 12"
+      - status: 400
+        code: "INVALID_LIMIT"
+        message: "Limit must be between 1 and 100"
+      - status: 500
+        code: "BOM_TIMELINE_FETCH_FAILED"
+        message: "Failed to fetch BOM timeline"
+
+    cache:
+      key: "org:{orgId}:dashboard:bom-timeline"
+      ttl: 300
+
+  # 4. Recent Activity Endpoint
+  - method: "GET"
+    path: "/api/technical/dashboard/recent-activity"
+    description: "Returns recent activity feed (products, BOMs, routings)"
+    file: "apps/frontend/app/api/technical/dashboard/recent-activity/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        - name: "limit"
+          type: "number"
+          required: false
+          default: 10
+          description: "Maximum number of activities (1-100)"
+
+    response:
+      status: 200
+      type: "RecentActivityResponse"
+      schema:
+        activities:
+          - id: "string"
+            type: "'product_created' | 'product_updated' | 'bom_created' | 'bom_activated' | 'routing_created' | 'routing_updated'"
+            entity_type: "'product' | 'bom' | 'routing'"
+            entity_id: "string"
+            description: "string"
+            user_id: "string"
+            user_name: "string"
+            timestamp: "string (ISO timestamp)"
+            relative_time: "string"
+            link: "string"
+
+    example_response: |
+      {
+        "activities": [
+          {
+            "id": "uuid-1",
+            "type": "product_created",
+            "entity_type": "product",
+            "entity_id": "uuid-p15",
+            "description": "Product SKU-015 created",
+            "user_id": "uuid-u1",
+            "user_name": "John Doe",
+            "timestamp": "2025-12-14T08:30:00Z",
+            "relative_time": "2 hours ago",
+            "link": "/technical/products/uuid-p15"
+          }
+        ]
+      }
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 400
+        code: "INVALID_LIMIT"
+        message: "Limit must be between 1 and 100"
+      - status: 500
+        code: "RECENT_ACTIVITY_FETCH_FAILED"
+        message: "Failed to fetch recent activity"
+
+    cache:
+      key: "org:{orgId}:dashboard:recent-activity"
+      ttl: 30
+
+  # 5. Cost Trends Endpoint
+  - method: "GET"
+    path: "/api/technical/dashboard/cost-trends"
+    description: "Returns monthly cost averages for chart"
+    file: "apps/frontend/app/api/technical/dashboard/cost-trends/route.ts"
+    auth: "required"
+    roles: ["*"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      query_params:
+        - name: "months"
+          type: "number"
+          required: false
+          default: 6
+          description: "Number of months to look back (1-12)"
+
+    response:
+      status: 200
+      type: "CostTrendsResponse"
+      schema:
+        months: "string[]"
+        data:
+          - month: "string"
+            material_cost: "number"
+            labor_cost: "number"
+            overhead_cost: "number"
+            total_cost: "number"
+        currency: "string"
+
+    example_response: |
+      {
+        "months": ["2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12"],
+        "data": [
+          {
+            "month": "2025-07",
+            "material_cost": 80.50,
+            "labor_cost": 30.00,
+            "overhead_cost": 15.00,
+            "total_cost": 125.50
+          }
+        ],
+        "currency": "PLN"
+      }
+
+    errors:
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+      - status: 400
+        code: "INVALID_MONTHS"
+        message: "Months must be between 1 and 12"
+      - status: 500
+        code: "COST_TRENDS_FETCH_FAILED"
+        message: "Failed to fetch cost trends"
+
+    cache:
+      key: "org:{orgId}:dashboard:cost-trends"
+      ttl: 300
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/dashboard-service.ts"
+    description: "Dashboard data aggregation and fetching"
+    exports:
+      - name: "fetchDashboardStats"
+        type: "async function"
+        returns: "Promise<DashboardStatsResponse>"
+      - name: "fetchAllergenMatrix"
+        type: "async function"
+        params: ["productType?: string"]
+        returns: "Promise<AllergenMatrixResponse>"
+      - name: "fetchBomTimeline"
+        type: "async function"
+        params: ["productId?: string", "months?: number", "limit?: number"]
+        returns: "Promise<BomTimelineResponse>"
+      - name: "fetchRecentActivity"
+        type: "async function"
+        params: ["limit?: number"]
+        returns: "Promise<RecentActivityResponse>"
+      - name: "fetchCostTrends"
+        type: "async function"
+        params: ["months?: number"]
+        returns: "Promise<CostTrendsResponse>"
+      - name: "exportAllergenMatrixPdf"
+        type: "async function"
+        params: ["data: AllergenMatrixResponse"]
+        returns: "Promise<Blob>"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/dashboard.ts"
+    description: "Dashboard TypeScript interfaces"
+    exports:
+      - "DashboardStatsResponse"
+      - "AllergenMatrixResponse"
+      - "BomTimelineResponse"
+      - "RecentActivityResponse"
+      - "CostTrendsResponse"
+      - "ActivityType"
+      - "EntityType"
+      - "TrendDirection"
+
+# Validation schemas
+validation:
+  - path: "apps/frontend/lib/validation/dashboard.ts"
+    schemas:
+      - name: "dashboardStatsResponseSchema"
+        type: "zod"
+      - name: "allergenMatrixQuerySchema"
+        type: "zod"
+        fields:
+          - "product_type: z.string().uuid().optional()"
+      - name: "bomTimelineQuerySchema"
+        type: "zod"
+        fields:
+          - "product_id: z.string().uuid().optional()"
+          - "months: z.coerce.number().min(1).max(12).default(6)"
+          - "limit: z.coerce.number().min(1).max(100).default(50)"
+      - name: "recentActivityQuerySchema"
+        type: "zod"
+        fields:
+          - "limit: z.coerce.number().min(1).max(100).default(10)"
+      - name: "costTrendsQuerySchema"
+        type: "zod"
+        fields:
+          - "months: z.coerce.number().min(1).max(12).default(6)"
+
+# Implementation patterns
+patterns:
+  api_route: |
+    // apps/frontend/app/api/technical/dashboard/stats/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { getOrgContext } from '@/lib/services/org-context-service';
+    import { hasPermission } from '@/lib/services/permission-service';
+
+    export async function GET() {
+      const context = await getOrgContext();
+      if (!context) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      if (!hasPermission(context, 'technical', 'R')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Fetch stats with parallel queries
+      const [productsResult, bomsResult, routingsResult, costResult] = await Promise.all([
+        supabase.rpc('get_product_stats', { p_org_id: context.org_id }),
+        supabase.rpc('get_bom_stats', { p_org_id: context.org_id }),
+        supabase.rpc('get_routing_stats', { p_org_id: context.org_id }),
+        supabase.rpc('get_avg_cost_with_trend', { p_org_id: context.org_id }),
+      ]);
+
+      return NextResponse.json({
+        products: productsResult.data,
+        boms: bomsResult.data,
+        routings: routingsResult.data,
+        avg_cost: {
+          ...costResult.data,
+          currency: context.organization.currency || 'PLN',
+        },
+      });
+    }
+
+  relative_time: |
+    // Utility function for relative time formatting
+    export function formatRelativeTime(timestamp: string): string {
+      const now = new Date();
+      const date = new Date(timestamp);
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffMins < 60) return `${diffMins} minutes ago`;
+      if (diffHours < 24) return `${diffHours} hours ago`;
+      if (diffDays < 7) return `${diffDays} days ago`;
+      return date.toLocaleDateString();
+    }

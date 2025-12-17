@@ -1,0 +1,303 @@
+# Story 06.2 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/quality-hold-service.test.ts"
+    type: "unit"
+    description: "Unit tests for hold service"
+  - path: "apps/frontend/lib/validation/__tests__/quality-hold-validation.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod schemas"
+  - path: "apps/frontend/app/api/quality/holds/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for API endpoints"
+  - path: "supabase/tests/quality-holds-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for multi-tenant isolation"
+  - path: "apps/frontend/e2e/quality-holds.spec.ts"
+    type: "e2e"
+    description: "E2E tests for hold lifecycle"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  # Hold Creation
+  - id: "AC-2.1"
+    given: "user is on Quality Holds list page"
+    when: "user clicks [+ Create Hold] button"
+    then: "Create Hold modal opens within 200ms"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-2.4"
+    given: "user has completed hold form"
+    when: "user clicks [Create Hold]"
+    then: "hold saved with auto-generated hold_number format 'QH-YYYYMMDD-NNNN'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2.7"
+    given: "user tries to create hold without selecting items"
+    when: "[Create Hold] clicked"
+    then: "validation error 'At least one item must be added to the hold'"
+    test_type: "unit"
+    priority: "P0"
+
+  # LP Blocking (CRITICAL)
+  - id: "AC-2.18"
+    given: "license plate LP-001 is added to active hold"
+    when: "hold saved"
+    then: "LP-001 qa_status updated to 'hold' in license_plates table"
+    test_type: "integration"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-2.19"
+    given: "LP-001 has qa_status 'hold'"
+    when: "user attempts to consume LP-001 in production"
+    then: "system blocks transaction with error 'License plate LP-001 is on quality hold'"
+    test_type: "integration"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-2.20"
+    given: "LP-001 is on hold and hold is released with disposition 'release'"
+    when: "release confirmed"
+    then: "LP-001 qa_status updated to 'passed'"
+    test_type: "integration"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-2.21"
+    given: "LP-001 is on hold and hold is released with disposition 'scrap'"
+    when: "release confirmed"
+    then: "LP-001 qa_status updated to 'scrap' and quantity_available set to 0"
+    test_type: "integration"
+    priority: "P0"
+    critical: true
+
+  # Hold Release
+  - id: "AC-2.14"
+    given: "user confirms release"
+    when: "[Confirm Release] clicked"
+    then: "hold status updated to 'released', released_by/released_at set, disposition saved"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2.16"
+    given: "user tries to release hold without selecting disposition"
+    when: "[Confirm Release] clicked"
+    then: "validation error 'Disposition decision is required'"
+    test_type: "unit"
+    priority: "P0"
+
+  # Hold Aging
+  - id: "AC-2.23"
+    given: "hold with priority 'high' is active for >48 hours"
+    when: "Hold List page loads"
+    then: "hold row displays yellow warning icon with tooltip"
+    test_type: "e2e"
+    priority: "P1"
+
+  - id: "AC-2.24"
+    given: "hold with priority 'critical' is active for >24 hours"
+    when: "Hold List page loads"
+    then: "hold row displays red critical icon"
+    test_type: "e2e"
+    priority: "P1"
+
+  # RLS/Security
+  - id: "AC-RLS-1"
+    given: "user from Org A"
+    when: "querying quality_holds"
+    then: "only holds from Org A returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-RLS-2"
+    given: "user from Org A"
+    when: "requesting hold from Org B by ID"
+    then: "returns 404 Not Found (not 403)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  # Permission
+  - id: "AC-2.34"
+    given: "user without Quality write permission"
+    when: "attempting to create hold via API"
+    then: "API returns 403 Forbidden"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-2.35"
+    given: "user with QA Inspector role"
+    when: "attempting to release hold"
+    then: "[Release Hold] button hidden or API returns 403"
+    test_type: "integration"
+    priority: "P0"
+
+# Unit Test Cases
+unit_tests:
+  quality_hold_service:
+    - name: "createHold creates hold with auto-generated number"
+      setup: "Valid hold data"
+      expected: "Returns hold with hold_number matching QH-YYYYMMDD-NNNN"
+
+    - name: "createHold updates LP qa_status to hold"
+      setup: "Hold with LP reference"
+      expected: "LP qa_status = 'hold' after creation"
+
+    - name: "releaseHold updates status and disposition"
+      setup: "Active hold"
+      expected: "status=released, released_by, released_at, disposition set"
+
+    - name: "releaseHold with disposition 'release' sets LP qa_status to 'passed'"
+      setup: "Hold with LP items, disposition='release'"
+      expected: "All LP qa_status = 'passed'"
+
+    - name: "releaseHold with disposition 'scrap' sets LP qa_status to 'scrap' and qty to 0"
+      setup: "Hold with LP items, disposition='scrap'"
+      expected: "LP qa_status = 'scrap', quantity_available = 0"
+
+    - name: "calculateAgingStatus returns 'critical' for critical priority hold >24h"
+      setup: "priority='critical', held_at=25h ago"
+      expected: "Returns 'critical'"
+
+    - name: "calculateAgingStatus returns 'warning' for high priority hold >24h"
+      setup: "priority='high', held_at=26h ago"
+      expected: "Returns 'warning'"
+
+    - name: "blockLPConsumption returns true if LP is on active hold"
+      setup: "LP with active hold"
+      expected: "Returns true"
+
+  validation:
+    - name: "createHoldSchema accepts valid hold data"
+      input: "{ reason: '10+ chars', hold_type: 'investigation', items: [...] }"
+      expected: "Passes validation"
+
+    - name: "createHoldSchema rejects reason < 10 chars"
+      input: "{ reason: 'short' }"
+      expected: "Fails with 'Reason must be at least 10 characters'"
+
+    - name: "createHoldSchema rejects empty items array"
+      input: "{ items: [] }"
+      expected: "Fails with 'At least one item must be added'"
+
+    - name: "releaseHoldSchema rejects release_notes < 10 chars"
+      input: "{ release_notes: 'short' }"
+      expected: "Fails with 'Release notes must be at least 10 characters'"
+
+# Integration Test Cases
+integration_tests:
+  api_endpoints:
+    - name: "POST /api/quality/holds creates hold and returns 201"
+      setup: "Valid hold data with LP item"
+      expected: "201, hold returned with auto-number, LP qa_status updated"
+
+    - name: "GET /api/quality/holds returns paginated list"
+      setup: "5 holds exist"
+      expected: "200, returns holds with pagination meta"
+
+    - name: "GET /api/quality/holds filters by status"
+      setup: "3 active, 2 released holds"
+      expected: "?status=active returns only 3 active holds"
+
+    - name: "PATCH /api/quality/holds/:id/release updates hold"
+      setup: "Active hold with LP items"
+      expected: "200, hold.status=released, LP qa_status updated per disposition"
+
+    - name: "PATCH /api/quality/holds/:id/release rejects non-QA Manager"
+      setup: "User with qa_inspector role"
+      expected: "403 FORBIDDEN"
+
+  rls_isolation:
+    - name: "User from Org A cannot read holds from Org B"
+      setup: "Org A and Org B with holds"
+      action: "User A queries quality_holds"
+      expected: "Only Org A holds returned"
+
+    - name: "User from Org A cannot update hold from Org B"
+      setup: "Hold in Org B"
+      action: "User A attempts to release Org B hold"
+      expected: "0 rows affected"
+
+# E2E Test Cases
+e2e_tests:
+  hold_lifecycle:
+    - name: "Create hold with 2 LPs"
+      steps:
+        - "Navigate to /quality/holds"
+        - "Click Create Hold"
+        - "Fill form: reason, type, priority"
+        - "Add 2 LP items"
+        - "Submit"
+      expected: "Hold created, success toast, redirected to detail"
+
+    - name: "Verify LPs have qa_status 'hold'"
+      steps:
+        - "Navigate to LP detail page"
+        - "Check QA status badge"
+      expected: "Shows 'On Hold' status"
+
+    - name: "Release hold with disposition 'release'"
+      steps:
+        - "Navigate to hold detail"
+        - "Click Release Hold"
+        - "Select disposition: Approve for use"
+        - "Enter release notes"
+        - "Confirm release"
+      expected: "Hold released, LPs status changed to 'passed'"
+
+    - name: "Verify LP can now be consumed"
+      steps:
+        - "Navigate to production picking"
+        - "Select previously held LP"
+      expected: "LP available for picking"
+
+# Definition of Done
+definition_of_done:
+  - "quality_holds and quality_hold_items tables created with RLS"
+  - "Hold auto-numbering generates QH-YYYYMMDD-NNNN format"
+  - "All API endpoints implemented and tested (>80% coverage)"
+  - "LP blocking logic prevents consumption of LPs on hold"
+  - "Disposition logic correctly updates LP qa_status"
+  - "Holds list displays within 1 second for 100+ holds"
+  - "Aging indicators display correctly"
+  - "Unit tests achieve >80% coverage"
+  - "Integration tests cover all API endpoints"
+  - "E2E test validates full hold lifecycle"
+  - "RLS policies tested for multi-tenant isolation"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Quality-critical code requires high coverage"
+  integration:
+    target: 80
+    reason: "All API endpoints must be tested"
+  critical_paths:
+    - "LP blocking on hold creation: 100%"
+    - "LP status update on hold release: 100%"
+    - "RLS isolation: 100%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "LP blocking logic failure could allow consumption of held inventory"
+    mitigation: "Comprehensive integration tests for all disposition types"
+    severity: "critical"
+
+  - id: "RISK-02"
+    description: "RLS policy misconfiguration could leak hold data across tenants"
+    mitigation: "RLS isolation tests with 2+ org fixtures"
+    severity: "high"
+
+  - id: "RISK-03"
+    description: "Auto-numbering collision on high volume"
+    mitigation: "Database trigger uses row-level lock; tested under load"
+    severity: "medium"

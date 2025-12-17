@@ -1,0 +1,454 @@
+# Story 05.18 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/warehouse/license-plates/validate-merge"
+    description: "Validate if selected LPs are eligible for merge"
+    file: "apps/frontend/app/api/warehouse/license-plates/validate-merge/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body:
+        sourceLpIds:
+          type: "string[]"
+          description: "Array of UUID strings for LPs to merge"
+          validation: "min 2, max 20, all valid UUIDs"
+          example: '["uuid-1", "uuid-2"]'
+
+    response:
+      status: 200
+      schema:
+        valid: "boolean"
+        errors: "string[]"
+        summary:
+          productName: "string"
+          productCode: "string"
+          totalQuantity: "number"
+          uom: "string"
+          batchNumber: "string | null"
+          expiryDate: "string | null"
+          qaStatus: "string"
+          warehouse: "string"
+          lpCount: "number"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Invalid request body"
+        when: "Request validation fails (not UUIDs, less than 2 IDs, etc.)"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "LPs not found: {ids}"
+        when: "One or more LP IDs not found in user's org"
+
+  - method: "POST"
+    path: "/api/warehouse/license-plates/merge"
+    description: "Execute merge operation - combines multiple LPs into one"
+    file: "apps/frontend/app/api/warehouse/license-plates/merge/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "admin", "owner"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body:
+        sourceLpIds:
+          type: "string[]"
+          description: "Array of UUID strings for LPs to merge"
+          validation: "min 2, max 20, all valid UUIDs"
+        targetLocationId:
+          type: "string"
+          description: "Optional target location UUID for new merged LP"
+          validation: "valid UUID, must be in same warehouse as source LPs"
+          optional: true
+
+    response:
+      status: 201
+      schema:
+        newLpId: "string (UUID)"
+        newLpNumber: "string"
+        mergedQuantity: "number"
+        sourceLpIds: "string[]"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Merge validation failed: {errors}"
+        when: "LPs fail merge validation (different product, batch, etc.)"
+      - status: 400
+        code: "INVALID_TARGET_LOCATION"
+        message: "Target location must be in the same warehouse as source LPs"
+        when: "Target location warehouse_id differs from source LPs"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "LPs not found: {ids}"
+        when: "One or more LP IDs not found"
+      - status: 409
+        code: "LP_STATUS_CHANGED"
+        message: "Merge failed: {lp_number} is no longer available (status changed to '{status}')"
+        when: "Race condition - LP status changed during operation"
+      - status: 500
+        code: "MERGE_FAILED"
+        message: "Merge operation failed. Transaction rolled back."
+        when: "Transaction fails for any reason"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/license-plate-service.ts"
+    description: "Extended with merge methods"
+    exports:
+      - name: "validateMerge"
+        type: "static async method"
+        params:
+          - "sourceLpIds: string[]"
+        returns: "Promise<MergeValidationResult>"
+        description: "Validates if LPs are eligible for merge"
+
+      - name: "merge"
+        type: "static async method"
+        params:
+          - "input: MergeInput"
+        returns: "Promise<MergeResult>"
+        description: "Executes merge operation with transaction"
+
+      - name: "getByIds"
+        type: "static async method"
+        params:
+          - "ids: string[]"
+        returns: "Promise<LicensePlate[]>"
+        description: "Fetches multiple LPs by ID array"
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/license-plate.ts"
+    description: "Extended merge types"
+    interfaces:
+      MergeValidationResult:
+        valid: "boolean"
+        errors: "string[]"
+        summary: "MergeSummary | null"
+
+      MergeSummary:
+        productId: "string"
+        productName: "string"
+        productCode: "string"
+        totalQuantity: "number"
+        uom: "string"
+        batchNumber: "string | null"
+        expiryDate: "string | null"
+        qaStatus: "QAStatus"
+        warehouseId: "string"
+        warehouseName: "string"
+        lpCount: "number"
+
+      MergeInput:
+        sourceLpIds: "string[]"
+        targetLocationId: "string | undefined"
+
+      MergeResult:
+        newLpId: "string"
+        newLpNumber: "string"
+        mergedQuantity: "number"
+        sourceLpIds: "string[]"
+
+# Validation schemas (Zod)
+validation:
+  - path: "apps/frontend/lib/validation/license-plate.ts"
+    schemas:
+      validateMergeSchema:
+        content: |
+          z.object({
+            sourceLpIds: z.array(z.string().uuid('Invalid LP ID'))
+              .min(2, 'At least 2 LPs required for merge')
+              .max(20, 'Maximum 20 LPs can be merged at once'),
+          })
+
+      mergeLPSchema:
+        content: |
+          z.object({
+            sourceLpIds: z.array(z.string().uuid('Invalid LP ID'))
+              .min(2, 'At least 2 LPs required for merge')
+              .max(20, 'Maximum 20 LPs can be merged at once'),
+            targetLocationId: z.string().uuid('Invalid location ID').optional(),
+          })
+
+# Implementation patterns
+patterns:
+  validate_merge_route: |
+    // apps/frontend/app/api/warehouse/license-plates/validate-merge/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { validateMergeSchema } from '@/lib/validation/license-plate';
+    import { LicensePlateService } from '@/lib/services/license-plate-service';
+
+    export async function POST(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const body = await request.json();
+      const validation = validateMergeSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: 'Invalid request body', details: validation.error.errors },
+          { status: 400 }
+        );
+      }
+
+      const result = await LicensePlateService.validateMerge(validation.data.sourceLpIds);
+      return NextResponse.json(result);
+    }
+
+  merge_route: |
+    // apps/frontend/app/api/warehouse/license-plates/merge/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextResponse } from 'next/server';
+    import { mergeLPSchema } from '@/lib/validation/license-plate';
+    import { LicensePlateService } from '@/lib/services/license-plate-service';
+
+    export async function POST(request: Request) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const body = await request.json();
+      const validation = mergeLPSchema.safeParse(body);
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: 'Invalid request body', details: validation.error.errors },
+          { status: 400 }
+        );
+      }
+
+      try {
+        const result = await LicensePlateService.merge(validation.data);
+        return NextResponse.json(result, { status: 201 });
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        if (error instanceof ConflictError) {
+          return NextResponse.json({ error: error.message }, { status: 409 });
+        }
+        return NextResponse.json(
+          { error: 'Merge operation failed. Transaction rolled back.' },
+          { status: 500 }
+        );
+      }
+    }
+
+  service_validate_merge: |
+    // In apps/frontend/lib/services/license-plate-service.ts
+
+    static async validateMerge(sourceLpIds: string[]): Promise<MergeValidationResult> {
+      // 1. Check minimum 2 LPs
+      if (sourceLpIds.length < 2) {
+        return {
+          valid: false,
+          errors: ['At least 2 LPs required for merge operation'],
+          summary: null,
+        };
+      }
+
+      // 2. Fetch all LPs with product/warehouse info
+      const lps = await this.getByIds(sourceLpIds);
+
+      // 3. Check all LPs found
+      const missingIds = sourceLpIds.filter(id => !lps.find(lp => lp.id === id));
+      if (missingIds.length > 0) {
+        return {
+          valid: false,
+          errors: [`LPs not found: ${missingIds.join(', ')}`],
+          summary: null,
+        };
+      }
+
+      const errors: string[] = [];
+
+      // 4. Validate same product
+      const productIds = [...new Set(lps.map(lp => lp.product_id))];
+      if (productIds.length > 1) {
+        errors.push('All LPs must be the same product for merge');
+      }
+
+      // 5. Validate same batch (NULL counts as a value)
+      const batches = [...new Set(lps.map(lp => lp.batch_number ?? 'NULL'))];
+      if (batches.length > 1) {
+        errors.push('All LPs must have the same batch number for merge');
+      }
+
+      // 6. Validate same expiry (NULL counts as a value)
+      const expiries = [...new Set(lps.map(lp => lp.expiry_date ?? 'NULL'))];
+      if (expiries.length > 1) {
+        errors.push('All LPs must have the same expiry date for merge');
+      }
+
+      // 7. Validate same QA status
+      const qaStatuses = [...new Set(lps.map(lp => lp.qa_status))];
+      if (qaStatuses.length > 1) {
+        errors.push('All LPs must have the same QA status for merge');
+      }
+
+      // 8. Validate all available
+      const nonAvailable = lps.filter(lp => lp.status !== 'available');
+      if (nonAvailable.length > 0) {
+        const lpNumbers = nonAvailable.map(lp => `${lp.lp_number} (${lp.status})`).join(', ');
+        errors.push(`All LPs must have status='available'. Non-available: ${lpNumbers}`);
+      }
+
+      // 9. Validate same warehouse
+      const warehouseIds = [...new Set(lps.map(lp => lp.warehouse_id))];
+      if (warehouseIds.length > 1) {
+        errors.push('All LPs must be in the same warehouse for merge');
+      }
+
+      // 10. Validate same UoM
+      const uoms = [...new Set(lps.map(lp => lp.uom))];
+      if (uoms.length > 1) {
+        errors.push('All LPs must have the same UoM for merge');
+      }
+
+      if (errors.length > 0) {
+        return { valid: false, errors, summary: null };
+      }
+
+      // Build summary
+      const firstLP = lps[0];
+      const totalQuantity = lps.reduce((sum, lp) => sum + lp.quantity, 0);
+
+      return {
+        valid: true,
+        errors: [],
+        summary: {
+          productId: firstLP.product_id,
+          productName: firstLP.product?.name || '',
+          productCode: firstLP.product?.code || '',
+          totalQuantity,
+          uom: firstLP.uom,
+          batchNumber: firstLP.batch_number,
+          expiryDate: firstLP.expiry_date,
+          qaStatus: firstLP.qa_status,
+          warehouseId: firstLP.warehouse_id,
+          warehouseName: firstLP.warehouse?.name || '',
+          lpCount: lps.length,
+        },
+      };
+    }
+
+  service_merge: |
+    // In apps/frontend/lib/services/license-plate-service.ts
+
+    static async merge(input: MergeInput): Promise<MergeResult> {
+      const { sourceLpIds, targetLocationId } = input;
+
+      // 1. Validate merge
+      const validation = await this.validateMerge(sourceLpIds);
+      if (!validation.valid) {
+        throw new ValidationError(`Merge validation failed: ${validation.errors.join('; ')}`);
+      }
+
+      const { summary } = validation;
+      if (!summary) {
+        throw new Error('Validation summary missing');
+      }
+
+      // 2. Fetch source LPs
+      const sourceLPs = await this.getByIds(sourceLpIds);
+
+      // 3. Determine target location
+      const locationId = targetLocationId || sourceLPs[0].location_id;
+
+      // 4. Validate target location is in same warehouse
+      if (targetLocationId) {
+        const location = await LocationService.getById(targetLocationId);
+        if (location.warehouse_id !== summary.warehouseId) {
+          throw new ValidationError('Target location must be in the same warehouse as source LPs');
+        }
+      }
+
+      // 5. Execute transaction
+      const supabase = createClientComponentClient();
+
+      // Create new merged LP
+      const { data: newLP, error: createError } = await supabase
+        .from('license_plates')
+        .insert({
+          org_id: sourceLPs[0].org_id,
+          product_id: summary.productId,
+          quantity: summary.totalQuantity,
+          uom: summary.uom,
+          location_id: locationId,
+          warehouse_id: summary.warehouseId,
+          status: 'available',
+          qa_status: summary.qaStatus,
+          batch_number: summary.batchNumber,
+          expiry_date: summary.expiryDate,
+          source: 'merge',
+          parent_lp_id: sourceLPs[0].id,
+          manufacture_date: sourceLPs[0].manufacture_date,
+          created_by: await getUserId(),
+        })
+        .select()
+        .single();
+
+      if (createError || !newLP) {
+        throw new Error('Failed to create merged LP');
+      }
+
+      // Mark source LPs as consumed
+      const { error: updateError } = await supabase
+        .from('license_plates')
+        .update({
+          status: 'consumed',
+          consumed_by_wo_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', sourceLpIds);
+
+      if (updateError) {
+        // Rollback: delete the new LP
+        await supabase.from('license_plates').delete().eq('id', newLP.id);
+        throw new Error('Failed to update source LPs');
+      }
+
+      // Create genealogy links (uses Story 05.2 service)
+      try {
+        await LPGenealogyService.linkMerge(sourceLpIds, newLP.id);
+      } catch (genealogyError) {
+        // Rollback: restore source LPs, delete new LP
+        await supabase
+          .from('license_plates')
+          .update({ status: 'available', consumed_by_wo_id: null })
+          .in('id', sourceLpIds);
+        await supabase.from('license_plates').delete().eq('id', newLP.id);
+        throw new Error('Failed to create genealogy links');
+      }
+
+      return {
+        newLpId: newLP.id,
+        newLpNumber: newLP.lp_number,
+        mergedQuantity: summary.totalQuantity,
+        sourceLpIds,
+      };
+    }

@@ -1,0 +1,585 @@
+# Story 03.8 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# ============================================================================
+# TEST FILES TO CREATE
+# ============================================================================
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/transfer-order-service.test.ts"
+    type: "unit"
+    description: "Unit tests for transfer order service"
+    coverage_target: 80
+
+  - path: "apps/frontend/lib/validation/__tests__/transfer-order.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schemas"
+    coverage_target: 95
+
+  - path: "apps/frontend/app/api/planning/transfer-orders/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for TO API endpoints"
+    coverage_target: 80
+
+  - path: "apps/frontend/app/api/planning/transfer-orders/[id]/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for TO detail endpoints"
+    coverage_target: 80
+
+  - path: "apps/frontend/app/api/planning/transfer-orders/[id]/lines/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for TO lines endpoints"
+    coverage_target: 80
+
+  - path: "supabase/tests/transfer-orders-rls.test.sql"
+    type: "integration"
+    description: "RLS policy tests for transfer orders"
+    coverage_target: 100
+
+  - path: "apps/frontend/e2e/planning/transfer-orders.spec.ts"
+    type: "e2e"
+    description: "End-to-end tests for TO workflows"
+
+# ============================================================================
+# ACCEPTANCE CRITERIA (From Story)
+# ============================================================================
+acceptance_criteria:
+  # AC-1: TO List Page
+  - id: "AC-01"
+    title: "TO List Page (FR-PLAN-012)"
+    given: "planner navigates to /planning/transfer-orders"
+    when: "page loads"
+    then:
+      - "TO list displays within 300ms"
+      - "table shows columns: TO Number, From Warehouse, To Warehouse, Planned Ship Date, Status, Priority, Created Date"
+      - "search box filters by TO number"
+      - "filter dropdowns for: Status, From Warehouse, To Warehouse, Priority"
+      - "sort works on all columns"
+      - "pagination shows 20 TOs per page"
+    test_type: "e2e"
+    priority: "P0"
+    wireframe: "PLAN-010"
+
+  # AC-2: Create TO Header
+  - id: "AC-02"
+    title: "Create TO Header (FR-PLAN-012)"
+    given: "planner clicks '+ New Transfer Order'"
+    when: "modal opens"
+    then:
+      - "form displays fields: From Warehouse, To Warehouse, Planned Ship Date, Planned Receive Date, Priority, Notes"
+      - "TO number is auto-generated on save (TO-YYYY-NNNNN format)"
+      - "status defaults to 'draft'"
+      - "on save, redirects to TO detail page"
+    test_type: "e2e"
+    priority: "P0"
+    wireframe: "PLAN-011"
+
+  # AC-3: Warehouse Validation
+  - id: "AC-03"
+    title: "Warehouse Validation (FR-PLAN-012)"
+    given: "user selects same warehouse in From and To fields"
+    when: "save attempted"
+    then:
+      - "error displays: 'From Warehouse and To Warehouse must be different'"
+      - "form submission blocked"
+    test_type: "unit"
+    priority: "P0"
+
+  # AC-4: Date Validation
+  - id: "AC-04"
+    title: "Planned Receive Date Validation (FR-PLAN-012)"
+    given: "user selects Planned Receive Date earlier than Planned Ship Date"
+    when: "save attempted"
+    then:
+      - "error displays: 'Planned Receive Date must be on or after Planned Ship Date'"
+      - "form submission blocked"
+    test_type: "unit"
+    priority: "P0"
+
+  # AC-5: Add TO Lines
+  - id: "AC-05"
+    title: "Add TO Lines (FR-PLAN-013)"
+    given: "TO detail page open with status = 'draft' or 'planned'"
+    when: "planner clicks '+ Add Line'"
+    then:
+      - "modal/inline row appears with: Product dropdown, Quantity input, UOM (readonly)"
+      - "Line Number auto-incremented"
+      - "on save, line added to TO"
+      - "line appears in lines table immediately"
+    test_type: "e2e"
+    priority: "P0"
+    wireframe: "PLAN-011"
+
+  # AC-6: Edit TO Line
+  - id: "AC-06"
+    title: "Edit TO Line (FR-PLAN-013)"
+    given: "TO line exists with shipped_qty = 0"
+    when: "planner clicks 'Edit' on line"
+    then:
+      - "edit mode activates"
+      - "can modify: Quantity, Notes"
+      - "cannot modify: Product, UOM, Line Number"
+      - "on save, changes persist"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-7: Delete TO Line
+  - id: "AC-07"
+    title: "Delete TO Line (FR-PLAN-013)"
+    given: "TO line exists with shipped_qty = 0"
+    when: "planner clicks 'Delete' on line"
+    then:
+      - "confirmation dialog displays"
+      - "on confirm, line removed"
+      - "subsequent lines renumbered"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-7b: Cannot Delete Shipped Line
+  - id: "AC-07b"
+    title: "Cannot Delete Shipped Line"
+    given: "TO line has shipped_qty > 0"
+    when: "planner attempts to delete"
+    then:
+      - "error displays: 'Cannot delete line that has been partially or fully shipped'"
+      - "delete action disabled or hidden"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-8: Duplicate Product Prevention
+  - id: "AC-08"
+    title: "Duplicate Product Prevention (FR-PLAN-013)"
+    given: "TO already has line with Product A"
+    when: "planner adds another line with Product A"
+    then:
+      - "error displays: 'Product already exists on this TO. Update the existing line instead.'"
+      - "line save blocked"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-9: Release TO
+  - id: "AC-09"
+    title: "TO Status Lifecycle - Draft to Planned (FR-PLAN-014)"
+    given: "TO with status = 'draft' and lines.length > 0"
+    when: "planner clicks 'Release TO'"
+    then:
+      - "confirmation dialog displays"
+      - "on confirm, status changes to 'planned'"
+      - "toast displays: 'Transfer Order released successfully'"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-9b: Cannot Release Empty TO
+  - id: "AC-09b"
+    title: "Cannot Release TO with No Lines"
+    given: "TO with status = 'draft' and lines.length = 0"
+    when: "planner clicks 'Release TO'"
+    then:
+      - "error displays: 'Cannot release TO with no lines. Add at least one line.'"
+      - "status remains 'draft'"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-13: Cancel TO
+  - id: "AC-13"
+    title: "Cancel TO (FR-PLAN-012)"
+    given: "TO with status = 'draft' or 'planned'"
+    when: "planner clicks 'Cancel TO'"
+    then:
+      - "confirmation dialog displays"
+      - "on confirm, status changes to 'cancelled'"
+      - "TO becomes read-only"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-13b: Cannot Cancel Shipped TO
+  - id: "AC-13b"
+    title: "Cannot Cancel Shipped TO"
+    given: "TO with status = 'shipped' or 'received'"
+    when: "planner attempts to cancel"
+    then:
+      - "error displays: 'Cannot cancel TO that has been shipped or received'"
+      - "cancel action disabled or hidden"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-14: Edit TO Header
+  - id: "AC-14"
+    title: "Edit TO Header (FR-PLAN-012)"
+    given: "TO with status = 'draft' or 'planned'"
+    when: "planner edits TO header and saves"
+    then:
+      - "changes persist"
+      - "updated_at timestamp updated"
+    test_type: "e2e"
+    priority: "P0"
+
+  # AC-14b: Cannot Edit After Shipment
+  - id: "AC-14b"
+    title: "Cannot Edit TO After Shipment"
+    given: "TO with status = 'shipped', 'received', or 'closed'"
+    when: "planner attempts to edit header"
+    then:
+      - "form fields disabled"
+      - "tooltip: 'Cannot edit TO after shipment'"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-15: Permission Enforcement
+  - id: "AC-15"
+    title: "Permission Enforcement"
+    given: "user has ADMIN or WH_MANAGER role"
+    when: "accessing /planning/transfer-orders"
+    then: "can create, edit, delete, release TOs"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-15b"
+    title: "Read-Only for Viewer"
+    given: "user has PROD_MANAGER or VIEWER role"
+    when: "accessing /planning/transfer-orders"
+    then:
+      - "can view TO list and detail"
+      - "'New Transfer Order' button hidden"
+      - "edit/delete/release actions hidden"
+    test_type: "integration"
+    priority: "P0"
+
+  # AC-16: Multi-tenancy
+  - id: "AC-16"
+    title: "Multi-tenancy (RLS)"
+    given: "User A from Org A"
+    when: "requesting /api/planning/transfer-orders"
+    then: "only Org A TOs returned"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-16b"
+    title: "Cross-tenant Access Returns 404"
+    given: "User A from Org A"
+    when: "requesting TO ID from Org B"
+    then: "404 Not Found returned (not 403 to avoid leaking existence)"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# ============================================================================
+# UNIT TEST CASES
+# ============================================================================
+unit_tests:
+  transfer_order_service:
+    - name: "list returns paginated TOs for current org"
+      setup: "Mock Supabase with 3 TOs"
+      expected: "Returns array with pagination metadata"
+
+    - name: "getById returns TO with lines"
+      setup: "Mock TO with 2 lines"
+      expected: "Returns TransferOrderWithLines object"
+
+    - name: "getById returns null for non-existent TO"
+      setup: "Mock empty response"
+      expected: "Returns null"
+
+    - name: "create validates warehouse difference"
+      setup: "Same from/to warehouse IDs"
+      expected: "Throws validation error"
+
+    - name: "create validates date range"
+      setup: "Receive date before ship date"
+      expected: "Throws validation error"
+
+    - name: "release validates TO has lines"
+      setup: "TO with 0 lines"
+      expected: "Throws error 'Cannot release TO with no lines'"
+
+    - name: "release changes status from draft to planned"
+      setup: "Draft TO with 2 lines"
+      expected: "Status updated to 'planned'"
+
+    - name: "cancel validates TO status is draft or planned"
+      setup: "TO with status 'shipped'"
+      expected: "Throws error 'Cannot cancel TO that has been shipped'"
+
+    - name: "addLine validates no duplicate products"
+      setup: "TO with existing product"
+      expected: "Throws error 'Product already exists on this TO'"
+
+    - name: "deleteLine validates shipped_qty is 0"
+      setup: "Line with shipped_qty > 0"
+      expected: "Throws error 'Cannot delete shipped line'"
+
+  validation_schemas:
+    - name: "createTransferOrderSchema validates required fields"
+      setup: "Empty object"
+      expected: "Returns errors for from_warehouse_id, to_warehouse_id, dates"
+
+    - name: "createTransferOrderSchema rejects same warehouses"
+      setup: "Same from/to warehouse ID"
+      expected: "Error on to_warehouse_id path"
+
+    - name: "createTransferOrderSchema rejects invalid date range"
+      setup: "Receive date before ship date"
+      expected: "Error on planned_receive_date path"
+
+    - name: "createTOLineSchema validates positive quantity"
+      setup: "quantity: -1"
+      expected: "Error 'Quantity must be greater than 0'"
+
+    - name: "updateTOLineSchema allows partial updates"
+      setup: "Only quantity provided"
+      expected: "Passes validation"
+
+# ============================================================================
+# INTEGRATION TEST CASES
+# ============================================================================
+integration_tests:
+  api_transfer_orders:
+    - name: "GET /api/planning/transfer-orders returns paginated list"
+      setup: "Create 25 TOs"
+      action: "GET with page=1, limit=20"
+      expected: "Returns 20 TOs with meta.total=25"
+
+    - name: "GET /api/planning/transfer-orders filters by status"
+      setup: "Create TOs with different statuses"
+      action: "GET with status=draft"
+      expected: "Returns only draft TOs"
+
+    - name: "GET /api/planning/transfer-orders searches by to_number"
+      setup: "Create TO-2024-00001, TO-2024-00002"
+      action: "GET with search=00001"
+      expected: "Returns only TO-2024-00001"
+
+    - name: "POST /api/planning/transfer-orders creates TO with lines"
+      setup: "Valid request body with 2 lines"
+      action: "POST"
+      expected: "Returns 201 with TO number generated"
+
+    - name: "POST /api/planning/transfer-orders rejects same warehouse"
+      setup: "Same from/to warehouse"
+      action: "POST"
+      expected: "Returns 400 SAME_WAREHOUSE"
+
+    - name: "GET /api/planning/transfer-orders/:id returns TO with lines"
+      setup: "Create TO with 3 lines"
+      action: "GET by ID"
+      expected: "Returns TO with lines array"
+
+    - name: "GET /api/planning/transfer-orders/:id returns 404 for other org"
+      setup: "Create TO in Org B"
+      action: "GET from Org A user"
+      expected: "Returns 404"
+
+    - name: "PUT /api/planning/transfer-orders/:id updates header"
+      setup: "Draft TO"
+      action: "PUT with new priority"
+      expected: "Returns updated TO"
+
+    - name: "PUT /api/planning/transfer-orders/:id rejects shipped TO"
+      setup: "Shipped TO"
+      action: "PUT"
+      expected: "Returns 400 CANNOT_EDIT_STATUS"
+
+  api_transfer_order_lines:
+    - name: "POST /api/planning/transfer-orders/:id/lines adds line"
+      setup: "Draft TO, valid product"
+      action: "POST with product_id, quantity"
+      expected: "Returns 201 with line_number assigned"
+
+    - name: "POST /api/planning/transfer-orders/:id/lines rejects duplicate product"
+      setup: "TO with existing product"
+      action: "POST same product"
+      expected: "Returns 400 DUPLICATE_PRODUCT"
+
+    - name: "PUT /api/planning/transfer-orders/:id/lines/:lineId updates line"
+      setup: "Draft TO line"
+      action: "PUT with new quantity"
+      expected: "Returns updated line"
+
+    - name: "DELETE /api/planning/transfer-orders/:id/lines/:lineId removes line"
+      setup: "Draft TO line"
+      action: "DELETE"
+      expected: "Returns 200, line removed"
+
+    - name: "DELETE rejects shipped line"
+      setup: "Line with shipped_qty > 0"
+      action: "DELETE"
+      expected: "Returns 400 CANNOT_DELETE_LINE"
+
+  api_actions:
+    - name: "POST /api/planning/transfer-orders/:id/release changes to planned"
+      setup: "Draft TO with lines"
+      action: "POST release"
+      expected: "Status = planned"
+
+    - name: "POST /api/planning/transfer-orders/:id/release rejects empty TO"
+      setup: "Draft TO with 0 lines"
+      action: "POST release"
+      expected: "Returns 400 NO_LINES"
+
+    - name: "POST /api/planning/transfer-orders/:id/cancel changes to cancelled"
+      setup: "Planned TO"
+      action: "POST cancel"
+      expected: "Status = cancelled"
+
+    - name: "POST /api/planning/transfer-orders/:id/cancel rejects shipped TO"
+      setup: "Shipped TO"
+      action: "POST cancel"
+      expected: "Returns 400 CANNOT_CANCEL"
+
+  rls_policies:
+    - name: "User can only read TOs from own org"
+      setup: "Create Org A TO, Org B TO"
+      action: "Org A user queries transfer_orders"
+      expected: "Only Org A TO returned"
+
+    - name: "Admin can create TO"
+      setup: "Admin user"
+      action: "INSERT into transfer_orders"
+      expected: "Insert succeeds"
+
+    - name: "Viewer cannot create TO"
+      setup: "Viewer user"
+      action: "INSERT into transfer_orders"
+      expected: "Insert blocked by RLS"
+
+    - name: "WH_MANAGER can update TO"
+      setup: "WH_MANAGER user, draft TO"
+      action: "UPDATE transfer_orders"
+      expected: "Update succeeds"
+
+    - name: "Cross-tenant write blocked"
+      setup: "Org A admin, Org B TO"
+      action: "UPDATE Org B TO"
+      expected: "0 rows affected"
+
+# ============================================================================
+# E2E TEST CASES
+# ============================================================================
+e2e_tests:
+  - name: "Create TO with lines workflow"
+    steps:
+      - "Navigate to /planning/transfer-orders"
+      - "Click 'New Transfer Order'"
+      - "Select From Warehouse"
+      - "Select To Warehouse (different)"
+      - "Select dates"
+      - "Click Save"
+      - "Verify redirect to detail page"
+      - "Click 'Add Line'"
+      - "Select product, enter quantity"
+      - "Click Save"
+      - "Verify line appears in table"
+    expected: "TO created with 1 line"
+
+  - name: "Release TO workflow"
+    steps:
+      - "Create draft TO with 2 lines"
+      - "Navigate to TO detail"
+      - "Click 'Release TO' button"
+      - "Confirm in dialog"
+      - "Verify status badge shows 'Planned'"
+      - "Verify edit button hidden"
+    expected: "TO status changed to planned"
+
+  - name: "Cancel TO workflow"
+    steps:
+      - "Create planned TO"
+      - "Navigate to TO detail"
+      - "Click 'Cancel TO' from actions menu"
+      - "Confirm in dialog"
+      - "Verify status badge shows 'Cancelled'"
+      - "Verify TO is read-only"
+    expected: "TO status changed to cancelled"
+
+  - name: "Filter and search TOs"
+    steps:
+      - "Create 5 TOs with different statuses"
+      - "Navigate to /planning/transfer-orders"
+      - "Filter by status = draft"
+      - "Verify only draft TOs shown"
+      - "Clear filter"
+      - "Search by TO number"
+      - "Verify only matching TO shown"
+    expected: "Filters work correctly"
+
+  - name: "Permission enforcement - Viewer cannot edit"
+    steps:
+      - "Login as Viewer user"
+      - "Navigate to /planning/transfer-orders"
+      - "Verify 'New Transfer Order' button hidden"
+      - "Navigate to TO detail"
+      - "Verify edit/delete/release actions hidden"
+    expected: "Read-only access enforced"
+
+# ============================================================================
+# DEFINITION OF DONE
+# ============================================================================
+definition_of_done:
+  - "Database migration creates transfer_orders and transfer_order_lines tables"
+  - "All DB constraints enforced (warehouses_different, dates_valid, no duplicate products)"
+  - "RLS policies enforce org isolation and role permissions"
+  - "TO number auto-generation trigger works (TO-YYYY-NNNNN format)"
+  - "All 8+ API endpoints implemented and documented"
+  - "Zod schemas validate all inputs"
+  - "transfer-order-service.ts implements all methods"
+  - "TO list page renders with DataTable"
+  - "Create/Edit modal with warehouse dropdowns"
+  - "TO detail page shows header + lines table"
+  - "Add/Edit/Delete line functionality works"
+  - "Line renumbering on delete works correctly"
+  - "Duplicate product prevention enforced"
+  - "Status lifecycle (draft -> planned -> cancelled) works"
+  - "Release TO validates lines.length > 0"
+  - "Cancel TO validates status in (draft, planned)"
+  - "Edit restrictions by status enforced"
+  - "Permission matrix implemented"
+  - "Multi-tenancy: cross-org returns 404"
+  - "Unit tests >= 80% coverage"
+  - "Integration tests for all endpoints"
+  - "E2E tests for critical flows"
+  - "Loading, empty, error states implemented"
+  - "Toast notifications on success/error"
+  - "Accessibility: keyboard nav, ARIA labels"
+  - "Performance: List loads in <300ms"
+
+# ============================================================================
+# COVERAGE REQUIREMENTS
+# ============================================================================
+coverage:
+  unit:
+    target: 80
+    reason: "Business logic coverage"
+  integration:
+    target: 80
+    reason: "API endpoint coverage"
+  rls:
+    target: 100
+    reason: "Security critical - all policies tested"
+  files:
+    - "lib/services/transfer-order-service.ts: 80%"
+    - "lib/validation/transfer-order.ts: 95%"
+    - "API routes: 80%"
+    - "RLS policies: 100%"
+
+# ============================================================================
+# RISKS
+# ============================================================================
+risks:
+  - id: "RISK-01"
+    description: "RLS policy misconfiguration could leak data across orgs"
+    mitigation: "Comprehensive integration tests with 2+ org fixtures"
+    severity: "high"
+    test_coverage: "integration_tests.rls_policies"
+
+  - id: "RISK-02"
+    description: "TO number collision during high concurrency"
+    mitigation: "Use PostgreSQL sequence or FOR UPDATE lock in trigger"
+    severity: "medium"
+    test_coverage: "Unit test with mocked concurrent inserts"
+
+  - id: "RISK-03"
+    description: "Line renumbering edge cases"
+    mitigation: "Test delete first, middle, last line scenarios"
+    severity: "low"
+    test_coverage: "integration_tests.api_transfer_order_lines"

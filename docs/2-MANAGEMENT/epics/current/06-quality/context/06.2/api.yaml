@@ -1,0 +1,158 @@
+# Story 06.2 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "GET"
+    path: "/api/quality/holds"
+    description: "Returns paginated list of holds with filters"
+    file: "apps/frontend/app/api/quality/holds/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "production_lead", "admin", "owner"]
+    request:
+      query_params:
+        status: "string (optional) - active|released|disposed"
+        priority: "string (optional) - low|medium|high|critical"
+        hold_type: "string (optional) - qa_pending|investigation|recall|quarantine"
+        search: "string (optional) - searches hold_number, reason"
+        page: "number (default: 1)"
+        limit: "number (default: 20)"
+        sort: "string (default: held_at)"
+        order: "string (default: desc)"
+    response:
+      status: 200
+      schema:
+        holds: "QualityHoldSummary[]"
+        pagination: "{ total, page, limit, total_pages }"
+        filters_applied: "object"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+
+  - method: "GET"
+    path: "/api/quality/holds/:id"
+    description: "Returns hold detail with items and NCR info"
+    file: "apps/frontend/app/api/quality/holds/[id]/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "production_lead", "admin", "owner"]
+    response:
+      status: 200
+      schema:
+        hold: "QualityHold"
+        items: "QualityHoldItem[]"
+        ncr: "{ id, ncr_number, title, status } | null"
+    errors:
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 404, code: "NOT_FOUND", message: "Hold not found", when: "Hold does not exist or belongs to different org" }
+
+  - method: "POST"
+    path: "/api/quality/holds"
+    description: "Creates new hold with items, updates LP qa_status"
+    file: "apps/frontend/app/api/quality/holds/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "admin", "owner"]
+    request:
+      body:
+        reason: "string (required, 10-500 chars)"
+        hold_type: "string (required) - qa_pending|investigation|recall|quarantine"
+        priority: "string (optional, default: medium) - low|medium|high|critical"
+        items: "array (required, min 1) - { reference_type, reference_id, quantity_held?, uom?, notes? }[]"
+    response:
+      status: 201
+      schema:
+        hold: "QualityHold"
+        items: "QualityHoldItem[]"
+        lp_updates: "{ lp_id, lp_number, previous_status, new_status }[] | null"
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Reason must be 10-500 characters" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "At least one item must be added to the hold" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Insufficient permissions to create quality holds" }
+
+  - method: "PATCH"
+    path: "/api/quality/holds/:id/release"
+    description: "Releases hold with disposition, updates LP qa_status"
+    file: "apps/frontend/app/api/quality/holds/[id]/release/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+    request:
+      body:
+        disposition: "string (required) - release|rework|scrap|return"
+        release_notes: "string (required, 10-1000 chars)"
+    response:
+      status: 200
+      schema:
+        hold: "QualityHold"
+        lp_updates: "{ lp_id, lp_number, previous_status, new_status, disposition_action }[] | null"
+    errors:
+      - { status: 400, code: "VALIDATION_ERROR", message: "Disposition decision is required" }
+      - { status: 400, code: "VALIDATION_ERROR", message: "Release notes must be 10-1000 characters" }
+      - { status: 400, code: "INVALID_STATUS", message: "Cannot release hold with status: {status}" }
+      - { status: 401, code: "UNAUTHORIZED", message: "Unauthorized" }
+      - { status: 403, code: "FORBIDDEN", message: "Only QA Managers can release holds" }
+      - { status: 404, code: "NOT_FOUND", message: "Hold not found" }
+
+  - method: "GET"
+    path: "/api/quality/holds/active"
+    description: "Returns active holds only with aging summary"
+    file: "apps/frontend/app/api/quality/holds/active/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "production_lead", "admin", "owner"]
+    response:
+      status: 200
+      schema:
+        holds: "QualityHoldSummary[]"
+        aging_summary: "{ normal, warning, critical }"
+
+  - method: "GET"
+    path: "/api/quality/holds/stats"
+    description: "Returns hold statistics for dashboard"
+    file: "apps/frontend/app/api/quality/holds/stats/route.ts"
+    auth: "required"
+    roles: ["qa_inspector", "qa_manager", "quality_director", "admin", "owner"]
+    response:
+      status: 200
+      schema:
+        active_count: "number"
+        released_today: "number"
+        aging_critical: "number"
+        by_priority: "{ low, medium, high, critical }"
+        by_type: "{ qa_pending, investigation, recall, quarantine }"
+        avg_resolution_time_hours: "number"
+
+  - method: "DELETE"
+    path: "/api/quality/holds/:id"
+    description: "Soft-delete hold (only if status = active and no items)"
+    file: "apps/frontend/app/api/quality/holds/[id]/route.ts"
+    auth: "required"
+    roles: ["qa_manager", "quality_director", "admin", "owner"]
+    response:
+      status: 204
+    errors:
+      - { status: 400, code: "CANNOT_DELETE", message: "Cannot delete hold with items" }
+      - { status: 400, code: "CANNOT_DELETE", message: "Cannot delete released hold" }
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/quality-hold-service.ts"
+    description: "Quality hold CRUD operations with LP blocking"
+    exports:
+      - { name: "QualityHoldService", type: "class", description: "Static methods for hold operations" }
+      - { name: "createHold", type: "async function", description: "Creates hold and updates LP qa_status" }
+      - { name: "releaseHold", type: "async function", description: "Releases hold with disposition logic" }
+      - { name: "getActiveHolds", type: "async function", description: "Returns active holds with aging" }
+      - { name: "calculateAgingStatus", type: "function", description: "Returns normal|warning|critical based on priority/time" }
+      - { name: "blockLPConsumption", type: "async function", description: "Check if LP is on active hold" }
+
+# Types
+types:
+  - path: "apps/frontend/lib/types/quality-hold.ts"
+    exports:
+      - "QualityHold"
+      - "QualityHoldSummary"
+      - "QualityHoldItem"
+      - "HoldType"
+      - "HoldStatus"
+      - "HoldPriority"
+      - "Disposition"
+      - "CreateHoldRequest"
+      - "ReleaseHoldRequest"

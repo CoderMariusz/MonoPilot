@@ -1,0 +1,218 @@
+# Story 03.14 - Frontend Specification
+# Purpose: Types, hooks, components for WO scheduling
+# Agent: FRONTEND-DEV (UI focus)
+
+# TypeScript Types
+types:
+  - path: "apps/frontend/lib/types/work-order.ts"
+    additions: |
+      // Add to existing WorkOrder interface if not present
+      export interface WorkOrder {
+        // ... existing fields ...
+        planned_start_date: string;
+        planned_end_date: string | null;
+        scheduled_start_time: string | null;
+        scheduled_end_time: string | null;
+        production_line_id: string | null;
+        machine_id: string | null;
+        // Relations
+        line?: {
+          id: string;
+          name: string;
+        } | null;
+        machine?: {
+          id: string;
+          name: string;
+        } | null;
+      }
+
+      // Schedule input type
+      export interface ScheduleWOInput {
+        planned_start_date?: string;
+        planned_end_date?: string | null;
+        scheduled_start_time?: string | null;
+        scheduled_end_time?: string | null;
+        production_line_id?: string | null;
+        machine_id?: string | null;
+      }
+
+# API Client / Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-work-orders.ts"
+    method_to_add: "useScheduleWorkOrder"
+    pattern: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+      export function useScheduleWorkOrder(woId: string) {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: async (input: ScheduleWOInput) => {
+            const response = await fetch(`/api/planning/work-orders/${woId}/schedule`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(input)
+            });
+
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || 'Failed to schedule work order');
+            }
+
+            return response.json();
+          },
+          onSuccess: () => {
+            // Invalidate WO list and detail queries
+            queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['work-order', woId] });
+            // Invalidate Gantt data if exists
+            queryClient.invalidateQueries({ queryKey: ['work-orders-gantt'] });
+          }
+        });
+      }
+
+# UX References
+ux:
+  wireframes:
+    - id: "PLAN-015"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-015-work-order-detail.md"
+      section: "Dates section in header"
+      relevant_fields:
+        - "scheduled_start_time"
+        - "scheduled_end_time"
+        - "production_line_id"
+      notes: |
+        WO Detail page shows scheduled times in header info section.
+        Inline editing or modal for schedule changes.
+
+    - id: "PLAN-016"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-016-wo-gantt-view.md"
+      section: "Drag-drop reschedule"
+      interaction: |
+        - Horizontal drag: Changes date and time
+        - On drop: Calls PATCH /work-orders/:id/schedule
+        - Confirmation dialog before save
+        - Success toast after reschedule
+
+  patterns:
+    form: "React Hook Form + Zod validation"
+    date_picker: "ShadCN DatePicker (Popover + Calendar)"
+    time_picker: "ShadCN Input with time mask or custom TimePicker"
+    toast: "ShadCN Toast for success/error feedback"
+
+  states:
+    - "idle - Form ready for input"
+    - "loading - Saving schedule"
+    - "success - Schedule saved, toast shown"
+    - "error - Validation or server error"
+
+# Components (minimal for MVP - used by existing WO detail/Gantt)
+components:
+  optional:
+    - path: "apps/frontend/components/planning/work-orders/schedule-form.tsx"
+      description: "Inline or modal form for editing WO schedule"
+      props:
+        - "workOrder: WorkOrder"
+        - "onSuccess: () => void"
+        - "onCancel: () => void"
+      pattern: |
+        'use client';
+
+        import { useForm } from 'react-hook-form';
+        import { zodResolver } from '@hookform/resolvers/zod';
+        import { scheduleWOSchema, ScheduleWOInput } from '@/lib/validation/work-order-schemas';
+        import { useScheduleWorkOrder } from '@/lib/hooks/use-work-orders';
+        import { Button } from '@/components/ui/button';
+        import { Input } from '@/components/ui/input';
+        import { toast } from '@/components/ui/use-toast';
+
+        interface ScheduleFormProps {
+          workOrder: WorkOrder;
+          onSuccess: () => void;
+          onCancel: () => void;
+        }
+
+        export function ScheduleForm({ workOrder, onSuccess, onCancel }: ScheduleFormProps) {
+          const { mutate, isPending } = useScheduleWorkOrder(workOrder.id);
+
+          const form = useForm<ScheduleWOInput>({
+            resolver: zodResolver(scheduleWOSchema),
+            defaultValues: {
+              planned_start_date: workOrder.planned_start_date,
+              planned_end_date: workOrder.planned_end_date,
+              scheduled_start_time: workOrder.scheduled_start_time,
+              scheduled_end_time: workOrder.scheduled_end_time,
+              production_line_id: workOrder.production_line_id,
+              machine_id: workOrder.machine_id
+            }
+          });
+
+          const onSubmit = (data: ScheduleWOInput) => {
+            mutate(data, {
+              onSuccess: () => {
+                toast({ title: 'Schedule updated', description: `${workOrder.wo_number} rescheduled` });
+                onSuccess();
+              },
+              onError: (error) => {
+                toast({ title: 'Error', description: error.message, variant: 'destructive' });
+              }
+            });
+          };
+
+          return (
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {/* Date inputs */}
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  type="date"
+                  {...form.register('planned_start_date')}
+                  label="Start Date"
+                />
+                <Input
+                  type="date"
+                  {...form.register('planned_end_date')}
+                  label="End Date"
+                />
+              </div>
+
+              {/* Time inputs */}
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  type="time"
+                  {...form.register('scheduled_start_time')}
+                  label="Start Time"
+                />
+                <Input
+                  type="time"
+                  {...form.register('scheduled_end_time')}
+                  label="End Time"
+                />
+              </div>
+
+              {/* Line/Machine selects would go here */}
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? 'Saving...' : 'Save Schedule'}
+                </Button>
+              </div>
+            </form>
+          );
+        }
+
+# Accessibility
+accessibility:
+  form_inputs:
+    - "All inputs have associated labels"
+    - "Error messages linked via aria-describedby"
+    - "Focus management on form open/close"
+  keyboard:
+    - "Tab navigation through form fields"
+    - "Enter to submit, Escape to cancel"
+  screen_reader:
+    - "Form title announced on open"
+    - "Field validation errors announced"
+    - "Success/error toasts announced"

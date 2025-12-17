@@ -1,0 +1,330 @@
+# Story 02.10b - Database Schema
+# Purpose: Recursive CTE queries for traceability, required tables from Epic 05
+# Agent: BACKEND-DEV (database focus)
+# Status: DEFERRED - requires Epic 05 tables
+
+# Required Tables (FROM EPIC 05 - NOT CREATED BY THIS STORY)
+required_tables_from_epic_05:
+  - name: "license_plates"
+    epic: "05"
+    story: "05.1"
+    description: "Actual inventory with lot numbers, quantities, locations"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "lp_number", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "product_id", type: "UUID", constraints: "NOT NULL REFERENCES products(id)" }
+      - { name: "lot_number", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "quantity", type: "DECIMAL(15,4)", constraints: "NOT NULL" }
+      - { name: "uom", type: "TEXT", constraints: "NOT NULL" }
+      - { name: "status", type: "TEXT", constraints: "NOT NULL CHECK (status IN ('available', 'in_production', 'shipped', 'consumed', 'quarantine'))" }
+      - { name: "expiry_date", type: "DATE", constraints: "" }
+      - { name: "manufacturing_date", type: "DATE", constraints: "" }
+      - { name: "warehouse_id", type: "UUID", constraints: "REFERENCES warehouses(id)" }
+      - { name: "location_id", type: "UUID", constraints: "REFERENCES locations(id)" }
+      - { name: "serial_number", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+      - { name: "updated_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+    rls: true
+    indexes:
+      - "idx_license_plates_org_lp_number ON license_plates(org_id, lp_number)"
+      - "idx_license_plates_org_product ON license_plates(org_id, product_id)"
+      - "idx_license_plates_org_lot ON license_plates(org_id, lot_number)"
+      - "idx_license_plates_status ON license_plates(status)"
+
+  - name: "lp_genealogy"
+    epic: "05"
+    story: "05.7"
+    description: "Parent-child relationships between LPs"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "parent_lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id)" }
+      - { name: "child_lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id)" }
+      - { name: "relationship_type", type: "TEXT", constraints: "CHECK (relationship_type IN ('split', 'combine', 'transform'))" }
+      - { name: "quantity_consumed", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "work_order_id", type: "UUID", constraints: "REFERENCES work_orders(id)" }
+      - { name: "operation_id", type: "UUID", constraints: "REFERENCES routing_operations(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+    rls: true
+    indexes:
+      - "idx_lp_genealogy_parent ON lp_genealogy(parent_lp_id)"
+      - "idx_lp_genealogy_child ON lp_genealogy(child_lp_id)"
+      - "idx_lp_genealogy_org ON lp_genealogy(org_id)"
+      - "idx_lp_genealogy_wo ON lp_genealogy(work_order_id)"
+
+# Existing Tables (Already in database)
+existing_tables:
+  - name: "traceability_links"
+    description: "Consumption records with quantities (may exist)"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "parent_lot_id", type: "UUID", constraints: "NOT NULL" }
+      - { name: "child_lot_id", type: "UUID", constraints: "" }
+      - { name: "work_order_id", type: "UUID", constraints: "REFERENCES work_orders(id)" }
+      - { name: "quantity_consumed", type: "DECIMAL(15,4)", constraints: "" }
+      - { name: "unit", type: "TEXT", constraints: "" }
+      - { name: "operation_id", type: "UUID", constraints: "" }
+      - { name: "consumed_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT now()" }
+
+  - name: "recall_simulations"
+    description: "Stored recall simulation results"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "org_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id)" }
+      - { name: "root_lp_id", type: "UUID", constraints: "NOT NULL REFERENCES license_plates(id)" }
+      - { name: "simulation_type", type: "TEXT", constraints: "NOT NULL CHECK (simulation_type IN ('forward', 'backward', 'full'))" }
+      - { name: "summary", type: "JSONB", constraints: "NOT NULL" }
+      - { name: "affected_lps", type: "JSONB", constraints: "" }
+      - { name: "affected_customers", type: "JSONB", constraints: "" }
+      - { name: "financial_impact", type: "JSONB", constraints: "" }
+      - { name: "execution_time_ms", type: "INTEGER", constraints: "" }
+      - { name: "created_by", type: "UUID", constraints: "REFERENCES users(id)" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT now()" }
+    rls: true
+    indexes:
+      - "idx_recall_simulations_org ON recall_simulations(org_id)"
+      - "idx_recall_simulations_root_lp ON recall_simulations(root_lp_id)"
+
+# Recursive CTE Queries (Core traceability logic)
+queries:
+  forward_trace:
+    name: "trace_forward"
+    description: "Find all descendants of a license plate up to max depth"
+    parameters:
+      - { name: "p_lp_id", type: "UUID", description: "Root LP to trace from" }
+      - { name: "p_org_id", type: "UUID", description: "Organization ID for RLS" }
+      - { name: "p_max_depth", type: "INTEGER", default: 20, description: "Maximum recursion depth" }
+    returns: "TABLE (id UUID, lp_number TEXT, product_id UUID, quantity DECIMAL, uom TEXT, status TEXT, depth INTEGER, path UUID[])"
+    sql: |
+      -- Forward trace: Find all descendants of a lot
+      WITH RECURSIVE trace AS (
+        -- Base case: root LP
+        SELECT
+          id,
+          lp_number,
+          product_id,
+          quantity,
+          uom,
+          status,
+          0 AS depth,
+          ARRAY[id] AS path
+        FROM license_plates
+        WHERE id = p_lp_id
+          AND org_id = p_org_id
+
+        UNION ALL
+
+        -- Recursive case: children
+        SELECT
+          lp.id,
+          lp.lp_number,
+          lp.product_id,
+          lp.quantity,
+          lp.uom,
+          lp.status,
+          t.depth + 1,
+          t.path || lp.id
+        FROM license_plates lp
+        JOIN lp_genealogy g ON g.child_lp_id = lp.id
+        JOIN trace t ON t.id = g.parent_lp_id
+        WHERE t.depth < p_max_depth
+          AND lp.org_id = p_org_id
+          AND NOT lp.id = ANY(t.path)  -- Prevent cycles
+      )
+      SELECT * FROM trace
+      ORDER BY depth, lp_number;
+
+  backward_trace:
+    name: "trace_backward"
+    description: "Find all ancestors of a license plate up to max depth"
+    parameters:
+      - { name: "p_lp_id", type: "UUID", description: "Root LP to trace from" }
+      - { name: "p_org_id", type: "UUID", description: "Organization ID for RLS" }
+      - { name: "p_max_depth", type: "INTEGER", default: 20, description: "Maximum recursion depth" }
+    returns: "TABLE (id UUID, lp_number TEXT, product_id UUID, quantity DECIMAL, uom TEXT, status TEXT, depth INTEGER, path UUID[])"
+    sql: |
+      -- Backward trace: Find all ancestors of a lot
+      WITH RECURSIVE trace AS (
+        -- Base case: root LP
+        SELECT
+          id,
+          lp_number,
+          product_id,
+          quantity,
+          uom,
+          status,
+          0 AS depth,
+          ARRAY[id] AS path
+        FROM license_plates
+        WHERE id = p_lp_id
+          AND org_id = p_org_id
+
+        UNION ALL
+
+        -- Recursive case: parents
+        SELECT
+          lp.id,
+          lp.lp_number,
+          lp.product_id,
+          lp.quantity,
+          lp.uom,
+          lp.status,
+          t.depth + 1,
+          t.path || lp.id
+        FROM license_plates lp
+        JOIN lp_genealogy g ON g.parent_lp_id = lp.id
+        JOIN trace t ON t.id = g.child_lp_id
+        WHERE t.depth < p_max_depth
+          AND lp.org_id = p_org_id
+          AND NOT lp.id = ANY(t.path)  -- Prevent cycles
+      )
+      SELECT * FROM trace
+      ORDER BY depth, lp_number;
+
+  genealogy_tree:
+    name: "get_genealogy_tree"
+    description: "Build hierarchical tree structure for genealogy visualization"
+    parameters:
+      - { name: "p_lp_id", type: "UUID", description: "Root LP to build tree from" }
+      - { name: "p_org_id", type: "UUID", description: "Organization ID for RLS" }
+      - { name: "p_max_depth", type: "INTEGER", default: 10, description: "Maximum tree depth" }
+      - { name: "p_direction", type: "TEXT", default: "'forward'", description: "forward or backward" }
+    returns: "JSONB"
+    sql: |
+      -- Build hierarchical JSONB tree for visualization
+      WITH RECURSIVE tree AS (
+        SELECT
+          lp.id,
+          lp.lp_number,
+          lp.product_id,
+          p.code AS product_code,
+          p.name AS product_name,
+          lp.quantity,
+          lp.uom,
+          lp.status,
+          g.relationship_type,
+          g.quantity_consumed AS quantity_from_parent,
+          0 AS depth,
+          ARRAY[lp.id] AS path
+        FROM license_plates lp
+        JOIN products p ON p.id = lp.product_id
+        LEFT JOIN lp_genealogy g ON
+          CASE WHEN p_direction = 'forward' THEN g.child_lp_id = lp.id
+               ELSE g.parent_lp_id = lp.id END
+        WHERE lp.id = p_lp_id
+          AND lp.org_id = p_org_id
+
+        UNION ALL
+
+        SELECT
+          lp.id,
+          lp.lp_number,
+          lp.product_id,
+          p.code AS product_code,
+          p.name AS product_name,
+          lp.quantity,
+          lp.uom,
+          lp.status,
+          g.relationship_type,
+          g.quantity_consumed,
+          t.depth + 1,
+          t.path || lp.id
+        FROM license_plates lp
+        JOIN products p ON p.id = lp.product_id
+        JOIN lp_genealogy g ON
+          CASE WHEN p_direction = 'forward' THEN g.parent_lp_id = t.id AND g.child_lp_id = lp.id
+               ELSE g.child_lp_id = t.id AND g.parent_lp_id = lp.id END
+        JOIN tree t ON TRUE
+        WHERE t.depth < p_max_depth
+          AND lp.org_id = p_org_id
+          AND NOT lp.id = ANY(t.path)
+      )
+      SELECT jsonb_agg(row_to_json(tree)::jsonb)
+      FROM tree;
+
+  recall_summary:
+    name: "get_recall_summary"
+    description: "Calculate recall simulation summary statistics"
+    parameters:
+      - { name: "p_lp_id", type: "UUID", description: "Root LP for recall simulation" }
+      - { name: "p_org_id", type: "UUID", description: "Organization ID for RLS" }
+    returns: "JSONB"
+    sql: |
+      -- Calculate recall impact summary
+      WITH forward_trace AS (
+        -- Get all descendants (affected LPs)
+        SELECT * FROM trace_forward(p_lp_id, p_org_id, 50)
+      ),
+      status_breakdown AS (
+        SELECT
+          status,
+          COUNT(*) AS count,
+          SUM(quantity) AS total_quantity
+        FROM forward_trace
+        GROUP BY status
+      ),
+      affected_warehouses AS (
+        SELECT DISTINCT
+          lp.warehouse_id,
+          w.name AS warehouse_name,
+          COUNT(*) AS affected_lps,
+          SUM(lp.quantity) AS total_quantity
+        FROM forward_trace ft
+        JOIN license_plates lp ON lp.id = ft.id
+        JOIN warehouses w ON w.id = lp.warehouse_id
+        GROUP BY lp.warehouse_id, w.name
+      ),
+      affected_customers AS (
+        SELECT DISTINCT
+          so.customer_id,
+          c.name AS customer_name,
+          c.email AS contact_email,
+          SUM(sol.quantity) AS shipped_quantity,
+          MAX(so.ship_date) AS ship_date
+        FROM forward_trace ft
+        JOIN license_plates lp ON lp.id = ft.id
+        JOIN sales_order_lines sol ON sol.lp_id = lp.id
+        JOIN sales_orders so ON so.id = sol.sales_order_id
+        JOIN customers c ON c.id = so.customer_id
+        WHERE lp.status = 'shipped'
+        GROUP BY so.customer_id, c.name, c.email
+      )
+      SELECT jsonb_build_object(
+        'total_affected_lps', (SELECT COUNT(*) FROM forward_trace),
+        'total_quantity', (SELECT SUM(quantity) FROM forward_trace),
+        'max_depth', (SELECT MAX(depth) FROM forward_trace),
+        'status_breakdown', (SELECT jsonb_object_agg(status, count) FROM status_breakdown),
+        'affected_warehouses', (SELECT COUNT(*) FROM affected_warehouses),
+        'affected_customers', (SELECT COUNT(*) FROM affected_customers),
+        'warehouse_details', (SELECT jsonb_agg(row_to_json(aw)) FROM affected_warehouses aw),
+        'customer_details', (SELECT jsonb_agg(row_to_json(ac)) FROM affected_customers ac)
+      );
+
+# RLS Policies (for new recall_simulations table)
+rls_policies:
+  - table: "recall_simulations"
+    name: "recall_simulations_org_isolation"
+    operation: "ALL"
+    using: "org_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+
+# Indexes for Performance
+performance_indexes:
+  - description: "Critical for forward trace performance"
+    index: "CREATE INDEX IF NOT EXISTS idx_lp_genealogy_parent_child ON lp_genealogy(parent_lp_id, child_lp_id)"
+  - description: "Critical for backward trace performance"
+    index: "CREATE INDEX IF NOT EXISTS idx_lp_genealogy_child_parent ON lp_genealogy(child_lp_id, parent_lp_id)"
+  - description: "For filtering by status in recall simulation"
+    index: "CREATE INDEX IF NOT EXISTS idx_license_plates_org_status ON license_plates(org_id, status)"
+  - description: "For date-based trace filtering"
+    index: "CREATE INDEX IF NOT EXISTS idx_license_plates_mfg_date ON license_plates(manufacturing_date)"
+
+# Migration Notes
+migration_notes:
+  - "This story does NOT create the license_plates or lp_genealogy tables"
+  - "Those tables are created in Epic 05 (Warehouse)"
+  - "This story may create recall_simulations table if it doesn't exist"
+  - "Database functions (trace_forward, trace_backward) can be created as stored procedures"
+  - "Or the recursive CTEs can be executed inline from the application layer"

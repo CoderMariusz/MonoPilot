@@ -1,0 +1,402 @@
+# Story 05.4 - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/lp-status-service.test.ts"
+    type: "unit"
+    description: "Unit tests for status validation and transitions"
+  - path: "apps/frontend/app/api/warehouse/license-plates/[id]/status/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for status update API"
+  - path: "apps/frontend/app/api/warehouse/license-plates/[id]/qa-status/__tests__/route.test.ts"
+    type: "integration"
+    description: "Integration tests for QA status update API"
+  - path: "supabase/tests/lp-status-audit-rls.test.sql"
+    type: "integration"
+    description: "RLS tests for status audit table"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    name: "Default QA Status on LP Creation"
+    prd: "WH-FR-008"
+    given: "warehouse_settings.require_qa_on_receipt = true AND default_qa_status = 'pending'"
+    when: "LP created via GRN"
+    then: "LP.qa_status = 'pending' AND LP.status = 'available'"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-02"
+    name: "QA Pass Transition"
+    prd: "WH-FR-008"
+    given: "LP with qa_status='pending' AND status='available'"
+    when: "updateQAStatus(lpId, 'passed', 'QA inspection passed') called"
+    then: "LP.qa_status updates to 'passed' AND LP.status remains 'available' AND audit entry created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "QA Fail Triggers Blocked Status"
+    prd: "WH-FR-008"
+    given: "LP with qa_status='pending' AND status='available'"
+    when: "updateQAStatus(lpId, 'failed', 'Failed moisture test') called"
+    then: "LP.qa_status updates to 'failed' AND LP.status updates to 'blocked' AND 2 audit entries created"
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-06"
+    name: "Consumption Validation - Success"
+    prd: "WH-FR-008"
+    given: "LP with status='available' AND qa_status='passed'"
+    when: "validateLPForConsumption(lpId) called"
+    then: "returns { valid: true }"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-07"
+    name: "Consumption Validation - QA Not Passed"
+    prd: "WH-FR-008"
+    given: "LP with status='available' AND qa_status='pending'"
+    when: "validateLPForConsumption(lpId) called"
+    then: "returns { valid: false, error: 'LP not QA approved' }"
+    test_type: "unit"
+    priority: "P0"
+    critical: true
+
+  - id: "AC-11"
+    name: "Invalid Status Transition Blocked"
+    prd: "WH-FR-002"
+    given: "LP with status='consumed'"
+    when: "updateLPStatus(lpId, 'available') attempted"
+    then: "returns 400 error 'Invalid status transition: consumed -> available'"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-15"
+    name: "Permissions - QA Status Change"
+    prd: "WH-FR-008"
+    given: "Operator role user views LP"
+    when: "attempts QA status change API"
+    then: "returns 403 Forbidden"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+# Unit Test Cases
+unit_tests:
+  status_transition_validation:
+    - name: "Valid: available -> reserved"
+      current: "available"
+      new: "reserved"
+      expected: "{ valid: true }"
+
+    - name: "Valid: reserved -> available"
+      current: "reserved"
+      new: "available"
+      expected: "{ valid: true }"
+
+    - name: "Valid: available -> consumed"
+      current: "available"
+      new: "consumed"
+      expected: "{ valid: true }"
+
+    - name: "Valid: available -> blocked"
+      current: "available"
+      new: "blocked"
+      expected: "{ valid: true }"
+
+    - name: "Valid: blocked -> available"
+      current: "blocked"
+      new: "available"
+      expected: "{ valid: true }"
+
+    - name: "Invalid: consumed -> available (terminal)"
+      current: "consumed"
+      new: "available"
+      expected: "{ valid: false, error: 'Invalid status transition: consumed -> available' }"
+
+    - name: "Invalid: consumed -> blocked (terminal)"
+      current: "consumed"
+      new: "blocked"
+      expected: "{ valid: false, error: 'Invalid status transition: consumed -> blocked' }"
+
+    - name: "Invalid: reserved -> blocked"
+      current: "reserved"
+      new: "blocked"
+      expected: "{ valid: false, error: 'Invalid status transition: reserved -> blocked' }"
+
+    - name: "Self-transition: available -> available"
+      current: "available"
+      new: "available"
+      expected: "{ valid: false, error: 'Status is already available' }"
+
+  qa_status_transitions:
+    - name: "QA Pass: pending -> passed"
+      current_qa: "pending"
+      new_qa: "passed"
+      side_effect_status: null
+      expected: "qa_status = 'passed', status unchanged"
+
+    - name: "QA Fail: pending -> failed (triggers blocked)"
+      current_qa: "pending"
+      current_status: "available"
+      new_qa: "failed"
+      side_effect_status: "blocked"
+      expected: "qa_status = 'failed', status = 'blocked', 2 audit entries"
+
+    - name: "Quarantine: failed -> quarantine"
+      current_qa: "failed"
+      new_qa: "quarantine"
+      side_effect_status: null
+      expected: "qa_status = 'quarantine', status unchanged"
+
+    - name: "Release: quarantine -> passed (triggers available)"
+      current_qa: "quarantine"
+      current_status: "blocked"
+      new_qa: "passed"
+      side_effect_status: "available"
+      expected: "qa_status = 'passed', status = 'available', 2 audit entries"
+
+    - name: "Invalid: passed -> pending"
+      current_qa: "passed"
+      new_qa: "pending"
+      expected: "{ valid: false, error: 'Invalid QA status transition' }"
+
+  consumption_validation:
+    - name: "Valid: available + passed"
+      status: "available"
+      qa_status: "passed"
+      expected: "{ valid: true }"
+
+    - name: "Valid: reserved + passed"
+      status: "reserved"
+      qa_status: "passed"
+      expected: "{ valid: true }"
+
+    - name: "Invalid: consumed + passed"
+      status: "consumed"
+      qa_status: "passed"
+      expected: "{ valid: false, error: 'LP not available for consumption (status: consumed)' }"
+
+    - name: "Invalid: blocked + passed"
+      status: "blocked"
+      qa_status: "passed"
+      expected: "{ valid: false, error: 'LP not available for consumption (status: blocked)' }"
+
+    - name: "Invalid: available + pending"
+      status: "available"
+      qa_status: "pending"
+      expected: "{ valid: false, error: 'LP not QA approved (qa_status: pending)' }"
+
+    - name: "Invalid: available + failed"
+      status: "available"
+      qa_status: "failed"
+      expected: "{ valid: false, error: 'LP not QA approved (qa_status: failed)' }"
+
+    - name: "Invalid: blocked + pending (both invalid)"
+      status: "blocked"
+      qa_status: "pending"
+      expected: "{ valid: false, error: includes status AND qa_status }"
+
+# Integration Test Cases
+integration_tests:
+  api_status_update:
+    - name: "PATCH /license-plates/:id/status - valid transition"
+      setup: "Create LP with status='available'"
+      action: "PATCH with { status: 'blocked', reason: 'Manual block' }"
+      expected: "200 OK, LP status = 'blocked', audit entry created"
+
+    - name: "PATCH /license-plates/:id/status - invalid transition"
+      setup: "Create LP with status='consumed'"
+      action: "PATCH with { status: 'available' }"
+      expected: "400 INVALID_TRANSITION error"
+
+    - name: "PATCH /license-plates/:id/status - cross-tenant blocked"
+      setup: "Create LP in Org A, authenticate as Org B"
+      action: "PATCH attempt"
+      expected: "404 LP_NOT_FOUND (not 403)"
+
+  api_qa_status_update:
+    - name: "PATCH /license-plates/:id/qa-status - pass"
+      setup: "Create LP with qa_status='pending'"
+      action: "PATCH with { qa_status: 'passed' }"
+      expected: "200 OK, qa_status = 'passed', audit entry"
+
+    - name: "PATCH /license-plates/:id/qa-status - fail triggers blocked"
+      setup: "Create LP with qa_status='pending', status='available'"
+      action: "PATCH with { qa_status: 'failed', reason: 'Failed test' }"
+      expected: "200 OK, qa_status = 'failed', status = 'blocked', 2 audit entries"
+
+    - name: "PATCH /license-plates/:id/qa-status - reason required for failed"
+      setup: "Create LP with qa_status='pending'"
+      action: "PATCH with { qa_status: 'failed' } (no reason)"
+      expected: "400 REASON_REQUIRED error"
+
+    - name: "PATCH /license-plates/:id/qa-status - quarantine requires location"
+      setup: "Create LP with qa_status='failed'"
+      action: "PATCH with { qa_status: 'quarantine', reason: 'Test' } (no location)"
+      expected: "400 QUARANTINE_LOCATION_REQUIRED error"
+
+  api_validate_consumption:
+    - name: "POST /license-plates/:id/validate-consumption - valid"
+      setup: "Create LP with status='available', qa_status='passed'"
+      action: "POST validate-consumption"
+      expected: "200 OK, { valid: true }"
+
+    - name: "POST /license-plates/:id/validate-consumption - invalid status"
+      setup: "Create LP with status='blocked', qa_status='passed'"
+      action: "POST validate-consumption"
+      expected: "400 NOT_AVAILABLE error"
+
+    - name: "POST /license-plates/:id/validate-consumption - invalid qa_status"
+      setup: "Create LP with status='available', qa_status='pending'"
+      action: "POST validate-consumption"
+      expected: "400 QA_NOT_PASSED error"
+
+  api_block_unblock:
+    - name: "POST /license-plates/:id/block - success"
+      setup: "Create LP with status='available'"
+      action: "POST with { reason: 'Damaged packaging' }"
+      expected: "200 OK, status = 'blocked', audit entry"
+
+    - name: "POST /license-plates/:id/block - reason required"
+      setup: "Create LP with status='available'"
+      action: "POST with {} (no reason)"
+      expected: "400 REASON_REQUIRED error"
+
+    - name: "POST /license-plates/:id/unblock - success"
+      setup: "Create LP with status='blocked'"
+      action: "POST with { reason: 'Issue resolved' }"
+      expected: "200 OK, status = 'available', audit entry"
+
+  api_audit_trail:
+    - name: "GET /license-plates/:id/status-audit - returns entries"
+      setup: "Create LP, change status 3 times"
+      action: "GET status-audit"
+      expected: "200 OK, 3 audit entries, sorted by changed_at DESC"
+
+    - name: "GET /license-plates/:id/status-audit - filter by field"
+      setup: "Create LP, change status + qa_status"
+      action: "GET status-audit?field_name=qa_status"
+      expected: "200 OK, only qa_status entries returned"
+
+  permission_tests:
+    - name: "QA status change - Manager allowed"
+      role: "warehouse_manager"
+      action: "PATCH /license-plates/:id/qa-status"
+      expected: "200 OK"
+
+    - name: "QA status change - Operator denied"
+      role: "warehouse_operator"
+      action: "PATCH /license-plates/:id/qa-status"
+      expected: "403 PERMISSION_DENIED"
+
+    - name: "Block LP - Manager allowed"
+      role: "warehouse_manager"
+      action: "POST /license-plates/:id/block"
+      expected: "200 OK"
+
+    - name: "Block LP - Operator denied"
+      role: "warehouse_operator"
+      action: "POST /license-plates/:id/block"
+      expected: "403 PERMISSION_DENIED"
+
+  rls_tests:
+    - name: "Status audit - org isolation"
+      setup: "Create audit entries in Org A and Org B"
+      action: "Query as Org A user"
+      expected: "Only Org A entries returned"
+
+    - name: "Status audit - cross-tenant read blocked"
+      setup: "Create audit entry in Org A"
+      action: "Direct query by Org B user"
+      expected: "0 rows returned"
+
+# E2E Test Cases
+e2e_tests:
+  - name: "Change QA Status modal - complete flow"
+    steps:
+      - "Navigate to LP detail page"
+      - "Click 'Change QA Status' button (visible for Manager)"
+      - "Select 'Passed' status"
+      - "Enter optional reason"
+      - "Click 'Update Status'"
+      - "Verify success toast"
+      - "Verify LP qa_status updated in detail view"
+
+  - name: "Block LP modal - complete flow"
+    steps:
+      - "Navigate to LP detail page"
+      - "Click 'Block LP' button"
+      - "Enter required reason"
+      - "Click 'Confirm'"
+      - "Verify LP status badge shows 'Blocked'"
+
+  - name: "Audit trail display"
+    steps:
+      - "Navigate to LP detail page"
+      - "Click 'Audit' tab"
+      - "Verify status changes displayed"
+      - "Verify entries sorted by date DESC"
+
+# Definition of Done
+definition_of_done:
+  - "lp_status_audit table created with RLS"
+  - "RLS policy enforces org_id isolation on audit table"
+  - "Status transition validation enforces VALID_TRANSITIONS map"
+  - "QA status side effects (failed -> blocked, passed -> available) working"
+  - "validateLPForConsumption() checks both status and qa_status"
+  - "Audit trail entry created for EVERY status change"
+  - "Reason field captured in audit trail"
+  - "API endpoints functional with <200ms response"
+  - "StatusBadge displays correct colors"
+  - "QAStatusBadge displays correct colors"
+  - "ChangeQAStatusModal works for Manager role"
+  - "BlockLPModal with reason required"
+  - "StatusAuditTrail displays sorted entries"
+  - "Permissions: Manager/QA can change QA status, Operator cannot"
+  - "Consumed status blocks all transitions"
+  - "Unit test coverage >= 90%"
+  - "Integration test coverage >= 80%"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 90
+    reason: "Critical service methods for Epic 04.6"
+  integration:
+    target: 80
+    reason: "Status transitions and RLS must be thoroughly tested"
+  files:
+    - "lib/services/lp-status-service.ts: 90%"
+    - "lib/validation/lp-status-schemas.ts: 100%"
+    - "RLS policies: 100% of policy rules tested"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "Epic 04.6 depends on validateLPForConsumption being correct"
+    mitigation: "Comprehensive unit tests for all status/qa_status combinations"
+    severity: "high"
+    test_coverage: "unit_tests.consumption_validation"
+
+  - id: "RISK-02"
+    description: "QA status side effects could create inconsistent state"
+    mitigation: "Transaction wrapping for QA status update with side effects"
+    severity: "medium"
+    test_coverage: "integration_tests.api_qa_status_update"
+
+  - id: "RISK-03"
+    description: "Audit trail could miss entries on concurrent updates"
+    mitigation: "Use database triggers or service layer enforcement"
+    severity: "medium"
+    test_coverage: "integration_tests.api_audit_trail"
+
+  - id: "RISK-04"
+    description: "Permission bypass for QA status changes"
+    mitigation: "Role check at API level, not just UI"
+    severity: "high"
+    test_coverage: "integration_tests.permission_tests"

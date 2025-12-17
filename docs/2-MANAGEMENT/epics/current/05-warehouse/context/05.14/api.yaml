@@ -1,0 +1,471 @@
+# Story 05.14 - API Specification
+# Purpose: Endpoints, request/response schemas, error handling
+# Agent: BACKEND-DEV (API focus)
+
+endpoints:
+  - method: "POST"
+    path: "/api/warehouse/lps/:id/print-label"
+    description: "Generate ZPL label for a single License Plate"
+    file: "apps/frontend/app/api/warehouse/lps/[id]/print-label/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator", "production_manager", "production_operator"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      params:
+        id: "UUID - LP ID"
+      query:
+        copies:
+          type: "number"
+          required: false
+          default: "from settings (label_copies_default)"
+          validation: "1-100"
+        format:
+          type: "string"
+          required: false
+          default: "zpl"
+          enum: ["zpl", "pdf"]
+          notes: "PDF format deferred to Phase 3"
+
+    response:
+      status: 200
+      type: "PrintLabelResponse"
+      schema:
+        zpl: "string - ZPL content"
+        lp_number: "string"
+        product_name: "string"
+        copies: "number"
+        label_size: "string - e.g. '4x6'"
+        generated_at: "string - ISO timestamp"
+        download_filename: "string - e.g. 'LP00000001.zpl'"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Copies must be between 1 and 100"
+        when: "copies parameter out of range"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 404
+        code: "LP_NOT_FOUND"
+        message: "License Plate not found"
+        when: "LP does not exist or RLS blocked"
+      - status: 500
+        code: "ZPL_GENERATION_FAILED"
+        message: "Failed to generate label"
+        when: "Template processing error"
+
+  - method: "POST"
+    path: "/api/warehouse/lps/print-bulk"
+    description: "Generate ZPL labels for multiple License Plates"
+    file: "apps/frontend/app/api/warehouse/lps/print-bulk/route.ts"
+    auth: "required"
+    roles: ["owner", "admin", "warehouse_manager", "warehouse_operator"]
+
+    request:
+      headers:
+        Authorization: "Bearer <jwt_token>"
+      body:
+        lp_ids:
+          type: "string[]"
+          required: true
+          validation: "UUID array, 1-100 items"
+        copies:
+          type: "number"
+          required: false
+          default: "1"
+          validation: "1-100"
+        format:
+          type: "string"
+          required: false
+          default: "zip"
+          enum: ["zip", "concat"]
+
+    response:
+      status: 200
+      type: "PrintBulkLabelsResponse"
+      schema:
+        format: "string - 'zip' or 'concat'"
+        total_labels: "number"
+        total_copies: "number"
+        file_size_bytes: "number"
+        download_url: "string - presigned URL for large files (optional)"
+        zpl: "string - if format='concat' and small (optional)"
+
+    errors:
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "At least one LP required"
+        when: "Empty lp_ids array"
+      - status: 400
+        code: "VALIDATION_ERROR"
+        message: "Maximum 100 LPs per bulk request"
+        when: "lp_ids array exceeds 100"
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+      - status: 404
+        code: "LPS_NOT_FOUND"
+        message: "One or more License Plates not found"
+        when: "Any LP not found or RLS blocked"
+
+# Services
+services:
+  - path: "apps/frontend/lib/services/label-print-service.ts"
+    description: "ZPL label generation and print management"
+    exports:
+      - name: "LabelPrintService"
+        type: "class"
+        methods:
+          - name: "generateLPLabel"
+            params:
+              - "lpId: string"
+              - "options?: LabelGenerationOptions"
+            returns: "Promise<string>"
+            description: "Generate ZPL for single LP"
+          - name: "generateBulkLabels"
+            params:
+              - "lpIds: string[]"
+              - "options?: LabelGenerationOptions"
+            returns: "Promise<string[] | string>"
+            description: "Generate ZPL for multiple LPs"
+          - name: "getLPLabelData"
+            params:
+              - "lpId: string"
+            returns: "Promise<LPLabelData>"
+            description: "Fetch LP data with product/location joins"
+          - name: "buildZPL"
+            params:
+              - "data: LPLabelData"
+              - "options: LabelGenerationOptions"
+            returns: "string"
+            description: "Build ZPL from template and data"
+          - name: "generateQRData"
+            params:
+              - "data: LPLabelData"
+            returns: "string"
+            description: "Generate JSON string for QR code"
+          - name: "escapeZPL"
+            params:
+              - "text: string"
+            returns: "string"
+            description: "Escape special ZPL characters"
+          - name: "logPrint"
+            params:
+              - "lpId: string"
+              - "copies: number"
+              - "autoPrint: boolean"
+            returns: "Promise<void>"
+            description: "Log print request to label_print_logs"
+          - name: "printToZebraPrinter"
+            params:
+              - "zpl: string"
+              - "printerIp: string"
+              - "port?: number"
+            returns: "Promise<void>"
+            description: "Send ZPL to printer via TCP (Phase 2)"
+
+      - name: "LPLabelData"
+        type: "interface"
+        fields:
+          - "lp_number: string"
+          - "product_name: string"
+          - "product_code: string"
+          - "quantity: number"
+          - "uom: string"
+          - "batch_number: string | null"
+          - "supplier_batch_number: string | null"
+          - "expiry_date: string | null"
+          - "manufacture_date: string | null"
+          - "location_path: string | null"
+          - "warehouse_name: string | null"
+          - "gtin: string | null"
+          - "qr_data: string"
+
+      - name: "LabelGenerationOptions"
+        type: "interface"
+        fields:
+          - "copies?: number"
+          - "label_size?: '4x6' | '4x3' | '3x2'"
+          - "include_qr?: boolean"
+
+# ZPL Template
+templates:
+  - path: "apps/frontend/lib/templates/lp-label-template.ts"
+    description: "ZPL template for LP labels"
+    exports:
+      - name: "LP_LABEL_TEMPLATE_4x6"
+        type: "const string"
+        description: "4x6 inch label ZPL template"
+      - name: "buildLPLabelZPL"
+        type: "function"
+        params:
+          - "data: LPLabelData"
+          - "copies: number"
+        returns: "string"
+        description: "Build ZPL with variable substitution"
+
+    template_variables:
+      - "{{LP_NUMBER}} - LP number for barcode"
+      - "{{PRODUCT_NAME}} - Product name (truncated to 40 chars)"
+      - "{{QUANTITY}} - Quantity value"
+      - "{{UOM}} - Unit of measure"
+      - "{{BATCH_NUMBER}} - Batch number or '--'"
+      - "{{EXPIRY_DATE}} - Expiry date or '--'"
+      - "{{LOCATION}} - Location path or 'Unassigned'"
+      - "{{QR_DATA}} - JSON data for QR code"
+      - "{{COPIES}} - Print quantity (^PQ command)"
+
+    zpl_structure: |
+      ^XA                           # Start format
+      ^CF0,30                       # Set font
+      ^FO50,30^FDLicense Plate^FS   # Header text
+
+      # Printer settings
+      ~TA000, ~JSN, ^LT0, ^MNW, ^MTT, ^PON, ^PMN
+      ^LH0,0, ^JMA, ^PR6,6, ~SD15, ^JUS, ^LRN, ^CI27, ^PA0,1,1,0
+      ^XZ
+
+      ^XA
+      ^MMT                          # Tear-off mode
+      ^PW812                        # Print width (4 inch @ 203dpi)
+      ^LL406                        # Label length (6 inch @ 203dpi)
+      ^LS0
+
+      # CODE128 Barcode for LP Number
+      ^FT50,50^BCN,100,Y,N,N
+      ^FD{{LP_NUMBER}}^FS
+
+      # QR Code (bottom right)
+      ^FT400,50^BQN,2,4
+      ^FDQA,{{QR_DATA}}^FS
+
+      # Text fields
+      ^FT50,180^A0N,28,28^FDProduct:^FS
+      ^FT150,180^A0N,28,28^FD{{PRODUCT_NAME}}^FS
+
+      ^FT50,220^A0N,28,28^FDQuantity:^FS
+      ^FT150,220^A0N,28,28^FD{{QUANTITY}} {{UOM}}^FS
+
+      ^FT50,260^A0N,28,28^FDBatch:^FS
+      ^FT150,260^A0N,28,28^FD{{BATCH_NUMBER}}^FS
+
+      ^FT50,300^A0N,28,28^FDExpiry:^FS
+      ^FT150,300^A0N,28,28^FD{{EXPIRY_DATE}}^FS
+
+      ^FT50,340^A0N,28,28^FDLocation:^FS
+      ^FT150,340^A0N,24,24^FD{{LOCATION}}^FS
+
+      ^PQ{{COPIES}},0,1,Y           # Print quantity command
+
+      ^XZ                           # End format
+
+# Validation Schemas
+validation:
+  - path: "apps/frontend/lib/validation/label-print.ts"
+    description: "Zod schemas for label print requests"
+    exports:
+      - name: "printLabelQuerySchema"
+        type: "z.object"
+        schema:
+          copies:
+            type: "z.coerce.number().int().min(1).max(100).default(1)"
+          format:
+            type: "z.enum(['zpl', 'pdf']).default('zpl')"
+
+      - name: "printBulkLabelsSchema"
+        type: "z.object"
+        schema:
+          lp_ids:
+            type: "z.array(z.string().uuid()).min(1).max(100)"
+          copies:
+            type: "z.number().int().min(1).max(100).optional()"
+          format:
+            type: "z.enum(['zip', 'concat']).default('zip')"
+
+      - name: "labelSettingsSchema"
+        type: "z.object"
+        schema:
+          print_label_on_receipt:
+            type: "z.boolean().default(true)"
+          label_copies_default:
+            type: "z.number().int().min(1).max(10).default(1)"
+          label_size:
+            type: "z.enum(['4x6', '4x3', '3x2']).default('4x6')"
+          printer_ip:
+            type: "z.string().ip().nullable().optional()"
+          printer_port:
+            type: "z.number().int().min(1).max(65535).default(9100)"
+
+# Implementation patterns
+patterns:
+  api_route_single: |
+    // apps/frontend/app/api/warehouse/lps/[id]/print-label/route.ts
+    import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+    import { cookies } from 'next/headers';
+    import { NextRequest, NextResponse } from 'next/server';
+    import { printLabelQuerySchema } from '@/lib/validation/label-print';
+    import { LabelPrintService } from '@/lib/services/label-print-service';
+
+    export async function POST(
+      request: NextRequest,
+      { params }: { params: { id: string } }
+    ) {
+      const supabase = createRouteHandlerClient({ cookies });
+
+      // Auth check
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Validate query params
+      const url = new URL(request.url);
+      const queryResult = printLabelQuerySchema.safeParse({
+        copies: url.searchParams.get('copies'),
+        format: url.searchParams.get('format'),
+      });
+
+      if (!queryResult.success) {
+        return NextResponse.json(
+          { error: 'Validation failed', details: queryResult.error.flatten() },
+          { status: 400 }
+        );
+      }
+
+      try {
+        const zpl = await LabelPrintService.generateLPLabel(params.id, {
+          copies: queryResult.data.copies,
+        });
+
+        // Log print request
+        await LabelPrintService.logPrint(params.id, queryResult.data.copies, false);
+
+        return NextResponse.json({
+          zpl,
+          lp_number: '...', // from LP data
+          product_name: '...',
+          copies: queryResult.data.copies,
+          label_size: '4x6',
+          generated_at: new Date().toISOString(),
+          download_filename: `${lpNumber}.zpl`,
+        });
+      } catch (error) {
+        if (error.message === 'LP not found') {
+          return NextResponse.json({ error: 'License Plate not found' }, { status: 404 });
+        }
+        return NextResponse.json({ error: 'Failed to generate label' }, { status: 500 });
+      }
+    }
+
+  service_pattern: |
+    // apps/frontend/lib/services/label-print-service.ts
+    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+    import { LP_LABEL_TEMPLATE_4x6, buildLPLabelZPL } from '@/lib/templates/lp-label-template';
+
+    export interface LPLabelData {
+      lp_number: string;
+      product_name: string;
+      product_code: string;
+      quantity: number;
+      uom: string;
+      batch_number: string | null;
+      expiry_date: string | null;
+      location_path: string | null;
+      qr_data: string;
+    }
+
+    export interface LabelGenerationOptions {
+      copies?: number;
+      label_size?: '4x6' | '4x3' | '3x2';
+      include_qr?: boolean;
+    }
+
+    export class LabelPrintService {
+      static async generateLPLabel(
+        lpId: string,
+        options: LabelGenerationOptions = {}
+      ): Promise<string> {
+        const data = await this.getLPLabelData(lpId);
+        return this.buildZPL(data, options);
+      }
+
+      static async getLPLabelData(lpId: string): Promise<LPLabelData> {
+        const supabase = createClientComponentClient();
+
+        const { data, error } = await supabase
+          .from('license_plates')
+          .select(`
+            id,
+            lp_number,
+            quantity,
+            uom,
+            batch_number,
+            expiry_date,
+            product:products(name, code),
+            location:locations(code, name)
+          `)
+          .eq('id', lpId)
+          .single();
+
+        if (error || !data) {
+          throw new Error('LP not found');
+        }
+
+        const qrData = this.generateQRData(data);
+
+        return {
+          lp_number: data.lp_number,
+          product_name: data.product?.name || 'Unknown',
+          product_code: data.product?.code || '',
+          quantity: data.quantity,
+          uom: data.uom,
+          batch_number: data.batch_number,
+          expiry_date: data.expiry_date,
+          location_path: data.location?.code || 'Unassigned',
+          qr_data: qrData,
+        };
+      }
+
+      static buildZPL(data: LPLabelData, options: LabelGenerationOptions): string {
+        return buildLPLabelZPL(data, options.copies || 1);
+      }
+
+      static generateQRData(data: any): string {
+        return JSON.stringify({
+          lp: data.lp_number,
+          product: data.product?.name,
+          qty: data.quantity,
+          uom: data.uom,
+          batch: data.batch_number,
+          expiry: data.expiry_date,
+        });
+      }
+
+      static escapeZPL(text: string): string {
+        return text
+          .replace(/\\/g, '\\\\')
+          .replace(/\^/g, '\\^')
+          .replace(/~/g, '\\~');
+      }
+
+      static async logPrint(
+        lpId: string,
+        copies: number,
+        autoPrint: boolean
+      ): Promise<void> {
+        const supabase = createClientComponentClient();
+
+        await supabase.from('label_print_logs').insert({
+          lp_id: lpId,
+          label_type: 'lp',
+          copies,
+          auto_print: autoPrint,
+          print_method: 'download',
+        });
+      }
+    }

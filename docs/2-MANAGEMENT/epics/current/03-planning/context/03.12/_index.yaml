@@ -1,0 +1,164 @@
+# Story 03.12 - Index File (Entry Point)
+# Generated: 2025-12-17
+# Purpose: Story metadata and dependencies - read this first
+
+story:
+  id: "03.12"
+  name: "WO Operations (Routing Copy)"
+  slug: "wo-operations"
+  epic: "03-planning"
+  phase: "MVP"
+  complexity: "M"
+  estimate_days: 4
+  type: "full-stack"
+  state: "ready"
+
+# Files in this context folder
+context_files:
+  - _index.yaml      # This file - metadata, dependencies
+  - database.yaml    # Tables, RLS, functions, triggers
+  - api.yaml         # Endpoints, auth, errors
+  - frontend.yaml    # Components, types, services
+  - tests.yaml       # Acceptance criteria, test specifications
+
+# PRD Traceability
+prd_coverage:
+  - id: "FR-PLAN-020"
+    name: "Routing Copy (wo_operations)"
+    description: "Copy routing operations to WO as immutable snapshot on release"
+    status: "implementing"
+  - id: "FR-PLAN-022"
+    name: "WO Status Lifecycle"
+    description: "Operation-level tracking within WO status lifecycle"
+    status: "implementing"
+
+# Dependencies
+dependencies:
+  required:
+    - story: "01.1"
+      name: "Org Context + Base RLS"
+      provides: ["organizations", "users", "roles", "RLS patterns"]
+    - story: "01.9"
+      name: "Production Lines CRUD"
+      provides: ["production_lines table", "line_id FK"]
+      type: "SOFT"
+    - story: "01.10"
+      name: "Machines CRUD"
+      provides: ["machines table", "machine_id FK"]
+      type: "SOFT"
+    - story: "02.7"
+      name: "Routings CRUD"
+      provides: ["routings table", "routing header schema"]
+    - story: "02.8"
+      name: "Routing Operations CRUD"
+      provides: ["routing_operations table", "source data for copy"]
+    - story: "03.10"
+      name: "WO CRUD"
+      provides: ["work_orders table", "routing_id FK", "release action trigger"]
+  blocked_by: []
+  blocks:
+    - story: "04.3"
+      epic: "04-production"
+      name: "Operation Tracking"
+      reason: "Production operators start/complete WO operations"
+    - story: "03.14"
+      name: "WO Gantt Chart"
+      reason: "Visualizes operations timeline"
+
+# Reference Documents
+files_to_read:
+  prd:
+    path: "docs/1-BASELINE/product/modules/planning.md"
+    sections:
+      - "FR-PLAN-020"
+      - "FR-PLAN-022"
+      - "Section 7.5: WO Operations"
+  architecture:
+    path: "docs/1-BASELINE/architecture/modules/planning.md"
+    sections:
+      - "Database Schema"
+      - "API Design"
+  story:
+    path: "docs/2-MANAGEMENT/epics/current/03-planning/03.12.wo-operations.md"
+  wireframes:
+    - path: "docs/3-ARCHITECTURE/ux/wireframes/PLAN-015-work-order-detail.md"
+      sections:
+        - "Operations Tab View"
+        - "Operations Table Columns"
+        - "Tab Navigation"
+  adrs:
+    - path: "docs/1-BASELINE/architecture/decisions/ADR-013-rls-org-isolation-pattern.md"
+      relevance: "RLS policy pattern for wo_operations"
+  patterns:
+    - path: "docs/2-MANAGEMENT/epics/current/01-settings/context/01.1/"
+      relevance: "YAML context structure pattern"
+    - path: "docs/2-MANAGEMENT/epics/current/03-planning/03.10.wo-crud.md"
+      relevance: "WO schema and release action integration"
+    - path: "docs/2-MANAGEMENT/epics/current/02-technical/02.7.routings-crud.md"
+      relevance: "Routing and routing_operations schema"
+
+# High-level deliverables
+deliverables:
+  - type: "migration"
+    count: 1
+    description: "wo_operations table with RLS, indexes, triggers, functions"
+  - type: "api"
+    count: 3
+    description: "GET list, GET detail, POST copy-routing endpoints"
+  - type: "service"
+    count: 1
+    description: "wo-operations-service.ts"
+  - type: "validation"
+    count: 1
+    description: "wo-operations-validation.ts (Zod schemas)"
+  - type: "component"
+    count: 5
+    description: "WOOperationsTimeline, WOOperationCard, WOOperationStatusBadge, WOOperationDetailPanel, WOOperationsEmptyState"
+  - type: "test"
+    count: 3
+    description: "Unit + API integration + E2E tests"
+
+# Technical notes
+technical_notes:
+  - "Routing operations copied to wo_operations on WO release (planned -> released)"
+  - "Copy is idempotent - subsequent releases do not duplicate operations"
+  - "Setting wo_copy_routing controls feature (default: true)"
+  - "expected_duration_minutes = duration + setup_time + cleanup_time from routing"
+  - "All operations start with status 'pending'"
+  - "Snapshot is immutable after copy (like BOM snapshot)"
+  - "Production module (Epic 04) updates actual times/yields/status"
+  - "Operations tab lazy loads on WO detail page"
+  - "Read-only for planners, start/complete actions for operators in Epic 04"
+
+# Business rules
+business_rules:
+  - rule: "Routing Copy Trigger"
+    description: "Operations copied on WO release (status: planned -> released)"
+    enforcement: "Service layer integration with 03.10 release action"
+  - rule: "Setting Control"
+    description: "wo_copy_routing setting enables/disables feature (default: true)"
+    enforcement: "Service layer checks planning_settings"
+  - rule: "Idempotency"
+    description: "Operations copied only once per WO, subsequent releases do not duplicate"
+    enforcement: "Database function checks existing operations count"
+  - rule: "Sequence Preservation"
+    description: "Operation sequences match routing_operations exactly"
+    enforcement: "Database function copies sequence as-is"
+  - rule: "Expected Duration Calculation"
+    description: "expected_duration_minutes = duration + setup_time + cleanup_time"
+    enforcement: "Database function calculates on copy"
+  - rule: "Null Routing Handling"
+    description: "WO without routing_id skips copy, no error"
+    enforcement: "Service layer handles gracefully"
+  - rule: "Empty Routing Handling"
+    description: "Routing with 0 operations results in 0 wo_operations, no error"
+    enforcement: "Database function handles gracefully"
+  - rule: "Initial Status"
+    description: "All operations start with status = 'pending'"
+    enforcement: "Database function sets default"
+  - rule: "Snapshot Immutability"
+    description: "Once copied, wo_operations are immutable snapshots"
+    enforcement: "RLS policies restrict writes, only Production updates actuals"
+  - rule: "Cascade Delete"
+    description: "Deleting WO removes all wo_operations (ON DELETE CASCADE)"
+    enforcement: "FK constraint"

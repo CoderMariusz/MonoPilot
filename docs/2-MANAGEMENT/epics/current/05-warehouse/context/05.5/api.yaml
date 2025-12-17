@@ -1,0 +1,518 @@
+# Story 05.5 - API Specification
+# Purpose: Enhanced query parameters, filter logic, endpoint specification
+# Agent: BACKEND-DEV (API focus)
+
+# Note: Extends existing endpoint from 05.1
+# GET /api/warehouse/license-plates already exists
+# This story adds advanced query parameters
+
+endpoints:
+  - method: "GET"
+    path: "/api/warehouse/license-plates"
+    description: "List license plates with advanced search and filtering (extends 05.1)"
+    file: "apps/frontend/app/api/warehouse/license-plates/route.ts"
+    auth: "required"
+    roles: ["warehouse_manager", "warehouse_operator", "production_manager", "production_operator", "admin", "owner", "viewer"]
+
+    # Extended query parameters (additions to 05.1)
+    query_params:
+      # Search (from 05.1 + enhanced)
+      search:
+        type: "string"
+        required: false
+        min_length: 2
+        description: "LP number prefix search (min 2 chars, case-insensitive)"
+        example: "LP000001"
+
+      batch_number:
+        type: "string"
+        required: false
+        description: "Exact batch number match (case-insensitive)"
+        example: "BATCH-2025-001"
+
+      # Single filters (from 05.1)
+      product_id:
+        type: "uuid"
+        required: false
+        description: "Filter by single product UUID"
+
+      warehouse_id:
+        type: "uuid"
+        required: false
+        description: "Filter by single warehouse UUID"
+
+      location_id:
+        type: "uuid"
+        required: false
+        description: "Filter by single location UUID"
+
+      status:
+        type: "enum"
+        enum: ["available", "reserved", "consumed", "blocked"]
+        required: false
+        description: "Filter by single status"
+
+      qa_status:
+        type: "enum"
+        enum: ["pending", "passed", "failed", "quarantine"]
+        required: false
+        description: "Filter by single QA status"
+
+      # NEW: Array filters
+      product_ids:
+        type: "uuid[]"
+        required: false
+        description: "Filter by multiple product UUIDs (comma-separated or repeated params)"
+        example: "product_ids=uuid1,uuid2,uuid3"
+        note: "If both product_id and product_ids provided, product_ids takes precedence"
+
+      location_ids:
+        type: "uuid[]"
+        required: false
+        description: "Filter by multiple location UUIDs"
+        example: "location_ids=uuid1,uuid2"
+        note: "If both location_id and location_ids provided, location_ids takes precedence"
+
+      statuses:
+        type: "enum[]"
+        enum: ["available", "reserved", "consumed", "blocked"]
+        required: false
+        description: "Filter by multiple statuses (OR logic)"
+        example: "statuses=available,reserved"
+
+      qa_statuses:
+        type: "enum[]"
+        enum: ["pending", "passed", "failed", "quarantine"]
+        required: false
+        description: "Filter by multiple QA statuses (OR logic)"
+        example: "qa_statuses=pending,passed"
+
+      # NEW: Date range filters
+      expiry_before:
+        type: "date"
+        format: "YYYY-MM-DD"
+        required: false
+        description: "Filter LPs expiring before this date (inclusive)"
+        example: "2025-03-31"
+
+      expiry_after:
+        type: "date"
+        format: "YYYY-MM-DD"
+        required: false
+        description: "Filter LPs expiring after this date (inclusive)"
+        example: "2025-01-01"
+
+      created_before:
+        type: "datetime"
+        required: false
+        description: "Filter LPs created before this datetime"
+        example: "2025-12-31T23:59:59Z"
+
+      created_after:
+        type: "datetime"
+        required: false
+        description: "Filter LPs created after this datetime"
+        example: "2025-01-01T00:00:00Z"
+
+      # Sort & pagination (from 05.1 + enhanced)
+      sort:
+        type: "enum"
+        enum: ["lp_number", "created_at", "expiry_date", "quantity", "batch_number"]
+        default: "created_at"
+        description: "Sort field"
+
+      order:
+        type: "enum"
+        enum: ["asc", "desc"]
+        default: "desc"
+        description: "Sort order"
+
+      page:
+        type: "integer"
+        default: 1
+        min: 1
+        description: "Page number"
+
+      limit:
+        type: "integer"
+        default: 50
+        min: 1
+        max: 200
+        description: "Items per page (max 200)"
+
+    # Response schema (same as 05.1)
+    response:
+      status: 200
+      type: "PaginatedResult<LicensePlate>"
+      schema:
+        data:
+          type: "array"
+          items:
+            type: "LicensePlate"
+            properties:
+              id: "uuid"
+              lp_number: "string"
+              product_id: "uuid"
+              product:
+                name: "string"
+                code: "string"
+              quantity: "number"
+              uom: "string"
+              location_id: "uuid"
+              location:
+                id: "uuid"
+                name: "string"
+                full_path: "string"
+              warehouse_id: "uuid"
+              warehouse:
+                id: "uuid"
+                name: "string"
+                code: "string"
+              status: "LPStatus"
+              qa_status: "QAStatus"
+              batch_number: "string | null"
+              supplier_batch_number: "string | null"
+              expiry_date: "string | null"
+              manufacture_date: "string | null"
+              catch_weight_kg: "number | null"
+              created_at: "string"
+              updated_at: "string"
+        pagination:
+          page: "number"
+          limit: "number"
+          total: "number"
+          total_pages: "number"
+
+    errors:
+      - status: 400
+        code: "INVALID_SEARCH_TERM"
+        message: "Search term must be at least 2 characters"
+        when: "search param provided but < 2 chars"
+
+      - status: 400
+        code: "INVALID_DATE_RANGE"
+        message: "expiry_before must be greater than or equal to expiry_after"
+        when: "expiry_before < expiry_after"
+
+      - status: 400
+        code: "INVALID_DATE_FORMAT"
+        message: "Date must be in YYYY-MM-DD format"
+        when: "Date param doesn't match ISO format"
+
+      - status: 400
+        code: "INVALID_UUID"
+        message: "Invalid UUID format for {param_name}"
+        when: "UUID param not valid"
+
+      - status: 400
+        code: "PAGE_SIZE_EXCEEDED"
+        message: "Maximum page size is 200"
+        when: "limit > 200 requested"
+
+      - status: 401
+        code: "UNAUTHORIZED"
+        message: "Unauthorized"
+        when: "No valid JWT token"
+
+# Query examples
+query_examples:
+  simple_search:
+    description: "Search by LP number prefix"
+    url: "GET /api/warehouse/license-plates?search=LP000001"
+
+  product_filter:
+    description: "Filter by single product"
+    url: "GET /api/warehouse/license-plates?product_id=uuid&status=available"
+
+  multiple_products:
+    description: "Filter by multiple products"
+    url: "GET /api/warehouse/license-plates?product_ids=uuid1,uuid2,uuid3"
+
+  batch_search:
+    description: "Search by batch number"
+    url: "GET /api/warehouse/license-plates?batch_number=BATCH-2025-001"
+
+  expiry_range:
+    description: "Filter by expiry date range"
+    url: "GET /api/warehouse/license-plates?expiry_after=2025-01-01&expiry_before=2025-03-31"
+
+  complex_filter:
+    description: "Complex multi-filter query"
+    url: "GET /api/warehouse/license-plates?product_id=uuid&warehouse_id=uuid&status=available&qa_status=passed&expiry_after=2025-02-01&sort=expiry_date&order=asc"
+
+  multiple_statuses:
+    description: "Filter by multiple statuses"
+    url: "GET /api/warehouse/license-plates?statuses=available,reserved"
+
+  pagination:
+    description: "Page 2 with 100 items"
+    url: "GET /api/warehouse/license-plates?page=2&limit=100&sort=created_at&order=desc"
+
+# Service layer updates
+services:
+  - path: "apps/frontend/lib/services/license-plate-service.ts"
+    description: "Extended list method with advanced filters"
+    changes:
+      - method: "list"
+        type: "modify"
+        description: "Add support for array filters and date ranges"
+
+    exports:
+      - name: "LicensePlateListParams"
+        type: "interface"
+        description: "Extended with new filter params"
+        fields:
+          # Existing from 05.1
+          - "search?: string"
+          - "warehouse_id?: string"
+          - "location_id?: string"
+          - "product_id?: string"
+          - "status?: LPStatus"
+          - "qa_status?: QAStatus"
+          - "batch_number?: string"
+          - "expiry_before?: string"
+          - "expiry_after?: string"
+          - "sort?: string"
+          - "order?: 'asc' | 'desc'"
+          - "page?: number"
+          - "limit?: number"
+          # NEW additions
+          - "product_ids?: string[]"
+          - "location_ids?: string[]"
+          - "statuses?: LPStatus[]"
+          - "qa_statuses?: QAStatus[]"
+          - "created_before?: string"
+          - "created_after?: string"
+
+      - name: "searchByBatch"
+        type: "async function"
+        params:
+          - "batch_number: string"
+        returns: "Promise<LicensePlate[]>"
+        description: "Search LPs by batch number (exact match)"
+
+      - name: "getExpiringSoon"
+        type: "async function"
+        params:
+          - "days: number = 30"
+        returns: "Promise<LicensePlate[]>"
+        description: "Get LPs expiring within days (preset filter)"
+
+      - name: "getAvailableStock"
+        type: "async function"
+        params:
+          - "product_ids: string[]"
+          - "warehouse_id?: string"
+        returns: "Promise<LicensePlate[]>"
+        description: "Get available+passed LPs for products (preset filter)"
+
+# Validation schema updates
+validation:
+  path: "apps/frontend/lib/validation/license-plate.ts"
+  changes:
+    - schema: "lpQuerySchema"
+      type: "extend"
+      description: "Add array filter and date range validation"
+
+  extended_schema: |
+    export const lpQuerySchema = z.object({
+      // Search
+      search: z.string().min(2, "Search term must be at least 2 characters").optional(),
+      batch_number: z.string().max(100).optional(),
+
+      // Single filters
+      product_id: z.string().uuid().optional(),
+      warehouse_id: z.string().uuid().optional(),
+      location_id: z.string().uuid().optional(),
+      status: lpStatusEnum.optional(),
+      qa_status: qaStatusEnum.optional(),
+
+      // Array filters (NEW)
+      product_ids: z.array(z.string().uuid()).optional(),
+      location_ids: z.array(z.string().uuid()).optional(),
+      statuses: z.array(lpStatusEnum).optional(),
+      qa_statuses: z.array(qaStatusEnum).optional(),
+
+      // Date range filters (NEW)
+      expiry_before: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD").optional(),
+      expiry_after: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD").optional(),
+      created_before: z.string().datetime().optional(),
+      created_after: z.string().datetime().optional(),
+
+      // Sort & pagination
+      sort: z.enum(['lp_number', 'created_at', 'expiry_date', 'quantity', 'batch_number']).default('created_at'),
+      order: z.enum(['asc', 'desc']).default('desc'),
+      page: z.coerce.number().int().positive().default(1),
+      limit: z.coerce.number().int().min(1).max(200).default(50),
+    }).refine(
+      (data) => {
+        if (data.expiry_before && data.expiry_after) {
+          return new Date(data.expiry_before) >= new Date(data.expiry_after);
+        }
+        return true;
+      },
+      {
+        message: "expiry_before must be greater than or equal to expiry_after",
+        path: ["expiry_before"],
+      }
+    );
+
+# Filter logic rules
+filter_logic:
+  combination: "AND"
+  description: "All filters combined with AND logic"
+  rules:
+    - name: "Single vs Array"
+      rule: "If both single (product_id) and array (product_ids) provided, array takes precedence"
+
+    - name: "Within Array"
+      rule: "Multiple values within same filter use OR logic"
+      example: "statuses=[available, reserved] means status=available OR status=reserved"
+
+    - name: "NULL Handling - Expiry"
+      rule: "NULL expiry_date excluded from expiry range filters"
+      rationale: "Products without expiry shouldn't appear in expiry-based queries"
+
+    - name: "NULL Handling - Batch"
+      rule: "NULL batch_number excluded from batch search"
+      rationale: "Exact match filter shouldn't return NULL values"
+
+    - name: "Case Sensitivity"
+      rule: "LP number search is case-insensitive (ILIKE), batch number search is case-insensitive"
+
+    - name: "Empty Filter"
+      rule: "Empty or omitted filter = no restriction on that field"
+
+    - name: "Date Range Inclusive"
+      rule: "expiry_before and expiry_after are inclusive (>= and <=)"
+
+# Implementation patterns
+patterns:
+  query_builder: |
+    // Service method pattern - extend existing list()
+    static async list(params: LicensePlateListParams): Promise<PaginatedResult<LicensePlate>> {
+      const supabase = getSupabaseClient();
+      let query = supabase
+        .from('license_plates')
+        .select(`
+          *,
+          product:products(id, name, code),
+          location:locations(id, name, full_path),
+          warehouse:warehouses(id, name, code)
+        `, { count: 'exact' });
+
+      // Search by LP number (prefix)
+      if (params.search) {
+        query = query.ilike('lp_number', `${params.search}%`);
+      }
+
+      // Filter by batch (exact, case-insensitive)
+      if (params.batch_number) {
+        query = query.ilike('batch_number', params.batch_number);
+      }
+
+      // Filter by product(s) - array takes precedence
+      if (params.product_ids?.length) {
+        query = query.in('product_id', params.product_ids);
+      } else if (params.product_id) {
+        query = query.eq('product_id', params.product_id);
+      }
+
+      // Filter by warehouse
+      if (params.warehouse_id) {
+        query = query.eq('warehouse_id', params.warehouse_id);
+      }
+
+      // Filter by location(s) - array takes precedence
+      if (params.location_ids?.length) {
+        query = query.in('location_id', params.location_ids);
+      } else if (params.location_id) {
+        query = query.eq('location_id', params.location_id);
+      }
+
+      // Filter by status(es) - array takes precedence
+      if (params.statuses?.length) {
+        query = query.in('status', params.statuses);
+      } else if (params.status) {
+        query = query.eq('status', params.status);
+      }
+
+      // Filter by QA status(es) - array takes precedence
+      if (params.qa_statuses?.length) {
+        query = query.in('qa_status', params.qa_statuses);
+      } else if (params.qa_status) {
+        query = query.eq('qa_status', params.qa_status);
+      }
+
+      // Filter by expiry date range
+      if (params.expiry_before) {
+        query = query.lte('expiry_date', params.expiry_before);
+      }
+      if (params.expiry_after) {
+        query = query.gte('expiry_date', params.expiry_after);
+      }
+
+      // Filter by created date range
+      if (params.created_before) {
+        query = query.lte('created_at', params.created_before);
+      }
+      if (params.created_after) {
+        query = query.gte('created_at', params.created_after);
+      }
+
+      // Sort with NULL handling
+      const sortField = params.sort || 'created_at';
+      const sortOrder = params.order || 'desc';
+      query = query.order(sortField, { ascending: sortOrder === 'asc', nullsFirst: false });
+
+      // Pagination with max enforcement
+      const page = params.page || 1;
+      const limit = Math.min(params.limit || 50, 200);
+      const offset = (page - 1) * limit;
+      query = query.range(offset, offset + limit - 1);
+
+      const { data, error, count } = await query;
+
+      if (error) throw error;
+
+      return {
+        data: data || [],
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          total_pages: Math.ceil((count || 0) / limit),
+        },
+      };
+    }
+
+  preset_filters: |
+    // Preset filter methods for common queries
+    static async getExpiringSoon(days: number = 30): Promise<LicensePlate[]> {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + days);
+
+      return this.list({
+        status: 'available',
+        expiry_before: futureDate.toISOString().split('T')[0],
+        sort: 'expiry_date',
+        order: 'asc',
+        limit: 200,
+      }).then(res => res.data);
+    }
+
+    static async getAvailableStock(product_ids: string[], warehouse_id?: string): Promise<LicensePlate[]> {
+      return this.list({
+        product_ids,
+        warehouse_id,
+        status: 'available',
+        qa_status: 'passed',
+        sort: 'created_at',
+        order: 'asc',
+        limit: 200,
+      }).then(res => res.data);
+    }
+
+    static async searchByBatch(batch_number: string): Promise<LicensePlate[]> {
+      return this.list({ batch_number, limit: 200 }).then(res => res.data);
+    }

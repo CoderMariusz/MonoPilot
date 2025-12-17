@@ -1,0 +1,168 @@
+# Story 05.18 - Database Schema
+# Purpose: Table updates, genealogy records, transaction handling
+# Agent: BACKEND-DEV (database focus)
+
+# No new migrations - uses existing tables from 05.1 and 05.2
+migrations: []
+
+# Tables modified by merge operation
+tables:
+  - name: "license_plates"
+    description: "Updated by merge - creates new LP, marks sources as consumed"
+    operation: "UPDATE/INSERT"
+    fields_updated:
+      source_lps:
+        - status: "consumed"
+        - consumed_by_wo_id: "NULL (warehouse operation)"
+        - updated_at: "current timestamp"
+      new_lp:
+        - id: "gen_random_uuid()"
+        - org_id: "from source LPs"
+        - lp_number: "auto-generated"
+        - product_id: "from source LPs (must match)"
+        - quantity: "SUM of all source LP quantities"
+        - uom: "from source LPs (must match)"
+        - location_id: "target location or first source LP"
+        - warehouse_id: "from source LPs (must match)"
+        - status: "available"
+        - qa_status: "from source LPs (must match)"
+        - batch_number: "from source LPs (must match, can be NULL)"
+        - expiry_date: "from source LPs (must match, can be NULL)"
+        - manufacture_date: "from first source LP"
+        - source: "merge"
+        - parent_lp_id: "first source LP id"
+        - created_at: "NOW()"
+        - created_by: "current user id"
+    indexes_used:
+      - "idx_lp_org_status (for querying available LPs)"
+      - "idx_lp_org_product (for merge validation)"
+
+  - name: "lp_genealogy"
+    description: "Records parent-child relationships for merge operation"
+    operation: "INSERT (via LPGenealogyService.linkMerge)"
+    fields_created:
+      - id: "gen_random_uuid()"
+      - org_id: "from context"
+      - parent_lp_id: "each source LP ID"
+      - child_lp_id: "new merged LP ID"
+      - operation_type: "merge"
+      - quantity: "quantity from each source LP"
+      - operation_date: "current timestamp"
+      - wo_id: "NULL (not a production operation)"
+      - is_reversed: "false"
+      - created_at: "NOW()"
+      - created_by: "current user id"
+
+# Merge validation rules (business logic)
+validation_rules:
+  same_product:
+    field: "product_id"
+    rule: "All source LPs must have same product_id"
+    error: "All LPs must be the same product for merge"
+
+  same_batch:
+    field: "batch_number"
+    rule: "All source LPs must have same batch_number (NULL equals NULL)"
+    error: "All LPs must have the same batch number for merge"
+    null_handling: "NULL is considered equal to NULL"
+
+  same_expiry:
+    field: "expiry_date"
+    rule: "All source LPs must have same expiry_date (NULL equals NULL)"
+    error: "All LPs must have the same expiry date for merge"
+    null_handling: "NULL is considered equal to NULL"
+
+  same_qa_status:
+    field: "qa_status"
+    rule: "All source LPs must have same qa_status"
+    error: "All LPs must have the same QA status for merge"
+    allowed_values: ["pending", "passed", "failed", "quarantine"]
+
+  all_available:
+    field: "status"
+    rule: "All source LPs must have status='available'"
+    error: "All LPs must have status='available' for merge. {lp_number} is '{status}'"
+
+  same_warehouse:
+    field: "warehouse_id"
+    rule: "All source LPs must be in same warehouse"
+    error: "All LPs must be in the same warehouse for merge"
+
+  same_uom:
+    field: "uom"
+    rule: "All source LPs must have same UoM"
+    error: "All LPs must have the same UoM for merge"
+
+  minimum_count:
+    rule: "At least 2 LPs required"
+    error: "At least 2 LPs required for merge operation"
+
+  maximum_count:
+    rule: "Maximum 20 LPs per merge"
+    error: "Maximum 20 LPs can be merged at once"
+
+# Transaction pattern
+transaction:
+  description: "Merge must be atomic - all steps succeed or all fail"
+  steps:
+    - step: 1
+      action: "Validate all source LPs"
+      rollback_on_failure: true
+    - step: 2
+      action: "Create new merged LP"
+      rollback_on_failure: true
+    - step: 3
+      action: "Mark source LPs as consumed"
+      rollback_on_failure: true
+    - step: 4
+      action: "Create genealogy links via LPGenealogyService.linkMerge()"
+      rollback_on_failure: true
+  isolation_level: "READ COMMITTED"
+  timeout_ms: 5000
+
+# Query patterns for merge
+queries:
+  fetch_source_lps:
+    description: "Get all source LPs with product and warehouse info"
+    sql: |
+      SELECT
+        lp.*,
+        p.name as product_name,
+        p.code as product_code,
+        w.name as warehouse_name
+      FROM license_plates lp
+      JOIN products p ON lp.product_id = p.id
+      JOIN warehouses w ON lp.warehouse_id = w.id
+      WHERE lp.id = ANY($1)
+        AND lp.org_id = $2
+    expected_time: "<100ms"
+
+  update_source_status:
+    description: "Mark source LPs as consumed"
+    sql: |
+      UPDATE license_plates
+      SET
+        status = 'consumed',
+        consumed_by_wo_id = NULL,
+        updated_at = NOW()
+      WHERE id = ANY($1)
+        AND org_id = $2
+    expected_time: "<100ms for 5 LPs"
+
+  create_merged_lp:
+    description: "Insert new merged LP"
+    sql: |
+      INSERT INTO license_plates (
+        org_id, product_id, quantity, uom, location_id, warehouse_id,
+        status, qa_status, batch_number, expiry_date, manufacture_date,
+        source, parent_lp_id, created_by
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, 'available', $7, $8, $9, $10, 'merge', $11, $12)
+      RETURNING *
+    expected_time: "<100ms"
+
+# RLS considerations
+rls:
+  policy: "All operations filtered by org_id"
+  cross_tenant: "Returns 404 for LPs not in user's org"
+  validation: "Source LP org_id verified before merge"

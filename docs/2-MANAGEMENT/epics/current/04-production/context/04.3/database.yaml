@@ -1,0 +1,210 @@
+# Story 04.3 - Database Schema
+# Purpose: Tables, RLS policies, triggers, indexes, seed data
+# Agent: BACKEND-DEV (database focus)
+
+migrations:
+  - path: "supabase/migrations/XXX_create_operation_logs_table.sql"
+    type: "migration"
+    description: "Operation audit log table with status change tracking"
+  - path: "supabase/migrations/XXX_operation_logs_rls_policies.sql"
+    type: "migration"
+    description: "RLS policies for operation_logs (org isolation, immutable)"
+  - path: "supabase/migrations/XXX_operation_status_change_trigger.sql"
+    type: "migration"
+    description: "Auto-create operation_logs on wo_operations status change"
+
+# Existing Table Reference (from Story 03.12)
+existing_tables:
+  - name: "wo_operations"
+    description: "Work order operations - exists from Story 03.12"
+    fields_used:
+      - { name: "status", description: "pending | in_progress | completed | skipped" }
+      - { name: "started_at", description: "Set on start" }
+      - { name: "started_by", description: "User ID who started" }
+      - { name: "completed_at", description: "Set on complete" }
+      - { name: "completed_by", description: "User ID who completed" }
+      - { name: "actual_duration_minutes", description: "Calculated on complete" }
+      - { name: "actual_yield_percent", description: "Captured on complete" }
+      - { name: "expected_duration_minutes", description: "From routing template" }
+      - { name: "expected_yield_percent", description: "From routing template" }
+      - { name: "sequence", description: "Operation order in WO" }
+
+# New Tables
+tables:
+  - name: "operation_logs"
+    description: "Audit log for operation status changes"
+    columns:
+      - { name: "id", type: "UUID", constraints: "PRIMARY KEY DEFAULT gen_random_uuid()" }
+      - { name: "operation_id", type: "UUID", constraints: "NOT NULL REFERENCES wo_operations(id) ON DELETE CASCADE" }
+      - { name: "organization_id", type: "UUID", constraints: "NOT NULL REFERENCES organizations(id) ON DELETE CASCADE" }
+      - { name: "event_type", type: "TEXT", constraints: "NOT NULL CHECK (event_type IN ('started', 'completed', 'updated', 'skipped'))" }
+      - { name: "timestamp", type: "TIMESTAMPTZ", constraints: "NOT NULL DEFAULT NOW()" }
+      - { name: "user_id", type: "UUID", constraints: "NOT NULL REFERENCES users(id)" }
+      - { name: "old_status", type: "TEXT", constraints: "" }
+      - { name: "new_status", type: "TEXT", constraints: "" }
+      - { name: "metadata", type: "JSONB", constraints: "" }
+      - { name: "notes", type: "TEXT", constraints: "" }
+      - { name: "created_at", type: "TIMESTAMPTZ", constraints: "DEFAULT NOW()" }
+    rls: true
+    rls_pattern: "organization_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+    immutable: true
+    indexes:
+      - "idx_op_logs_operation ON operation_logs(operation_id)"
+      - "idx_op_logs_org ON operation_logs(organization_id)"
+      - "idx_op_logs_timestamp ON operation_logs(timestamp DESC)"
+      - "idx_op_logs_event_type ON operation_logs(event_type)"
+      - "idx_op_logs_user ON operation_logs(user_id)"
+    notes:
+      - "Logs are immutable - no UPDATE or DELETE policies"
+      - "metadata JSONB stores: actual_yield_percent, duration_minutes, etc."
+      - "Auto-populated via trigger on wo_operations status change"
+
+# RLS Policies (ADR-013)
+rls_policies:
+  pattern: "Users Table Lookup"
+  pattern_sql: "(SELECT org_id FROM users WHERE id = auth.uid())"
+
+  policies:
+    - table: "operation_logs"
+      name: "op_logs_select"
+      operation: "SELECT"
+      using: "organization_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only read logs from their organization"
+
+    - table: "operation_logs"
+      name: "op_logs_insert"
+      operation: "INSERT"
+      with_check: "organization_id = (SELECT org_id FROM users WHERE id = auth.uid())"
+      description: "Users can only insert logs for their organization"
+
+    # Note: No UPDATE or DELETE policies - logs are immutable
+
+# Database Trigger
+triggers:
+  - name: "tr_log_operation_status_change"
+    table: "wo_operations"
+    event: "AFTER UPDATE OF status"
+    description: "Auto-create operation_logs record when status changes"
+    function: "log_operation_status_change()"
+    function_body: |
+      CREATE OR REPLACE FUNCTION log_operation_status_change()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        -- Only log if status changed
+        IF OLD.status IS DISTINCT FROM NEW.status THEN
+          INSERT INTO operation_logs (
+            operation_id,
+            organization_id,
+            event_type,
+            user_id,
+            old_status,
+            new_status,
+            metadata
+          )
+          VALUES (
+            NEW.id,
+            NEW.organization_id,
+            CASE
+              WHEN NEW.status = 'in_progress' THEN 'started'
+              WHEN NEW.status = 'completed' THEN 'completed'
+              WHEN NEW.status = 'skipped' THEN 'skipped'
+              ELSE 'updated'
+            END,
+            auth.uid(),
+            OLD.status,
+            NEW.status,
+            jsonb_build_object(
+              'actual_yield_percent', NEW.actual_yield_percent,
+              'actual_duration_minutes', NEW.actual_duration_minutes
+            )
+          );
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+# Status Enum Values (existing in wo_operations)
+operation_status_enum:
+  values:
+    - "pending"
+    - "in_progress"
+    - "completed"
+    - "skipped"
+  transitions:
+    - { from: "pending", to: "in_progress", action: "start" }
+    - { from: "in_progress", to: "completed", action: "complete" }
+    - { from: "pending", to: "skipped", action: "skip" }
+    - { from: "in_progress", to: "pending", action: "reset (admin only, Phase 1)" }
+
+# Duration Calculation
+duration_calculation:
+  formula: "ROUND(EXTRACT(EPOCH FROM (completed_at - started_at)) / 60)"
+  unit: "minutes"
+  rounding: "nearest minute"
+  notes:
+    - "Calculated on complete, not stored incrementally"
+    - "If started_at or completed_at is null, duration is null"
+
+# Yield Constraints
+yield_constraints:
+  field: "actual_yield_percent"
+  type: "DECIMAL(5,2)"
+  min: 0
+  max: 100
+  required_on_complete: true
+  notes:
+    - "Required when completing operation (unless expected_yield_percent is null)"
+    - "Variance = actual_yield_percent - expected_yield_percent"
+
+# Settings Reference (from production_settings table)
+settings_reference:
+  table: "production_settings"
+  relevant_fields:
+    - name: "require_operation_sequence"
+      type: "BOOLEAN"
+      default: true
+      description: "If true, operations must be started in sequence order"
+    - name: "allow_pause_wo"
+      type: "BOOLEAN"
+      default: false
+      description: "Referenced to check if WO can be paused (affects operation state)"
+
+# Sample Queries
+sample_queries:
+  get_operations_with_status: |
+    SELECT
+      wo.id,
+      wo.sequence,
+      wo.operation_name,
+      wo.status,
+      wo.started_at,
+      wo.completed_at,
+      wo.actual_duration_minutes,
+      wo.expected_duration_minutes,
+      wo.actual_yield_percent,
+      wo.expected_yield_percent,
+      started_by_user.first_name || ' ' || started_by_user.last_name as started_by_name,
+      completed_by_user.first_name || ' ' || completed_by_user.last_name as completed_by_name
+    FROM wo_operations wo
+    LEFT JOIN users started_by_user ON wo.started_by = started_by_user.id
+    LEFT JOIN users completed_by_user ON wo.completed_by = completed_by_user.id
+    WHERE wo.wo_id = :wo_id
+    ORDER BY wo.sequence ASC;
+
+  check_sequence_can_start: |
+    -- Returns true if all prior operations are completed or skipped
+    SELECT NOT EXISTS (
+      SELECT 1 FROM wo_operations
+      WHERE wo_id = :wo_id
+        AND sequence < :current_sequence
+        AND status NOT IN ('completed', 'skipped')
+    ) AS can_start;
+
+  get_operation_logs: |
+    SELECT
+      ol.*,
+      u.first_name || ' ' || u.last_name as user_name
+    FROM operation_logs ol
+    JOIN users u ON ol.user_id = u.id
+    WHERE ol.operation_id = :operation_id
+    ORDER BY ol.timestamp DESC;

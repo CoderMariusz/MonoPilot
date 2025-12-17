@@ -1,0 +1,498 @@
+# Story 04.3 - Frontend Specification
+# Purpose: Components, hooks, services, types, UX patterns
+# Agent: FRONTEND-DEV
+
+# This is a full-stack story with significant frontend work
+is_backend_focused: false
+
+# UX Reference
+ux:
+  wireframes:
+    - id: "PROD-002"
+      path: "docs/3-ARCHITECTURE/ux/wireframes/PROD-002-wo-execution-detail.md"
+      sections:
+        - "Operations Timeline (Section 5)"
+        - "Complete Operation Modal (Section 4.4)"
+      relevance: "Operations timeline UI, start/complete buttons, modal specs"
+
+  patterns:
+    table: "ShadCN DataTable for operations list"
+    modal: "ShadCN Dialog for complete operation"
+    timeline: "Custom timeline with status indicators"
+    buttons: "ShadCN Button with loading states"
+    toast: "ShadCN Toast for success/error notifications"
+    badge: "ShadCN Badge for status indicators"
+
+  states:
+    - "loading"
+    - "empty (no operations)"
+    - "error"
+    - "success"
+
+# Components
+components:
+  - path: "apps/frontend/components/production/operations/OperationsTimeline.tsx"
+    description: "Main timeline view of all operations for a WO"
+    props:
+      - { name: "woId", type: "string", required: true }
+      - { name: "operations", type: "WOOperation[]", required: true }
+      - { name: "onOperationSelect", type: "(op: WOOperation) => void", required: false }
+      - { name: "isLoading", type: "boolean", required: false }
+    state:
+      - "selectedOperationId: string | null"
+    features:
+      - "Vertical timeline with progress line"
+      - "Color-coded status indicators"
+      - "Sequence numbers"
+      - "Duration display (expected vs actual)"
+      - "Sequence enforcement indicator"
+
+  - path: "apps/frontend/components/production/operations/OperationCard.tsx"
+    description: "Single operation card with Start/Complete buttons"
+    props:
+      - { name: "operation", type: "WOOperation", required: true }
+      - { name: "canStart", type: "boolean", required: true }
+      - { name: "onStart", type: "() => void", required: true }
+      - { name: "onComplete", type: "() => void", required: true }
+      - { name: "onClick", type: "() => void", required: false }
+      - { name: "sequenceBlocked", type: "boolean", required: false }
+      - { name: "sequenceBlockReason", type: "string", required: false }
+    displays:
+      - "Sequence number"
+      - "Operation name"
+      - "Machine assignment (if any)"
+      - "Expected duration"
+      - "Status badge (color-coded)"
+      - "Start/Complete buttons (context-sensitive)"
+      - "Actual duration (if completed)"
+      - "Yield (if completed)"
+
+  - path: "apps/frontend/components/production/operations/OperationStatusBadge.tsx"
+    description: "Status badge with color coding"
+    props:
+      - { name: "status", type: "OperationStatus", required: true }
+    badge_colors:
+      pending: "bg-gray-100 text-gray-700"
+      in_progress: "bg-yellow-100 text-yellow-800"
+      completed: "bg-green-100 text-green-800"
+      skipped: "bg-red-100 text-red-800"
+
+  - path: "apps/frontend/components/production/operations/OperationDetailPanel.tsx"
+    description: "Detailed operation view (slide-over panel)"
+    props:
+      - { name: "operation", type: "WOOperation", required: true }
+      - { name: "logs", type: "OperationLog[]", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+    displays:
+      - "Full description"
+      - "Instructions"
+      - "Expected vs actual times"
+      - "Expected vs actual yield"
+      - "Started/completed by user names"
+      - "Operation logs history"
+
+  - path: "apps/frontend/components/production/operations/StartOperationButton.tsx"
+    description: "Start button with confirmation and validation"
+    props:
+      - { name: "operation", type: "WOOperation", required: true }
+      - { name: "onStart", type: "() => Promise<void>", required: true }
+      - { name: "disabled", type: "boolean", required: false }
+      - { name: "disabledReason", type: "string", required: false }
+    features:
+      - "Confirmation dialog: 'Start operation [name]?'"
+      - "Loading state during API call"
+      - "Disabled state with tooltip for blocked operations"
+
+  - path: "apps/frontend/components/production/operations/CompleteOperationModal.tsx"
+    description: "Modal to capture yield on complete"
+    props:
+      - { name: "operation", type: "WOOperation", required: true }
+      - { name: "open", type: "boolean", required: true }
+      - { name: "onClose", type: "() => void", required: true }
+      - { name: "onComplete", type: "(input: CompleteOperationInput) => Promise<void>", required: true }
+    fields:
+      - { name: "actual_yield_percent", type: "number", required: true, min: 0, max: 100 }
+      - { name: "notes", type: "textarea", required: false, maxLength: 2000 }
+    displays:
+      - "Operation name"
+      - "Started at time"
+      - "Current duration"
+      - "Expected duration (comparison)"
+    buttons:
+      - { label: "Cancel", variant: "outline" }
+      - { label: "Complete", variant: "default", loading: true }
+
+  - path: "apps/frontend/components/production/operations/OperationProgressBar.tsx"
+    description: "Visual progress (completed/total operations)"
+    props:
+      - { name: "completed", type: "number", required: true }
+      - { name: "total", type: "number", required: true }
+      - { name: "inProgress", type: "number", required: false }
+
+  - path: "apps/frontend/components/production/operations/OperationLogsHistory.tsx"
+    description: "Audit log timeline"
+    props:
+      - { name: "logs", type: "OperationLog[]", required: true }
+      - { name: "isLoading", type: "boolean", required: false }
+    displays:
+      - "Event type icon"
+      - "User name"
+      - "Timestamp (relative and absolute)"
+      - "Status change (old -> new)"
+      - "Metadata (yield, duration if present)"
+
+  - path: "apps/frontend/components/production/operations/DurationVarianceIndicator.tsx"
+    description: "Shows duration variance with color coding"
+    props:
+      - { name: "expected", type: "number | null", required: true }
+      - { name: "actual", type: "number | null", required: true }
+    color_rules:
+      - { condition: "within 10% expected", color: "text-gray-600" }
+      - { condition: "10-25% over expected", color: "text-yellow-600" }
+      - { condition: ">25% over expected", color: "text-red-600" }
+
+  - path: "apps/frontend/components/production/operations/YieldVarianceIndicator.tsx"
+    description: "Shows yield variance with color coding"
+    props:
+      - { name: "expected", type: "number | null", required: true }
+      - { name: "actual", type: "number | null", required: true }
+    color_rules:
+      - { condition: "within 5pp expected", color: "text-gray-600" }
+      - { condition: "5-10pp below expected", color: "text-yellow-600" }
+      - { condition: ">10pp below expected", color: "text-red-600" }
+
+# Hooks
+hooks:
+  - path: "apps/frontend/lib/hooks/use-operations.ts"
+    description: "React Query hook for fetching WO operations"
+    exports:
+      - name: "useOperations"
+        params:
+          - "woId: string"
+        returns: "UseQueryResult<WOOperation[]>"
+        queryKey: "['operations', woId]"
+        staleTime: 30000
+
+  - path: "apps/frontend/lib/hooks/use-operation-logs.ts"
+    description: "React Query hook for fetching operation audit logs"
+    exports:
+      - name: "useOperationLogs"
+        params:
+          - "operationId: string"
+        returns: "UseQueryResult<OperationLog[]>"
+        queryKey: "['operation-logs', operationId]"
+
+  - path: "apps/frontend/lib/hooks/use-start-operation.ts"
+    description: "Mutation hook for starting operation"
+    exports:
+      - name: "useStartOperation"
+        returns: "UseMutationResult<WOOperation, Error, StartOperationParams>"
+        invalidates: "['operations', woId]"
+
+  - path: "apps/frontend/lib/hooks/use-complete-operation.ts"
+    description: "Mutation hook for completing operation"
+    exports:
+      - name: "useCompleteOperation"
+        returns: "UseMutationResult<WOOperation, Error, CompleteOperationParams>"
+        invalidates: "['operations', woId]"
+
+# Services (Frontend)
+services:
+  - path: "apps/frontend/lib/services/operation-client-service.ts"
+    description: "Client-side service for operation API calls"
+    exports:
+      - name: "getOperations"
+        params: ["woId: string"]
+        returns: "Promise<WOOperation[]>"
+
+      - name: "startOperation"
+        params:
+          - "operationId: string"
+          - "options?: StartOperationOptions"
+        returns: "Promise<WOOperation>"
+
+      - name: "completeOperation"
+        params:
+          - "operationId: string"
+          - "input: CompleteOperationInput"
+        returns: "Promise<WOOperation>"
+
+      - name: "getOperationLogs"
+        params: ["operationId: string"]
+        returns: "Promise<OperationLog[]>"
+
+# Page Integration
+pages:
+  - path: "apps/frontend/app/(authenticated)/production/work-orders/[id]/page.tsx"
+    description: "WO detail page with operations section"
+    sections:
+      - "WO Header (from 04.2a)"
+      - "Operations Timeline (this story)"
+      - "Materials Tab (Phase 1)"
+      - "Outputs Tab (Phase 1)"
+    notes:
+      - "Operations section shows below WO header"
+      - "Timeline view showing all operations vertically"
+      - "Each operation displayed as a card"
+
+# UI Flow
+ui_flow:
+  start_operation:
+    steps:
+      - "1. Click 'Start' button on pending operation card"
+      - "2. Confirmation dialog: 'Start operation [name]?'"
+      - "3. On confirm: POST /api/production/operations/:id/start"
+      - "4. Success: Status badge updates, toast 'Operation started successfully'"
+      - "5. Error: Show error toast, no state change"
+    loading_state: "Button shows spinner during API call"
+
+  complete_operation:
+    steps:
+      - "1. Click 'Complete' button on in-progress operation card"
+      - "2. Modal opens with yield input"
+      - "3. Enter actual yield percentage"
+      - "4. Optionally add notes"
+      - "5. Click 'Complete'"
+      - "6. POST /api/production/operations/:id/complete"
+      - "7. Success: Modal closes, status updates, toast shows"
+      - "8. Error: Modal shows error, user can retry"
+
+  view_detail:
+    steps:
+      - "1. Click anywhere on operation card (not on buttons)"
+      - "2. Slide-over panel opens from right"
+      - "3. Shows full operation details"
+      - "4. Shows operation logs history"
+      - "5. Click outside or X to close"
+
+# Empty/Error States
+states:
+  empty:
+    trigger: "WO has no wo_operations"
+    display:
+      icon: "ClipboardList"
+      title: "No routing operations defined"
+      description: "This work order has no operations to track."
+      action: null
+
+  loading:
+    display: "Skeleton cards for operation list"
+
+  error:
+    trigger: "API error fetching operations"
+    display:
+      icon: "AlertCircle"
+      title: "Error loading operations"
+      description: "Failed to load operations. Please try again."
+      action: "Retry button"
+
+# Accessibility
+accessibility:
+  keyboard:
+    - "Tab through operation cards and buttons"
+    - "Enter to activate buttons"
+    - "Escape to close modals and panels"
+  aria:
+    - "aria-label on all buttons"
+    - "aria-describedby for disabled buttons (reason)"
+    - "role='status' for toast notifications"
+  screen_reader:
+    - "Operation status announced on change"
+    - "Loading states announced"
+    - "Error messages announced"
+
+# Toast Notifications
+toasts:
+  - trigger: "operation_started"
+    variant: "success"
+    title: "Operation started"
+    description: "Operation [name] is now in progress"
+
+  - trigger: "operation_completed"
+    variant: "success"
+    title: "Operation completed"
+    description: "Operation [name] completed with [yield]% yield"
+
+  - trigger: "start_error"
+    variant: "destructive"
+    title: "Failed to start operation"
+    description: "[error message]"
+
+  - trigger: "complete_error"
+    variant: "destructive"
+    title: "Failed to complete operation"
+    description: "[error message]"
+
+# Component Patterns
+patterns:
+  operation_card: |
+    // components/production/operations/OperationCard.tsx
+    import { Card, CardContent } from '@/components/ui/card';
+    import { Button } from '@/components/ui/button';
+    import { OperationStatusBadge } from './OperationStatusBadge';
+    import { DurationVarianceIndicator } from './DurationVarianceIndicator';
+    import { Play, CheckCircle } from 'lucide-react';
+
+    export function OperationCard({
+      operation,
+      canStart,
+      onStart,
+      onComplete,
+      onClick,
+      sequenceBlocked,
+      sequenceBlockReason,
+    }: OperationCardProps) {
+      return (
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={onClick}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {operation.sequence}
+                </span>
+                <div>
+                  <p className="font-medium">{operation.operation_name}</p>
+                  {operation.machine?.name && (
+                    <p className="text-sm text-muted-foreground">
+                      Machine: {operation.machine.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <OperationStatusBadge status={operation.status} />
+
+                {operation.status === 'pending' && (
+                  <Button
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onStart(); }}
+                    disabled={!canStart || sequenceBlocked}
+                    title={sequenceBlocked ? sequenceBlockReason : undefined}
+                  >
+                    <Play className="h-4 w-4 mr-1" />
+                    Start
+                  </Button>
+                )}
+
+                {operation.status === 'in_progress' && (
+                  <Button
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onComplete(); }}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Complete
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {operation.status === 'completed' && (
+              <div className="mt-2 flex items-center gap-4 text-sm">
+                <DurationVarianceIndicator
+                  expected={operation.expected_duration_minutes}
+                  actual={operation.actual_duration_minutes}
+                />
+                <span>Yield: {operation.actual_yield_percent}%</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      );
+    }
+
+  complete_modal: |
+    // components/production/operations/CompleteOperationModal.tsx
+    import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+    import { Button } from '@/components/ui/button';
+    import { Input } from '@/components/ui/input';
+    import { Textarea } from '@/components/ui/textarea';
+    import { Label } from '@/components/ui/label';
+    import { useForm } from 'react-hook-form';
+    import { zodResolver } from '@hookform/resolvers/zod';
+    import { completeOperationSchema } from '@/lib/validation/operation-execution';
+
+    export function CompleteOperationModal({
+      operation,
+      open,
+      onClose,
+      onComplete,
+    }: CompleteOperationModalProps) {
+      const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+        resolver: zodResolver(completeOperationSchema),
+        defaultValues: {
+          actual_yield_percent: operation.expected_yield_percent || 100,
+          notes: '',
+        },
+      });
+
+      const onSubmit = async (data: CompleteOperationInput) => {
+        await onComplete(data);
+        onClose();
+      };
+
+      const duration = operation.started_at
+        ? Math.round((Date.now() - new Date(operation.started_at).getTime()) / 60000)
+        : 0;
+
+      return (
+        <Dialog open={open} onOpenChange={onClose}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Complete Operation: {operation.operation_name}</DialogTitle>
+            </DialogHeader>
+
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="space-y-4 py-4">
+                <div className="text-sm text-muted-foreground">
+                  <p>Started: {new Date(operation.started_at!).toLocaleString()}</p>
+                  <p>Duration: {duration} minutes</p>
+                  {operation.expected_duration_minutes && (
+                    <p>Expected: {operation.expected_duration_minutes} minutes</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="actual_yield_percent">Actual Yield (%)*</Label>
+                  <Input
+                    id="actual_yield_percent"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                    {...register('actual_yield_percent', { valueAsNumber: true })}
+                  />
+                  {errors.actual_yield_percent && (
+                    <p className="text-sm text-destructive">
+                      {errors.actual_yield_percent.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes (optional)</Label>
+                  <Textarea
+                    id="notes"
+                    {...register('notes')}
+                    placeholder="Add completion notes..."
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Completing...' : 'Complete'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      );
+    }

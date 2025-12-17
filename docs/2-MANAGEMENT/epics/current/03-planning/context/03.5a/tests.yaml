@@ -1,0 +1,439 @@
+# Story 03.5a - Test Specification
+# Purpose: Acceptance criteria, test cases, coverage requirements
+# Agent: QA-AGENT / TEST-WRITER
+
+# Test files to create
+test_files:
+  - path: "apps/frontend/lib/services/__tests__/planning-settings-service.test.ts"
+    type: "unit"
+    description: "Unit tests for planning settings service"
+
+  - path: "apps/frontend/lib/validation/__tests__/planning-settings-schema.test.ts"
+    type: "unit"
+    description: "Unit tests for Zod validation schema"
+
+  - path: "apps/frontend/__tests__/api/settings/planning.test.ts"
+    type: "integration"
+    description: "API route integration tests"
+
+  - path: "apps/frontend/components/settings/__tests__/POApprovalSettings.test.tsx"
+    type: "component"
+    description: "Component tests for POApprovalSettings"
+
+  - path: "supabase/tests/rls-planning-settings.test.sql"
+    type: "integration"
+    description: "RLS policy tests for planning_settings table"
+
+# Acceptance Criteria (from story)
+acceptance_criteria:
+  - id: "AC-01"
+    name: "Planning Settings Page Navigation"
+    given: "admin navigates to /settings/planning"
+    when: "page loads"
+    then: "settings page displays within 300ms"
+    and: "page shows section 'Purchase Order Approval'"
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-02"
+    name: "Default Approval Settings (Fresh Org)"
+    given: "organization has no planning_settings record"
+    when: "planning settings page loads for first time"
+    then: |
+      system creates default settings:
+      - po_require_approval = false
+      - po_approval_threshold = null
+      - po_approval_roles = ['admin', 'manager']
+    and: |
+      UI displays:
+      - Toggle "Require Approval" = OFF
+      - Threshold field = empty (disabled/grayed out)
+      - Role multi-select = "Admin, Manager" (pre-selected)
+    test_type: "integration"
+    priority: "P0"
+
+  - id: "AC-03"
+    name: "Enable PO Approval Toggle"
+    given: "admin is on planning settings page"
+    and: "'Require Approval' toggle is OFF"
+    when: "admin clicks toggle to enable"
+    then: "toggle switches to ON"
+    and: "threshold field becomes enabled (editable)"
+    and: "role multi-select remains enabled"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-04"
+    name: "Disable PO Approval Toggle"
+    given: "admin has approval enabled (po_require_approval = true)"
+    when: "admin clicks toggle to disable"
+    then: "toggle switches to OFF"
+    and: "threshold field becomes disabled (grayed out)"
+    and: "role multi-select remains enabled"
+    and: "threshold value preserved (but not enforced)"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-05"
+    name: "Set Approval Threshold Amount"
+    given: "admin has approval enabled"
+    when: "admin enters threshold '10000.00'"
+    then: "threshold field accepts valid decimal"
+    and: "currency symbol displays based on org default"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-06"
+    name: "Threshold Validation (Positive Number)"
+    given: "admin enters threshold '-500'"
+    when: "save attempted"
+    then: "validation error: 'Threshold must be a positive number'"
+    and: "save blocked"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-07"
+    name: "Threshold Validation (Greater Than Zero)"
+    given: "admin enters threshold '0'"
+    when: "save attempted"
+    then: "validation error: 'Threshold must be greater than zero'"
+    and: "save blocked"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-08"
+    name: "Threshold Validation (Max Precision)"
+    given: "admin enters threshold '12345.6789' (5 decimal places)"
+    when: "save attempted"
+    then: "validation error: 'Threshold can have at most 4 decimal places'"
+    and: "save blocked"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-09"
+    name: "Threshold Optional (Null Allowed)"
+    given: "admin has approval enabled"
+    and: "threshold field is empty"
+    when: "admin saves"
+    then: "settings saved with po_approval_threshold = null"
+    and: "approval applies to ALL POs regardless of amount"
+    test_type: "integration"
+    priority: "P1"
+
+  - id: "AC-10"
+    name: "Role Multi-Select Dropdown"
+    given: "organization has roles: Admin, Manager, Planner, Viewer"
+    when: "admin opens role multi-select dropdown"
+    then: "dropdown displays all 4 roles as checkboxes"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-11"
+    name: "Role Selection"
+    given: "dropdown is open"
+    when: "admin selects 'Admin' and 'Manager'"
+    then: "both roles appear as chips/tags in the field"
+    and: "checkboxes show selected state"
+    test_type: "component"
+    priority: "P0"
+
+  - id: "AC-12"
+    name: "Role Validation (At Least One Required)"
+    given: "admin has all roles deselected"
+    when: "save attempted"
+    then: "validation error: 'At least one approval role must be selected'"
+    and: "save blocked"
+    test_type: "unit"
+    priority: "P0"
+
+  - id: "AC-13"
+    name: "Settings Persistence Across Sessions"
+    given: |
+      admin saves settings:
+      - po_require_approval = true
+      - po_approval_threshold = 5000.00
+      - po_approval_roles = ['admin', 'finance_manager']
+    when: "admin logs out and logs back in"
+    and: "navigates to /settings/planning"
+    then: |
+      all settings display with saved values:
+      - Toggle ON
+      - Threshold "5,000.00"
+      - Roles "Admin, Finance Manager" selected
+    test_type: "e2e"
+    priority: "P0"
+
+  - id: "AC-14"
+    name: "RLS Policy Enforcement"
+    given: "user logged in as Org A"
+    when: "user views planning settings"
+    then: "only Org A's planning_settings record loads"
+    and: "user cannot see/edit Org B's settings via API"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-15"
+    name: "Permission Check (Admin Only)"
+    given: "user with role 'Planner' (non-admin)"
+    when: "user navigates to /settings/planning"
+    then: "access denied with message: 'You do not have permission to access settings'"
+    test_type: "integration"
+    priority: "P0"
+    security: true
+
+  - id: "AC-16"
+    name: "Help Text and Tooltips"
+    given: "admin hovers over 'Require Approval' toggle"
+    when: "hover occurs"
+    then: "tooltip displays: 'When enabled, POs must be approved before confirmation'"
+    test_type: "component"
+    priority: "P2"
+
+# Unit Test Cases
+unit_tests:
+  validation_schema:
+    file: "planning-settings-schema.test.ts"
+    cases:
+      - name: "validates positive threshold"
+        input: { po_approval_threshold: 1000 }
+        expected: "passes"
+
+      - name: "rejects negative threshold"
+        input: { po_approval_threshold: -500 }
+        expected: "fails with 'Threshold must be a positive number'"
+
+      - name: "rejects zero threshold"
+        input: { po_approval_threshold: 0 }
+        expected: "fails with 'Threshold must be greater than zero'"
+
+      - name: "accepts 4 decimal places"
+        input: { po_approval_threshold: 123.4567 }
+        expected: "passes"
+
+      - name: "rejects 5 decimal places"
+        input: { po_approval_threshold: 123.45678 }
+        expected: "fails with 'Threshold can have at most 4 decimal places'"
+
+      - name: "accepts null threshold"
+        input: { po_approval_threshold: null }
+        expected: "passes"
+
+      - name: "validates non-empty roles array"
+        input: { po_approval_roles: ['admin'] }
+        expected: "passes"
+
+      - name: "rejects empty roles array"
+        input: { po_approval_roles: [] }
+        expected: "fails with 'At least one approval role must be selected'"
+
+  service:
+    file: "planning-settings-service.test.ts"
+    cases:
+      - name: "getPlanningSettings returns settings"
+        setup: "Mock successful API response"
+        expected: "Returns PlanningSettings object"
+
+      - name: "getPlanningSettings creates default on 404"
+        setup: "Mock 404 then successful create"
+        expected: "Returns default settings"
+
+      - name: "updatePlanningSettings sends correct payload"
+        setup: "Mock successful PUT response"
+        expected: "Sends validated data to API"
+
+      - name: "updatePlanningSettings handles validation error"
+        setup: "Mock 400 response"
+        expected: "Throws error with validation details"
+
+# Integration Test Cases
+integration_tests:
+  api:
+    file: "api/settings/planning.test.ts"
+    cases:
+      - name: "GET returns settings for authenticated user"
+        setup: "Create org with settings"
+        action: "GET /api/settings/planning"
+        expected: "200 with settings data"
+
+      - name: "GET auto-creates default settings"
+        setup: "Create org without settings"
+        action: "GET /api/settings/planning"
+        expected: "200 with default settings"
+
+      - name: "GET returns 401 for unauthenticated"
+        setup: "No auth token"
+        action: "GET /api/settings/planning"
+        expected: "401 Unauthorized"
+
+      - name: "PUT updates settings for admin"
+        setup: "Create org with admin user"
+        action: "PUT /api/settings/planning with valid data"
+        expected: "200 with updated settings"
+
+      - name: "PUT returns 403 for non-admin"
+        setup: "Create org with planner user"
+        action: "PUT /api/settings/planning"
+        expected: "403 Forbidden"
+
+      - name: "PUT returns 400 for invalid data"
+        setup: "Create org with admin user"
+        action: "PUT /api/settings/planning with invalid threshold"
+        expected: "400 with validation errors"
+
+      - name: "Cross-org access blocked by RLS"
+        setup: "Create Org A and Org B with settings"
+        action: "User A requests Org B settings"
+        expected: "Only Org A settings returned"
+
+  rls:
+    file: "rls-planning-settings.test.sql"
+    cases:
+      - name: "User can read own org settings"
+        setup: "Create Org A with User A and settings"
+        action: "User A selects from planning_settings"
+        expected: "Returns Org A settings"
+
+      - name: "User cannot read other org settings"
+        setup: "Create Org A, Org B with settings"
+        action: "User A selects all from planning_settings"
+        expected: "Only Org A settings returned"
+
+      - name: "Admin can update own org settings"
+        setup: "Create Org A with Admin A"
+        action: "Admin A updates planning_settings"
+        expected: "Update succeeds"
+
+      - name: "Non-admin cannot update settings"
+        setup: "Create Org A with Planner"
+        action: "Planner updates planning_settings"
+        expected: "Update blocked by RLS"
+
+      - name: "Admin cannot update other org settings"
+        setup: "Create Org A with Admin A, Org B"
+        action: "Admin A updates Org B settings"
+        expected: "Update blocked by RLS"
+
+# Component Test Cases
+component_tests:
+  POApprovalSettings:
+    file: "POApprovalSettings.test.tsx"
+    cases:
+      - name: "renders with initial settings"
+        props: { settings: defaultSettings }
+        expected: "Toggle OFF, threshold disabled, roles pre-selected"
+
+      - name: "enables threshold when toggle turned on"
+        action: "Click toggle"
+        expected: "Threshold input becomes enabled"
+
+      - name: "disables threshold when toggle turned off"
+        setup: "Toggle is ON"
+        action: "Click toggle"
+        expected: "Threshold input becomes disabled"
+
+      - name: "shows validation error for negative threshold"
+        action: "Enter -500, blur"
+        expected: "Error message displayed"
+
+      - name: "shows validation error for empty roles"
+        action: "Deselect all roles"
+        expected: "Error message displayed"
+
+      - name: "calls onSave with correct data"
+        action: "Fill form, click save"
+        expected: "onSave called with form values"
+
+      - name: "displays loading state during save"
+        props: { isLoading: true }
+        expected: "Save button disabled with spinner"
+
+      - name: "renders tooltips on hover"
+        action: "Hover over tooltip icon"
+        expected: "Tooltip content displayed"
+
+# E2E Test Cases
+e2e_tests:
+  file: "e2e/settings/planning-settings.spec.ts"
+  cases:
+    - name: "Admin can enable PO approval"
+      steps:
+        - "Login as admin"
+        - "Navigate to /settings/planning"
+        - "Toggle approval ON"
+        - "Enter threshold 5000"
+        - "Click Save"
+      expected: "Toast: 'Planning settings updated successfully'"
+
+    - name: "Admin can configure approval roles"
+      steps:
+        - "Login as admin"
+        - "Navigate to /settings/planning"
+        - "Open roles dropdown"
+        - "Select Admin, Manager, Finance"
+        - "Click Save"
+      expected: "Settings saved with 3 roles"
+
+    - name: "Non-admin cannot access settings"
+      steps:
+        - "Login as planner"
+        - "Navigate to /settings/planning"
+      expected: "Access denied message"
+
+    - name: "Settings persist after refresh"
+      steps:
+        - "Login as admin"
+        - "Configure settings"
+        - "Save"
+        - "Refresh page"
+      expected: "Settings show saved values"
+
+# Definition of Done
+definition_of_done:
+  - "Database migration creates/updates planning_settings table"
+  - "RLS policies enforce org isolation and admin-only writes"
+  - "GET /api/settings/planning auto-creates default settings"
+  - "PUT /api/settings/planning validates and updates settings"
+  - "Zod schemas validate all inputs"
+  - "POApprovalSettings component renders correctly"
+  - "Toggle enables/disables threshold field"
+  - "Multi-select shows all roles with checkboxes"
+  - "Validation errors display inline"
+  - "Success toast on save"
+  - "Admin permission check enforced"
+  - "Unit test coverage >= 80%"
+  - "API integration tests pass"
+  - "Component tests pass"
+  - "RLS isolation verified"
+  - "Performance: Settings load < 300ms"
+  - "Performance: Settings save < 500ms"
+
+# Coverage Requirements
+coverage:
+  unit:
+    target: 80
+    reason: "Settings are configuration critical"
+  integration:
+    target: 70
+    reason: "API and RLS must be tested"
+  files:
+    - "lib/services/planning-settings-service.ts: 80%"
+    - "lib/validation/planning-settings-schema.ts: 95%"
+    - "components/settings/POApprovalSettings.tsx: 70%"
+
+# Risks
+risks:
+  - id: "RISK-01"
+    description: "RLS policy misconfiguration could leak settings"
+    mitigation: "Integration tests with 2+ org fixtures"
+    severity: "medium"
+
+  - id: "RISK-02"
+    description: "Auto-create on GET could cause race condition"
+    mitigation: "Use upsert with ON CONFLICT"
+    severity: "low"
+
+  - id: "RISK-03"
+    description: "Roles in settings may not match actual roles"
+    mitigation: "Soft validation in service (warn but allow)"
+    severity: "low"
