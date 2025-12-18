@@ -19,15 +19,15 @@ export async function GET() {
     // Get user's organization
     const { data: userData } = await supabase
       .from('users')
-      .select('organization_id')
+      .select('org_id')
       .eq('id', user.id)
       .single()
 
-    if (!userData?.organization_id) {
+    if (!userData?.org_id) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
     }
 
-    const orgId = userData.organization_id
+    const orgId = userData.org_id
 
     // Fetch all stats in parallel
     const [
@@ -40,40 +40,39 @@ export async function GET() {
       allergensResult,
       taxCodesResult,
       modulesResult,
-      wizardResult,
       orgResult
     ] = await Promise.all([
       // Users stats
       supabase
         .from('users')
         .select('id, is_active, last_activity_at', { count: 'exact' })
-        .eq('organization_id', orgId),
+        .eq('org_id', orgId),
       // Pending invitations
       supabase
         .from('user_invitations')
         .select('id', { count: 'exact' })
-        .eq('organization_id', orgId)
+        .eq('org_id', orgId)
         .eq('status', 'pending'),
       // Warehouses
       supabase
         .from('warehouses')
         .select('id', { count: 'exact' })
-        .eq('organization_id', orgId),
+        .eq('org_id', orgId),
       // Locations
       supabase
         .from('locations')
         .select('id', { count: 'exact' })
-        .eq('organization_id', orgId),
+        .eq('org_id', orgId),
       // Machines
       supabase
         .from('machines')
         .select('id', { count: 'exact' })
-        .eq('organization_id', orgId),
+        .eq('org_id', orgId),
       // Production Lines
       supabase
         .from('production_lines')
         .select('id', { count: 'exact' })
-        .eq('organization_id', orgId),
+        .eq('org_id', orgId),
       // Allergens (global, no org filter)
       supabase
         .from('allergens')
@@ -86,18 +85,12 @@ export async function GET() {
       supabase
         .from('organization_modules')
         .select('id', { count: 'exact' })
-        .eq('organization_id', orgId)
+        .eq('org_id', orgId)
         .eq('enabled', true),
-      // Wizard progress
-      supabase
-        .from('wizard_progress')
-        .select('current_step, completed')
-        .eq('organization_id', orgId)
-        .single(),
-      // Organization info
+      // Organization info (includes wizard progress)
       supabase
         .from('organizations')
-        .select('name, updated_at')
+        .select('name, updated_at, wizard_completed, wizard_progress')
         .eq('id', orgId)
         .single()
     ])
@@ -121,9 +114,9 @@ export async function GET() {
     }
 
     // Wizard progress percentage
-    const wizardProgress = wizardResult.data?.completed
+    const wizardProgressValue = orgResult.data?.wizard_completed
       ? 100
-      : Math.round(((wizardResult.data?.current_step || 0) / 6) * 100)
+      : Math.round(((orgResult.data?.wizard_progress || 0) / 6) * 100)
 
     const stats = {
       users: {
@@ -145,7 +138,7 @@ export async function GET() {
         activeModules: `${modulesResult.count || 0}/8`
       },
       system: {
-        wizardProgress: `${wizardProgress}%`,
+        wizardProgress: `${wizardProgressValue}%`,
         lastUpdated: formatLastActivity(orgResult.data?.updated_at || null),
         organizationName: orgResult.data?.name || 'N/A',
         subscription: 'Pro' // Placeholder
